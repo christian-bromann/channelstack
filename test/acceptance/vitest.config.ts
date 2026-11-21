@@ -22,7 +22,9 @@ export default defineConfig({
     root: fileURLToPath(new URL("../..", import.meta.url)),
     include: [
       "api/examples/slack.test.ts",
+      "api/examples/github.test.ts",
       "test/acceptance/stack/**/*.test.ts",
+      "test/acceptance/github/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],
     testTimeout: 30_000,

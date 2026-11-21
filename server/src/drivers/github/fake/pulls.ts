@@ -85,7 +85,8 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
   const submitted = (pull: Pull, review: GitHubReviewRecord): void => {
     review.delivery = kit.emit(store.repo(pull.repo), "pull_request_review", review.author, {
       action: "submitted",
-      review: objects.review(review, pull),
+      // The REST API writes a review's state in capitals; webhooks write it in lower case.
+      review: { ...objects.review(review, pull), state: review.state.toLowerCase() },
       pull_request: objects.pullRequest(pull),
     });
   };

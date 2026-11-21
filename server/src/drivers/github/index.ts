@@ -35,7 +35,9 @@ export const github: DriverDefinition = {
         GITHUB_APP_SLUG: fake.store.app.slug,
         GITHUB_INSTALLATION_ID: String(fake.store.app.installationId),
         GITHUB_BOT_USER_ID: String(fake.store.app.botId),
-        GITHUB_PRIVATE_KEY: context.secret("privateKey"),
+        // A PEM in one line, with `\n` for its line breaks: an .env line is one line, and Probot,
+        // Octokit's App auth and most deploy targets take the key this way.
+        GITHUB_PRIVATE_KEY: context.secret("privateKey").replaceAll("\n", "\\n"),
         GITHUB_WEBHOOK_SECRET: context.secret("webhookSecret"),
       }),
     };

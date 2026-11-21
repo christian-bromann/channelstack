@@ -184,6 +184,9 @@ importers:
       '@octokit/openapi-webhooks':
         specifier: 12.2.0
         version: 12.2.0
+      '@octokit/rest':
+        specifier: 22.0.1
+        version: 22.0.1
       '@octokit/webhooks':
         specifier: 14.2.0
         version: 14.2.0
