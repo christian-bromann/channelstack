@@ -10,13 +10,14 @@ import {
   payloadForm,
   slashCommandFields,
 } from "../interaction-payloads.ts";
-import type {
-  SlackControlScope,
-  SlackConversationRecord,
-  SlackMessageInput,
-  SlackMessageRecord,
-  SlackUserRecord,
-  SlackWorld,
+import {
+  NOBODY,
+  type SlackControlScope,
+  type SlackConversationRecord,
+  type SlackMessageInput,
+  type SlackMessageRecord,
+  type SlackUserRecord,
+  type SlackWorld,
 } from "../world.ts";
 import type { SlackStore } from "./store.ts";
 
@@ -48,6 +49,10 @@ export interface InteractionKit {
   ): void;
   remove(conversation: SlackConversationRecord, message: SlackMessageRecord): void;
   action(session: string, name: string, data: Record<string, unknown>): void;
+  /** The person's DM with the app, opened if there is none yet. */
+  directMessage(session: string, userId: string): SlackConversationRecord;
+  /** A person writes in a thread. */
+  replyAsUser: SlackWorld["replyAsUser"];
   /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
 }
@@ -66,7 +71,15 @@ export interface InteractionDispatch {
 
 type Interactions = Pick<
   SlackWorld,
-  "clickAsUser" | "selectAsUser" | "shortcutAsUser" | "commandAsUser" | "stopAsUser"
+  | "clickAsUser"
+  | "selectAsUser"
+  | "shortcutAsUser"
+  | "commandAsUser"
+  | "stopAsUser"
+  | "openAgentThread"
+  | "pickPrompt"
+  | "switchContext"
+  | "suggestedPrompts"
 > & {
   dispatch: InteractionDispatch;
   /**
@@ -318,6 +331,57 @@ export function createInteractions(kit: InteractionKit): Interactions {
       return delivery;
     },
 
+    openAgentThread(session, userId, from) {
+      const user = store.users.get(session, userId);
+      const context = from === undefined ? undefined : store.conversations.get(session, from);
+      const dm = kit.directMessage(session, user.id);
+      // The thread hangs on an anchor nobody sees; what people and the app write are its replies.
+      const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY });
+      kit.action(session, "openAgentThread", { user: user.id, channel: dm.id, ts: anchor.ts });
+      kit.emit(
+        dm,
+        "assistant_thread_started",
+        assistantThreadEvent("assistant_thread_started", user, dm, anchor.ts, context),
+      );
+      return anchor;
+    },
+
+    pickPrompt(session, userId, title, thread) {
+      const conversation = store.conversations.get(session, thread.channel);
+      const prompt = store
+        .threadState(conversation.id, thread.ts)
+        .suggestedPrompts?.find((offered) => offered.title === title);
+      if (!prompt) {
+        const offered = store.threadState(conversation.id, thread.ts).suggestedPrompts ?? [];
+        throw new ProtocolError(
+          "not_found",
+          `No suggested prompt "${title}" there. Suggested: ${offered.length === 0 ? "none" : offered.map((known) => known.title).join(", ")}`,
+        );
+      }
+      return kit.replyAsUser(session, userId, { text: prompt.message }, thread, false);
+    },
+
+    switchContext(session, userId, channel, thread) {
+      const dm = store.conversations.get(session, thread.channel);
+      const user = member(session, userId, dm);
+      const context = store.conversations.get(session, channel);
+      kit.action(session, "switchContext", { user: user.id, channel: context.id, ts: thread.ts });
+      const delivery = kit.emit(
+        dm,
+        "assistant_thread_context_changed",
+        assistantThreadEvent("assistant_thread_context_changed", user, dm, thread.ts, context),
+      );
+      if (delivery === undefined) {
+        throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_context_changed");
+      }
+      return delivery;
+    },
+
+    suggestedPrompts: (session, channel, ts) => {
+      const conversation = store.conversations.get(session, channel);
+      return store.threadState(conversation.id, requireMessage(conversation, ts).threadTs ?? ts).suggestedPrompts ?? [];
+    },
+
     respond(key, body) {
       const url = store.responseUrls.get(key);
       if (!url || url.uses >= RESPONSE_URL_USES || url.expiresAt < clock()) return false;
@@ -339,6 +403,26 @@ export function createInteractions(kit: InteractionKit): Interactions {
       return true;
     },
   };
+
+  /** `assistant_thread_started` and `assistant_thread_context_changed`: who has the view open, where, looking at what. */
+  function assistantThreadEvent(
+    type: string,
+    user: SlackUserRecord,
+    dm: SlackConversationRecord,
+    threadTs: string,
+    looking: SlackConversationRecord | undefined,
+  ): Record<string, unknown> {
+    return {
+      type,
+      assistant_thread: {
+        user_id: user.id,
+        context: { ...(looking ? { channel_id: looking.id } : {}), team_id: store.team.id, enterprise_id: null },
+        channel_id: dm.id,
+        thread_ts: threadTs,
+      },
+      event_ts: ids.slackTs(dm.id),
+    };
+  }
 
   /** A new message from the app in answer to an interaction: for the person alone, unless it is `in_channel`. */
   function publish(

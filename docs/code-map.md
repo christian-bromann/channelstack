@@ -66,7 +66,7 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `blocks.ts` (Slack) | Reading Block Kit: the text and controls a person sees, finding a button or a menu by label or `action_id`, filling in missing `block_id`s and `action_id`s |
 | `views.ts` (Slack) | Reading a modal as a person does: its inputs by label, what is filled in, `state.values` |
 | `fake/views.ts` (Slack) | Modals: `views.open` / `update` / `push`, and a person submitting or closing one. Part of the fake world |
-| `fake/interactions.ts` (Slack) | What a person does beyond writing: clicks, menu choices, shortcuts, slash commands, and the app's answers through `response_url`. Part of the fake world |
+| `fake/interactions.ts` (Slack) | What a person does beyond writing: clicks, menu choices, shortcuts, slash commands, Stop, the agent split view, and the app's answers through `response_url`. Part of the fake world |
 | `transcript.ts` | State → what a person would see |
 | `capabilities.ts` | Per action: fake, live, what live needs |
 

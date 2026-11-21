@@ -6,7 +6,7 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
-import type { SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "../world.ts";
+import { NOBODY, type SlackConversationRecord, type SlackMessageRecord, type SlackUserRecord } from "../world.ts";
 import type { SlackStore } from "./store.ts";
 import { type FakeSlackWorld, SlackRefusal } from "./world.ts";
 
@@ -511,14 +511,19 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
     "conversations.replies": (args) => {
       const conversation = joined(required(args, "channel"));
-      const root = messageIn(conversation, required(args, "ts"));
+      // A split-view thread hangs on an anchor nobody sees: the thread exists, its root isn't shown.
+      const root = store.findMessage(conversation.id, required(args, "ts"));
+      if (!root || (root.ephemeralFor !== undefined && root.ephemeralFor !== NOBODY)) {
+        throw new SlackApiError("thread_not_found");
+      }
       const rootTs = root.threadTs ?? root.ts;
       const thread = store
         .messagesIn(conversation.id)
         .filter((message) => message.threadTs === rootTs && message.ephemeralFor === undefined);
       // The root is always first; the window and the limit apply to the replies under it.
       const { messages, has_more } = page(args, thread);
-      return { messages: [root, ...messages].map(messageOf), has_more, response_metadata: { next_cursor: "" } };
+      const shown = root.ephemeralFor === undefined ? [root, ...messages] : messages;
+      return { messages: shown.map(messageOf), has_more, response_metadata: { next_cursor: "" } };
     },
 
     "conversations.members": (args) => ({

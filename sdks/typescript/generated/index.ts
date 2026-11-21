@@ -24,6 +24,7 @@ export class NotFoundError extends ChannelstackError {}
 export class NotInChannelError extends ChannelstackError {}
 export class NotInRoomError extends ChannelstackError {}
 export class SessionNotFoundError extends ChannelstackError {}
+export class SplitViewUnavailableError extends ChannelstackError {}
 export class StopUnavailableError extends ChannelstackError {}
 export class UnauthorizedError extends ChannelstackError {}
 
@@ -44,6 +45,7 @@ const ERRORS: ErrorClasses = {
   not_in_channel: NotInChannelError,
   not_in_room: NotInRoomError,
   session_not_found: SessionNotFoundError,
+  split_view_unavailable: SplitViewUnavailableError,
   stop_unavailable: StopUnavailableError,
   unauthorized: UnauthorizedError,
 };
@@ -172,6 +174,8 @@ export interface SlackMenuRef {
   label?: string;
   actionId?: string;
 }
+
+export type SlackSuggestedPrompts = Array<{ title: string; message: string }>;
 
 export type SlackModals = SlackModal[];
 
@@ -808,6 +812,27 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
+  /** Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental. */
+  async openAgentThread(options: { from?: SlackConversation } = {}): Promise<SlackThread> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/agent-threads`, { body: { from: options.from === undefined ? undefined : options.from.id } })) as SlackThreadData;
+    return new SlackThread(ctx, data);
+  }
+
+  /** Pick one of the prompts the app suggested in a thread: this person says its message there. Experimental. */
+  async pickPrompt(title: string, options: { thread: SlackThread | SlackMessage }): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/pick-prompt`, { body: { title, thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Look at another channel while the split view stays open: the app is told the new context. Experimental. */
+  async switchContext(channel: SlackConversation, options: { thread: SlackThread | SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/switch-context`, { body: { channel: channel.id, thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
   /** The modals the app has open for this person, the one on top last. Experimental. */
   async modals(): Promise<SlackModals> {
     const ctx = this.#ctx;
@@ -1032,6 +1057,13 @@ export class SlackThread {
     this.channel = data.channel;
     this.ts = data.ts;
     this.conversation = new SlackConversation(ctx, data.conversation);
+  }
+
+  /** The prompts the app suggested in a thread. Experimental. */
+  async suggestedPrompts(): Promise<SlackSuggestedPrompts> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}/suggested-prompts`)) as SlackSuggestedPrompts;
+    return data;
   }
 
   /** Replies in a thread, oldest first, without the message that starts it. Experimental. */

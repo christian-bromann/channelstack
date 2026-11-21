@@ -584,6 +584,67 @@ export function registerSlackRoutes(
       interaction(session.id, world.stopAsUser(session.id, params.user, body.thread)),
   });
 
+  const threadWire = (session: string, anchor: SlackMessageRecord) => ({
+    channel: anchor.conversation,
+    ts: anchor.threadTs ?? anchor.ts,
+    conversation: conversationWire(world.conversation(session, anchor.conversation)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/agent-threads",
+    summary:
+      "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+    params: UserParams,
+    body: z.object({ from: conversationRef.optional() }).openapi("SlackAgentThreadOptions"),
+    response: SlackThread,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      threadWire(session.id, world.openAgentThread(session.id, params.user, body.from)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/pick-prompt",
+    summary: "Pick one of the prompts the app suggested in a thread: this person says its message there",
+    params: UserParams,
+    body: z.object({ title: z.string().min(1), thread: threadRef }).openapi("SlackPickPromptBody"),
+    response: SlackMessage,
+    errors: ["not_found", "not_in_channel"],
+    sdkMethod: { on: "SlackUser", name: "pickPrompt", args: ["title"], options: ["thread"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      messageWire(session.id, world.pickPrompt(session.id, params.user, body.title, body.thread)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/switch-context",
+    summary: "Look at another channel while the split view stays open: the app is told the new context",
+    params: UserParams,
+    body: z.object({ channel: conversationRef, thread: threadRef }).openapi("SlackSwitchContextBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "split_view_unavailable"],
+    sdkMethod: { on: "SlackUser", name: "switchContext", args: ["channel"], options: ["thread"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.switchContext(session.id, params.user, body.channel, body.thread)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/threads/{ts}/suggested-prompts",
+    summary: "The prompts the app suggested in a thread",
+    params: MessageParams,
+    response: z.array(z.object({ title: z.string(), message: z.string() })).openapi("SlackSuggestedPrompts"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackThread", name: "suggestedPrompts", bind: messageBinding },
+    stability,
+    handler: ({ session, params }) => world.suggestedPrompts(session.id, params.channel, params.ts),
+  });
+
   const ViewParams = z.object({ view: z.string().openapi({ param: { name: "view", in: "path" } }) });
   const modalWire = (session: string, view: SlackViewRecord) => {
     const inputs = viewInputs(view.definition.blocks);

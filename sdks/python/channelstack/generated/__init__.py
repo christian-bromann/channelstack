@@ -12,7 +12,7 @@ from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -81,6 +81,10 @@ class SessionNotFoundError(ChannelstackError):
     pass
 
 
+class SplitViewUnavailableError(ChannelstackError):
+    pass
+
+
 class StopUnavailableError(ChannelstackError):
     pass
 
@@ -106,6 +110,7 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "not_in_channel": NotInChannelError,
     "not_in_room": NotInRoomError,
     "session_not_found": SessionNotFoundError,
+    "split_view_unavailable": SplitViewUnavailableError,
     "stop_unavailable": StopUnavailableError,
     "unauthorized": UnauthorizedError,
 }
@@ -391,6 +396,9 @@ class SlackMenuRef:
     def _to_wire(self) -> dict[str, Any]:
         wire = {"label": self.label, "actionId": self.action_id}
         return {key: value for key, value in wire.items() if value is not None}
+
+
+type SlackSuggestedPrompts = list[dict[str, Any]]
 
 
 type SlackModals = list[SlackModal]
@@ -843,6 +851,24 @@ class SlackUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/stop", body={"thread": {"channel": thread.channel, "ts": thread.ts}})
         return SlackDelivery(ctx, data)
 
+    async def open_agent_thread(self, *, from_: SlackConversation | None = None) -> SlackThread:
+        """Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/agent-threads", body={"from": None if from_ is None else from_.id})
+        return SlackThread(ctx, data)
+
+    async def pick_prompt(self, title: str, *, thread: SlackThread | SlackMessage) -> SlackMessage:
+        """Pick one of the prompts the app suggested in a thread: this person says its message there. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/pick-prompt", body={"title": title, "thread": {"channel": thread.channel, "ts": thread.ts}})
+        return SlackMessage(ctx, data)
+
+    async def switch_context(self, channel: SlackConversation, *, thread: SlackThread | SlackMessage) -> SlackDelivery:
+        """Look at another channel while the split view stays open: the app is told the new context. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/switch-context", body={"channel": channel.id, "thread": {"channel": thread.channel, "ts": thread.ts}})
+        return SlackDelivery(ctx, data)
+
     async def modals(self) -> SlackModals:
         """The modals the app has open for this person, the one on top last. Experimental."""
         ctx = self._ctx
@@ -974,6 +1000,12 @@ class SlackThread:
         self.channel: str = data["channel"]
         self.ts: str = data["ts"]
         self.conversation: SlackConversation = SlackConversation(ctx, data["conversation"])
+
+    async def suggested_prompts(self) -> SlackSuggestedPrompts:
+        """The prompts the app suggested in a thread. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/suggested-prompts")
+        return data
 
     async def replies(self) -> SlackReplies:
         """Replies in a thread, oldest first, without the message that starts it. Experimental."""

@@ -549,3 +549,78 @@ describe("Stop", () => {
     expect(JSON.parse(agent.received.at(-1)?.body ?? "{}").event.streaming_message_ts).toEqual([]);
   });
 });
+
+describe("the agent split view", () => {
+  test("opening it starts a thread in the DM, the app offers prompts, and the person picks one", async () => {
+    const { h, agent, app, team, ana, channel, api, post, get } = await workspace();
+    const events = () => agent.received.map(({ body }) => JSON.parse(body).event);
+
+    const thread = await post(`/users/${ana.id}/agent-threads`, { from: channel.id });
+    await h.app.settled();
+
+    expect(thread.conversation.kind).toBe("im");
+    expect(events().at(-1)).toMatchObject({
+      type: "assistant_thread_started",
+      assistant_thread: {
+        user_id: ana.id,
+        context: { channel_id: channel.id, team_id: team.id },
+        channel_id: thread.channel,
+        thread_ts: thread.ts,
+      },
+    });
+    // The thread is empty until someone writes in it.
+    const base = `/conversations/${thread.channel}/threads/${thread.ts}`;
+    expect(await get(`${base}/replies`)).toEqual([]);
+    expect((await get(`${base}/transcript`)).text).toBe("");
+    expect(await get(`${base}/suggested-prompts`)).toEqual([]);
+
+    const prompts = [{ title: "What changed?", message: "What changed in this channel today?" }];
+    expect(
+      await api("assistant.threads.setSuggestedPrompts", { channel_id: thread.channel, thread_ts: thread.ts, prompts }),
+    ).toEqual({ ok: true });
+    expect(await get(`${base}/suggested-prompts`)).toEqual(prompts);
+
+    // Picking a prompt is the person saying its message in the thread.
+    const picked = await post(`/users/${ana.id}/pick-prompt`, {
+      title: "What changed?",
+      thread: { channel: thread.channel, ts: thread.ts },
+    });
+    await h.app.settled();
+    expect(picked).toMatchObject({
+      text: "What changed in this channel today?",
+      threadTs: thread.ts,
+      author: { id: ana.id },
+    });
+    expect(events().at(-1)).toMatchObject({ type: "message", channel_type: "im", thread_ts: thread.ts, user: ana.id });
+    expect(
+      await refusal(
+        post(`/users/${ana.id}/pick-prompt`, { title: "Nope", thread: { channel: thread.channel, ts: thread.ts } }),
+      ),
+    ).toBe("not_found");
+    expect(app.id).toBeDefined();
+  });
+
+  test("moving to another channel with the view open tells the app the new context", async () => {
+    const { h, agent, app, ana, team, channel, post } = await workspace();
+    const thread = await post(`/users/${ana.id}/agent-threads`, {});
+    const general = await post("/channels", { name: "general", participants: [ana.id, app.id] });
+
+    const switched = await post(`/users/${ana.id}/switch-context`, {
+      channel: general.id,
+      thread: { channel: thread.channel, ts: thread.ts },
+    });
+    await h.app.settled();
+
+    expect(switched).toMatchObject({ type: "event_callback", eventType: "assistant_thread_context_changed" });
+    expect(JSON.parse(agent.received.at(-1)?.body ?? "{}").event).toMatchObject({
+      type: "assistant_thread_context_changed",
+      assistant_thread: {
+        user_id: ana.id,
+        context: { channel_id: general.id, team_id: team.id },
+        channel_id: thread.channel,
+        thread_ts: thread.ts,
+      },
+    });
+    expect(channel.id).not.toBe(general.id);
+  });
+});

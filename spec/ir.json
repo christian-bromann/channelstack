@@ -1889,6 +1889,173 @@
           "dispose": false
         },
         {
+          "name": "openAgentThread",
+          "kind": "method",
+          "summary": "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/agent-threads",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "from",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackThread"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "pickPrompt",
+          "kind": "method",
+          "summary": "Pick one of the prompts the app suggested in a thread: this person says its message there",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/pick-prompt",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "switchContext",
+          "kind": "method",
+          "summary": "Look at another channel while the split view stays open: the app is told the new context",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/switch-context",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "split_view_unavailable"
+          ],
+          "dispose": false
+        },
+        {
           "name": "modals",
           "kind": "method",
           "summary": "The modals the app has open for this person, the one on top last",
@@ -2796,6 +2963,46 @@
         }
       ],
       "methods": [
+        {
+          "name": "suggestedPrompts",
+          "kind": "method",
+          "summary": "The prompts the app suggested in a thread",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/suggested-prompts",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackSuggestedPrompts"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
         {
           "name": "replies",
           "kind": "method",
@@ -4206,6 +4413,31 @@
       }
     },
     {
+      "name": "SlackSuggestedPrompts",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "object",
+          "fields": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "SlackModals",
       "type": {
         "kind": "array",
@@ -4690,6 +4922,7 @@
     "not_in_channel",
     "not_in_room",
     "session_not_found",
+    "split_view_unavailable",
     "stop_unavailable",
     "unauthorized"
   ]

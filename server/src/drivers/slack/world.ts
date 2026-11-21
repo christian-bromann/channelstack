@@ -116,6 +116,12 @@ export interface SlackThreadState {
   suggestedPrompts?: Array<{ title: string; message: string }>;
 }
 
+/**
+ * "Visible to" for a message nobody sees: the anchor a split-view thread hangs on. Slack has such
+ * a root too; it holds the thread together and is never shown.
+ */
+export const NOBODY = "U00000000";
+
 /** A modal the app opened for one person, for as long as it is open. */
 export interface SlackViewRecord {
   readonly id: string;
@@ -233,6 +239,18 @@ export interface SlackWorld {
 
   /** Press Stop on the app's work in a thread: open streams end, and the app is told. Returns the delivery. */
   stopAsUser(session: string, user: string, thread: { channel: string; ts: string }): string;
+
+  /**
+   * Open the app's split view: a new thread in the person's DM with the app, started from the
+   * channel they are looking at (if any). Returns the thread's anchor.
+   */
+  openAgentThread(session: string, user: string, from: string | undefined): SlackMessageRecord;
+  /** Pick one of the prompts the app suggested in a thread: the person says its message there. */
+  pickPrompt(session: string, user: string, title: string, thread: { channel: string; ts: string }): SlackMessageRecord;
+  /** Look at another channel while the split view stays open. Returns the delivery that tells the app. */
+  switchContext(session: string, user: string, channel: string, thread: { channel: string; ts: string }): string;
+  /** The prompts the app suggested in a thread. */
+  suggestedPrompts(session: string, channel: string, ts: string): Array<{ title: string; message: string }>;
 
   /** The modals open for a person, the one on top last. */
   modals(session: string, user: string): SlackViewRecord[];
