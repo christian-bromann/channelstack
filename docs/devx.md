@@ -464,7 +464,7 @@ portless trusts its CA in the system store, but not every runtime reads that sto
 | `@channelstack/wdio-service` | WebdriverIO service and `expect-webdriverio` matchers |
 | `pytest-channelstack` | pytest plugin: fixtures and assertion helpers over the control API |
 
-> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 3.2 and Jest 30. Examples are in `api/examples/`.
+> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5 and Jest 30. Examples are in `api/examples/`.
 
 ## 13. Settled since the first draft
 
