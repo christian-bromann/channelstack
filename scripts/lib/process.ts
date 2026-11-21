@@ -59,21 +59,3 @@ export function freePort(): Promise<number> {
     });
   });
 }
-
-/**
- * Poll until `probe` returns a value. For processes that take a moment to listen: a probe that
- * rejects (connection refused) counts as "not yet", a probe that throws synchronously ends the wait.
- */
-export async function eventually<T>(
-  what: string,
-  probe: () => Promise<T | undefined> | T | undefined,
-  timeoutMs = 30_000,
-): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const value = await Promise.resolve(probe()).catch(() => undefined);
-    if (value !== undefined) return value;
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-}

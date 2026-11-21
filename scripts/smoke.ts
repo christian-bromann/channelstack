@@ -11,9 +11,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
+import { waitFor } from "../sdks/typescript/runtime/wait.ts";
 import { ROOT } from "./lib/generate.ts";
 import { binaryPath } from "./lib/packages.ts";
-import { background, capture, eventually, freePort, run } from "./lib/process.ts";
+import { background, capture, freePort, run } from "./lib/process.ts";
+import { startBinary } from "./lib/server.ts";
 
 export type Sdk = "typescript" | "python";
 export const SDKS: readonly Sdk[] = ["typescript", "python"];
@@ -64,19 +66,15 @@ export async function runSmoke(options: SmokeOptions): Promise<void> {
   const base: NodeJS.ProcessEnv = { ...process.env, CHANNELSTACK_HOME: home, CHANNELSTACK_LOG_LEVEL: "warn" };
   delete base.CHANNELSTACK_URL;
   delete base.CHANNELSTACK_TOKEN;
-  const stops: Array<() => Promise<void>> = [];
+  const stops: Array<() => Promise<unknown>> = [];
   try {
     const agentPort = await freePort();
-    const server = background(bin, ["start", "--no-portless", "--port", "0"], {
-      ...base,
-      CHANNELSTACK_ECHO_WEBHOOK_URL: `http://127.0.0.1:${agentPort}/echo/events`,
+    const server = await startBinary({
+      bin,
+      home,
+      env: { ...base, CHANNELSTACK_ECHO_WEBHOOK_URL: `http://127.0.0.1:${agentPort}/echo/events` },
     });
     stops.push(server.stop);
-    await eventually("the server to start", () => {
-      if (server.child.exitCode !== null || server.child.signalCode !== null)
-        throw new Error(`${bin} exited before it was ready`);
-      return existsSync(join(home, "server.json")) ? true : undefined;
-    });
 
     // The agent gets its configuration the way a developer's agent does: from `channelstack env`.
     const agentEnv = Object.fromEntries(
@@ -87,8 +85,11 @@ export async function runSmoke(options: SmokeOptions): Promise<void> {
     );
     const agent = background(process.execPath, [AGENT], { ...process.env, ...agentEnv, PORT: String(agentPort) });
     stops.push(agent.stop);
-    await eventually("the echo agent to listen", async () =>
-      (await fetch(`http://127.0.0.1:${agentPort}/`)).ok ? true : undefined,
+    await waitFor("the echo agent to listen", () =>
+      fetch(`http://127.0.0.1:${agentPort}/`).then(
+        (response) => (response.ok ? true : undefined),
+        () => undefined,
+      ),
     );
 
     for (const sdk of options.sdks) {

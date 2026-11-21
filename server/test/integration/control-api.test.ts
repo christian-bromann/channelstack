@@ -136,18 +136,53 @@ describe("the CLI", () => {
     expect(cli(["--help"]).stdout).toContain("channelstack secrets rotate");
   });
 
-  test("a private server file leaves the shared one alone", async () => {
-    const home = temporaryHome();
-    const shared = await start({ home });
+  test("a private server file gets its own token, and the shared one is left alone", async () => {
+    const shared = await start();
     const privateFile = join(temporaryHome(), "private.json");
-    const second = await startBinary({
-      home,
+    const second = await start({
+      home: shared.home,
       args: ["--no-portless", "--port", "0", "--server-file", privateFile],
-    }).catch(() => undefined);
-    // startBinary waits for <home>/server.json, which already exists, so read the private file directly.
-    await second?.stop();
-    expect(JSON.parse(readFileSync(join(home, "server.json"), "utf8")).token).toBe(shared.token);
+      serverFile: privateFile,
+    });
+
+    expect(second.url).not.toBe(shared.url);
+    expect(second.token).not.toBe(shared.token);
+    expect((await second.control("GET", "/status")).status).toBe(200);
+    expect((await second.control("GET", "/status", undefined, shared.token)).status).toBe(401);
+    if (posix) expect(statSync(privateFile).mode & 0o777).toBe(0o600);
+    // Both servers accept the same fake tokens: the agent is configured once per install.
+    expect((await second.control("GET", "/env")).body.ECHO_APP_TOKEN).toBe(
+      (await shared.control("GET", "/env")).body.ECHO_APP_TOKEN,
+    );
+
+    expect(await second.stop()).toBe(0);
+    expect(existsSync(privateFile)).toBe(false);
+    expect(JSON.parse(readFileSync(join(shared.home, "server.json"), "utf8")).token).toBe(shared.token);
     expect((await shared.control("GET", "/status")).status).toBe(200);
+  });
+
+  test("a second default server is refused while the first one runs, and takes over once it is gone", async () => {
+    const first = await start();
+    await expect(startBinary({ home: first.home })).rejects.toThrow(
+      /already running \(pid \d+, http:\/\/127\.0\.0\.1:\d+\).*--server-file/s,
+    );
+    // The refused start changed nothing for the first server.
+    expect(JSON.parse(readFileSync(join(first.home, "server.json"), "utf8")).token).toBe(first.token);
+    expect((await first.control("GET", "/status")).status).toBe(200);
+
+    // A server that was killed leaves its file behind; the next start replaces it.
+    first.child.kill("SIGKILL");
+    await new Promise((resolve) => first.child.once("exit", resolve));
+    expect(existsSync(join(first.home, "server.json"))).toBe(true);
+    const next = await start({ home: first.home });
+    expect(next.token).not.toBe(first.token);
+    expect((await next.control("GET", "/status")).status).toBe(200);
+  });
+
+  test("a secrets.json that isn't JSON stops the start with a message that names the file", async () => {
+    const home = temporaryHome();
+    writeFileSync(join(home, "secrets.json"), '{"version":1,"secr');
+    await expect(startBinary({ home })).rejects.toThrow(/secrets\.json is not valid JSON\. Delete it/);
   });
 });
 
