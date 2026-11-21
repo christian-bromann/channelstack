@@ -10,3 +10,7 @@ allowBuilds:
   # The bun package fetches the Bun binary for this platform when it installs.
   bun: true
   esbuild: false
+  # WebdriverIO brings drivers for every browser. The UI test runs in Chrome, whose driver needs no
+  # install script, so the Edge and Firefox drivers aren't downloaded.
+  edgedriver: false
+  geckodriver: false
