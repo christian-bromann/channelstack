@@ -14,9 +14,10 @@ import { Check, Pause, Play, Replay } from "./Icons";
 import { GitHubMock, LinearMock, type MockProps, NotionMock, SlackMock } from "./Mocks";
 
 type Lang = "ts" | "py";
-const LANGS: Array<{ id: Lang; label: string; name: string }> = [
-  { id: "ts", label: "TS", name: "TypeScript" },
-  { id: "py", label: "Py", name: "Python" },
+/** The switch shows each language's official logo, unmodified (public/logos/SOURCES.md). */
+const LANGS: Array<{ id: Lang; name: string; logo: string }> = [
+  { id: "ts", name: "TypeScript", logo: "/logos/typescript.svg" },
+  { id: "py", name: "Python", logo: "/logos/python.svg" },
 ];
 
 interface Example {
@@ -137,7 +138,7 @@ function Panel({ example, active, step, lang, onLang, controls }: { example: Exa
           <span className="lang" role="group" aria-label="Language">
             {LANGS.map((item) => (
               <button key={item.id} type="button" aria-pressed={item.id === lang} aria-label={item.name} title={item.name} onClick={() => onLang(item.id)}>
-                {item.label}
+                <img src={item.logo} alt="" width="18" height="18" decoding="async" />
               </button>
             ))}
           </span>
