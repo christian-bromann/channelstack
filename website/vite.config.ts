@@ -15,5 +15,7 @@ export default defineConfig({
     react(),
   ],
   build: { cssCodeSplit: false, assetsInlineLimit: 0 },
-  ssgOptions: { dirStyle: "flat", script: "async", formatting: "none" },
+  // script "sync": a plain module script runs after the document is parsed, so the inline data
+  // the prerenderer writes at the end of <body> is always there before the app starts.
+  ssgOptions: { dirStyle: "flat", script: "sync", formatting: "none" },
 });

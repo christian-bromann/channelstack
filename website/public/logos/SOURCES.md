@@ -1,10 +1,13 @@
-# Channel logos
+# Logos
 
-The channel cards on the home page show each platform's official mark, to say "channelstack works
-with this platform". Every file here is the unmodified official file, byte for byte, taken from the
-company's own brand or media kit on 2026-11-20.
+Third-party logos on the site, each the unmodified official file, byte for byte, taken from its
+owner's own brand or media kit on 2026-11-20:
 
-| File | Channel | Official source | Path inside the kit | Used on | SHA-256 |
+- the four platform marks on the channel cards of the home page, to say "channelstack works with
+  this platform";
+- the TypeScript and Python marks on the language switch of the example player.
+
+| File | Used for | Official source | Path inside the kit | Used on | SHA-256 |
 |---|---|---|---|---|---|
 | `slack.svg` | Slack | Media kit linked from https://slack.com/media-kit | `SLA-Slack-icon-RGB.svg` | light and dark | `08f20f65a7d900c40358ca441caa7b834d82083356aa40d1f17d0844e8b3f73f` |
 | `github.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub Logos/SVG/GitHub_Invertocat_Black.svg` | light | `693d7abe6f899646cc2e96856723b45e95f71885a54910b2749f6decdf7e1ee1` |
@@ -12,7 +15,6 @@ company's own brand or media kit on 2026-11-20.
 | `linear.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-dark.svg` | light | `e683e95a5eb9b360ae06360c0350fd1b5fcf3d2222ef9de8e71fa0bc413dccc3` |
 | `linear-light.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-light.svg` | dark | `32f9883452188b39787f8242c7bfce723ded255f35f13254e727871d3dae2fd1` |
 | `notion.svg` | Notion | `NotionLogoFiles.zip` on https://notion.notion.site/Media-Kit-205535b1d9c4440497a3d7a2ac096286 | `notion-logo-block-main.svg` | light and dark | `840a6f78e87f39cc4a4b0743a00cc6fd82c07ba5dc51d778d7976b6575bcf4fb` |
-
 | `typescript.svg` | TypeScript (TS \| Py switch) | Asset pack on https://www.typescriptlang.org/branding/ | `ts-logo-128.svg` | light and dark | `25e995fa85ae9ff6b5749f4ffeb21b2fe71d74e9b8d8db8eac4b9732cd9ef287` |
 | `python.svg` | Python (TS \| Py switch) | "SVG format of only two snakes" on https://www.python.org/community/logos/ | `python-logo-only.svg` | light and dark | `baec8662a1461c2cacc326b54d2727cb2f1ce07ba02d00f5b826d035104f649f` |
 
@@ -22,7 +24,7 @@ To re-check a file, download the kit, and compare `shasum -a 256` of the file at
 
 Summaries are paraphrased; read the linked page before changing how a mark is used.
 
-| Channel | Guidelines | What they say about "works with" use on a third-party site |
+| Channel | Guidelines | What they say about this use on a third-party site |
 |---|---|---|
 | Slack | https://slack.com/terms-of-service/slack-brand | Text statements that an app integrates with Slack are allowed. The terms say not to use the Slack logo without a licence; other uses need a request to Slack with a mockup. |
 | GitHub | https://brand.github.com/foundations/logo, https://docs.github.com/en/site-policy/other-site-policies/github-logo-policy | "Show integration" is listed as an allowed use of a permitted logo; the same page also asks for prior written permission. Black or white mark only. |
