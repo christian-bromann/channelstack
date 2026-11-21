@@ -281,3 +281,225 @@ describe("shortcuts and slash commands", () => {
     expect(await get(`/users/${ana.id}/ephemeral`)).toHaveLength(1);
   });
 });
+
+const INCIDENT_VIEW = {
+  type: "modal",
+  callback_id: "incident",
+  private_metadata: "C123",
+  notify_on_close: true,
+  title: { type: "plain_text", text: "File an incident" },
+  submit: { type: "plain_text", text: "File" },
+  close: { type: "plain_text", text: "Cancel" },
+  blocks: [
+    {
+      type: "input",
+      block_id: "severity",
+      label: { type: "plain_text", text: "Severity" },
+      element: {
+        type: "static_select",
+        action_id: "pick",
+        initial_option: { text: { type: "plain_text", text: "SEV3" }, value: "sev3" },
+        options: ["SEV1", "SEV2", "SEV3"].map((text) => ({
+          text: { type: "plain_text", text },
+          value: text.toLowerCase(),
+        })),
+      },
+    },
+    {
+      type: "input",
+      block_id: "summary",
+      label: { type: "plain_text", text: "Summary" },
+      element: { type: "plain_text_input", action_id: "text" },
+    },
+    {
+      type: "input",
+      block_id: "teams",
+      optional: true,
+      label: { type: "plain_text", text: "Teams" },
+      element: {
+        type: "multi_static_select",
+        action_id: "teams",
+        options: ["web", "api"].map((text) => ({ text: { type: "plain_text", text }, value: text })),
+      },
+    },
+  ],
+};
+
+describe("modals", () => {
+  /** Ana clicks "Open form"; the agent has three seconds to open a modal with the click's trigger_id. */
+  async function clicked() {
+    const space = await workspace();
+    const { h, ana, channel, api, post } = space;
+    const blocks = [
+      {
+        type: "actions",
+        elements: [{ type: "button", action_id: "open_form", text: { type: "plain_text", text: "Open form" } }],
+      },
+    ];
+    await api("chat.postMessage", { channel: channel.id, text: "File an incident?", blocks });
+    await h.app.settled();
+    await post(`/users/${ana.id}/click`, { button: { label: "Open form" }, channel: channel.id });
+    await h.app.settled();
+    return { ...space, triggerId: space.last().payload.trigger_id as string };
+  }
+
+  test("views.open with a fresh trigger_id opens a modal for the person who clicked", async () => {
+    const { ana, app, team, api, get, triggerId } = await clicked();
+    expect(await get(`/users/${ana.id}/modals`)).toEqual([]);
+
+    const opened = await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW });
+    expect(opened).toMatchObject({
+      ok: true,
+      view: {
+        id: expect.stringMatching(/^V0[0-9A-Z]{9}$/),
+        team_id: team.id,
+        type: "modal",
+        callback_id: "incident",
+        private_metadata: "C123",
+        title: { text: "File an incident" },
+        state: { values: {} },
+        app_id: app.id,
+        bot_id: app.botId,
+        notify_on_close: true,
+        previous_view_id: null,
+      },
+    });
+    expect(opened.view.root_view_id).toBe(opened.view.id);
+    expect(opened.view.hash).toMatch(/^\d+\.[0-9a-zA-Z]+$/);
+
+    const [modal] = await get(`/users/${ana.id}/modals`);
+    expect(modal).toMatchObject({ viewId: opened.view.id, title: "File an incident", user: { id: ana.id } });
+    // What a person sees in the form: each input by its label, with what is filled in so far.
+    expect(await get(`/modals/${modal.viewId}/values`)).toEqual({ Severity: "SEV3", Summary: undefined, Teams: [] });
+
+    // A trigger_id works once, for three seconds, and only if Slack issued it.
+    expect((await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW })).error).toBe(
+      "exchanged_trigger_id",
+    );
+    expect((await api("views.open", { trigger_id: "1.2.abc", view: INCIDENT_VIEW })).error).toBe("invalid_trigger_id");
+    expect((await api("views.open", { trigger_id: triggerId })).error).toBe("invalid_arguments");
+  });
+
+  test("a trigger_id expires after three seconds", async () => {
+    const { h, api, triggerId } = await clicked();
+    h.clock.advance(3001);
+    expect((await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW })).error).toBe("expired_trigger_id");
+  });
+
+  test("submitting sends view_submission with the state; an empty answer closes the modal", async () => {
+    const { h, agent, ana, app, api, get, post, last, triggerId } = await clicked();
+    const { view } = await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW });
+    // An acknowledgement with an empty body, as Bolt's `ack()` sends it.
+    agent.respond = () => ({ status: 200 });
+
+    const submitted = await post(`/modals/${view.id}/submit`, {
+      values: { Severity: "SEV2", Summary: "Checkout errors", Teams: ["web", "api"] },
+    });
+    await h.app.settled();
+
+    expect(submitted).toMatchObject({ type: "view_submission" });
+    const { delivery, payload } = last();
+    expect(signedBy(delivery, app.signingSecret)).toBe(true);
+    expect(payload).toMatchObject({
+      type: "view_submission",
+      user: { id: ana.id },
+      view: {
+        id: view.id,
+        callback_id: "incident",
+        private_metadata: "C123",
+        state: {
+          values: {
+            severity: { pick: { type: "static_select", selected_option: { text: { text: "SEV2" }, value: "sev2" } } },
+            summary: { text: { type: "plain_text_input", value: "Checkout errors" } },
+            teams: { teams: { type: "multi_static_select", selected_options: [{ value: "web" }, { value: "api" }] } },
+          },
+        },
+      },
+      response_urls: [],
+    });
+    expect(payload.trigger_id).toBeDefined();
+    expect(await get(`/users/${ana.id}/modals`)).toEqual([]);
+    expect((await api("views.update", { view_id: view.id, view: INCIDENT_VIEW })).error).toBe("not_found");
+  });
+
+  test("the app's response_action comes back in the response body: errors keep the modal open, update replaces it", async () => {
+    const { h, agent, ana, api, get, post, triggerId } = await clicked();
+    const { view } = await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW });
+    const json = (body: unknown) => ({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    agent.respond = () => json({ response_action: "errors", errors: { summary: "Say what is broken" } });
+    const refused = await post(`/modals/${view.id}/submit`, { values: { Severity: "SEV1", Summary: "?" } });
+    await h.app.settled();
+    expect((await get(`/deliveries/${refused.id}`)).attempts[0].responseBody).toBe(
+      '{"response_action":"errors","errors":{"summary":"Say what is broken"}}',
+    );
+    const [open] = await get(`/users/${ana.id}/modals`);
+    expect(open).toMatchObject({ viewId: view.id, errors: { Summary: "Say what is broken" } });
+    // An answer that is neither empty nor JSON leaves the modal as it is: the person sees an error in the client.
+    agent.respond = () => ({ status: 200, body: "ok" });
+    await post(`/modals/${view.id}/submit`);
+    await h.app.settled();
+    expect(await get(`/users/${ana.id}/modals`)).toHaveLength(1);
+    // What was filled in stays filled in.
+    expect((await get(`/modals/${view.id}/values`)).Severity).toBe("SEV1");
+
+    const thanks = { type: "modal", title: { type: "plain_text", text: "Filed" }, blocks: [] };
+    agent.respond = () => json({ response_action: "update", view: thanks });
+    await post(`/modals/${view.id}/submit`, { values: { Summary: "Checkout errors" } });
+    await h.app.settled();
+    expect(await get(`/users/${ana.id}/modals`)).toMatchObject([{ viewId: view.id, title: "Filed" }]);
+
+    // Required inputs must be filled, as in the client, and unknown inputs are refused.
+    agent.respond = () => ({ status: 200 });
+    expect(await refusal(post(`/modals/${view.id}/submit`, { values: { Nope: "x" } }))).toBe("not_found");
+  });
+
+  test("a required input left empty stops the submission in the client", async () => {
+    const { ana, api, get, post, triggerId } = await clicked();
+    const { view } = await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW });
+    const attempt = post(`/modals/${view.id}/submit`, { values: { Severity: "SEV1" } });
+    expect(await refusal(attempt)).toBe("invalid_argument");
+    await expect(attempt).rejects.toMatchObject({ body: { message: expect.stringContaining("Summary") } });
+    expect(await get(`/users/${ana.id}/modals`)).toHaveLength(1);
+  });
+
+  test("closing tells the app when it asked to be told; views.update changes an open modal", async () => {
+    const { h, agent, ana, api, get, post, last, triggerId } = await clicked();
+    const { view } = await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW });
+
+    const updated = await api("views.update", {
+      view_id: view.id,
+      hash: view.hash,
+      view: { ...INCIDENT_VIEW, title: { type: "plain_text", text: "File a big incident" } },
+    });
+    expect(updated.view).toMatchObject({ id: view.id, title: { text: "File a big incident" } });
+    expect(updated.view.hash).not.toBe(view.hash);
+    // An update made against an older version of the view is refused.
+    expect((await api("views.update", { view_id: view.id, hash: view.hash, view: INCIDENT_VIEW })).error).toBe(
+      "hash_conflict",
+    );
+
+    const closed = await post(`/modals/${view.id}/close`);
+    await h.app.settled();
+    expect(closed).toMatchObject({ type: "view_closed" });
+    expect(last().payload).toMatchObject({ type: "view_closed", view: { id: view.id }, is_cleared: false });
+    expect(await get(`/users/${ana.id}/modals`)).toEqual([]);
+
+    // Without notify_on_close the app hears nothing, and there is no delivery to hand back.
+    const channel = (await get("/conversations"))[0].id;
+    await post(`/users/${ana.id}/click`, { button: { label: "Open form" }, channel });
+    await h.app.settled();
+    const quiet = await api("views.open", {
+      trigger_id: last().payload.trigger_id,
+      view: { ...INCIDENT_VIEW, notify_on_close: false },
+    });
+    const before = agent.received.length;
+    expect(await post(`/modals/${quiet.view.id}/close`)).toBeNull();
+    await h.app.settled();
+    expect(agent.received).toHaveLength(before);
+  });
+});

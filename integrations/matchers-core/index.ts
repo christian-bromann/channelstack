@@ -308,6 +308,17 @@ export const matchers = {
     });
   },
 
+  /** Subject: a person. The agent has a modal open for them, with this title if one is given. */
+  toHaveOpenedModal(state: MatcherState, subject: unknown, title?: string | RegExp, options?: Timing) {
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => (subject as { modals(): Promise<Array<{ title: string }>> }).modals(),
+      holds: (modals) => modals.some((modal) => textMatches(modal.title, title)),
+      describe: (modals) =>
+        `Expected ${state.isNot ? "no" : "a"} modal${title === undefined ? "" : ` titled ${show(title)}`} to be open. Open: ${modals.length === 0 ? "none" : modals.map((modal) => JSON.stringify(modal.title)).join(", ")}`,
+    });
+  },
+
   /** Only this person can see the message. */
   async toBeEphemeralFor(
     state: MatcherState,

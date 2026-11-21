@@ -3,7 +3,7 @@ import { ClientBase, connectWith, disposeQuietly, type HandleContext, printsAs, 
 import { type Duration, parseDuration } from "../runtime/duration.ts";
 import type { LaunchOptions } from "../runtime/launcher.ts";
 import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";
-import { describeWait, fromMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, type QuietState } from "../runtime/wait.ts";
+import { describeWait, fromMatches, textMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, type QuietState } from "../runtime/wait.ts";
 
 /** The server version this SDK was generated for. */
 export const VERSION = "0.0.0";
@@ -170,6 +170,16 @@ export interface SlackMenuRef {
   label?: string;
   actionId?: string;
 }
+
+export type SlackModals = SlackModal[];
+
+export type SlackModalsWire = SlackModalData[];
+
+function decodeSlackModals(ctx: HandleContext, data: SlackModalsWire): SlackModals {
+  return data.map((item) => new SlackModal(ctx, item));
+}
+
+export type SlackModalValues = Record<string, string | string[]>;
 
 export type SlackMessages = SlackMessage[];
 
@@ -719,6 +729,7 @@ export class SlackUser {
   readonly isAdmin: boolean;
   readonly isBot: boolean;
   readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
 
   /** @internal Handles come from the SDK, never from `new`. */
   constructor(ctx: HandleContext, data: SlackUserData) {
@@ -788,6 +799,13 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
+  /** The modals the app has open for this person, the one on top last. Experimental. */
+  async modals(): Promise<SlackModals> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/modals`)) as SlackModalsWire;
+    return decodeSlackModals(ctx, data);
+  }
+
   /** Add an emoji reaction to a message. Experimental. */
   async react(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
     const ctx = this.#ctx;
@@ -826,6 +844,11 @@ export class SlackUser {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/ephemeral`)) as SlackEphemeralMessagesWire;
     return decodeSlackEphemeralMessages(ctx, data);
+  }
+
+  /** Wait for the next new modal from the agent, after the last one this handle saw. */
+  async waitForModal(options: { title?: string | RegExp } & WaitOptions = {}): Promise<SlackModal> {
+    return waitForNext(this.#seen, "waitForModal", () => this.modals(), (item) => textMatches(item.title, options.title), "a modal from the agent", options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1153,6 +1176,60 @@ export class SlackStream {
       const value = await this.refresh();
       return value.state === "open" ? undefined : value;
     }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link SlackModal}. */
+export interface SlackModalData {
+  viewId: string;
+  user: SlackUserData;
+  title: string;
+  blocks: unknown[];
+  errors: Record<string, string>;
+}
+
+export class SlackModal {
+  readonly viewId: string;
+  readonly user: SlackUser;
+  readonly title: string;
+  readonly blocks: unknown[];
+  readonly errors: Record<string, string>;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackModalData) {
+    this.#ctx = ctx;
+    this.viewId = data.viewId;
+    this.user = new SlackUser(ctx, data.user);
+    this.title = data.title;
+    this.blocks = data.blocks;
+    this.errors = data.errors;
+  }
+
+  /** What is filled in: each input by its label (or action_id), with the text a person sees in it. Experimental. */
+  async values(): Promise<SlackModalValues> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/values`)) as SlackModalValues;
+    return data;
+  }
+
+  /** Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental. */
+  async submit(options: { values?: Record<string, string | string[]> } = {}): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/submit`, { body: { values: options.values } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Close the modal. The app is told only if it asked to be (`notify_on_close`). Experimental. */
+  async close(): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/close`)) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

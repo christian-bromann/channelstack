@@ -62,6 +62,15 @@ export function fromMatches(author: Author, from: Author | string | undefined): 
   return typeof from === "string" ? author.name === from || author.id === from : author.id === from.id;
 }
 
+/** Does a text match what was asked for: a string it contains, a pattern, or nothing (any text)? */
+export function textMatches(text: string, expected: string | RegExp | undefined): boolean {
+  if (expected === undefined) return true;
+  if (typeof expected === "string") return text.includes(expected);
+  // A pattern with the `g` or `y` flag remembers where it stopped; every test starts afresh.
+  expected.lastIndex = 0;
+  return expected.test(text);
+}
+
 /** "a reply" → "a reply from my-agent", for timeout messages. */
 export function describeWait(what: string, from: Author | string | undefined): string {
   return from === undefined ? what : `${what} from ${typeof from === "string" ? from : from.name}`;

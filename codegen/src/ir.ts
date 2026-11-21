@@ -44,6 +44,8 @@ export interface IrWait {
   not?: string[];
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
+  /** A text field of the item; an option of the same name narrows the wait by a string or a pattern. */
+  text?: string;
   /** The wait's first argument is the read's own options, passed through to it. */
   filter?: true;
   /** What is waited for, for the timeout message. */
@@ -333,6 +335,7 @@ export function buildIr(openapi: Json): Ir {
             read: binding.name,
             item,
             ...(wait.from ? { from: wait.from } : {}),
+            ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
             ...(wait.mode === "until" ? { field: wait.field, not: wait.not } : {}),
             what: wait.what,

@@ -27,8 +27,9 @@ import type {
   SlackUserRecord,
   SlackWorld,
 } from "../world.ts";
-import { createInteractions } from "./interactions.ts";
+import { createInteractions, type InteractionKit } from "./interactions.ts";
 import type { SlackFault, SlackStore } from "./store.ts";
+import { createViews } from "./views.ts";
 
 /** Slack expects an acknowledgement within 3 seconds. */
 const ACK_WINDOW_MS = 3000;
@@ -81,6 +82,10 @@ export interface FakeSlackWorld extends SlackWorld {
     emoji: string,
     direction: "add" | "remove",
   ): string | undefined;
+  /** `views.open` / `views.push`: open a modal for the person whose `trigger_id` this is. Answers with the view. */
+  openView(triggerId: string, view: unknown, onTop: boolean): Record<string, unknown>;
+  /** `views.update`: replace an open modal's definition. */
+  updateView(viewId: string, hash: string | undefined, view: unknown): Record<string, unknown>;
   /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
   respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
@@ -295,7 +300,10 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
   const action = (session: string, name: string, data: Record<string, unknown>) =>
     events.append(session, "slack", "action", { action: name, ...data });
 
-  const world: Omit<FakeSlackWorld, keyof ReturnType<typeof createInteractions>> = {
+  const world: Omit<
+    FakeSlackWorld,
+    keyof ReturnType<typeof createInteractions> | keyof ReturnType<typeof createViews>
+  > = {
     team: () => store.team,
     app: () => store.app,
     emit,
@@ -618,19 +626,18 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     },
   };
 
-  return Object.assign(
-    world,
-    createInteractions({
-      context,
-      store,
-      refuse,
-      member,
-      requireMessage,
-      messageObject: (message) => messageObject(message, author(message.user), store.team, store.app),
-      postAsApp: world.postAsApp,
-      edit: world.edit,
-      remove: world.remove,
-      action,
-    }),
-  );
+  const kit: InteractionKit = {
+    context,
+    store,
+    refuse,
+    member,
+    requireMessage,
+    messageObject: (message) => messageObject(message, author(message.user), store.team, store.app),
+    postAsApp: world.postAsApp,
+    edit: world.edit,
+    remove: world.remove,
+    action,
+  };
+  const { dispatch, ...interactions } = createInteractions(kit);
+  return Object.assign(world, interactions, createViews(kit, dispatch));
 }

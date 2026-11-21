@@ -116,6 +116,24 @@ export interface SlackThreadState {
   suggestedPrompts?: Array<{ title: string; message: string }>;
 }
 
+/** A modal the app opened for one person, for as long as it is open. */
+export interface SlackViewRecord {
+  readonly id: string;
+  readonly session: string;
+  /** Who sees it. */
+  readonly user: string;
+  /** The view as the app defined it, with every `block_id` and `action_id` filled in. */
+  definition: Record<string, unknown> & { blocks: unknown[] };
+  /** What is filled in: `values[block_id][action_id]`. */
+  values: Record<string, Record<string, Record<string, unknown> & { type: string }>>;
+  /** Changes with every update; `views.update` with an older one is refused. */
+  hash: string;
+  readonly rootViewId: string;
+  readonly previousViewId: string | null;
+  /** What the app said is wrong after a submission, by `block_id`. */
+  errors: Record<string, string>;
+}
+
 /** A control a person means: by the label they see, by its `action_id`, or both. */
 interface SlackControlRef {
   label?: string | undefined;
@@ -212,6 +230,14 @@ export interface SlackWorld {
   shortcutAsUser(session: string, user: string, callbackId: string, message: { channel: string; ts: string }): string;
   /** Run a slash command in a conversation: `/deploy web staging`. Returns the command's delivery. */
   commandAsUser(session: string, user: string, command: string, channel: string): string;
+
+  /** The modals open for a person, the one on top last. */
+  modals(session: string, user: string): SlackViewRecord[];
+  modal(session: string, view: string): SlackViewRecord;
+  /** Fill in inputs (by label, `block_id.action_id`, `action_id` or `block_id`) and submit. Returns the `view_submission` delivery. */
+  submitModal(session: string, view: string, values: Readonly<Record<string, string | readonly string[]>>): string;
+  /** Close a modal. Returns the `view_closed` delivery when the app asked to be told. */
+  closeModal(session: string, view: string): string | undefined;
 
   invite(session: string, user: string, participants: readonly string[], channel: string): void;
   kick(session: string, user: string, participant: string, channel: string): void;

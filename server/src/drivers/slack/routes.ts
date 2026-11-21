@@ -5,9 +5,17 @@ import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { slackTsTime } from "../../core/ids/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
+import { plain } from "./blocks.ts";
 import type { FakeSlackWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
-import type { SlackAppRecord, SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "./world.ts";
+import { shownValue, viewInputs } from "./views.ts";
+import type {
+  SlackAppRecord,
+  SlackConversationRecord,
+  SlackMessageRecord,
+  SlackUserRecord,
+  SlackViewRecord,
+} from "./world.ts";
 
 const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
 
@@ -113,6 +121,18 @@ const SlackMessage = z
     stream: SlackStream.optional(),
   })
   .openapi("SlackMessage", { "x-channelstack-resource": { id: ["channel", "ts"] } });
+
+const SlackModal = z
+  .object({
+    viewId: z.string(),
+    user: SlackUser,
+    title: z.string(),
+    blocks: z.array(z.unknown()),
+    errors: z
+      .record(z.string(), z.string())
+      .openapi({ description: "What the app said is wrong after a submission, by the label of the input." }),
+  })
+  .openapi("SlackModal", { "x-channelstack-resource": { id: "viewId" } });
 
 const SlackThreadStatus = z
   .object({
@@ -548,6 +568,88 @@ export function registerSlackRoutes(
     stability,
     handler: ({ session, params, body }) =>
       interaction(session.id, world.commandAsUser(session.id, params.user, body.command, body.channel)),
+  });
+
+  const ViewParams = z.object({ view: z.string().openapi({ param: { name: "view", in: "path" } }) });
+  const modalWire = (session: string, view: SlackViewRecord) => {
+    const inputs = viewInputs(view.definition.blocks);
+    return {
+      viewId: view.id,
+      user: userWire(world.user(session, view.user)),
+      title: plain(view.definition.title),
+      blocks: view.definition.blocks,
+      // What the app said is wrong, by the label of the input it is shown at.
+      errors: Object.fromEntries(
+        Object.entries(view.errors).map(([block, message]) => [
+          inputs.find((input) => input.blockId === block)?.label ?? block,
+          message,
+        ]),
+      ),
+    };
+  };
+
+  router.route({
+    method: "get",
+    path: "/users/{user}/modals",
+    summary: "The modals the app has open for this person, the one on top last",
+    params: UserParams,
+    response: z.array(SlackModal).openapi("SlackModals"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackUser", name: "modals" },
+    waits: [{ name: "waitForModal", mode: "next", text: "title", what: "a modal from the agent" }],
+    stability,
+    handler: ({ session, params }) => world.modals(session.id, params.user).map((view) => modalWire(session.id, view)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/modals/{view}/values",
+    summary: "What is filled in: each input by its label (or action_id), with the text a person sees in it",
+    params: ViewParams,
+    response: z.record(z.string(), z.union([z.string(), z.array(z.string())]).optional()).openapi("SlackModalValues"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackModal", name: "values" },
+    stability,
+    handler: ({ session, params }) => {
+      const view = world.modal(session.id, params.view);
+      return Object.fromEntries(
+        viewInputs(view.definition.blocks).map((input) => [
+          input.label || input.actionId,
+          shownValue(view.values[input.blockId]?.[input.actionId] ?? { type: "" }),
+        ]),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/modals/{view}/submit",
+    summary: "Fill in inputs, by label or `block_id.action_id`, and submit the modal",
+    params: ViewParams,
+    body: z
+      .object({ values: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional() })
+      .openapi("SlackModalSubmitBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "dispatch_failed"],
+    sdkMethod: { on: "SlackModal", name: "submit", args: [], options: ["values"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.submitModal(session.id, params.view, body.values ?? {})),
+  });
+
+  router.route({
+    method: "post",
+    path: "/modals/{view}/close",
+    summary: "Close the modal. The app is told only if it asked to be (`notify_on_close`)",
+    params: ViewParams,
+    response: SlackDelivery.nullable(),
+    errors: ["not_found", "dispatch_failed"],
+    sdkMethod: { on: "SlackModal", name: "close" },
+    stability,
+    handler: ({ session, params }) => {
+      const delivery = world.closeModal(session.id, params.view);
+      return delivery === undefined ? null : interaction(session.id, delivery);
+    },
   });
 
   for (const [name, action] of [

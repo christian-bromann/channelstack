@@ -50,7 +50,20 @@ export interface InteractionKit {
   action(session: string, name: string, data: Record<string, unknown>): void;
 }
 
+/** Sending an interaction to the app, for the parts of the fake that have their own (modals). */
+export interface InteractionDispatch {
+  issueTrigger(session: string, user: SlackUserRecord): string;
+  send(
+    session: string,
+    type: string,
+    body: string,
+    payload: Record<string, unknown>,
+    answered?: (answer: { contentType: string; body: string }) => void,
+  ): string;
+}
+
 type Interactions = Pick<SlackWorld, "clickAsUser" | "selectAsUser" | "shortcutAsUser" | "commandAsUser"> & {
+  dispatch: InteractionDispatch;
   /**
    * The app answers an interaction through its `response_url`. False when the URL is unknown,
    * used up or expired.
@@ -63,6 +76,13 @@ export function createInteractions(kit: InteractionKit): Interactions {
   const { context, store, refuse, member, requireMessage } = kit;
   const { ids, clock, delivery } = context;
 
+  /** A `trigger_id` the app may open one modal with, for three seconds. */
+  const issueTrigger = (session: string, user: SlackUserRecord): string => {
+    const triggerId = ids.next("slack.trigger");
+    store.triggers.set(triggerId, { session, user: user.id, expiresAt: clock() + ACK_WINDOW_MS, used: false });
+    return triggerId;
+  };
+
   /** Hand the app what it needs to answer: a `trigger_id` for a modal, a `response_url` for messages. */
   const answerable = (
     session: string,
@@ -71,8 +91,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
     conversation: SlackConversationRecord,
     source?: SlackMessageRecord,
   ): InteractionContext => {
-    const triggerId = ids.next("slack.trigger");
-    store.triggers.set(triggerId, { session, user: user.id, expiresAt: clock() + ACK_WINDOW_MS });
+    const triggerId = issueTrigger(session, user);
     // The URL is the credential, as with Slack's: whoever has it may answer.
     const key = `${store.team.id}/${triggerId.split(".")[0]}/${randomToken(18)}`;
     store.responseUrls.set(key, {
@@ -165,6 +184,8 @@ export function createInteractions(kit: InteractionKit): Interactions {
   };
 
   return {
+    dispatch: { issueTrigger, send },
+
     clickAsUser(session, userId, button, where) {
       const user = store.users.get(session, userId);
       const { conversation, messages } = inScope(session, user, where);

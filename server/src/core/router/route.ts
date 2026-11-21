@@ -33,6 +33,8 @@ interface WaitBinding {
   not?: readonly string[];
   /** The item field holding who authored it; the wait's `from` option filters on it. */
   from?: string;
+  /** A text field of the item the wait can be narrowed by: an option of that name takes a string or a pattern. */
+  text?: string;
   /** The wait takes the read's own options as its first argument: `waitForCall({ operation }, { timeout })`. */
   filter?: true;
   /** What is being waited for, for the timeout message: "a reply". */

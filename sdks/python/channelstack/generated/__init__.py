@@ -10,9 +10,9 @@ from urllib.parse import quote
 from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
-from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
+from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -386,6 +386,12 @@ class SlackMenuRef:
     def _to_wire(self) -> dict[str, Any]:
         wire = {"label": self.label, "actionId": self.action_id}
         return {key: value for key, value in wire.items() if value is not None}
+
+
+type SlackModals = list[SlackModal]
+
+
+type SlackModalValues = dict[str, str | list[str]]
 
 
 type SlackMessages = list[SlackMessage]
@@ -769,6 +775,7 @@ class SlackApp:
 class SlackUser:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
+        self._seen: dict[str, int] = {}
         self.id: str = data["id"]
         self.name: str = data["name"]
         self.kind: Literal["user"] = data["kind"]
@@ -825,6 +832,12 @@ class SlackUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/commands", body={"command": command, "channel": channel.id})
         return SlackDelivery(ctx, data)
 
+    async def modals(self) -> SlackModals:
+        """The modals the app has open for this person, the one on top last. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/modals")
+        return [SlackModal(ctx, item) for item in data]
+
     async def react(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
         """Add an emoji reaction to a message. Experimental."""
         ctx = self._ctx
@@ -858,6 +871,10 @@ class SlackUser:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/ephemeral")
         return [SlackMessage(ctx, item) for item in data]
+
+    async def wait_for_modal(self, *, title: Text | None = None, timeout: Duration = "10s") -> SlackModal:
+        """Wait for the next new modal from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForModal", self.modals, lambda item: text_matches(item.title, title), "a modal from the agent", timeout=timeout)
 
 
 class SlackConversation:
@@ -1038,6 +1055,34 @@ class SlackStream:
             return None if value.state in ("open",) else value
 
         return await wait_for("the stream to end", settled, timeout=timeout)
+
+
+class SlackModal:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.view_id: str = data["viewId"]
+        self.user: SlackUser = SlackUser(ctx, data["user"])
+        self.title: str = data["title"]
+        self.blocks: list[Any] = data["blocks"]
+        self.errors: dict[str, str] = data["errors"]
+
+    async def values(self) -> SlackModalValues:
+        """What is filled in: each input by its label (or action_id), with the text a person sees in it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/modals/{quote(self.view_id, safe='')}/values")
+        return data
+
+    async def submit(self, *, values: dict[str, str | list[str]] | None = None) -> SlackDelivery:
+        """Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/modals/{quote(self.view_id, safe='')}/submit", body={"values": values})
+        return SlackDelivery(ctx, data)
+
+    async def close(self) -> SlackDelivery | None:
+        """Close the modal. The app is told only if it asked to be (`notify_on_close`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/modals/{quote(self.view_id, safe='')}/close")
+        return (None if data is None else SlackDelivery(ctx, data))
 
 
 class SlackFault:

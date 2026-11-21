@@ -7,6 +7,7 @@ import type {
   SlackTeam,
   SlackThreadState,
   SlackUserRecord,
+  SlackViewRecord,
 } from "../world.ts";
 
 /** A transport fault for the agent's Web API calls (`slack.fault(...)`). */
@@ -47,7 +48,9 @@ export class SlackStore {
   /** What an interaction handed the app to answer with: its `response_url`s, by the key in the URL. */
   readonly responseUrls = new Map<string, SlackResponseUrl>();
   /** `trigger_id`s the app may open a modal with, and until when. */
-  readonly triggers = new Map<string, { session: string; user: string; expiresAt: number }>();
+  readonly triggers = new Map<string, { session: string; user: string; expiresAt: number; used: boolean }>();
+  /** The modals that are open, by view id. */
+  readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
   /** The session that uninstalled the app, so closing it installs the app again. */
@@ -163,6 +166,7 @@ export class SlackStore {
       if (fault.session === session) this.faults.splice(this.faults.indexOf(fault), 1);
     for (const [key, url] of this.responseUrls) if (url.session === session) this.responseUrls.delete(key);
     for (const [id, trigger] of this.triggers) if (trigger.session === session) this.triggers.delete(id);
+    for (const [id, view] of this.views) if (view.session === session) this.views.delete(id);
     const people = this.usersOf(session);
     this.#people.delete(session);
     for (const id of [...this.#known]) {

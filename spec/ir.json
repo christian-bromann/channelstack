@@ -1839,6 +1839,41 @@
           "dispose": false
         },
         {
+          "name": "modals",
+          "kind": "method",
+          "summary": "The modals the app has open for this person, the one on top last",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/users/{user}/modals",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackModals"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "react",
           "kind": "method",
           "summary": "Add an emoji reaction to a message",
@@ -2167,6 +2202,19 @@
             "not_found"
           ],
           "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForModal",
+          "mode": "next",
+          "read": "modals",
+          "item": {
+            "kind": "resource",
+            "name": "SlackModal"
+          },
+          "text": "title",
+          "what": "a modal from the agent"
         }
       ]
     },
@@ -3224,6 +3272,191 @@
       ]
     },
     {
+      "name": "SlackModal",
+      "idFields": [
+        "viewId"
+      ],
+      "fields": [
+        {
+          "name": "viewId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "user",
+          "type": {
+            "kind": "resource",
+            "name": "SlackUser"
+          },
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "blocks",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "unknown"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "errors",
+          "type": {
+            "kind": "record",
+            "values": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "values",
+          "kind": "method",
+          "summary": "What is filled in: each input by its label (or action_id), with the text a person sees in it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/modals/{view}/values",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "view",
+                "from": "self",
+                "field": "viewId"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackModalValues"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "submit",
+          "kind": "method",
+          "summary": "Fill in inputs, by label or `block_id.action_id`, and submit the modal",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/modals/{view}/submit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "view",
+                "from": "self",
+                "field": "viewId"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "values",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "union",
+                  "types": [
+                    {
+                      "kind": "string"
+                    },
+                    {
+                      "kind": "array",
+                      "items": {
+                        "kind": "string"
+                      }
+                    }
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "close",
+          "kind": "method",
+          "summary": "Close the modal. The app is told only if it asked to be (`notify_on_close`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/modals/{view}/close",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "view",
+                "from": "self",
+                "field": "viewId"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
       "name": "SlackFault",
       "idFields": [
         "id"
@@ -3920,6 +4153,36 @@
             "optional": true
           }
         ]
+      }
+    },
+    {
+      "name": "SlackModals",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackModal"
+        }
+      }
+    },
+    {
+      "name": "SlackModalValues",
+      "type": {
+        "kind": "record",
+        "values": {
+          "kind": "union",
+          "types": [
+            {
+              "kind": "string"
+            },
+            {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            }
+          ]
+        }
       }
     },
     {

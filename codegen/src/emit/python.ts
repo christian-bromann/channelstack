@@ -221,12 +221,15 @@ export function emitPython(ir: Ir): Map<string, string> {
       "*",
       ...filters.map((option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`),
       ...from,
+      ...(w.text ? [`${snakeCase(w.text)}: Text | None = None`] : []),
       'timeout: Duration = "10s"',
       ...(w.mode === "latest" ? ['quiet_for: Duration = "750ms"'] : []),
     ];
-    const matches = fromField
-      ? `lambda item: from_matches(item.${snakeCase(w.from ?? "")}, from_)`
-      : "lambda item: True";
+    const conditions = [
+      ...(fromField ? [`from_matches(item.${snakeCase(w.from ?? "")}, from_)`] : []),
+      ...(w.text ? [`text_matches(item.${snakeCase(w.text)}, ${snakeCase(w.text)})`] : []),
+    ];
+    const matches = `lambda item: ${conditions.length > 0 ? conditions.join(" and ") : "True"}`;
     const what = fromField ? `describe_wait(${JSON.stringify(w.what)}, from_)` : JSON.stringify(w.what);
     const noun = w.what.replace(/^an? /, "");
     if (w.mode === "until") {
@@ -355,7 +358,9 @@ export function emitPython(ir: Ir): Map<string, string> {
       : []),
     "from ..runtime.transport import ChannelstackError, Transport",
     ...(allWaits.length > 0
-      ? ["from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next"]
+      ? [
+          `from ..runtime.wait import ${allWaits.some((w) => w.text !== undefined) ? "Text, " : ""}describe_wait, from_matches, latest_once_quiet${allWaits.some((w) => w.text !== undefined) ? ", text_matches" : ""}, wait_for, wait_for_next`,
+        ]
       : []),
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,

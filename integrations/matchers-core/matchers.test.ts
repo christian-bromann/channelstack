@@ -140,3 +140,16 @@ describe("toHaveReceivedCall", () => {
     expect(missing.message()).toContain('Expected the agent to call "reactions.add", found 0');
   });
 });
+
+describe("toHaveOpenedModal", () => {
+  test("looks at the modals open for a person, by title when one is given", async () => {
+    const person = { ...quiet, modals: async () => [{ title: "File an incident" }] };
+    expect((await matchers.toHaveOpenedModal(state, person)).pass).toBe(true);
+    expect((await matchers.toHaveOpenedModal(state, person, /incident/i)).pass).toBe(true);
+    const other = await matchers.toHaveOpenedModal(state, person, "Deploy");
+    expect([other.pass, other.message()]).toEqual([
+      false,
+      'Expected a modal titled "Deploy" to be open. Open: "File an incident"',
+    ]);
+  });
+});

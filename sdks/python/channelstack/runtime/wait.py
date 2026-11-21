@@ -1,6 +1,7 @@
 """The one polling loop. Every wait_for…, latest… and matcher is built on it; tests never sleep."""
 
 import asyncio
+import re
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
@@ -52,6 +53,17 @@ class Author(Protocol):
 
     @property
     def name(self) -> str: ...
+
+
+Text = str | re.Pattern[str]
+"""Text to look for: a string the text contains, or a compiled pattern."""
+
+
+def text_matches(text: str, expected: Text | None) -> bool:
+    """Does a text match what was asked for: a string it contains, a pattern, or nothing (any text)?"""
+    if expected is None:
+        return True
+    return expected in text if isinstance(expected, str) else expected.search(text) is not None
 
 
 def from_matches(author: Author, from_: Author | str | None) -> bool:

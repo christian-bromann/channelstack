@@ -403,6 +403,13 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       return { status, agent_status: status };
     },
 
+    // Modals: opened with the trigger_id of an interaction, for the person who caused it.
+    "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false) }),
+    "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true) }),
+    "views.update": (args) => ({
+      view: world.updateView(required(args, "view_id"), string(args, "hash"), json(args, "view")),
+    }),
+
     // Files upload v2: ask where to upload, send the bytes there, then share the file.
     "files.getUploadURLExternal": (args) => {
       const name = required(args, "filename");

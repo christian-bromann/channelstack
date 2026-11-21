@@ -64,6 +64,8 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `payloads.ts` | Builders for every event payload this platform sends (used by the fake's delivery) |
 | `interaction-payloads.ts` (Slack) | Builders for what Slack sends when a person acts in the client: `block_actions`, `message_action`, slash command fields; a person's handle (`handleOf`) |
 | `blocks.ts` (Slack) | Reading Block Kit: the text and controls a person sees, finding a button or a menu by label or `action_id`, filling in missing `block_id`s and `action_id`s |
+| `views.ts` (Slack) | Reading a modal as a person does: its inputs by label, what is filled in, `state.values` |
+| `fake/views.ts` (Slack) | Modals: `views.open` / `update` / `push`, and a person submitting or closing one. Part of the fake world |
 | `fake/interactions.ts` (Slack) | What a person does beyond writing: clicks, menu choices, shortcuts, slash commands, and the app's answers through `response_url`. Part of the fake world |
 | `transcript.ts` | State → what a person would see |
 | `capabilities.ts` | Per action: fake, live, what live needs |
