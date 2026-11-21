@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Self
 from urllib.parse import quote
 
-from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, session_of
+from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, session_of
 from ..runtime.transport import ChannelstackError, Transport
 
 __all__ = ["Capabilities", "Capability", "Channelstack", "ChannelstackError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "NotFoundError", "NotInRoomError", "Session", "SessionNotFoundError", "Status", "UnauthorizedError", "VERSION", "connect"]
@@ -254,7 +254,7 @@ class Session:
         return self
 
     async def __aexit__(self, *_: object) -> None:
-        await self.close()
+        await dispose_quietly(self.close)
 
 
 class EchoFixture:

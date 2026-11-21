@@ -160,7 +160,7 @@ export function emitPython(ir: Ir): Map<string, string> {
             "        return self",
             "",
             "    async def __aexit__(self, *_: object) -> None:",
-            `        await self.${snakeCase(disposer.name)}()`,
+            `        await dispose_quietly(self.${snakeCase(disposer.name)})`,
           ]
         : []),
     ];
@@ -208,7 +208,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     "from typing import Any, Literal, Self",
     "from urllib.parse import quote",
     "",
-    "from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, session_of",
+    "from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, session_of",
     "from ..runtime.transport import ChannelstackError, Transport",
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,

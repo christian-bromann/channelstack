@@ -48,3 +48,9 @@ steps:
   - call: other.close
   - call: other.events
     throws: session_not_found
+
+  # The runner disposes its own session when the scenario ends. Closing it here first proves that
+  # disposing a session that is already gone is quiet, while closing it again explicitly is an error.
+  - call: session.close
+  - call: session.close
+    throws: session_not_found

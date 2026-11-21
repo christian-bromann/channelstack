@@ -1,5 +1,5 @@
 import { type LaunchOptions, launch } from "./launcher.ts";
-import { type ErrorClasses, Transport } from "./transport.ts";
+import { ChannelstackError, type ErrorClasses, Transport } from "./transport.ts";
 
 /** What a handle needs to call the server: the transport, and the session it lives in. */
 export interface HandleContext {
@@ -11,6 +11,19 @@ export interface HandleContext {
 export function sessionOf(context: HandleContext): string {
   if (context.session === undefined) throw new Error("This handle doesn't belong to a session");
   return context.session;
+}
+
+/**
+ * Run a handle's disposer. Disposing only cleans up and never fails a test: when the handle is
+ * already gone on the server (closed earlier, or dropped by a reset), there is nothing left to do.
+ * An explicit call to the same method still reports that.
+ */
+export async function disposeQuietly(dispose: () => Promise<void>): Promise<void> {
+  try {
+    await dispose();
+  } catch (error) {
+    if (!(error instanceof ChannelstackError && error.status === 404)) throw error;
+  }
 }
 
 /** Base of the generated root client: closing it stops the server if this client started it. */

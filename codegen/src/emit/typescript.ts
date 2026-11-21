@@ -113,7 +113,12 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         : [`    await ${call};`]),
       "  }",
       ...(m.dispose && resource.name !== ir.root
-        ? ["", "  async [Symbol.asyncDispose](): Promise<void> {", `    await this.${m.name}();`, "  }"]
+        ? [
+            "",
+            "  async [Symbol.asyncDispose](): Promise<void> {",
+            `    await disposeQuietly(() => this.${m.name}());`,
+            "  }",
+          ]
         : []),
     ];
   };
@@ -170,12 +175,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ];
   };
 
+  const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
   const lines = [
     `// ${BANNER}`,
-    `import { ClientBase, connectWith, type HandleContext${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
     "",

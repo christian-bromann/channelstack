@@ -23,6 +23,19 @@ def session_of(context: HandleContext) -> str:
     return context.session
 
 
+async def dispose_quietly(dispose: Callable[[], Awaitable[None]]) -> None:
+    """Run a handle's disposer. Disposing only cleans up and never fails a test.
+
+    When the handle is already gone on the server (closed earlier, or dropped by a reset), there is
+    nothing left to do. An explicit call to the same method still reports that.
+    """
+    try:
+        await dispose()
+    except ChannelstackError as error:
+        if error.status != 404:
+            raise
+
+
 class ClientBase:
     """Base of the generated root client: closing it stops the server if this client started it."""
 
