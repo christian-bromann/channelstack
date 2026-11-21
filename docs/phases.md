@@ -126,7 +126,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 |---|---|---|
 | 1.1 | Conversation examples pass | `api/examples/slack.test.ts`: "mentions and threads", "direct messages", "reactions, edits and deletes", "inspecting what the agent did", and the stream and status test, against both reference agents |
 | 1.2 | Delivery basics | "delivery and failures": the 3 s retry, bad and stale signatures, rate limit, uninstall |
-| 1.3 | The fake signs like Slack | Delivery cases S1–S8 ([appendix](#appendix-delivery-cases)) as integration tests against the fake's real delivery code, received by Bolt |
+| 1.3 | The fake signs like Slack | Delivery cases S1 and S6–S8 ([appendix](#appendix-delivery-cases)) as integration tests against the fake's real delivery code, received by Bolt. S2–S5 are interactions (buttons, modals, commands), which phase 2 builds; they are part of exit check 2.2 |
 | 1.4 | A real bug is caught | The `mdac-220` agent fails the stream and status test with a message that names the leftover message |
 | 1.5 | Negative matchers wait for quiet | Test: a reply posted 500 ms after a `.not.toHaveReplyFrom` check started makes it fail; one posted after `quietFor` doesn't |
 | 1.6 | CLI and UI | Scripted: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, then `channelstack show` prints the agent's reply; a browser test opens the UI and finds the same reply in the transcript |
@@ -150,7 +150,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 | # | Check | How |
 |---|---|---|
 | 2.1 | Every fake Slack example passes | All of `api/examples/slack.test.ts` except "live mode", against both reference agents |
-| 2.2 | Socket Mode works with Bolt | The DM and modal tests pass with the Bolt reference agent switched to Socket Mode; delivery cases K1–K4 ([appendix](#appendix-delivery-cases)) pass against the real fake |
+| 2.2 | Socket Mode works with Bolt | The DM and modal tests pass with the Bolt reference agent switched to Socket Mode; delivery cases S2–S5 and K1–K4 ([appendix](#appendix-delivery-cases)) pass against the real fake |
 | 2.3 | Standard checks | `slackChecks({ app: "my-agent" })` passes against both reference agents, and against a deliberately broken agent each check fails (one broken variant per check) |
 
 **Docs to update:** reality-matrix, `devx.md` CLI section.

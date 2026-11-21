@@ -117,6 +117,8 @@ The UI, the CLI, MCP and the test integrations all use one plain-HTTP control AP
 
 The API only listens on loopback and requires a bearer token. The server writes the token to `~/.channelstack/server.json` (mode 0600), where the CLI, MCP and test integrations find it on their own. The UI opens through a one-time login link printed on start.
 
+The link signs one browser in and works once; `channelstack ui` prints a fresh one. A signed-in browser can only read what the UI shows (conversations, transcripts, the event log), with tokens scrubbed. It can't read `channelstack env` or change anything ([decision 0008](decisions/0008-ui-access.md)).
+
 ### 4a. The attach CLI
 
 The CLI attaches to a running server. It finds it through portless (`channelstack.localhost`), or through `--server <url>` or `CHANNELSTACK_URL`. It's for poking the agent by hand while developing, and for shell scripts.
@@ -152,7 +154,9 @@ channelstack deliver last --bad-signature
 
 # Watching
 channelstack tail                                         # live stream: events in, agent API calls out
-channelstack show --thread last                           # thread as rendered text; --json for raw
+channelstack show                                         # the latest conversation as rendered text
+channelstack show --thread last                           # only the latest thread; --json for raw
+channelstack ui                                           # a one-time link that opens the UI in a browser
 channelstack reset
 
 # Setup and maintenance
@@ -166,6 +170,8 @@ channelstack sweep                                        # live mode: remove le
 `--as <name>` creates that user the first time it's used, and `--in "#name"` does the same for channels, so the dev loop needs no seed data either. Repos, Linear teams and Notion pages are created the same way on first mention (`acme/web`, `ENG`, `"Roadmap"`).
 
 `last` always refers to the most recent message, thread, issue or delivery, so a loop of "say, look, fix the code, say again" needs no IDs.
+
+Everything the CLI does happens in one shared session called `dev`, which the UI shows too. It lives until the server stops ([decision 0010](decisions/0010-dev-session-and-attach-cli.md)).
 
 ### 4b. MCP for coding agents
 
@@ -347,7 +353,7 @@ await using channel = await slack.createChannel();   // archived when the scope 
 All matchers are **asynchronous and wait until the condition holds or a timeout passes**, like Playwright's web-first assertions and expect-webdriverio. A test never needs `sleep`.
 
 - **Positive** matchers resolve once the condition holds.
-- **Negative and exact-count** matchers (`not.…`, `toHaveRepliesFrom`) wait until the agent goes quiet. channelstack knows when that is: no open stream, no request from the agent in flight, and a short settle window. It then checks the result.
+- **Negative and exact-count** matchers (`not.…`, `toHaveRepliesFrom`) wait until the agent goes quiet. channelstack knows when that is: no open stream, no request from the agent in flight, no retry it was told to make later, and a short settle window that the matcher watches from start to end. It then checks the result. When a check fails or a wait gives up, the message also says what the agent left open, for example `Still open: a stream my-agent started and never stopped: "Thinking…"` ([decision 0009](decisions/0009-quiet-means-watched.md)).
 
 Every matcher reads the **transcript**: each channel's state reduced to what a person would read. Edits are applied, deleted messages are gone, stream chunks are joined, ephemeral messages are visible only to their recipient, and Block Kit text and button labels are extracted. The UI shows the same transcript.
 
