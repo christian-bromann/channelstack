@@ -1,59 +1,109 @@
+import { useEffect, useRef } from "react";
+import { prefersReducedMotion } from "../lib/hooks";
+
 /**
- * Hero decoration: voice waves drifting past, like audio scrolling under a playhead. One layer
- * of speech-like bars and two smooth lines move at different speeds. Each layer draws two
- * identical periods and slides by exactly one, so the loop is seamless and runs on transform
- * alone. Hidden on narrow screens and from assistive technology.
+ * Hero decoration: two voices taking turns. A person speaks (grey bars, left of centre), the
+ * agent answers (amber bars, right of centre), and so on: the conversation channelstack tests.
+ * It renders as a still waveform; script animates each bar's scaleY, so it runs on transform and
+ * opacity only. Hidden on narrow screens and from assistive technology.
  */
-const PERIOD = 600;
-const HEIGHT = 200;
+const COUNT = 54;
+const STEP = 9;
+const HEIGHT = 160;
 const MID = HEIGHT / 2;
-const TAU = Math.PI * 2;
+const CYCLE = 4400;
+/** Each voice speaks during its own part of the cycle, with a short silence between turns. */
+const TURNS = { person: [0.03, 0.44], agent: [0.53, 0.94] } as const;
+const FRAMES = 11;
 
-/** Bars with the bursts and pauses of speech. `t` runs 0–1 over one period. */
-const BAR_COUNT = 100;
-const BARS = Array.from({ length: BAR_COUNT * 2 }, (_, i) => {
-  const k = i % BAR_COUNT;
-  const t = k / BAR_COUNT;
-  const words = Math.pow(Math.abs(Math.sin(TAU * 2.5 * t + 0.4)), 1.6);
-  const phrase = 0.45 + 0.55 * Math.pow(Math.sin(Math.PI * t), 0.8);
-  const jitter = 0.55 + 0.45 * (Math.abs(Math.sin(k * 12.9898) * 43758.5453) % 1);
-  return { x: i * (PERIOD / BAR_COUNT), h: Math.max(2, Math.round(150 * words * phrase * jitter)) };
-});
+const noise = (n: number) => Math.abs(Math.sin(n * 12.9898 + 78.233) * 43758.5453) % 1;
+/** How loud a voice can get at bar `i`: a bell around the voice's side of the picture. */
+const reach = (i: number, centre: number) => Math.exp(-Math.pow((i / (COUNT - 1) - centre) / 0.2, 2));
 
-/** A smooth line: a carrier wave whose loudness swells and fades. Whole cycles per period keep it seamless. */
-function line(cycles: number, swells: number, amplitude: number, phase: number) {
-  const points: string[] = [];
-  for (let x = 0; x <= PERIOD * 2; x += 4) {
-    const t = x / PERIOD;
-    const y = MID + amplitude * Math.sin(TAU * cycles * t + phase) * (0.35 + 0.65 * Math.pow(Math.sin(Math.PI * swells * t), 2));
-    points.push(`${x},${y.toFixed(1)}`);
-  }
-  return `M${points.join("L")}`;
-}
+const VOICES = [
+  { id: "person", centre: 0.36, seed: 1 },
+  { id: "agent", centre: 0.64, seed: 2 },
+] as const;
 
-const LINE_A = line(7, 2, 62, 0);
-const LINE_B = line(11, 3, 38, 1.3);
+/** The still pose: both voices mid-word. */
+const pose = (i: number, centre: number, seed: number) => Math.max(3, Math.round(HEIGHT * 0.86 * reach(i, centre) * (0.45 + 0.55 * noise(i * 7 + seed))));
 
 export function HeroWaves() {
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el || prefersReducedMotion() || typeof el.animate !== "function" || typeof IntersectionObserver === "undefined") return;
+    if (getComputedStyle(el).display === "none") return;
+    const animations: Animation[] = [];
+    const timing = { duration: CYCLE, iterations: Infinity } as const;
+
+    for (const voice of VOICES) {
+      const [from, to] = TURNS[voice.id];
+      el.querySelectorAll<SVGRectElement>(`.voice-${voice.id} rect`).forEach((rect, i) => {
+        const rest = 3 / Number(rect.getAttribute("height"));
+        // Silence, then a run of quick syllables that ripples outwards from the voice's centre, then silence.
+        const delay = Math.abs(i / (COUNT - 1) - voice.centre) * 0.12;
+        const frames: Keyframe[] = [{ transform: `scaleY(${rest})`, offset: 0 }, { transform: `scaleY(${rest})`, offset: from + delay }];
+        for (let f = 1; f <= FRAMES; f++) {
+          const offset = from + delay + ((to - from - 0.12) * f) / (FRAMES + 1);
+          const loud = 0.25 + 1.05 * noise(i * 13 + f * 29 + voice.seed * 101);
+          frames.push({ transform: `scaleY(${loud.toFixed(2)})`, offset, easing: "ease-in-out" });
+        }
+        frames.push({ transform: `scaleY(${rest})`, offset: to }, { transform: `scaleY(${rest})`, offset: 1 });
+        animations.push(rect.animate(frames, timing));
+      });
+
+      // The speaker's name lights up for the length of its turn.
+      const label = el.querySelector(`.speaker-${voice.id}`);
+      if (label) {
+        animations.push(
+          label.animate(
+            [
+              { opacity: 0.35, offset: 0 },
+              { opacity: 0.35, offset: Math.max(0, from - 0.02) },
+              { opacity: 1, offset: from + 0.04 },
+              { opacity: 1, offset: to - 0.04 },
+              { opacity: 0.35, offset: Math.min(1, to + 0.02) },
+              { opacity: 0.35, offset: 1 },
+            ],
+            timing,
+          ),
+        );
+      }
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      const run = entry?.isIntersecting && document.documentElement.getAttribute("data-motion") !== "paused";
+      animations.forEach((animation) => (run ? animation.play() : animation.pause()));
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      animations.forEach((animation) => animation.cancel());
+    };
+  }, []);
+
   return (
-    <div className="hero-waves" aria-hidden="true">
-      <div className="wave-layer bars">
-        <svg viewBox={`0 0 ${PERIOD * 2} ${HEIGHT}`} preserveAspectRatio="none" focusable="false">
-          {BARS.map((bar, i) => (
-            <rect key={i} x={bar.x} y={MID - bar.h / 2} width="2.4" height={bar.h} rx="1.2" />
-          ))}
-        </svg>
-      </div>
-      <div className="wave-layer line-b">
-        <svg viewBox={`0 0 ${PERIOD * 2} ${HEIGHT}`} preserveAspectRatio="none" focusable="false">
-          <path d={LINE_B} />
-        </svg>
-      </div>
-      <div className="wave-layer line-a">
-        <svg viewBox={`0 0 ${PERIOD * 2} ${HEIGHT}`} preserveAspectRatio="none" focusable="false">
-          <path d={LINE_A} />
-        </svg>
-      </div>
+    <div className="hero-waves" ref={root} aria-hidden="true">
+      <svg viewBox={`0 0 ${COUNT * STEP} ${HEIGHT}`} focusable="false">
+        {VOICES.map((voice) => (
+          <g key={voice.id} className={`voice-${voice.id}`}>
+            {Array.from({ length: COUNT }, (_, i) => {
+              const h = pose(i, voice.centre, voice.seed);
+              return <rect key={i} x={i * STEP + 3} y={MID - h / 2} width="3" height={h} rx="1.5" />;
+            })}
+          </g>
+        ))}
+      </svg>
+      <p className="speakers">
+        <span className="speaker-person">
+          <i /> ana
+        </span>
+        <span className="speaker-agent">
+          <i /> robin
+        </span>
+      </p>
     </div>
   );
 }

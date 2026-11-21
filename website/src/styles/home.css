@@ -60,17 +60,14 @@ main > .hero {
   position: relative;
 }
 
-/* voice waves drifting past in the free space beside the headline */
+/* two voices taking turns, in the free space beside the headline */
 .hero-waves {
   display: none;
   position: absolute;
-  top: 24px;
-  right: -32px;
-  width: min(46%, 560px);
-  height: 300px;
+  top: 56px;
+  right: 0;
+  width: min(42%, 500px);
   pointer-events: none;
-  -webkit-mask-image: radial-gradient(60% 62% at 55% 50%, #000 35%, transparent 100%);
-  mask-image: radial-gradient(60% 62% at 55% 50%, #000 35%, transparent 100%);
 }
 
 @media (min-width: 1180px) {
@@ -79,74 +76,58 @@ main > .hero {
   }
 }
 
-.wave-layer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
+.hero-waves svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
-/* each drawing holds two identical periods; sliding by half its width loops seamlessly */
-.wave-layer svg {
-  width: 200%;
-  height: 100%;
+.hero-waves rect {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-.wave-layer rect {
+.voice-person rect {
   fill: var(--muted);
+  opacity: 0.55;
 }
 
-.wave-layer path {
-  fill: none;
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
+.voice-agent rect {
+  fill: var(--accent);
+  opacity: 0.85;
 }
 
-.wave-layer.bars {
-  opacity: 0.28;
+.speakers {
+  display: flex;
+  justify-content: center;
+  gap: 28%;
+  margin-top: 14px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
 }
 
-.wave-layer.line-a {
-  opacity: 0.75;
+.speakers span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  opacity: 0.6;
 }
 
-.wave-layer.line-a path {
-  stroke: var(--accent);
+.speakers i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
 }
 
-.wave-layer.line-b {
-  opacity: 0.4;
+.speaker-agent {
+  color: var(--accent);
 }
 
-.wave-layer.line-b path {
-  stroke: var(--muted);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .wave-layer svg {
-    animation: drift 46s linear infinite;
-  }
-  .wave-layer.line-a svg {
-    animation-duration: 30s;
-  }
-  .wave-layer.line-b svg {
-    animation-duration: 64s;
-    animation-direction: reverse;
-  }
-  /* the whole layer swells and settles, like a voice getting louder and quieter */
-  .wave-layer.bars {
-    animation: swell 7s ease-in-out infinite;
-  }
-  .wave-layer.line-a {
-    animation: swell 9s ease-in-out -3s infinite;
-  }
-}
-
-@keyframes drift {
-  to { transform: translateX(-50%); }
-}
-
-@keyframes swell {
-  50% { transform: scaleY(0.72); }
+.speaker-agent i {
+  background: var(--accent);
 }
 
 .eyebrow {
