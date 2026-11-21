@@ -2,7 +2,7 @@
 import { parseArgs } from "node:util";
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
-import { homeDir, readJsonFile } from "./core/home/index.ts";
+import { homeDir, readPrivateJsonFile } from "./core/home/index.ts";
 import { parseSeed } from "./core/ids/index.ts";
 import { parseLogLevel } from "./core/log/index.ts";
 import { randomSeed, Secrets } from "./core/secrets/index.ts";
@@ -89,7 +89,7 @@ async function runStart(flags: {
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */
 async function runEnv(flags: { "server-file"?: string }) {
   const file = flags["server-file"] ?? process.env.CHANNELSTACK_SERVER_FILE ?? serverFilePath(homeDir());
-  const server = readJsonFile(file) as { url?: string; token?: string } | undefined;
+  const server = readPrivateJsonFile(file) as { url?: string; token?: string } | undefined;
   if (!server?.url || !server.token) fail("no running server found. Start one with `channelstack start`.");
   const response = await fetch(`${server.url}${CONTROL_PREFIX}/env`, {
     headers: { authorization: `Bearer ${server.token}` },

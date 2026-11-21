@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readJsonFile, writePrivateFile } from "../home/index.ts";
+import { readPrivateJsonFile, writePrivateFile } from "../home/index.ts";
 import { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
 
 export { randomSeed, randomToken } from "./csprng.ts";
@@ -58,7 +58,7 @@ export class Secrets {
   /** Load the install's secrets, generating and saving whatever is missing. */
   static load(home: string, specs: Readonly<Record<string, SecretSpec>>): Secrets {
     const path = Secrets.path(home);
-    const { values, changed } = generate(specs, parse(readJsonFile(path)));
+    const { values, changed } = generate(specs, parse(readPrivateJsonFile(path)));
     if (changed) Secrets.#save(path, values);
     return new Secrets(values);
   }

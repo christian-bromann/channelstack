@@ -2,7 +2,7 @@ import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { homeDir, readJsonFile, removeFile, writePrivateFile } from "./index.ts";
+import { homeDir, readPrivateJsonFile, removeFile, writePrivateFile } from "./index.ts";
 
 const posix = process.platform !== "win32";
 
@@ -30,12 +30,18 @@ describe("state directory", () => {
     writePrivateFile(file, '{"a":1}');
 
     expect(statSync(file).mode & 0o777).toBe(0o600);
-    expect(readJsonFile(file)).toEqual({ a: 1 });
+    expect(readPrivateJsonFile(file)).toEqual({ a: 1 });
+  });
+
+  test("a state file that isn't JSON is an error that names the file", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "cs-home-")), "server.json");
+    writeFileSync(file, "{not json");
+    expect(() => readPrivateJsonFile(file)).toThrow(`${file} is not valid JSON`);
   });
 
   test("a missing file reads as undefined, and removing it twice is fine", () => {
     const file = join(mkdtempSync(join(tmpdir(), "cs-home-")), "missing.json");
-    expect(readJsonFile(file)).toBeUndefined();
+    expect(readPrivateJsonFile(file)).toBeUndefined();
     removeFile(file);
     removeFile(file);
   });

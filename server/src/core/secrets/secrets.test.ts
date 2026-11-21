@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -73,7 +73,24 @@ describe("secrets.json", () => {
     expect(JSON.parse(readFileSync(path, "utf8")).secrets.echo.appToken).toBe(repaired.get("echo", "appToken"));
   });
 
-  test("an unreadable file starts over, and unknown secrets are an error", () => {
+  test.runIf(posix)("a secrets.json that others can read is made private again on load, without changing it", () => {
+    const dir = home();
+    const first = Secrets.load(dir, specs);
+    chmodSync(Secrets.path(dir), 0o644);
+
+    const second = Secrets.load(dir, specs);
+
+    expect(statSync(Secrets.path(dir)).mode & 0o777).toBe(0o600);
+    expect(second.all()).toEqual(first.all());
+  });
+
+  test("a truncated file is an error that names the file and says how to recover", () => {
+    const dir = home();
+    writeFileSync(Secrets.path(dir), '{"version":1,"secr');
+    expect(() => Secrets.load(dir, specs)).toThrow(`${Secrets.path(dir)} is not valid JSON. Delete it and start again`);
+  });
+
+  test("a file with the wrong shape starts over, and unknown secrets are an error", () => {
     const dir = home();
     writeFileSync(Secrets.path(dir), "[]");
     const secrets = Secrets.load(dir, specs);

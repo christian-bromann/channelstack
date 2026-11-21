@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -20,16 +20,24 @@ export function writePrivateFile(path: string, contents: string): void {
   renameSync(temporary, path);
 }
 
-/** Read and parse a JSON file. Returns undefined when it doesn't exist. */
-export function readJsonFile(path: string): unknown {
+/**
+ * Read and parse a private JSON state file. Returns undefined when it doesn't exist. A file that
+ * others can read is made private again, and one that isn't JSON is an error that names the file.
+ */
+export function readPrivateJsonFile(path: string): unknown {
   let text: string;
   try {
     text = readFileSync(path, "utf8");
+    if (process.platform !== "win32" && (statSync(path).mode & 0o077) !== 0) chmodSync(path, PRIVATE_FILE);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;
   }
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${path} is not valid JSON. Delete it and start again; channelstack recreates it.`);
+  }
 }
 
 export function removeFile(path: string): void {
