@@ -8,6 +8,15 @@ import { streamText } from "ai";
 
 import { app, listen } from "../shared/bolt.ts";
 import { answer, wantsWriting, writer } from "../shared/scripted-model.ts";
+import {
+  approvalBlocks,
+  deployRequest,
+  environmentBlocks,
+  incidentOfferBlocks,
+  incidentView,
+  SUGGESTED_PROMPTS,
+  texts,
+} from "../shared/workflows.ts";
 
 /** Events Slack delivers more than once (a retry after a slow ack) are handled once. */
 const handled = new Set<string>();
@@ -23,9 +32,116 @@ app.event("app_mention", async ({ event, body, client, say }) => {
   joined.add(`${event.channel}:${thread}`);
   if (/look at/i.test(event.text))
     await client.reactions.add({ channel: event.channel, timestamp: event.ts, name: "eyes" });
+  // Workflows first: a deploy needs an approval or an environment, an incident needs its form.
+  const deploy = deployRequest(event.text);
+  if (deploy?.environment) {
+    const { service, environment } = deploy;
+    return void (await say({
+      thread_ts: thread,
+      text: texts.askApproval(service, environment),
+      blocks: approvalBlocks(service, environment),
+    }));
+  }
+  if (deploy) {
+    const { service } = deploy;
+    return void (await say({
+      thread_ts: thread,
+      text: texts.askEnvironment(service),
+      blocks: environmentBlocks(service),
+    }));
+  }
+  if (/file an incident/i.test(event.text)) {
+    return void (await say({ thread_ts: thread, text: texts.askIncident, blocks: incidentOfferBlocks() }));
+  }
   // In a group DM the answer goes into the conversation itself; everywhere else, into the thread.
   const { channel } = await client.conversations.info({ channel: event.channel });
   await say({ text: answer(event.text, event.user ?? ""), ...(channel?.is_mpim ? {} : { thread_ts: thread }) });
+});
+
+/** Approvals already acted on, by the message the button is on: a double click deploys once. */
+const approved = new Set<string>();
+
+app.action("approve_deploy", async ({ ack, body, action, client, respond }) => {
+  await ack();
+  if (body.type !== "block_actions" || action.type !== "button" || !body.message || !body.channel) return;
+  const { user } = await client.users.info({ user: body.user.id });
+  if (!user?.is_admin) {
+    return void (await respond({ response_type: "ephemeral", replace_original: false, text: texts.mayNotApprove }));
+  }
+  if (approved.has(body.message.ts)) return;
+  approved.add(body.message.ts);
+  const [service = "", environment = ""] = (action.value ?? "").split(":");
+  await client.chat.postMessage({
+    channel: body.channel.id,
+    thread_ts: body.message.thread_ts ?? body.message.ts,
+    text: texts.deploying(service, environment),
+  });
+});
+
+app.action("pick_environment", async ({ ack, body, action, client }) => {
+  await ack();
+  if (body.type !== "block_actions" || action.type !== "static_select" || !body.message || !body.channel) return;
+  await client.chat.postMessage({
+    channel: body.channel.id,
+    thread_ts: body.message.thread_ts ?? body.message.ts,
+    text: texts.deploying(action.block_id.replace(/^deploy:/, ""), action.selected_option.value),
+  });
+});
+
+app.action("open_incident_form", async ({ ack, body, client }) => {
+  await ack();
+  if (body.type !== "block_actions" || !body.channel) return;
+  // The trigger_id is good for three seconds: the form opens before anything else happens.
+  await client.views.open({ trigger_id: body.trigger_id, view: incidentView(body.channel.id) });
+});
+
+app.view("incident", async ({ ack, view, client }) => {
+  await ack();
+  const severity = view.state.values.severity?.value?.selected_option?.value ?? "";
+  const summary = view.state.values.summary?.value?.value ?? "";
+  await client.chat.postMessage({ channel: view.private_metadata, text: texts.incidentFiled(severity, summary) });
+});
+
+app.command("/deploy", async ({ ack, command }) => {
+  // "/deploy web staging": answered in the acknowledgement itself, for everyone in the channel.
+  const [service = "", environment = "staging"] = command.text.split(/\s+/);
+  await ack({ response_type: "in_channel", text: texts.deploying(service, environment) });
+});
+
+app.shortcut("create_ticket", async ({ ack, shortcut, client }) => {
+  await ack();
+  if (shortcut.type !== "message_action") return;
+  await client.chat.postMessage({
+    channel: shortcut.channel.id,
+    thread_ts: shortcut.message.thread_ts ?? shortcut.message_ts,
+    text: texts.ticketCreated,
+  });
+});
+
+/** What is being written right now, by thread: Stop ends it. */
+const writing = new Map<string, AbortController>();
+
+app.event("agent_session_stopped", async ({ event }) => {
+  const { channel, thread_ts: thread } = event as unknown as { channel: string; thread_ts: string };
+  writing.get(`${channel}:${thread}`)?.abort();
+});
+
+/** Which channel a person is looking at while they talk to the agent in its split view, by thread. */
+const lookingAt = new Map<string, string>();
+
+app.event("assistant_thread_started", async ({ event, client }) => {
+  const { channel_id: channel, thread_ts: thread, context } = event.assistant_thread;
+  if (context.channel_id) lookingAt.set(`${channel}:${thread}`, context.channel_id);
+  await client.assistant.threads.setSuggestedPrompts({
+    channel_id: channel,
+    thread_ts: thread,
+    prompts: SUGGESTED_PROMPTS,
+  });
+});
+
+app.event("assistant_thread_context_changed", async ({ event }) => {
+  const { channel_id: channel, thread_ts: thread, context } = event.assistant_thread;
+  if (context.channel_id) lookingAt.set(`${channel}:${thread}`, context.channel_id);
 });
 
 app.message(async ({ message, body, client, say }) => {
@@ -39,18 +155,37 @@ app.message(async ({ message, body, client, say }) => {
   if ((message.text ?? "").includes("<@") && !direct) return;
   joined.add(`${message.channel}:${thread}`);
   const prompt = message.text ?? "";
+  // In the split view, "this channel" is the one the person is looking at.
+  const looking = lookingAt.get(`${message.channel}:${thread}`);
+  if (looking !== undefined && /this channel/i.test(prompt)) {
+    const { channel } = await client.conversations.info({ channel: looking });
+    return void (await say({ text: texts.channelSummary(channel?.name ?? looking), thread_ts: thread }));
+  }
   if (!wantsWriting(prompt)) return void (await say({ text: answer(prompt, message.user), thread_ts: thread }));
 
   // Long-form: say that it is thinking, then stream the answer as the model produces it.
   await client.assistant.threads.setStatus({ channel_id: message.channel, thread_ts: thread, status: "is thinking…" });
-  const { textStream } = streamText({ model: writer(prompt), prompt });
+  const stop = new AbortController();
+  writing.set(`${message.channel}:${thread}`, stop);
+  const { textStream } = streamText({ model: writer(prompt), prompt, abortSignal: stop.signal });
   let stream: string | undefined;
-  for await (const text of textStream) {
-    if (stream === undefined)
-      stream = (await client.chat.startStream({ channel: message.channel, thread_ts: thread, markdown_text: text })).ts;
-    else await client.chat.appendStream({ channel: message.channel, ts: stream, markdown_text: text });
+  try {
+    for await (const text of textStream) {
+      // Stop ends the stream on Slack's side; nothing more is written to it.
+      if (stop.signal.aborted) return;
+      if (stream === undefined)
+        stream = (await client.chat.startStream({ channel: message.channel, thread_ts: thread, markdown_text: text }))
+          .ts;
+      else await client.chat.appendStream({ channel: message.channel, ts: stream, markdown_text: text });
+    }
+    if (stream !== undefined && !stop.signal.aborted)
+      await client.chat.stopStream({ channel: message.channel, ts: stream });
+  } catch (error) {
+    // Stop can land between the check above and the next append.
+    if (!stop.signal.aborted) throw error;
+  } finally {
+    writing.delete(`${message.channel}:${thread}`);
   }
-  if (stream !== undefined) await client.chat.stopStream({ channel: message.channel, ts: stream });
 });
 
 app.event("reaction_added", async ({ event, body, client }) => {

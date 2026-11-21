@@ -10,7 +10,7 @@ from urllib.parse import quote
 from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
-from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next
+from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next
 
 __all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
@@ -404,7 +404,7 @@ type SlackSuggestedPrompts = list[dict[str, Any]]
 type SlackModals = list[SlackModal]
 
 
-type SlackModalValues = dict[str, str | list[str]]
+type SlackModalValues = dict[str, str | list[str] | None]
 
 
 type SlackMessages = list[SlackMessage]
@@ -824,13 +824,13 @@ class SlackUser:
     async def click(self, button: str | SlackButtonRef, *, message: SlackMessage | None = None, thread: SlackThread | SlackMessage | None = None, channel: SlackConversation | None = None) -> SlackDelivery:
         """Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/click", body={"button": {"label": button} if isinstance(button, str) else button._to_wire(), "message": None if message is None else {"channel": message.channel, "ts": message.ts}, "thread": None if thread is None else {"channel": thread.channel, "ts": thread.ts}, "channel": None if channel is None else channel.id})
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/click", body={"button": {"label": button} if isinstance(button, str) else button._to_wire(), "message": None if message is None else {"channel": message.channel, "ts": message.ts}, "thread": None if thread is None else {"channel": thread.channel, "ts": thread.ts}, "channel": None if channel is None else channel.id}))
         return SlackDelivery(ctx, data)
 
     async def select(self, option: str | list[str], *, menu: str | SlackMenuRef, message: SlackMessage) -> SlackDelivery:
         """Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/select", body={"option": (option if isinstance(option, list) else [option]), "menu": {"label": menu} if isinstance(menu, str) else menu._to_wire(), "message": {"channel": message.channel, "ts": message.ts}})
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/select", body={"option": (option if isinstance(option, list) else [option]), "menu": {"label": menu} if isinstance(menu, str) else menu._to_wire(), "message": {"channel": message.channel, "ts": message.ts}}))
         return SlackDelivery(ctx, data)
 
     async def shortcut(self, callback_id: str, *, message: SlackMessage) -> SlackDelivery:
@@ -860,7 +860,7 @@ class SlackUser:
     async def pick_prompt(self, title: str, *, thread: SlackThread | SlackMessage) -> SlackMessage:
         """Pick one of the prompts the app suggested in a thread: this person says its message there. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/pick-prompt", body={"title": title, "thread": {"channel": thread.channel, "ts": thread.ts}})
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/pick-prompt", body={"title": title, "thread": {"channel": thread.channel, "ts": thread.ts}}))
         return SlackMessage(ctx, data)
 
     async def switch_context(self, channel: SlackConversation, *, thread: SlackThread | SlackMessage) -> SlackDelivery:
@@ -906,6 +906,7 @@ class SlackUser:
     async def ephemeral(self) -> SlackEphemeralMessages:
         """Messages only this person can see. Experimental."""
         ctx = self._ctx
+        await until_quiet(lambda: quiet_of(ctx))
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/ephemeral")
         return [SlackMessage(ctx, item) for item in data]
 
@@ -1004,6 +1005,7 @@ class SlackThread:
     async def suggested_prompts(self) -> SlackSuggestedPrompts:
         """The prompts the app suggested in a thread. Experimental."""
         ctx = self._ctx
+        await until_quiet(lambda: quiet_of(ctx))
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/suggested-prompts")
         return data
 
@@ -1113,7 +1115,7 @@ class SlackModal:
         """What is filled in: each input by its label (or action_id), with the text a person sees in it. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/modals/{quote(self.view_id, safe='')}/values")
-        return data
+        return {key: (None if value is None else value) for key, value in data.items()}
 
     async def submit(self, values: dict[str, str | list[str]] | None = None) -> SlackDelivery:
         """Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental."""

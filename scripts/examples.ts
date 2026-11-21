@@ -24,10 +24,11 @@ const AGENTS = {
 const ENABLED = [
   "mentions and threads > ",
   "direct messages > ",
+  "buttons, menus, modals and commands > ",
+  "streaming, status and Stop > ",
   "reactions, edits and deletes > ",
   "inspecting what the agent did > ",
-  "streaming, status and Stop > streams a reply and shows a status while working",
-  // Everything but the Socket Mode test, which is phase 2.
+  // Everything but the Socket Mode test, which needs an agent started in Socket Mode (exit check 2.2).
   "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
 ];
 

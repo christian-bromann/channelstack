@@ -80,7 +80,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       case "record":
         return converts(type.values);
       case "nullable":
-        return converts(type.type);
+        return true;
       case "union":
         return type.types.some(converts);
       default:
@@ -196,12 +196,16 @@ export function emitPython(ir: Ir): Map<string, string> {
         .map((param) => `${JSON.stringify(param.name)}: ${encode(param)}`);
       return entries.length > 0 ? [`${where}={${entries.join(", ")}}`] : [];
     };
-    const call = `await ctx.transport.request(${[JSON.stringify(m.http.verb), `f"${path}"`, ...dict("body"), ...dict("query")].join(", ")})`;
+    const sent = `ctx.transport.request(${[JSON.stringify(m.http.verb), `f"${path}"`, ...dict("body"), ...dict("query")].join(", ")})`;
+    const call = m.retryWhile
+      ? `await retry_while((${m.retryWhile.map((code) => JSON.stringify(code)).join(", ")},), lambda: ${sent})`
+      : `await ${sent}`;
     return [
       "",
       `    async def ${snakeCase(m.name)}(${parameters.join(", ")}) -> ${m.returns ? typeOf(m.returns) : "None"}:`,
       `        """${m.summary}.${m.stability === "experimental" ? " Experimental." : ""}"""`,
       "        ctx = self._ctx",
+      ...(m.onceQuiet ? ["        await until_quiet(lambda: quiet_of(ctx))"] : []),
       ...(m.returns ? [`        data = ${call}`, `        return ${decode(m.returns, "data")}`] : [`        ${call}`]),
     ];
   };
@@ -342,6 +346,17 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...ir.resources.map((resource) => resource.name),
   ].sort();
 
+  const allMethods = ir.resources.flatMap((resource) => resource.methods);
+  const usesText = allWaits.some((w) => w.text !== undefined);
+  // In the order ruff sorts them: capitalized names first, then the rest by name.
+  const waitImports = [
+    ...(usesText ? ["Text"] : []),
+    ...(allWaits.length > 0 ? ["describe_wait", "from_matches", "latest_once_quiet"] : []),
+    ...(allMethods.some((m) => m.retryWhile) ? ["retry_while"] : []),
+    ...(usesText ? ["text_matches"] : []),
+    ...(allMethods.some((m) => m.onceQuiet) ? ["until_quiet"] : []),
+    ...(allWaits.length > 0 ? ["wait_for", "wait_for_next"] : []),
+  ];
   const lines = [
     `# ${BANNER}`,
     "# ruff: noqa",
@@ -352,16 +367,12 @@ export function emitPython(ir: Ir): Map<string, string> {
     "from typing import Any, Literal, Self",
     "from urllib.parse import quote",
     "",
-    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") ? ", quiet_of" : ""}, session_of`,
+    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") || allMethods.some((m) => m.onceQuiet) ? ", quiet_of" : ""}, session_of`,
     ...(usesDurations || allWaits.length > 0
       ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
       : []),
     "from ..runtime.transport import ChannelstackError, Transport",
-    ...(allWaits.length > 0
-      ? [
-          `from ..runtime.wait import ${allWaits.some((w) => w.text !== undefined) ? "Text, " : ""}describe_wait, from_matches, latest_once_quiet${allWaits.some((w) => w.text !== undefined) ? ", text_matches" : ""}, wait_for, wait_for_next`,
-        ]
-      : []),
+    ...(waitImports.length > 0 ? [`from ..runtime.wait import ${waitImports.join(", ")}`] : []),
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,
     "",

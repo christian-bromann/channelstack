@@ -49,7 +49,8 @@ export class IrIndex {
       case "record":
         return this.holdsResources(type.values, seen);
       case "nullable":
-        return this.holdsResources(type.type, seen);
+        // `null` on the wire is "nothing" in the SDK, so the value is converted whatever it holds.
+        return true;
       case "object":
         return type.fields.some((field) => this.holdsResources(field.type, seen));
       case "union":

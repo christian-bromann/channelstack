@@ -69,6 +69,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return `decode${type.name}(ctx, ${expr})`;
       case "nullable":
         return `(${expr} === null ? undefined : ${decode(type.type, expr)})`;
+      case "record":
+        return `Object.fromEntries(Object.entries(${expr}).map(([key, value]) => [key, ${decode(type.values, "value")}]))`;
       case "object":
         return `{ ...${expr}, ${type.fields
           .filter((field) => index.holdsResources(field.type))
@@ -161,13 +163,15 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       ...(body.length > 0 ? [`body: { ${body.map(entry).join(", ")} }`] : []),
       ...(query.length > 0 ? [`query: { ${query.map(entry).join(", ")} }`] : []),
     ];
-    const call = `ctx.transport.request(${JSON.stringify(m.http.verb)}, \`${path}\`${request.length > 0 ? `, { ${request.join(", ")} }` : ""})`;
+    const sent = `ctx.transport.request(${JSON.stringify(m.http.verb)}, \`${path}\`${request.length > 0 ? `, { ${request.join(", ")} }` : ""})`;
+    const call = m.retryWhile ? `retryWhile(${JSON.stringify(m.retryWhile)}, () => ${sent})` : sent;
     const returns = m.returns ? typeOf(m.returns, "public") : "void";
     return [
       "",
       `  /** ${m.summary}.${m.stability === "experimental" ? " Experimental." : ""} */`,
       `  async ${m.name}(${parameters.join(", ")}): Promise<${returns}> {`,
       "    const ctx = this.#ctx;",
+      ...(m.onceQuiet ? ["    await untilQuiet(() => quietOf(ctx));"] : []),
       ...(m.returns
         ? [
             `    const data = (await ${call}) as ${typeOf(m.returns, "wire")};`,
@@ -323,6 +327,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
   const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
   const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
+  const allMethods = ir.resources.flatMap((resource) => resource.methods);
   const waitImports = [
     ...(allWaits.some((w) => w.from !== undefined) ? ["describeWait", "fromMatches"] : []),
     ...(allWaits.some((w) => w.text !== undefined) ? ["textMatches"] : []),
@@ -330,6 +335,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ...(allWaits.some((w) => w.mode === "until") ? ["waitFor"] : []),
     ...(allWaits.some((w) => w.mode === "next") ? ["waitForNext"] : []),
     ...(allWaits.some((w) => w.mode !== "latest") ? ["type WaitOptions"] : []),
+    ...(allMethods.some((m) => m.retryWhile) ? ["retryWhile"] : []),
+    ...(allMethods.some((m) => m.onceQuiet) ? ["untilQuiet"] : []),
   ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),

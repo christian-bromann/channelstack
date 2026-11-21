@@ -34,6 +34,13 @@ export function writer(prompt: string) {
     "## What changed\n\nThe delivery queue now retries a slow acknowledgement the way the platform does, signatures are checked before anything else is read, and a rate-limited call waits for as long as it was told to before it tries again. None of this needs a change in your code.\n\n",
     "## What to do\n\nUpdate, run the tests once and read the new failure messages: they name the message a person would still see, which is usually the line you need to fix.\n\n",
     "## Thanks\n\nTo everyone who reported a conversation that went wrong and sent the transcript along with it.\n",
+    // A long piece of writing keeps going for a few seconds, long enough for someone to press Stop.
+    ...(/\blong\b/i.test(prompt)
+      ? Array.from(
+          { length: 16 },
+          (_, index) => `\n## Appendix ${index + 1}\n\nMore detail, for those who asked for a long one.\n`,
+        )
+      : []),
   ];
   return new MockLanguageModelV4({
     doStream: async () => ({

@@ -370,7 +370,7 @@ describe("modals", () => {
     const [modal] = await get(`/users/${ana.id}/modals`);
     expect(modal).toMatchObject({ viewId: opened.view.id, title: "File an incident", user: { id: ana.id } });
     // What a person sees in the form: each input by its label, with what is filled in so far.
-    expect(await get(`/modals/${modal.viewId}/values`)).toEqual({ Severity: "SEV3", Summary: undefined, Teams: [] });
+    expect(await get(`/modals/${modal.viewId}/values`)).toEqual({ Severity: "SEV3", Summary: null, Teams: [] });
 
     // A trigger_id works once, for three seconds, and only if Slack issued it.
     expect((await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW })).error).toBe(

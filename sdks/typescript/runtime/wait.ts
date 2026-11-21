@@ -34,6 +34,35 @@ export async function waitFor<T>(
   }
 }
 
+/**
+ * Repeat a call while it is refused with one of these error codes, the way a person waits for a
+ * button to appear before clicking it. When the time is up, the last refusal is the error.
+ */
+export async function retryWhile<T>(
+  codes: readonly string[],
+  call: () => Promise<T>,
+  options: WaitOptions = {},
+): Promise<T> {
+  let refusal: unknown;
+  try {
+    return await waitFor(
+      "the call to be accepted",
+      async () => {
+        try {
+          return { value: await call() };
+        } catch (error) {
+          if (!codes.includes(String((error as { code?: unknown } | null)?.code))) throw error;
+          refusal = error;
+          return undefined;
+        }
+      },
+      options,
+    ).then(({ value }) => value);
+  } catch (error) {
+    throw error instanceof WaitTimeoutError && refusal !== undefined ? refusal : error;
+  }
+}
+
 export interface QuietOptions extends WaitOptions {
   /**
    * How long the agent must be quiet (no call in flight, no delivery in flight or about to be retried, no open stream)

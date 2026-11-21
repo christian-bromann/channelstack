@@ -88,7 +88,7 @@ The same modules with the same names in every language.
 | Launcher | `launcher` | `auto` / `attach` / `start`; finding the server binary and its per-platform package name |
 | Client base | `client` | What generated handles share: `HandleContext`, the root client's `close`, the version check on connect |
 | Credentials | `credentials` *(planned, phase 5)* | `CHANNELSTACK_<CHANNEL>_*` lookup |
-| Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it |
+| Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, repeating a call a person would wait for (`retryWhile`), text matching for waits, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it |
 | Durations | `duration` | Parsing `"3s"`, `"750ms"` |
 
 The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary.
@@ -108,6 +108,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Concern | Module | Notes |
 |---|---|---|
 | What the agents answer | `shared/scripted-model.ts` | The scripted "model": short answers, and the AI SDK's mock model for streamed long-form. Every agent answers from here, so they behave the same |
+| The workflows the agents offer | `shared/workflows.ts` | A deploy that needs approval or an environment, the incident form, a ticket for a message, suggested prompts: the Block Kit and the words, the same for every agent |
 | The Bolt app the Bolt agents start from | `shared/bolt.ts` | Configuration from the environment, `listen` |
 | Bolt + AI SDK | `bolt-ai-sdk/agent.ts` | Mentions, DMs, reactions, native streaming |
 | Chat SDK | `chat-sdk-slack/agent.ts` | The same behaviour on Vercel's Chat SDK and its Slack adapter |

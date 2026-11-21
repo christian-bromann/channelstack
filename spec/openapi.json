@@ -1461,6 +1461,9 @@
               "items": {
                 "type": "string"
               }
+            },
+            {
+              "type": "null"
             }
           ]
         }
@@ -3528,6 +3531,9 @@
             "message",
             "thread",
             "channel"
+          ],
+          "retryWhile": [
+            "not_found"
           ]
         },
         "x-channelstack-error-codes": [
@@ -3610,6 +3616,9 @@
           "options": [
             "menu",
             "message"
+          ],
+          "retryWhile": [
+            "not_found"
           ]
         },
         "x-channelstack-error-codes": [
@@ -4009,6 +4018,9 @@
           ],
           "options": [
             "thread"
+          ],
+          "retryWhile": [
+            "not_found"
           ]
         },
         "x-channelstack-error-codes": [
@@ -4168,7 +4180,8 @@
           "bind": {
             "channel": "channel",
             "ts": "ts"
-          }
+          },
+          "onceQuiet": true
         },
         "x-channelstack-error-codes": [
           "unauthorized",
@@ -5635,7 +5648,8 @@
         ],
         "x-channelstack-method": {
           "on": "SlackUser",
-          "name": "ephemeral"
+          "name": "ephemeral",
+          "onceQuiet": true
         },
         "x-channelstack-error-codes": [
           "unauthorized",

@@ -502,7 +502,14 @@ export function registerSlackRoutes(
       .openapi("SlackClickBody"),
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
-    sdkMethod: { on: "SlackUser", name: "click", args: ["button"], options: ["message", "thread", "channel"] },
+    // A person waits for the button to appear before they click it.
+    sdkMethod: {
+      on: "SlackUser",
+      name: "click",
+      args: ["button"],
+      options: ["message", "thread", "channel"],
+      retryWhile: ["not_found"],
+    },
     stability,
     handler: ({ session, params, body }) => {
       const scopes = [
@@ -536,7 +543,13 @@ export function registerSlackRoutes(
       .openapi("SlackSelectBody"),
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
-    sdkMethod: { on: "SlackUser", name: "select", args: ["option"], options: ["menu", "message"] },
+    sdkMethod: {
+      on: "SlackUser",
+      name: "select",
+      args: ["option"],
+      options: ["menu", "message"],
+      retryWhile: ["not_found"],
+    },
     stability,
     handler: ({ session, params, body }) =>
       interaction(session.id, world.selectAsUser(session.id, params.user, body.option, body.menu, body.message)),
@@ -613,7 +626,7 @@ export function registerSlackRoutes(
     body: z.object({ title: z.string().min(1), thread: threadRef }).openapi("SlackPickPromptBody"),
     response: SlackMessage,
     errors: ["not_found", "not_in_channel"],
-    sdkMethod: { on: "SlackUser", name: "pickPrompt", args: ["title"], options: ["thread"] },
+    sdkMethod: { on: "SlackUser", name: "pickPrompt", args: ["title"], options: ["thread"], retryWhile: ["not_found"] },
     stability,
     handler: ({ session, params, body }) =>
       messageWire(session.id, world.pickPrompt(session.id, params.user, body.title, body.thread)),
@@ -640,7 +653,8 @@ export function registerSlackRoutes(
     params: MessageParams,
     response: z.array(z.object({ title: z.string(), message: z.string() })).openapi("SlackSuggestedPrompts"),
     errors: ["not_found"],
-    sdkMethod: { on: "SlackThread", name: "suggestedPrompts", bind: messageBinding },
+    // The app sets them after it hears the thread was opened: read once it has gone quiet.
+    sdkMethod: { on: "SlackThread", name: "suggestedPrompts", bind: messageBinding, onceQuiet: true },
     stability,
     handler: ({ session, params }) => world.suggestedPrompts(session.id, params.channel, params.ts),
   });
@@ -681,7 +695,8 @@ export function registerSlackRoutes(
     path: "/modals/{view}/values",
     summary: "What is filled in: each input by its label (or action_id), with the text a person sees in it",
     params: ViewParams,
-    response: z.record(z.string(), z.union([z.string(), z.array(z.string())]).optional()).openapi("SlackModalValues"),
+    // An empty input is there, with nothing in it: null on the wire, so the key survives.
+    response: z.record(z.string(), z.union([z.string(), z.array(z.string())]).nullable()).openapi("SlackModalValues"),
     errors: ["not_found"],
     sdkMethod: { on: "SlackModal", name: "values" },
     stability,
@@ -690,7 +705,7 @@ export function registerSlackRoutes(
       return Object.fromEntries(
         viewInputs(view.definition.blocks).map((input) => [
           input.label || input.actionId,
-          shownValue(view.values[input.blockId]?.[input.actionId] ?? { type: "" }),
+          shownValue(view.values[input.blockId]?.[input.actionId] ?? { type: "" }) ?? null,
         ]),
       );
     },
@@ -964,7 +979,8 @@ export function registerSlackRoutes(
     params: UserParams,
     response: z.array(SlackMessage).openapi("SlackEphemeralMessages"),
     errors: ["not_found"],
-    sdkMethod: { on: "SlackUser", name: "ephemeral" },
+    // What the app answered only this person with: read once it has gone quiet.
+    sdkMethod: { on: "SlackUser", name: "ephemeral", onceQuiet: true },
     stability,
     handler: ({ session, params }) =>
       world.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),

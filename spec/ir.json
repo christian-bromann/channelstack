@@ -1648,7 +1648,10 @@
             "not_in_channel",
             "dispatch_failed"
           ],
-          "dispose": false
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
         },
         {
           "name": "select",
@@ -1720,7 +1723,10 @@
             "not_in_channel",
             "dispatch_failed"
           ],
-          "dispose": false
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
         },
         {
           "name": "shortcut",
@@ -1991,7 +1997,10 @@
             "not_found",
             "not_in_channel"
           ],
-          "dispose": false
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
         },
         {
           "name": "switchContext",
@@ -2418,7 +2427,8 @@
             "session_not_found",
             "not_found"
           ],
-          "dispose": false
+          "dispose": false,
+          "onceQuiet": true
         }
       ],
       "waits": [
@@ -3001,7 +3011,8 @@
             "session_not_found",
             "not_found"
           ],
-          "dispose": false
+          "dispose": false,
+          "onceQuiet": true
         },
         {
           "name": "replies",
@@ -4452,18 +4463,21 @@
       "type": {
         "kind": "record",
         "values": {
-          "kind": "union",
-          "types": [
-            {
-              "kind": "string"
-            },
-            {
-              "kind": "array",
-              "items": {
+          "kind": "nullable",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
                 "kind": "string"
+              },
+              {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
               }
-            }
-          ]
+            ]
+          }
         }
       }
     },

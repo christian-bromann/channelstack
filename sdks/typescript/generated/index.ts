@@ -3,7 +3,7 @@ import { ClientBase, connectWith, disposeQuietly, type HandleContext, printsAs, 
 import { type Duration, parseDuration } from "../runtime/duration.ts";
 import type { LaunchOptions } from "../runtime/launcher.ts";
 import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";
-import { describeWait, fromMatches, textMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, type QuietState } from "../runtime/wait.ts";
+import { describeWait, fromMatches, textMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, retryWhile, untilQuiet, type QuietState } from "../runtime/wait.ts";
 
 /** The server version this SDK was generated for. */
 export const VERSION = "0.0.0";
@@ -185,7 +185,13 @@ function decodeSlackModals(ctx: HandleContext, data: SlackModalsWire): SlackModa
   return data.map((item) => new SlackModal(ctx, item));
 }
 
-export type SlackModalValues = Record<string, string | string[]>;
+export type SlackModalValues = Record<string, string | string[] | undefined>;
+
+export type SlackModalValuesWire = Record<string, string | string[] | null>;
+
+function decodeSlackModalValues(ctx: HandleContext, data: SlackModalValuesWire): SlackModalValues {
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, (value === null ? undefined : value)]));
+}
 
 export type SlackMessages = SlackMessage[];
 
@@ -780,14 +786,14 @@ export class SlackUser {
   /** Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental. */
   async click(button: string | SlackButtonRef, options: { message?: SlackMessage; thread?: SlackThread | SlackMessage; channel?: SlackConversation } = {}): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } })) as SlackDeliveryData;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
   /** Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental. */
   async select(option: string | string[], options: { menu: string | SlackMenuRef; message: SlackMessage }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/select`, { body: { option: [option].flat(), menu: typeof options.menu === "string" ? { label: options.menu } : options.menu, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/select`, { body: { option: [option].flat(), menu: typeof options.menu === "string" ? { label: options.menu } : options.menu, message: { channel: options.message.channel, ts: options.message.ts } } }))) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 
@@ -822,7 +828,7 @@ export class SlackUser {
   /** Pick one of the prompts the app suggested in a thread: this person says its message there. Experimental. */
   async pickPrompt(title: string, options: { thread: SlackThread | SlackMessage }): Promise<SlackMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/pick-prompt`, { body: { title, thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackMessageData;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/pick-prompt`, { body: { title, thread: { channel: options.thread.channel, ts: options.thread.ts } } }))) as SlackMessageData;
     return new SlackMessage(ctx, data);
   }
 
@@ -876,6 +882,7 @@ export class SlackUser {
   /** Messages only this person can see. Experimental. */
   async ephemeral(): Promise<SlackEphemeralMessages> {
     const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/ephemeral`)) as SlackEphemeralMessagesWire;
     return decodeSlackEphemeralMessages(ctx, data);
   }
@@ -1062,6 +1069,7 @@ export class SlackThread {
   /** The prompts the app suggested in a thread. Experimental. */
   async suggestedPrompts(): Promise<SlackSuggestedPrompts> {
     const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}/suggested-prompts`)) as SlackSuggestedPrompts;
     return data;
   }
@@ -1255,8 +1263,8 @@ export class SlackModal {
   /** What is filled in: each input by its label (or action_id), with the text a person sees in it. Experimental. */
   async values(): Promise<SlackModalValues> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/values`)) as SlackModalValues;
-    return data;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/values`)) as SlackModalValuesWire;
+    return decodeSlackModalValues(ctx, data);
   }
 
   /** Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental. */
