@@ -9,6 +9,7 @@ export function Code({ sample, label, plain = false }: { sample: Sample; label: 
     <pre className={plain ? "code plain" : "code"} tabIndex={0} role="region" aria-label={label}>
       <code>
         {sample.lines.map((html, i) => (
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: highlighted HTML built from our own sample files
           <span key={i} className="line" dangerouslySetInnerHTML={{ __html: html }} />
         ))}
       </code>

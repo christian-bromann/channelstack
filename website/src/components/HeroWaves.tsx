@@ -103,7 +103,7 @@ export function HeroWaves() {
       typeof IntersectionObserver === "undefined"
     )
       return;
-    if (getComputedStyle(el).display === "none") return;
+    // Below 1180 px the decoration is hidden; its animations stay paused until it is on screen.
     const animations: Animation[] = [];
     const timing = { duration: CYCLE, iterations: Infinity } as const;
 

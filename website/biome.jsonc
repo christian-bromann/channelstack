@@ -9,10 +9,6 @@
   },
   "linter": {
     "rules": {
-      "security": {
-        // Highlighted code is HTML produced at build time from this repository's own sample files.
-        "noDangerouslySetInnerHtml": "off",
-      },
       "a11y": {
         // Scrollable code blocks and tables are focusable regions on purpose, so keyboard users can scroll them.
         "noNoninteractiveTabindex": "off",

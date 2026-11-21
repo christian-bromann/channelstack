@@ -2,8 +2,9 @@ import { expect, test } from "vitest";
 
 test("ships a PR from a Slack DM", async ({ slack }) => {
   const ana = await slack.createUser({ name: "ana" });
+  const dm = { to: slack.app };
   // [!step 1]
-  const msg = await ana.say("@robin ship #812 to staging", { to: slack.app });
+  const msg = await ana.say("@robin ship #812 to staging", dm);
 
   // [!step 2]
   await expect(msg.thread).toHaveStatusText(/checking CI/);

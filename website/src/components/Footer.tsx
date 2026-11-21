@@ -24,7 +24,8 @@ export function Footer() {
           </Link>
           <p className="legal">
             MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub,
-            Linear or Notion. Their names and logos are trademarks of their owners.
+            Linear or Notion. All names and logos shown, including TypeScript and Python, are trademarks of their
+            owners.
           </p>
         </div>
         <nav aria-labelledby="footer-docs">

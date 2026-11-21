@@ -197,6 +197,7 @@ function Panel({
           <code>
             <span className="hot" ref={bar} aria-hidden="true" />
             {sample.lines.map((html, i) => (
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: highlighted HTML built from our own sample files
               <span key={i} className="line" dangerouslySetInnerHTML={{ __html: html }} />
             ))}
           </code>

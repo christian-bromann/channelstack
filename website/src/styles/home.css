@@ -969,6 +969,9 @@ td.p {
 
 .voice-wave {
   position: relative;
+  /* the playhead is moved with a transform; clip it so it can never widen the page */
+  padding-block: 6px;
+  overflow: hidden;
 }
 
 .voice svg {
@@ -979,7 +982,7 @@ td.p {
 /* the playhead: a thin line that crosses the wave as the word is spoken */
 .playhead {
   position: absolute;
-  inset: -6px 0;
+  inset: 0;
   opacity: 0;
   pointer-events: none;
 }

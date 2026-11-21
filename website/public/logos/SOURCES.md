@@ -24,7 +24,7 @@ To re-check a file, download the kit, and compare `shasum -a 256` of the file at
 
 Summaries are paraphrased; read the linked page before changing how a mark is used.
 
-| Channel | Guidelines | What they say about this use on a third-party site |
+| Owner | Guidelines | What they say about this use on a third-party site |
 |---|---|---|
 | Slack | https://slack.com/terms-of-service/slack-brand | Text statements that an app integrates with Slack are allowed. The terms say not to use the Slack logo without a licence; other uses need a request to Slack with a mockup. |
 | GitHub | https://brand.github.com/foundations/logo, https://docs.github.com/en/site-policy/other-site-policies/github-logo-policy | "Show integration" is listed as an allowed use of a permitted logo; the same page also asks for prior written permission. Black or white mark only. |
@@ -43,4 +43,4 @@ Notion for permission, or replacing those two marks with names, are the ways to 
 - "Works with" use only: one platform mark per channel card, next to the platform's name, and nowhere else on the site.
 - The TypeScript and Python marks appear only on the language switch of the example player, at 18 px, to name the language of the sample.
 - GitHub and Linear use their official dark-background files in the dark theme; Slack and Notion have one file for both.
-- The footer states that channelstack is not affiliated with or endorsed by these companies and that the names and logos are their trademarks (`src/components/Footer.tsx`).
+- The footer states that channelstack is not affiliated with or endorsed by the four platforms, and that all names and logos shown, including TypeScript (Microsoft) and Python (Python Software Foundation), are trademarks of their owners (`src/components/Footer.tsx`).
