@@ -2,31 +2,54 @@ import { useEffect, useRef } from "react";
 import { prefersReducedMotion, runWhileVisible } from "../lib/hooks";
 
 /**
- * Hero decoration: two voices taking turns. A person speaks (grey bars, left of centre), the
- * agent answers (amber bars, right of centre), and so on: the conversation channelstack tests.
- * It renders as a still waveform; script animates each bar's scaleY, so it runs on transform and
- * opacity only. Hidden on narrow screens and from assistive technology.
+ * Hero decoration: two voices taking turns, the conversation channelstack tests. A person asks
+ * (grey bars, left of centre), a dot carries the message across, the agent answers at more length
+ * (amber bars, right of centre), and a dot carries the answer back. Each voice has a fainter echo
+ * that trails it. It renders as a still waveform; script animates scaleY, translateX and opacity
+ * only. Hidden on narrow screens and from assistive technology.
  */
-const COUNT = 54;
-const STEP = 9;
-const HEIGHT = 160;
+const COUNT = 60;
+const STEP = 8;
+const HEIGHT = 170;
 const MID = HEIGHT / 2;
-const CYCLE = 4400;
-/** Each voice speaks during its own part of the cycle, with a short silence between turns. */
-const TURNS = { person: [0.03, 0.44], agent: [0.53, 0.94] } as const;
-const FRAMES = 11;
+const CYCLE = 5200;
+
+const VOICES = [
+  { id: "person", centre: 0.35, seed: 1, from: 0.03, to: 0.33, syllables: 7 },
+  { id: "agent", centre: 0.65, seed: 2, from: 0.45, to: 0.89, syllables: 12 },
+] as const;
+
+/** The message crossing between the voices, in the silences. */
+const HANDOFFS = [
+  { id: "ask", from: 0.33, to: 0.45, start: 0.35, end: 0.65 },
+  { id: "answer", from: 0.89, to: 0.99, start: 0.65, end: 0.35 },
+] as const;
 
 const noise = (n: number) => Math.abs(Math.sin(n * 12.9898 + 78.233) * 43758.5453) % 1;
 /** How loud a voice can get at bar `i`: a bell around the voice's side of the picture. */
-const reach = (i: number, centre: number) => Math.exp(-Math.pow((i / (COUNT - 1) - centre) / 0.2, 2));
-
-const VOICES = [
-  { id: "person", centre: 0.36, seed: 1 },
-  { id: "agent", centre: 0.64, seed: 2 },
-] as const;
-
+const reach = (i: number, centre: number) => Math.exp(-Math.pow((i / (COUNT - 1) - centre) / 0.17, 2));
 /** The still pose: both voices mid-word. */
-const pose = (i: number, centre: number, seed: number) => Math.max(3, Math.round(HEIGHT * 0.86 * reach(i, centre) * (0.45 + 0.55 * noise(i * 7 + seed))));
+const pose = (i: number, centre: number, seed: number) => Math.max(3, Math.round(HEIGHT * 0.9 * reach(i, centre) * (0.5 + 0.5 * noise(i * 7 + seed))));
+
+/** Keyframes for one bar: silence, a run of syllables that spreads out from the voice's centre, silence. */
+function speak(i: number, height: number, voice: (typeof VOICES)[number], lag: number, gain: number): Keyframe[] {
+  const rest = `scaleY(${(3 / height).toFixed(3)})`;
+  const spread = Math.abs(i / (COUNT - 1) - voice.centre) * 0.1;
+  const start = voice.from + spread + lag;
+  const span = voice.to - voice.from - 0.1;
+  const frames: Keyframe[] = [{ transform: rest, offset: 0 }, { transform: rest, offset: start, easing: "cubic-bezier(0.3, 0, 0.2, 1)" }];
+  for (let s = 0; s < voice.syllables; s++) {
+    // Every bar shares the syllable's loudness, so the voice moves as one; each bar adds its own grain.
+    const syllable = 0.45 + 0.75 * noise(s * 17 + voice.seed * 53);
+    const grain = 0.7 + 0.3 * noise(i * 13 + s * 29 + voice.seed * 101);
+    const peak = start + (span * (s + 0.5)) / voice.syllables;
+    const dip = start + (span * (s + 1)) / voice.syllables;
+    frames.push({ transform: `scaleY(${(gain * syllable * grain).toFixed(2)})`, offset: peak, easing: "ease-in-out" });
+    if (s < voice.syllables - 1) frames.push({ transform: `scaleY(${(gain * 0.28 * grain).toFixed(2)})`, offset: dip, easing: "ease-in-out" });
+  }
+  frames.push({ transform: rest, offset: Math.min(0.995, voice.to + spread * 0.5 + lag) }, { transform: rest, offset: 1 });
+  return frames;
+}
 
 export function HeroWaves() {
   const root = useRef<HTMLDivElement>(null);
@@ -39,33 +62,23 @@ export function HeroWaves() {
     const timing = { duration: CYCLE, iterations: Infinity } as const;
 
     for (const voice of VOICES) {
-      const [from, to] = TURNS[voice.id];
-      el.querySelectorAll<SVGRectElement>(`.voice-${voice.id} rect`).forEach((rect, i) => {
-        const rest = 3 / Number(rect.getAttribute("height"));
-        // Silence, then a run of quick syllables that ripples outwards from the voice's centre, then silence.
-        const delay = Math.abs(i / (COUNT - 1) - voice.centre) * 0.12;
-        const frames: Keyframe[] = [{ transform: `scaleY(${rest})`, offset: 0 }, { transform: `scaleY(${rest})`, offset: from + delay }];
-        for (let f = 1; f <= FRAMES; f++) {
-          const offset = from + delay + ((to - from - 0.12) * f) / (FRAMES + 1);
-          const loud = 0.25 + 1.05 * noise(i * 13 + f * 29 + voice.seed * 101);
-          frames.push({ transform: `scaleY(${loud.toFixed(2)})`, offset, easing: "ease-in-out" });
-        }
-        frames.push({ transform: `scaleY(${rest})`, offset: to }, { transform: `scaleY(${rest})`, offset: 1 });
-        animations.push(rect.animate(frames, timing));
-      });
-
+      for (const [layer, lag, gain] of [["voice", 0, 1.12], ["echo", 0.024, 1.3]] as const) {
+        el.querySelectorAll<SVGRectElement>(`.${layer}-${voice.id} rect`).forEach((rect, i) => {
+          animations.push(rect.animate(speak(i, Number(rect.getAttribute("height")), voice, lag, gain), timing));
+        });
+      }
       // The speaker's name lights up for the length of its turn.
       const label = el.querySelector(`.speaker-${voice.id}`);
       if (label) {
         animations.push(
           label.animate(
             [
-              { opacity: 0.35, offset: 0 },
-              { opacity: 0.35, offset: Math.max(0, from - 0.02) },
-              { opacity: 1, offset: from + 0.04 },
-              { opacity: 1, offset: to - 0.04 },
-              { opacity: 0.35, offset: Math.min(1, to + 0.02) },
-              { opacity: 0.35, offset: 1 },
+              { opacity: 0.4, offset: 0 },
+              { opacity: 0.4, offset: Math.max(0, voice.from - 0.02) },
+              { opacity: 1, offset: voice.from + 0.04 },
+              { opacity: 1, offset: voice.to - 0.03 },
+              { opacity: 0.4, offset: Math.min(1, voice.to + 0.03) },
+              { opacity: 0.4, offset: 1 },
             ],
             timing,
           ),
@@ -73,27 +86,55 @@ export function HeroWaves() {
       }
     }
 
+    for (const handoff of HANDOFFS) {
+      const dot = el.querySelector(`.handoff-${handoff.id}`);
+      if (!dot) continue;
+      const at = (x: number) => `translateX(${(x * 100).toFixed(1)}%)`;
+      animations.push(
+        dot.animate(
+          [
+            { opacity: 0, transform: at(handoff.start), offset: 0 },
+            { opacity: 0, transform: at(handoff.start), offset: handoff.from, easing: "cubic-bezier(0.5, 0, 0.2, 1)" },
+            { opacity: 1, transform: at(handoff.start + (handoff.end - handoff.start) * 0.2), offset: handoff.from + (handoff.to - handoff.from) * 0.25, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+            { opacity: 1, transform: at(handoff.start + (handoff.end - handoff.start) * 0.85), offset: handoff.from + (handoff.to - handoff.from) * 0.8 },
+            { opacity: 0, transform: at(handoff.end), offset: handoff.to },
+            { opacity: 0, transform: at(handoff.end), offset: 1 },
+          ],
+          timing,
+        ),
+      );
+    }
+
     return runWhileVisible(el, animations);
   }, []);
 
   return (
     <div className="hero-waves" ref={root} aria-hidden="true">
-      <svg viewBox={`0 0 ${COUNT * STEP} ${HEIGHT}`} focusable="false">
-        {VOICES.map((voice) => (
-          <g key={voice.id} className={`voice-${voice.id}`}>
-            {Array.from({ length: COUNT }, (_, i) => {
-              const h = pose(i, voice.centre, voice.seed);
-              return <rect key={i} x={i * STEP + 3} y={MID - h / 2} width="3" height={h} rx="1.5" />;
-            })}
-          </g>
+      <div className="wave-box">
+        <svg viewBox={`0 0 ${COUNT * STEP} ${HEIGHT}`} focusable="false">
+          {VOICES.flatMap((voice) =>
+            (["echo", "voice"] as const).map((layer) => (
+              <g key={`${layer}-${voice.id}`} className={`${layer}-${voice.id}`}>
+                {Array.from({ length: COUNT }, (_, i) => {
+                  const h = pose(i, voice.centre, voice.seed);
+                  return <rect key={i} x={i * STEP + 2.75} y={MID - h / 2} width="2.5" height={h} rx="1.25" />;
+                })}
+              </g>
+            )),
+          )}
+        </svg>
+        {HANDOFFS.map((handoff) => (
+          <span key={handoff.id} className={`handoff handoff-${handoff.id}`}>
+            <i />
+          </span>
         ))}
-      </svg>
+      </div>
       <p className="speakers">
         <span className="speaker-person">
-          <i /> ana
+          <i>A</i> ana
         </span>
         <span className="speaker-agent">
-          <i /> robin
+          <i>R</i> robin
         </span>
       </p>
     </div>
