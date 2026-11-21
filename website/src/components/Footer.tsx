@@ -17,13 +17,14 @@ const DOCS = [
 export function Footer() {
   const [paused, setPaused] = useState(false);
 
-  // Pauses the looping decorations (hero waves, diagram, waveform); see `data-motion` in base.css.
+  // Pauses the looping decorations. CSS animations follow `data-motion` (base.css); the
+  // script-driven waveforms listen for the "motionchange" event.
   function toggleMotion() {
     const next = !paused;
     setPaused(next);
     if (next) document.documentElement.setAttribute("data-motion", "paused");
     else document.documentElement.removeAttribute("data-motion");
-    for (const animation of document.getAnimations()) next ? animation.pause() : animation.play();
+    document.dispatchEvent(new Event("motionchange"));
   }
 
   return (
@@ -37,7 +38,7 @@ export function Footer() {
           <p className="legal">
             MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear or Notion. Their names and logos are trademarks of their owners.
           </p>
-          <button type="button" className="motion-toggle" aria-pressed={paused} onClick={toggleMotion}>
+          <button type="button" className="motion-toggle" onClick={toggleMotion}>
             {paused ? <Play size={12} /> : <Pause size={12} />}
             {paused ? "Play animations" : "Pause animations"}
           </button>

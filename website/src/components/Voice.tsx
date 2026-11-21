@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { prefersReducedMotion } from "../lib/hooks";
+import { prefersReducedMotion, runWhileVisible } from "../lib/hooks";
 
 /**
  * The waveform of someone saying "channelstack": a burst for "ch", loud vowels, a quiet
@@ -69,15 +69,7 @@ export function Voice() {
       animation.pause();
       return animation;
     });
-    const observer = new IntersectionObserver(([entry]) => {
-      const run = entry?.isIntersecting && document.documentElement.getAttribute("data-motion") !== "paused";
-      animations.forEach((animation) => (run ? animation.play() : animation.pause()));
-    });
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      animations.forEach((animation) => animation.cancel());
-    };
+    return runWhileVisible(el, animations);
   }, []);
 
   return (

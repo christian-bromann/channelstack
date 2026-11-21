@@ -20,7 +20,7 @@
   --grid: rgba(255, 255, 255, 0.045);
   --shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.9);
 
-  /* code surfaces stay dark in both themes */
+  /* code surfaces: dark here, light in the light theme */
   --code-bg: #0b0e14;
   --code-raise: #141922;
   --code-line: #1c2330;
@@ -30,6 +30,8 @@
   --code-str: #8fd3a8;
   --code-fn: #8db7ff;
   --code-const: #e0a8f0;
+  --code-punct: #a3aebf;
+  --code-ok: #6fd6a0;
 
   --font-display: "Familjen Grotesk Variable", "Helvetica Neue", Arial, sans-serif;
   --font-body: "IBM Plex Sans Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -62,6 +64,17 @@
     --glow: rgba(214, 137, 24, 0.14);
     --grid: rgba(16, 20, 27, 0.05);
     --shadow: 0 30px 70px -40px rgba(16, 20, 27, 0.4);
+    --code-bg: #ffffff;
+    --code-raise: #eef0f4;
+    --code-line: #e1e5eb;
+    --code-fg: #1f2733;
+    --code-dim: #667080;
+    --code-key: #a35604;
+    --code-str: #0f7548;
+    --code-fn: #2456c9;
+    --code-const: #8a3ea8;
+    --code-punct: #4b5565;
+    --code-ok: #12734b;
     color-scheme: light;
   }
 }
@@ -84,6 +97,17 @@
   --glow: rgba(214, 137, 24, 0.14);
   --grid: rgba(16, 20, 27, 0.05);
   --shadow: 0 30px 70px -40px rgba(16, 20, 27, 0.4);
+  --code-bg: #ffffff;
+  --code-raise: #eef0f4;
+  --code-line: #e1e5eb;
+  --code-fg: #1f2733;
+  --code-dim: #667080;
+  --code-key: #a35604;
+  --code-str: #0f7548;
+  --code-fn: #2456c9;
+  --code-const: #8a3ea8;
+  --code-punct: #4b5565;
+  --code-ok: #12734b;
   color-scheme: light;
 }
 
@@ -504,7 +528,7 @@ button {
 .t-function { color: var(--code-fn); }
 .t-constant { color: var(--code-const); }
 .t-comment { color: var(--code-dim); font-style: italic; }
-.t-punctuation { color: #a3aebf; }
+.t-punctuation { color: var(--code-punct); }
 .t-parameter { color: var(--code-fg); }
 .t-link { color: var(--code-fn); text-decoration: underline; }
 
@@ -518,7 +542,7 @@ button {
 }
 
 .out .pass {
-  color: #6fd6a0;
+  color: var(--code-ok);
 }
 
 .copy {
@@ -549,7 +573,7 @@ button {
 }
 
 .copy .check {
-  color: #6fd6a0;
+  color: var(--code-ok);
   opacity: 0;
   transform: scale(0.5);
 }

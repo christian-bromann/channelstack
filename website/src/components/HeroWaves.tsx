@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { prefersReducedMotion } from "../lib/hooks";
+import { prefersReducedMotion, runWhileVisible } from "../lib/hooks";
 
 /**
  * Hero decoration: two voices taking turns. A person speaks (grey bars, left of centre), the
@@ -73,15 +73,7 @@ export function HeroWaves() {
       }
     }
 
-    const observer = new IntersectionObserver(([entry]) => {
-      const run = entry?.isIntersecting && document.documentElement.getAttribute("data-motion") !== "paused";
-      animations.forEach((animation) => (run ? animation.play() : animation.pause()));
-    });
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      animations.forEach((animation) => animation.cancel());
-    };
+    return runWhileVisible(el, animations);
   }, []);
 
   return (

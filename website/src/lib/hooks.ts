@@ -52,3 +52,27 @@ export function useReveal<T extends HTMLElement>() {
   }, []);
   return ref;
 }
+
+/**
+ * Runs script-driven (Web Animations) loops only while their element is on screen and the
+ * footer's "Pause animations" button is not pressed. Returns a cleanup function.
+ */
+export function runWhileVisible(el: Element, animations: Animation[]) {
+  let visible = false;
+  const sync = () => {
+    const run = visible && document.documentElement.getAttribute("data-motion") !== "paused";
+    animations.forEach((animation) => (run ? animation.play() : animation.pause()));
+  };
+  const observer = new IntersectionObserver(([entry]) => {
+    visible = Boolean(entry?.isIntersecting);
+    sync();
+  });
+  observer.observe(el);
+  document.addEventListener("motionchange", sync);
+  sync();
+  return () => {
+    observer.disconnect();
+    document.removeEventListener("motionchange", sync);
+    animations.forEach((animation) => animation.cancel());
+  };
+}

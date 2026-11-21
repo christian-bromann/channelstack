@@ -4,6 +4,8 @@ name: Website
 
 on:
   push:
+    # Branches only: path filters are not evaluated for tag pushes, so tags would run this.
+    branches: ["**"]
     paths:
       - "website/**"
       - ".github/workflows/website.yml"
