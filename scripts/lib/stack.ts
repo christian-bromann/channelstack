@@ -19,6 +19,8 @@ export interface StackOptions {
    * and the server is given no endpoint to deliver to.
    */
   socketMode?: boolean;
+  /** Extra environment for the agent, on top of what `channelstack env` prints. */
+  agentEnv?: Readonly<Record<string, string>>;
 }
 
 export interface RunningStack {
@@ -64,6 +66,7 @@ export async function withStack(
       ...agentEnv,
       PORT: String(port),
       ...(options.socketMode ? { SLACK_SOCKET_MODE: "1" } : {}),
+      ...options.agentEnv,
     });
     stops.push(agent.stop);
     const running = () => {

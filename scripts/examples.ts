@@ -47,6 +47,8 @@ export async function runExamples(
       run("pnpm", [...vitest, "api/examples", "-t", ENABLED_TESTS.source], { cwd: ROOT, env });
       // The tests that need a server and an agent but aren't examples (quiet, parallel sessions).
       run("pnpm", [...vitest, "test/acceptance/stack"], { cwd: ROOT, env });
+      // The standard checks, as a developer adds them to a suite (exit check 2.3).
+      run("pnpm", [...vitest, "test/acceptance/checks"], { cwd: ROOT, env });
     });
   }
 }

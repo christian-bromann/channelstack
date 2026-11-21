@@ -113,6 +113,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The Bolt app the Bolt agents start from | `shared/bolt.ts` | Configuration from the environment, `listen` |
 | Bolt + AI SDK | `bolt-ai-sdk/agent.ts` | Mentions, DMs, reactions, native streaming |
 | Chat SDK | `chat-sdk-slack/agent.ts` | The same behaviour on Vercel's Chat SDK and its Slack adapter |
+| An agent with one fault per standard check | `broken-slack/agent.ts` | `BROKEN=<check id>` switches on the bug that check exists to catch; exit check 2.3 proves each check fails against it |
 | A deliberately broken agent | `mdac-220/agent.ts` | Leaves a lone "Thinking…" stream behind; exit check 1.4 proves the suite catches it |
 
 ## Scripts (`scripts/`)
@@ -144,7 +145,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
 | Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test and the `expect.extend` adapter (`setup.ts`) |
 | Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
-| Checks | `integrations/checks/` *(planned, phase 2)* | `slackChecks()` and friends, built on the public API only |
+| Checks | `integrations/checks/` | `slackChecks()` (and later the other channels'): the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS` lists their ids |
 | pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |
 
 ## Generated code (never edit by hand)

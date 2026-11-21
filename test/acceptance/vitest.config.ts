@@ -15,11 +15,16 @@ export default defineConfig({
     alias: {
       // The examples import the published names; here they resolve to the sources in this repository.
       "channelstack/vitest": fileURLToPath(new URL("../../integrations/vitest/index.ts", import.meta.url)),
+      "channelstack/checks": fileURLToPath(new URL("../../integrations/checks/index.ts", import.meta.url)),
     },
   },
   test: {
     root: fileURLToPath(new URL("../..", import.meta.url)),
-    include: ["api/examples/slack.test.ts", "test/acceptance/stack/**/*.test.ts"],
+    include: [
+      "api/examples/slack.test.ts",
+      "test/acceptance/stack/**/*.test.ts",
+      "test/acceptance/checks/**/*.test.ts",
+    ],
     testTimeout: 30_000,
     // Exit check 1.7 runs 20 tests at the same moment; Vitest's default is 5 at a time.
     maxConcurrency: 20,

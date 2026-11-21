@@ -6,8 +6,8 @@
  */
 import { streamText } from "ai";
 
-import { app, listen } from "../shared/bolt.ts";
-import { answer, wantsWriting, writer } from "../shared/scripted-model.ts";
+import { createApp, listen } from "../shared/bolt.ts";
+import { answer, sendOrShorten, wantsWriting, writer } from "../shared/scripted-model.ts";
 import {
   approvalBlocks,
   deployRequest,
@@ -17,6 +17,8 @@ import {
   SUGGESTED_PROMPTS,
   texts,
 } from "../shared/workflows.ts";
+
+const app = createApp();
 
 /** Events Slack delivers more than once (a retry after a slow ack) are handled once. */
 const handled = new Set<string>();
@@ -55,7 +57,9 @@ app.event("app_mention", async ({ event, body, client, say }) => {
   }
   // In a group DM the answer goes into the conversation itself; everywhere else, into the thread.
   const { channel } = await client.conversations.info({ channel: event.channel });
-  await say({ text: answer(event.text, event.user ?? ""), ...(channel?.is_mpim ? {} : { thread_ts: thread }) });
+  await sendOrShorten(answer(event.text, event.user ?? ""), (text) =>
+    say({ text, ...(channel?.is_mpim ? {} : { thread_ts: thread }) }),
+  );
 });
 
 /** Approvals already acted on, by the message the button is on: a double click deploys once. */
@@ -161,7 +165,9 @@ app.message(async ({ message, body, client, say }) => {
     const { channel } = await client.conversations.info({ channel: looking });
     return void (await say({ text: texts.channelSummary(channel?.name ?? looking), thread_ts: thread }));
   }
-  if (!wantsWriting(prompt)) return void (await say({ text: answer(prompt, message.user), thread_ts: thread }));
+  if (!wantsWriting(prompt)) {
+    return sendOrShorten(answer(prompt, message.user), (text) => say({ text, thread_ts: thread }));
+  }
 
   // Long-form: say that it is thinking, then stream the answer as the model produces it.
   await client.assistant.threads.setStatus({ channel_id: message.channel, thread_ts: thread, status: "is thinking…" });
@@ -198,4 +204,4 @@ app.event("reaction_added", async ({ event, body, client }) => {
   });
 });
 
-await listen();
+await listen(app);

@@ -64,3 +64,16 @@ export function writer(prompt: string) {
     }),
   });
 }
+
+/**
+ * Send an answer; when Slack refuses it as too long, send the start of it instead. Each agent
+ * passes its own way of sending.
+ */
+export async function sendOrShorten(text: string, send: (text: string) => Promise<unknown>): Promise<void> {
+  try {
+    await send(text);
+  } catch (error) {
+    if (!String((error as { data?: { error?: string } }).data?.error ?? error).includes("msg_too_long")) throw error;
+    await send(`${text.slice(0, 3000)}…`);
+  }
+}

@@ -25,7 +25,7 @@ import {
   type Thread,
 } from "chat";
 
-import { answer, wantsWriting, writer } from "../shared/scripted-model.ts";
+import { answer, sendOrShorten, wantsWriting, writer } from "../shared/scripted-model.ts";
 import { deployRequest, SUGGESTED_PROMPTS, texts } from "../shared/workflows.ts";
 
 const { SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, PORT } = process.env;
@@ -103,7 +103,7 @@ async function respond(thread: Thread, message: Message): Promise<void> {
     await thread.post(textStream);
     return;
   }
-  await thread.post(answer(message.text, message.author.userId));
+  await sendOrShorten(answer(message.text, message.author.userId), (text) => thread.post(text));
 }
 
 bot.onNewMention(async (thread, message) => {
