@@ -26,6 +26,14 @@ describe("redaction", () => {
     expect(out).toBe("Authorization: Bearer [redacted] from [redacted] using [redacted]");
   });
 
+  test("recorded payloads keep ordinary text that mentions bearer tokens", () => {
+    const redactor = new Redactor();
+    const said = { text: "please use bearer authentication", header: "Authorization: Bearer abcdefgh12345678" };
+    expect(redactor.tokens(said)).toEqual(said);
+    // A log line is not content: there, whatever follows `Bearer` is scrubbed.
+    expect(redactor.text(said.header)).toBe("Authorization: Bearer [redacted]");
+  });
+
   test("recorded payloads keep their content and lose only tokens", () => {
     const token = SECRET_FORMATS["slack.botToken"].generate();
     const recorded = new Redactor().tokens({ text: `mail ana@example.com`, nested: [{ token }], n: 1, none: null });

@@ -26,12 +26,15 @@ export class Redactor {
     for (const secret of secrets) if (secret.length >= 8) this.#literals.add(secret);
   }
 
-  /** For logs and error messages: tokens, registered secrets and emails. */
+  /** For logs and error messages: tokens, registered secrets, anything after `Bearer`, and emails. */
   text(input: string): string {
-    return this.#tokensIn(input).replace(EMAIL_PATTERN, REDACTED);
+    return this.#tokensIn(input).replace(BEARER_PATTERN, `$1 ${REDACTED}`).replace(EMAIL_PATTERN, REDACTED);
   }
 
-  /** For recorded payloads: tokens and registered secrets, in every string of a JSON value. Content is kept. */
+  /**
+   * For recorded payloads: tokens by their shape and registered secrets, in every string of a JSON
+   * value. Everything else is kept as it was said, because the event log is what tests read.
+   */
   tokens<T>(value: T): T {
     if (typeof value === "string") return this.#tokensIn(value) as T;
     if (Array.isArray(value)) return value.map((item) => this.tokens(item)) as T;
@@ -45,6 +48,6 @@ export class Redactor {
     let out = input;
     for (const literal of this.#literals) out = out.split(literal).join(REDACTED);
     for (const pattern of TOKEN_PATTERNS) out = out.replace(pattern, REDACTED);
-    return out.replace(BEARER_PATTERN, `$1 ${REDACTED}`);
+    return out;
   }
 }
