@@ -1,16 +1,27 @@
 <!doctype html>
-<!-- Source of public/og.png (1200×630) and public/apple-touch-icon.png. Render with `pnpm og`. -->
+<!--
+  Source of the link-preview image (src/assets/og.png, 1200×630) and the icons in public/.
+  Render with `pnpm og`.
+
+  The image is composed for two crops. Most places show the whole 1.91:1 picture, but some
+  (Slack's compact card, iMessage, WhatsApp) cut a centred square out of it. So the brand and
+  the headline sit inside the centred 630×630 square, and the cards on the left and right are
+  decoration that may be cut off.
+-->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../node_modules/@fontsource-variable/familjen-grotesk/wght.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource-variable/ibm-plex-sans/wght.css" />
     <link rel="stylesheet" href="../node_modules/@fontsource/ibm-plex-mono/latin-400.css" />
+    <link rel="stylesheet" href="../node_modules/@fontsource/ibm-plex-mono/latin-500.css" />
     <style>
       * {
         box-sizing: border-box;
         margin: 0;
       }
       body {
+        position: relative;
         width: 1200px;
         height: 630px;
         overflow: hidden;
@@ -22,22 +33,30 @@
         position: absolute;
         inset: 0;
         background:
-          radial-gradient(60% 70% at 85% 0%, rgba(245, 168, 60, 0.22), transparent 70%),
-          linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 60px 60px,
-          linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 60px 60px;
+          radial-gradient(46% 62% at 50% 0%, rgba(245, 168, 60, 0.2), transparent 72%),
+          linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 60px 60px,
+          linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 60px 60px;
       }
-      main {
-        position: relative;
+
+      /* ---- the centre: safe in a square crop ---- */
+      .centre {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 285px;
+        width: 630px;
         display: flex;
         flex-direction: column;
-        height: 100%;
-        padding: 72px 80px;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 34px;
       }
       .brand {
         display: flex;
         align-items: center;
-        gap: 18px;
-        font-size: 40px;
+        gap: 14px;
+        font-size: 34px;
         font-weight: 700;
         letter-spacing: -0.03em;
       }
@@ -45,81 +64,269 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
+        gap: 3.5px;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
         background: #10141b;
-        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+        box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.14);
       }
       .mark i {
-        width: 4px;
+        width: 3.5px;
         border-radius: 2px;
         background: #f5a83c;
       }
       h1 {
-        margin-top: auto;
-        font-size: 104px;
+        margin-top: 34px;
+        font-size: 82px;
         font-weight: 700;
-        line-height: 0.95;
+        line-height: 0.96;
         letter-spacing: -0.04em;
       }
       h1 em {
         color: #f5a83c;
         font-style: normal;
       }
-      p {
-        margin-top: 34px;
-        color: #9aa4b5;
+      .sub {
+        margin-top: 30px;
+        color: #a7b0c0;
         font-family: "IBM Plex Mono", monospace;
-        font-size: 26px;
+        font-size: 21px;
+        line-height: 1.5;
       }
-      body.icon {
-        width: 180px;
-        height: 180px;
+      .sub b {
+        color: #eef1f6;
+        font-weight: 500;
+      }
+
+      /* ---- the sides: decoration that a square crop cuts away ---- */
+      .card {
+        position: absolute;
+        top: 150px;
+        width: 330px;
+        border: 1px solid #2c3544;
+        border-radius: 16px;
+        background: #0f131a;
+        box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+        overflow: hidden;
+        font-size: 15px;
+      }
+      .card.left {
+        left: -64px;
+        transform: rotate(-3deg);
+      }
+      .card.right {
+        right: -64px;
+        transform: rotate(3deg);
+        font-family: "IBM Plex Sans Variable", sans-serif;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        height: 38px;
+        padding: 0 14px;
+        border-bottom: 1px solid #1e2530;
+        color: #8591a4;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12.5px;
+      }
+      .card-head i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #1c2330;
+      }
+      .card-head span {
+        margin-left: 6px;
+      }
+      pre {
+        padding: 14px 16px 18px;
+        color: #d7dde8;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13.5px;
+        line-height: 1.75;
+      }
+      pre .k {
+        color: #f2a93b;
+      }
+      pre .s {
+        color: #8fd3a8;
+      }
+      pre .f {
+        color: #8db7ff;
+      }
+      pre .hot {
+        display: block;
+        margin: 0 -16px;
+        padding: 0 16px;
+        background: rgba(242, 169, 59, 0.13);
+        box-shadow: inset 2px 0 0 #f2a93b;
+      }
+      .thread {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+        background: #1a1d21;
+        color: #d1d2d3;
+      }
+      .msg {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 9px;
+        line-height: 1.4;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 6px;
+        background: #2c7a9e;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .avatar.bot {
         background: #10141b;
+        color: #f5a83c;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
       }
-      body.icon main,
-      body.icon .bg {
-        display: none;
+      .msg b {
+        color: #fff;
+        font-weight: 800;
       }
+      .msg .app {
+        padding: 1px 4px;
+        border-radius: 3px;
+        background: #35373b;
+        color: #c9c9ca;
+        font-size: 9.5px;
+        font-weight: 700;
+      }
+      .msg .at {
+        padding: 0 2px;
+        border-radius: 3px;
+        background: rgba(29, 155, 209, 0.14);
+        color: #1d9bd1;
+      }
+      .btn {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 4px 11px;
+        border-radius: 4px;
+        background: #007a5a;
+        color: #fff;
+        font-size: 12.5px;
+        font-weight: 700;
+      }
+      .pass {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 11px 16px;
+        border-top: 1px solid #1e2530;
+        color: #a7b0c0;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12.5px;
+      }
+      .pass em {
+        padding: 1px 7px;
+        border-radius: 4px;
+        background: #4cc38a;
+        color: #04130c;
+        font-style: normal;
+        font-weight: 500;
+      }
+
+      /* ---- icons ---- */
       .icon-mark {
         display: none;
       }
+      body.icon {
+        background: #10141b;
+      }
+      body.icon > :not(.icon-mark) {
+        display: none;
+      }
       body.icon .icon-mark {
+        position: absolute;
+        inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 13px;
-        width: 180px;
-        height: 180px;
+        gap: 7.2%;
       }
-      .icon-mark i {
-        width: 14px;
-        border-radius: 7px;
+      body.icon .icon-mark i {
+        width: 7.8%;
+        border-radius: 999px;
         background: #f5a83c;
+      }
+      /* maskable and touch icons are square; the small favicon is rounded like favicon.svg */
+      body.icon.round {
+        background: transparent;
+      }
+      body.icon.round .icon-mark {
+        border-radius: 25%;
+        background: #10141b;
       }
     </style>
   </head>
   <body>
     <div class="bg"></div>
-    <main>
+
+    <div class="card left">
+      <div class="card-head"><i></i><i></i><i></i><span>deploy.test.ts</span></div>
+      <pre><span class="k">const</span> ana = <span class="k">await</span> slack
+  .<span class="f">createUser</span>({ name: <span class="s">"ana"</span> });
+<span class="hot"><span class="k">await</span> ana.<span class="f">say</span>(<span class="s">"@robin ship</span>
+<span class="s">  #812 to staging"</span>, dm);</span>
+<span class="k">await</span> <span class="f">expect</span>(ask)
+  .<span class="f">toHaveButton</span>(<span class="s">"Approve"</span>);
+<span class="k">await</span> ana.<span class="f">click</span>(<span class="s">"Approve"</span>);</pre>
+    </div>
+
+    <div class="card right">
+      <div class="card-head"><i style="background: #4cc38a"></i><span>slack.localhost</span></div>
+      <div class="thread">
+        <div class="msg">
+          <span class="avatar">A</span>
+          <div><b>ana</b><br /><span class="at">@robin</span> ship #812 to staging</div>
+        </div>
+        <div class="msg">
+          <span class="avatar bot">R</span>
+          <div>
+            <b>robin</b> <span class="app">APP</span><br />Deploy #812 to staging?<br /><span class="btn">Approve</span>
+          </div>
+        </div>
+      </div>
+      <div class="pass"><em>PASS</em> 5 assertions</div>
+    </div>
+
+    <main class="centre">
       <div class="brand">
         <span class="mark"
-          ><i style="height: 16px"></i><i style="height: 28px"></i><i style="height: 20px"></i
-          ><i style="height: 32px"></i><i style="height: 12px"></i
+          ><i style="height: 14px"></i><i style="height: 25px"></i><i style="height: 18px"></i
+          ><i style="height: 28px"></i><i style="height: 11px"></i
         ></span>
         channelstack
       </div>
-      <h1>Your agent’s whole world, <em>on localhost.</em></h1>
-      <p>Test harness for AI agents in Slack, GitHub, Linear and Notion</p>
+      <h1>Your agent’s<br />whole world,<br /><em>on localhost.</em></h1>
+      <p class="sub">Test AI agents in <b>Slack, GitHub,</b><br /><b>Linear</b> and <b>Notion</b>, on your machine</p>
     </main>
+
     <div class="icon-mark">
-      <i style="height: 56px"></i><i style="height: 96px"></i><i style="height: 68px"></i><i style="height: 112px"></i
-      ><i style="height: 40px"></i>
+      <i style="height: 31%"></i><i style="height: 53%"></i><i style="height: 38%"></i><i style="height: 62%"></i
+      ><i style="height: 22%"></i>
     </div>
+
     <script>
-      if (location.hash === "#icon") document.body.className = "icon";
+      // #icon-<size> renders a square icon; #favicon-<size> a rounded one on a transparent page.
+      const match = /^#(icon|favicon)-(\d+)$/.exec(location.hash);
+      if (match) {
+        document.body.className = match[1] === "favicon" ? "icon round" : "icon";
+        document.body.style.width = document.body.style.height = `${match[2]}px`;
+      }
     </script>
   </body>
 </html>

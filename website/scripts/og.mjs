@@ -1,7 +1,7 @@
-// Renders og/og.html to public/og.png and public/apple-touch-icon.png with a local Chrome.
+// Renders og/og.html to the link-preview image and the icons, with a local Chrome.
 // Run it by hand after changing og/og.html; the PNGs are committed.
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 
 const root = new URL("..", import.meta.url).pathname;
 const chrome = [
@@ -12,7 +12,7 @@ const chrome = [
 ].find((path) => path && existsSync(path));
 if (!chrome) throw new Error("Chrome not found. Set CHROME_PATH.");
 
-function shot(hash, width, height, out) {
+function shot(hash, width, height, out, transparent = false) {
   execFileSync(
     chrome,
     [
@@ -21,14 +21,21 @@ function shot(hash, width, height, out) {
       "--force-device-scale-factor=1",
       "--allow-file-access-from-files",
       "--virtual-time-budget=3000",
+      ...(transparent ? ["--default-background-color=00000000"] : []),
       `--window-size=${width},${height}`,
-      `--screenshot=${root}public/${out}`,
+      `--screenshot=${root}${out}`,
       `file://${root}og/og.html${hash}`,
     ],
     { stdio: "ignore" },
   );
-  console.log(`wrote public/${out}`);
+  console.log(`wrote ${out}`);
 }
 
-shot("", 1200, 630, "og.png");
-shot("#icon", 180, 180, "apple-touch-icon.png");
+mkdirSync(`${root}src/assets`, { recursive: true });
+// Imported by src/components/Seo.tsx, so its URL carries a content hash: a changed image gets a
+// new URL, and link previews that cache by URL pick it up.
+shot("", 1200, 630, "src/assets/og.png");
+shot("#icon-180", 180, 180, "public/apple-touch-icon.png");
+shot("#icon-192", 192, 192, "public/icon-192.png");
+shot("#icon-512", 512, 512, "public/icon-512.png");
+shot("#favicon-32", 32, 32, "public/favicon-32.png", true);

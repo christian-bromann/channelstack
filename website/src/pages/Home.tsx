@@ -129,7 +129,7 @@ export default function Home() {
 
   return (
     <>
-      <Seo title={SITE.title} path="/" />
+      <Seo title={SITE.title} path="/" structured />
       <Nav />
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
