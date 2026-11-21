@@ -43,6 +43,19 @@ module.exports = {
       to: { path: "^(sdks|codegen|scripts|scenarios)/" },
     },
     {
+      name: "integrations-and-agents-use-the-public-surface",
+      comment: "Test integrations are built on the SDK; reference agents have no channelstack code in them at all.",
+      severity: "error",
+      from: { path: "^(integrations|examples)/" },
+      to: { path: "^(server|codegen|scripts)/" },
+    },
+    {
+      name: "agents-contain-no-channelstack-code",
+      severity: "error",
+      from: { path: "^examples/agents/" },
+      to: { path: "^(sdks|integrations)/" },
+    },
+    {
       name: "no-circular",
       severity: "error",
       from: {},

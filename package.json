@@ -26,7 +26,7 @@
     "sdk": "node scripts/sdk.ts",
     "sdk:check": "node scripts/sdk.ts --check",
     "check:dupes": "jscpd",
-    "check:deps": "depcruise server codegen sdks/typescript scenarios scripts --config .dependency-cruiser.cjs",
+    "check:deps": "depcruise server codegen sdks/typescript integrations examples scenarios scripts test --config .dependency-cruiser.cjs",
     "check:unused": "knip",
     "verify:phase": "node scripts/verify-phase.ts"
   },
