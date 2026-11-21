@@ -12,9 +12,7 @@ const EchoPrincipal = z
 
 const EchoUser = z.object({ id: z.string(), name: z.string(), kind: z.literal("user") }).openapi("EchoUser", resource);
 
-const EchoApp = z
-  .object({ id: z.string(), name: z.string(), kind: z.literal("app"), botUserId: z.string() })
-  .openapi("EchoApp", resource);
+const EchoApp = z.object({ id: z.string(), name: z.string(), kind: z.literal("app") }).openapi("EchoApp", resource);
 
 const EchoRoom = z
   .object({ id: z.string(), name: z.string(), members: z.array(z.string()) })

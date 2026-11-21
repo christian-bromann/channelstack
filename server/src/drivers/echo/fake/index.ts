@@ -23,7 +23,6 @@ export function createEchoFake(context: DriverContext): EchoFake {
         id: context.ids.next("echo.app"),
         name: APP_NAME,
         kind: "app",
-        botUserId: context.ids.next("echo.user"),
       };
     },
     release(session: string) {

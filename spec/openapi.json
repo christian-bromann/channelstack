@@ -167,16 +167,12 @@
             "enum": [
               "app"
             ]
-          },
-          "botUserId": {
-            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
-          "kind",
-          "botUserId"
+          "kind"
         ],
         "x-channelstack-resource": {
           "id": "id"

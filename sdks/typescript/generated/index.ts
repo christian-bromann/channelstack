@@ -209,14 +209,12 @@ export interface EchoAppData {
   id: string;
   name: string;
   kind: "app";
-  botUserId: string;
 }
 
 export class EchoApp {
   readonly id: string;
   readonly name: string;
   readonly kind: "app";
-  readonly botUserId: string;
   readonly #ctx: HandleContext;
 
   /** @internal Handles come from the SDK, never from `new`. */
@@ -225,7 +223,6 @@ export class EchoApp {
     this.id = data.id;
     this.name = data.name;
     this.kind = data.kind;
-    this.botUserId = data.botUserId;
   }
 }
 

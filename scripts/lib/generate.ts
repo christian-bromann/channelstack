@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { buildIr, type Ir } from "../../codegen/src/ir.ts";
 import serverPackage from "../../server/package.json" with { type: "json" };
 import { createApp } from "../../server/src/app.ts";
+import { createBearerToken } from "../../server/src/core/auth/index.ts";
 import { createLogger } from "../../server/src/core/log/index.ts";
 import { Redactor } from "../../server/src/core/redact/index.ts";
 import { Secrets } from "../../server/src/core/secrets/index.ts";
@@ -16,7 +17,7 @@ export function specFromRoutes(): { openapi: object; ir: Ir } {
   const redactor = new Redactor();
   const app = createApp({
     version: serverPackage.version,
-    token: "unused: the spec is read without serving a request",
+    token: createBearerToken(),
     seed: 0,
     secrets: Secrets.ephemeral(secretSpecs()),
     redactor,

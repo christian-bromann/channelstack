@@ -385,13 +385,6 @@
             "value": "app"
           },
           "optional": false
-        },
-        {
-          "name": "botUserId",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
         }
       ],
       "methods": []

@@ -11,7 +11,6 @@ export interface EchoUser extends EchoPrincipal {
 
 export interface EchoApp extends EchoPrincipal {
   readonly kind: "app";
-  readonly botUserId: string;
 }
 
 export interface EchoRoom {
