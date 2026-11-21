@@ -1,0 +1,6 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`inspecting what the agent did > a transcript snapshot reads like the conversation 1`] = `
+"Ana: what's 2 + 2?
+  my-agent: 2 + 2 is 4."
+`;

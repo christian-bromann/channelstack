@@ -26,7 +26,8 @@ declare module "vitest" {
     notion: NotionFixture;
   }
 
-  interface Matchers<T = any> extends ChannelstackMatchers<void> {}
+  // Vitest 5 declares `Matchers<R, T>`; the parameters have to be identical to merge with it.
+  interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> extends ChannelstackMatchers<void> {}
 }
 
 export default function channelstack(options?: ChannelstackIntegrationOptions): Plugin;
