@@ -59,7 +59,7 @@ Filled in as they are added; each with version, reason and license.
 | Package | Version | Where | Why a library and not our code | License |
 |---|---|---|---|---|
 | `@slack/bolt` | 5.1.0 | reference agents, exit check 1.3 | The official receiver the fake must satisfy | MIT |
-| `ai` | 7.0.179 | reference agent | Streaming and the framework's mock model | Apache-2.0 |
+| `ai` | 7.0.177 | reference agent | Streaming and the framework's mock model | Apache-2.0 |
 | `chat`, `@chat-adapter/slack`, `@chat-adapter/state-memory` | 4.45.0 | reference agent | The Chat SDK Slack adapter | MIT |
 | `webdriverio` | 10.2.0 | exit check 1.6 | The browser test for the UI | MIT |
 | `yaml` | 2.9.1 | server | Reading a real Slack manifest (already a development dependency) | ISC |

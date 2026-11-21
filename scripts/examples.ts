@@ -11,7 +11,10 @@ import { run } from "./lib/process.ts";
 import { withStack } from "./lib/stack.ts";
 
 /** The reference agents the examples run against, by name. */
-const AGENTS = { "bolt-ai-sdk": join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts") } as const;
+const AGENTS = {
+  "bolt-ai-sdk": join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts"),
+  "chat-sdk-slack": join(ROOT, "examples", "agents", "chat-sdk-slack", "agent.ts"),
+} as const;
 
 /**
  * What this phase has enabled of `api/examples/slack.test.ts` (docs/phases.md), as patterns on

@@ -5,16 +5,14 @@
  * `SLACK_API_URL` points at: the fake in tests, Slack itself when the variable is unset.
  */
 import { App, LogLevel } from "@slack/bolt";
-import { simulateReadableStream, streamText } from "ai";
-import { MockLanguageModelV4 } from "ai/test";
+import { streamText } from "ai";
+
+import { answer, wantsWriting, writer } from "../shared/scripted-model.ts";
 
 const { SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, SLACK_API_URL, PORT } = process.env;
 if (!SLACK_BOT_TOKEN || !SLACK_SIGNING_SECRET || !PORT) {
   throw new Error("The agent needs SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET and PORT");
 }
-
-/** People who may run privileged commands, by Slack user id. */
-const ADMINS = new Set((process.env.ADMINS ?? "U0ADMIN01").split(","));
 
 const app = new App({
   token: SLACK_BOT_TOKEN,
@@ -22,48 +20,6 @@ const app = new App({
   ...(SLACK_API_URL ? { clientOptions: { slackApiUrl: SLACK_API_URL } } : {}),
   logLevel: LogLevel.ERROR,
 });
-
-/** The scripted model: the same prompt always gets the same answer. */
-function answer(prompt: string, user: string): string {
-  const text = prompt.replace(/<@[A-Z0-9]+>/g, "").trim();
-  if (/rotate the api keys/i.test(text))
-    return ADMINS.has(user) ? "Rotating the API keys now." : "Sorry, you're not allowed to do that.";
-  if (/2 \+ 2/.test(text)) return "2 + 2 is 4.";
-  return `Here's what I found about "${text}".`;
-}
-
-/**
- * The model for long-form requests: the AI SDK's mock model, streaming a scripted answer in
- * pieces after a moment of "thinking", the way a real model does.
- */
-function writer(prompt: string) {
-  const pieces = [
-    `# ${prompt.replace(/^write (the |a )?/i, "")}\n\n`,
-    "- First, what changed.\n",
-    "- Then, what to do about it.\n",
-  ];
-  return new MockLanguageModelV4({
-    doStream: async () => ({
-      stream: simulateReadableStream({
-        initialDelayInMs: 700,
-        chunkDelayInMs: 250,
-        chunks: [
-          { type: "text-start" as const, id: "answer" },
-          ...pieces.map((delta) => ({ type: "text-delta" as const, id: "answer", delta })),
-          { type: "text-end" as const, id: "answer" },
-          {
-            type: "finish" as const,
-            finishReason: { unified: "stop" as const, raw: undefined },
-            usage: {
-              inputTokens: { total: 12, noCache: 12, cacheRead: undefined, cacheWrite: undefined },
-              outputTokens: { total: 24, text: 24, reasoning: undefined },
-            },
-          },
-        ],
-      }),
-    }),
-  });
-}
 
 /** Events Slack delivers more than once (a retry after a slow ack) are handled once. */
 const handled = new Set<string>();
@@ -95,7 +51,7 @@ app.message(async ({ message, body, client, say }) => {
   if ((message.text ?? "").includes("<@") && !direct) return;
   joined.add(`${message.channel}:${thread}`);
   const prompt = message.text ?? "";
-  if (!/^write /i.test(prompt)) return void (await say({ text: answer(prompt, message.user), thread_ts: thread }));
+  if (!wantsWriting(prompt)) return void (await say({ text: answer(prompt, message.user), thread_ts: thread }));
 
   // Long-form: say that it is thinking, then stream the answer as the model produces it.
   await client.assistant.threads.setStatus({ channel_id: message.channel, thread_ts: thread, status: "is thinking…" });
