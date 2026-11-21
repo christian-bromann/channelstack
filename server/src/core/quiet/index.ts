@@ -2,7 +2,7 @@ import type { Clock } from "../clock/index.ts";
 
 /** Is the agent idle, and for how long? Negative and exact-count matchers wait for this before they check. */
 export interface QuietState {
-  /** Something is still happening: a call from the agent in flight, a delivery not settled, a stream open. */
+  /** Something is still happening: a call from the agent in flight, a delivery in flight or about to be retried, a stream open. */
   busy: boolean;
   /** Milliseconds since the last thing happened in the session. 0 while busy. */
   quietForMs: number;
@@ -10,7 +10,7 @@ export interface QuietState {
 
 /**
  * Knows when the agent has gone quiet. Three things count as work in progress: a provider API
- * call in flight, a delivery whose attempt hasn't settled, and whatever a driver says is still
+ * call in flight, a delivery in flight or about to be retried, and whatever a driver says is still
  * open (a stream). When none is, the session has been quiet since its last recorded event.
  */
 export class QuietDetector {

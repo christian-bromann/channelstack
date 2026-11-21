@@ -109,10 +109,11 @@ export async function runSlack(server: Attached, action: string | undefined, arg
     const target = await slack.message(flags.on, "--on");
     await slack.join(target.channel, actor);
     await slack.post(`/users/${segment(actor.id)}/react`, {
-      emoji: emoji.replace(/^:|:$/g, ""),
+      // As typed: the server reads `:eyes:` and `eyes` as the same reaction.
+      emoji,
       message: { channel: target.channel, ts: target.ts },
     });
-    return `${actor.name} reacted with :${emoji.replace(/^:|:$/g, "")}: (${where(target)})\n`;
+    return `${actor.name} reacted with ${emoji} (${where(target)})\n`;
   }
   throw new CliError(`unknown slack command "${action ?? ""}". Try \`say\`, \`reply\` or \`react\`.`);
 }

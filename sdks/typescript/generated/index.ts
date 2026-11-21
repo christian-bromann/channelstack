@@ -630,7 +630,7 @@ export class SlackFixture {
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
   async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<SlackApiCall> {
-    return waitForNext(this.#seen, "waitForCall", () => this.calls(filter), () => true, "an API call from the agent", options);
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

@@ -708,7 +708,7 @@ class SlackFixture:
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> SlackApiCall:
         """Wait for the next new API call from the agent, after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForCall", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
+        return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
 
 
 class SlackApp:

@@ -218,7 +218,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         : `  /** The latest ${noun}${from ? " matching `from`" : ""}, once the agent is quiet. Waits for at least one. */`,
       `  async ${w.name}(${filter}options: ${options} = {}): Promise<${item}> {`,
       w.mode === "next"
-        ? `    return waitForNext(this.#seen, ${JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options);`
+        ? // A filtered read is its own list, so each filter keeps its own place in it.
+          `    return waitForNext(this.#seen, ${filter ? `\`${w.name}:\${JSON.stringify(filter)}\`` : JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options);`
         : `    return latestOnceQuiet(${call}, ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
       "  }",
     ];

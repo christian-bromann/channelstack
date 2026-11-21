@@ -36,7 +36,7 @@ export async function waitFor<T>(
 
 export interface QuietOptions extends WaitOptions {
   /**
-   * How long the agent must be quiet (no call in flight, no delivery pending, no open stream)
+   * How long the agent must be quiet (no call in flight, no delivery in flight or about to be retried, no open stream)
    * before the result is read. Default: 750ms.
    */
   quietFor?: Duration;
@@ -46,7 +46,7 @@ export interface QuietOptions extends WaitOptions {
 export interface QuietState {
   busy: boolean;
   quietForMs: number;
-  /** What is still open, in words: a delivery that hasn't settled, a stream the agent never stopped. */
+  /** What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped. */
   open: string[];
 }
 

@@ -41,7 +41,7 @@ class QuietState:
     busy: bool
     quiet_for_ms: float
     open: Sequence[str] = ()
-    """What is still open, in words: a delivery that hasn't settled, a stream the agent never stopped."""
+    """What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped."""
 
 
 class Author(Protocol):

@@ -37,7 +37,7 @@
 | Access to the control API | `auth/` | Creating the bearer token, parsing `Authorization: Bearer`, the middleware (`requireAccess`); browser access for the UI (`ui.ts`): one-time login codes, the session cookie, and the short list of reads it allows | Compare tokens with `===`; let a cookie authorize anything but those reads |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
 | Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
-| Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is pending, a driver reports open work (named, so a failure can say what was left open), or the agent was told to retry later (`expectMore` until it `arrived`); negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
+| Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is in flight or about to be retried, a driver reports open work (named, so a failure can say what was left open), or the agent was told to retry later (`expectMore` until it `arrived`); negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
 | Reality rules | `reality/` *(planned, phase 5)* | Fake or live per object, `unsupported_in_live`, `fake_actor_in_live_world` | Branch on `process.env` credentials in a driver |
 | Safety and cleanup ledger | `safety/`, `ledger/` *(planned, phase 5)* | Live allowlists, tagging, cleanup, `channelstack sweep` | Delete live objects from a driver directly |
 | Errors | `errors/` | The protocol's error codes and their HTTP status (`ProtocolError`), including a platform's own refusal surfaced through the control API (`{ platform, status }`) | Throw ad-hoc error shapes from routes |
@@ -59,7 +59,7 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `routes.ts` | Control API routes and schemas for this channel |
 | `world.ts` | The `World` interface: each action written once; the channel's record types |
 | `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`: every change to the state happens here once, for people and for the app alike, and the caller brings the permission check; also what only a fake can do: forged deliveries, faults), `index.ts` (the `FakeBackend`) |
-| `mentions.ts` (Slack) | `@name` in a test's text → the platform's mention syntax, and back |
+| `mentions.ts` (Slack) | `@name` in a test's text → the platform's mention syntax, and back (`nameMentions`, `splitAtMentions`); an emoji's name (`emojiName`) |
 | `live/` | Real API calls as the app or a person, reads, cleanup handlers *(phase 5)* |
 | `payloads.ts` | Builders for every event payload this platform sends (used by the fake's delivery) |
 | `transcript.ts` | State → what a person would see |
