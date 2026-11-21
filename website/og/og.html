@@ -239,40 +239,60 @@
         font-weight: 500;
       }
 
-      /* ---- the logo lockup for the README: mark and name on a transparent page ---- */
-      .logo {
+      /* ---- the README banner: logo and tagline on their own dark card, so it reads on any page colour ---- */
+      .banner {
         display: none;
       }
-      body.lockup {
+      body.is-banner {
         background: transparent;
       }
-      body.lockup > :not(.logo) {
+      body.is-banner > :not(.banner) {
         display: none;
       }
-      body.lockup .logo {
+      body.is-banner .banner {
         position: absolute;
         inset: 0;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        border-radius: 28px;
+        background:
+          radial-gradient(50% 90% at 50% 0%, rgba(245, 168, 60, 0.2), transparent 72%),
+          linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 56px 56px,
+          linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 56px 56px,
+          #090b0f;
+        box-shadow: inset 0 0 0 1.5px #2c3544;
+        overflow: hidden;
+      }
+      .banner .name {
+        display: flex;
+        align-items: center;
         gap: 22px;
-        font-size: 76px;
+        font-size: 80px;
         font-weight: 700;
         letter-spacing: -0.035em;
       }
-      body.lockup.on-light .logo {
-        color: #10141b;
-      }
-      .logo .mark {
+      .banner .mark {
         gap: 6px;
-        width: 84px;
-        height: 84px;
+        width: 86px;
+        height: 86px;
         border-radius: 22px;
         box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16);
       }
-      .logo .mark i {
+      .banner .mark i {
         width: 6.5px;
         border-radius: 4px;
+      }
+      .banner p {
+        margin-top: 26px;
+        font-size: 34px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .banner p em {
+        color: #f5a83c;
+        font-style: normal;
       }
 
       /* ---- icons ---- */
@@ -351,12 +371,15 @@
       <p class="sub">Test AI agents in <b>Slack, GitHub,</b><br /><b>Linear</b> and <b>Notion</b>, on your machine</p>
     </main>
 
-    <div class="logo">
-      <span class="mark"
-        ><i style="height: 26px"></i><i style="height: 45px"></i><i style="height: 32px"></i><i style="height: 52px"></i
-        ><i style="height: 20px"></i
-      ></span>
-      channelstack
+    <div class="banner">
+      <div class="name">
+        <span class="mark"
+          ><i style="height: 27px"></i><i style="height: 46px"></i><i style="height: 33px"></i
+          ><i style="height: 53px"></i><i style="height: 20px"></i
+        ></span>
+        channelstack
+      </div>
+      <p>Your agent’s whole world, <em>on localhost.</em></p>
     </div>
 
     <div class="icon-mark">
@@ -365,12 +388,11 @@
     </div>
 
     <script>
-      // #lockup-dark and #lockup-light render the logo lockup for dark and light backgrounds.
-      const lockup = /^#lockup-(dark|light)$/.exec(location.hash);
-      if (lockup) {
-        document.body.className = lockup[1] === "light" ? "lockup on-light" : "lockup";
-        document.body.style.width = "640px";
-        document.body.style.height = "140px";
+      // #banner renders the README banner on a transparent page.
+      if (location.hash === "#banner") {
+        document.body.className = "is-banner";
+        document.body.style.width = "1280px";
+        document.body.style.height = "340px";
       }
       // #icon-<size> renders a square icon; #favicon-<size> a rounded one on a transparent page.
       const match = /^#(icon|favicon)-(\d+)$/.exec(location.hash);

@@ -1,14 +1,10 @@
 <p align="center">
   <a href="https://channelstack.dev">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.png">
-      <img src=".github/assets/logo-light.png" alt="channelstack" width="320">
-    </picture>
+    <img src=".github/assets/banner.png" alt="channelstack: your agent's whole world, on localhost." width="100%">
   </a>
 </p>
 
 <p align="center">
-  <strong>Your agent's whole world, on localhost.</strong><br>
   A test harness for AI agents that live in Slack, GitHub, Linear and Notion.
 </p>
 

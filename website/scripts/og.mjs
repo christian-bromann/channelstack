@@ -39,7 +39,7 @@ shot("#icon-180", 180, 180, "public/apple-touch-icon.png");
 shot("#icon-192", 192, 192, "public/icon-192.png");
 shot("#icon-512", 512, 512, "public/icon-512.png");
 shot("#favicon-32", 32, 32, "public/favicon-32.png", { transparent: true });
-// The logo lockup shown at the top of the repository README, at 2x for sharp rendering.
+// The banner at the top of the repository README, at 2x for sharp rendering. It carries its own
+// dark background, so it reads the same on light and dark pages.
 mkdirSync(`${root}../.github/assets`, { recursive: true });
-shot("#lockup-dark", 640, 140, "../.github/assets/logo-dark.png", { transparent: true, scale: 2 });
-shot("#lockup-light", 640, 140, "../.github/assets/logo-light.png", { transparent: true, scale: 2 });
+shot("#banner", 1280, 340, "../.github/assets/banner.png", { transparent: true, scale: 2 });
