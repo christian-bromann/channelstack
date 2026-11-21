@@ -94,6 +94,7 @@ export function createApp(options: AppOptions): App {
   const driverNames = drivers.map((driver) => driver.name);
 
   sessions.onClose((session) => {
+    delivery.cancel(session.id);
     for (const driver of drivers) driver.fake.release(session.id);
     registry.release(session.id);
     events.drop(session.id);

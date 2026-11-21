@@ -31,6 +31,8 @@ export class DeliveryQueue {
   readonly #clock: Clock;
   readonly #log: Logger;
   readonly #inFlight = new Set<Promise<void>>();
+  /** One per session with deliveries in flight: closing the session aborts them. */
+  readonly #cancellers = new Map<string, AbortController>();
 
   constructor(deps: { events: EventLog; clock: Clock; log: Logger }) {
     this.#events = deps.events;
@@ -45,12 +47,27 @@ export class DeliveryQueue {
     this.#inFlight.add(attempt);
   }
 
+  /**
+   * Abort a closed session's deliveries. Nothing more is sent or recorded for it, so its event
+   * log stays gone.
+   */
+  cancel(session: string): void {
+    this.#cancellers.get(session)?.abort();
+    this.#cancellers.delete(session);
+  }
+
   /** Resolves once no attempt is in flight. */
   async settled(): Promise<void> {
     while (this.#inFlight.size > 0) await Promise.all(this.#inFlight);
   }
 
   async #attempt(request: DeliveryRequest, number: number): Promise<void> {
+    let canceller = this.#cancellers.get(request.session);
+    if (!canceller) {
+      canceller = new AbortController();
+      this.#cancellers.set(request.session, canceller);
+    }
+    const cancelled = canceller.signal;
     const sentAt = this.#clock();
     const requestHeaders = {
       "content-type": "application/json",
@@ -66,7 +83,7 @@ export class DeliveryQueue {
         headers: requestHeaders,
         body: request.body,
         redirect: "manual",
-        signal: AbortSignal.timeout(request.timeoutMs),
+        signal: AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]),
       });
       responseStatus = response.status;
       responseBody = (await response.text()).slice(0, RESPONSE_BODY_LIMIT);
@@ -75,6 +92,7 @@ export class DeliveryQueue {
       const name = error instanceof Error ? error.name : "";
       status = name === "TimeoutError" || name === "AbortError" ? "timed_out" : "unreachable";
     }
+    if (cancelled.aborted) return;
     this.#events.append(request.session, request.driver, "delivery_attempt", {
       id: request.id,
       number,
