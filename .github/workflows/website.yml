@@ -41,9 +41,12 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    # One group per branch. A new push replaces the runs before it. The run for a newly opened
+    # pull request waits for the push's run instead of cancelling it (a cancelled run shows as a
+    # failed check), so the two never post the preview comment at the same time.
     concurrency:
       group: website-preview-${{ github.head_ref || github.ref_name }}
-      cancel-in-progress: true
+      cancel-in-progress: ${{ github.event_name == 'push' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
