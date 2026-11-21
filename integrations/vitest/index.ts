@@ -58,7 +58,6 @@ declare module "vitest" {
   }
 
   // The type parameters have to be Vitest 5's own for this to merge with its declaration.
-  // biome-ignore lint/correctness/noUnusedVariables: see above.
   interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> extends ChannelstackMatchers {}
 
   interface ProvidedContext {

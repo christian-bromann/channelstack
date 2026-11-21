@@ -12,6 +12,7 @@ import {
   type InSession,
   parseDuration,
   QUIET,
+  type SlackConversation,
   untilQuiet,
   waitFor,
   WaitTimeoutError,
@@ -47,13 +48,18 @@ interface Message {
 }
 
 interface TranscriptEntry {
-  readonly author: Author;
+  readonly id?: string;
+  readonly author: Author & { readonly kind?: string };
   readonly text: string;
   readonly controls: readonly string[];
+  readonly streaming?: string | undefined;
 }
 
+/** Who a transcript is read as: the SDK's own type, so a change to that signature fails to compile here. */
+type Viewer = NonNullable<NonNullable<Parameters<SlackConversation["transcript"]>[0]>["as"]>;
+
 interface HasTranscript {
-  transcript(options?: { as?: string }): Promise<{ entries: readonly TranscriptEntry[] }>;
+  transcript(options?: { as?: Viewer }): Promise<{ entries: readonly TranscriptEntry[] }>;
 }
 
 interface Attempt {
@@ -69,8 +75,13 @@ interface Delivery {
 }
 
 const nameOf = (author: AuthorRef) => (typeof author === "string" ? author : author.name);
+/** Does a pattern match? A `RegExp` with the `g` or `y` flag remembers where it stopped; every test starts afresh. */
+const patternMatches = (text: string, pattern: RegExp) => {
+  pattern.lastIndex = 0;
+  return pattern.test(text);
+};
 const textMatches = (text: string, expected: string | RegExp | undefined) =>
-  expected === undefined || (typeof expected === "string" ? text.includes(expected) : expected.test(text));
+  expected === undefined || (typeof expected === "string" ? text.includes(expected) : patternMatches(text, expected));
 const show = (expected: string | RegExp) =>
   typeof expected === "string" ? JSON.stringify(expected) : String(expected);
 const listing = (lines: readonly string[]) =>
@@ -85,7 +96,13 @@ const says = (messages: readonly Message[]) =>
 async function messagesOf(subject: unknown): Promise<readonly Message[]> {
   const handle = subject as { replies?: () => Promise<Message[]> } & Partial<HasTranscript>;
   if (typeof handle.replies === "function") return handle.replies();
-  if (typeof handle.transcript === "function") return (await handle.transcript()).entries;
+  // A transcript entry says `streaming`; a message has a `stream`. Here they read the same.
+  if (typeof handle.transcript === "function") {
+    return (await handle.transcript()).entries.map((entry) => ({
+      ...entry,
+      stream: entry.streaming === undefined ? undefined : { state: entry.streaming },
+    }));
+  }
   throw new TypeError("This matcher needs a thread or a conversation");
 }
 
@@ -157,7 +174,7 @@ export const matchers = {
       read: () => messagesOf(subject),
       holds: (messages) => messages.some(from(author, options?.text)),
       describe: (messages) =>
-        `Expected ${state.isNot ? "no" : ""} ${wanted}. The thread has:\n${says(messages)}`.replace("  ", " "),
+        `Expected ${state.isNot ? wanted.replace(/^a /, "no ") : wanted}. The thread has:\n${says(messages)}`,
     });
   },
 
@@ -195,10 +212,10 @@ export const matchers = {
     state: MatcherState,
     subject: unknown,
     text: string | RegExp,
-    options?: Timing & { count?: number; from?: AuthorRef; as?: { readonly id: string } },
+    options?: Timing & { count?: number; from?: AuthorRef; as?: Viewer },
   ) {
     const read = async () => {
-      const transcript = await (subject as HasTranscript).transcript(options?.as ? { as: options.as.id } : {});
+      const transcript = await (subject as HasTranscript).transcript(options?.as ? { as: options.as } : {});
       const entries = transcript.entries.filter(
         (entry) => options?.from === undefined || fromMatches(entry.author, options.from),
       );
@@ -255,18 +272,19 @@ export const matchers = {
     });
   },
 
-  /** The message (or a message in the thread) has a button with this label. */
+  /** The message has a button with this label; for a thread or a conversation, the agent's latest message there. */
   toHaveButton(state: MatcherState, subject: unknown, label: string | RegExp, options?: Timing) {
-    const thread = subject as { thread?: HasTranscript; ts?: string } & Partial<HasTranscript>;
+    const handle = subject as { thread?: HasTranscript; ts?: string } & Partial<HasTranscript>;
     return settle(subject, state, options, {
       onceQuiet: false,
       read: async () => {
-        // A message is read through its thread's transcript, where it is one entry.
-        const transcript = await (thread.thread ?? (thread as HasTranscript)).transcript();
-        const entries = transcript.entries as ReadonlyArray<TranscriptEntry & { id?: string }>;
-        return (thread.ts === undefined ? entries : entries.filter((entry) => entry.id === thread.ts)).flatMap(
-          (entry) => entry.controls,
-        );
+        // A message (it has a thread) is one entry of its thread's transcript.
+        if (handle.thread) {
+          const { entries } = await handle.thread.transcript();
+          return entries.filter((entry) => entry.id === handle.ts).flatMap((entry) => entry.controls);
+        }
+        const { entries } = await (handle as HasTranscript).transcript();
+        return entries.filter((entry) => entry.author.kind === "app").at(-1)?.controls ?? [];
       },
       holds: (controls) => controls.some((control) => textMatches(control, label)),
       describe: (controls) =>
@@ -371,7 +389,7 @@ export const matchers = {
         return {
           calls,
           matching: calls.filter((call) =>
-            typeof operation === "string" ? call.operation === operation : operation.test(call.operation),
+            typeof operation === "string" ? call.operation === operation : patternMatches(call.operation, operation),
           ),
         };
       },
