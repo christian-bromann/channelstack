@@ -1,0 +1,71 @@
+name: echo
+description: A person posts in a room the app is in; the echo agent gets a signed delivery and answers through the provider API.
+requires: [echo-agent]
+steps:
+  - call: channelstack.status
+    as: status
+  - expect:
+      - { value: $status.ready, equals: true }
+      - { value: $status.drivers, contains: echo }
+
+  - call: session.echo
+    as: echo
+  - call: echo.createUser
+    options: { name: Ana }
+    as: ana
+  - call: echo.createUser
+    options: { name: Ben }
+    as: ben
+  - call: echo.createRoom
+    options: { participants: [$ana, $echo.app] }
+    as: room
+  - expect:
+      - { value: $ana.id, matches: "^EU[0-9A-Z]{10}$" }
+      - { value: $room.name, matches: "^test-[0-9a-z]{6}$" }
+      - { value: $room.members, contains: $echo.app.id }
+
+  - call: ana.say
+    args: [hello]
+    options: { room: $room }
+    as: message
+  - expect:
+      - { value: $message.text, equals: hello }
+      - { value: $message.author.id, equals: $ana.id }
+      - { value: $message.delivery, matches: "^ED[0-9A-Z]{10}$" }
+
+  # The agent's reply arrives on its own time: read until it is there.
+  - call: room.messages
+    as: page
+    until:
+      - { value: $page.messages.length, equals: 2 }
+  - expect:
+      - { value: $page.messages.1.text, equals: "echo: hello" }
+      - { value: $page.messages.1.author.kind, equals: app }
+      - { value: $page.messages.1.author.id, equals: $echo.app.id }
+
+  - call: room.messages
+    options: { since: $page.cursor }
+    as: later
+  - expect:
+      - { value: $later.messages.length, equals: 0 }
+
+  - call: room.transcript
+    as: transcript
+  - expect:
+      - { value: $transcript.entries.0.text, equals: hello }
+      - { value: $transcript.entries.1.author.name, equals: echo-agent }
+
+  - call: session.events
+    as: log
+    until:
+      - {
+          value: $log.events,
+          contains: { kind: delivery_attempt, data: { status: acknowledged, responseStatus: 200 } },
+        }
+      - { value: $log.events, contains: { kind: api_call, data: { operation: messages.create, responseStatus: 200 } } }
+
+  # The platform refuses what it should, and the SDK raises the typed error for it.
+  - call: ben.say
+    args: [hi]
+    options: { room: $room }
+    throws: not_in_room
