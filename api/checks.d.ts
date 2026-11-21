@@ -9,6 +9,20 @@ export interface ChecksOptions {
   app: string;
   /** Text that makes the agent reply, e.g. "@my-agent hello". Default: `@<app> hello`. */
   prompt?: string;
+  /**
+   * Text that makes the agent stream a longer answer in a DM. Without it the stream and Stop
+   * checks are left out: not every agent streams.
+   */
+  streamPrompt?: string;
+  /**
+   * Text that makes the agent ask for an approval, and the label of the button it shows. A
+   * workspace admin may press it; anyone else may not. Without it the click checks are left out.
+   *
+   * `slack.double-click` counts messages: it expects the agent to answer one approval with exactly
+   * one new message in the thread (it may also replace the question). An agent that answers only
+   * in place, or with several messages, skips that check.
+   */
+  approval?: { prompt: string; button: string };
   /** Skip checks by id, e.g. `["slack.stream-stop"]` for an agent that doesn't stream. */
   skip?: string[];
   timeout?: Duration;

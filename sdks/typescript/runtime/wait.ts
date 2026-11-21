@@ -34,6 +34,35 @@ export async function waitFor<T>(
   }
 }
 
+/**
+ * Repeat a call while it is refused with one of these error codes, the way a person waits for a
+ * button to appear before clicking it. When the time is up, the last refusal is the error.
+ */
+export async function retryWhile<T>(
+  codes: readonly string[],
+  call: () => Promise<T>,
+  options: WaitOptions = {},
+): Promise<T> {
+  let refusal: unknown;
+  try {
+    return await waitFor(
+      "the call to be accepted",
+      async () => {
+        try {
+          return { value: await call() };
+        } catch (error) {
+          if (!codes.includes(String((error as { code?: unknown } | null)?.code))) throw error;
+          refusal = error;
+          return undefined;
+        }
+      },
+      options,
+    ).then(({ value }) => value);
+  } catch (error) {
+    throw error instanceof WaitTimeoutError && refusal !== undefined ? refusal : error;
+  }
+}
+
 export interface QuietOptions extends WaitOptions {
   /**
    * How long the agent must be quiet (no call in flight, no delivery in flight or about to be retried, no open stream)
@@ -60,6 +89,15 @@ interface Author {
 export function fromMatches(author: Author, from: Author | string | undefined): boolean {
   if (from === undefined) return true;
   return typeof from === "string" ? author.name === from || author.id === from : author.id === from.id;
+}
+
+/** Does a text match what was asked for: a string it contains, a pattern, or nothing (any text)? */
+export function textMatches(text: string, expected: string | RegExp | undefined): boolean {
+  if (expected === undefined) return true;
+  if (typeof expected === "string") return text.includes(expected);
+  // A pattern with the `g` or `y` flag remembers where it stopped; every test starts afresh.
+  expected.lastIndex = 0;
+  return expected.test(text);
 }
 
 /** "a reply" → "a reply from my-agent", for timeout messages. */

@@ -14,7 +14,14 @@ import type { Logger } from "./core/log/index.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
 import type { Redactor } from "./core/redact/index.ts";
 import { Registry } from "./core/registry/index.ts";
-import { type Driver, DriverRouter, invalidArgument, registerRoute, SessionParams } from "./core/router/index.ts";
+import {
+  type Driver,
+  DriverRouter,
+  invalidArgument,
+  registerRoute,
+  SessionParams,
+  type SocketSession,
+} from "./core/router/index.ts";
 import { randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
 import { DRIVERS } from "./drivers/index.ts";
@@ -61,6 +68,8 @@ export interface App {
   settled(): Promise<void>;
   /** A new one-time link that opens the UI in a browser. */
   uiLoginLink(): string;
+  /** A WebSocket the agent wants to open to a fake: what handles it, or nothing when no fake expects one there. */
+  socket(request: Request): SocketSession | undefined;
 }
 
 const Status = z.object({ ready: z.boolean(), version: z.string(), drivers: z.array(z.string()) }).openapi("Status");
@@ -333,5 +342,12 @@ export function createApp(options: AppOptions): App {
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),
     uiLoginLink,
+    socket(request) {
+      // The same routing as for requests: a driver's own host, or its path prefix.
+      const { host, pathname } = new URL(request.url);
+      const named = (request.headers.get("x-forwarded-host") ?? host).split(":")[0] ?? "";
+      const driver = byHost.get(named) ?? drivers.find((candidate) => pathname.startsWith(`/${candidate.name}/`));
+      return driver?.fake.socket?.(request);
+    },
   };
 }

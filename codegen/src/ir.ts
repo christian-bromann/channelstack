@@ -44,6 +44,8 @@ export interface IrWait {
   not?: string[];
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
+  /** A text field of the item; an option of the same name narrows the wait by a string or a pattern. */
+  text?: string;
   /** The wait's first argument is the read's own options, passed through to it. */
   filter?: true;
   /** What is waited for, for the timeout message. */
@@ -113,6 +115,10 @@ export interface IrMethod {
   errors: string[];
   /** Ends the handle's life: SDKs call it on dispose. */
   dispose: boolean;
+  /** Repeat the call while it is refused with one of these codes, up to the wait timeout. */
+  retryWhile?: string[];
+  /** Wait until the agent is quiet before reading. */
+  onceQuiet?: true;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -168,6 +174,15 @@ export function buildIr(openapi: Json): Ir {
     }
     const alternatives: Json[] | undefined = schema.oneOf ?? schema.anyOf;
     if (Array.isArray(alternatives)) {
+      // "One of these, or null": the alternatives that aren't null, marked as nullable.
+      const present = alternatives.filter((alternative) => alternative.type !== "null");
+      if (present.length < alternatives.length) {
+        const [only] = present;
+        return {
+          kind: "nullable",
+          type: present.length === 1 && only ? typeOf(only, where) : typeOf({ anyOf: present }, where),
+        };
+      }
       const types = alternatives.map((alternative, index) => typeOf(alternative, `${where}|${index}`));
       const discriminator: unknown = schema.discriminator?.propertyName;
       return { kind: "union", types, ...(typeof discriminator === "string" ? { discriminator } : {}) };
@@ -308,9 +323,13 @@ export function buildIr(openapi: Json): Ir {
       const options = take(binding.options);
       if (available.size > 0)
         throw new SpecError(where, `doesn't expose ${[...available.keys()].join(", ")} as an argument or option`);
-      const query = args.find((arg) => arg.in === "query" || arg.optional);
+      // Positional arguments are body fields, and required ones. Only the last may be optional: `modal.submit(values?)`.
+      const query = args.find((arg, position) => arg.in === "query" || (arg.optional && position < args.length - 1));
       if (query)
-        throw new SpecError(where, `"${query.name}" must be an option: positional arguments are required body fields`);
+        throw new SpecError(
+          where,
+          `"${query.name}" must be an option: positional arguments are body fields, and only the last may be optional`,
+        );
 
       const responseSchema: Json | undefined = operation.responses?.["200"]?.content?.["application/json"]?.schema;
       for (const wait of (operation["x-channelstack-waits"] ?? []) as Json[]) {
@@ -333,6 +352,7 @@ export function buildIr(openapi: Json): Ir {
             read: binding.name,
             item,
             ...(wait.from ? { from: wait.from } : {}),
+            ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
             ...(wait.mode === "until" ? { field: wait.field, not: wait.not } : {}),
             what: wait.what,
@@ -350,6 +370,10 @@ export function buildIr(openapi: Json): Ir {
         returns: responseSchema ? typeOf(responseSchema, `${where} → 200`) : null,
         errors: operation["x-channelstack-error-codes"] ?? [],
         dispose: binding.dispose === true,
+        ...(Array.isArray(binding.retryWhile) && binding.retryWhile.length > 0
+          ? { retryWhile: binding.retryWhile }
+          : {}),
+        ...(binding.onceQuiet === true ? { onceQuiet: true as const } : {}),
       });
     }
   }

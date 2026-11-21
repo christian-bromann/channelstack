@@ -3,7 +3,7 @@ import { ClientBase, connectWith, disposeQuietly, type HandleContext, printsAs, 
 import { type Duration, parseDuration } from "../runtime/duration.ts";
 import type { LaunchOptions } from "../runtime/launcher.ts";
 import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";
-import { describeWait, fromMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, type QuietState } from "../runtime/wait.ts";
+import { describeWait, fromMatches, textMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, retryWhile, untilQuiet, type QuietState } from "../runtime/wait.ts";
 
 /** The server version this SDK was generated for. */
 export const VERSION = "0.0.0";
@@ -13,6 +13,7 @@ export class AlreadyInChannelError extends ChannelstackError {}
 export class AlreadyReactedError extends ChannelstackError {}
 export class CantDeleteMessageError extends ChannelstackError {}
 export class CantUpdateMessageError extends ChannelstackError {}
+export class DispatchFailedError extends ChannelstackError {}
 export class InternalError extends ChannelstackError {}
 export class InvalidArgumentError extends ChannelstackError {}
 export class MsgTooLongError extends ChannelstackError {}
@@ -23,6 +24,8 @@ export class NotFoundError extends ChannelstackError {}
 export class NotInChannelError extends ChannelstackError {}
 export class NotInRoomError extends ChannelstackError {}
 export class SessionNotFoundError extends ChannelstackError {}
+export class SplitViewUnavailableError extends ChannelstackError {}
+export class StopUnavailableError extends ChannelstackError {}
 export class UnauthorizedError extends ChannelstackError {}
 
 const ERRORS: ErrorClasses = {
@@ -31,6 +34,7 @@ const ERRORS: ErrorClasses = {
   already_reacted: AlreadyReactedError,
   cant_delete_message: CantDeleteMessageError,
   cant_update_message: CantUpdateMessageError,
+  dispatch_failed: DispatchFailedError,
   internal: InternalError,
   invalid_argument: InvalidArgumentError,
   msg_too_long: MsgTooLongError,
@@ -41,6 +45,8 @@ const ERRORS: ErrorClasses = {
   not_in_channel: NotInChannelError,
   not_in_room: NotInRoomError,
   session_not_found: SessionNotFoundError,
+  split_view_unavailable: SplitViewUnavailableError,
+  stop_unavailable: StopUnavailableError,
   unauthorized: UnauthorizedError,
 };
 
@@ -156,6 +162,35 @@ export interface SlackMessageInput {
 export interface SlackMessageMetadata {
   event_type: string;
   event_payload: Record<string, unknown>;
+}
+
+export interface SlackButtonRef {
+  label?: string;
+  actionId?: string;
+  value?: string;
+}
+
+export interface SlackMenuRef {
+  label?: string;
+  actionId?: string;
+}
+
+export type SlackSuggestedPrompts = Array<{ title: string; message: string }>;
+
+export type SlackModals = SlackModal[];
+
+export type SlackModalsWire = SlackModalData[];
+
+function decodeSlackModals(ctx: HandleContext, data: SlackModalsWire): SlackModals {
+  return data.map((item) => new SlackModal(ctx, item));
+}
+
+export type SlackModalValues = Record<string, string | string[] | undefined>;
+
+export type SlackModalValuesWire = Record<string, string | string[] | null>;
+
+function decodeSlackModalValues(ctx: HandleContext, data: SlackModalValuesWire): SlackModalValues {
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, (value === null ? undefined : value)]));
 }
 
 export type SlackMessages = SlackMessage[];
@@ -555,12 +590,14 @@ export interface SlackFixtureData {
   app: SlackAppData;
   apiUrl: string;
   team: SlackTeam;
+  socketConnections: number;
 }
 
 export class SlackFixture {
   readonly app: SlackApp;
   readonly apiUrl: string;
   readonly team: SlackTeam;
+  readonly socketConnections: number;
   readonly #ctx: HandleContext;
   readonly #seen = new Map<string, number>();
 
@@ -570,6 +607,7 @@ export class SlackFixture {
     this.app = new SlackApp(ctx, data.app);
     this.apiUrl = data.apiUrl;
     this.team = data.team;
+    this.socketConnections = data.socketConnections;
   }
 
   /** Create a person in the workspace. Experimental. */
@@ -621,10 +659,10 @@ export class SlackFixture {
     return decodeSlackUninstallDeliveries(ctx, data);
   }
 
-  /** Inject a transport fault into the agent's Web API calls. Removed when this session closes. Experimental. */
-  async fault(options: { type: "rate_limit" | "latency" | "error"; operation?: string; retryAfter?: Duration; delay?: Duration; error?: string; times?: number }): Promise<SlackFault> {
+  /** Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental. */
+  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; after?: Duration; error?: string; times?: number }): Promise<SlackFault> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), error: options.error, times: options.times } })) as SlackFaultData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), after: options.after === undefined ? undefined : parseDuration(options.after), error: options.error, times: options.times } })) as SlackFaultData;
     return new SlackFault(ctx, data);
   }
 
@@ -706,6 +744,7 @@ export class SlackUser {
   readonly isAdmin: boolean;
   readonly isBot: boolean;
   readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
 
   /** @internal Handles come from the SDK, never from `new`. */
   constructor(ctx: HandleContext, data: SlackUserData) {
@@ -747,6 +786,69 @@ export class SlackUser {
     await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/delete`, { body: { message: { channel: options.message.channel, ts: options.message.ts } } });
   }
 
+  /** Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental. */
+  async click(button: string | SlackButtonRef, options: { message?: SlackMessage; thread?: SlackThread | SlackMessage; channel?: SlackConversation } = {}): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental. */
+  async select(option: string | string[], options: { menu: string | SlackMenuRef; message: SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/select`, { body: { option: [option].flat(), menu: typeof options.menu === "string" ? { label: options.menu } : options.menu, message: { channel: options.message.channel, ts: options.message.ts } } }))) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Run a message shortcut on a message. Experimental. */
+  async shortcut(callbackId: string, options: { message: SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/shortcut`, { body: { callbackId, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental. */
+  async runCommand(command: string, options: { channel: SlackConversation }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Press Stop on the app's work in a thread: what is streaming there ends, and the app is told. Experimental. */
+  async stop(options: { thread: SlackThread | SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/stop`, { body: { thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at. Experimental. */
+  async openAgentThread(options: { from?: SlackConversation } = {}): Promise<SlackThread> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/agent-threads`, { body: { from: options.from === undefined ? undefined : options.from.id } })) as SlackThreadData;
+    return new SlackThread(ctx, data);
+  }
+
+  /** Pick one of the prompts the app suggested in a thread: this person says its message there. Experimental. */
+  async pickPrompt(title: string, options: { thread: SlackThread | SlackMessage }): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/pick-prompt`, { body: { title, thread: { channel: options.thread.channel, ts: options.thread.ts } } }))) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Look at another channel while the split view stays open: the app is told the new context. Experimental. */
+  async switchContext(channel: SlackConversation, options: { thread: SlackThread | SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/switch-context`, { body: { channel: channel.id, thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** The modals the app opened for this person, in the order it opened them; `open` says which are still up. Experimental. */
+  async modals(): Promise<SlackModals> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/modals`)) as SlackModalsWire;
+    return decodeSlackModals(ctx, data);
+  }
+
   /** Add an emoji reaction to a message. Experimental. */
   async react(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
     const ctx = this.#ctx;
@@ -783,8 +885,14 @@ export class SlackUser {
   /** Messages only this person can see. Experimental. */
   async ephemeral(): Promise<SlackEphemeralMessages> {
     const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/ephemeral`)) as SlackEphemeralMessagesWire;
     return decodeSlackEphemeralMessages(ctx, data);
+  }
+
+  /** Wait for the next new modal from the agent, after the last one this handle saw. */
+  async waitForModal(options: { title?: string | RegExp } & WaitOptions = {}): Promise<SlackModal> {
+    return waitForNext(this.#seen, "waitForModal", () => this.modals(), (item) => textMatches(item.title, options.title), "a modal from the agent", options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -961,6 +1069,14 @@ export class SlackThread {
     this.conversation = new SlackConversation(ctx, data.conversation);
   }
 
+  /** The prompts the app suggested in a thread. Experimental. */
+  async suggestedPrompts(): Promise<SlackSuggestedPrompts> {
+    const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}/suggested-prompts`)) as SlackSuggestedPrompts;
+    return data;
+  }
+
   /** Replies in a thread, oldest first, without the message that starts it. Experimental. */
   async replies(): Promise<SlackReplies> {
     const ctx = this.#ctx;
@@ -1112,6 +1228,63 @@ export class SlackStream {
       const value = await this.refresh();
       return value.state === "open" ? undefined : value;
     }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link SlackModal}. */
+export interface SlackModalData {
+  viewId: string;
+  user: SlackUserData;
+  title: string;
+  blocks: unknown[];
+  open: boolean;
+  errors: Record<string, string>;
+}
+
+export class SlackModal {
+  readonly viewId: string;
+  readonly user: SlackUser;
+  readonly title: string;
+  readonly blocks: unknown[];
+  readonly open: boolean;
+  readonly errors: Record<string, string>;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackModalData) {
+    this.#ctx = ctx;
+    this.viewId = data.viewId;
+    this.user = new SlackUser(ctx, data.user);
+    this.title = data.title;
+    this.blocks = data.blocks;
+    this.open = data.open;
+    this.errors = data.errors;
+  }
+
+  /** What is filled in: each input by its label (or action_id), with the text a person sees in it. Experimental. */
+  async values(): Promise<SlackModalValues> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/values`)) as SlackModalValuesWire;
+    return decodeSlackModalValues(ctx, data);
+  }
+
+  /** Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental. */
+  async submit(values?: Record<string, string | string[]>): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/submit`, { body: { values } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Close the modal. The app is told only if it asked to be (`notify_on_close`). Experimental. */
+  async close(): Promise<SlackDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/close`)) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

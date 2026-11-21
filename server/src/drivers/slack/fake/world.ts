@@ -4,6 +4,7 @@ import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signSlackRequest } from "../../../core/signing/slack.ts";
+import { identified } from "../blocks.ts";
 import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
   appMentionEvent,
@@ -26,7 +27,10 @@ import type {
   SlackUserRecord,
   SlackWorld,
 } from "../world.ts";
+import { createInteractions, type InteractionKit } from "./interactions.ts";
+import type { SocketMode } from "./socket.ts";
 import type { SlackFault, SlackStore } from "./store.ts";
+import { createViews } from "./views.ts";
 
 /** Slack expects an acknowledgement within 3 seconds. */
 const ACK_WINDOW_MS = 3000;
@@ -79,6 +83,12 @@ export interface FakeSlackWorld extends SlackWorld {
     emoji: string,
     direction: "add" | "remove",
   ): string | undefined;
+  /** `views.open` / `views.push`: open a modal for the person whose `trigger_id` this is. Answers with the view. */
+  openView(triggerId: string, view: unknown, onTop: boolean): Record<string, unknown>;
+  /** `views.update`: replace an open modal's definition. */
+  updateView(viewId: string, hash: string | undefined, view: unknown): Record<string, unknown>;
+  /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
+  respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
   /** The user a name in a test's text refers to, in this session. */
@@ -100,7 +110,10 @@ export interface FakeSlackWorld extends SlackWorld {
     options: { badSignature: boolean; stale: boolean; headers?: Record<string, string> | undefined },
   ): Promise<DeliveryAttempt>;
   /** Inject a fault into the Web API. It applies to every caller until removed, or until the session closes. */
-  addFault(session: string, fault: Omit<SlackFault, "id" | "session">): string;
+  addFault(
+    session: string,
+    fault: Omit<SlackFault, "id" | "session" | "type"> & { type: SlackFault["type"] | "drop_socket" },
+  ): string;
   removeFault(session: string, id: string): void;
 }
 
@@ -125,7 +138,7 @@ const SLACK_RETRIES: RetryPolicy = {
   },
 };
 
-export function createFakeWorld(context: DriverContext, store: SlackStore): FakeSlackWorld {
+export function createFakeWorld(context: DriverContext, store: SlackStore, socket: SocketMode): FakeSlackWorld {
   const { ids, clock, events, delivery } = context;
 
   const author = (id: string): SlackUserRecord | undefined => store.users.find(id);
@@ -140,7 +153,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
 
   /** Sign an event and hand it to the delivery queue, for the session whose action caused it. */
   const deliver = (session: string, event: Record<string, unknown>): string | undefined => {
-    if (context.webhookUrl === undefined) return undefined;
+    // The app is reached at its request URL, or over the connection it opened (Socket Mode). With neither, nothing is sent.
+    if (context.webhookUrl === undefined && socket.transport() === undefined) return undefined;
     const eventId = ids.next("slack.event");
     const payload = eventCallback({
       event,
@@ -155,7 +169,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       session,
       driver: "slack",
       type: "event_callback",
-      url: context.webhookUrl,
+      url: context.webhookUrl ?? "",
+      transport: socket.transport,
       body: JSON.stringify(payload),
       sign: (body, atMs) => signSlackRequest(context.secret("signingSecret"), body, atMs),
       timeoutMs: ACK_WINDOW_MS,
@@ -165,13 +180,23 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     return eventId;
   };
 
-  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
+  /** Would the app be told about this kind of event in this conversation? */
+  const hears = (conversation: SlackConversationRecord | "dm", subscription: string): boolean => {
     const { app } = store;
+    // Reachable at all: at its request URL, or over the socket it opened.
+    const reachable = context.webhookUrl !== undefined || socket.transport() !== undefined;
+    return (
+      reachable &&
+      app.installed &&
+      app.botEvents.includes(subscription) &&
+      // The app is always a member of a DM with itself.
+      (conversation === "dm" || conversation.members.has(app.botUserId))
+    );
+  };
+
+  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
     const session = store.conversations.owner(conversation.id);
-    if (session === undefined) return undefined;
-    if (!app.installed || !app.botEvents.includes(subscription) || !conversation.members.has(app.botUserId)) {
-      return undefined;
-    }
+    if (session === undefined || !hears(conversation, subscription)) return undefined;
     return deliver(session, event);
   };
 
@@ -223,7 +248,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       conversation: conversation.id,
       user: userId,
       text: body.text,
-      blocks: body.blocks,
+      blocks: identified(body.blocks, () => ids.next("slack.block")),
       threadTs: options.threadTs,
       edited: undefined,
       reactions: [],
@@ -291,7 +316,10 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
   const action = (session: string, name: string, data: Record<string, unknown>) =>
     events.append(session, "slack", "action", { action: name, ...data });
 
-  return {
+  const world: Omit<
+    FakeSlackWorld,
+    keyof ReturnType<typeof createInteractions> | keyof ReturnType<typeof createViews>
+  > = {
     team: () => store.team,
     app: () => store.app,
     emit,
@@ -411,7 +439,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     edit(conversation, message, body) {
       const { app, team } = store;
       const previous = messageObject(message, author(message.user), team, app);
-      Object.assign(message, body);
+      Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next("slack.block")) });
       const eventTs = ids.slackTs(conversation.id);
       message.edited = eventTs;
       const current = messageObject(message, author(message.user), team, app);
@@ -601,9 +629,22 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       });
     },
 
+    socketConnections: () => socket.connections(),
+
     addFault(session, fault) {
       const id = `fault_${store.faults.length + 1}_${ids.next("slack.block")}`;
-      store.faults.push({ id, session, ...fault });
+      // Dropping the socket happens once, now; the other faults stay until they are removed.
+      if (fault.type === "drop_socket") {
+        if (fault.delayMs > 0) {
+          // A drop that is still to come is called off with its fault, and with its session.
+          const cancel = context.timers.after(fault.delayMs, () => {
+            store.pendingDrops.delete(id);
+            socket.drop();
+          });
+          store.pendingDrops.set(id, { session, cancel });
+        } else socket.drop();
+      }
+      if (fault.type !== "drop_socket") store.faults.push({ id, session, ...fault, type: fault.type });
       action(session, "fault", { fault: id, type: fault.type });
       return id;
     },
@@ -611,6 +652,31 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     removeFault(session, id) {
       const index = store.faults.findIndex((fault) => fault.id === id && fault.session === session);
       if (index !== -1) store.faults.splice(index, 1);
+      const drop = store.pendingDrops.get(id);
+      if (drop?.session === session) {
+        drop.cancel();
+        store.pendingDrops.delete(id);
+      }
     },
   };
+
+  const kit: InteractionKit = {
+    context,
+    store,
+    refuse,
+    member,
+    requireMessage,
+    messageObject: (message) => messageObject(message, author(message.user), store.team, store.app),
+    postAsApp: world.postAsApp,
+    edit: world.edit,
+    remove: world.remove,
+    action,
+    hears,
+    emit,
+    transport: socket.transport,
+    directMessage: (session, userId) => open(session, userId, [store.app.botUserId]),
+    replyAsUser: (...args) => world.replyAsUser(...args),
+  };
+  const { dispatch, ...interactions } = createInteractions(kit);
+  return Object.assign(world, interactions, createViews(kit, dispatch));
 }

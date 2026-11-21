@@ -7,6 +7,9 @@ import { waitFor } from "../../sdks/typescript/runtime/wait.ts";
 import { background, capture, freePort } from "./process.ts";
 import { startBinary } from "./server.ts";
 
+/** How long an agent may take to come up. Several stacks start side by side in CI, on few cores. */
+const STARTUP = { timeout: "45s" } as const;
+
 export interface StackOptions {
   /** The server executable. */
   bin: string;
@@ -14,6 +17,13 @@ export interface StackOptions {
   agent: string;
   /** Which driver delivers to the agent, and at which path of the agent. */
   webhook: { driver: string; path: string };
+  /**
+   * Start the agent in Slack's Socket Mode (`SLACK_SOCKET_MODE=1`): it connects out to the fake,
+   * and the server is given no endpoint to deliver to.
+   */
+  socketMode?: boolean;
+  /** Extra environment for the agent, on top of what `channelstack env` prints. */
+  agentEnv?: Readonly<Record<string, string>>;
 }
 
 export interface RunningStack {
@@ -44,7 +54,7 @@ export async function withStack(
     const server = await startBinary({
       bin: options.bin,
       home,
-      env: { ...env, [webhookVariable]: `http://127.0.0.1:${port}${options.webhook.path}` },
+      env: options.socketMode ? env : { ...env, [webhookVariable]: `http://127.0.0.1:${port}${options.webhook.path}` },
     });
     stops.push(server.stop);
 
@@ -54,17 +64,49 @@ export async function withStack(
         .filter((line) => line.includes("="))
         .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
     );
-    const agent = background(process.execPath, [options.agent], { ...process.env, ...agentEnv, PORT: String(port) });
+    const agent = background(process.execPath, [options.agent], {
+      ...process.env,
+      ...agentEnv,
+      PORT: String(port),
+      ...(options.socketMode ? { SLACK_SOCKET_MODE: "1" } : {}),
+      ...options.agentEnv,
+    });
     stops.push(agent.stop);
-    await waitFor("the reference agent to listen", () => {
+    const running = () => {
       if (agent.child.exitCode !== null)
         throw new Error(`The agent ${options.agent} exited with ${agent.child.exitCode}`);
-      return new Promise<true | undefined>((resolve) => {
-        const socket = connect({ host: "127.0.0.1", port });
-        socket.once("connect", () => resolve(socket.destroy() && true));
-        socket.once("error", () => resolve(undefined));
-      });
-    });
+    };
+    if (options.socketMode) {
+      // In Socket Mode the agent listens nowhere: it is ready once the fake sees its connection.
+      const { url, token } = server;
+      const control = (method: string, path: string) =>
+        fetch(`${url}/_channelstack${path}`, { method, headers: { authorization: `Bearer ${token}` } });
+      const { sessionId } = (await (await control("POST", "/sessions")).json()) as { sessionId: string };
+      await waitFor(
+        "the reference agent to connect",
+        async () => {
+          running();
+          const fixture = (await (await control("GET", `/sessions/${sessionId}/slack`)).json()) as {
+            socketConnections: number;
+          };
+          return fixture.socketConnections > 0 ? true : undefined;
+        },
+        STARTUP,
+      );
+      await control("DELETE", `/sessions/${sessionId}`);
+    } else
+      await waitFor(
+        "the reference agent to listen",
+        () => {
+          running();
+          return new Promise<true | undefined>((resolve) => {
+            const socket = connect({ host: "127.0.0.1", port });
+            socket.once("connect", () => resolve(socket.destroy() && true));
+            socket.once("error", () => resolve(undefined));
+          });
+        },
+        STARTUP,
+      );
 
     await use({ home, env });
   } finally {

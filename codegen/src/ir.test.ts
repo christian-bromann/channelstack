@@ -159,12 +159,12 @@ describe("OpenAPI → IR", () => {
       /binds "nope"/,
     ],
     [
-      "an optional field as a positional argument",
+      "an optional field before another positional argument",
       {
         "x-channelstack-method": {
           on: "Widget",
           name: "update",
-          args: ["label", "parent"],
+          args: ["parent", "label"],
           options: ["mode", "since"],
         },
       },

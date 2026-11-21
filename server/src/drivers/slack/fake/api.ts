@@ -4,8 +4,11 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
+import { identified } from "../blocks.ts";
+import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
-import type { SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "../world.ts";
+import { NOBODY, type SlackConversationRecord, type SlackMessageRecord, type SlackUserRecord } from "../world.ts";
+import type { SocketMode } from "./socket.ts";
 import type { SlackStore } from "./store.ts";
 import { type FakeSlackWorld, SlackRefusal } from "./world.ts";
 
@@ -85,14 +88,19 @@ const json = (args: Args, name: string): unknown => {
  * bot token. It refuses what Slack refuses, with Slack's error codes, and records every call
  * about a conversation for the session that owns it.
  */
-export function createSlackApi(context: DriverContext, store: SlackStore, world: FakeSlackWorld): Hono {
+export function createSlackApi(
+  context: DriverContext,
+  store: SlackStore,
+  world: FakeSlackWorld,
+  socket: SocketMode,
+): Hono {
   const { ids, clock } = context;
   const bot = () => store.app.botUserId;
 
   const userObject = (user: SlackUserRecord) => ({
     id: user.id,
     team_id: store.team.id,
-    name: user.name.toLowerCase().replace(/\s+/g, "."),
+    name: handleOf(user),
     deleted: false,
     real_name: user.realName,
     tz: user.timezone,
@@ -241,6 +249,8 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
   const appendToStream = (message: SlackMessageRecord, piece: string) => {
     const stream = message.stream;
+    // After a person pressed Stop, the stream takes nothing more, and says why.
+    if (stream?.state === "stopped") throw new SlackApiError("stopped_by_user");
     if (stream?.state !== "open") throw new SlackApiError("message_not_in_streaming_state");
     if (piece === "") return;
     if (message.text.length + piece.length > MAX_STREAM_LENGTH) throw new SlackApiError("msg_too_long");
@@ -354,7 +364,9 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       const stream = message.stream;
       if (!stream) throw new SlackApiError("message_not_in_streaming_state");
       const blocks = json(args, "blocks");
-      if (Array.isArray(blocks)) message.blocks = [...message.blocks, ...blocks];
+      if (Array.isArray(blocks)) {
+        message.blocks = [...message.blocks, ...identified(blocks, () => ids.next("slack.block"))];
+      }
       const metadata = json(args, "metadata");
       if (metadata !== undefined) message.metadata = metadata;
       stream.state = "completed";
@@ -401,6 +413,16 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       store.threadState(conversation.id, threadTs).sessionStatus = status as (typeof SESSION_STATUSES)[number];
       return { status, agent_status: status };
     },
+
+    // Socket Mode: where to connect, with a ticket that works once.
+    "apps.connections.open": () => ({ url: socket.ticket() }),
+
+    // Modals: opened with the trigger_id of an interaction, for the person who caused it.
+    "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false) }),
+    "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true) }),
+    "views.update": (args) => ({
+      view: world.updateView(required(args, "view_id"), string(args, "hash"), json(args, "view")),
+    }),
 
     // Files upload v2: ask where to upload, send the bytes there, then share the file.
     "files.getUploadURLExternal": (args) => {
@@ -501,14 +523,19 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
     "conversations.replies": (args) => {
       const conversation = joined(required(args, "channel"));
-      const root = messageIn(conversation, required(args, "ts"));
+      // A split-view thread hangs on an anchor nobody sees: the thread exists, its root isn't shown.
+      const root = store.findMessage(conversation.id, required(args, "ts"));
+      if (!root || (root.ephemeralFor !== undefined && root.ephemeralFor !== NOBODY)) {
+        throw new SlackApiError("thread_not_found");
+      }
       const rootTs = root.threadTs ?? root.ts;
       const thread = store
         .messagesIn(conversation.id)
         .filter((message) => message.threadTs === rootTs && message.ephemeralFor === undefined);
       // The root is always first; the window and the limit apply to the replies under it.
       const { messages, has_more } = page(args, thread);
-      return { messages: [root, ...messages].map(messageOf), has_more, response_metadata: { next_cursor: "" } };
+      const shown = root.ephemeralFor === undefined ? [root, ...messages] : messages;
+      return { messages: shown.map(messageOf), has_more, response_metadata: { next_cursor: "" } };
     },
 
     "conversations.members": (args) => ({
@@ -604,7 +631,15 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
     const method = methods[name];
     try {
       if (token === undefined) throw new SlackApiError("not_authed");
-      if (!constantTimeEqual(token, context.secret("botToken"))) throw new SlackApiError("invalid_auth");
+      // Socket Mode connections are opened with the app-level token; everything else takes the bot token.
+      const [expected, other] =
+        name === "apps.connections.open" ? (["appToken", "botToken"] as const) : (["botToken", "appToken"] as const);
+      if (!constantTimeEqual(token, context.secret(expected))) {
+        // A real token of the wrong kind is told so; anything else is simply not a token.
+        throw new SlackApiError(
+          constantTimeEqual(token, context.secret(other)) ? "not_allowed_token_type" : "invalid_auth",
+        );
+      }
       if (!store.app.installed) throw new SlackApiError("account_inactive");
       if (!method) throw new SlackApiError("unknown_method", { req_method: name });
 
@@ -670,6 +705,22 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       else context.arrived(session, name);
     }
     return c.json(body, status, headers);
+  });
+
+  // A `response_url`: the app answers an interaction here. The URL is the credential, as with Slack's.
+  api.post("/hooks/:kind/*", async (c) => {
+    const key = c.req.path.split(`/hooks/${c.req.param("kind")}/`)[1] ?? "";
+    const type = c.req.header("content-type") ?? "";
+    // Slack takes JSON, or a form with the JSON in `payload`.
+    const raw = type.includes("form") ? String((await c.req.parseBody()).payload ?? "") : await c.req.text();
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return c.text("invalid_payload", 400);
+    }
+    if (typeof body !== "object" || body === null) return c.text("invalid_payload", 400);
+    return world.respond(key, body as Record<string, unknown>) ? c.text("ok") : c.text("expired_url", 404);
   });
 
   // Where `files.getUploadURLExternal` sends the app with a file's bytes.

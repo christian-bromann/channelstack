@@ -24,10 +24,11 @@ const AGENTS = {
 const ENABLED = [
   "mentions and threads > ",
   "direct messages > ",
+  "buttons, menus, modals and commands > ",
+  "streaming, status and Stop > ",
   "reactions, edits and deletes > ",
   "inspecting what the agent did > ",
-  "streaming, status and Stop > streams a reply and shows a status while working",
-  // Everything but the Socket Mode test, which is phase 2.
+  // Everything but the Socket Mode test, which needs an agent started in Socket Mode (exit check 2.2).
   "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
 ];
 
@@ -46,6 +47,8 @@ export async function runExamples(
       run("pnpm", [...vitest, "api/examples", "-t", ENABLED_TESTS.source], { cwd: ROOT, env });
       // The tests that need a server and an agent but aren't examples (quiet, parallel sessions).
       run("pnpm", [...vitest, "test/acceptance/stack"], { cwd: ROOT, env });
+      // The standard checks, as a developer adds them to a suite (exit check 2.3).
+      run("pnpm", [...vitest, "test/acceptance/checks"], { cwd: ROOT, env });
     });
   }
 }

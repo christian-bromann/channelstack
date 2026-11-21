@@ -6,7 +6,9 @@
  * It exists so the test suite can show that channelstack catches this: the stream-and-status
  * example fails against it, and the failure names the message that was left behind.
  */
-import { app, listen } from "../shared/bolt.ts";
+import { createApp, listen } from "../shared/bolt.ts";
+
+const app = createApp();
 
 /** The model call that goes wrong after a moment. */
 const model = (): Promise<string> =>
@@ -28,4 +30,4 @@ app.message(async ({ message, client }) => {
   }
 });
 
-await listen();
+await listen(app);

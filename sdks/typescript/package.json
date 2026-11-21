@@ -27,6 +27,10 @@
       "types": "./dist/integrations/vitest/index.d.ts",
       "default": "./dist/integrations/vitest/index.js"
     },
+    "./checks": {
+      "types": "./dist/integrations/checks/index.d.ts",
+      "default": "./dist/integrations/checks/index.js"
+    },
     "./vitest/setup": {
       "default": "./dist/integrations/vitest/setup.js"
     },

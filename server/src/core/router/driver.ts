@@ -20,6 +20,25 @@ export interface FakeBackend {
   seed(): void;
   /** Remove what a closed session owned from the store's own indexes. The registry drops the objects themselves. */
   release(session: string): void;
+  /**
+   * A WebSocket the agent wants to open to this fake (Slack's Socket Mode). Returns what handles
+   * the connection, or nothing when the fake doesn't expect one there.
+   */
+  socket?(request: Request): SocketSession | undefined;
+}
+
+/** One WebSocket connection from the agent, as the fake sees it. The server feeds it what happens. */
+export interface SocketSession {
+  /** The connection is up; `peer` is how to talk back. */
+  open(peer: SocketPeer): void;
+  message(text: string): void;
+  closed(): void;
+}
+
+/** The agent's end of a WebSocket connection. */
+export interface SocketPeer {
+  send(text: string): void;
+  close(): void;
 }
 
 /** Per action: does it work in the fake, does it work live, and what does live need. */

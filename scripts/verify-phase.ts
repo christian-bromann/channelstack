@@ -44,6 +44,11 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // 1.2 (`api/examples` against both reference agents), 1.5 and 1.7 (`test/acceptance/stack`),
   // 1.4 and 1.6 (`test/acceptance`). 1.3 (delivery cases against Bolt) is in `test:integration`.
   1: [],
+  // Phase 2 likewise. The acceptance run covers 2.1 (every fake Slack example against both
+  // agents) and 2.3 (`test/acceptance/checks` against both, `checks-broken.test.ts` against the
+  // agent with one fault per check), and the Socket Mode half of 2.2 (`socket-mode.test.ts`).
+  // Delivery cases S2 to S5 and K1 to K4 against Bolt are in `test:integration`.
+  2: [],
 };
 
 const phase = Number(process.argv[2]);

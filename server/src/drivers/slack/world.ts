@@ -116,6 +116,42 @@ export interface SlackThreadState {
   suggestedPrompts?: Array<{ title: string; message: string }>;
 }
 
+/**
+ * "Visible to" for a message nobody sees: the anchor a split-view thread hangs on. Slack has such
+ * a root too; it holds the thread together and is never shown.
+ */
+export const NOBODY = "U00000000";
+
+/** A modal the app opened for one person, for as long as it is open. */
+export interface SlackViewRecord {
+  readonly id: string;
+  readonly session: string;
+  /** Who sees it. */
+  readonly user: string;
+  /** The view as the app defined it, with every `block_id` and `action_id` filled in. */
+  definition: Record<string, unknown> & { blocks: unknown[] };
+  /** What is filled in: `values[block_id][action_id]`. */
+  values: Record<string, Record<string, Record<string, unknown> & { type: string }>>;
+  /** Changes with every update; `views.update` with an older one is refused. */
+  hash: string;
+  readonly rootViewId: string;
+  readonly previousViewId: string | null;
+  /** What the app said is wrong after a submission, by `block_id`. */
+  errors: Record<string, string>;
+  /** Submitted or closed. The record stays, so a test can still ask which modals the app opened. */
+  closed: boolean;
+}
+
+/** A control a person means: by the label they see, by its `action_id`, or both. */
+interface SlackControlRef {
+  label?: string | undefined;
+  actionId?: string | undefined;
+}
+
+/** Where a person looks for a control: on one message, or on the app's latest message that has it in a thread or a conversation. */
+export type SlackControlScope =
+  { message: { channel: string; ts: string } } | { thread: { channel: string; ts: string } } | { channel: string };
+
 /** Where a person posts: a conversation, or people to open (or reuse) a DM with. */
 type SlackDestination = { channel: string } | { to: string[] };
 
@@ -183,6 +219,52 @@ export interface SlackWorld {
     target: { channel: string; ts: string },
     action: "add" | "remove",
   ): string | undefined;
+  /** Press a button: found by its label, its `action_id`, or both. Returns the `block_actions` delivery. */
+  clickAsUser(
+    session: string,
+    user: string,
+    button: SlackControlRef & { value?: string | undefined },
+    where: SlackControlScope,
+  ): string;
+  /** Choose options in a select menu on a message, by their text or value. Returns the `block_actions` delivery. */
+  selectAsUser(
+    session: string,
+    user: string,
+    options: readonly string[],
+    menu: SlackControlRef,
+    message: { channel: string; ts: string },
+  ): string;
+  /** Run a message shortcut on a message. Returns the `message_action` delivery. */
+  shortcutAsUser(session: string, user: string, callbackId: string, message: { channel: string; ts: string }): string;
+  /** Run a slash command in a conversation: `/deploy web staging`. Returns the command's delivery. */
+  commandAsUser(session: string, user: string, command: string, channel: string): string;
+
+  /** Press Stop on the app's work in a thread: open streams end, and the app is told. Returns the delivery. */
+  stopAsUser(session: string, user: string, thread: { channel: string; ts: string }): string;
+
+  /**
+   * Open the app's split view: a new thread in the person's DM with the app, started from the
+   * channel they are looking at (if any). Returns the thread's anchor.
+   */
+  openAgentThread(session: string, user: string, from: string | undefined): SlackMessageRecord;
+  /** Pick one of the prompts the app suggested in a thread: the person says its message there. */
+  pickPrompt(session: string, user: string, title: string, thread: { channel: string; ts: string }): SlackMessageRecord;
+  /** Look at another channel while the split view stays open. Returns the delivery that tells the app. */
+  switchContext(session: string, user: string, channel: string, thread: { channel: string; ts: string }): string;
+  /** The prompts the app suggested in a thread. */
+  suggestedPrompts(session: string, channel: string, ts: string): Array<{ title: string; message: string }>;
+
+  /** How many Socket Mode connections the app holds open. 0 for an app that receives over HTTP. */
+  socketConnections(): number;
+
+  /** The modals the app opened for a person, in the order it opened them, closed ones included. */
+  modals(session: string, user: string): SlackViewRecord[];
+  modal(session: string, view: string): SlackViewRecord;
+  /** Fill in inputs (by label, `block_id.action_id`, `action_id` or `block_id`) and submit. Returns the `view_submission` delivery. */
+  submitModal(session: string, view: string, values: Readonly<Record<string, string | readonly string[]>>): string;
+  /** Close a modal. Returns the `view_closed` delivery when the app asked to be told. */
+  closeModal(session: string, view: string): string | undefined;
+
   invite(session: string, user: string, participants: readonly string[], channel: string): void;
   kick(session: string, user: string, participant: string, channel: string): void;
 

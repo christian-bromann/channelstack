@@ -17,6 +17,13 @@ interface SdkBinding {
   bind?: Readonly<Record<string, string>>;
   /** This method ends the handle's life; SDKs call it on dispose. */
   dispose?: boolean;
+  /**
+   * A person would wait for it: SDKs repeat the call while it is refused with one of these codes
+   * (a button that isn't there yet), up to the wait timeout, then report the last refusal.
+   */
+  retryWhile?: readonly string[];
+  /** A read of what the agent has set: SDKs wait until the agent is quiet before they read. */
+  onceQuiet?: boolean;
 }
 
 /**
@@ -33,6 +40,8 @@ interface WaitBinding {
   not?: readonly string[];
   /** The item field holding who authored it; the wait's `from` option filters on it. */
   from?: string;
+  /** A text field of the item the wait can be narrowed by: an option of that name takes a string or a pattern. */
+  text?: string;
   /** The wait takes the read's own options as its first argument: `waitForCall({ operation }, { timeout })`. */
   filter?: true;
   /** What is being waited for, for the timeout message: "a reply". */

@@ -7,6 +7,7 @@ import type {
   SlackTeam,
   SlackThreadState,
   SlackUserRecord,
+  SlackViewRecord,
 } from "../world.ts";
 
 /** A transport fault for the agent's Web API calls (`slack.fault(...)`). */
@@ -23,6 +24,19 @@ export interface SlackFault {
   readonly error: string;
 }
 
+/** A `response_url`: where the app answers one interaction, a few times, for a while. */
+export interface SlackResponseUrl {
+  readonly session: string;
+  readonly conversation: string;
+  /** Who acted: an answer that isn't `in_channel` is for them alone. */
+  readonly user: string;
+  /** The message the control was on, which an answer replaces by default. A command or a shortcut has none. */
+  readonly source: string | undefined;
+  readonly threadTs: string | undefined;
+  readonly expiresAt: number;
+  uses: number;
+}
+
 /** The Slack fake's in-memory state. Objects live in the core registry; the store adds Slack's own indexes. */
 export class SlackStore {
   readonly users: Collection<SlackUserRecord>;
@@ -31,6 +45,14 @@ export class SlackStore {
   readonly #threads = new Map<string, SlackThreadState>();
   /** Files the app uploaded, by id. */
   readonly files = new Map<string, SlackFileRecord>();
+  /** What an interaction handed the app to answer with: its `response_url`s, by the key in the URL. */
+  readonly responseUrls = new Map<string, SlackResponseUrl>();
+  /** `trigger_id`s the app may open a modal with, and until when. */
+  readonly triggers = new Map<string, { session: string; user: string; expiresAt: number; used: boolean }>();
+  /** `drop_socket` faults that haven't fired yet, by fault id. */
+  readonly pendingDrops = new Map<string, { session: string; cancel(): void }>();
+  /** Every modal the app opened, by view id. A submitted or closed one stays, marked `closed`. */
+  readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
   /** The session that uninstalled the app, so closing it installs the app again. */
@@ -144,6 +166,14 @@ export class SlackStore {
     }
     for (const fault of [...this.faults])
       if (fault.session === session) this.faults.splice(this.faults.indexOf(fault), 1);
+    for (const [key, url] of this.responseUrls) if (url.session === session) this.responseUrls.delete(key);
+    for (const [id, trigger] of this.triggers) if (trigger.session === session) this.triggers.delete(id);
+    for (const [id, view] of this.views) if (view.session === session) this.views.delete(id);
+    for (const [id, drop] of this.pendingDrops) {
+      if (drop.session !== session) continue;
+      drop.cancel();
+      this.pendingDrops.delete(id);
+    }
     const people = this.usersOf(session);
     this.#people.delete(session);
     for (const id of [...this.#known]) {

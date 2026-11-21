@@ -69,6 +69,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return `decode${type.name}(ctx, ${expr})`;
       case "nullable":
         return `(${expr} === null ? undefined : ${decode(type.type, expr)})`;
+      case "record":
+        return `Object.fromEntries(Object.entries(${expr}).map(([key, value]) => [key, ${decode(type.values, "value")}]))`;
       case "object":
         return `{ ...${expr}, ${type.fields
           .filter((field) => index.holdsResources(field.type))
@@ -139,9 +141,11 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const method = (resource: IrResource, m: IrMethod): string[] => {
     const optionsOptional = m.options.every((option) => option.optional);
     const parameters = [
-      ...m.args.map((arg) => `${arg.name}: ${parameterType(arg)}`),
+      ...m.args.map((arg) => `${arg.name}${arg.optional ? "?" : ""}: ${parameterType(arg)}`),
       ...(m.options.length > 0
-        ? [`options: { ${fields(m.options, "public").join("; ")} }${optionsOptional ? " = {}" : ""}`]
+        ? [
+            `options: { ${m.options.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,
+          ]
         : []),
     ];
     const path = pathParts(m)
@@ -159,13 +163,15 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       ...(body.length > 0 ? [`body: { ${body.map(entry).join(", ")} }`] : []),
       ...(query.length > 0 ? [`query: { ${query.map(entry).join(", ")} }`] : []),
     ];
-    const call = `ctx.transport.request(${JSON.stringify(m.http.verb)}, \`${path}\`${request.length > 0 ? `, { ${request.join(", ")} }` : ""})`;
+    const sent = `ctx.transport.request(${JSON.stringify(m.http.verb)}, \`${path}\`${request.length > 0 ? `, { ${request.join(", ")} }` : ""})`;
+    const call = m.retryWhile ? `retryWhile(${JSON.stringify(m.retryWhile)}, () => ${sent})` : sent;
     const returns = m.returns ? typeOf(m.returns, "public") : "void";
     return [
       "",
       `  /** ${m.summary}.${m.stability === "experimental" ? " Experimental." : ""} */`,
       `  async ${m.name}(${parameters.join(", ")}): Promise<${returns}> {`,
       "    const ctx = this.#ctx;",
+      ...(m.onceQuiet ? ["    await untilQuiet(() => quietOf(ctx));"] : []),
       ...(m.returns
         ? [
             `    const data = (await ${call}) as ${typeOf(m.returns, "wire")};`,
@@ -190,8 +196,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const fromField =
       w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
     const from = fromField ? `from?: ${typeOf(fromField.type, "public")} | string` : undefined;
-    const options = `${from ? `{ ${from} } & ` : ""}${w.mode === "next" ? "WaitOptions" : "QuietOptions"}`;
-    const matches = from ? `(item) => fromMatches(item.${w.from}, options.from)` : "() => true";
+    const narrowing = [...(from ? [from] : []), ...(w.text ? [`${w.text}?: string | RegExp`] : [])];
+    const options = `${narrowing.length > 0 ? `{ ${narrowing.join("; ")} } & ` : ""}${w.mode === "next" ? "WaitOptions" : "QuietOptions"}`;
+    const conditions = [
+      ...(from ? [`fromMatches(item.${w.from}, options.from)`] : []),
+      ...(w.text ? [`textMatches(item.${w.text}, options.${w.text})`] : []),
+    ];
+    const matches = conditions.length > 0 ? `(item) => ${conditions.join(" && ")}` : "() => true";
     const what = from ? `describeWait(${JSON.stringify(w.what)}, options.from)` : JSON.stringify(w.what);
     // With `filter`, the read's own options come first and are passed through to it.
     const read = resource.methods.find((m) => m.name === w.read);
@@ -316,12 +327,16 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
   const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
   const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
+  const allMethods = ir.resources.flatMap((resource) => resource.methods);
   const waitImports = [
     ...(allWaits.some((w) => w.from !== undefined) ? ["describeWait", "fromMatches"] : []),
+    ...(allWaits.some((w) => w.text !== undefined) ? ["textMatches"] : []),
     ...(allWaits.some((w) => w.mode === "latest") ? ["latestOnceQuiet", "type QuietOptions"] : []),
     ...(allWaits.some((w) => w.mode === "until") ? ["waitFor"] : []),
     ...(allWaits.some((w) => w.mode === "next") ? ["waitForNext"] : []),
     ...(allWaits.some((w) => w.mode !== "latest") ? ["type WaitOptions"] : []),
+    ...(allMethods.some((m) => m.retryWhile) ? ["retryWhile"] : []),
+    ...(allMethods.some((m) => m.onceQuiet) ? ["untilQuiet"] : []),
   ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),

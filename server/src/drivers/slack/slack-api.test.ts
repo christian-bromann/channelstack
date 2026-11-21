@@ -243,9 +243,23 @@ describe("streams and status", () => {
         { type: "task_update", id: "t1", title: "x", status: "complete" },
       ],
     });
-    const stopped = await api("chat.stopStream", { channel: channel.id, ts: started.ts, markdown_text: "\n- status" });
+    const feedback = {
+      type: "actions",
+      elements: [{ type: "button", text: { type: "plain_text", text: "Helpful" } }],
+    };
+    const stopped = await api("chat.stopStream", {
+      channel: channel.id,
+      ts: started.ts,
+      markdown_text: "\n- status",
+      blocks: [feedback],
+    });
 
     expect(stopped).toMatchObject({ ok: true, ts: started.ts, message: { text: "## 0.10\n- streams\n- status" } });
+    // Blocks added at the end get their ids like any others, so their controls can be found and pressed.
+    expect(stopped.message.blocks.at(-1)).toMatchObject({
+      block_id: expect.any(String),
+      elements: [{ action_id: expect.any(String) }],
+    });
     const replies = await get(`/conversations/${channel.id}/threads/${question.ts}/replies`);
     expect(replies).toHaveLength(1);
     expect(replies[0].text).toBe("## 0.10\n- streams\n- status");

@@ -23,8 +23,34 @@ export interface DeliveryRequest {
   readonly timeoutMs: number;
   /** What the driver wants to find again on the delivery: the inner event type, the object that caused it. */
   readonly meta?: Readonly<Record<string, unknown>>;
+  /**
+   * Another way to the agent than an HTTP request, asked for at every attempt: a connection the
+   * agent opened itself (Slack's Socket Mode). Undefined sends over HTTP to `url`.
+   */
+  transport?(): DeliveryTransport | undefined;
   /** How the platform retries a delivery the agent didn't acknowledge. Without it, there is one attempt. */
   readonly retry?: RetryPolicy;
+  /**
+   * Called with the agent's answer when it acknowledges an attempt of the platform's own chain.
+   * Some deliveries are answered in the response itself: a slash command's immediate reply, a
+   * modal submission's `response_action`.
+   */
+  answered?(answer: { status: number; contentType: string; body: string }): void;
+}
+
+/** A way to the agent over a connection the agent holds open. */
+export interface DeliveryTransport {
+  /** Where the connection goes, for the record. */
+  readonly url: string;
+  /**
+   * Send one attempt and resolve with what the agent acknowledged it with. Rejects when the agent
+   * can't be reached; `signal` fires at the end of the ack window and when the session closes.
+   */
+  send(attempt: {
+    request: DeliveryRequest;
+    headers: Readonly<Record<string, string>>;
+    signal: AbortSignal;
+  }): Promise<{ contentType: string; body: string }>;
 }
 
 /** A platform's own retry behaviour, asked after each attempt of the chain it started itself. */
@@ -45,7 +71,7 @@ export interface RetryPolicy {
 export interface DeliveryAttempt {
   readonly number: number;
   readonly sentAt: string;
-  readonly transport: "http";
+  readonly transport: "http" | "socket";
   readonly url: string;
   readonly requestHeaders: Readonly<Record<string, string>>;
   readonly status: DeliveryStatus;
@@ -75,6 +101,8 @@ export interface AttemptOptions {
 }
 
 const RESPONSE_BODY_LIMIT = 2048;
+/** How much of an agent's answer is handed to the driver that acts on it. */
+const ANSWER_LIMIT = 256 * 1024;
 /** A scheduled retry this close counts as work in progress; a later one doesn't. */
 const RETRY_SOON_MS = 5000;
 
@@ -113,9 +141,29 @@ export class DeliveryQueue {
    * for as long as the platform's policy asks for one. Attempts a test sends (`again`) are not part of it.
    */
   async #chain(record: DeliveryRecord, options: AttemptOptions, retries: number): Promise<void> {
-    const { attempt, responseHeaders } = await this.#send(record, options);
+    const { attempt, responseHeaders, responseText } = await this.#send(record, options);
     const cancelled = this.#sessions.get(record.request.session)?.records.get(record.request.id) !== record;
-    if (cancelled || attempt.status === "acknowledged") return;
+    if (cancelled) return;
+    if (attempt.status === "acknowledged") {
+      try {
+        record.request.answered?.({
+          status: attempt.responseStatus ?? 200,
+          contentType: responseHeaders?.get("content-type") ?? "",
+          body: responseText ?? "",
+        });
+      } catch (error) {
+        // The agent acknowledged with something the platform can't act on (a view that isn't one, a
+        // reply it refuses). The delivery stands; what went wrong is in the log and the event log.
+        const problem = error instanceof Error ? error.message : String(error);
+        this.#log.warn("the agent's answer could not be acted on", { id: record.request.id, problem });
+        this.#events.append(record.request.session, record.request.driver, "action", {
+          action: "answer_refused",
+          delivery: record.request.id,
+          problem,
+        });
+      }
+      return;
+    }
     const next = record.request.retry?.next(attempt, retries, responseHeaders);
     if (!next) return;
     const cancel = this.#timers.after(next.afterMs, () => {
@@ -193,22 +241,26 @@ export class DeliveryQueue {
   async #send(
     record: DeliveryRecord,
     options: AttemptOptions,
-  ): Promise<{ attempt: DeliveryAttempt; responseHeaders: Headers | undefined }> {
+  ): Promise<{ attempt: DeliveryAttempt; responseHeaders: Headers | undefined; responseText?: string }> {
     const { request } = record;
     const cancelled = this.#session(request.session).canceller.signal;
     const sentAt = this.#clock();
-    const requestHeaders = {
-      "content-type": request.contentType ?? "application/json",
-      "user-agent": "channelstack",
-      ...(options.sign ?? request.sign)(request.body, sentAt),
-      ...options.headers,
-    };
+    const transport = request.transport?.();
+    const requestHeaders = transport
+      ? // A connection the agent opened needs no signature: only what the platform adds to a retry.
+        { ...options.headers }
+      : {
+          "content-type": request.contentType ?? "application/json",
+          "user-agent": "channelstack",
+          ...(options.sign ?? request.sign)(request.body, sentAt),
+          ...options.headers,
+        };
     const index = record.attempts.length;
     const started = {
       number: index + 1,
       sentAt: new Date(sentAt).toISOString(),
-      transport: "http" as const,
-      url: request.url,
+      transport: transport ? ("socket" as const) : ("http" as const),
+      url: transport?.url ?? request.url,
       requestHeaders,
       forgedSignature: options.forged === true,
     };
@@ -216,26 +268,42 @@ export class DeliveryQueue {
 
     let outcome: Pick<DeliveryAttempt, "status" | "responseStatus" | "responseBody">;
     let responseHeaders: Headers | undefined;
+    let responseText: string | undefined;
+    const signal = AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]);
     try {
-      const response = await fetch(request.url, {
-        method: "POST",
-        headers: requestHeaders,
-        body: request.body,
-        redirect: "manual",
-        signal: AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]),
-      });
-      responseHeaders = response.headers;
-      const responseBody = (await response.text()).slice(0, RESPONSE_BODY_LIMIT);
-      outcome = { status: response.ok ? "acknowledged" : "failed", responseStatus: response.status, responseBody };
+      if (transport) {
+        const answer = await transport.send({ request, headers: requestHeaders, signal });
+        responseHeaders = new Headers({ "content-type": answer.contentType });
+        responseText = answer.body.slice(0, ANSWER_LIMIT);
+        outcome = {
+          status: "acknowledged",
+          responseStatus: 200,
+          responseBody: responseText.slice(0, RESPONSE_BODY_LIMIT),
+        };
+      } else {
+        const response = await fetch(request.url, {
+          method: "POST",
+          headers: requestHeaders,
+          body: request.body,
+          redirect: "manual",
+          signal,
+        });
+        responseHeaders = response.headers;
+        // The attempt keeps the start of the answer; whoever acts on the answer gets more of it, still bounded.
+        responseText = (await response.text()).slice(0, ANSWER_LIMIT);
+        const responseBody = responseText.slice(0, RESPONSE_BODY_LIMIT);
+        outcome = { status: response.ok ? "acknowledged" : "failed", responseStatus: response.status, responseBody };
+      }
     } catch (error) {
       const name = error instanceof Error ? error.name : "";
       outcome = { status: name === "TimeoutError" || name === "AbortError" ? "timed_out" : "unreachable" };
     }
     const attempt: DeliveryAttempt = { ...started, ...outcome, durationMs: this.#clock() - sentAt };
     if (cancelled.aborted) return { attempt, responseHeaders };
+    const answer = responseText === undefined ? {} : { responseText };
     record.attempts[index] = attempt;
     this.#events.append(request.session, request.driver, "delivery_attempt", { id: request.id, ...attempt });
     this.#log.debug("delivery attempt", { id: request.id, driver: request.driver, type: request.type, ...outcome });
-    return { attempt, responseHeaders };
+    return { attempt, responseHeaders, ...answer };
   }
 }

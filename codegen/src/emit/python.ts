@@ -80,7 +80,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       case "record":
         return converts(type.values);
       case "nullable":
-        return converts(type.type);
+        return true;
       case "union":
         return type.types.some(converts);
       default:
@@ -174,10 +174,11 @@ export function emitPython(ir: Ir): Map<string, string> {
   const method = (m: IrMethod): string[] => {
     const parameters = [
       "self",
-      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}`),
+      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}${arg.optional ? " | None = None" : ""}`),
       ...(m.options.length > 0 ? ["*"] : []),
       ...m.options.map(
-        (option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`,
+        (option) =>
+          `${snakeCase(option.name)}: ${option.shorthand === undefined ? "" : "str | "}${annotation(option)}${option.optional ? " = None" : ""}`,
       ),
     ];
     const path = pathParts(m)
@@ -195,12 +196,16 @@ export function emitPython(ir: Ir): Map<string, string> {
         .map((param) => `${JSON.stringify(param.name)}: ${encode(param)}`);
       return entries.length > 0 ? [`${where}={${entries.join(", ")}}`] : [];
     };
-    const call = `await ctx.transport.request(${[JSON.stringify(m.http.verb), `f"${path}"`, ...dict("body"), ...dict("query")].join(", ")})`;
+    const sent = `ctx.transport.request(${[JSON.stringify(m.http.verb), `f"${path}"`, ...dict("body"), ...dict("query")].join(", ")})`;
+    const call = m.retryWhile
+      ? `await retry_while((${m.retryWhile.map((code) => JSON.stringify(code)).join(", ")},), lambda: ${sent})`
+      : `await ${sent}`;
     return [
       "",
       `    async def ${snakeCase(m.name)}(${parameters.join(", ")}) -> ${m.returns ? typeOf(m.returns) : "None"}:`,
       `        """${m.summary}.${m.stability === "experimental" ? " Experimental." : ""}"""`,
       "        ctx = self._ctx",
+      ...(m.onceQuiet ? ["        await until_quiet(lambda: quiet_of(ctx))"] : []),
       ...(m.returns ? [`        data = ${call}`, `        return ${decode(m.returns, "data")}`] : [`        ${call}`]),
     ];
   };
@@ -220,12 +225,15 @@ export function emitPython(ir: Ir): Map<string, string> {
       "*",
       ...filters.map((option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`),
       ...from,
+      ...(w.text ? [`${snakeCase(w.text)}: Text | None = None`] : []),
       'timeout: Duration = "10s"',
       ...(w.mode === "latest" ? ['quiet_for: Duration = "750ms"'] : []),
     ];
-    const matches = fromField
-      ? `lambda item: from_matches(item.${snakeCase(w.from ?? "")}, from_)`
-      : "lambda item: True";
+    const conditions = [
+      ...(fromField ? [`from_matches(item.${snakeCase(w.from ?? "")}, from_)`] : []),
+      ...(w.text ? [`text_matches(item.${snakeCase(w.text)}, ${snakeCase(w.text)})`] : []),
+    ];
+    const matches = `lambda item: ${conditions.length > 0 ? conditions.join(" and ") : "True"}`;
     const what = fromField ? `describe_wait(${JSON.stringify(w.what)}, from_)` : JSON.stringify(w.what);
     const noun = w.what.replace(/^an? /, "");
     if (w.mode === "until") {
@@ -338,6 +346,17 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...ir.resources.map((resource) => resource.name),
   ].sort();
 
+  const allMethods = ir.resources.flatMap((resource) => resource.methods);
+  const usesText = allWaits.some((w) => w.text !== undefined);
+  // In the order ruff sorts them: capitalized names first, then the rest by name.
+  const waitImports = [
+    ...(usesText ? ["Text"] : []),
+    ...(allWaits.length > 0 ? ["describe_wait", "from_matches", "latest_once_quiet"] : []),
+    ...(allMethods.some((m) => m.retryWhile) ? ["retry_while"] : []),
+    ...(usesText ? ["text_matches"] : []),
+    ...(allMethods.some((m) => m.onceQuiet) ? ["until_quiet"] : []),
+    ...(allWaits.length > 0 ? ["wait_for", "wait_for_next"] : []),
+  ];
   const lines = [
     `# ${BANNER}`,
     "# ruff: noqa",
@@ -348,14 +367,12 @@ export function emitPython(ir: Ir): Map<string, string> {
     "from typing import Any, Literal, Self",
     "from urllib.parse import quote",
     "",
-    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") ? ", quiet_of" : ""}, session_of`,
+    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") || allMethods.some((m) => m.onceQuiet) ? ", quiet_of" : ""}, session_of`,
     ...(usesDurations || allWaits.length > 0
       ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
       : []),
     "from ..runtime.transport import ChannelstackError, Transport",
-    ...(allWaits.length > 0
-      ? ["from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next"]
-      : []),
+    ...(waitImports.length > 0 ? [`from ..runtime.wait import ${waitImports.join(", ")}`] : []),
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,
     "",

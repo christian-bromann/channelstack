@@ -54,6 +54,8 @@ export interface Harness {
   app: App;
   /** The app's timers: retries and pauses happen when the test advances them. */
   timers: ManualTimers;
+  /** The app's clock: the real time, plus whatever the test let pass. */
+  clock: { advance(ms: number): void };
   secrets: Secrets;
   /** Every line the app logged. */
   logs: string[];
@@ -70,6 +72,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
   redactor.register(TOKEN, ...secrets.all());
   const logs: string[] = [];
   const timers = manualTimers();
+  let ahead = 0;
   const app = createApp({
     version: "0.0.0-test",
     token: TOKEN,
@@ -81,6 +84,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
     webhooks,
     ui: UI_PAGE,
     timers,
+    clock: () => Date.now() + ahead,
   });
   const send = async (url: string, method: string, body: unknown, token: string | null | undefined): Reply => {
     const response = await app.fetch(
@@ -99,6 +103,11 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
   return {
     app,
     timers,
+    clock: {
+      advance(ms) {
+        ahead += ms;
+      },
+    },
     secrets,
     logs,
     call: (method, path, body, token = TOKEN) =>

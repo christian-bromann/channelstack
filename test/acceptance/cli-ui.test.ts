@@ -78,6 +78,13 @@ test("the attach CLI talks to the agent, and the UI shows the same conversation"
       } finally {
         await browser.deleteSession();
       }
+
+      // A button the agent shows can be pressed from the terminal, and Stop too.
+      cli("slack", "say", "--as", "ana", "--in", "#deploys", "@my-agent deploy web to staging");
+      await waitFor("the agent's question", async () => (cli("show").includes("[Approve]") ? true : undefined));
+      expect(cli("slack", "click", "--as", "ana", "Approve")).toBe('ana clicked "Approve"\n');
+      expect(cli("slack", "stop", "--thread", "last")).toMatch(/^ana pressed Stop/);
+      expect(cli("tail", "--once")).toMatch(/→ slack agent_session_stopped {2}200/);
     },
   );
 }, 120_000);

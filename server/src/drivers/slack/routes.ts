@@ -5,9 +5,17 @@ import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { slackTsTime } from "../../core/ids/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
+import { plain } from "./blocks.ts";
 import type { FakeSlackWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
-import type { SlackAppRecord, SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "./world.ts";
+import { shownValue, viewInputs } from "./views.ts";
+import type {
+  SlackAppRecord,
+  SlackConversationRecord,
+  SlackMessageRecord,
+  SlackUserRecord,
+  SlackViewRecord,
+} from "./world.ts";
 
 const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
 
@@ -114,6 +122,19 @@ const SlackMessage = z
   })
   .openapi("SlackMessage", { "x-channelstack-resource": { id: ["channel", "ts"] } });
 
+const SlackModal = z
+  .object({
+    viewId: z.string(),
+    user: SlackUser,
+    title: z.string(),
+    blocks: z.array(z.unknown()),
+    open: z.boolean().openapi({ description: "False once it was submitted or closed." }),
+    errors: z
+      .record(z.string(), z.string())
+      .openapi({ description: "What the app said is wrong after a submission, by the label of the input." }),
+  })
+  .openapi("SlackModal", { "x-channelstack-resource": { id: "viewId" } });
+
 const SlackThreadStatus = z
   .object({
     /** `working`: a status line or a processing session. `streaming`: a stream is open. `stopped`: a person pressed Stop. */
@@ -177,6 +198,10 @@ const SlackFixture = z
     app: SlackApp,
     apiUrl: z.string(),
     team: z.object({ id: z.string(), name: z.string() }).openapi("SlackTeam"),
+    socketConnections: z
+      .number()
+      .int()
+      .openapi({ description: "How many Socket Mode connections the app holds open. 0 when it receives over HTTP." }),
   })
   .openapi("SlackFixture", { "x-channelstack-resource": {} });
 
@@ -296,7 +321,12 @@ export function registerSlackRoutes(
     response: SlackFixture,
     factory: { on: "Session", name: "slack" },
     stability,
-    handler: () => ({ app: appWire(world.app()), apiUrl: deps.apiUrl(), team: world.team() }),
+    handler: () => ({
+      app: appWire(world.app()),
+      apiUrl: deps.apiUrl(),
+      team: world.team(),
+      socketConnections: world.socketConnections(),
+    }),
   });
 
   router.route({
@@ -455,6 +485,272 @@ export function registerSlackRoutes(
     sdkMethod: { on: "SlackUser", name: "delete", options: ["message"] },
     stability,
     handler: ({ session, params, body }) => world.deleteAsUser(session.id, params.user, body.message),
+  });
+
+  const controlRef = (name: string) =>
+    z
+      .object({ label: z.string().optional(), actionId: z.string().optional() })
+      .openapi(name, { "x-channelstack-shorthand": "label" });
+  /** The delivery an interaction caused, for the routes that answer with it. */
+  const interaction = (session: string, delivery: string) => deliveryWire(world.delivery(session, delivery));
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/click",
+    summary:
+      "Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation",
+    params: UserParams,
+    body: z
+      .object({
+        button: z
+          .object({ label: z.string().optional(), actionId: z.string().optional(), value: z.string().optional() })
+          .openapi("SlackButtonRef", { "x-channelstack-shorthand": "label" }),
+        message: messageRef.optional(),
+        thread: threadRef.optional(),
+        channel: conversationRef.optional(),
+      })
+      .openapi("SlackClickBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    // A person waits for the button to appear before they click it.
+    sdkMethod: {
+      on: "SlackUser",
+      name: "click",
+      args: ["button"],
+      options: ["message", "thread", "channel"],
+      retryWhile: ["not_found"],
+    },
+    stability,
+    handler: ({ session, params, body }) => {
+      const scopes = [
+        body.message && { message: body.message },
+        body.thread && { thread: body.thread },
+        body.channel !== undefined && { channel: body.channel },
+      ].filter((scope) => scope !== undefined && scope !== false);
+      const [where] = scopes;
+      if (scopes.length !== 1 || !where) {
+        throw new ProtocolError("invalid_argument", "click needs exactly one of `message`, `thread` and `channel`");
+      }
+      if (body.button.label === undefined && body.button.actionId === undefined) {
+        throw new ProtocolError("invalid_argument", "Say which button: its label or its action_id");
+      }
+      return interaction(session.id, world.clickAsUser(session.id, params.user, body.button, where));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/select",
+    summary:
+      "Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id",
+    params: UserParams,
+    body: z
+      .object({
+        option: z.array(z.string()).min(1).openapi({ "x-channelstack-one-or-many": true }),
+        menu: controlRef("SlackMenuRef"),
+        message: messageRef,
+      })
+      .openapi("SlackSelectBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: {
+      on: "SlackUser",
+      name: "select",
+      args: ["option"],
+      options: ["menu", "message"],
+      retryWhile: ["not_found"],
+    },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.selectAsUser(session.id, params.user, body.option, body.menu, body.message)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/shortcut",
+    summary: "Run a message shortcut on a message",
+    params: UserParams,
+    body: z.object({ callbackId: z.string().min(1), message: messageRef }).openapi("SlackShortcutBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.shortcutAsUser(session.id, params.user, body.callbackId, body.message)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/commands",
+    summary: "Run a slash command in a conversation, e.g. `/deploy web staging`",
+    params: UserParams,
+    body: z.object({ command: z.string().regex(/^\/\S/), channel: conversationRef }).openapi("SlackCommandBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.commandAsUser(session.id, params.user, body.command, body.channel)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/stop",
+    summary: "Press Stop on the app's work in a thread: what is streaming there ends, and the app is told",
+    params: UserParams,
+    body: z.object({ thread: threadRef }).openapi("SlackStopBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "stop_unavailable"],
+    sdkMethod: { on: "SlackUser", name: "stop", args: [], options: ["thread"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.stopAsUser(session.id, params.user, body.thread)),
+  });
+
+  const threadWire = (session: string, anchor: SlackMessageRecord) => ({
+    channel: anchor.conversation,
+    ts: anchor.threadTs ?? anchor.ts,
+    conversation: conversationWire(world.conversation(session, anchor.conversation)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/agent-threads",
+    summary:
+      "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+    params: UserParams,
+    body: z.object({ from: conversationRef.optional() }).openapi("SlackAgentThreadOptions"),
+    response: SlackThread,
+    errors: ["not_found", "split_view_unavailable"],
+    sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      threadWire(session.id, world.openAgentThread(session.id, params.user, body.from)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/pick-prompt",
+    summary: "Pick one of the prompts the app suggested in a thread: this person says its message there",
+    params: UserParams,
+    body: z.object({ title: z.string().min(1), thread: threadRef }).openapi("SlackPickPromptBody"),
+    response: SlackMessage,
+    errors: ["not_found", "not_in_channel"],
+    sdkMethod: { on: "SlackUser", name: "pickPrompt", args: ["title"], options: ["thread"], retryWhile: ["not_found"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      messageWire(session.id, world.pickPrompt(session.id, params.user, body.title, body.thread)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/switch-context",
+    summary: "Look at another channel while the split view stays open: the app is told the new context",
+    params: UserParams,
+    body: z.object({ channel: conversationRef, thread: threadRef }).openapi("SlackSwitchContextBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "split_view_unavailable"],
+    sdkMethod: { on: "SlackUser", name: "switchContext", args: ["channel"], options: ["thread"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.switchContext(session.id, params.user, body.channel, body.thread)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/threads/{ts}/suggested-prompts",
+    summary: "The prompts the app suggested in a thread",
+    params: MessageParams,
+    response: z.array(z.object({ title: z.string(), message: z.string() })).openapi("SlackSuggestedPrompts"),
+    errors: ["not_found"],
+    // The app sets them after it hears the thread was opened: read once it has gone quiet.
+    sdkMethod: { on: "SlackThread", name: "suggestedPrompts", bind: messageBinding, onceQuiet: true },
+    stability,
+    handler: ({ session, params }) => world.suggestedPrompts(session.id, params.channel, params.ts),
+  });
+
+  const ViewParams = z.object({ view: z.string().openapi({ param: { name: "view", in: "path" } }) });
+  const modalWire = (session: string, view: SlackViewRecord) => {
+    const inputs = viewInputs(view.definition.blocks);
+    return {
+      viewId: view.id,
+      user: userWire(world.user(session, view.user)),
+      title: plain(view.definition.title),
+      blocks: view.definition.blocks,
+      open: !view.closed,
+      // What the app said is wrong, by the label of the input it is shown at.
+      errors: Object.fromEntries(
+        Object.entries(view.errors).map(([block, message]) => [
+          inputs.find((input) => input.blockId === block)?.label ?? block,
+          message,
+        ]),
+      ),
+    };
+  };
+
+  router.route({
+    method: "get",
+    path: "/users/{user}/modals",
+    summary: "The modals the app opened for this person, in the order it opened them; `open` says which are still up",
+    params: UserParams,
+    response: z.array(SlackModal).openapi("SlackModals"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackUser", name: "modals" },
+    waits: [{ name: "waitForModal", mode: "next", text: "title", what: "a modal from the agent" }],
+    stability,
+    handler: ({ session, params }) => world.modals(session.id, params.user).map((view) => modalWire(session.id, view)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/modals/{view}/values",
+    summary: "What is filled in: each input by its label (or action_id), with the text a person sees in it",
+    params: ViewParams,
+    // An empty input is there, with nothing in it: null on the wire, so the key survives.
+    response: z.record(z.string(), z.union([z.string(), z.array(z.string())]).nullable()).openapi("SlackModalValues"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackModal", name: "values" },
+    stability,
+    handler: ({ session, params }) => {
+      const view = world.modal(session.id, params.view);
+      return Object.fromEntries(
+        viewInputs(view.definition.blocks).map((input) => [
+          input.label || input.actionId,
+          shownValue(view.values[input.blockId]?.[input.actionId] ?? { type: "" }) ?? null,
+        ]),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/modals/{view}/submit",
+    summary: "Fill in inputs, by label or `block_id.action_id`, and submit the modal",
+    params: ViewParams,
+    body: z
+      .object({ values: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional() })
+      .openapi("SlackModalSubmitBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "dispatch_failed"],
+    sdkMethod: { on: "SlackModal", name: "submit", args: ["values"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.submitModal(session.id, params.view, body.values ?? {})),
+  });
+
+  router.route({
+    method: "post",
+    path: "/modals/{view}/close",
+    summary: "Close the modal. The app is told only if it asked to be (`notify_on_close`)",
+    params: ViewParams,
+    response: SlackDelivery.nullable(),
+    errors: ["not_found", "dispatch_failed"],
+    sdkMethod: { on: "SlackModal", name: "close" },
+    stability,
+    handler: ({ session, params }) => {
+      const delivery = world.closeModal(session.id, params.view);
+      return delivery === undefined ? null : interaction(session.id, delivery);
+    },
   });
 
   for (const [name, action] of [
@@ -694,7 +990,8 @@ export function registerSlackRoutes(
     params: UserParams,
     response: z.array(SlackMessage).openapi("SlackEphemeralMessages"),
     errors: ["not_found"],
-    sdkMethod: { on: "SlackUser", name: "ephemeral" },
+    // What the app answered only this person with: read once it has gone quiet.
+    sdkMethod: { on: "SlackUser", name: "ephemeral", onceQuiet: true },
     stability,
     handler: ({ session, params }) =>
       world.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),
@@ -851,13 +1148,15 @@ export function registerSlackRoutes(
   router.route({
     method: "post",
     path: "/faults",
-    summary: "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+    summary:
+      "Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once",
     body: z
       .object({
-        type: z.enum(["rate_limit", "latency", "error"]),
+        type: z.enum(["rate_limit", "latency", "error", "drop_socket"]),
         operation: z.string().optional(),
         retryAfter: duration("For rate_limit: what Retry-After says.").default(1000),
         delay: duration("For latency: how long each call takes longer.").default(0),
+        after: duration("For drop_socket: how long until the connection drops. Default: now.").default(0),
         error: z.string().default("internal_error"),
         times: z.number().int().min(1).optional(),
       })
@@ -866,7 +1165,7 @@ export function registerSlackRoutes(
     sdkMethod: {
       on: "SlackFixture",
       name: "fault",
-      options: ["type", "operation", "retryAfter", "delay", "error", "times"],
+      options: ["type", "operation", "retryAfter", "delay", "after", "error", "times"],
     },
     stability,
     handler: ({ session, body }) => ({
@@ -875,7 +1174,8 @@ export function registerSlackRoutes(
         operation: body.operation,
         remaining: body.times,
         retryAfterMs: body.retryAfter,
-        delayMs: body.delay,
+        // One delay field in the record: a latency fault's per-call delay, or how long until the socket drops.
+        delayMs: body.type === "drop_socket" ? body.after : body.delay,
         error: body.error,
       }),
     }),

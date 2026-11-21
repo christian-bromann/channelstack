@@ -710,6 +710,13 @@
             "name": "SlackTeam"
           },
           "optional": false
+        },
+        {
+          "name": "socketConnections",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
         }
       ],
       "methods": [
@@ -1077,7 +1084,7 @@
         {
           "name": "fault",
           "kind": "method",
-          "summary": "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+          "summary": "Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -1098,7 +1105,8 @@
                 "values": [
                   "rate_limit",
                   "latency",
-                  "error"
+                  "error",
+                  "drop_socket"
                 ]
               },
               "optional": false,
@@ -1122,6 +1130,14 @@
             },
             {
               "name": "delay",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "after",
               "type": {
                 "kind": "duration"
               },
@@ -1568,6 +1584,539 @@
           "dispose": false
         },
         {
+          "name": "click",
+          "kind": "method",
+          "summary": "Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/click",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "button",
+              "type": {
+                "kind": "named",
+                "name": "SlackButtonRef"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "label"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
+        },
+        {
+          "name": "select",
+          "kind": "method",
+          "summary": "Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/select",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "option",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "menu",
+              "type": {
+                "kind": "named",
+                "name": "SlackMenuRef"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "label"
+            },
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
+        },
+        {
+          "name": "shortcut",
+          "kind": "method",
+          "summary": "Run a message shortcut on a message",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/shortcut",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "callbackId",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "runCommand",
+          "kind": "method",
+          "summary": "Run a slash command in a conversation, e.g. `/deploy web staging`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/commands",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "command",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "stop",
+          "kind": "method",
+          "summary": "Press Stop on the app's work in a thread: what is streaming there ends, and the app is told",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/stop",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "stop_unavailable"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "openAgentThread",
+          "kind": "method",
+          "summary": "Open the app's split view: a new thread in this person's DM with the app, started from the channel they are looking at",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/agent-threads",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "from",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackThread"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "split_view_unavailable"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "pickPrompt",
+          "kind": "method",
+          "summary": "Pick one of the prompts the app suggested in a thread: this person says its message there",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/pick-prompt",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel"
+          ],
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
+        },
+        {
+          "name": "switchContext",
+          "kind": "method",
+          "summary": "Look at another channel while the split view stays open: the app is told the new context",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/switch-context",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "split_view_unavailable"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "modals",
+          "kind": "method",
+          "summary": "The modals the app opened for this person, in the order it opened them; `open` says which are still up",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/users/{user}/modals",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackModals"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "react",
           "kind": "method",
           "summary": "Add an emoji reaction to a message",
@@ -1895,7 +2444,21 @@
             "session_not_found",
             "not_found"
           ],
-          "dispose": false
+          "dispose": false,
+          "onceQuiet": true
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForModal",
+          "mode": "next",
+          "read": "modals",
+          "item": {
+            "kind": "resource",
+            "name": "SlackModal"
+          },
+          "text": "title",
+          "what": "a modal from the agent"
         }
       ]
     },
@@ -2428,6 +2991,47 @@
       ],
       "methods": [
         {
+          "name": "suggestedPrompts",
+          "kind": "method",
+          "summary": "The prompts the app suggested in a thread",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/suggested-prompts",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackSuggestedPrompts"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
           "name": "replies",
           "kind": "method",
           "summary": "Replies in a thread, oldest first, without the message that starts it",
@@ -2949,6 +3553,198 @@
             "open"
           ],
           "what": "the stream to end"
+        }
+      ]
+    },
+    {
+      "name": "SlackModal",
+      "idFields": [
+        "viewId"
+      ],
+      "fields": [
+        {
+          "name": "viewId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "user",
+          "type": {
+            "kind": "resource",
+            "name": "SlackUser"
+          },
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "blocks",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "unknown"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "open",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "errors",
+          "type": {
+            "kind": "record",
+            "values": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "values",
+          "kind": "method",
+          "summary": "What is filled in: each input by its label (or action_id), with the text a person sees in it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/modals/{view}/values",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "view",
+                "from": "self",
+                "field": "viewId"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackModalValues"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "submit",
+          "kind": "method",
+          "summary": "Fill in inputs, by label or `block_id.action_id`, and submit the modal",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/modals/{view}/submit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "view",
+                "from": "self",
+                "field": "viewId"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "values",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "union",
+                  "types": [
+                    {
+                      "kind": "string"
+                    },
+                    {
+                      "kind": "array",
+                      "items": {
+                        "kind": "string"
+                      }
+                    }
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "close",
+          "kind": "method",
+          "summary": "Close the modal. The app is told only if it asked to be (`notify_on_close`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/modals/{view}/close",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "view",
+                "from": "self",
+                "field": "viewId"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "dispatch_failed"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -3601,6 +4397,115 @@
       }
     },
     {
+      "name": "SlackButtonRef",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "label",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "actionId",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "value",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackMenuRef",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "label",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "actionId",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackSuggestedPrompts",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "object",
+          "fields": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "SlackModals",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackModal"
+        }
+      }
+    },
+    {
+      "name": "SlackModalValues",
+      "type": {
+        "kind": "record",
+        "values": {
+          "kind": "nullable",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "string"
+              },
+              {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
       "name": "SlackMessages",
       "type": {
         "kind": "array",
@@ -4044,6 +4949,7 @@
     "already_reacted",
     "cant_delete_message",
     "cant_update_message",
+    "dispatch_failed",
     "internal",
     "invalid_argument",
     "msg_too_long",
@@ -4054,6 +4960,8 @@
     "not_in_channel",
     "not_in_room",
     "session_not_found",
+    "split_view_unavailable",
+    "stop_unavailable",
     "unauthorized"
   ]
 }
