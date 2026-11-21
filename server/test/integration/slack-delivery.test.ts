@@ -8,9 +8,9 @@ import { waitFor } from "../../../sdks/typescript/runtime/wait.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 
 /**
- * Exit check 1.3: the fake signs like Slack. The fake's real delivery code, in the compiled
- * binary, sends to a Bolt app, Slack's official receiver. Cases S1 and S6 to S8 of the appendix
- * in docs/phases.md; S2 to S5 need the interactions of phase 2.
+ * The fake signs like Slack. The fake's real delivery code, in the compiled binary, sends to a
+ * Bolt app, Slack's official receiver. Cases S1 to S8 of the appendix in docs/phases.md: S1 and
+ * S6 to S8 are exit check 1.3, S2 to S5 (interactions) are part of exit check 2.2.
  */
 
 interface Seen {
@@ -24,6 +24,8 @@ let server: RunningBinary;
 let bolt: App;
 let listener: Server;
 const seen: Seen[] = [];
+/** What Bolt's interaction handlers were called with. */
+const interactions: Array<{ kind: string; detail: string }> = [];
 
 beforeAll(async () => {
   const port = await freePort();
@@ -45,6 +47,25 @@ beforeAll(async () => {
     seen.push({ type: event.type, text: event.text, retryNum: context.retryNum, retryReason: context.retryReason });
     // Answer once, in the thread: a retry of the same event must not answer again.
     if (context.retryNum === undefined) await say({ text: `on it: ${event.text}`, thread_ts: event.ts });
+  });
+  // S2 to S5: what a person does in the client, routed by Bolt to the handler for its kind.
+  bolt.action("approve", async ({ ack, body, action }) => {
+    await ack();
+    if (body.type === "block_actions" && action.type === "button" && "action_id" in action) {
+      interactions.push({ kind: "action", detail: `${action.action_id}=${action.value} by ${body.user.id}` });
+    }
+  });
+  bolt.view("incident", async ({ ack, view }) => {
+    interactions.push({ kind: "view", detail: view.state.values.summary?.text?.value ?? "" });
+    await ack({ response_action: "errors", errors: { summary: "Say what is broken" } });
+  });
+  bolt.command("/deploy", async ({ ack, command }) => {
+    interactions.push({ kind: "command", detail: `${command.command} ${command.text} by ${command.user_id}` });
+    await ack(`Deploying ${command.text}`);
+  });
+  bolt.event("agent_session_stopped", async ({ event }) => {
+    const stopped = event as unknown as { channel: string; thread_ts: string; user: string };
+    interactions.push({ kind: "stopped", detail: `${stopped.channel} ${stopped.thread_ts} by ${stopped.user}` });
   });
   listener = (await bolt.start(port)) as Server;
 });
@@ -141,5 +162,105 @@ describe("exit check 1.3: the fake signs like Slack", () => {
     // The handler saw the retry and didn't answer twice.
     await waitFor("Bolt's reply", async () => ((await replies()).length > 0 ? true : undefined));
     expect(await replies()).toHaveLength(1);
+  });
+});
+
+describe("exit check 2.2: interactions reach Bolt's handlers, and its answers come back", () => {
+  /** A session with Ana in a channel with the app, and what a test needs to act and look. */
+  async function workspace() {
+    const { sessionId } = (await server.control("POST", "/sessions")).body;
+    const base = `/sessions/${sessionId}/slack`;
+    const ana = (await server.control("POST", `${base}/users`, { name: "Ana" })).body;
+    const { app } = (await server.control("GET", base)).body;
+    const channel = (await server.control("POST", `${base}/channels`, { participants: [ana.id, app.id] })).body;
+    const act = (path: string, body?: unknown) =>
+      server.control("POST", `${base}${path}`, body).then((response) => response.body);
+    const settled = (id: string) =>
+      waitFor("the delivery to settle", async () => {
+        const current = (await server.control("GET", `${base}/deliveries/${id}`)).body;
+        return current.status === "pending" ? undefined : current;
+      });
+    const handled = (kind: string) =>
+      waitFor(`Bolt's ${kind} handler`, async () => interactions.findLast((seenOne) => seenOne.kind === kind));
+    return { base, ana, channel, act, settled, handled };
+  }
+  const approval = [
+    {
+      type: "actions",
+      elements: [{ type: "button", action_id: "approve", value: "web", text: { type: "plain_text", text: "Approve" } }],
+    },
+  ];
+
+  test("S2: Bolt routes a block_actions payload to the action handler", async () => {
+    const { ana, channel, act, settled, handled } = await workspace();
+    await bolt.client.chat.postMessage({ channel: channel.id, text: "Deploy?", blocks: approval });
+
+    const click = await act(`/users/${ana.id}/click`, { button: { label: "Approve" }, channel: channel.id });
+    expect(await settled(click.id)).toMatchObject({ type: "block_actions", status: "acknowledged" });
+    expect(await handled("action")).toEqual({ kind: "action", detail: `approve=web by ${ana.id}` });
+  });
+
+  test("S3: for view_submission, the agent's response_action comes back in the HTTP response body", async () => {
+    const { base, ana, channel, act, settled, handled } = await workspace();
+    await bolt.client.chat.postMessage({ channel: channel.id, text: "Deploy?", blocks: approval });
+    const click = await act(`/users/${ana.id}/click`, { button: { label: "Approve" }, channel: channel.id });
+    const { payload } = await settled(click.id);
+    const { view } = await bolt.client.views.open({
+      trigger_id: payload.trigger_id,
+      view: {
+        type: "modal",
+        callback_id: "incident",
+        title: { type: "plain_text", text: "File an incident" },
+        submit: { type: "plain_text", text: "File" },
+        blocks: [
+          {
+            type: "input",
+            block_id: "summary",
+            label: { type: "plain_text", text: "Summary" },
+            element: { type: "plain_text_input", action_id: "text" },
+          },
+        ],
+      },
+    });
+
+    const submitted = await act(`/modals/${view?.id}/submit`, { values: { Summary: "?" } });
+    const delivery = await settled(submitted.id);
+    expect(delivery).toMatchObject({ type: "view_submission", status: "acknowledged" });
+    expect(JSON.parse(delivery.attempts[0].responseBody)).toEqual({
+      response_action: "errors",
+      errors: { summary: "Say what is broken" },
+    });
+    expect(await handled("view")).toEqual({ kind: "view", detail: "?" });
+    // The person still has the form in front of them, with the app's complaint at the input.
+    const [open] = (await server.control("GET", `${base}/users/${ana.id}/modals`)).body;
+    expect(open.errors).toEqual({ Summary: "Say what is broken" });
+  });
+
+  test("S4: Bolt accepts a slash command, and its immediate reply is in the HTTP body", async () => {
+    const { base, ana, channel, act, settled, handled } = await workspace();
+    const command = await act(`/users/${ana.id}/commands`, { command: "/deploy web staging", channel: channel.id });
+
+    const delivery = await settled(command.id);
+    expect(delivery).toMatchObject({ type: "slash_command", status: "acknowledged" });
+    expect(delivery.attempts[0].responseBody).toBe("Deploying web staging");
+    expect(await handled("command")).toEqual({ kind: "command", detail: `/deploy web staging by ${ana.id}` });
+    // A plain-text reply is for the person who ran the command.
+    const [reply] = await waitFor("the reply to show", async () => {
+      const mine = (await server.control("GET", `${base}/users/${ana.id}/ephemeral`)).body;
+      return mine.length > 0 ? mine : undefined;
+    });
+    expect(reply.text).toBe("Deploying web staging");
+  });
+
+  test("S5: Bolt routes agent_session_stopped to the event handler", async () => {
+    const { ana, channel, act, settled, handled } = await workspace();
+    const question = await act(`/users/${ana.id}/say`, {
+      message: { text: "write a long report" },
+      channel: channel.id,
+    });
+
+    const stop = await act(`/users/${ana.id}/stop`, { thread: { channel: channel.id, ts: question.ts } });
+    expect(await settled(stop.id)).toMatchObject({ eventType: "agent_session_stopped", status: "acknowledged" });
+    expect(await handled("stopped")).toEqual({ kind: "stopped", detail: `${channel.id} ${question.ts} by ${ana.id}` });
   });
 });
