@@ -61,6 +61,8 @@ export function emitPython(ir: Ir): Map<string, string> {
         return type.name;
       case "ref":
         return type.resources.join(" | ");
+      case "nullable":
+        return `${typeOf(type.type)} | None`;
       case "union":
         return type.types.map(typeOf).join(" | ");
     }
@@ -77,6 +79,8 @@ export function emitPython(ir: Ir): Map<string, string> {
         return converts(type.items);
       case "record":
         return converts(type.values);
+      case "nullable":
+        return converts(type.type);
       case "union":
         return type.types.some(converts);
       default:
@@ -101,6 +105,8 @@ export function emitPython(ir: Ir): Map<string, string> {
           : decode(namedTypes.get(type.name) ?? { kind: "unknown" }, expr);
       case "array":
         return `[${decode(type.items, "item")} for item in ${expr}]`;
+      case "nullable":
+        return `(None if ${expr} is None else ${decode(type.type, expr)})`;
       case "record":
         return `{key: ${decode(type.values, "value")} for key, value in ${expr}.items()}`;
       case "union": {

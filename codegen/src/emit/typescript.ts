@@ -41,6 +41,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         const ids = index.refIdFields(type.resources);
         return ids.length === 1 ? "string" : `{ ${ids.map((id) => `${id}: string`).join("; ")} }`;
       }
+      case "nullable":
+        return `${typeOf(type.type, side)} | ${side === "wire" ? "null" : "undefined"}`;
       case "union":
         return type.types.map((member) => typeOf(member, side)).join(" | ");
     }
@@ -65,6 +67,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return `${expr}.map((item) => ${decode(type.items, "item")})`;
       case "named":
         return `decode${type.name}(ctx, ${expr})`;
+      case "nullable":
+        return `(${expr} === null ? undefined : ${decode(type.type, expr)})`;
       case "object":
         return `{ ...${expr}, ${type.fields
           .filter((field) => index.holdsResources(field.type))

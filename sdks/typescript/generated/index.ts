@@ -158,14 +158,6 @@ export interface SlackMessageMetadata {
   event_payload: Record<string, unknown>;
 }
 
-export interface SlackReactResult {
-  delivery?: string;
-}
-
-export interface SlackUnreactResult {
-  delivery?: string;
-}
-
 export type SlackMessages = SlackMessage[];
 
 export type SlackMessagesWire = SlackMessageData[];
@@ -755,17 +747,17 @@ export class SlackUser {
   }
 
   /** Add an emoji reaction to a message. Experimental. */
-  async react(emoji: string, options: { message: SlackMessage }): Promise<SlackReactResult> {
+  async react(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/react`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackReactResult;
-    return data;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/react`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** Remove this person's emoji reaction from a message. Experimental. */
-  async unreact(emoji: string, options: { message: SlackMessage }): Promise<SlackUnreactResult> {
+  async unreact(emoji: string, options: { message: SlackMessage }): Promise<SlackDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/unreact`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackUnreactResult;
-    return data;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/unreact`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** Open (or reuse) a DM with the app, another person, or several. Experimental. */
@@ -844,9 +836,9 @@ export class SlackConversation {
   }
 
   /** The conversation as a person would read it, threads included. Experimental. */
-  async transcript(options: { as?: string } = {}): Promise<SlackTranscript> {
+  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/transcript`, { query: { as: options.as } })) as SlackTranscriptWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
     return decodeSlackTranscript(ctx, data);
   }
 
@@ -926,6 +918,13 @@ export class SlackMessage {
     return decodeSlackReactions(ctx, data);
   }
 
+  /** A message and the replies under it as a person would read them. Experimental. */
+  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
+    return decodeSlackTranscript(ctx, data);
+  }
+
   /** Every delivery this message caused to the agent. Experimental. */
   async deliveries(): Promise<SlackMessageDeliveries> {
     const ctx = this.#ctx;
@@ -969,16 +968,16 @@ export class SlackThread {
   }
 
   /** What the agent is doing in a thread: its status line, an open stream, or idle. Experimental. */
-  async state(): Promise<SlackThreadStatus> {
+  async status(): Promise<SlackThreadStatus> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}/state`)) as SlackThreadStatus;
     return data;
   }
 
   /** A thread as a person would read it. Experimental. */
-  async transcript(options: { as?: string } = {}): Promise<SlackTranscript> {
+  async transcript(options: { as?: SlackUser | SlackApp } = {}): Promise<SlackTranscript> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}/transcript`, { query: { as: options.as } })) as SlackTranscriptWire;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as SlackTranscriptWire;
     return decodeSlackTranscript(ctx, data);
   }
 
@@ -1053,6 +1052,14 @@ export class SlackDelivery {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale, headers: options.headers } })) as DeliveryAttempt;
     return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<SlackDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

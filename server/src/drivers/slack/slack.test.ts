@@ -292,7 +292,8 @@ describe("messages and the events they send", () => {
     const target = { channel: message.channel, ts: message.ts };
 
     const added = await post(`/users/${ana.id}/react`, { emoji: ":ticket:", message: target });
-    expect(added.delivery).toMatch(/^Ev0/);
+    // The answer is the delivery the reaction caused.
+    expect(added).toMatchObject({ id: expect.stringMatching(/^Ev0/), eventType: "reaction_added", channel: "slack" });
     expect(await refusal(post(`/users/${ana.id}/react`, { emoji: "ticket", message: target }))).toBe("already_reacted");
     expect(await get(`/conversations/${channel.id}/messages/${message.ts}/reactions`)).toEqual([
       { emoji: "ticket", by: [expect.objectContaining({ id: ana.id, kind: "user" })] },
@@ -316,6 +317,18 @@ describe("messages and the events they send", () => {
       },
       { type: "reaction_removed", reaction: "ticket" },
     ]);
+
+    // Where the app isn't a member it isn't told, so there is no delivery to hand back.
+    const quiet = await post("/channels", { participants: [ana.id] });
+    const unheard = await post(`/users/${ana.id}/say`, { message: { text: "between us" }, channel: quiet.id });
+    expect(
+      await post(`/users/${ana.id}/react`, { emoji: "eyes", message: { channel: unheard.channel, ts: unheard.ts } }),
+    ).toBeNull();
+    // A message reads like its thread: itself, then the replies under it.
+    await post(`/users/${ana.id}/reply`, { message: { text: "still broken" }, thread: target });
+    expect((await get(`/conversations/${channel.id}/messages/${message.ts}/transcript`)).text).toBe(
+      "Ana: login is broken\n  Ana: still broken",
+    );
   });
 
   test("the platform refuses what Slack refuses", async () => {

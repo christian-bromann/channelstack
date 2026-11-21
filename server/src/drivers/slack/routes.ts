@@ -454,15 +454,15 @@ export function registerSlackRoutes(
       body: z
         .object({ emoji: z.string().min(1), message: messageRef })
         .openapi(action === "add" ? "SlackReactBody" : "SlackUnreactBody"),
-      response: z
-        .object({ delivery: z.string().optional() })
-        .openapi(action === "add" ? "SlackReactResult" : "SlackUnreactResult"),
+      // The delivery the reaction caused, or nothing when the app isn't told (not subscribed, not a member).
+      response: SlackDelivery.nullable(),
       errors: ["not_found", "not_in_channel", action === "add" ? "already_reacted" : "no_reaction"],
       sdkMethod: { on: "SlackUser", name, args: ["emoji"], options: ["message"] },
       stability,
-      handler: ({ session, params, body }) => ({
-        delivery: world.reactAsUser(session.id, params.user, body.emoji, body.message, action),
-      }),
+      handler: ({ session, params, body }) => {
+        const delivery = world.reactAsUser(session.id, params.user, body.emoji, body.message, action);
+        return delivery === undefined ? null : deliveryWire(world.delivery(session.id, delivery));
+      },
     });
   }
 
@@ -587,7 +587,7 @@ export function registerSlackRoutes(
     params: MessageParams,
     response: SlackThreadStatus,
     errors: ["not_found"],
-    sdkMethod: { on: "SlackThread", name: "state", bind: messageBinding },
+    sdkMethod: { on: "SlackThread", name: "status", bind: messageBinding },
     stability,
     handler: ({ session, params }) => {
       const state = world.threadState(session.id, params.channel, params.ts);
@@ -607,16 +607,36 @@ export function registerSlackRoutes(
     },
   });
 
+  /** Who is reading: ephemeral messages show only to their recipient. */
+  const viewer = z
+    .string()
+    .optional()
+    .openapi({ param: { name: "as", in: "query" }, "x-channelstack-ref": ["SlackUser", "SlackApp"] });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/messages/{ts}/transcript",
+    summary: "A message and the replies under it as a person would read them",
+    params: MessageParams,
+    query: z.object({ as: viewer }),
+    response: SlackTranscript,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackMessage", name: "transcript", options: ["as"], bind: messageBinding },
+    stability,
+    handler: ({ session, params, query }) =>
+      renderTranscript(world.thread(session.id, params.channel, params.ts), {
+        viewer: query.as,
+        principal: principal(session.id),
+      }),
+  });
+
   router.route({
     method: "get",
     path: "/conversations/{channel}/threads/{ts}/transcript",
     summary: "A thread as a person would read it",
     params: MessageParams,
     query: z.object({
-      as: z
-        .string()
-        .optional()
-        .openapi({ param: { name: "as", in: "query" } }),
+      as: viewer,
     }),
     response: SlackTranscript,
     errors: ["not_found"],
@@ -635,10 +655,7 @@ export function registerSlackRoutes(
     summary: "The conversation as a person would read it, threads included",
     params: ChannelParams,
     query: z.object({
-      as: z
-        .string()
-        .optional()
-        .openapi({ param: { name: "as", in: "query" } }),
+      as: viewer,
     }),
     response: SlackTranscript,
     errors: ["not_found"],
@@ -716,6 +733,7 @@ export function registerSlackRoutes(
     response: SlackDelivery,
     errors: ["not_found"],
     sdkMethod: { on: "SlackDelivery", name: "refresh" },
+    waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
     stability,
     handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
   });

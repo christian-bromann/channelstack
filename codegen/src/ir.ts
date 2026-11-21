@@ -80,6 +80,8 @@ export type IrType =
   | { kind: "resource"; name: string }
   /** In a request: a handle, sent by its id (an object of its id fields when it has several). */
   | { kind: "ref"; resources: string[] }
+  /** A value that may be absent (JSON `null`): SDKs give the language's "nothing" for it. */
+  | { kind: "nullable"; type: IrType }
   /** One of several types. `discriminator` names the literal field that tells them apart. */
   | { kind: "union"; types: IrType[]; discriminator?: string };
 
@@ -152,6 +154,17 @@ export function buildIr(openapi: Json): Ir {
       for (const name of refs)
         if (!resourceNames.has(name)) throw new SpecError(where, `x-channelstack-ref names unknown resource "${name}"`);
       return { kind: "ref", resources: refs };
+    }
+    // "This, or null", the way OpenAPI 3.1 writes a nullable reference: the reference, and a type list with "null".
+    if (Array.isArray(schema.allOf) && schema.allOf.length === 2) {
+      const [target, nullability] = schema.allOf as Json[];
+      if (
+        refName(target ?? {}) !== undefined &&
+        Array.isArray(nullability?.type) &&
+        nullability.type.includes("null")
+      ) {
+        return { kind: "nullable", type: typeOf(target ?? {}, where) };
+      }
     }
     const alternatives: Json[] | undefined = schema.oneOf ?? schema.anyOf;
     if (Array.isArray(alternatives)) {

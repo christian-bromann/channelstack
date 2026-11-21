@@ -12,7 +12,7 @@ from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -344,28 +344,6 @@ class SlackMessageMetadata:
         return cls(
             event_type=data["event_type"],
             event_payload=data["event_payload"],
-        )
-
-
-@dataclass(frozen=True)
-class SlackReactResult:
-    delivery: str | None = None
-
-    @classmethod
-    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackReactResult:
-        return cls(
-            delivery=data.get("delivery"),
-        )
-
-
-@dataclass(frozen=True)
-class SlackUnreactResult:
-    delivery: str | None = None
-
-    @classmethod
-    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackUnreactResult:
-        return cls(
-            delivery=data.get("delivery"),
         )
 
 
@@ -780,17 +758,17 @@ class SlackUser:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/delete", body={"message": {"channel": message.channel, "ts": message.ts}})
 
-    async def react(self, emoji: str, *, message: SlackMessage) -> SlackReactResult:
+    async def react(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
         """Add an emoji reaction to a message. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/react", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
-        return SlackReactResult._from_wire(ctx, data)
+        return (None if data is None else SlackDelivery(ctx, data))
 
-    async def unreact(self, emoji: str, *, message: SlackMessage) -> SlackUnreactResult:
+    async def unreact(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
         """Remove this person's emoji reaction from a message. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/unreact", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
-        return SlackUnreactResult._from_wire(ctx, data)
+        return (None if data is None else SlackDelivery(ctx, data))
 
     async def open_d_m(self, participants: SlackUser | SlackApp | list[SlackUser | SlackApp]) -> SlackConversation:
         """Open (or reuse) a DM with the app, another person, or several. Experimental."""
@@ -841,10 +819,10 @@ class SlackConversation:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/members")
         return [SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data]
 
-    async def transcript(self, *, as_: str | None = None) -> SlackTranscript:
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
         """The conversation as a person would read it, threads included. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/transcript", query={"as": as_})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/transcript", query={"as": None if as_ is None else as_.id})
         return SlackTranscript._from_wire(ctx, data)
 
     async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
@@ -881,6 +859,12 @@ class SlackMessage:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/reactions")
         return [SlackReaction._from_wire(ctx, item) for item in data]
 
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
+        """A message and the replies under it as a person would read them. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return SlackTranscript._from_wire(ctx, data)
+
     async def deliveries(self) -> SlackMessageDeliveries:
         """Every delivery this message caused to the agent. Experimental."""
         ctx = self._ctx
@@ -902,16 +886,16 @@ class SlackThread:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/replies")
         return [SlackMessage(ctx, item) for item in data]
 
-    async def state(self) -> SlackThreadStatus:
+    async def status(self) -> SlackThreadStatus:
         """What the agent is doing in a thread: its status line, an open stream, or idle. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/state")
         return SlackThreadStatus._from_wire(ctx, data)
 
-    async def transcript(self, *, as_: str | None = None) -> SlackTranscript:
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
         """A thread as a person would read it. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/transcript", query={"as": as_})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/transcript", query={"as": None if as_ is None else as_.id})
         return SlackTranscript._from_wire(ctx, data)
 
     async def wait_for_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
@@ -952,6 +936,15 @@ class SlackDelivery:
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(self.id, safe='')}/resend", body={"badSignature": bad_signature, "stale": stale, "headers": headers})
         return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration = "10s") -> SlackDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> SlackDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
 class SlackStream:

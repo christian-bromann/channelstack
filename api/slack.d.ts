@@ -226,8 +226,17 @@ export interface SlackThread extends HasTranscript {
   waitForReply(options?: { from?: SlackParticipant | string } & WaitOptions): Promise<SlackMessage>;
   /** The latest reply matching `from`, once the agent is quiet. Waits for at least one. */
   latestReply(options?: { from?: SlackParticipant | string } & QuietOptions): Promise<SlackMessage>;
-  /** The agent's current status line (`assistant.threads.setStatus`), if any. */
-  status(): Promise<string | undefined>;
+  /** What the agent is doing in the thread right now. `toHaveStatus` and `toHaveStatusText` read this. */
+  status(): Promise<SlackThreadStatus>;
+}
+
+export interface SlackThreadStatus {
+  /** `working` while a status line is set, `streaming` while a reply is being streamed, `stopped` after Stop. */
+  readonly state: "working" | "streaming" | "stopped" | "idle";
+  /** The agent's status line (`assistant.threads.setStatus`), if one is set. */
+  readonly text?: string;
+  /** The agent session's lifecycle status (`agents.sessions.setStatus`), if the agent set one. */
+  readonly sessionStatus?: "active" | "processing" | "suspended" | "closed";
 }
 
 /** A thread in the agent / assistant split view. */

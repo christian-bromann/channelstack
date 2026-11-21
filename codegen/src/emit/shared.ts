@@ -48,6 +48,8 @@ export class IrIndex {
         return this.holdsResources(type.items, seen);
       case "record":
         return this.holdsResources(type.values, seen);
+      case "nullable":
+        return this.holdsResources(type.type, seen);
       case "object":
         return type.fields.some((field) => this.holdsResources(field.type, seen));
       case "union":

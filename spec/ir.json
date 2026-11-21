@@ -1611,8 +1611,11 @@
             }
           ],
           "returns": {
-            "kind": "named",
-            "name": "SlackReactResult"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -1669,8 +1672,11 @@
             }
           ],
           "returns": {
-            "kind": "named",
-            "name": "SlackUnreactResult"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -2058,7 +2064,11 @@
             {
               "name": "as",
               "type": {
-                "kind": "string"
+                "kind": "ref",
+                "resources": [
+                  "SlackUser",
+                  "SlackApp"
+                ]
               },
               "optional": true,
               "in": "query"
@@ -2292,6 +2302,59 @@
           "dispose": false
         },
         {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "A message and the replies under it as a person would read them",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "as",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackUser",
+                  "SlackApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "deliveries",
           "kind": "method",
           "summary": "Every delivery this message caused to the agent",
@@ -2405,7 +2468,7 @@
           "dispose": false
         },
         {
-          "name": "state",
+          "name": "status",
           "kind": "method",
           "summary": "What the agent is doing in a thread: its status line, an open stream, or idle",
           "stability": "experimental",
@@ -2474,7 +2537,11 @@
             {
               "name": "as",
               "type": {
-                "kind": "string"
+                "kind": "ref",
+                "resources": [
+                  "SlackUser",
+                  "SlackApp"
+                ]
               },
               "optional": true,
               "in": "query"
@@ -2749,6 +2816,22 @@
             "not_found"
           ],
           "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
         }
       ]
     },
@@ -3513,36 +3596,6 @@
               }
             },
             "optional": false
-          }
-        ]
-      }
-    },
-    {
-      "name": "SlackReactResult",
-      "type": {
-        "kind": "object",
-        "fields": [
-          {
-            "name": "delivery",
-            "type": {
-              "kind": "string"
-            },
-            "optional": true
-          }
-        ]
-      }
-    },
-    {
-      "name": "SlackUnreactResult",
-      "type": {
-        "kind": "object",
-        "fields": [
-          {
-            "name": "delivery",
-            "type": {
-              "kind": "string"
-            },
-            "optional": true
           }
         ]
       }

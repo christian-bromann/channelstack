@@ -236,7 +236,7 @@ export const matchers = {
   ) {
     return settle(subject, state, options, {
       onceQuiet: false,
-      read: () => (subject as { state(): Promise<{ state: string; text?: string }> }).state(),
+      read: () => (subject as { status(): Promise<{ state: string; text?: string }> }).status(),
       holds: (status) => status.state === expected,
       describe: (status) =>
         `Expected the thread ${state.isNot ? "not " : ""}to be ${expected}, it is ${status.state}${status.text ? ` ("${status.text}")` : ""}`,
@@ -247,7 +247,7 @@ export const matchers = {
   toHaveStatusText(state: MatcherState, subject: unknown, text: string | RegExp, options?: Timing) {
     return settle(subject, state, options, {
       onceQuiet: false,
-      read: () => (subject as { state(): Promise<{ state: string; text?: string }> }).state(),
+      read: () => (subject as { status(): Promise<{ state: string; text?: string }> }).status(),
       holds: (status) => status.text !== undefined && textMatches(status.text, text),
       describe: (status) =>
         `Expected the status line ${state.isNot ? "not " : ""}to match ${show(text)}, ${status.text === undefined ? "there is none" : `it is "${status.text}"`}`,
