@@ -239,6 +239,42 @@
         font-weight: 500;
       }
 
+      /* ---- the logo lockup for the README: mark and name on a transparent page ---- */
+      .logo {
+        display: none;
+      }
+      body.lockup {
+        background: transparent;
+      }
+      body.lockup > :not(.logo) {
+        display: none;
+      }
+      body.lockup .logo {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        font-size: 76px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+      }
+      body.lockup.on-light .logo {
+        color: #10141b;
+      }
+      .logo .mark {
+        gap: 6px;
+        width: 84px;
+        height: 84px;
+        border-radius: 22px;
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.16);
+      }
+      .logo .mark i {
+        width: 6.5px;
+        border-radius: 4px;
+      }
+
       /* ---- icons ---- */
       .icon-mark {
         display: none;
@@ -315,12 +351,27 @@
       <p class="sub">Test AI agents in <b>Slack, GitHub,</b><br /><b>Linear</b> and <b>Notion</b>, on your machine</p>
     </main>
 
+    <div class="logo">
+      <span class="mark"
+        ><i style="height: 26px"></i><i style="height: 45px"></i><i style="height: 32px"></i><i style="height: 52px"></i
+        ><i style="height: 20px"></i
+      ></span>
+      channelstack
+    </div>
+
     <div class="icon-mark">
       <i style="height: 31%"></i><i style="height: 53%"></i><i style="height: 38%"></i><i style="height: 62%"></i
       ><i style="height: 22%"></i>
     </div>
 
     <script>
+      // #lockup-dark and #lockup-light render the logo lockup for dark and light backgrounds.
+      const lockup = /^#lockup-(dark|light)$/.exec(location.hash);
+      if (lockup) {
+        document.body.className = lockup[1] === "light" ? "lockup on-light" : "lockup";
+        document.body.style.width = "640px";
+        document.body.style.height = "140px";
+      }
       // #icon-<size> renders a square icon; #favicon-<size> a rounded one on a transparent page.
       const match = /^#(icon|favicon)-(\d+)$/.exec(location.hash);
       if (match) {
