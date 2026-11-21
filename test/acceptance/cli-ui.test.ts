@@ -74,7 +74,7 @@ test("the attach CLI talks to the agent, and the UI shows the same conversation"
         expect(await transcript.getText()).toContain("ben: and the one before?");
         // The login code is gone from the address, and the inspector lists the agent's call.
         expect(await browser.getUrl()).not.toContain("login=");
-        expect(await browser.$('[data-testid="inspector"]').getText()).toContain("← chat.postMessage");
+        expect(await browser.$('[data-testid="inspector"]').getText()).toContain("← slack chat.postMessage");
       } finally {
         await browser.deleteSession();
       }

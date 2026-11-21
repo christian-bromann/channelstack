@@ -79,7 +79,6 @@
       let chosen; // The conversation the person picked; the most recent one until they do.
       let shown = ""; // What the transcript pane last rendered, to leave it alone while nothing changes.
       let cursor; // How far into the event log the inspector has read.
-      const deliveries = new Map(); // Delivery id -> its event type, announced once before its attempts.
 
       const label = (conversation) =>
         conversation.name ? `#${conversation.name}` : conversation.kind === "im" ? "Direct message" : "Group message";
@@ -138,25 +137,12 @@
         );
       }
 
-      function describe(event) {
-        const { data } = event;
-        if (event.kind === "delivery") deliveries.set(data.id, data.eventType ?? data.type);
-        if (event.kind === "delivery_attempt") {
-          const ok = data.status === "acknowledged";
-          const retry = data.number === 1 ? "" : ` (attempt ${data.number})`;
-          return { text: `→ ${deliveries.get(data.id) ?? "event"}${retry}`, outcome: ok ? String(data.responseStatus) : data.status, ok };
-        }
-        if (event.kind === "api_call") {
-          const ok = data.error === undefined;
-          return { text: `← ${data.operation}`, outcome: ok ? String(data.responseStatus) : `${data.responseStatus} ${data.error}`, ok };
-        }
-      }
-
       async function inspector() {
         const page = await api(`/events${cursor === undefined ? "" : `?since=${encodeURIComponent(cursor)}`}`);
         cursor = page.cursor;
         for (const event of page.events) {
-          const line = describe(event);
+          // The server summarizes delivery attempts and API calls; the rest is bookkeeping.
+          const line = event.summary;
           if (!line) continue;
           const details = element("details");
           const summary = element("summary");

@@ -135,6 +135,7 @@ class LogEvent:
     driver: str
     kind: Literal["action", "delivery", "delivery_attempt", "api_call"]
     data: dict[str, Any]
+    summary: dict[str, Any] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LogEvent:
@@ -143,6 +144,7 @@ class LogEvent:
             driver=data["driver"],
             kind=data["kind"],
             data=data["data"],
+            summary=data.get("summary"),
         )
 
 

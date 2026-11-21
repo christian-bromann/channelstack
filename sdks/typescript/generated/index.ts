@@ -60,6 +60,7 @@ export interface LogEvent {
   driver: string;
   kind: "action" | "delivery" | "delivery_attempt" | "api_call";
   data: Record<string, unknown>;
+  summary?: { text: string; outcome: string; ok: boolean };
 }
 
 export interface Quiet {

@@ -73,6 +73,9 @@ const LogEvent = z
     driver: z.string(),
     kind: z.enum(["action", "delivery", "delivery_attempt", "api_call"]),
     data: z.record(z.string(), z.unknown()),
+    summary: z.object({ text: z.string(), outcome: z.string(), ok: z.boolean() }).optional().openapi({
+      description: "Delivery attempts and API calls in one line, e.g. `← slack chat.postMessage` and `200`.",
+    }),
   })
   .openapi("LogEvent");
 

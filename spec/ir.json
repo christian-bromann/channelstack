@@ -3018,6 +3018,36 @@
               }
             },
             "optional": false
+          },
+          {
+            "name": "summary",
+            "type": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "text",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "outcome",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "ok",
+                  "type": {
+                    "kind": "boolean"
+                  },
+                  "optional": false
+                }
+              ]
+            },
+            "optional": true
           }
         ]
       }

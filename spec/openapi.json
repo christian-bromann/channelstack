@@ -122,6 +122,26 @@
           "data": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "outcome": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "text",
+              "outcome",
+              "ok"
+            ],
+            "description": "Delivery attempts and API calls in one line, e.g. `← slack chat.postMessage` and `200`."
           }
         },
         "required": [

@@ -27,11 +27,49 @@ export class CursorList<T> {
 
 export type EventKind = "action" | "delivery" | "delivery_attempt" | "api_call";
 
+/** An event in one line, for `channelstack tail` and the UI's inspector. */
+interface EventSummary {
+  /** What went where: `→ slack app_mention` (to the agent), `← slack chat.postMessage` (from it). */
+  readonly text: string;
+  /** How it went: the HTTP status, with the platform's error code or the delivery's fate when it failed. */
+  readonly outcome: string;
+  readonly ok: boolean;
+}
+
 export interface LogEvent {
   readonly at: string;
   readonly driver: string;
   readonly kind: EventKind;
   readonly data: Record<string, unknown>;
+  /** Delivery attempts and API calls have a one-line summary. */
+  readonly summary?: EventSummary;
+}
+
+/** The one-line summary of an event. `deliveryType` is what the delivery it belongs to carried. */
+function summarize(
+  driver: string,
+  kind: EventKind,
+  data: Record<string, unknown>,
+  deliveryType: unknown,
+): EventSummary | undefined {
+  if (kind === "delivery_attempt") {
+    const ok = data.status === "acknowledged";
+    const retry = data.number === 1 ? "" : ` (attempt ${data.number})`;
+    return {
+      text: `→ ${driver} ${deliveryType ?? "event"}${retry}`,
+      outcome: ok ? String(data.responseStatus) : String(data.status),
+      ok,
+    };
+  }
+  if (kind === "api_call") {
+    const ok = data.error === undefined;
+    return {
+      text: `← ${driver} ${data.operation}`,
+      outcome: ok ? String(data.responseStatus) : `${data.responseStatus} ${data.error}`,
+      ok,
+    };
+  }
+  return undefined;
 }
 
 /** The event log: per session, append-only. Tokens are scrubbed before anything is recorded. */
@@ -39,6 +77,8 @@ export class EventLog {
   readonly #clock: Clock;
   readonly #redactor: Redactor;
   readonly #logs = new Map<string, CursorList<LogEvent>>();
+  /** Per session: what each delivery carried, announced once before its attempts. */
+  readonly #deliveryTypes = new Map<string, Map<unknown, unknown>>();
   readonly #listeners: Array<(session: string) => void> = [];
 
   constructor(clock: Clock, redactor: Redactor) {
@@ -52,7 +92,20 @@ export class EventLog {
       log = new CursorList();
       this.#logs.set(session, log);
     }
-    log.append({ at: new Date(this.#clock()).toISOString(), driver, kind, data: this.#redactor.tokens(data) });
+    let types = this.#deliveryTypes.get(session);
+    if (!types) {
+      types = new Map();
+      this.#deliveryTypes.set(session, types);
+    }
+    if (kind === "delivery") types.set(data.id, data.eventType ?? data.type);
+    const summary = summarize(driver, kind, data, types.get(data.id));
+    log.append({
+      at: new Date(this.#clock()).toISOString(),
+      driver,
+      kind,
+      data: this.#redactor.tokens(data),
+      ...(summary ? { summary } : {}),
+    });
     for (const listener of this.#listeners) listener(session);
   }
 
@@ -68,5 +121,6 @@ export class EventLog {
 
   drop(session: string): void {
     this.#logs.delete(session);
+    this.#deliveryTypes.delete(session);
   }
 }

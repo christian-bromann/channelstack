@@ -24,27 +24,7 @@ export async function runShow(server: Attached, flags: { thread?: string | undef
 
 interface LogEvent {
   at: string;
-  driver: string;
-  kind: "action" | "delivery" | "delivery_attempt" | "api_call";
-  data: Record<string, unknown>;
-}
-
-/** One line per event: what went to the agent (→) and what the agent called (←). */
-function line(event: LogEvent, deliveries: Map<unknown, unknown>): string | undefined {
-  const time = event.at.slice(11, 23);
-  const { data } = event;
-  // A delivery is announced once with its type; each attempt then says how it went.
-  if (event.kind === "delivery") deliveries.set(data.id, data.eventType ?? data.type);
-  if (event.kind === "delivery_attempt") {
-    const outcome = data.status === "acknowledged" ? `${data.responseStatus}` : String(data.status);
-    const retry = data.number === 1 ? "" : ` (attempt ${data.number})`;
-    return `${time} → ${event.driver} ${deliveries.get(data.id) ?? "event"}${retry}  ${outcome}`;
-  }
-  if (event.kind === "api_call") {
-    const outcome = data.error === undefined ? `${data.responseStatus}` : `${data.responseStatus} ${data.error}`;
-    return `${time} ← ${event.driver} ${data.operation}  ${outcome}`;
-  }
-  return undefined;
+  summary?: { text: string; outcome: string };
 }
 
 /**
@@ -53,7 +33,6 @@ function line(event: LogEvent, deliveries: Map<unknown, unknown>): string | unde
  */
 export async function runTail(server: Attached, flags: { once?: boolean | undefined }, write: (text: string) => void) {
   const session = segment(await server.devSession());
-  const deliveries = new Map<unknown, unknown>();
   let cursor: string | undefined;
   for (;;) {
     const page = await server.request<{ events: LogEvent[]; cursor: string }>(
@@ -61,9 +40,9 @@ export async function runTail(server: Attached, flags: { once?: boolean | undefi
       `/sessions/${session}/events${cursor === undefined ? "" : `?since=${segment(cursor)}`}`,
     );
     cursor = page.cursor;
-    for (const event of page.events) {
-      const text = line(event, deliveries);
-      if (text !== undefined) write(`${text}\n`);
+    // One line per event the server summarizes: what went to the agent (→) and what the agent called (←).
+    for (const { at, summary } of page.events) {
+      if (summary) write(`${at.slice(11, 23)} ${summary.text}  ${summary.outcome}\n`);
     }
     if (flags.once) return;
     await new Promise((resolve) => setTimeout(resolve, 250));
