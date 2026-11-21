@@ -254,6 +254,5 @@ channelstack/
   integrations/      vitest, jest, pytest-channelstack, checks
   scenarios/         smoke/*.yaml (protocol parity) + per-driver differential suites
   conformance/       schema validators, shape differ, coverage page
-  probes/            small experiments that back design decisions (e.g. delivery-signing/)
   docs/
 ```
