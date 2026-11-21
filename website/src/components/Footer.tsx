@@ -1,0 +1,55 @@
+import { Link } from "react-router-dom";
+import { SITE } from "../lib/site";
+import { Mark } from "./Mark";
+
+const DOCS = [
+  ["Getting started", "/docs/getting-started"],
+  ["Slack", "/docs/slack"],
+  ["GitHub", "/docs/github"],
+  ["Linear", "/docs/linear"],
+  ["Notion", "/docs/notion"],
+  ["Live mode", "/docs/live-mode"],
+  ["API reference", "/docs/api-reference"],
+] as const;
+
+export function Footer() {
+  return (
+    <footer className="footer">
+      <div className="wrap">
+        <div className="about">
+          <Link className="brand" to="/">
+            <Mark />
+            channelstack
+          </Link>
+          <p className="legal">
+            MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear or Notion. Their names and logos are trademarks of their owners.
+          </p>
+        </div>
+        <nav aria-labelledby="footer-docs">
+          <h2 id="footer-docs">Docs</h2>
+          <ul>
+            {DOCS.map(([label, to]) => (
+              <li key={to}>
+                <Link to={to}>{label}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <nav aria-labelledby="footer-project">
+          <h2 id="footer-project">Project</h2>
+          <ul>
+            <li>
+              <a href={SITE.repo}>GitHub</a>
+            </li>
+            <li>
+              <a href="/#why">Why channelstack</a>
+            </li>
+            <li>
+              <a href="/#quick-start">Quick start</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </footer>
+  );
+}
