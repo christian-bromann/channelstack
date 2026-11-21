@@ -5,11 +5,12 @@ import { harness, type RecordingAgent, recordingAgent } from "./app-harness.ts";
 /**
  * A Slack workspace for a unit test: the app in memory, a stand-in agent, one session with Ana
  * and a channel she shares with the app. `api` calls the fake Web API as the app, `post` and
- * `get` the control API. Close the agent when the test ends.
+ * `get` the control API. Close the agent when the test ends. With `reachable: false` the app has
+ * no request URL (and no socket until it opens one): Slack has nowhere to send anything.
  */
-export async function slackWorkspace() {
+export async function slackWorkspace({ reachable = true }: { reachable?: boolean } = {}) {
   const agent = await recordingAgent();
-  const h = harness({ slack: agent.url });
+  const h = harness(reachable ? { slack: agent.url } : {});
   const { sessionId } = (await h.call("POST", "/sessions")).body;
   const base = `/sessions/${sessionId}/slack`;
   const call = async (method: string, path: string, body?: unknown) => {

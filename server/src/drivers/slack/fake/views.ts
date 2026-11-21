@@ -193,6 +193,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
           `The form can't be submitted yet. Still empty: ${missing.map((input) => input.label).join(", ")}`,
         );
       }
+      dispatch.reachable();
       view.errors = {};
       const user = store.users.get(session, view.user);
       kit.action(session, "submit", { user: user.id, view: view.id });
@@ -207,6 +208,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
 
     closeModal(session, id) {
       const view = owned(session, id);
+      if (view.definition.notify_on_close === true) dispatch.reachable();
       kit.action(session, "close", { user: view.user, view: view.id });
       view.closed = true;
       if (view.definition.notify_on_close !== true) return undefined;

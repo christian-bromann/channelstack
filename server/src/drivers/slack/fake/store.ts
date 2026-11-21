@@ -51,7 +51,7 @@ export class SlackStore {
   readonly triggers = new Map<string, { session: string; user: string; expiresAt: number; used: boolean }>();
   /** `drop_socket` faults that haven't fired yet, by fault id. */
   readonly pendingDrops = new Map<string, { session: string; cancel(): void }>();
-  /** The modals that are open, by view id. */
+  /** Every modal the app opened, by view id. A submitted or closed one stays, marked `closed`. */
   readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];

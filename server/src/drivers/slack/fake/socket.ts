@@ -56,6 +56,7 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
   /** Resolves with a connection, waiting for the app to connect if it has none right now. */
   const connection = (signal: AbortSignal): Promise<SocketPeer> =>
     new Promise((resolve, reject) => {
+      signal.throwIfAborted();
       const ready = () => {
         const [peer] = [...peers].slice(-1);
         if (!peer) return false;
@@ -79,6 +80,7 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
     const peer = await connection(signal);
     const envelopeId = ids.next("slack.envelope");
     const acknowledged = new Promise<unknown>((resolve, reject) => {
+      signal.throwIfAborted();
       awaiting.set(envelopeId, resolve);
       signal.addEventListener("abort", () => reject(signal.reason), { once: true });
     });
@@ -134,13 +136,14 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
           for (const retry of waiting.splice(0)) retry();
         },
         message(text) {
-          let ack: { envelope_id?: unknown; payload?: unknown };
+          let ack: { envelope_id?: unknown; payload?: unknown } | null;
           try {
             ack = JSON.parse(text) as typeof ack;
           } catch {
             return;
           }
-          if (typeof ack.envelope_id === "string") awaiting.get(ack.envelope_id)?.(ack.payload);
+          if (typeof ack === "object" && ack !== null && typeof ack.envelope_id === "string")
+            awaiting.get(ack.envelope_id)?.(ack.payload);
         },
         closed() {
           if (self) peers.delete(self);

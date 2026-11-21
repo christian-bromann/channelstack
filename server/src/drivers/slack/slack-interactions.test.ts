@@ -692,6 +692,40 @@ describe("where the app can't be told", () => {
     expect((await get(`/conversations/${channel.id}/messages/${stream.ts}/stream`)).state).toBe("open");
   });
 
+  test("with nowhere to send it, a click or Stop is refused and nothing is on record", async () => {
+    const space = await slackWorkspace({ reachable: false });
+    closers.push(space.agent.close);
+    const { h, ana, team, sessionId, channel, say, api, post, get } = space;
+    const blocks = [
+      { type: "actions", elements: [{ type: "button", action_id: "go", text: { type: "plain_text", text: "Go" } }] },
+    ];
+    await api("chat.postMessage", { channel: channel.id, text: "Ready?", blocks });
+    const question = await say("@my-agent write a long report");
+    const stream = await api("chat.startStream", {
+      channel: channel.id,
+      thread_ts: question.ts,
+      markdown_text: "Q3 was",
+      recipient_user_id: ana.id,
+      recipient_team_id: team.id,
+    });
+
+    expect(await refusal(post(`/users/${ana.id}/click`, { button: { label: "Go" }, channel: channel.id }))).toBe(
+      "dispatch_failed",
+    );
+    expect(await refusal(post(`/users/${ana.id}/stop`, { thread: { channel: channel.id, ts: question.ts } }))).toBe(
+      "stop_unavailable",
+    );
+    expect((await get(`/conversations/${channel.id}/messages/${stream.ts}/stream`)).state).toBe("open");
+    // No DM is opened for a split view that can't be shown.
+    const before = (await get("/conversations")).length;
+    expect(await refusal(post(`/users/${ana.id}/agent-threads`, {}))).toBe("split_view_unavailable");
+    expect(await get("/conversations")).toHaveLength(before);
+    const { events } = (await h.call("GET", `/sessions/${sessionId}/events`)).body;
+    const actions = events.map((event: { data: { action?: string } }) => event.data.action);
+    expect(actions).not.toContain("click");
+    expect(actions).not.toContain("stop");
+  });
+
   test("the split view can't be opened for an app that isn't installed, and no thread is made", async () => {
     const { ana, sessionId, h, post } = await workspace();
     await post("/uninstall");

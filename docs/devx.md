@@ -385,7 +385,7 @@ githubChecks({ app: "my-agent" });   // ignores its own comments, one comment pe
 
 Each check is named after a bug class found in real apps (`app-developers.md`). The UI's **Checks** panel runs the same set.
 
-Ten of the Slack checks need nothing but the prompt. The stream and Stop checks need `streamPrompt` (text that makes the agent stream a longer answer), and the two click checks need `approval: { prompt, button }` (text that makes it ask for an approval, and the button's label). Without those options the checks are left out, as with `skip: ["slack.stream-stop"]`. Every check's id is in its test name.
+Ten of the Slack checks need nothing but the prompt. The stream and Stop checks need `streamPrompt` (text that makes the agent stream a longer answer), and the two click checks need `approval: { prompt, button }` (text that makes it ask for an approval, and the button's label). Without those options the checks are left out, as with `skip: ["slack.stream-stop"]`. `slack.double-click` counts messages: it expects the agent to answer one approval with exactly one new message in the thread (replacing the question as well is fine); an agent that answers only in place, or with several messages, skips it. Every check's id is in its test name.
 
 ## 6. The model is yours
 

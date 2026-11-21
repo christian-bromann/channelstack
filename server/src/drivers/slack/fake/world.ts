@@ -181,12 +181,16 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   };
 
   /** Would the app be told about this kind of event in this conversation? */
-  const hears = (conversation: SlackConversationRecord, subscription: string): boolean => {
+  const hears = (conversation: SlackConversationRecord | "dm", subscription: string): boolean => {
     const { app } = store;
     // Reachable at all: at its request URL, or over the socket it opened.
     const reachable = context.webhookUrl !== undefined || socket.transport() !== undefined;
     return (
-      reachable && app.installed && app.botEvents.includes(subscription) && conversation.members.has(app.botUserId)
+      reachable &&
+      app.installed &&
+      app.botEvents.includes(subscription) &&
+      // The app is always a member of a DM with itself.
+      (conversation === "dm" || conversation.members.has(app.botUserId))
     );
   };
 

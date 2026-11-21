@@ -57,7 +57,7 @@ export interface InteractionKit {
   /** The app's Socket Mode connection, once it has chosen that over a request URL. */
   transport(): DeliveryTransport | undefined;
   /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
-  hears(conversation: SlackConversationRecord, subscription: string): boolean;
+  hears(conversation: SlackConversationRecord | "dm", subscription: string): boolean;
   /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
 }
@@ -65,6 +65,8 @@ export interface InteractionKit {
 /** Sending an interaction to the app, for the parts of the fake that have their own (modals). */
 export interface InteractionDispatch {
   issueTrigger(session: string, user: SlackUserRecord): string;
+  /** Refuses with `dispatch_failed` when Slack has nowhere to send an interaction. Asked before anything changes. */
+  reachable(): void;
   send(
     session: string,
     type: string,
@@ -137,6 +139,12 @@ export function createInteractions(kit: InteractionKit): Interactions {
     };
   };
 
+  const reachable = () => {
+    if (context.webhookUrl === undefined && kit.transport() === undefined) {
+      throw refuse("dispatch_failed", "The app has no request URL and no socket, so Slack has nowhere to send this");
+    }
+  };
+
   /** Sign an interaction and send it. Slack doesn't retry these: the person sees an error instead. */
   const send = (
     session: string,
@@ -145,9 +153,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
     payload: Record<string, unknown>,
     answered?: (answer: { contentType: string; body: string }) => void,
   ): string => {
-    if (context.webhookUrl === undefined && kit.transport() === undefined) {
-      throw refuse("dispatch_failed", "The app has no request URL and no socket, so Slack has nowhere to send this");
-    }
+    reachable();
     const id = ids.next("slack.event");
     delivery.enqueue({
       id,
@@ -216,7 +222,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
   };
 
   return {
-    dispatch: { issueTrigger, send },
+    dispatch: { issueTrigger, reachable, send },
 
     clickAsUser(session, userId, button, where) {
       const user = store.users.get(session, userId);
@@ -231,6 +237,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
           `No button ${JSON.stringify(button.label ?? button.actionId)} there. Controls there: ${there.length === 0 ? "none" : there.join(", ")}`,
         );
       }
+      reachable();
       kit.action(session, "click", {
         user: user.id,
         channel: conversation.id,
@@ -263,6 +270,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       if (!many && chosen.length !== 1) {
         throw new ProtocolError("invalid_argument", "That menu takes one option");
       }
+      reachable();
       kit.action(session, "select", { user: user.id, channel: conversation.id, ts: message.ts, options: [...options] });
       return blockActions(
         session,
@@ -277,6 +285,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const user = store.users.get(session, userId);
       const { conversation, messages } = inScope(session, user, { message: target });
       const [message] = messages as [SlackMessageRecord];
+      reachable();
       kit.action(session, "shortcut", { user: user.id, channel: conversation.id, ts: message.ts, callbackId });
       // A shortcut has no message of the app's to replace: an answer through its response_url is a new message.
       const payload = messageActionPayload(answerable(session, "actions", user, conversation), {
@@ -292,6 +301,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const user = member(session, userId, conversation);
       const [command = "", ...rest] = line.trim().split(/\s+/);
       if (!/^\/\S+$/.test(command)) throw new ProtocolError("invalid_argument", "A slash command starts with /");
+      reachable();
       kit.action(session, "command", { user: user.id, channel: conversation.id, command });
       const fields = slashCommandFields(answerable(session, "commands", user, conversation), {
         command,
@@ -352,11 +362,11 @@ export function createInteractions(kit: InteractionKit): Interactions {
     openAgentThread(session, userId, from) {
       const user = store.users.get(session, userId);
       const context = from === undefined ? undefined : store.conversations.get(session, from);
-      const dm = kit.directMessage(session, user.id);
-      // The split view belongs to an app that is installed and listening. Refused before a thread exists.
-      if (!kit.hears(dm, "assistant_thread_started")) {
+      // The split view belongs to an app that is installed and listening. Refused before a DM or a thread exists.
+      if (!kit.hears("dm", "assistant_thread_started")) {
         throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_started");
       }
+      const dm = kit.directMessage(session, user.id);
       // The thread hangs on an anchor nobody sees; what people and the app write are its replies.
       const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY });
       kit.action(session, "openAgentThread", { user: user.id, channel: dm.id, ts: anchor.ts });

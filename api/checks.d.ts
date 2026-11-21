@@ -17,6 +17,10 @@ export interface ChecksOptions {
   /**
    * Text that makes the agent ask for an approval, and the label of the button it shows. A
    * workspace admin may press it; anyone else may not. Without it the click checks are left out.
+   *
+   * `slack.double-click` counts messages: it expects the agent to answer one approval with exactly
+   * one new message in the thread (it may also replace the question). An agent that answers only
+   * in place, or with several messages, skips that check.
    */
   approval?: { prompt: string; button: string };
   /** Skip checks by id, e.g. `["slack.stream-stop"]` for an agent that doesn't stream. */
