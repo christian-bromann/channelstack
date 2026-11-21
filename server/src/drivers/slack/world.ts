@@ -171,4 +171,12 @@ export interface SlackWorld {
   /** Replies in a thread, oldest first, without the root. */
   replies(session: string, channel: string, ts: string): SlackMessageRecord[];
   user(session: string, id: string): SlackUserRecord;
+  /** Every message of a thread, root first, as stored (ephemeral ones included). */
+  thread(session: string, channel: string, ts: string): SlackMessageRecord[];
+  /** Every message of a conversation in posting order, replies included. */
+  everything(session: string, channel: string): SlackMessageRecord[];
+  /** What the app has said about its work in a thread. */
+  threadState(session: string, channel: string, ts: string): SlackThreadState;
+  /** The ephemeral messages only this person can see, across the session's conversations. */
+  ephemeral(session: string, user: string): SlackMessageRecord[];
 }

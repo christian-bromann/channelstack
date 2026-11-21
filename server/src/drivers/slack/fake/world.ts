@@ -1,5 +1,7 @@
+import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
+import { randomToken } from "../../../core/secrets/index.ts";
 import { signSlackRequest } from "../../../core/signing/slack.ts";
 import { mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
@@ -22,10 +24,12 @@ import type {
   SlackUserRecord,
   SlackWorld,
 } from "../world.ts";
-import type { SlackStore } from "./store.ts";
+import type { SlackFault, SlackStore } from "./store.ts";
 
 /** Slack expects an acknowledgement within 3 seconds. */
 const ACK_WINDOW_MS = 3000;
+/** How far back a "stale" delivery is signed: Slack receivers reject anything older than five minutes. */
+const STALE_MS = 6 * 60_000;
 /** Slack's limit for a message's text. */
 const MAX_TEXT_LENGTH = 40_000;
 
@@ -46,6 +50,25 @@ export interface FakeSlackWorld extends SlackWorld {
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
   /** The user a name in a test's text refers to, in this session. */
   resolveName(session: string, name: string): string | undefined;
+  /**
+   * The workspace uninstalls the app: it gets `app_uninstalled` and `tokens_revoked`, then nothing
+   * more, and its token stops working. Undone when the session that did it closes (decision 0006).
+   */
+  uninstallApp(session: string): string[];
+
+  deliveries(session: string): DeliveryRecord[];
+  delivery(session: string, id: string): DeliveryRecord;
+  /** Send a delivery again the way Slack retries: same payload, with the retry headers. */
+  retry(session: string, id: string, options: { afterMs: number; reason: string }): Promise<DeliveryAttempt>;
+  /** Send a delivery again, unchanged or forged: signed with a wrong secret, or with a stale timestamp. */
+  resend(
+    session: string,
+    id: string,
+    options: { badSignature: boolean; stale: boolean; headers?: Record<string, string> | undefined },
+  ): Promise<DeliveryAttempt>;
+  /** Inject a fault into the Web API. It applies to every caller until removed, or until the session closes. */
+  addFault(session: string, fault: Omit<SlackFault, "id" | "session">): string;
+  removeFault(session: string, id: string): void;
 }
 
 export function createFakeWorld(context: DriverContext, store: SlackStore): FakeSlackWorld {
@@ -61,20 +84,16 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       .find((user) => user.name.toLowerCase() === wanted || user.displayName.toLowerCase() === wanted)?.id;
   };
 
-  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
-    const { app } = store;
-    const session = store.conversations.owner(conversation.id);
-    if (session === undefined || context.webhookUrl === undefined) return undefined;
-    if (!app.installed || !app.botEvents.includes(subscription) || !conversation.members.has(app.botUserId)) {
-      return undefined;
-    }
+  /** Sign an event and hand it to the delivery queue, for the session whose action caused it. */
+  const deliver = (session: string, event: Record<string, unknown>): string | undefined => {
+    if (context.webhookUrl === undefined) return undefined;
     const eventId = ids.next("slack.event");
     const payload = eventCallback({
       event,
       eventId,
       atMs: clock(),
       team: store.team,
-      app,
+      app: store.app,
       verificationToken: context.secret("verificationToken"),
     });
     delivery.enqueue({
@@ -89,6 +108,16 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       meta: { eventType: event.type, payload },
     });
     return eventId;
+  };
+
+  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
+    const { app } = store;
+    const session = store.conversations.owner(conversation.id);
+    if (session === undefined) return undefined;
+    if (!app.installed || !app.botEvents.includes(subscription) || !conversation.members.has(app.botUserId)) {
+      return undefined;
+    }
+    return deliver(session, event);
   };
 
   const member = (session: string, userId: string, conversation: SlackConversationRecord): SlackUserRecord => {
@@ -198,6 +227,23 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     app: () => store.app,
     emit,
     resolveName,
+
+    uninstallApp(session) {
+      const { app, team } = store;
+      if (!app.installed) throw refuse("account_inactive", "The app is already uninstalled");
+      const eventTs = Math.floor(clock() / 1000).toString();
+      const sent = [
+        ["app_uninstalled", { type: "app_uninstalled", event_ts: eventTs }],
+        ["tokens_revoked", { type: "tokens_revoked", tokens: { oauth: [], bot: [app.botUserId] }, event_ts: eventTs }],
+      ]
+        .filter(([subscription]) => app.botEvents.includes(subscription as string))
+        .map(([, event]) => deliver(session, { ...(event as Record<string, unknown>), team_id: team.id }))
+        .filter((id): id is string => id !== undefined);
+      app.installed = false;
+      store.uninstalledBy = session;
+      action(session, "uninstallApp", {});
+      return sent;
+    },
 
     createUser(session, options) {
       // A fixed id must be free in the whole world: the agent can't tell two of them apart (decision 0006).
@@ -407,5 +453,61 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     replies: (session, channel, ts) =>
       store.messagesIn(store.conversations.get(session, channel).id).filter((message) => message.threadTs === ts),
     user: (session, id) => store.users.get(session, id),
+    thread: (session, channel, ts) => {
+      const conversation = store.conversations.get(session, channel);
+      const root = requireMessage(conversation, ts);
+      const rootTs = root.threadTs ?? root.ts;
+      return store
+        .messagesIn(conversation.id)
+        .filter((message) => message.ts === rootTs || message.threadTs === rootTs);
+    },
+    everything: (session, channel) => [...store.messagesIn(store.conversations.get(session, channel).id)],
+    threadState: (session, channel, ts) => {
+      const conversation = store.conversations.get(session, channel);
+      const root = requireMessage(conversation, ts);
+      return store.threadState(conversation.id, root.threadTs ?? root.ts);
+    },
+    ephemeral: (session, userId) => {
+      const user = store.users.get(session, userId);
+      return store
+        .conversationsOf(session)
+        .flatMap((conversation) => store.messagesIn(conversation.id))
+        .filter((message) => message.ephemeralFor === user.id);
+    },
+
+    deliveries: (session) => delivery.list(session).filter((record) => record.request.driver === "slack"),
+    delivery: (session, id) => delivery.get(session, id),
+
+    async retry(session, id, options) {
+      const record = delivery.get(session, id);
+      if (options.afterMs > 0) await new Promise((resolve) => setTimeout(resolve, options.afterMs));
+      // Slack repeats the same payload and says which retry this is, and why.
+      return delivery.again(session, id, {
+        headers: { "x-slack-retry-num": String(record.attempts.length), "x-slack-retry-reason": options.reason },
+      });
+    },
+
+    resend(session, id, options) {
+      const secret = options.badSignature ? randomToken() : context.secret("signingSecret");
+      // Receivers reject a request more than five minutes old; six is safely outside.
+      const age = options.stale ? STALE_MS : 0;
+      return delivery.again(session, id, {
+        sign: (body, atMs) => signSlackRequest(secret, body, atMs - age),
+        forged: options.badSignature || options.stale,
+        ...(options.headers === undefined ? {} : { headers: options.headers }),
+      });
+    },
+
+    addFault(session, fault) {
+      const id = `fault_${store.faults.length + 1}_${ids.next("slack.block")}`;
+      store.faults.push({ id, session, ...fault });
+      action(session, "fault", { fault: id, type: fault.type });
+      return id;
+    },
+
+    removeFault(session, id) {
+      const index = store.faults.findIndex((fault) => fault.id === id && fault.session === session);
+      if (index !== -1) store.faults.splice(index, 1);
+    },
   };
 }

@@ -513,12 +513,31 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
     delete args.token;
 
     let body: Record<string, unknown>;
+    let status: 200 | 429 = 200;
+    const headers: Record<string, string> = { "x-oauth-scopes": store.app.scopes.join(",") };
     const method = methods[name];
     try {
       if (token === undefined) throw new SlackApiError("not_authed");
       if (!constantTimeEqual(token, context.secret("botToken"))) throw new SlackApiError("invalid_auth");
       if (!store.app.installed) throw new SlackApiError("account_inactive");
       if (!method) throw new SlackApiError("unknown_method", { req_method: name });
+
+      // A fault a test injected: it applies to the next matching calls, whoever makes them.
+      const fault = store.faults.find(
+        (candidate) =>
+          (candidate.operation === undefined || candidate.operation === name) &&
+          (candidate.remaining === undefined || candidate.remaining > 0),
+      );
+      if (fault?.remaining !== undefined) fault.remaining -= 1;
+      if (fault?.type === "latency") await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
+      if (fault?.type === "rate_limit") {
+        // Slack answers 429 with Retry-After in seconds.
+        status = 429;
+        headers["retry-after"] = String(Math.max(1, Math.ceil(fault.retryAfterMs / 1000)));
+        throw new SlackApiError("ratelimited");
+      }
+      if (fault?.type === "error") throw new SlackApiError(fault.error);
+
       const needed = SCOPES[name] ?? [];
       if (needed.length > 0 && !needed.some((scope) => store.app.scopes.includes(scope))) {
         throw new SlackApiError("missing_scope", { needed: needed.join(","), provided: store.app.scopes.join(",") });
@@ -541,13 +560,13 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
         method: c.req.method,
         path: new URL(c.req.url).pathname,
         request: args,
-        responseStatus: 200,
+        responseStatus: status,
         response: body,
         ...(body.ok === false ? { error: body.error } : {}),
         durationMs: clock() - startedAt,
       });
     }
-    return c.json(body, 200, { "x-oauth-scopes": store.app.scopes.join(",") });
+    return c.json(body, status, headers);
   });
 
   api.all("*", (c) => c.json({ ok: false, error: "unknown_method" }, 404));

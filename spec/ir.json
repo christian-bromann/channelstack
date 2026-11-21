@@ -840,6 +840,194 @@
             "name_taken"
           ],
           "dispose": false
+        },
+        {
+          "name": "deliveries",
+          "kind": "method",
+          "summary": "Every event channelstack sent the agent for this session, with every attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The Web API calls the agent made about this session's conversations",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "uninstallApp",
+          "kind": "method",
+          "summary": "The workspace uninstalls the app. Undone when this session closes; run such tests on their own",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/uninstall",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackUninstallDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "account_inactive"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "fault",
+          "kind": "method",
+          "summary": "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/faults",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "type",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "rate_limit",
+                  "latency",
+                  "error"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "retryAfter",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "delay",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "times",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackFault"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -1522,6 +1710,41 @@
             "not_in_channel"
           ],
           "dispose": false
+        },
+        {
+          "name": "ephemeral",
+          "kind": "method",
+          "summary": "Messages only this person can see",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/users/{user}/ephemeral",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackEphemeralMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -1620,6 +1843,50 @@
           "returns": {
             "kind": "named",
             "name": "SlackMembers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The conversation as a person would read it, threads included",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "as",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackTranscript"
           },
           "errors": [
             "unauthorized",
@@ -1739,6 +2006,14 @@
           "name": "delivery",
           "type": {
             "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "stream",
+          "type": {
+            "kind": "named",
+            "name": "SlackStream"
           },
           "optional": true
         }
@@ -1863,6 +2138,376 @@
             "not_found"
           ],
           "dispose": false
+        },
+        {
+          "name": "threadStatus",
+          "kind": "method",
+          "summary": "What the agent is doing in the thread this message starts: its status line, an open stream, or idle",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/status",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackThreadStatus"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "threadTranscript",
+          "kind": "method",
+          "summary": "The thread this message starts, as a person would read it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "as",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "slack"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "eventType",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "eventId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "retry",
+          "kind": "method",
+          "summary": "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/deliveries/{delivery}/retry",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "after",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "reason",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "http_timeout",
+                  "http_error",
+                  "too_many_redirects"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "stale",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "headers",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackFault",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "undo",
+          "kind": "method",
+          "summary": "Remove a fault",
+          "stability": "experimental",
+          "http": {
+            "verb": "DELETE",
+            "path": "/sessions/{session}/slack/faults/{fault}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "fault",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": true
         }
       ]
     }
@@ -2235,6 +2880,50 @@
       }
     },
     {
+      "name": "SlackStream",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "state",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "open",
+                "stopped",
+                "completed"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "chunks",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "startedAt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "endedAt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
       "name": "SlackMessageInput",
       "type": {
         "kind": "object",
@@ -2407,9 +3096,402 @@
           }
         ]
       }
+    },
+    {
+      "name": "SlackThreadStatus",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "state",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "working",
+                "streaming",
+                "stopped",
+                "idle"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "sessionStatus",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "active",
+                "processing",
+                "suspended",
+                "closed"
+              ]
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "SlackTranscriptEntry"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "SlackPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "streaming",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "open",
+                "stopped",
+                "completed"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "visibleTo",
+            "type": {
+              "kind": "named",
+              "name": "SlackPrincipal"
+            },
+            "optional": true
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackPrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackEphemeralMessages",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackMessage"
+        }
+      }
+    },
+    {
+      "name": "SlackDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackDelivery"
+        }
+      }
+    },
+    {
+      "name": "DeliveryAttempt",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "number",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "sentAt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "transport",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "http",
+                "socket"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "url",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "requestHeaders",
+            "type": {
+              "kind": "record",
+              "values": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "status",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "pending",
+                "acknowledged",
+                "failed",
+                "timed_out",
+                "unreachable"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseBody",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": true
+          },
+          {
+            "name": "forgedSignature",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "SlackApiCall"
+        }
+      }
+    },
+    {
+      "name": "SlackApiCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "literal",
+              "value": "slack"
+            },
+            "optional": false
+          },
+          {
+            "name": "operation",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackUninstallDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackDelivery"
+        }
+      }
     }
   ],
   "errors": [
+    "account_inactive",
     "already_in_channel",
     "already_reacted",
     "cant_delete_message",

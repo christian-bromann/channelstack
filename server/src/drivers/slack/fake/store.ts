@@ -8,6 +8,20 @@ import type {
   SlackUserRecord,
 } from "../world.ts";
 
+/** A transport fault for the agent's Web API calls (`slack.fault(...)`). */
+export interface SlackFault {
+  readonly id: string;
+  readonly session: string;
+  readonly type: "rate_limit" | "latency" | "error";
+  /** Only calls to this method; every method when left out. */
+  readonly operation: string | undefined;
+  /** How many more calls it applies to; forever when left out. */
+  remaining: number | undefined;
+  readonly retryAfterMs: number;
+  readonly delayMs: number;
+  readonly error: string;
+}
+
 /** The Slack fake's in-memory state. Objects live in the core registry; the store adds Slack's own indexes. */
 export class SlackStore {
   readonly users: Collection<SlackUserRecord>;
@@ -16,6 +30,10 @@ export class SlackStore {
   readonly #threads = new Map<string, SlackThreadState>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
+  /** The session that uninstalled the app, so closing it installs the app again. */
+  uninstalledBy: string | undefined;
+  /** Faults sessions injected into the Web API. They apply to every caller until removed. */
+  readonly faults: SlackFault[] = [];
   #team: SlackTeam | undefined;
   #app: SlackAppRecord | undefined;
 
@@ -39,6 +57,8 @@ export class SlackStore {
     this.#threads.clear();
     this.#known.length = 0;
     this.#people.clear();
+    this.faults.length = 0;
+    this.uninstalledBy = undefined;
     this.#team = team;
     this.#app = app;
   }
@@ -114,6 +134,13 @@ export class SlackStore {
    * before the registry releases the objects.
    */
   release(session: string): SlackUserRecord[] {
+    // What a session changed for the whole workspace is undone with it (decision 0006).
+    if (this.uninstalledBy === session) {
+      this.app.installed = true;
+      this.uninstalledBy = undefined;
+    }
+    for (const fault of [...this.faults])
+      if (fault.session === session) this.faults.splice(this.faults.indexOf(fault), 1);
     const people = this.usersOf(session);
     this.#people.delete(session);
     for (const id of [...this.#known]) {

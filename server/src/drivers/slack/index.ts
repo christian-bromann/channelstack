@@ -17,7 +17,12 @@ export const slack: DriverDefinition = {
       name: "slack",
       fake,
       routes: (router) =>
-        registerSlackRoutes(router, { world: fake.world, apiUrl: context.apiUrl, secret: context.secret }),
+        registerSlackRoutes(router, {
+          world: fake.world,
+          events: context.events,
+          apiUrl: context.apiUrl,
+          secret: context.secret,
+        }),
       capabilities: () => ({}),
       env: () => ({
         SLACK_API_URL: `${context.apiUrl()}/api/`,

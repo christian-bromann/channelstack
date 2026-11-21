@@ -1,14 +1,12 @@
 import { z } from "@hono/zod-openapi";
 
+import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
+import type { EventLog } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
-import type {
-  SlackAppRecord,
-  SlackConversationRecord,
-  SlackMessageRecord,
-  SlackUserRecord,
-  SlackWorld,
-} from "./world.ts";
+import type { FakeSlackWorld } from "./fake/world.ts";
+import { renderTranscript } from "./transcript.ts";
+import type { SlackAppRecord, SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "./world.ts";
 
 const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
 
@@ -49,6 +47,15 @@ const SlackConversation = z
   })
   .openapi("SlackConversation", { "x-channelstack-resource": { id: "id" } });
 
+const SlackStream = z
+  .object({
+    state: z.enum(["open", "stopped", "completed"]),
+    chunks: z.array(z.string()),
+    startedAt: z.string(),
+    endedAt: z.string().optional(),
+  })
+  .openapi("SlackStream");
+
 const SlackMessage = z
   .object({
     channel: z.string(),
@@ -63,8 +70,91 @@ const SlackMessage = z
     visibleTo: SlackUser.optional(),
     deliveries: z.array(z.string()),
     delivery: z.string().optional(),
+    stream: SlackStream.optional(),
   })
   .openapi("SlackMessage", { "x-channelstack-resource": { id: ["channel", "ts"] } });
+
+const DeliveryStatus = z.enum(["pending", "acknowledged", "failed", "timed_out", "unreachable"]);
+
+const DeliveryAttempt = z
+  .object({
+    number: z.number().int(),
+    sentAt: z.string(),
+    transport: z.enum(["http", "socket"]),
+    url: z.string().optional(),
+    requestHeaders: z.record(z.string(), z.string()),
+    status: DeliveryStatus,
+    responseStatus: z.number().int().optional(),
+    responseBody: z.string().optional(),
+    durationMs: z.number().optional(),
+    forgedSignature: z.boolean(),
+  })
+  .openapi("DeliveryAttempt");
+
+const SlackDelivery = z
+  .object({
+    id: z.string(),
+    channel: z.literal("slack"),
+    type: z.string(),
+    eventType: z.string().optional(),
+    eventId: z.string().optional(),
+    payload: z.unknown(),
+    attempts: z.array(DeliveryAttempt),
+    status: DeliveryStatus,
+  })
+  .openapi("SlackDelivery", { "x-channelstack-resource": { id: "id" } });
+
+const SlackThreadStatus = z
+  .object({
+    /** `working`: a status line or a processing session. `streaming`: a stream is open. `stopped`: a person pressed Stop. */
+    state: z.enum(["working", "streaming", "stopped", "idle"]),
+    text: z.string().optional(),
+    sessionStatus: z.enum(["active", "processing", "suspended", "closed"]).optional(),
+  })
+  .openapi("SlackThreadStatus");
+
+const Principal = z
+  .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })
+  .openapi("SlackPrincipal");
+
+const SlackTranscript = z
+  .object({
+    entries: z.array(
+      z
+        .object({
+          id: z.string(),
+          author: Principal,
+          at: z.string(),
+          text: z.string(),
+          controls: z.array(z.string()),
+          edited: z.boolean(),
+          streaming: z.enum(["open", "stopped", "completed"]).optional(),
+          visibleTo: Principal.optional(),
+          depth: z.number().int(),
+        })
+        .openapi("SlackTranscriptEntry"),
+    ),
+  })
+  .openapi("SlackTranscript");
+
+const SlackApiCall = z
+  .object({
+    id: z.string(),
+    channel: z.literal("slack"),
+    operation: z.string(),
+    method: z.string(),
+    path: z.string(),
+    at: z.string(),
+    durationMs: z.number(),
+    request: z.unknown(),
+    responseStatus: z.number().int(),
+    response: z.unknown(),
+    error: z.string().optional(),
+  })
+  .openapi("SlackApiCall");
+
+const duration = (description: string) =>
+  z.number().int().min(0).openapi({ description, "x-channelstack-duration": true });
 
 const SlackFixture = z
   .object({
@@ -101,7 +191,7 @@ const messageBinding = { channel: "channel", ts: "ts" };
 /** The Slack driver's control API: what a test's people do, and what a test reads back. */
 export function registerSlackRoutes(
   router: DriverRouter,
-  deps: { world: SlackWorld; apiUrl: () => string; secret: (name: string) => string },
+  deps: { world: FakeSlackWorld; events: EventLog; apiUrl: () => string; secret: (name: string) => string },
 ): void {
   const { world } = deps;
   const stability = "experimental";
@@ -135,7 +225,35 @@ export function registerSlackRoutes(
     visibleTo: message.ephemeralFor === undefined ? undefined : userWire(world.user(session, message.ephemeralFor)),
     deliveries: [...message.deliveries],
     delivery: message.deliveries[0],
+    stream:
+      message.stream === undefined
+        ? undefined
+        : {
+            state: message.stream.state,
+            chunks: [...message.stream.chunks],
+            startedAt: new Date(message.stream.startedAt).toISOString(),
+            endedAt: message.stream.endedAt === undefined ? undefined : new Date(message.stream.endedAt).toISOString(),
+          },
   });
+
+  const deliveryWire = ({ request, attempts }: DeliveryRecord) => {
+    const meta = request.meta ?? {};
+    return {
+      id: request.id,
+      channel: "slack" as const,
+      type: request.type,
+      eventType: typeof meta.eventType === "string" ? meta.eventType : undefined,
+      eventId: request.type === "event_callback" ? request.id : undefined,
+      payload: meta.payload,
+      attempts,
+      status: attempts.at(-1)?.status ?? ("pending" as const),
+    };
+  };
+
+  const principal = (session: string) => (id: string) => {
+    const { id: principalId, name, kind } = participantWire(session, id);
+    return { id: principalId, name, kind };
+  };
 
   router.route({
     method: "get",
@@ -400,5 +518,244 @@ export function registerSlackRoutes(
         emoji: reaction.name,
         by: reaction.users.map((id) => participantWire(session.id, id)),
       })),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/messages/{ts}/status",
+    summary: "What the agent is doing in the thread this message starts: its status line, an open stream, or idle",
+    params: MessageParams,
+    response: SlackThreadStatus,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackMessage", name: "threadStatus", bind: messageBinding },
+    stability,
+    handler: ({ session, params }) => {
+      const state = world.threadState(session.id, params.channel, params.ts);
+      const streams = world.thread(session.id, params.channel, params.ts).flatMap((message) => message.stream ?? []);
+      const working = state.statusText !== "" || state.sessionStatus === "processing";
+      return {
+        state: streams.some((stream) => stream.state === "open")
+          ? ("streaming" as const)
+          : working
+            ? ("working" as const)
+            : streams.at(-1)?.state === "stopped"
+              ? ("stopped" as const)
+              : ("idle" as const),
+        text: state.statusText === "" ? undefined : state.statusText,
+        sessionStatus: state.sessionStatus,
+      };
+    },
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/messages/{ts}/transcript",
+    summary: "The thread this message starts, as a person would read it",
+    params: MessageParams,
+    query: z.object({
+      as: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "as", in: "query" } }),
+    }),
+    response: SlackTranscript,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackMessage", name: "threadTranscript", options: ["as"], bind: messageBinding },
+    stability,
+    handler: ({ session, params, query }) =>
+      renderTranscript(world.thread(session.id, params.channel, params.ts), {
+        viewer: query.as,
+        principal: principal(session.id),
+      }),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/transcript",
+    summary: "The conversation as a person would read it, threads included",
+    params: ChannelParams,
+    query: z.object({
+      as: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "as", in: "query" } }),
+    }),
+    response: SlackTranscript,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackConversation", name: "transcript", options: ["as"] },
+    stability,
+    handler: ({ session, params, query }) =>
+      renderTranscript(world.everything(session.id, params.channel), {
+        viewer: query.as,
+        principal: principal(session.id),
+      }),
+  });
+
+  router.route({
+    method: "get",
+    path: "/users/{user}/ephemeral",
+    summary: "Messages only this person can see",
+    params: UserParams,
+    response: z.array(SlackMessage).openapi("SlackEphemeralMessages"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackUser", name: "ephemeral" },
+    stability,
+    handler: ({ session, params }) =>
+      world.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),
+  });
+
+  const DeliveryParams = z.object({ delivery: z.string().openapi({ param: { name: "delivery", in: "path" } }) });
+
+  router.route({
+    method: "get",
+    path: "/deliveries",
+    summary: "Every event channelstack sent the agent for this session, with every attempt",
+    response: z.array(SlackDelivery).openapi("SlackDeliveries"),
+    sdkMethod: { on: "SlackFixture", name: "deliveries" },
+    stability,
+    handler: ({ session }) => world.deliveries(session.id).map(deliveryWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/deliveries/{delivery}",
+    summary: "Re-read a delivery: its attempts and status",
+    params: DeliveryParams,
+    response: SlackDelivery,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackDelivery", name: "refresh" },
+    stability,
+    handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/deliveries/{delivery}/retry",
+    summary: "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
+    params: DeliveryParams,
+    body: z
+      .object({
+        after: duration("How long to wait before the retry. Slack's first retry comes after about 3 seconds.").default(
+          3000,
+        ),
+        reason: z.enum(["http_timeout", "http_error", "too_many_redirects"]).default("http_timeout"),
+      })
+      .openapi("SlackRetryBody"),
+    response: DeliveryAttempt,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackDelivery", name: "retry", options: ["after", "reason"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      world.retry(session.id, params.delivery, { afterMs: body.after, reason: body.reason }),
+  });
+
+  router.route({
+    method: "post",
+    path: "/deliveries/{delivery}/resend",
+    summary:
+      "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
+    params: DeliveryParams,
+    body: z
+      .object({
+        badSignature: z.boolean().default(false),
+        stale: z.boolean().default(false),
+        headers: z.record(z.string(), z.string()).optional(),
+      })
+      .openapi("SlackResendBody"),
+    response: DeliveryAttempt,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackDelivery", name: "resend", options: ["badSignature", "stale", "headers"] },
+    stability,
+    handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+  });
+
+  router.route({
+    method: "get",
+    path: "/calls",
+    summary: "The Web API calls the agent made about this session's conversations",
+    query: z.object({
+      operation: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "operation", in: "query" } }),
+      error: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "error", in: "query" }, description: "`true` for any error, or one error code" }),
+    }),
+    response: z.array(SlackApiCall).openapi("SlackApiCalls"),
+    sdkMethod: { on: "SlackFixture", name: "calls", options: ["operation", "error"] },
+    stability,
+    handler: ({ session, query }) =>
+      deps.events
+        .read(session.id)
+        .events.map((event, index) => ({ event, id: `call_${index + 1}` }))
+        .filter(({ event }) => event.kind === "api_call" && event.driver === "slack")
+        .map(({ event, id }) => ({
+          ...(event.data as z.infer<typeof SlackApiCall>),
+          id,
+          channel: "slack" as const,
+          at: event.at,
+        }))
+        .filter((call) => query.operation === undefined || call.operation === query.operation)
+        .filter(
+          (call) =>
+            query.error === undefined ||
+            (query.error === "true" ? call.error !== undefined : call.error === query.error),
+        ),
+  });
+
+  router.route({
+    method: "post",
+    path: "/uninstall",
+    summary: "The workspace uninstalls the app. Undone when this session closes; run such tests on their own",
+    response: z.array(SlackDelivery).openapi("SlackUninstallDeliveries"),
+    errors: ["account_inactive"],
+    sdkMethod: { on: "SlackFixture", name: "uninstallApp" },
+    stability,
+    handler: ({ session }) => world.uninstallApp(session.id).map((id) => deliveryWire(world.delivery(session.id, id))),
+  });
+
+  router.route({
+    method: "post",
+    path: "/faults",
+    summary: "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+    body: z
+      .object({
+        type: z.enum(["rate_limit", "latency", "error"]),
+        operation: z.string().optional(),
+        retryAfter: duration("For rate_limit: what Retry-After says.").default(1000),
+        delay: duration("For latency: how long each call takes longer.").default(0),
+        error: z.string().default("internal_error"),
+        times: z.number().int().min(1).optional(),
+      })
+      .openapi("SlackFaultBody"),
+    response: z.object({ id: z.string() }).openapi("SlackFault", { "x-channelstack-resource": { id: "id" } }),
+    sdkMethod: {
+      on: "SlackFixture",
+      name: "fault",
+      options: ["type", "operation", "retryAfter", "delay", "error", "times"],
+    },
+    stability,
+    handler: ({ session, body }) => ({
+      id: world.addFault(session.id, {
+        type: body.type,
+        operation: body.operation,
+        remaining: body.times,
+        retryAfterMs: body.retryAfter,
+        delayMs: body.delay,
+        error: body.error,
+      }),
+    }),
+  });
+
+  router.route({
+    method: "delete",
+    path: "/faults/{fault}",
+    summary: "Remove a fault",
+    params: z.object({ fault: z.string().openapi({ param: { name: "fault", in: "path" } }) }),
+    sdkMethod: { on: "SlackFault", name: "undo", dispose: true },
+    stability,
+    handler: ({ session, params }) => world.removeFault(session.id, params.fault),
   });
 }
