@@ -33,8 +33,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return side === "wire" && index.holdsResources(type) ? `${type.name}Wire` : type.name;
       case "resource":
         return side === "wire" ? `${type.name}Data` : type.name;
-      case "ref":
-        return side === "wire" ? "string" : type.resources.join(" | ");
+      case "ref": {
+        if (side === "public") return type.resources.join(" | ");
+        const ids = index.refIdFields(type.resources);
+        return ids.length === 1 ? "string" : `{ ${ids.map((id) => `${id}: string`).join("; ")} }`;
+      }
+      case "union":
+        return type.types.map((member) => typeOf(member, side)).join(" | ");
     }
   };
 
@@ -48,7 +53,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       case "resource": {
         const resource = index.resource(type.name);
         const context =
-          resource.scope === "session" ? `{ transport: ctx.transport, session: ${expr}.${resource.idField} }` : "ctx";
+          resource.scope === "session"
+            ? `{ transport: ctx.transport, session: ${expr}.${resource.idFields?.[0]} }`
+            : "ctx";
         return `new ${type.name}(${context}, ${expr})`;
       }
       case "array":
@@ -60,25 +67,65 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
           .filter((field) => index.holdsResources(field.type))
           .map((field) => `${field.name}: ${decode(field.type, `${expr}.${field.name}`)}`)
           .join(", ")} }`;
+      case "union": {
+        // Handle data in a union is told apart by its discriminator field, e.g. `kind: "user" | "app"`.
+        const members = index.discriminated(type);
+        if (!members)
+          throw new Error("A union that holds handles needs a discriminator every member declares as a literal");
+        return members
+          .map(({ value, member }, position) =>
+            position === members.length - 1
+              ? decode(member, expr)
+              : `${expr}.${type.discriminator} === ${JSON.stringify(value)} ? ${decode(member, expr)} : `,
+          )
+          .join("");
+      }
       default:
         throw new Error(`Can't decode handles inside a ${type.kind}`);
     }
   };
 
-  /** An expression that turns an argument into what goes on the wire: handles become their ids. */
-  const encode = (param: IrParam, expr: string): string => {
-    const access = param.optional ? "?." : ".";
-    if (param.type.kind === "ref") return `${expr}${access}${index.refIdField(param.type.resources)}`;
-    if (param.type.kind === "array" && param.type.items.kind === "ref") {
-      return `${expr}${access}map((item) => item.${index.refIdField(param.type.items.resources)})`;
+  /** Does a value of this type carry handles that have to be sent as ids? */
+  const holdsRefs = (type: IrType): boolean =>
+    type.kind === "ref" ||
+    (type.kind === "array" && holdsRefs(type.items)) ||
+    (type.kind === "object" && type.fields.some((field) => holdsRefs(field.type)));
+
+  /** An expression that turns a value into what goes on the wire: handles become their ids. */
+  const encodeValue = (type: IrType, expr: string): string => {
+    if (!holdsRefs(type)) return expr;
+    if (type.kind === "ref") {
+      const ids = index.refIdFields(type.resources);
+      return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
+    }
+    if (type.kind === "array") return `${expr}.map((item) => ${encodeValue(type.items, "item")})`;
+    if (type.kind === "object") {
+      const converted = type.fields
+        .filter((field) => holdsRefs(field.type))
+        .map((field) => `${field.name}: ${encodeField(field, `${expr}.${field.name}`)}`);
+      return `{ ...${expr}, ${converted.join(", ")} }`;
     }
     return expr;
   };
 
+  const encodeField = (field: IrField, expr: string): string =>
+    field.optional && holdsRefs(field.type)
+      ? `${expr} === undefined ? undefined : ${encodeValue(field.type, expr)}`
+      : encodeValue(field.type, expr);
+
+  /** An argument or option as it goes on the wire. A string where an object is expected is its shorthand. */
+  const encode = (param: IrParam, expr: string): string =>
+    param.shorthand === undefined
+      ? encodeField(param, expr)
+      : `typeof ${expr} === "string" ? { ${param.shorthand}: ${expr} } : ${encodeField(param, expr)}`;
+
+  const parameterType = (param: IrParam): string =>
+    `${param.shorthand === undefined ? "" : "string | "}${typeOf(param.type, "public")}`;
+
   const method = (resource: IrResource, m: IrMethod): string[] => {
     const optionsOptional = m.options.every((option) => option.optional);
     const parameters = [
-      ...m.args.map((arg) => `${arg.name}: ${typeOf(arg.type, "public")}`),
+      ...m.args.map((arg) => `${arg.name}: ${parameterType(arg)}`),
       ...(m.options.length > 0
         ? [`options: { ${fields(m.options, "public").join("; ")} }${optionsOptional ? " = {}" : ""}`]
         : []),
@@ -137,7 +184,10 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
             "",
           ]),
       `export class ${resource.name}${isRoot ? " extends ClientBase" : disposable ? " implements AsyncDisposable" : ""} {`,
-      ...fields(resource.fields, "public").map((f) => `  readonly ${f};`),
+      // An optional field is always present on a handle, as undefined when the server didn't send it.
+      ...resource.fields.map(
+        (field) => `  readonly ${field.name}: ${typeOf(field.type, "public")}${field.optional ? " | undefined" : ""};`,
+      ),
       "  readonly #ctx: HandleContext;",
       "",
       "  /** @internal Handles come from the SDK, never from `new`. */",
@@ -150,7 +200,14 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         : [
             `  constructor(ctx: HandleContext, data: ${resource.name}Data) {`,
             "    this.#ctx = ctx;",
-            ...resource.fields.map((field) => `    this.${field.name} = ${decode(field.type, `data.${field.name}`)};`),
+            ...resource.fields.map((field) => {
+              const value = decode(field.type, `data.${field.name}`);
+              const guarded =
+                field.optional && value !== `data.${field.name}`
+                  ? `data.${field.name} === undefined ? undefined : ${value}`
+                  : value;
+              return `    this.${field.name} = ${guarded};`;
+            }),
           ]),
       "  }",
       ...resource.methods.flatMap((m) => method(resource, m)),

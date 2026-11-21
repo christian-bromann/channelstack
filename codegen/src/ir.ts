@@ -18,8 +18,11 @@ export interface Ir {
 /** A handle: an object with an identity on the server, and methods. */
 export interface IrResource {
   name: string;
-  /** The field that identifies the handle. Fixtures and the root have none. */
-  idField?: string;
+  /**
+   * The fields that identify the handle: one for most (`id`), several where the platform needs
+   * them (a Slack message is `channel` and `ts`). Fixtures and the root have none.
+   */
+  idFields?: string[];
   /** This resource is the session: its id is the `{session}` of everything created through it. */
   scope?: "session";
   fields: IrField[];
@@ -49,11 +52,15 @@ export type IrType =
   | { kind: "named"; name: string }
   /** In a response: the wire data of a handle, which SDKs wrap into the handle again. */
   | { kind: "resource"; name: string }
-  /** In a request: a handle, sent by its id. */
-  | { kind: "ref"; resources: string[] };
+  /** In a request: a handle, sent by its id (an object of its id fields when it has several). */
+  | { kind: "ref"; resources: string[] }
+  /** One of several types. `discriminator` names the literal field that tells them apart. */
+  | { kind: "union"; types: IrType[]; discriminator?: string };
 
 export interface IrParam extends IrField {
   in: "body" | "query";
+  /** For an object argument: a plain string is shorthand for `{ [shorthand]: string }` (`ana.say("hi", …)`). */
+  shorthand?: string;
 }
 
 interface IrPathParam {
@@ -120,6 +127,12 @@ export function buildIr(openapi: Json): Ir {
         if (!resourceNames.has(name)) throw new SpecError(where, `x-channelstack-ref names unknown resource "${name}"`);
       return { kind: "ref", resources: refs };
     }
+    const alternatives: Json[] | undefined = schema.oneOf ?? schema.anyOf;
+    if (Array.isArray(alternatives)) {
+      const types = alternatives.map((alternative, index) => typeOf(alternative, `${where}|${index}`));
+      const discriminator: unknown = schema.discriminator?.propertyName;
+      return { kind: "union", types, ...(typeof discriminator === "string" ? { discriminator } : {}) };
+    }
     if (typeof schema.const === "string") return { kind: "literal", value: schema.const };
     if (Array.isArray(schema.enum)) {
       const [first] = schema.enum;
@@ -168,12 +181,15 @@ export function buildIr(openapi: Json): Ir {
       continue;
     }
     const fields = fieldsOf(schema, name);
-    if (marker.id !== undefined && !fields.some((field) => field.name === marker.id)) {
-      throw new SpecError(name, `x-channelstack-resource names id field "${marker.id}", which the schema doesn't have`);
+    const idFields: string[] | undefined = marker.id === undefined ? undefined : [marker.id].flat();
+    for (const id of idFields ?? []) {
+      if (!fields.some((field) => field.name === id)) {
+        throw new SpecError(name, `x-channelstack-resource names id field "${id}", which the schema doesn't have`);
+      }
     }
     resources.set(name, {
       name,
-      ...(marker.id === undefined ? {} : { idField: marker.id }),
+      ...(idFields === undefined ? {} : { idFields }),
       ...(marker.scope === undefined ? {} : { scope: marker.scope }),
       fields,
       methods: [],
@@ -198,7 +214,13 @@ export function buildIr(openapi: Json): Ir {
       const bodySchema: Json | undefined = operation.requestBody?.content?.["application/json"]?.schema;
       const body = bodySchema ? resolveObject(bodySchema, schemas, where) : undefined;
       const available = new Map<string, IrParam>();
-      for (const field of body ? fieldsOf(body, where) : []) available.set(field.name, { ...field, in: "body" });
+      for (const field of body ? fieldsOf(body, where) : []) {
+        const property: Json = body?.properties?.[field.name] ?? {};
+        const schema: Json =
+          (typeof property.$ref === "string" ? schemas[property.$ref.slice(REF_PREFIX.length)] : property) ?? {};
+        const shorthand: unknown = schema["x-channelstack-shorthand"];
+        available.set(field.name, { ...field, in: "body", ...(typeof shorthand === "string" ? { shorthand } : {}) });
+      }
       const pathParams: IrPathParam[] = [];
       for (const parameter of (operation.parameters ?? []) as Json[]) {
         if (parameter.in === "query") {
@@ -211,7 +233,9 @@ export function buildIr(openapi: Json): Ir {
         } else if (parameter.name === "session") {
           pathParams.push({ name: "session", from: "session" });
         } else {
-          const field: string | undefined = binding.bind?.[parameter.name] ?? owner.idField;
+          // With one id field, the one path parameter left binds to it; with several, the route says which.
+          const [onlyId] = owner.idFields?.length === 1 ? owner.idFields : [];
+          const field: string | undefined = binding.bind?.[parameter.name] ?? onlyId;
           if (!field || !owner.fields.some((candidate) => candidate.name === field)) {
             throw new SpecError(where, `can't bind path parameter "${parameter.name}" to a field of ${owner.name}`);
           }
@@ -251,14 +275,15 @@ export function buildIr(openapi: Json): Ir {
     }
   }
 
-  // Only the data types a response or a handle's fields can reach are part of the SDK surface;
-  // request bodies are spelled out as each method's arguments and options instead.
+  // Only the data types a response, a handle's fields or an argument can reach are part of the SDK
+  // surface; request bodies themselves are spelled out as each method's arguments and options.
   const reachable = new Set<string>();
   const visit = (type: IrType | null): void => {
     if (!type) return;
     if (type.kind === "array") visit(type.items);
     else if (type.kind === "record") visit(type.values);
     else if (type.kind === "object") for (const field of type.fields) visit(field.type);
+    else if (type.kind === "union") for (const member of type.types) visit(member);
     else if (type.kind === "named" && !reachable.has(type.name)) {
       reachable.add(type.name);
       visit(types.find((candidate) => candidate.name === type.name)?.type ?? null);
@@ -266,7 +291,11 @@ export function buildIr(openapi: Json): Ir {
   };
   for (const resource of resources.values()) {
     for (const field of resource.fields) visit(field.type);
-    for (const method of resource.methods) visit(method.returns);
+    for (const method of resource.methods) {
+      visit(method.returns);
+      // A named type an argument takes (a message's input) is part of the surface too.
+      for (const param of [...method.args, ...method.options]) visit(param.type);
+    }
   }
 
   return {

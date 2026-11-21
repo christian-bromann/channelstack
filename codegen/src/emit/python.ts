@@ -9,6 +9,16 @@ export function emitPython(ir: Ir): Map<string, string> {
   const namedTypes = new Map(ir.types.map((type) => [type.name, type.type]));
   const isDataclass = (name: string) => namedTypes.get(name)?.kind === "object";
 
+  /** Named types that methods take as arguments: these also need a wire form. */
+  const inputTypes = new Set(
+    ir.resources
+      .flatMap((resource) => resource.methods)
+      .flatMap((m) => [...m.args, ...m.options])
+      .map((param) => param.type)
+      .filter((type) => type.kind === "named")
+      .map((type) => type.name),
+  );
+
   const typeOf = (type: IrType): string => {
     switch (type.kind) {
       case "string":
@@ -36,6 +46,8 @@ export function emitPython(ir: Ir): Map<string, string> {
         return type.name;
       case "ref":
         return type.resources.join(" | ");
+      case "union":
+        return type.types.map(typeOf).join(" | ");
     }
   };
 
@@ -50,6 +62,8 @@ export function emitPython(ir: Ir): Map<string, string> {
         return converts(type.items);
       case "record":
         return converts(type.values);
+      case "union":
+        return type.types.some(converts);
       default:
         return false;
     }
@@ -62,7 +76,7 @@ export function emitPython(ir: Ir): Map<string, string> {
         const resource = index.resource(type.name);
         const context =
           resource.scope === "session"
-            ? `HandleContext(ctx.transport, ${expr}[${JSON.stringify(resource.idField)}])`
+            ? `HandleContext(ctx.transport, ${expr}[${JSON.stringify(resource.idFields?.[0])}])`
             : "ctx";
         return `${type.name}(${context}, ${expr})`;
       }
@@ -74,6 +88,20 @@ export function emitPython(ir: Ir): Map<string, string> {
         return `[${decode(type.items, "item")} for item in ${expr}]`;
       case "record":
         return `{key: ${decode(type.values, "value")} for key, value in ${expr}.items()}`;
+      case "union": {
+        // Handle data in a union is told apart by its discriminator field, e.g. `kind: "user" | "app"`.
+        const members = index.discriminated(type);
+        if (!members)
+          throw new Error("A union that holds handles needs a discriminator every member declares as a literal");
+        const key = JSON.stringify(type.discriminator);
+        return members
+          .map(({ value, member }, position) =>
+            position === members.length - 1
+              ? decode(member, expr)
+              : `${decode(member, expr)} if ${expr}[${key}] == ${JSON.stringify(value)} else `,
+          )
+          .join("");
+      }
       default:
         throw new Error(`Can't decode a ${type.kind}`);
     }
@@ -88,20 +116,40 @@ export function emitPython(ir: Ir): Map<string, string> {
 
   const annotation = (field: IrField) => `${typeOf(field.type)}${field.optional ? " | None" : ""}`;
 
+  /** An expression that turns a value into what goes on the wire: handles become their ids. */
+  const encodeValue = (type: IrType, expr: string): string => {
+    if (type.kind === "ref") {
+      const idFields = index.refIdFields(type.resources);
+      const [only] = idFields;
+      return idFields.length === 1 && only !== undefined
+        ? `${expr}.${snakeCase(only)}`
+        : `{${idFields.map((id) => `${JSON.stringify(id)}: ${expr}.${snakeCase(id)}`).join(", ")}}`;
+    }
+    if (type.kind === "array" && type.items.kind === "ref")
+      return `[${encodeValue(type.items, "item")} for item in ${expr}]`;
+    // A named input type is a dataclass that knows its own wire form.
+    if (type.kind === "named" && isDataclass(type.name)) return `${expr}._to_wire()`;
+    return expr;
+  };
+
+  /** An argument or option as it goes on the wire. A string where an object is expected is its shorthand. */
   const encode = (param: IrParam): string => {
     const name = snakeCase(param.name);
-    const guard = (expr: string) => (param.optional ? `None if ${name} is None else ${expr}` : expr);
-    if (param.type.kind === "ref") return guard(`${name}.${snakeCase(index.refIdField(param.type.resources))}`);
-    if (param.type.kind === "array" && param.type.items.kind === "ref") {
-      return guard(`[item.${snakeCase(index.refIdField(param.type.items.resources))} for item in ${name}]`);
-    }
-    return name;
+    const encoded = encodeValue(param.type, name);
+    const value =
+      param.shorthand === undefined
+        ? encoded
+        : `{${JSON.stringify(param.shorthand)}: ${name}} if isinstance(${name}, str) else ${encoded}`;
+    return param.optional && value !== name ? `None if ${name} is None else ${value}` : value;
   };
+
+  const parameterType = (param: IrParam): string =>
+    `${param.shorthand === undefined ? "" : "str | "}${typeOf(param.type)}`;
 
   const method = (m: IrMethod): string[] => {
     const parameters = [
       "self",
-      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${typeOf(arg.type)}`),
+      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}`),
       ...(m.options.length > 0 ? ["*"] : []),
       ...m.options.map(
         (option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`,
@@ -186,6 +234,14 @@ export function emitPython(ir: Ir): Map<string, string> {
       "        return cls(",
       ...ordered.map((field) => `            ${snakeCase(field.name)}=${fieldDecode(field, "data")},`),
       "        )",
+      ...(inputTypes.has(name)
+        ? [
+            "",
+            "    def _to_wire(self) -> dict[str, Any]:",
+            `        wire = {${ordered.map((field) => `${JSON.stringify(field.name)}: self.${snakeCase(field.name)}`).join(", ")}}`,
+            "        return {key: value for key, value in wire.items() if value is not None}",
+          ]
+        : []),
     ];
   };
 

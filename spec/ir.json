@@ -100,7 +100,9 @@
     },
     {
       "name": "Session",
-      "idField": "sessionId",
+      "idFields": [
+        "sessionId"
+      ],
       "scope": "session",
       "fields": [
         {
@@ -206,6 +208,35 @@
           "returns": {
             "kind": "resource",
             "name": "EchoFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "slack",
+          "kind": "factory",
+          "summary": "The Slack fixture: the agent's app, the workspace, and where the agent reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackFixture"
           },
           "errors": [
             "unauthorized",
@@ -362,7 +393,9 @@
     },
     {
       "name": "EchoApp",
-      "idField": "id",
+      "idFields": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -391,7 +424,9 @@
     },
     {
       "name": "EchoUser",
-      "idField": "id",
+      "idFields": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -478,7 +513,9 @@
     },
     {
       "name": "EchoRoom",
-      "idField": "id",
+      "idFields": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -575,6 +612,1248 @@
           "returns": {
             "kind": "named",
             "name": "EchoTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "SlackApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "team",
+          "type": {
+            "kind": "named",
+            "name": "SlackTeam"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person in the workspace",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "id",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "displayName",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "realName",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "email",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "timezone",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "admin",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "owner",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "guest",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "bot",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createChannel",
+          "kind": "factory",
+          "summary": "Create a channel. Only the listed participants are members; include the app for it to receive events",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/channels",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "private",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "participants",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "SlackUser",
+                    "SlackApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "topic",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "purpose",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackConversation"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "name_taken"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackApp",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        },
+        {
+          "name": "botUserId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "botId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "botToken",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "appToken",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "signingSecret",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "scopes",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "SlackUser",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "displayName",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "realName",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "email",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "isAdmin",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "isBot",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "say",
+          "kind": "method",
+          "summary": "Post a top-level message in a conversation, or in a DM with the people in `to`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/say",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "named",
+                "name": "SlackMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "text"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "to",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "SlackUser",
+                    "SlackApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "no_text",
+            "msg_too_long"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "Reply in a thread: pass the message that starts it, or any reply in it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "named",
+                "name": "SlackMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "text"
+            }
+          ],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "alsoSendToChannel",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "no_text",
+            "msg_too_long"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "summary": "Edit one of this person's own messages",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/edit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "named",
+                "name": "SlackMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "text"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "cant_update_message",
+            "no_text"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "delete",
+          "kind": "method",
+          "summary": "Delete a message: this person's own, or anyone's for an admin",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/delete",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "cant_delete_message"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "react",
+          "kind": "method",
+          "summary": "Add an emoji reaction to a message",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/react",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackReactResult"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "already_reacted"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "unreact",
+          "kind": "method",
+          "summary": "Remove this person's emoji reaction from a message",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/unreact",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "SlackUnreactResult"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "no_reaction"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "openDM",
+          "kind": "method",
+          "summary": "Open (or reuse) a DM with the app, another person, or several",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/open-dm",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "participants",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "SlackUser",
+                    "SlackApp"
+                  ]
+                }
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackConversation"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "invite",
+          "kind": "method",
+          "summary": "Invite people or the app to a channel",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/invite",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "participants",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "SlackUser",
+                    "SlackApp"
+                  ]
+                }
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "already_in_channel"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "kick",
+          "kind": "method",
+          "summary": "Remove someone from a channel",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/kick",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "participant",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackUser",
+                  "SlackApp"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackConversation",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "channel",
+              "private_channel",
+              "im",
+              "mpim"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "Top-level messages of a conversation, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "members",
+          "kind": "method",
+          "summary": "The people and apps in a conversation",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/members",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackMembers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackMessage",
+      "idFields": [
+        "channel",
+        "ts"
+      ],
+      "fields": [
+        {
+          "name": "channel",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "ts",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "conversation",
+          "type": {
+            "kind": "resource",
+            "name": "SlackConversation"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "SlackUser"
+              },
+              {
+                "kind": "resource",
+                "name": "SlackApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "text",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "blocks",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "unknown"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "postedAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "threadTs",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "edited",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "visibleTo",
+          "type": {
+            "kind": "resource",
+            "name": "SlackUser"
+          },
+          "optional": true
+        },
+        {
+          "name": "deliveries",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a message: its latest text, edits and deliveries",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "Replies in the thread this message starts, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reactions",
+          "kind": "method",
+          "summary": "The reactions on a message, and who added each",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/reactions",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackReactions"
           },
           "errors": [
             "unauthorized",
@@ -932,12 +2211,217 @@
           }
         ]
       }
+    },
+    {
+      "name": "SlackTeam",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackMessageInput",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "blocks",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "unknown"
+              }
+            },
+            "optional": true
+          },
+          {
+            "name": "metadata",
+            "type": {
+              "kind": "named",
+              "name": "SlackMessageMetadata"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackMessageMetadata",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "event_type",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "event_payload",
+            "type": {
+              "kind": "record",
+              "values": {
+                "kind": "unknown"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackReactResult",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "delivery",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackUnreactResult",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "delivery",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackMessages",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackMessage"
+        }
+      }
+    },
+    {
+      "name": "SlackMembers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "union",
+          "types": [
+            {
+              "kind": "resource",
+              "name": "SlackUser"
+            },
+            {
+              "kind": "resource",
+              "name": "SlackApp"
+            }
+          ],
+          "discriminator": "kind"
+        }
+      }
+    },
+    {
+      "name": "SlackReplies",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackMessage"
+        }
+      }
+    },
+    {
+      "name": "SlackReactions",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "SlackReaction"
+        }
+      }
+    },
+    {
+      "name": "SlackReaction",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "emoji",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "by",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "resource",
+                    "name": "SlackUser"
+                  },
+                  {
+                    "kind": "resource",
+                    "name": "SlackApp"
+                  }
+                ],
+                "discriminator": "kind"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
     }
   ],
   "errors": [
+    "already_in_channel",
+    "already_reacted",
+    "cant_delete_message",
+    "cant_update_message",
     "internal",
     "invalid_argument",
+    "msg_too_long",
+    "name_taken",
+    "no_reaction",
+    "no_text",
     "not_found",
+    "not_in_channel",
     "not_in_room",
     "session_not_found",
     "unauthorized"

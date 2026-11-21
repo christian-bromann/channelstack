@@ -45,6 +45,8 @@ export class IrIndex {
         return this.holdsResources(type.values, seen);
       case "object":
         return type.fields.some((field) => this.holdsResources(field.type, seen));
+      case "union":
+        return type.types.some((member) => this.holdsResources(member, seen));
       case "named": {
         if (seen.has(type.name)) return false;
         seen.add(type.name);
@@ -55,14 +57,27 @@ export class IrIndex {
     }
   }
 
-  /** The id field shared by the resources a `ref` accepts: what gets sent in place of the handle. */
-  refIdField(resources: readonly string[]): string {
-    const fields = new Set(resources.map((name) => this.resource(name).idField));
-    const [field] = fields;
-    if (fields.size !== 1 || field === undefined) {
-      throw new Error(`A reference to ${resources.join(" | ")} needs resources that share one id field`);
+  /** The id fields shared by the resources a `ref` accepts: what gets sent in place of the handle. */
+  refIdFields(resources: readonly string[]): string[] {
+    const [first, ...rest] = resources.map((name) => this.resource(name).idFields ?? []);
+    if (first === undefined || first.length === 0 || rest.some((fields) => fields.join() !== first.join())) {
+      throw new Error(`A reference to ${resources.join(" | ")} needs resources that share the same id fields`);
     }
-    return field;
+    return first;
+  }
+
+  /** In a union of handles, the value of the discriminator field for each member: what tells their data apart. */
+  discriminated(type: Extract<IrType, { kind: "union" }>): Array<{ value: string; member: IrType }> | undefined {
+    const { discriminator } = type;
+    if (discriminator === undefined) return undefined;
+    const tagged = type.types.map((member) => {
+      const field =
+        member.kind === "resource"
+          ? this.resource(member.name).fields.find((candidate) => candidate.name === discriminator)
+          : undefined;
+      return field?.type.kind === "literal" ? { value: field.type.value, member } : undefined;
+    });
+    return tagged.every((entry) => entry !== undefined) ? tagged : undefined;
   }
 
   /** The method SDKs call when a handle is disposed, if the resource has one. */

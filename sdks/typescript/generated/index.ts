@@ -6,17 +6,35 @@ import { ChannelstackError, type ErrorClasses, segment, type Transport } from ".
 /** The server version this SDK was generated for. */
 export const VERSION = "0.0.0";
 
+export class AlreadyInChannelError extends ChannelstackError {}
+export class AlreadyReactedError extends ChannelstackError {}
+export class CantDeleteMessageError extends ChannelstackError {}
+export class CantUpdateMessageError extends ChannelstackError {}
 export class InternalError extends ChannelstackError {}
 export class InvalidArgumentError extends ChannelstackError {}
+export class MsgTooLongError extends ChannelstackError {}
+export class NameTakenError extends ChannelstackError {}
+export class NoReactionError extends ChannelstackError {}
+export class NoTextError extends ChannelstackError {}
 export class NotFoundError extends ChannelstackError {}
+export class NotInChannelError extends ChannelstackError {}
 export class NotInRoomError extends ChannelstackError {}
 export class SessionNotFoundError extends ChannelstackError {}
 export class UnauthorizedError extends ChannelstackError {}
 
 const ERRORS: ErrorClasses = {
+  already_in_channel: AlreadyInChannelError,
+  already_reacted: AlreadyReactedError,
+  cant_delete_message: CantDeleteMessageError,
+  cant_update_message: CantUpdateMessageError,
   internal: InternalError,
   invalid_argument: InvalidArgumentError,
+  msg_too_long: MsgTooLongError,
+  name_taken: NameTakenError,
+  no_reaction: NoReactionError,
+  no_text: NoTextError,
   not_found: NotFoundError,
+  not_in_channel: NotInChannelError,
   not_in_room: NotInRoomError,
   session_not_found: SessionNotFoundError,
   unauthorized: UnauthorizedError,
@@ -82,6 +100,76 @@ export interface Capability {
   fake: boolean;
   live: boolean;
   liveRequires: string[];
+}
+
+export interface SlackTeam {
+  id: string;
+  name: string;
+}
+
+export interface SlackMessageInput {
+  text?: string;
+  blocks?: unknown[];
+  metadata?: SlackMessageMetadata;
+}
+
+export interface SlackMessageMetadata {
+  event_type: string;
+  event_payload: Record<string, unknown>;
+}
+
+export interface SlackReactResult {
+  delivery?: string;
+}
+
+export interface SlackUnreactResult {
+  delivery?: string;
+}
+
+export type SlackMessages = SlackMessage[];
+
+export type SlackMessagesWire = SlackMessageData[];
+
+function decodeSlackMessages(ctx: HandleContext, data: SlackMessagesWire): SlackMessages {
+  return data.map((item) => new SlackMessage(ctx, item));
+}
+
+export type SlackMembers = Array<SlackUser | SlackApp>;
+
+export type SlackMembersWire = Array<SlackUserData | SlackAppData>;
+
+function decodeSlackMembers(ctx: HandleContext, data: SlackMembersWire): SlackMembers {
+  return data.map((item) => item.kind === "user" ? new SlackUser(ctx, item) : new SlackApp(ctx, item));
+}
+
+export type SlackReplies = SlackMessage[];
+
+export type SlackRepliesWire = SlackMessageData[];
+
+function decodeSlackReplies(ctx: HandleContext, data: SlackRepliesWire): SlackReplies {
+  return data.map((item) => new SlackMessage(ctx, item));
+}
+
+export type SlackReactions = SlackReaction[];
+
+export type SlackReactionsWire = SlackReactionWire[];
+
+function decodeSlackReactions(ctx: HandleContext, data: SlackReactionsWire): SlackReactions {
+  return data.map((item) => decodeSlackReaction(ctx, item));
+}
+
+export interface SlackReaction {
+  emoji: string;
+  by: Array<SlackUser | SlackApp>;
+}
+
+export interface SlackReactionWire {
+  emoji: string;
+  by: Array<SlackUserData | SlackAppData>;
+}
+
+function decodeSlackReaction(ctx: HandleContext, data: SlackReactionWire): SlackReaction {
+  return { ...data, by: data.by.map((item) => item.kind === "user" ? new SlackUser(ctx, item) : new SlackApp(ctx, item)) };
 }
 
 export class Channelstack extends ClientBase {
@@ -162,6 +250,13 @@ export class Session implements AsyncDisposable {
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/echo`)) as EchoFixtureData;
     return new EchoFixture(ctx, data);
   }
+
+  /** The Slack fixture: the agent's app, the workspace, and where the agent reaches the fake. Experimental. */
+  async slack(): Promise<SlackFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack`)) as SlackFixtureData;
+    return new SlackFixture(ctx, data);
+  }
 }
 
 /** Wire data of a {@link EchoFixture}. */
@@ -192,7 +287,7 @@ export class EchoFixture {
   /** Create a room. Only the listed participants are members; include the app for it to receive events. Experimental. */
   async createRoom(options: { name?: string; participants?: Array<EchoUser | EchoApp> } = {}): Promise<EchoRoom> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/echo/rooms`, { body: { name: options.name, participants: options.participants?.map((item) => item.id) } })) as EchoRoomData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/echo/rooms`, { body: { name: options.name, participants: options.participants === undefined ? undefined : options.participants.map((item) => item.id) } })) as EchoRoomData;
     return new EchoRoom(ctx, data);
   }
 
@@ -288,6 +383,285 @@ export class EchoRoom {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/echo/rooms/${segment(this.id)}/transcript`)) as EchoTranscript;
     return data;
+  }
+}
+
+/** Wire data of a {@link SlackFixture}. */
+export interface SlackFixtureData {
+  app: SlackAppData;
+  apiUrl: string;
+  team: SlackTeam;
+}
+
+export class SlackFixture {
+  readonly app: SlackApp;
+  readonly apiUrl: string;
+  readonly team: SlackTeam;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackFixtureData) {
+    this.#ctx = ctx;
+    this.app = new SlackApp(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+    this.team = data.team;
+  }
+
+  /** Create a person in the workspace. Experimental. */
+  async createUser(options: { name: string; id?: string; displayName?: string; realName?: string; email?: string; timezone?: string; admin?: boolean; owner?: boolean; guest?: boolean; bot?: boolean }): Promise<SlackUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users`, { body: { name: options.name, id: options.id, displayName: options.displayName, realName: options.realName, email: options.email, timezone: options.timezone, admin: options.admin, owner: options.owner, guest: options.guest, bot: options.bot } })) as SlackUserData;
+    return new SlackUser(ctx, data);
+  }
+
+  /** Create a channel. Only the listed participants are members; include the app for it to receive events. Experimental. */
+  async createChannel(options: { name?: string; private?: boolean; participants?: Array<SlackUser | SlackApp>; topic?: string; purpose?: string } = {}): Promise<SlackConversation> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/channels`, { body: { name: options.name, private: options.private, participants: options.participants === undefined ? undefined : options.participants.map((item) => item.id), topic: options.topic, purpose: options.purpose } })) as SlackConversationData;
+    return new SlackConversation(ctx, data);
+  }
+}
+
+/** Wire data of a {@link SlackApp}. */
+export interface SlackAppData {
+  id: string;
+  name: string;
+  kind: "app";
+  botUserId: string;
+  botId: string;
+  botToken: string;
+  appToken: string;
+  signingSecret: string;
+  scopes: string[];
+}
+
+export class SlackApp {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "app";
+  readonly botUserId: string;
+  readonly botId: string;
+  readonly botToken: string;
+  readonly appToken: string;
+  readonly signingSecret: string;
+  readonly scopes: string[];
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackAppData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.botUserId = data.botUserId;
+    this.botId = data.botId;
+    this.botToken = data.botToken;
+    this.appToken = data.appToken;
+    this.signingSecret = data.signingSecret;
+    this.scopes = data.scopes;
+  }
+}
+
+/** Wire data of a {@link SlackUser}. */
+export interface SlackUserData {
+  id: string;
+  name: string;
+  kind: "user";
+  displayName: string;
+  realName: string;
+  email?: string;
+  isAdmin: boolean;
+  isBot: boolean;
+}
+
+export class SlackUser {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "user";
+  readonly displayName: string;
+  readonly realName: string;
+  readonly email: string | undefined;
+  readonly isAdmin: boolean;
+  readonly isBot: boolean;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.displayName = data.displayName;
+    this.realName = data.realName;
+    this.email = data.email;
+    this.isAdmin = data.isAdmin;
+    this.isBot = data.isBot;
+  }
+
+  /** Post a top-level message in a conversation, or in a DM with the people in `to`. Experimental. */
+  async say(message: string | SlackMessageInput, options: { channel?: SlackConversation; to?: Array<SlackUser | SlackApp> } = {}): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : message, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : options.to.map((item) => item.id) } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Reply in a thread: pass the message that starts it, or any reply in it. Experimental. */
+  async reply(message: string | SlackMessageInput, options: { thread: SlackMessage; alsoSendToChannel?: boolean }): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : message, thread: { channel: options.thread.channel, ts: options.thread.ts }, alsoSendToChannel: options.alsoSendToChannel } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Edit one of this person's own messages. Experimental. */
+  async edit(text: string | SlackMessageInput, options: { message: SlackMessage }): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/edit`, { body: { text: typeof text === "string" ? { text: text } : text, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Delete a message: this person's own, or anyone's for an admin. Experimental. */
+  async delete(options: { message: SlackMessage }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/delete`, { body: { message: { channel: options.message.channel, ts: options.message.ts } } });
+  }
+
+  /** Add an emoji reaction to a message. Experimental. */
+  async react(emoji: string, options: { message: SlackMessage }): Promise<SlackReactResult> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/react`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackReactResult;
+    return data;
+  }
+
+  /** Remove this person's emoji reaction from a message. Experimental. */
+  async unreact(emoji: string, options: { message: SlackMessage }): Promise<SlackUnreactResult> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/unreact`, { body: { emoji, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackUnreactResult;
+    return data;
+  }
+
+  /** Open (or reuse) a DM with the app, another person, or several. Experimental. */
+  async openDM(participants: Array<SlackUser | SlackApp>): Promise<SlackConversation> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/open-dm`, { body: { participants: participants.map((item) => item.id) } })) as SlackConversationData;
+    return new SlackConversation(ctx, data);
+  }
+
+  /** Invite people or the app to a channel. Experimental. */
+  async invite(participants: Array<SlackUser | SlackApp>, options: { channel: SlackConversation }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/invite`, { body: { participants: participants.map((item) => item.id), channel: options.channel.id } });
+  }
+
+  /** Remove someone from a channel. Experimental. */
+  async kick(participant: SlackUser | SlackApp, options: { channel: SlackConversation }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/kick`, { body: { participant: participant.id, channel: options.channel.id } });
+  }
+}
+
+/** Wire data of a {@link SlackConversation}. */
+export interface SlackConversationData {
+  id: string;
+  kind: "channel" | "private_channel" | "im" | "mpim";
+  name?: string;
+}
+
+export class SlackConversation {
+  readonly id: string;
+  readonly kind: "channel" | "private_channel" | "im" | "mpim";
+  readonly name: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackConversationData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.kind = data.kind;
+    this.name = data.name;
+  }
+
+  /** Top-level messages of a conversation, oldest first. Experimental. */
+  async messages(): Promise<SlackMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/messages`)) as SlackMessagesWire;
+    return decodeSlackMessages(ctx, data);
+  }
+
+  /** The people and apps in a conversation. Experimental. */
+  async members(): Promise<SlackMembers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/members`)) as SlackMembersWire;
+    return decodeSlackMembers(ctx, data);
+  }
+}
+
+/** Wire data of a {@link SlackMessage}. */
+export interface SlackMessageData {
+  channel: string;
+  ts: string;
+  conversation: SlackConversationData;
+  author: SlackUserData | SlackAppData;
+  text: string;
+  blocks: unknown[];
+  postedAt: string;
+  threadTs?: string;
+  edited: boolean;
+  visibleTo?: SlackUserData;
+  deliveries: string[];
+  delivery?: string;
+}
+
+export class SlackMessage {
+  readonly channel: string;
+  readonly ts: string;
+  readonly conversation: SlackConversation;
+  readonly author: SlackUser | SlackApp;
+  readonly text: string;
+  readonly blocks: unknown[];
+  readonly postedAt: string;
+  readonly threadTs: string | undefined;
+  readonly edited: boolean;
+  readonly visibleTo: SlackUser | undefined;
+  readonly deliveries: string[];
+  readonly delivery: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackMessageData) {
+    this.#ctx = ctx;
+    this.channel = data.channel;
+    this.ts = data.ts;
+    this.conversation = new SlackConversation(ctx, data.conversation);
+    this.author = data.author.kind === "user" ? new SlackUser(ctx, data.author) : new SlackApp(ctx, data.author);
+    this.text = data.text;
+    this.blocks = data.blocks;
+    this.postedAt = data.postedAt;
+    this.threadTs = data.threadTs;
+    this.edited = data.edited;
+    this.visibleTo = data.visibleTo === undefined ? undefined : new SlackUser(ctx, data.visibleTo);
+    this.deliveries = data.deliveries;
+    this.delivery = data.delivery;
+  }
+
+  /** Re-read a message: its latest text, edits and deliveries. Experimental. */
+  async refresh(): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}`)) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
+  /** Replies in the thread this message starts, oldest first. Experimental. */
+  async replies(): Promise<SlackReplies> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/replies`)) as SlackRepliesWire;
+    return decodeSlackReplies(ctx, data);
+  }
+
+  /** The reactions on a message, and who added each. Experimental. */
+  async reactions(): Promise<SlackReactions> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/reactions`)) as SlackReactionsWire;
+    return decodeSlackReactions(ctx, data);
   }
 }
 
