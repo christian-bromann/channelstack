@@ -314,6 +314,42 @@ export function registerSlackRoutes(
   });
 
   router.route({
+    method: "get",
+    path: "/users",
+    summary: "The people this session created",
+    response: z.array(SlackUser).openapi("SlackUsers"),
+    sdkMethod: { on: "SlackFixture", name: "users" },
+    stability: "experimental",
+    handler: ({ session }) => world.users(session.id).map(userWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations",
+    summary: "The session's conversations, the one with the newest message last",
+    response: z.array(SlackConversation).openapi("SlackConversations"),
+    sdkMethod: { on: "SlackFixture", name: "conversations" },
+    stability: "experimental",
+    handler: ({ session }) => world.conversations(session.id).map(conversationWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/latest",
+    summary: "The newest message of a conversation, replies included",
+    params: ChannelParams,
+    response: SlackMessage,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackConversation", name: "latestMessage" },
+    stability: "experimental",
+    handler: ({ session, params }) => {
+      const latest = world.everything(session.id, params.channel).at(-1);
+      if (!latest) throw new ProtocolError("not_found", "The conversation has no messages yet");
+      return messageWire(session.id, latest);
+    },
+  });
+
+  router.route({
     method: "post",
     path: "/channels",
     summary: "Create a channel. Only the listed participants are members; include the app for it to receive events",

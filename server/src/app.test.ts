@@ -76,7 +76,11 @@ describe("control API", () => {
       "not_in_room",
     ]);
     expect(say["x-channelstack-stability"]).toBe("experimental");
-    expect(doc.paths["/sessions"].post["x-channelstack-factory"]).toEqual({ on: "Channelstack", name: "openSession" });
+    expect(doc.paths["/sessions"].post["x-channelstack-factory"]).toEqual({
+      on: "Channelstack",
+      name: "openSession",
+      options: ["name"],
+    });
     expect(doc.components.schemas.EchoUser["x-channelstack-resource"]).toEqual({ id: "id" });
     expect(doc.components.schemas.EchoSayBody.properties.room["x-channelstack-ref"]).toEqual(["EchoRoom"]);
     expect(doc.components.securitySchemes.bearer).toEqual({ type: "http", scheme: "bearer" });
@@ -287,5 +291,20 @@ describe("the echo pipeline", () => {
     expect(await forwarded.json()).toEqual({ ok: false, error: "unknown_method" });
     expect(h.app.hosts()).toEqual(["channelstack", "echo", "slack"]);
     expect((await h.app.fetch(new Request("http://127.0.0.1:4500/elsewhere"))).status).toBe(404);
+  });
+});
+
+describe("named sessions", () => {
+  test("a session opened by name is shared until it closes; unnamed ones are always new", async () => {
+    const h = harness();
+    const open = async (body?: unknown) => (await h.call("POST", "/sessions", body)).body.sessionId;
+    const dev = await open({ name: "dev" });
+    expect(await open({ name: "dev" })).toBe(dev);
+    expect(await open({ name: "other" })).not.toBe(dev);
+    expect(await open()).not.toBe(await open());
+
+    await h.call("DELETE", `/sessions/${dev}`);
+    expect(await open({ name: "dev" })).not.toBe(dev);
+    expect((await h.call("POST", "/sessions", { name: "Not A Name" })).body.error).toBe("invalid_argument");
   });
 });

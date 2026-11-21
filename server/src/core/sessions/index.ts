@@ -6,6 +6,8 @@ import type { IdGenerator } from "../ids/index.ts";
 export interface Session {
   readonly id: string;
   readonly openedAt: number;
+  /** A session opened by name is shared: whoever asks for the name gets the same one. */
+  readonly name?: string;
 }
 
 export class Sessions {
@@ -19,8 +21,18 @@ export class Sessions {
     this.#clock = clock;
   }
 
-  open(): Session {
-    const session: Session = { id: this.#ids.next("channelstack.session"), openedAt: this.#clock() };
+  /**
+   * Open a session. With a name, the open session of that name is returned if there is one: the
+   * CLI, the UI and MCP share a long-lived session called `dev` this way.
+   */
+  open(name?: string): Session {
+    const existing = name === undefined ? undefined : [...this.#open.values()].find((open) => open.name === name);
+    if (existing) return existing;
+    const session: Session = {
+      id: this.#ids.next("channelstack.session"),
+      openedAt: this.#clock(),
+      ...(name === undefined ? {} : { name }),
+    };
     this.#open.set(session.id, session);
     return session;
   }

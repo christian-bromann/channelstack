@@ -62,6 +62,32 @@ describe("the workspace", () => {
     expect((await post("/channels", { private: true })).kind).toBe("private_channel");
   });
 
+  test("a session lists its people and its conversations, the one with the newest message last", async () => {
+    const { user, post, get, app } = await workspace({ agent: false });
+    const ana = await user({ name: "Ana" });
+    const ben = await user({ name: "Ben" });
+    const support = await post("/channels", { name: "support", participants: [ana.id, ben.id, app.id] });
+    const random = await post("/channels", { name: "random", participants: [ana.id, ben.id] });
+    expect((await get("/users")).map((person: { name: string }) => person.name)).toEqual(["Ana", "Ben"]);
+    expect((await get(`/conversations/${support.id}/latest`)).error).toBe("not_found");
+
+    const question = await post(`/users/${ana.id}/say`, { message: { text: "first" }, channel: random.id });
+    await post(`/users/${ana.id}/say`, { message: { text: "second" }, channel: support.id });
+    await post(`/users/${ben.id}/reply`, {
+      message: { text: "a reply to the first" },
+      thread: { channel: question.channel, ts: question.ts },
+    });
+    // The reply made #random the most recent again, and it is that conversation's newest message.
+    expect((await get("/conversations")).map((conversation: { name: string }) => conversation.name)).toEqual([
+      "support",
+      "random",
+    ]);
+    expect(await get(`/conversations/${random.id}/latest`)).toMatchObject({
+      text: "a reply to the first",
+      threadTs: question.ts,
+    });
+  });
+
   test("decision 0006: names are unique per session, fixed ids are unique in the world", async () => {
     const { h, user, post } = await workspace({ agent: false });
     const other = await session(h);

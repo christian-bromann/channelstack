@@ -160,10 +160,19 @@ export function createApp(options: AppOptions): App {
     method: "post",
     path: "/sessions",
     summary: "Open a session: a scope in the shared world that owns what it creates",
+    body: z
+      .object({
+        name: z
+          .string()
+          .regex(/^[a-z][a-z0-9-]{0,31}$/)
+          .optional()
+          .openapi({ description: "Share the session: the open session of this name is returned if there is one." }),
+      })
+      .optional(),
     response: Session,
-    factory: { on: "Channelstack", name: "openSession" },
+    factory: { on: "Channelstack", name: "openSession", options: ["name"] },
     stability: "stable",
-    handler: () => ({ sessionId: sessions.open().id, drivers: driverNames }),
+    handler: ({ body }) => ({ sessionId: sessions.open(body?.name).id, drivers: driverNames }),
   });
 
   registerRoute(control, {

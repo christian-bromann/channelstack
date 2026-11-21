@@ -445,6 +445,12 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     },
 
     conversation: (session, id) => store.conversations.get(session, id),
+    conversations: (session) => {
+      const newest = (conversation: SlackConversationRecord) => store.messagesIn(conversation.id).at(-1)?.ts ?? "";
+      // `ts` values are fixed-width decimals, so they sort as text.
+      return store.conversationsOf(session).sort((a, b) => newest(a).localeCompare(newest(b)));
+    },
+    users: (session) => store.usersOf(session),
     message: (session, channel, ts) => requireMessage(store.conversations.get(session, channel), ts),
     messages: (session, channel) =>
       store

@@ -169,6 +169,10 @@ export interface SlackWorld {
   kick(session: string, user: string, participant: string, channel: string): void;
 
   conversation(session: string, id: string): SlackConversationRecord;
+  /** The session's conversations, the one with the newest message last. */
+  conversations(session: string): SlackConversationRecord[];
+  /** The people the session created, in creation order. */
+  users(session: string): SlackUserRecord[];
   message(session: string, channel: string, ts: string): SlackMessageRecord;
   /** Top-level messages of a conversation, oldest first. */
   messages(session: string, channel: string): SlackMessageRecord[];

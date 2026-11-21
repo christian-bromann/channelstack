@@ -117,6 +117,22 @@ export interface SlackTeam {
   name: string;
 }
 
+export type SlackUsers = SlackUser[];
+
+export type SlackUsersWire = SlackUserData[];
+
+function decodeSlackUsers(ctx: HandleContext, data: SlackUsersWire): SlackUsers {
+  return data.map((item) => new SlackUser(ctx, item));
+}
+
+export type SlackConversations = SlackConversation[];
+
+export type SlackConversationsWire = SlackConversationData[];
+
+function decodeSlackConversations(ctx: HandleContext, data: SlackConversationsWire): SlackConversations {
+  return data.map((item) => new SlackConversation(ctx, item));
+}
+
 export interface DeliveryAttempt {
   number: number;
   sentAt: string;
@@ -299,9 +315,9 @@ export class Channelstack extends ClientBase {
   }
 
   /** Open a session: a scope in the shared world that owns what it creates. */
-  async openSession(): Promise<Session> {
+  async openSession(options: { name?: string } = {}): Promise<Session> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions`)) as SessionData;
+    const data = (await ctx.transport.request("POST", `/sessions`, { body: { name: options.name } })) as SessionData;
     return new Session({ transport: ctx.transport, session: data.sessionId }, data);
   }
 
@@ -557,6 +573,20 @@ export class SlackFixture {
     return new SlackUser(ctx, data);
   }
 
+  /** The people this session created. Experimental. */
+  async users(): Promise<SlackUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users`)) as SlackUsersWire;
+    return decodeSlackUsers(ctx, data);
+  }
+
+  /** The session's conversations, the one with the newest message last. Experimental. */
+  async conversations(): Promise<SlackConversations> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations`)) as SlackConversationsWire;
+    return decodeSlackConversations(ctx, data);
+  }
+
   /** Create a channel. Only the listed participants are members; include the app for it to receive events. Experimental. */
   async createChannel(options: { name?: string; private?: boolean; participants?: Array<SlackUser | SlackApp>; topic?: string; purpose?: string } = {}): Promise<SlackConversation> {
     const ctx = this.#ctx;
@@ -777,6 +807,13 @@ export class SlackConversation {
     this.id = data.id;
     this.kind = data.kind;
     this.name = data.name;
+  }
+
+  /** The newest message of a conversation, replies included. Experimental. */
+  async latestMessage(): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.id)}/latest`)) as SlackMessageData;
+    return new SlackMessage(ctx, data);
   }
 
   /** Top-level messages of a conversation, oldest first. Experimental. */

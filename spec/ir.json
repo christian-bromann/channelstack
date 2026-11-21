@@ -41,7 +41,16 @@
             "pathParams": []
           },
           "args": [],
-          "options": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
           "returns": {
             "kind": "resource",
             "name": "Session"
@@ -782,6 +791,64 @@
           "returns": {
             "kind": "resource",
             "name": "SlackUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "users",
+          "kind": "method",
+          "summary": "The people this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackUsers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "conversations",
+          "kind": "method",
+          "summary": "The session's conversations, the one with the newest message last",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackConversations"
           },
           "errors": [
             "unauthorized",
@@ -1829,6 +1896,41 @@
         }
       ],
       "methods": [
+        {
+          "name": "latestMessage",
+          "kind": "method",
+          "summary": "The newest message of a conversation, replies included",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/latest",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
         {
           "name": "messages",
           "kind": "method",
@@ -3181,6 +3283,26 @@
             "optional": false
           }
         ]
+      }
+    },
+    {
+      "name": "SlackUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackUser"
+        }
+      }
+    },
+    {
+      "name": "SlackConversations",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackConversation"
+        }
       }
     },
     {

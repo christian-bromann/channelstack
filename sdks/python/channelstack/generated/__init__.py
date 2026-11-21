@@ -12,7 +12,7 @@ from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "Status", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "SlackUsers", "Status", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -278,6 +278,12 @@ class SlackTeam:
         )
 
 
+type SlackUsers = list[SlackUser]
+
+
+type SlackConversations = list[SlackConversation]
+
+
 @dataclass(frozen=True)
 class DeliveryAttempt:
     number: int
@@ -516,10 +522,10 @@ class Channelstack(ClientBase):
         data = await ctx.transport.request("GET", f"/status")
         return Status._from_wire(ctx, data)
 
-    async def open_session(self) -> Session:
+    async def open_session(self, *, name: str | None = None) -> Session:
         """Open a session: a scope in the shared world that owns what it creates."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions")
+        data = await ctx.transport.request("POST", f"/sessions", body={"name": name})
         return Session(HandleContext(ctx.transport, data["sessionId"]), data)
 
     async def reset(self) -> None:
@@ -657,6 +663,18 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users", body={"name": name, "id": id, "displayName": display_name, "realName": real_name, "email": email, "timezone": timezone, "admin": admin, "owner": owner, "guest": guest, "bot": bot})
         return SlackUser(ctx, data)
 
+    async def users(self) -> SlackUsers:
+        """The people this session created. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users")
+        return [SlackUser(ctx, item) for item in data]
+
+    async def conversations(self) -> SlackConversations:
+        """The session's conversations, the one with the newest message last. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations")
+        return [SlackConversation(ctx, item) for item in data]
+
     async def create_channel(self, *, name: str | None = None, private: bool | None = None, participants: list[SlackUser | SlackApp] | None = None, topic: str | None = None, purpose: str | None = None) -> SlackConversation:
         """Create a channel. Only the listed participants are members; include the app for it to receive events. Experimental."""
         ctx = self._ctx
@@ -783,6 +801,12 @@ class SlackConversation:
         self.id: str = data["id"]
         self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
         self.name: str | None = data.get("name")
+
+    async def latest_message(self) -> SlackMessage:
+        """The newest message of a conversation, replies included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/latest")
+        return SlackMessage(ctx, data)
 
     async def messages(self) -> SlackMessages:
         """Top-level messages of a conversation, oldest first. Experimental."""
