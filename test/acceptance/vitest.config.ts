@@ -21,5 +21,7 @@ export default defineConfig({
     root: fileURLToPath(new URL("../..", import.meta.url)),
     include: ["api/examples/slack.test.ts", "test/acceptance/stack/**/*.test.ts"],
     testTimeout: 30_000,
+    // Exit check 1.7 runs 20 tests at the same moment; Vitest's default is 5 at a time.
+    maxConcurrency: 20,
   },
 });
