@@ -1,6 +1,10 @@
 packages:
+  - api
   - server
   - codegen
   - sdks/typescript
-minimumReleaseAgeExclude:
-  - knip@6.47.0
+
+# esbuild arrives through the Vitest 3.2 types the api contract is checked against. Nothing runs it,
+# so its install script isn't needed.
+allowBuilds:
+  esbuild: false
