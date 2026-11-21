@@ -174,7 +174,7 @@ export function emitPython(ir: Ir): Map<string, string> {
   const method = (m: IrMethod): string[] => {
     const parameters = [
       "self",
-      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}`),
+      ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}${arg.optional ? " | None = None" : ""}`),
       ...(m.options.length > 0 ? ["*"] : []),
       ...m.options.map(
         (option) =>

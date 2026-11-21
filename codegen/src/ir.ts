@@ -310,9 +310,13 @@ export function buildIr(openapi: Json): Ir {
       const options = take(binding.options);
       if (available.size > 0)
         throw new SpecError(where, `doesn't expose ${[...available.keys()].join(", ")} as an argument or option`);
-      const query = args.find((arg) => arg.in === "query" || arg.optional);
+      // Positional arguments are body fields, and required ones. Only the last may be optional: `modal.submit(values?)`.
+      const query = args.find((arg, position) => arg.in === "query" || (arg.optional && position < args.length - 1));
       if (query)
-        throw new SpecError(where, `"${query.name}" must be an option: positional arguments are required body fields`);
+        throw new SpecError(
+          where,
+          `"${query.name}" must be an option: positional arguments are body fields, and only the last may be optional`,
+        );
 
       const responseSchema: Json | undefined = operation.responses?.["200"]?.content?.["application/json"]?.schema;
       for (const wait of (operation["x-channelstack-waits"] ?? []) as Json[]) {

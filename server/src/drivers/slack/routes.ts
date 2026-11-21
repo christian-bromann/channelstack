@@ -631,7 +631,7 @@ export function registerSlackRoutes(
       .openapi("SlackModalSubmitBody"),
     response: SlackDelivery,
     errors: ["not_found", "dispatch_failed"],
-    sdkMethod: { on: "SlackModal", name: "submit", args: [], options: ["values"] },
+    sdkMethod: { on: "SlackModal", name: "submit", args: ["values"] },
     stability,
     handler: ({ session, params, body }) =>
       interaction(session.id, world.submitModal(session.id, params.view, body.values ?? {})),

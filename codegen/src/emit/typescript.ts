@@ -139,7 +139,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const method = (resource: IrResource, m: IrMethod): string[] => {
     const optionsOptional = m.options.every((option) => option.optional);
     const parameters = [
-      ...m.args.map((arg) => `${arg.name}: ${parameterType(arg)}`),
+      ...m.args.map((arg) => `${arg.name}${arg.optional ? "?" : ""}: ${parameterType(arg)}`),
       ...(m.options.length > 0
         ? [
             `options: { ${m.options.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,

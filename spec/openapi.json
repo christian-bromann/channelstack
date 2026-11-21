@@ -3860,8 +3860,7 @@
         "x-channelstack-method": {
           "on": "SlackModal",
           "name": "submit",
-          "args": [],
-          "options": [
+          "args": [
             "values"
           ]
         },

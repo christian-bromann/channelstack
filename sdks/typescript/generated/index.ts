@@ -1219,9 +1219,9 @@ export class SlackModal {
   }
 
   /** Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental. */
-  async submit(options: { values?: Record<string, string | string[]> } = {}): Promise<SlackDelivery> {
+  async submit(values?: Record<string, string | string[]>): Promise<SlackDelivery> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/submit`, { body: { values: options.values } })) as SlackDeliveryData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/modals/${segment(this.viewId)}/submit`, { body: { values } })) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 

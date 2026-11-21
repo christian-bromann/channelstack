@@ -3376,8 +3376,7 @@
               }
             ]
           },
-          "args": [],
-          "options": [
+          "args": [
             {
               "name": "values",
               "type": {
@@ -3401,6 +3400,7 @@
               "in": "body"
             }
           ],
+          "options": [],
           "returns": {
             "kind": "resource",
             "name": "SlackDelivery"

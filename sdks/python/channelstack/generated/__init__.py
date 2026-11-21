@@ -1072,7 +1072,7 @@ class SlackModal:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/modals/{quote(self.view_id, safe='')}/values")
         return data
 
-    async def submit(self, *, values: dict[str, str | list[str]] | None = None) -> SlackDelivery:
+    async def submit(self, values: dict[str, str | list[str]] | None = None) -> SlackDelivery:
         """Fill in inputs, by label or `block_id.action_id`, and submit the modal. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/modals/{quote(self.view_id, safe='')}/submit", body={"values": values})
