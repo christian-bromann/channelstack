@@ -16,7 +16,7 @@ env:
   # The phase being built. `verify:phase` runs the gates of phase 0..n, so a later phase can't break an earlier one.
   PHASE: 0
   NODE_VERSION: 24.12.0
-  BUN_VERSION: 1.4.2
+  BUN_VERSION: 1.4.5
   UV_VERSION: 0.13.1
 
 jobs:

@@ -42,7 +42,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | Check | Command | Passes when |
 |---|---|---|
 | Types | `pnpm typecheck` | No errors in `server/`, `codegen/`, `integrations/`, `sdks/typescript/`, `sdks/python/`, `scenarios/`, `scripts/` and `api/` (the examples against `api/*.d.ts`, with the Vitest and Jest versions the contract names) |
-| Lint and format | `pnpm lint` | No errors (Biome for TypeScript, ruff for Python) |
+| Lint and format | `pnpm lint` | No errors (`bun fmt --check` and lint rules for TypeScript, ruff for Python) |
 | Unit tests | `pnpm test` | Green |
 | Spec is current | `pnpm spec:check` | Regenerating `spec/openapi.json` and `spec/ir.json` from the routes gives no diff |
 | SDKs are current | `pnpm sdk:check` | Regenerating every SDK gives no diff |

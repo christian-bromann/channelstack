@@ -19,7 +19,7 @@ Standing checks, all wired into `pnpm verify:phase 0` (`scripts/verify-phase.ts`
 | Check | How |
 |---|---|
 | `pnpm typecheck` | `tsc --noEmit` over `server/`, `codegen/`, `sdks/typescript/`, `scenarios/`, `scripts/`; `api/` with its own tsconfigs (examples against `api/*.d.ts`, with the Vitest and Jest versions the contract names, until phase 1 turns on `api:check`); pyright over `sdks/python/` and the Python runner |
-| `pnpm lint` | Biome (lint and format) for TypeScript; ruff for Python |
+| `pnpm lint` | `bun fmt --check` (formatting) and Biome (lint rules only, until `bun lint` is in a stable Bun) for TypeScript; ruff for Python. See decision 0005 |
 | `pnpm test` | Vitest unit tests |
 | `pnpm spec:check`, `pnpm sdk:check` | Regenerate in memory from the routes and compare with the committed files |
 | `pnpm test:redaction` | `server/test/integration/redaction.test.ts`: drives the binary with known fake secrets and live-shaped tokens, then searches logs, error bodies and the event log. Recordings and the UI don't exist yet; they join this check in the phases that build them |
@@ -61,6 +61,7 @@ Recorded in `docs/decisions/`:
 - `0002-smoke-scenario-format.md`: the YAML step format for `scenarios/smoke/`, which no spec document defines.
 - `0003-echo-driver.md`: the `echo` driver ships in the binary and the generated SDKs as an experimental, internal surface; it is not part of `api/*.d.ts`.
 - `0004-state-directory.md`: `CHANNELSTACK_HOME`, and how a private server (`mode: "start"`) avoids overwriting the shared `server.json`.
+- `0005-formatter-and-linter.md`: Bun's built-in formatter now, its linter once it is stable.
 
 ## New dependencies
 
@@ -80,7 +81,8 @@ Development only:
 |---|---|---|---|
 | `typescript` | 6.0.3 | Type checks and the SDK build. 6.x because dependency-cruiser 18 can't read TypeScript 7.0's API | Apache-2.0 |
 | `vitest` | 5.1.1 | Unit and integration tests | MIT |
-| `@biomejs/biome` | 2.6.8 | Lint and format | MIT OR Apache-2.0 |
+| `bun` | 1.4.5 | Pins the Bun that compiles the binary and runs `bun fmt`, so every machine and CI use the same one | MIT |
+| `@biomejs/biome` | 2.6.8 | Lint rules only; formatting is `bun fmt`. Removed once `bun lint` is in a stable Bun (decision 0005) | MIT OR Apache-2.0 |
 | `jscpd` | 5.4.3 | `check:dupes` (named in phases.md) | MIT |
 | `dependency-cruiser` | 18.8.0 | `check:deps` (named in phases.md) | MIT |
 | `knip` | 6.45.1 | `check:unused` (named in phases.md) | ISC |
