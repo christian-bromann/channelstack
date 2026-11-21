@@ -41,6 +41,8 @@ export interface IrWait {
   item: IrType;
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
+  /** The wait's first argument is the read's own options, passed through to it. */
+  filter?: true;
   /** What is waited for, for the timeout message. */
   what: string;
 }
@@ -49,6 +51,8 @@ export interface IrWait {
 interface IrNamedType {
   name: string;
   type: IrType;
+  /** The field that is this value as text: what `toString()` (or `__str__`) returns. */
+  stringField?: string;
 }
 
 export interface IrField {
@@ -63,7 +67,8 @@ export type IrType =
   | { kind: "duration" }
   | { kind: "literal"; value: string }
   | { kind: "enum"; values: string[] }
-  | { kind: "array"; items: IrType }
+  /** `oneOrMany`: as an argument, a single item is accepted in place of a list of one. */
+  | { kind: "array"; items: IrType; oneOrMany?: true }
   | { kind: "record"; values: IrType }
   | { kind: "object"; fields: IrField[] }
   /** A named data type from `types`. */
@@ -166,7 +171,11 @@ export function buildIr(openapi: Json): Ir {
       case "boolean":
         return { kind: schema.type };
       case "array":
-        return { kind: "array", items: typeOf(schema.items ?? {}, `${where}[]`) };
+        return {
+          kind: "array",
+          items: typeOf(schema.items ?? {}, `${where}[]`),
+          ...(schema["x-channelstack-one-or-many"] === true ? { oneOrMany: true as const } : {}),
+        };
       case "object": {
         if (schema.properties) return { kind: "object", fields: fieldsOf(schema, where) };
         const values = schema.additionalProperties;
@@ -196,7 +205,8 @@ export function buildIr(openapi: Json): Ir {
   for (const [name, schema] of Object.entries<Json>(schemas)) {
     const marker: Json | undefined = schema["x-channelstack-resource"];
     if (!marker) {
-      types.push({ name, type: typeOf(schema, name) });
+      const stringField: unknown = schema["x-channelstack-string"];
+      types.push({ name, type: typeOf(schema, name), ...(typeof stringField === "string" ? { stringField } : {}) });
       continue;
     }
     const fields = fieldsOf(schema, name);
@@ -297,6 +307,7 @@ export function buildIr(openapi: Json): Ir {
             read: binding.name,
             item,
             ...(wait.from ? { from: wait.from } : {}),
+            ...(wait.filter ? { filter: true as const } : {}),
             what: wait.what,
           },
         ];

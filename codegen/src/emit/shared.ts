@@ -20,8 +20,10 @@ export class IrIndex {
   readonly ir: Ir;
   readonly #resources: Map<string, IrResource>;
   readonly #types: Map<string, IrType>;
+  readonly #printable: Set<string>;
 
   constructor(ir: Ir) {
+    this.#printable = new Set(ir.types.filter((type) => type.stringField !== undefined).map((type) => type.name));
     this.ir = ir;
     this.#resources = new Map(ir.resources.map((resource) => [resource.name, resource]));
     this.#types = new Map(ir.types.map((type) => [type.name, type.type]));
@@ -33,7 +35,10 @@ export class IrIndex {
     return resource;
   }
 
-  /** Does a response of this type carry handle data that has to be wrapped into handles again? */
+  /**
+   * Does wire data of this type have to be converted before SDK users see it: handle data wrapped
+   * into handles again, or a value that prints as text?
+   */
   holdsResources(type: IrType | null, seen = new Set<string>()): boolean {
     if (!type) return false;
     switch (type.kind) {
@@ -48,6 +53,7 @@ export class IrIndex {
       case "union":
         return type.types.some((member) => this.holdsResources(member, seen));
       case "named": {
+        if (this.#printable.has(type.name)) return true;
         if (seen.has(type.name)) return false;
         seen.add(type.name);
         return this.holdsResources(this.#types.get(type.name) ?? null, seen);

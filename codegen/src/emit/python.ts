@@ -51,7 +51,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       case "enum":
         return `Literal[${type.values.map((value) => JSON.stringify(value)).join(", ")}]`;
       case "array":
-        return `list[${typeOf(type.items)}]`;
+        return type.oneOrMany ? `${typeOf(type.items)} | list[${typeOf(type.items)}]` : `list[${typeOf(type.items)}]`;
       case "record":
         return `dict[str, ${typeOf(type.values)}]`;
       case "object":
@@ -141,8 +141,11 @@ export function emitPython(ir: Ir): Map<string, string> {
         : `{${idFields.map((id) => `${JSON.stringify(id)}: ${expr}.${snakeCase(id)}`).join(", ")}}`;
     }
     if (type.kind === "duration") return `parse_duration(${expr})`;
-    if (type.kind === "array" && type.items.kind === "ref")
-      return `[${encodeValue(type.items, "item")} for item in ${expr}]`;
+    if (type.kind === "array" && (type.items.kind === "ref" || type.oneOrMany)) {
+      const list = type.oneOrMany ? `(${expr} if isinstance(${expr}, list) else [${expr}])` : expr;
+      const item = encodeValue(type.items, "item");
+      return item === "item" ? list : `[${item} for item in ${list}]`;
+    }
     // A named input type is a dataclass that knows its own wire form.
     if (type.kind === "named" && isDataclass(type.name)) return `${expr}._to_wire()`;
     return expr;
@@ -197,13 +200,19 @@ export function emitPython(ir: Ir): Map<string, string> {
   };
 
   /** `thread.wait_for_reply()`, `thread.latest_reply()`: waits generated from a list read. */
-  const wait = (w: IrWait): string[] => {
+  const wait = (resource: IrResource, w: IrWait): string[] => {
+    // With `filter`, the read's own options are keyword arguments of the wait and passed through to it.
+    const read = resource.methods.find((m) => m.name === w.read);
+    const filters = w.filter && read ? read.options : [];
+    const passed = filters.map((option) => `${snakeCase(option.name)}=${snakeCase(option.name)}`).join(", ");
+    const reader = filters.length > 0 ? `lambda: self.${snakeCase(w.read)}(${passed})` : `self.${snakeCase(w.read)}`;
     const fromField =
       w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
     const from = fromField ? [`from_: ${typeOf(fromField.type)} | str | None = None`] : [];
     const parameters = [
       "self",
       "*",
+      ...filters.map((option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`),
       ...from,
       'timeout: Duration = "10s"',
       ...(w.mode === "latest" ? ['quiet_for: Duration = "750ms"'] : []),
@@ -220,8 +229,8 @@ export function emitPython(ir: Ir): Map<string, string> {
         ? `        """Wait for the next new ${noun}${fromField ? " matching `from_` (anyone if omitted)" : ""}, after the last one this handle saw."""`
         : `        """The latest ${noun}${fromField ? " matching `from_`" : ""}, once the agent is quiet. Waits for at least one."""`,
       w.mode === "next"
-        ? `        return await wait_for_next(self._seen, ${JSON.stringify(w.name)}, self.${snakeCase(w.read)}, ${matches}, ${what}, timeout=timeout)`
-        : `        return await latest_once_quiet(self.${snakeCase(w.read)}, ${matches}, lambda: quiet_of(self._ctx), ${what}, timeout=timeout, quiet_for=quiet_for)`,
+        ? `        return await wait_for_next(self._seen, ${JSON.stringify(w.name)}, ${reader}, ${matches}, ${what}, timeout=timeout)`
+        : `        return await latest_once_quiet(${reader}, ${matches}, lambda: quiet_of(self._ctx), ${what}, timeout=timeout, quiet_for=quiet_for)`,
     ];
   };
 
@@ -251,7 +260,7 @@ export function emitPython(ir: Ir): Map<string, string> {
             ),
           ]),
       ...resource.methods.flatMap(method),
-      ...waits.flatMap(wait),
+      ...waits.flatMap((w) => wait(resource, w)),
       ...(disposer
         ? [
             "",
@@ -265,7 +274,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     ];
   };
 
-  const dataType = ({ name, type }: Ir["types"][number]): string[] => {
+  const dataType = ({ name, type, stringField }: Ir["types"][number]): string[] => {
     // A `type` statement is evaluated lazily, so an alias can name a class declared after it.
     if (type.kind !== "object") return ["", "", `type ${name} = ${typeOf(type)}`];
     // Dataclass fields without a default must come first.
@@ -285,6 +294,9 @@ export function emitPython(ir: Ir): Map<string, string> {
       "        return cls(",
       ...ordered.map((field) => `            ${snakeCase(field.name)}=${fieldDecode(field, "data")},`),
       "        )",
+      ...(stringField === undefined
+        ? []
+        : ["", "    def __str__(self) -> str:", `        return self.${snakeCase(stringField)}`]),
       ...(inputTypes.has(name)
         ? [
             "",

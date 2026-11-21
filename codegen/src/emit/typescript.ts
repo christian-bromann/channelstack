@@ -25,7 +25,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return type.values.map((value) => JSON.stringify(value)).join(" | ");
       case "array": {
         const items = typeOf(type.items, side);
-        return items.includes(" ") ? `Array<${items}>` : `${items}[]`;
+        const list = items.includes(" ") ? `Array<${items}>` : `${items}[]`;
+        return type.oneOrMany && side === "public" ? `${items} | ${list}` : list;
       }
       case "record":
         return `Record<string, ${typeOf(type.values, side)}>`;
@@ -91,6 +92,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const holdsRefs = (type: IrType): boolean =>
     type.kind === "ref" ||
     type.kind === "duration" ||
+    (type.kind === "array" && type.oneOrMany === true) ||
     (type.kind === "array" && holdsRefs(type.items)) ||
     (type.kind === "object" && type.fields.some((field) => holdsRefs(field.type)));
 
@@ -102,7 +104,11 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
     }
     if (type.kind === "duration") return `parseDuration(${expr})`;
-    if (type.kind === "array") return `${expr}.map((item) => ${encodeValue(type.items, "item")})`;
+    if (type.kind === "array") {
+      const list = type.oneOrMany ? `[${expr}].flat()` : expr;
+      const item = encodeValue(type.items, "item");
+      return item === "item" ? list : `${list}.map((item) => ${item})`;
+    }
     if (type.kind === "object") {
       const converted = type.fields
         .filter((field) => holdsRefs(field.type))
@@ -175,7 +181,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   };
 
   /** `thread.waitForReply()`, `thread.latestReply()`: waits generated from a list read. */
-  const wait = (w: IrWait): string[] => {
+  const wait = (resource: IrResource, w: IrWait): string[] => {
     const item = typeOf(w.item, "public");
     const fromField =
       w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
@@ -183,15 +189,20 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const options = `${from ? `{ ${from} } & ` : ""}${w.mode === "next" ? "WaitOptions" : "QuietOptions"}`;
     const matches = from ? `(item) => fromMatches(item.${w.from}, options.from)` : "() => true";
     const what = from ? `describeWait(${JSON.stringify(w.what)}, options.from)` : JSON.stringify(w.what);
+    // With `filter`, the read's own options come first and are passed through to it.
+    const read = resource.methods.find((m) => m.name === w.read);
+    const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }, ` : "";
+    const call = `() => this.${w.read}(${filter === "" ? "" : "filter"})`;
+    const noun = w.what.replace(/^an? /, "");
     return [
       "",
       w.mode === "next"
-        ? `  /** Wait for the next new ${w.what.replace(/^an? /, "")}${from ? " matching `from` (anyone if omitted)" : ""}, after the last one this handle saw. */`
-        : `  /** The latest ${w.what.replace(/^an? /, "")}${from ? " matching `from`" : ""}, once the agent is quiet. Waits for at least one. */`,
-      `  async ${w.name}(options: ${options} = {}): Promise<${item}> {`,
+        ? `  /** Wait for the next new ${noun}${from ? " matching `from` (anyone if omitted)" : ""}, after the last one this handle saw. */`
+        : `  /** The latest ${noun}${from ? " matching `from`" : ""}, once the agent is quiet. Waits for at least one. */`,
+      `  async ${w.name}(${filter}options: ${options} = {}): Promise<${item}> {`,
       w.mode === "next"
-        ? `    return waitForNext(this.#seen, ${JSON.stringify(w.name)}, () => this.${w.read}(), ${matches}, ${what}, options);`
-        : `    return latestOnceQuiet(() => this.${w.read}(), ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
+        ? `    return waitForNext(this.#seen, ${JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options);`
+        : `    return latestOnceQuiet(${call}, ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
       "  }",
     ];
   };
@@ -201,7 +212,22 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const disposable = !isRoot && index.disposer(resource) !== undefined;
     const waits = resource.waits ?? [];
     const seen = waits.some((w) => w.mode === "next") ? ["  readonly #seen = new Map<string, number>();"] : [];
-    const tail = [...resource.methods.flatMap((m) => method(resource, m)), ...waits.flatMap(wait), "}", ""];
+    const quiet = isRoot
+      ? []
+      : [
+          "",
+          "  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */",
+          "  [QUIET](): Promise<QuietState> {",
+          "    return quietOf(this.#ctx);",
+          "  }",
+        ];
+    const tail = [
+      ...resource.methods.flatMap((m) => method(resource, m)),
+      ...waits.flatMap((w) => wait(resource, w)),
+      ...quiet,
+      "}",
+      "",
+    ];
     return [
       ...(isRoot
         ? []
@@ -243,17 +269,27 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       ...tail,
     ];
   };
-  const dataType = ({ name, type }: Ir["types"][number]): string[] => {
+  const dataType = ({ name, type, stringField }: Ir["types"][number]): string[] => {
+    // A value with a text form prints as that text: `transcript.toString()`.
+    const printable = stringField !== undefined && type.kind === "object";
     const declare = (suffix: string, side: "public" | "wire") =>
       type.kind === "object"
-        ? [`export interface ${name}${suffix} {`, ...fields(type.fields, side).map((f) => `  ${f};`), "}", ""]
+        ? [
+            `export interface ${name}${suffix} {`,
+            ...fields(type.fields, side).map((f) => `  ${f};`),
+            ...(printable && side === "public" ? ["  toString(): string;"] : []),
+            "}",
+            "",
+          ]
         : [`export type ${name}${suffix} = ${typeOf(type, side)};`, ""];
-    if (!index.holdsResources(type)) return declare("", "public");
+    if (!printable && !index.holdsResources(type)) return declare("", "public");
+    const fieldsToConvert = type.kind === "object" && type.fields.some((field) => index.holdsResources(field.type));
+    const decoded = type.kind !== "object" || fieldsToConvert ? decode(type, "data") : "{ ...data }";
     return [
       ...declare("", "public"),
       ...declare("Wire", "wire"),
-      `function decode${name}(ctx: HandleContext, data: ${name}Wire): ${name} {`,
-      `  return ${decode(type, "data")};`,
+      `function decode${name}(${fieldsToConvert || type.kind !== "object" ? "ctx" : "_ctx"}: HandleContext, data: ${name}Wire): ${name} {`,
+      printable ? `  return printsAs(${decoded}, data.${stringField});` : `  return ${decoded};`,
       "}",
       "",
     ];
@@ -272,11 +308,11 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   );
   const lines = [
     `// ${BANNER}`,
-    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${allWaits.some((w) => w.mode === "latest") ? ", quietOf" : ""}${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
-    ...(waitImports.length > 0 ? [`import { ${waitImports.join(", ")} } from "../runtime/wait.ts";`] : []),
+    `import { ${[...waitImports, "type QuietState"].join(", ")} } from "../runtime/wait.ts";`,
     "",
     "/** The server version this SDK was generated for. */",
     `export const VERSION = ${JSON.stringify(ir.version)};`,

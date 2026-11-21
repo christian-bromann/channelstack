@@ -419,12 +419,17 @@ class SlackThreadStatus:
 @dataclass(frozen=True)
 class SlackTranscript:
     entries: list[SlackTranscriptEntry]
+    text: str
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackTranscript:
         return cls(
             entries=[SlackTranscriptEntry._from_wire(ctx, item) for item in data["entries"]],
+            text=data["text"],
         )
+
+    def __str__(self) -> str:
+        return self.text
 
 
 @dataclass(frozen=True)
@@ -656,6 +661,7 @@ class EchoRoom:
 class SlackFixture:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
+        self._seen: dict[str, int] = {}
         self.app: SlackApp = SlackApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
         self.team: SlackTeam = SlackTeam._from_wire(ctx, data["team"])
@@ -696,6 +702,10 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "error": error, "times": times})
         return SlackFault(ctx, data)
 
+    async def wait_for_call(self, *, operation: str | None = None, error: str | None = None, timeout: Duration = "10s") -> SlackApiCall:
+        """Wait for the next new API call from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForCall", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
+
 
 class SlackApp:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
@@ -723,10 +733,10 @@ class SlackUser:
         self.is_admin: bool = data["isAdmin"]
         self.is_bot: bool = data["isBot"]
 
-    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: list[SlackUser | SlackApp] | None = None) -> SlackMessage:
+    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: SlackUser | SlackApp | list[SlackUser | SlackApp] | None = None) -> SlackMessage:
         """Post a top-level message in a conversation, or in a DM with the people in `to`. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in to]})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
         return SlackMessage(ctx, data)
 
     async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage, also_send_to_channel: bool | None = None) -> SlackMessage:
@@ -758,16 +768,16 @@ class SlackUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/unreact", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
         return SlackUnreactResult._from_wire(ctx, data)
 
-    async def open_d_m(self, participants: list[SlackUser | SlackApp]) -> SlackConversation:
+    async def open_d_m(self, participants: SlackUser | SlackApp | list[SlackUser | SlackApp]) -> SlackConversation:
         """Open (or reuse) a DM with the app, another person, or several. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/open-dm", body={"participants": [item.id for item in participants]})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/open-dm", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])]})
         return SlackConversation(ctx, data)
 
-    async def invite(self, participants: list[SlackUser | SlackApp], *, channel: SlackConversation) -> None:
+    async def invite(self, participants: SlackUser | SlackApp | list[SlackUser | SlackApp], *, channel: SlackConversation) -> None:
         """Invite people or the app to a channel. Experimental."""
         ctx = self._ctx
-        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/invite", body={"participants": [item.id for item in participants], "channel": channel.id})
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/invite", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])], "channel": channel.id})
 
     async def kick(self, participant: SlackUser | SlackApp, *, channel: SlackConversation) -> None:
         """Remove someone from a channel. Experimental."""

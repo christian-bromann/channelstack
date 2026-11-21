@@ -20,8 +20,18 @@
   ],
   "exports": {
     "./client": {
-      "types": "./dist/client.d.ts",
-      "default": "./dist/client.js"
+      "types": "./dist/sdks/typescript/client.d.ts",
+      "default": "./dist/sdks/typescript/client.js"
+    },
+    "./vitest": {
+      "types": "./dist/integrations/vitest/index.d.ts",
+      "default": "./dist/integrations/vitest/index.js"
+    },
+    "./vitest/setup": {
+      "default": "./dist/integrations/vitest/setup.js"
+    },
+    "./vitest/global-setup": {
+      "default": "./dist/integrations/vitest/global-setup.js"
     },
     "./package.json": "./package.json"
   },
@@ -34,5 +44,13 @@
     "@channelstack/server-linux-arm64": "0.0.0",
     "@channelstack/server-linux-x64": "0.0.0",
     "@channelstack/server-win32-x64": "0.0.0"
+  },
+  "peerDependencies": {
+    "vitest": ">=5.0.0 <6"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   }
 }

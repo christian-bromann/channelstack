@@ -14,6 +14,24 @@ export function sessionOf(context: HandleContext): string {
   return context.session;
 }
 
+/**
+ * Every handle that lives in a session answers this: is the agent quiet there? Matchers use it for
+ * negative and exact-count checks, whatever handle they are given.
+ */
+export const QUIET: unique symbol = Symbol.for("channelstack.quiet");
+
+/** Anything a matcher can ask about quiet: any generated handle in a session. */
+export interface InSession {
+  [QUIET](): Promise<QuietState>;
+}
+
+/** Give a value its text form: `String(value)` and `value.toString()` return `text`, and the value keeps its fields. */
+export function printsAs<T extends object>(value: T, text: string): T & { toString(): string } {
+  return Object.defineProperty(value, "toString", { value: () => text, enumerable: false }) as T & {
+    toString(): string;
+  };
+}
+
 /** Ask the server whether the agent is quiet in the session a handle lives in. */
 export async function quietOf(context: HandleContext): Promise<QuietState> {
   return (await context.transport.request("GET", `/sessions/${segment(sessionOf(context))}/quiet`)) as QuietState;

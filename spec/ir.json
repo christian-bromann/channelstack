@@ -1058,6 +1058,19 @@
           ],
           "dispose": false
         }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "named",
+            "name": "SlackApiCall"
+          },
+          "filter": true,
+          "what": "an API call from the agent"
+        }
       ]
     },
     {
@@ -1255,7 +1268,8 @@
                     "SlackUser",
                     "SlackApp"
                   ]
-                }
+                },
+                "oneOrMany": true
               },
               "optional": true,
               "in": "body"
@@ -1601,7 +1615,8 @@
                     "SlackUser",
                     "SlackApp"
                   ]
-                }
+                },
+                "oneOrMany": true
               },
               "optional": false,
               "in": "body"
@@ -1652,7 +1667,8 @@
                     "SlackUser",
                     "SlackApp"
                   ]
-                }
+                },
+                "oneOrMany": true
               },
               "optional": false,
               "in": "body"
@@ -3406,9 +3422,17 @@
               }
             },
             "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
           }
         ]
-      }
+      },
+      "stringField": "text"
     },
     {
       "name": "SlackTranscriptEntry",
