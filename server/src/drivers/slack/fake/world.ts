@@ -4,7 +4,7 @@ import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signSlackRequest } from "../../../core/signing/slack.ts";
-import { mentionedUsers, resolveMentions } from "../mentions.ts";
+import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
   appMentionEvent,
   eventCallback,
@@ -55,6 +55,7 @@ export interface FakeSlackWorld extends SlackWorld {
       threadTs?: string | undefined;
       ephemeralFor?: string | undefined;
       files?: readonly SlackFileRecord[] | undefined;
+      broadcast?: boolean | undefined;
     },
   ): SlackMessageRecord;
   /**
@@ -432,7 +433,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     },
 
     react(conversation, message, userId, emoji, direction) {
-      const name = emoji.replace(/^:|:$/g, "");
+      const name = emojiName(emoji);
       const reaction = message.reactions.find((candidate) => candidate.name === name);
       if (direction === "add") {
         if (reaction?.users.includes(userId))
@@ -482,7 +483,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
         user: user.id,
         channel: conversation.id,
         ts: message.ts,
-        emoji: emoji.replace(/^:|:$/g, ""),
+        emoji: emojiName(emoji),
       });
       return delivery;
     },
@@ -571,9 +572,14 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     async retry(session, id, options) {
       const record = delivery.get(session, id);
       await delay(context.timers, options.afterMs);
-      // Slack repeats the same payload and says which retry this is, and why.
+      // Slack repeats the same payload and says which retry this is, and why: one more than the
+      // last retry this delivery had, whether Slack sent that one itself or a test did.
+      const last = Math.max(
+        0,
+        ...record.attempts.map((attempt) => Number(attempt.requestHeaders["x-slack-retry-num"] ?? 0)),
+      );
       return delivery.again(session, id, {
-        headers: { "x-slack-retry-num": String(record.attempts.length), "x-slack-retry-reason": options.reason },
+        headers: { "x-slack-retry-num": String(last + 1), "x-slack-retry-reason": options.reason },
       });
     },
 

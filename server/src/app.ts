@@ -87,12 +87,13 @@ const Env = z.record(z.string(), z.string()).openapi("Env");
 
 const Quiet = z
   .object({
-    busy: z
-      .boolean()
-      .openapi({ description: "A call from the agent is in flight, a delivery hasn't settled, or a stream is open." }),
+    busy: z.boolean().openapi({
+      description:
+        "A call from the agent is in flight, a delivery is in flight or about to be retried, or a stream is open.",
+    }),
     quietForMs: z.number().openapi({ description: "Milliseconds since the last event in the session. 0 while busy." }),
     open: z.array(z.string()).openapi({
-      description: "What is still open, in words: deliveries that haven't settled, streams never stopped.",
+      description: "What is still open, in words: deliveries in flight or about to be retried, streams never stopped.",
     }),
   })
   .openapi("Quiet");
@@ -236,8 +237,7 @@ export function createApp(options: AppOptions): App {
     handler: ({ params }) => {
       const session = sessions.get(params.session).id;
       const pending = delivery.pending(session);
-      const deliveries =
-        pending === 1 ? "1 delivery that hasn't settled" : `${pending} deliveries that haven't settled`;
+      const deliveries = `${pending} ${pending === 1 ? "delivery" : "deliveries"} in flight or about to be retried`;
       const open = [...(pending > 0 ? [deliveries] : []), ...drivers.flatMap((driver) => driver.openWork(session))];
       return { ...quiet.state(session, open.length), open };
     },

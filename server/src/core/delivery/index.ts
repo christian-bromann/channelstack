@@ -60,8 +60,8 @@ export interface DeliveryAttempt {
 export interface DeliveryRecord {
   readonly request: DeliveryRequest;
   readonly attempts: DeliveryAttempt[];
-  /** Calls off the retry the platform has scheduled, while one is. */
-  cancelRetry?: (() => void) | undefined;
+  /** The retry the platform has scheduled, while one is: when it is due, and how to call it off. */
+  retry?: { readonly at: number; cancel(): void } | undefined;
 }
 
 /** How a later attempt differs from the first: what a platform's retry, or a test's forged delivery, changes. */
@@ -75,6 +75,8 @@ export interface AttemptOptions {
 }
 
 const RESPONSE_BODY_LIMIT = 2048;
+/** A scheduled retry this close counts as work in progress; a later one doesn't. */
+const RETRY_SOON_MS = 5000;
 
 /**
  * Sends events to the agent and keeps every delivery with its attempts. Drivers hand it a
@@ -116,10 +118,11 @@ export class DeliveryQueue {
     if (cancelled || attempt.status === "acknowledged") return;
     const next = record.request.retry?.next(attempt, retries, responseHeaders);
     if (!next) return;
-    record.cancelRetry = this.#timers.after(next.afterMs, () => {
-      record.cancelRetry = undefined;
+    const cancel = this.#timers.after(next.afterMs, () => {
+      record.retry = undefined;
       this.#track(this.#chain(record, { headers: next.headers }, retries + 1));
     });
+    record.retry = { at: this.#clock() + next.afterMs, cancel };
   }
 
   /** Send a delivery again: a platform retry, a redelivery, or a forged copy. Resolves with the new attempt. */
@@ -137,13 +140,20 @@ export class DeliveryQueue {
     return [...(this.#sessions.get(session)?.records.values() ?? [])];
   }
 
-  /** Deliveries with an attempt still in flight or a retry scheduled, across all sessions or for one. */
+  /**
+   * Deliveries the agent is about to hear from: an attempt in flight, or a retry due within
+   * moments. A retry a minute or more away doesn't count: the agent is quiet until then, and a
+   * check shouldn't wait minutes for a delivery the agent already failed.
+   */
   pending(session?: string): number {
     const sessions = session === undefined ? [...this.#sessions.values()] : [this.#sessions.get(session)];
+    const soon = this.#clock() + RETRY_SOON_MS;
     return sessions
       .flatMap((entry) => [...(entry?.records.values() ?? [])])
       .filter(
-        (record) => record.cancelRetry !== undefined || record.attempts.some((attempt) => attempt.status === "pending"),
+        (record) =>
+          (record.retry !== undefined && record.retry.at <= soon) ||
+          record.attempts.some((attempt) => attempt.status === "pending"),
       ).length;
   }
 
@@ -153,7 +163,7 @@ export class DeliveryQueue {
    */
   cancel(session: string): void {
     const entry = this.#sessions.get(session);
-    for (const record of entry?.records.values() ?? []) record.cancelRetry?.();
+    for (const record of entry?.records.values() ?? []) record.retry?.cancel();
     entry?.canceller.abort();
     this.#sessions.delete(session);
   }

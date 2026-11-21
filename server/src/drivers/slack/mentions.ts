@@ -26,3 +26,19 @@ export function mentionedUsers(text: string): string[] {
 export function nameMentions(text: string, nameOf: (userId: string) => string): string {
   return text.replace(MENTION, (_, id: string) => `@${nameOf(id)}`);
 }
+
+/** Text split at its mentions: each piece is plain text, or the id of the user one mention names. */
+export function splitAtMentions(text: string): Array<{ text: string } | { user: string }> {
+  const pieces: Array<{ text: string } | { user: string }> = [];
+  let from = 0;
+  for (const match of text.matchAll(MENTION)) {
+    if (match.index > from) pieces.push({ text: text.slice(from, match.index) });
+    pieces.push({ user: match[1] as string });
+    from = match.index + match[0].length;
+  }
+  if (from < text.length) pieces.push({ text: text.slice(from) });
+  return pieces;
+}
+
+/** An emoji's name as Slack stores it: `:eyes:` and `eyes` are the same reaction. */
+export const emojiName = (emoji: string): string => emoji.replace(/^:|:$/g, "");

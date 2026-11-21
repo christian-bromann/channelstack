@@ -137,11 +137,14 @@ describe("deliveries", () => {
     const quiet = async () => (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
     await h.app.settled();
     expect((await delivery()).attempts).toHaveLength(1);
-    // A retry that is scheduled is work in progress: the session isn't quiet.
-    expect(await quiet()).toMatchObject({ busy: true, open: ["1 delivery that hasn't settled"] });
+    // The first retry is due at once: that is work in progress, and the session isn't quiet.
+    expect(await quiet()).toMatchObject({ busy: true, open: ["1 delivery in flight or about to be retried"] });
+    h.timers.advance(0);
+    await h.app.settled();
+    // The next one is a minute away. Until then the agent is quiet: a check doesn't wait minutes for it.
+    expect([h.timers.waiting(), (await quiet()).busy, (await quiet()).open]).toEqual([1, false, []]);
 
     for (const [wait, attempts] of [
-      [0, 2],
       [59_999, 2],
       [1, 3],
       [299_999, 3],
@@ -164,6 +167,18 @@ describe("deliveries", () => {
     expect(h.timers.waiting()).toBe(0);
     expect((await delivery()).status).toBe("failed");
     expect((await quiet()).busy).toBe(false);
+  });
+
+  test("a retry a test asks for continues Slack's numbering", async () => {
+    const { h, agent, say, post } = await workspace();
+    agent.respond = () => ({ status: 500 });
+    const message = await say("numbered");
+    await h.app.settled();
+    h.timers.advance(0);
+    await h.app.settled();
+    // Slack sent retry 1 itself; the test's retry is number 2, not the attempt count.
+    await post(`/deliveries/${message.delivery.id}/retry`, { after: 0, reason: "http_error" });
+    expect(agent.received.map(({ headers }) => headers["x-slack-retry-num"])).toEqual([undefined, "1", "2"]);
   });
 
   test("the retries end when the agent answers, when it says X-Slack-No-Retry, and when the session closes", async () => {
@@ -290,7 +305,11 @@ describe("quiet", () => {
     agent.respond = () => ({ status: 200, delayMs: 200 });
 
     const question = await say("@my-agent write the notes");
-    expect(await quiet()).toEqual({ busy: true, quietForMs: 0, open: ["2 deliveries that haven't settled"] });
+    expect(await quiet()).toEqual({
+      busy: true,
+      quietForMs: 0,
+      open: ["2 deliveries in flight or about to be retried"],
+    });
     await h.app.settled();
     expect(await quiet()).toMatchObject({ busy: false, open: [] });
 

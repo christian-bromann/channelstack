@@ -156,7 +156,7 @@
         "properties": {
           "busy": {
             "type": "boolean",
-            "description": "A call from the agent is in flight, a delivery hasn't settled, or a stream is open."
+            "description": "A call from the agent is in flight, a delivery is in flight or about to be retried, or a stream is open."
           },
           "quietForMs": {
             "type": "number",
@@ -167,7 +167,7 @@
             "items": {
               "type": "string"
             },
-            "description": "What is still open, in words: deliveries that haven't settled, streams never stopped."
+            "description": "What is still open, in words: deliveries in flight or about to be retried, streams never stopped."
           }
         },
         "required": [

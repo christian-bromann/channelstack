@@ -1,3 +1,4 @@
+import { splitAtMentions } from "./mentions.ts";
 import type {
   SlackAppRecord,
   SlackConversationRecord,
@@ -20,13 +21,9 @@ export function messageSubscription(conversation: SlackConversationRecord): stri
 
 /** Slack's `rich_text` block for a message a person typed: text, with mentions as their own elements. */
 export function richTextBlock(text: string, blockId: string): unknown {
-  const elements = text
-    .split(/(<@[UW][A-Z0-9]+>)/)
-    .filter((part) => part !== "")
-    .map((part) => {
-      const mention = /^<@([UW][A-Z0-9]+)>$/.exec(part);
-      return mention ? { type: "user", user_id: mention[1] } : { type: "text", text: part };
-    });
+  const elements = splitAtMentions(text).map((piece) =>
+    "user" in piece ? { type: "user", user_id: piece.user } : { type: "text", text: piece.text },
+  );
   return { type: "rich_text", block_id: blockId, elements: [{ type: "rich_text_section", elements }] };
 }
 

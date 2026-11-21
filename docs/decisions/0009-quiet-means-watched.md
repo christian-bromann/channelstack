@@ -12,6 +12,8 @@ Negative and exact-count matchers wait until the agent is quiet before they read
 2. **A rate-limited agent isn't quiet.** When the fake answers 429, the session stays busy until the agent calls that method again, or until `Retry-After` plus a grace period has passed (`QuietDetector.expectMore` / `arrived`). The grace is 3 seconds, because Slack's own client adds 1 to 2 seconds of backoff on top of `Retry-After`.
 3. **Open work has a name.** A driver reports what is still open in words (`a stream my-agent started and never stopped: "Thinking…"`). The quiet endpoint returns it, a wait that gives up prints it, and a failed matcher appends it. This is how the `mdac-220` bug gets a failure message that names the leftover message (exit check 1.4).
 
+4. **Only a retry that is about to happen keeps a session busy.** Slack retries a delivery the agent didn't acknowledge at once, after a minute and after five. A retry due within 5 seconds counts as work in progress; one further away doesn't. Otherwise one failed delivery would hold every negative and exact-count matcher of that session for six minutes, and against a running server a test can't move the timers. The later retries still happen; a test that wants one now asks for it with `delivery.retry()`.
+
 ## Why
 
 Each rule removes a way for a test to pass or fail for the wrong reason: a check that didn't look long enough, a check that ran during the agent's backoff, and a timeout that doesn't say what it was waiting for.

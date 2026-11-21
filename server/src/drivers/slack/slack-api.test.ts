@@ -370,6 +370,24 @@ describe("what the agent did is recorded", () => {
   });
 });
 
+describe("reply_broadcast", () => {
+  test("the app's thread reply with reply_broadcast also shows in the channel; outside a thread it means nothing", async () => {
+    const { channel, say, api, get } = await workspace();
+    const question = await say("@my-agent status?");
+    const reply = await api("chat.postMessage", {
+      channel: channel.id,
+      thread_ts: question.ts,
+      text: "all green",
+      reply_broadcast: true,
+    });
+    expect(reply.message).toMatchObject({ subtype: "thread_broadcast", thread_ts: question.ts });
+    const plain = await api("chat.postMessage", { channel: channel.id, text: "fyi", reply_broadcast: true });
+    expect(plain.message.subtype).toBeUndefined();
+    const texts = (await get(`/conversations/${channel.id}/messages`)).map((message: { text: string }) => message.text);
+    expect(texts.slice(1)).toEqual(["all green", "fyi"]);
+  });
+});
+
 describe("calls that name no channel", () => {
   test("a call about a person, or a file shared in a conversation, lands in that session; auth.test in none", async () => {
     const { h, ana, channel, api, calls, say } = await workspace();

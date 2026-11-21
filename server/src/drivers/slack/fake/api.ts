@@ -257,6 +257,10 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
         { ...text(args), metadata: json(args, "metadata") },
         {
           threadTs: threadRoot(conversation, string(args, "thread_ts")),
+          // `reply_broadcast` also sends a thread reply to the channel. Outside a thread it means nothing.
+          broadcast:
+            (args.reply_broadcast === true || args.reply_broadcast === "true") &&
+            string(args, "thread_ts") !== undefined,
         },
       );
       answeredIn(message);

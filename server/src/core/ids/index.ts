@@ -10,12 +10,12 @@ import { type Draw, ID_FORMATS, type IdKind } from "./formats.ts";
 
 export { ID_FORMATS, type IdKind, SLACK_TS_PATTERN } from "./formats.ts";
 
-/** A seed from `CHANNELSTACK_SEED`: a number as is, any other text hashed to 32 bits. */
 /** When a Slack `ts` was issued, as an ISO time: a `ts` is seconds since the epoch, then a counter. */
 export function slackTsTime(ts: string): string {
   return new Date(Number(ts.split(".")[0]) * 1000).toISOString();
 }
 
+/** A seed from `CHANNELSTACK_SEED`: a number as is, any other text hashed to 32 bits. */
 export function parseSeed(seed: string): number {
   if (/^\d{1,9}$/.test(seed)) return Number(seed);
   return createHash("sha256").update(seed).digest().readUInt32BE(0);
