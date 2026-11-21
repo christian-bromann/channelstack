@@ -1315,6 +1315,7 @@
               "type": {
                 "kind": "ref",
                 "resources": [
+                  "SlackThread",
                   "SlackMessage"
                 ]
               },
@@ -1926,6 +1927,19 @@
           ],
           "dispose": false
         }
+      ],
+      "waits": [
+        {
+          "name": "waitForMessage",
+          "mode": "next",
+          "read": "messages",
+          "item": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "from": "author",
+          "what": "a message"
+        }
       ]
     },
     {
@@ -2022,19 +2036,18 @@
           "optional": true
         },
         {
-          "name": "deliveries",
+          "name": "thread",
           "type": {
-            "kind": "array",
-            "items": {
-              "kind": "string"
-            }
+            "kind": "resource",
+            "name": "SlackThread"
           },
           "optional": false
         },
         {
           "name": "delivery",
           "type": {
-            "kind": "string"
+            "kind": "resource",
+            "name": "SlackDelivery"
           },
           "optional": true
         },
@@ -2089,46 +2102,6 @@
           "dispose": false
         },
         {
-          "name": "replies",
-          "kind": "method",
-          "summary": "Replies in the thread this message starts, oldest first",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/replies",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "channel"
-              },
-              {
-                "name": "ts",
-                "from": "self",
-                "field": "ts"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "SlackReplies"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
           "name": "reactions",
           "kind": "method",
           "summary": "The reactions on a message, and who added each",
@@ -2169,13 +2142,126 @@
           "dispose": false
         },
         {
-          "name": "threadStatus",
+          "name": "deliveries",
           "kind": "method",
-          "summary": "What the agent is doing in the thread this message starts: its status line, an open stream, or idle",
+          "summary": "Every delivery this message caused to the agent",
           "stability": "experimental",
           "http": {
             "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/status",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackMessageDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "SlackThread",
+      "idFields": [
+        "channel",
+        "ts"
+      ],
+      "fields": [
+        {
+          "name": "channel",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "ts",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "conversation",
+          "type": {
+            "kind": "resource",
+            "name": "SlackConversation"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "Replies in a thread, oldest first, without the message that starts it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "SlackReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "state",
+          "kind": "method",
+          "summary": "What the agent is doing in a thread: its status line, an open stream, or idle",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/state",
             "pathParams": [
               {
                 "name": "session",
@@ -2209,13 +2295,13 @@
           "dispose": false
         },
         {
-          "name": "threadTranscript",
+          "name": "transcript",
           "kind": "method",
-          "summary": "The thread this message starts, as a person would read it",
+          "summary": "A thread as a person would read it",
           "stability": "experimental",
           "http": {
             "verb": "GET",
-            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/transcript",
+            "path": "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/transcript",
             "pathParams": [
               {
                 "name": "session",
@@ -2256,6 +2342,30 @@
             "not_found"
           ],
           "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForReply",
+          "mode": "next",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "from": "author",
+          "what": "a reply"
+        },
+        {
+          "name": "latestReply",
+          "mode": "latest",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "from": "author",
+          "what": "a reply"
         }
       ]
     },
@@ -2931,6 +3041,98 @@
       }
     },
     {
+      "name": "DeliveryAttempt",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "number",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "sentAt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "transport",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "http",
+                "socket"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "url",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "requestHeaders",
+            "type": {
+              "kind": "record",
+              "values": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "status",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "pending",
+                "acknowledged",
+                "failed",
+                "timed_out",
+                "unreachable"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseBody",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": true
+          },
+          {
+            "name": "forgedSignature",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
       "name": "SlackStream",
       "type": {
         "kind": "object",
@@ -3333,7 +3535,7 @@
       }
     },
     {
-      "name": "SlackDeliveries",
+      "name": "SlackMessageDeliveries",
       "type": {
         "kind": "array",
         "items": {
@@ -3343,95 +3545,13 @@
       }
     },
     {
-      "name": "DeliveryAttempt",
+      "name": "SlackDeliveries",
       "type": {
-        "kind": "object",
-        "fields": [
-          {
-            "name": "number",
-            "type": {
-              "kind": "integer"
-            },
-            "optional": false
-          },
-          {
-            "name": "sentAt",
-            "type": {
-              "kind": "string"
-            },
-            "optional": false
-          },
-          {
-            "name": "transport",
-            "type": {
-              "kind": "enum",
-              "values": [
-                "http",
-                "socket"
-              ]
-            },
-            "optional": false
-          },
-          {
-            "name": "url",
-            "type": {
-              "kind": "string"
-            },
-            "optional": true
-          },
-          {
-            "name": "requestHeaders",
-            "type": {
-              "kind": "record",
-              "values": {
-                "kind": "string"
-              }
-            },
-            "optional": false
-          },
-          {
-            "name": "status",
-            "type": {
-              "kind": "enum",
-              "values": [
-                "pending",
-                "acknowledged",
-                "failed",
-                "timed_out",
-                "unreachable"
-              ]
-            },
-            "optional": false
-          },
-          {
-            "name": "responseStatus",
-            "type": {
-              "kind": "integer"
-            },
-            "optional": true
-          },
-          {
-            "name": "responseBody",
-            "type": {
-              "kind": "string"
-            },
-            "optional": true
-          },
-          {
-            "name": "durationMs",
-            "type": {
-              "kind": "number"
-            },
-            "optional": true
-          },
-          {
-            "name": "forgedSignature",
-            "type": {
-              "kind": "boolean"
-            },
-            "optional": false
-          }
-        ]
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "SlackDelivery"
+        }
       }
     },
     {

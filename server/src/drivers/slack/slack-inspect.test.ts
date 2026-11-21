@@ -62,11 +62,11 @@ describe("deliveries", () => {
 
     const [mention, plain] = await get("/deliveries");
     expect(mention).toMatchObject({
-      id: message.delivery,
+      id: message.delivery.id,
       channel: "slack",
       type: "event_callback",
       eventType: "app_mention",
-      eventId: message.delivery,
+      eventId: message.delivery.id,
       status: "acknowledged",
       payload: { type: "event_callback", event: { type: "app_mention" } },
       attempts: [{ number: 1, transport: "http", status: "acknowledged", responseStatus: 200, forgedSignature: false }],
@@ -96,25 +96,25 @@ describe("deliveries", () => {
     const message = await say("@my-agent hi");
     await h.app.settled();
 
-    const bad = await post(`/deliveries/${message.delivery}/resend`, { badSignature: true });
-    const stale = await post(`/deliveries/${message.delivery}/resend`, { stale: true });
-    const honest = await post(`/deliveries/${message.delivery}/resend`, {});
+    const bad = await post(`/deliveries/${message.delivery.id}/resend`, { badSignature: true });
+    const stale = await post(`/deliveries/${message.delivery.id}/resend`, { stale: true });
+    const honest = await post(`/deliveries/${message.delivery.id}/resend`, {});
 
     expect(bad).toMatchObject({ status: "failed", responseStatus: 401, forgedSignature: true });
     expect(stale).toMatchObject({ status: "failed", responseStatus: 401, forgedSignature: true });
     expect(honest).toMatchObject({ status: "acknowledged", forgedSignature: false });
     const age = Date.now() / 1000 - Number(stale.requestHeaders["x-slack-request-timestamp"]);
     expect(age).toBeGreaterThan(300);
-    expect((await get(`/deliveries/${message.delivery}`)).status).toBe("acknowledged");
+    expect((await get(`/deliveries/${message.delivery.id}`)).status).toBe("acknowledged");
   });
 
   test("an agent that answers after the 3 second window is recorded as timed out", async () => {
     const { h, agent, say, get } = await workspace();
     agent.respond = () => ({ status: 200, delayMs: 3300 });
     const message = await say("@my-agent slow");
-    expect((await get(`/deliveries/${message.delivery}`)).status).toBe("pending");
+    expect((await get(`/deliveries/${message.delivery.id}`)).status).toBe("pending");
     await h.app.settled();
-    expect((await get(`/deliveries/${message.delivery}`)).attempts[0]).toMatchObject({ status: "timed_out" });
+    expect((await get(`/deliveries/${message.delivery.id}`)).attempts[0]).toMatchObject({ status: "timed_out" });
   }, 10_000);
 });
 
@@ -188,13 +188,13 @@ describe("faults and uninstall (decision 0006: undone when the session closes)",
       "tokens_revoked",
     ]);
     expect((await api("auth.test")).body).toEqual({ ok: false, error: "account_inactive" });
-    expect((await say("@my-agent anyone?")).deliveries).toEqual([]);
+    expect((await say("@my-agent anyone?")).delivery).toBeUndefined();
     expect((await post("/uninstall")).error).toBe("account_inactive");
 
     await h.call("DELETE", `/sessions/${sessionId}`);
     expect((await api("auth.test")).body.ok).toBe(true);
     const next = await open(h);
-    expect((await next.say("@my-agent back?")).deliveries).toHaveLength(2);
+    expect((await next.say("@my-agent back?")).delivery.eventType).toBe("app_mention");
   });
 });
 
@@ -235,7 +235,7 @@ describe("what a person sees", () => {
   test("thread status: working while a status line is set, streaming while a stream is open, idle after", async () => {
     const { api, ana, team, channel, say, get } = await workspace();
     const question = await say("@my-agent write the notes");
-    const status = () => get(`/conversations/${channel.id}/messages/${question.ts}/status`);
+    const status = () => get(`/conversations/${channel.id}/threads/${question.ts}/state`);
     const thread = { channel_id: channel.id, thread_ts: question.ts };
 
     expect(await status()).toEqual({ state: "idle" });
@@ -253,12 +253,12 @@ describe("what a person sees", () => {
     // Starting to answer clears the status line, as on Slack.
     expect(await status()).toEqual({ state: "streaming" });
     await api("chat.appendStream", { channel: channel.id, ts: stream.ts, markdown_text: "## 0.10" });
-    const [reply] = await get(`/conversations/${channel.id}/messages/${question.ts}/replies`);
+    const [reply] = await get(`/conversations/${channel.id}/threads/${question.ts}/replies`);
     expect(reply.stream).toMatchObject({ state: "open", chunks: ["## 0.10"] });
 
     await api("chat.stopStream", { channel: channel.id, ts: stream.ts });
     expect(await status()).toEqual({ state: "idle", sessionStatus: "active" });
-    const [done] = await get(`/conversations/${channel.id}/messages/${question.ts}/replies`);
+    const [done] = await get(`/conversations/${channel.id}/threads/${question.ts}/replies`);
     expect(done.stream).toMatchObject({ state: "completed", endedAt: expect.any(String) });
 
     await api("agents.sessions.setStatus", { ...thread, status: "processing" });
@@ -294,7 +294,7 @@ describe("what a person sees", () => {
       text: "Only admins can approve",
     });
 
-    const thread = `/conversations/${channel.id}/messages/${question.ts}/transcript`;
+    const thread = `/conversations/${channel.id}/threads/${question.ts}/transcript`;
     const lines = (transcript: { entries: Array<{ author: { name: string }; text: string }> }) =>
       transcript.entries.map((entry) => `${entry.author.name}: ${entry.text}`);
 

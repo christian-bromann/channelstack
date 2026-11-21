@@ -721,14 +721,11 @@
           "visibleTo": {
             "$ref": "#/components/schemas/SlackUser"
           },
-          "deliveries": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "thread": {
+            "$ref": "#/components/schemas/SlackThread"
           },
           "delivery": {
-            "type": "string"
+            "$ref": "#/components/schemas/SlackDelivery"
           },
           "stream": {
             "$ref": "#/components/schemas/SlackStream"
@@ -743,7 +740,7 @@
           "blocks",
           "postedAt",
           "edited",
-          "deliveries"
+          "thread"
         ],
         "x-channelstack-resource": {
           "id": [
@@ -751,6 +748,138 @@
             "ts"
           ]
         }
+      },
+      "SlackThread": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/SlackConversation"
+          }
+        },
+        "required": [
+          "channel",
+          "ts",
+          "conversation"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "channel",
+            "ts"
+          ]
+        }
+      },
+      "SlackDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "slack"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "payload": {},
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttempt"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "type",
+          "attempts",
+          "status"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "DeliveryAttempt": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "sentAt": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "http",
+              "socket"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "requestHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "responseStatus": {
+            "type": "integer"
+          },
+          "responseBody": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "forgedSignature": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "sentAt",
+          "transport",
+          "requestHeaders",
+          "status",
+          "forgedSignature"
+        ]
       },
       "SlackStream": {
         "type": "object",
@@ -862,6 +991,7 @@
               "ts"
             ],
             "x-channelstack-ref": [
+              "SlackThread",
               "SlackMessage"
             ]
           },
@@ -1266,118 +1396,17 @@
           "$ref": "#/components/schemas/SlackMessage"
         }
       },
-      "SlackDeliveries": {
+      "SlackMessageDeliveries": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/SlackDelivery"
         }
       },
-      "SlackDelivery": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "slack"
-            ]
-          },
-          "type": {
-            "type": "string"
-          },
-          "eventType": {
-            "type": "string"
-          },
-          "eventId": {
-            "type": "string"
-          },
-          "payload": {},
-          "attempts": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DeliveryAttempt"
-            }
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "acknowledged",
-              "failed",
-              "timed_out",
-              "unreachable"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "channel",
-          "type",
-          "attempts",
-          "status"
-        ],
-        "x-channelstack-resource": {
-          "id": "id"
+      "SlackDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackDelivery"
         }
-      },
-      "DeliveryAttempt": {
-        "type": "object",
-        "properties": {
-          "number": {
-            "type": "integer"
-          },
-          "sentAt": {
-            "type": "string"
-          },
-          "transport": {
-            "type": "string",
-            "enum": [
-              "http",
-              "socket"
-            ]
-          },
-          "url": {
-            "type": "string"
-          },
-          "requestHeaders": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "acknowledged",
-              "failed",
-              "timed_out",
-              "unreachable"
-            ]
-          },
-          "responseStatus": {
-            "type": "integer"
-          },
-          "responseBody": {
-            "type": "string"
-          },
-          "durationMs": {
-            "type": "number"
-          },
-          "forgedSignature": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "number",
-          "sentAt",
-          "transport",
-          "requestHeaders",
-          "status",
-          "forgedSignature"
-        ]
       },
       "SlackRetryBody": {
         "type": "object",
@@ -3245,6 +3274,14 @@
           "on": "SlackConversation",
           "name": "messages"
         },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForMessage",
+            "mode": "next",
+            "from": "author",
+            "what": "a message"
+          }
+        ],
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
@@ -3434,22 +3471,36 @@
         }
       }
     },
-    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/replies": {
+    "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/replies": {
       "get": {
-        "summary": "Replies in the thread this message starts, oldest first",
+        "summary": "Replies in a thread, oldest first, without the message that starts it",
         "security": [
           {
             "bearer": []
           }
         ],
         "x-channelstack-method": {
-          "on": "SlackMessage",
+          "on": "SlackThread",
           "name": "replies",
           "bind": {
             "channel": "channel",
             "ts": "ts"
           }
         },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForReply",
+            "mode": "next",
+            "from": "author",
+            "what": "a reply"
+          },
+          {
+            "name": "latestReply",
+            "mode": "latest",
+            "from": "author",
+            "what": "a reply"
+          }
+        ],
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
@@ -3584,17 +3635,17 @@
         }
       }
     },
-    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/status": {
+    "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/state": {
       "get": {
-        "summary": "What the agent is doing in the thread this message starts: its status line, an open stream, or idle",
+        "summary": "What the agent is doing in a thread: its status line, an open stream, or idle",
         "security": [
           {
             "bearer": []
           }
         ],
         "x-channelstack-method": {
-          "on": "SlackMessage",
-          "name": "threadStatus",
+          "on": "SlackThread",
+          "name": "state",
           "bind": {
             "channel": "channel",
             "ts": "ts"
@@ -3659,17 +3710,17 @@
         }
       }
     },
-    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/transcript": {
+    "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/transcript": {
       "get": {
-        "summary": "The thread this message starts, as a person would read it",
+        "summary": "A thread as a person would read it",
         "security": [
           {
             "bearer": []
           }
         ],
         "x-channelstack-method": {
-          "on": "SlackMessage",
-          "name": "threadTranscript",
+          "on": "SlackThread",
+          "name": "transcript",
           "options": [
             "as"
           ],
@@ -3865,6 +3916,81 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SlackEphemeralMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/deliveries": {
+      "get": {
+        "summary": "Every delivery this message caused to the agent",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackMessage",
+          "name": "deliveries",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessageDeliveries"
                 }
               }
             }

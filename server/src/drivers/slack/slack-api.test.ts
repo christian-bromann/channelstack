@@ -89,7 +89,7 @@ describe("chat", () => {
       question.text,
       "Looking into it",
     ]);
-    const [answer] = await get(`/conversations/${channel.id}/messages/${question.ts}/replies`);
+    const [answer] = await get(`/conversations/${channel.id}/threads/${question.ts}/replies`);
     expect(answer).toMatchObject({
       text: "All green",
       author: { kind: "app", id: app.id, name: "my-agent" },
@@ -191,7 +191,7 @@ describe("streams and status", () => {
     const stopped = await api("chat.stopStream", { channel: channel.id, ts: started.ts, markdown_text: "\n- status" });
 
     expect(stopped).toMatchObject({ ok: true, ts: started.ts, message: { text: "## 0.10\n- streams\n- status" } });
-    const replies = await get(`/conversations/${channel.id}/messages/${question.ts}/replies`);
+    const replies = await get(`/conversations/${channel.id}/threads/${question.ts}/replies`);
     expect(replies).toHaveLength(1);
     expect(replies[0].text).toBe("## 0.10\n- streams\n- status");
     expect((await api("chat.appendStream", { channel: channel.id, ts: started.ts, markdown_text: "late" })).error).toBe(

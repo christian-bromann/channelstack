@@ -65,7 +65,7 @@ async function mention(text: string) {
     await server.control("POST", `${base}/users/${ana.id}/say`, { message: { text }, channel: channel.id })
   ).body;
   const delivery = () =>
-    server.control("GET", `${base}/deliveries/${message.delivery}`).then((response) => response.body);
+    server.control("GET", `${base}/deliveries/${message.delivery.id}`).then((response) => response.body);
   const settled = () =>
     waitFor("the delivery to settle", async () => {
       const current = await delivery();
@@ -73,10 +73,12 @@ async function mention(text: string) {
     });
   const replies = () =>
     server
-      .control("GET", `${base}/conversations/${channel.id}/messages/${message.ts}/replies`)
+      .control("GET", `${base}/conversations/${channel.id}/threads/${message.ts}/replies`)
       .then((response) => response.body);
   const again = (action: "retry" | "resend", body: unknown) =>
-    server.control("POST", `${base}/deliveries/${message.delivery}/${action}`, body).then((response) => response.body);
+    server
+      .control("POST", `${base}/deliveries/${message.delivery.id}/${action}`, body)
+      .then((response) => response.body);
   return { app, message, settled, replies, again };
 }
 

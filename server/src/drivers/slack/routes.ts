@@ -47,6 +47,11 @@ const SlackConversation = z
   })
   .openapi("SlackConversation", { "x-channelstack-resource": { id: "id" } });
 
+/** A thread is identified by the conversation and its root message's `ts`. A message that has no replies yet is a thread too. */
+const SlackThread = z
+  .object({ channel: z.string(), ts: z.string(), conversation: SlackConversation })
+  .openapi("SlackThread", { "x-channelstack-resource": { id: ["channel", "ts"] } });
+
 const SlackStream = z
   .object({
     state: z.enum(["open", "stopped", "completed"]),
@@ -55,24 +60,6 @@ const SlackStream = z
     endedAt: z.string().optional(),
   })
   .openapi("SlackStream");
-
-const SlackMessage = z
-  .object({
-    channel: z.string(),
-    ts: z.string(),
-    conversation: SlackConversation,
-    author: SlackParticipant,
-    text: z.string(),
-    blocks: z.array(z.unknown()),
-    postedAt: z.string(),
-    threadTs: z.string().optional(),
-    edited: z.boolean(),
-    visibleTo: SlackUser.optional(),
-    deliveries: z.array(z.string()),
-    delivery: z.string().optional(),
-    stream: SlackStream.optional(),
-  })
-  .openapi("SlackMessage", { "x-channelstack-resource": { id: ["channel", "ts"] } });
 
 const DeliveryStatus = z.enum(["pending", "acknowledged", "failed", "timed_out", "unreachable"]);
 
@@ -103,6 +90,26 @@ const SlackDelivery = z
     status: DeliveryStatus,
   })
   .openapi("SlackDelivery", { "x-channelstack-resource": { id: "id" } });
+
+const SlackMessage = z
+  .object({
+    channel: z.string(),
+    ts: z.string(),
+    conversation: SlackConversation,
+    author: SlackParticipant,
+    text: z.string(),
+    blocks: z.array(z.unknown()),
+    postedAt: z.string(),
+    threadTs: z.string().optional(),
+    edited: z.boolean(),
+    visibleTo: SlackUser.optional(),
+    /** The thread this message starts or belongs to. */
+    thread: SlackThread,
+    /** The delivery this message caused to the agent; when it caused several, the `app_mention`. */
+    delivery: SlackDelivery.optional(),
+    stream: SlackStream.optional(),
+  })
+  .openapi("SlackMessage", { "x-channelstack-resource": { id: ["channel", "ts"] } });
 
 const SlackThreadStatus = z
   .object({
@@ -182,6 +189,7 @@ const MessageInput = z
 const participantRef = z.string().openapi(refTo("SlackUser", "SlackApp"));
 const conversationRef = z.string().openapi(refTo("SlackConversation"));
 const messageRef = z.object({ channel: z.string(), ts: z.string() }).openapi(refTo("SlackMessage"));
+const threadRef = z.object({ channel: z.string(), ts: z.string() }).openapi(refTo("SlackThread", "SlackMessage"));
 
 const UserParams = z.object({ user: z.string().openapi({ param: { name: "user", in: "path" } }) });
 const ChannelParams = z.object({ channel: z.string().openapi({ param: { name: "channel", in: "path" } }) });
@@ -223,8 +231,13 @@ export function registerSlackRoutes(
     threadTs: message.threadTs,
     edited: message.edited !== undefined,
     visibleTo: message.ephemeralFor === undefined ? undefined : userWire(world.user(session, message.ephemeralFor)),
-    deliveries: [...message.deliveries],
-    delivery: message.deliveries[0],
+    thread: {
+      channel: message.conversation,
+      ts: message.threadTs ?? message.ts,
+      conversation: conversationWire(world.conversation(session, message.conversation)),
+    },
+    delivery:
+      message.deliveries[0] === undefined ? undefined : deliveryWire(world.delivery(session, message.deliveries[0])),
     stream:
       message.stream === undefined
         ? undefined
@@ -345,7 +358,7 @@ export function registerSlackRoutes(
     summary: "Reply in a thread: pass the message that starts it, or any reply in it",
     params: UserParams,
     body: z
-      .object({ message: MessageInput, thread: messageRef, alsoSendToChannel: z.boolean().optional() })
+      .object({ message: MessageInput, thread: threadRef, alsoSendToChannel: z.boolean().optional() })
       .openapi("SlackReplyBody"),
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
@@ -457,6 +470,7 @@ export function registerSlackRoutes(
     response: z.array(SlackMessage).openapi("SlackMessages"),
     errors: ["not_found"],
     sdkMethod: { on: "SlackConversation", name: "messages" },
+    waits: [{ name: "waitForMessage", mode: "next", from: "author", what: "a message" }],
     stability,
     handler: ({ session, params }) =>
       world.messages(session.id, params.channel).map((message) => messageWire(session.id, message)),
@@ -489,12 +503,16 @@ export function registerSlackRoutes(
 
   router.route({
     method: "get",
-    path: "/conversations/{channel}/messages/{ts}/replies",
-    summary: "Replies in the thread this message starts, oldest first",
+    path: "/conversations/{channel}/threads/{ts}/replies",
+    summary: "Replies in a thread, oldest first, without the message that starts it",
     params: MessageParams,
     response: z.array(SlackMessage).openapi("SlackReplies"),
     errors: ["not_found"],
-    sdkMethod: { on: "SlackMessage", name: "replies", bind: messageBinding },
+    sdkMethod: { on: "SlackThread", name: "replies", bind: messageBinding },
+    waits: [
+      { name: "waitForReply", mode: "next", from: "author", what: "a reply" },
+      { name: "latestReply", mode: "latest", from: "author", what: "a reply" },
+    ],
     stability,
     handler: ({ session, params }) => {
       const root = world.message(session.id, params.channel, params.ts);
@@ -522,12 +540,12 @@ export function registerSlackRoutes(
 
   router.route({
     method: "get",
-    path: "/conversations/{channel}/messages/{ts}/status",
-    summary: "What the agent is doing in the thread this message starts: its status line, an open stream, or idle",
+    path: "/conversations/{channel}/threads/{ts}/state",
+    summary: "What the agent is doing in a thread: its status line, an open stream, or idle",
     params: MessageParams,
     response: SlackThreadStatus,
     errors: ["not_found"],
-    sdkMethod: { on: "SlackMessage", name: "threadStatus", bind: messageBinding },
+    sdkMethod: { on: "SlackThread", name: "state", bind: messageBinding },
     stability,
     handler: ({ session, params }) => {
       const state = world.threadState(session.id, params.channel, params.ts);
@@ -549,8 +567,8 @@ export function registerSlackRoutes(
 
   router.route({
     method: "get",
-    path: "/conversations/{channel}/messages/{ts}/transcript",
-    summary: "The thread this message starts, as a person would read it",
+    path: "/conversations/{channel}/threads/{ts}/transcript",
+    summary: "A thread as a person would read it",
     params: MessageParams,
     query: z.object({
       as: z
@@ -560,7 +578,7 @@ export function registerSlackRoutes(
     }),
     response: SlackTranscript,
     errors: ["not_found"],
-    sdkMethod: { on: "SlackMessage", name: "threadTranscript", options: ["as"], bind: messageBinding },
+    sdkMethod: { on: "SlackThread", name: "transcript", options: ["as"], bind: messageBinding },
     stability,
     handler: ({ session, params, query }) =>
       renderTranscript(world.thread(session.id, params.channel, params.ts), {
@@ -602,6 +620,21 @@ export function registerSlackRoutes(
     stability,
     handler: ({ session, params }) =>
       world.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/messages/{ts}/deliveries",
+    summary: "Every delivery this message caused to the agent",
+    params: MessageParams,
+    response: z.array(SlackDelivery).openapi("SlackMessageDeliveries"),
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackMessage", name: "deliveries", bind: messageBinding },
+    stability,
+    handler: ({ session, params }) =>
+      world
+        .message(session.id, params.channel, params.ts)
+        .deliveries.map((id) => deliveryWire(world.delivery(session.id, id))),
   });
 
   const DeliveryParams = z.object({ delivery: z.string().openapi({ param: { name: "delivery", in: "path" } }) });

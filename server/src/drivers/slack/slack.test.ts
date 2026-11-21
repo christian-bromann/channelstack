@@ -87,7 +87,7 @@ describe("the workspace", () => {
 
 describe("messages and the events they send", () => {
   test("a mention in a channel the app is in: app_mention and message, signed like Slack", async () => {
-    const { h, agent, app, user, post, fixture } = await workspace();
+    const { h, agent, app, base, user, post, fixture } = await workspace();
     const ana = await user({ name: "Ana" });
     const channel = await post("/channels", { participants: [ana.id, app.id] });
 
@@ -105,15 +105,18 @@ describe("messages and the events they send", () => {
       edited: false,
     });
     expect(message.ts).toMatch(/^\d{10}\.\d{6}$/);
-    expect(message.deliveries).toHaveLength(2);
-    expect(message.delivery).toBe(message.deliveries[0]);
+    // When a message causes both, `delivery` is the app_mention one.
+    expect(message.delivery).toMatchObject({ type: "event_callback", eventType: "app_mention" });
+    expect(message.thread).toEqual({ channel: channel.id, ts: message.ts, conversation: message.conversation });
+    const caused = (await h.call("GET", `${base}/conversations/${channel.id}/messages/${message.ts}/deliveries`)).body;
+    expect(caused.map((delivery: { eventType: string }) => delivery.eventType)).toEqual(["app_mention", "message"]);
 
     const [mention, plain] = events(agent as RecordingAgent);
     expect(mention).toMatchObject({
       type: "event_callback",
       team_id: fixture.team.id,
       api_app_id: app.id,
-      event_id: message.delivery,
+      event_id: message.delivery.id,
       event: { type: "app_mention", user: ana.id, channel: channel.id, ts: message.ts, text: message.text },
       authorizations: [{ team_id: fixture.team.id, user_id: app.botUserId, is_bot: true }],
     });
@@ -144,14 +147,13 @@ describe("messages and the events they send", () => {
       channel: channel.id,
     });
     await h.app.settled();
-    expect(first.deliveries).toEqual([]);
     expect(first.delivery).toBeUndefined();
     expect(agent?.received).toHaveLength(0);
 
     await post(`/users/${ana.id}/invite`, { participants: [app.id], channel: channel.id });
     const second = await post(`/users/${ana.id}/say`, { message: { text: "@my-agent now?" }, channel: channel.id });
     await h.app.settled();
-    expect(second.deliveries).toHaveLength(2);
+    expect(second.delivery.eventType).toBe("app_mention");
     expect(events(agent as RecordingAgent).map((event) => event.event.type)).toEqual([
       "member_joined_channel",
       "app_mention",
@@ -214,7 +216,7 @@ describe("messages and the events they send", () => {
       "status?",
     ]);
     expect(
-      (await get(`/conversations/${channel.id}/messages/${root.ts}/replies`)).map((m: { text: string }) => m.text),
+      (await get(`/conversations/${channel.id}/threads/${root.ts}/replies`)).map((m: { text: string }) => m.text),
     ).toEqual(["and the API?", "anyone?"]);
     expect(events(agent as RecordingAgent)[1].event).toMatchObject({
       type: "message",

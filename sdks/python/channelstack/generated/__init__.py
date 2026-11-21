@@ -7,11 +7,12 @@ from dataclasses import dataclass
 from typing import Any, Literal, Self
 from urllib.parse import quote
 
-from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, session_of
+from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
+from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "Status", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "Status", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -276,6 +277,35 @@ class SlackTeam:
 
 
 @dataclass(frozen=True)
+class DeliveryAttempt:
+    number: int
+    sent_at: str
+    transport: Literal["http", "socket"]
+    request_headers: dict[str, str]
+    status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"]
+    forged_signature: bool
+    url: str | None = None
+    response_status: int | None = None
+    response_body: str | None = None
+    duration_ms: float | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DeliveryAttempt:
+        return cls(
+            number=data["number"],
+            sent_at=data["sentAt"],
+            transport=data["transport"],
+            request_headers=data["requestHeaders"],
+            status=data["status"],
+            forged_signature=data["forgedSignature"],
+            url=data.get("url"),
+            response_status=data.get("responseStatus"),
+            response_body=data.get("responseBody"),
+            duration_ms=data.get("durationMs"),
+        )
+
+
+@dataclass(frozen=True)
 class SlackStream:
     state: Literal["open", "stopped", "completed"]
     chunks: list[str]
@@ -442,36 +472,10 @@ class SlackPrincipal:
 type SlackEphemeralMessages = list[SlackMessage]
 
 
+type SlackMessageDeliveries = list[SlackDelivery]
+
+
 type SlackDeliveries = list[SlackDelivery]
-
-
-@dataclass(frozen=True)
-class DeliveryAttempt:
-    number: int
-    sent_at: str
-    transport: Literal["http", "socket"]
-    request_headers: dict[str, str]
-    status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"]
-    forged_signature: bool
-    url: str | None = None
-    response_status: int | None = None
-    response_body: str | None = None
-    duration_ms: float | None = None
-
-    @classmethod
-    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DeliveryAttempt:
-        return cls(
-            number=data["number"],
-            sent_at=data["sentAt"],
-            transport=data["transport"],
-            request_headers=data["requestHeaders"],
-            status=data["status"],
-            forged_signature=data["forgedSignature"],
-            url=data.get("url"),
-            response_status=data.get("responseStatus"),
-            response_body=data.get("responseBody"),
-            duration_ms=data.get("durationMs"),
-        )
 
 
 type SlackApiCalls = list[SlackApiCall]
@@ -725,7 +729,7 @@ class SlackUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in to]})
         return SlackMessage(ctx, data)
 
-    async def reply(self, message: str | SlackMessageInput, *, thread: SlackMessage, also_send_to_channel: bool | None = None) -> SlackMessage:
+    async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage, also_send_to_channel: bool | None = None) -> SlackMessage:
         """Reply in a thread: pass the message that starts it, or any reply in it. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/reply", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "thread": {"channel": thread.channel, "ts": thread.ts}, "alsoSendToChannel": also_send_to_channel})
@@ -780,6 +784,7 @@ class SlackUser:
 class SlackConversation:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
+        self._seen: dict[str, int] = {}
         self.id: str = data["id"]
         self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
         self.name: str | None = data.get("name")
@@ -802,6 +807,10 @@ class SlackConversation:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/transcript", query={"as": as_})
         return SlackTranscript._from_wire(ctx, data)
 
+    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
+
 
 class SlackMessage:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
@@ -816,8 +825,8 @@ class SlackMessage:
         self.thread_ts: str | None = data.get("threadTs")
         self.edited: bool = data["edited"]
         self.visible_to: SlackUser | None = None if data.get("visibleTo") is None else SlackUser(ctx, data["visibleTo"])
-        self.deliveries: list[str] = data["deliveries"]
-        self.delivery: str | None = data.get("delivery")
+        self.thread: SlackThread = SlackThread(ctx, data["thread"])
+        self.delivery: SlackDelivery | None = None if data.get("delivery") is None else SlackDelivery(ctx, data["delivery"])
         self.stream: SlackStream | None = None if data.get("stream") is None else SlackStream._from_wire(ctx, data["stream"])
 
     async def refresh(self) -> SlackMessage:
@@ -826,29 +835,52 @@ class SlackMessage:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}")
         return SlackMessage(ctx, data)
 
-    async def replies(self) -> SlackReplies:
-        """Replies in the thread this message starts, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/replies")
-        return [SlackMessage(ctx, item) for item in data]
-
     async def reactions(self) -> SlackReactions:
         """The reactions on a message, and who added each. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/reactions")
         return [SlackReaction._from_wire(ctx, item) for item in data]
 
-    async def thread_status(self) -> SlackThreadStatus:
-        """What the agent is doing in the thread this message starts: its status line, an open stream, or idle. Experimental."""
+    async def deliveries(self) -> SlackMessageDeliveries:
+        """Every delivery this message caused to the agent. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/status")
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/deliveries")
+        return [SlackDelivery(ctx, item) for item in data]
+
+
+class SlackThread:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.channel: str = data["channel"]
+        self.ts: str = data["ts"]
+        self.conversation: SlackConversation = SlackConversation(ctx, data["conversation"])
+
+    async def replies(self) -> SlackReplies:
+        """Replies in a thread, oldest first, without the message that starts it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/replies")
+        return [SlackMessage(ctx, item) for item in data]
+
+    async def state(self) -> SlackThreadStatus:
+        """What the agent is doing in a thread: its status line, an open stream, or idle. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/state")
         return SlackThreadStatus._from_wire(ctx, data)
 
-    async def thread_transcript(self, *, as_: str | None = None) -> SlackTranscript:
-        """The thread this message starts, as a person would read it. Experimental."""
+    async def transcript(self, *, as_: str | None = None) -> SlackTranscript:
+        """A thread as a person would read it. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/transcript", query={"as": as_})
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/transcript", query={"as": as_})
         return SlackTranscript._from_wire(ctx, data)
+
+    async def wait_for_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
+        """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
+
+    async def latest_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> SlackMessage:
+        """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
 
 class SlackDelivery:
