@@ -1,3 +1,4 @@
+import type { DeliveryTransport } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
@@ -53,6 +54,8 @@ export interface InteractionKit {
   directMessage(session: string, userId: string): SlackConversationRecord;
   /** A person writes in a thread. */
   replyAsUser: SlackWorld["replyAsUser"];
+  /** The app's Socket Mode connection, once it has chosen that over a request URL. */
+  transport(): DeliveryTransport | undefined;
   /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
 }
@@ -140,8 +143,8 @@ export function createInteractions(kit: InteractionKit): Interactions {
     payload: Record<string, unknown>,
     answered?: (answer: { contentType: string; body: string }) => void,
   ): string => {
-    if (context.webhookUrl === undefined) {
-      throw refuse("dispatch_failed", "The app has no request URL, so Slack has nowhere to send this");
+    if (context.webhookUrl === undefined && kit.transport() === undefined) {
+      throw refuse("dispatch_failed", "The app has no request URL and no socket, so Slack has nowhere to send this");
     }
     const id = ids.next("slack.event");
     delivery.enqueue({
@@ -149,7 +152,8 @@ export function createInteractions(kit: InteractionKit): Interactions {
       session,
       driver: "slack",
       type,
-      url: context.webhookUrl,
+      url: context.webhookUrl ?? "",
+      transport: kit.transport,
       body,
       contentType: "application/x-www-form-urlencoded",
       sign: (bytes, atMs) => signSlackRequest(context.secret("signingSecret"), bytes, atMs),

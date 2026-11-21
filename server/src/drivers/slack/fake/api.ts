@@ -7,6 +7,7 @@ import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
 import { NOBODY, type SlackConversationRecord, type SlackMessageRecord, type SlackUserRecord } from "../world.ts";
+import type { SocketMode } from "./socket.ts";
 import type { SlackStore } from "./store.ts";
 import { type FakeSlackWorld, SlackRefusal } from "./world.ts";
 
@@ -86,7 +87,12 @@ const json = (args: Args, name: string): unknown => {
  * bot token. It refuses what Slack refuses, with Slack's error codes, and records every call
  * about a conversation for the session that owns it.
  */
-export function createSlackApi(context: DriverContext, store: SlackStore, world: FakeSlackWorld): Hono {
+export function createSlackApi(
+  context: DriverContext,
+  store: SlackStore,
+  world: FakeSlackWorld,
+  socket: SocketMode,
+): Hono {
   const { ids, clock } = context;
   const bot = () => store.app.botUserId;
 
@@ -405,6 +411,9 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       return { status, agent_status: status };
     },
 
+    // Socket Mode: where to connect, with a ticket that works once.
+    "apps.connections.open": () => ({ url: socket.ticket() }),
+
     // Modals: opened with the trigger_id of an interaction, for the person who caused it.
     "views.open": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), false) }),
     "views.push": (args) => ({ view: world.openView(required(args, "trigger_id"), json(args, "view"), true) }),
@@ -619,7 +628,9 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
     const method = methods[name];
     try {
       if (token === undefined) throw new SlackApiError("not_authed");
-      if (!constantTimeEqual(token, context.secret("botToken"))) throw new SlackApiError("invalid_auth");
+      // Socket Mode connections are opened with the app-level token; everything else takes the bot token.
+      const expected = context.secret(name === "apps.connections.open" ? "appToken" : "botToken");
+      if (!constantTimeEqual(token, expected)) throw new SlackApiError("invalid_auth");
       if (!store.app.installed) throw new SlackApiError("account_inactive");
       if (!method) throw new SlackApiError("unknown_method", { req_method: name });
 

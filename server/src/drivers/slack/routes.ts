@@ -197,6 +197,10 @@ const SlackFixture = z
     app: SlackApp,
     apiUrl: z.string(),
     team: z.object({ id: z.string(), name: z.string() }).openapi("SlackTeam"),
+    socketConnections: z
+      .number()
+      .int()
+      .openapi({ description: "How many Socket Mode connections the app holds open. 0 when it receives over HTTP." }),
   })
   .openapi("SlackFixture", { "x-channelstack-resource": {} });
 
@@ -316,7 +320,12 @@ export function registerSlackRoutes(
     response: SlackFixture,
     factory: { on: "Session", name: "slack" },
     stability,
-    handler: () => ({ app: appWire(world.app()), apiUrl: deps.apiUrl(), team: world.team() }),
+    handler: () => ({
+      app: appWire(world.app()),
+      apiUrl: deps.apiUrl(),
+      team: world.team(),
+      socketConnections: world.socketConnections(),
+    }),
   });
 
   router.route({
@@ -1137,10 +1146,11 @@ export function registerSlackRoutes(
   router.route({
     method: "post",
     path: "/faults",
-    summary: "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+    summary:
+      "Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once",
     body: z
       .object({
-        type: z.enum(["rate_limit", "latency", "error"]),
+        type: z.enum(["rate_limit", "latency", "error", "drop_socket"]),
         operation: z.string().optional(),
         retryAfter: duration("For rate_limit: what Retry-After says.").default(1000),
         delay: duration("For latency: how long each call takes longer.").default(0),

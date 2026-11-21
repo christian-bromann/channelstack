@@ -717,6 +717,7 @@ class SlackFixture:
         self.app: SlackApp = SlackApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
         self.team: SlackTeam = SlackTeam._from_wire(ctx, data["team"])
+        self.socket_connections: int = data["socketConnections"]
 
     async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, real_name: str | None = None, email: str | None = None, timezone: str | None = None, admin: bool | None = None, owner: bool | None = None, guest: bool | None = None, bot: bool | None = None) -> SlackUser:
         """Create a person in the workspace. Experimental."""
@@ -760,8 +761,8 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall")
         return [SlackDelivery(ctx, item) for item in data]
 
-    async def fault(self, *, type: Literal["rate_limit", "latency", "error"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
-        """Inject a transport fault into the agent's Web API calls. Removed when this session closes. Experimental."""
+    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
+        """Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "error": error, "times": times})
         return SlackFault(ctx, data)

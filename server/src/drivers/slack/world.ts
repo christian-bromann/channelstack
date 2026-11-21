@@ -252,6 +252,9 @@ export interface SlackWorld {
   /** The prompts the app suggested in a thread. */
   suggestedPrompts(session: string, channel: string, ts: string): Array<{ title: string; message: string }>;
 
+  /** How many Socket Mode connections the app holds open. 0 for an app that receives over HTTP. */
+  socketConnections(): number;
+
   /** The modals open for a person, the one on top last. */
   modals(session: string, user: string): SlackViewRecord[];
   modal(session: string, view: string): SlackViewRecord;

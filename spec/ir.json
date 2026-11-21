@@ -710,6 +710,13 @@
             "name": "SlackTeam"
           },
           "optional": false
+        },
+        {
+          "name": "socketConnections",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
         }
       ],
       "methods": [
@@ -1077,7 +1084,7 @@
         {
           "name": "fault",
           "kind": "method",
-          "summary": "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+          "summary": "Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -1098,7 +1105,8 @@
                 "values": [
                   "rate_limit",
                   "latency",
-                  "error"
+                  "error",
+                  "drop_socket"
                 ]
               },
               "optional": false,

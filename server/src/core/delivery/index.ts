@@ -23,6 +23,11 @@ export interface DeliveryRequest {
   readonly timeoutMs: number;
   /** What the driver wants to find again on the delivery: the inner event type, the object that caused it. */
   readonly meta?: Readonly<Record<string, unknown>>;
+  /**
+   * Another way to the agent than an HTTP request, asked for at every attempt: a connection the
+   * agent opened itself (Slack's Socket Mode). Undefined sends over HTTP to `url`.
+   */
+  transport?(): DeliveryTransport | undefined;
   /** How the platform retries a delivery the agent didn't acknowledge. Without it, there is one attempt. */
   readonly retry?: RetryPolicy;
   /**
@@ -31,6 +36,21 @@ export interface DeliveryRequest {
    * modal submission's `response_action`.
    */
   answered?(answer: { status: number; contentType: string; body: string }): void;
+}
+
+/** A way to the agent over a connection the agent holds open. */
+export interface DeliveryTransport {
+  /** Where the connection goes, for the record. */
+  readonly url: string;
+  /**
+   * Send one attempt and resolve with what the agent acknowledged it with. Rejects when the agent
+   * can't be reached; `signal` fires at the end of the ack window and when the session closes.
+   */
+  send(attempt: {
+    request: DeliveryRequest;
+    headers: Readonly<Record<string, string>>;
+    signal: AbortSignal;
+  }): Promise<{ contentType: string; body: string }>;
 }
 
 /** A platform's own retry behaviour, asked after each attempt of the chain it started itself. */
@@ -51,7 +71,7 @@ export interface RetryPolicy {
 export interface DeliveryAttempt {
   readonly number: number;
   readonly sentAt: string;
-  readonly transport: "http";
+  readonly transport: "http" | "socket";
   readonly url: string;
   readonly requestHeaders: Readonly<Record<string, string>>;
   readonly status: DeliveryStatus;
@@ -213,18 +233,22 @@ export class DeliveryQueue {
     const { request } = record;
     const cancelled = this.#session(request.session).canceller.signal;
     const sentAt = this.#clock();
-    const requestHeaders = {
-      "content-type": request.contentType ?? "application/json",
-      "user-agent": "channelstack",
-      ...(options.sign ?? request.sign)(request.body, sentAt),
-      ...options.headers,
-    };
+    const transport = request.transport?.();
+    const requestHeaders = transport
+      ? // A connection the agent opened needs no signature: only what the platform adds to a retry.
+        { ...options.headers }
+      : {
+          "content-type": request.contentType ?? "application/json",
+          "user-agent": "channelstack",
+          ...(options.sign ?? request.sign)(request.body, sentAt),
+          ...options.headers,
+        };
     const index = record.attempts.length;
     const started = {
       number: index + 1,
       sentAt: new Date(sentAt).toISOString(),
-      transport: "http" as const,
-      url: request.url,
+      transport: transport ? ("socket" as const) : ("http" as const),
+      url: transport?.url ?? request.url,
       requestHeaders,
       forgedSignature: options.forged === true,
     };
@@ -233,19 +257,31 @@ export class DeliveryQueue {
     let outcome: Pick<DeliveryAttempt, "status" | "responseStatus" | "responseBody">;
     let responseHeaders: Headers | undefined;
     let responseText: string | undefined;
+    const signal = AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]);
     try {
-      const response = await fetch(request.url, {
-        method: "POST",
-        headers: requestHeaders,
-        body: request.body,
-        redirect: "manual",
-        signal: AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]),
-      });
-      responseHeaders = response.headers;
-      // The attempt keeps the start of the answer; whoever acts on the answer gets more of it, still bounded.
-      responseText = (await response.text()).slice(0, ANSWER_LIMIT);
-      const responseBody = responseText.slice(0, RESPONSE_BODY_LIMIT);
-      outcome = { status: response.ok ? "acknowledged" : "failed", responseStatus: response.status, responseBody };
+      if (transport) {
+        const answer = await transport.send({ request, headers: requestHeaders, signal });
+        responseHeaders = new Headers({ "content-type": answer.contentType });
+        responseText = answer.body.slice(0, ANSWER_LIMIT);
+        outcome = {
+          status: "acknowledged",
+          responseStatus: 200,
+          responseBody: responseText.slice(0, RESPONSE_BODY_LIMIT),
+        };
+      } else {
+        const response = await fetch(request.url, {
+          method: "POST",
+          headers: requestHeaders,
+          body: request.body,
+          redirect: "manual",
+          signal,
+        });
+        responseHeaders = response.headers;
+        // The attempt keeps the start of the answer; whoever acts on the answer gets more of it, still bounded.
+        responseText = (await response.text()).slice(0, ANSWER_LIMIT);
+        const responseBody = responseText.slice(0, RESPONSE_BODY_LIMIT);
+        outcome = { status: response.ok ? "acknowledged" : "failed", responseStatus: response.status, responseBody };
+      }
     } catch (error) {
       const name = error instanceof Error ? error.name : "";
       outcome = { status: name === "TimeoutError" || name === "AbortError" ? "timed_out" : "unreachable" };

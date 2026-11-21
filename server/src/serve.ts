@@ -6,6 +6,7 @@ import { readPrivateJsonFile, removeFile, writePrivateFile } from "./core/home/i
 import { createLogger, type LogLevel } from "./core/log/index.ts";
 import { registerAliases } from "./core/portless/index.ts";
 import { Redactor } from "./core/redact/index.ts";
+import type { SocketSession } from "./core/router/index.ts";
 import { Secrets } from "./core/secrets/index.ts";
 import { secretSpecs } from "./drivers/index.ts";
 
@@ -112,7 +113,23 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     },
   });
 
-  const server = Bun.serve({ hostname: LOOPBACK, port: options.port, fetch: (request) => app.fetch(request) });
+  const server = Bun.serve<{ session: SocketSession }>({
+    hostname: LOOPBACK,
+    port: options.port,
+    fetch(request, listening) {
+      if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return app.fetch(request);
+      // A WebSocket is only opened where a fake expects one (Slack's Socket Mode, with its ticket).
+      const session = app.socket(request);
+      if (session && listening.upgrade(request, { data: { session } })) return undefined;
+      return new Response("Not Found", { status: 404 });
+    },
+    websocket: {
+      open: (socket) =>
+        socket.data.session.open({ send: (text) => void socket.send(text), close: () => socket.terminate() }),
+      message: (socket, message) => socket.data.session.message(String(message)),
+      close: (socket) => socket.data.session.closed(),
+    },
+  });
   const origin = `http://${LOOPBACK}:${server.port}`;
   const listening: ServerUrls = options.portless
     ? { control: "https://channelstack.localhost", driver: (name) => `https://${name}.localhost` }

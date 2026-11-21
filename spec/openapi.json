@@ -486,12 +486,17 @@
           },
           "team": {
             "$ref": "#/components/schemas/SlackTeam"
+          },
+          "socketConnections": {
+            "type": "integer",
+            "description": "How many Socket Mode connections the app holds open. 0 when it receives over HTTP."
           }
         },
         "required": [
           "app",
           "apiUrl",
-          "team"
+          "team",
+          "socketConnections"
         ],
         "x-channelstack-resource": {}
       },
@@ -1965,7 +1970,8 @@
             "enum": [
               "rate_limit",
               "latency",
-              "error"
+              "error",
+              "drop_socket"
             ]
           },
           "operation": {
@@ -6297,7 +6303,7 @@
     },
     "/sessions/{session}/slack/faults": {
       "post": {
-        "summary": "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+        "summary": "Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once",
         "security": [
           {
             "bearer": []

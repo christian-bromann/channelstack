@@ -590,12 +590,14 @@ export interface SlackFixtureData {
   app: SlackAppData;
   apiUrl: string;
   team: SlackTeam;
+  socketConnections: number;
 }
 
 export class SlackFixture {
   readonly app: SlackApp;
   readonly apiUrl: string;
   readonly team: SlackTeam;
+  readonly socketConnections: number;
   readonly #ctx: HandleContext;
   readonly #seen = new Map<string, number>();
 
@@ -605,6 +607,7 @@ export class SlackFixture {
     this.app = new SlackApp(ctx, data.app);
     this.apiUrl = data.apiUrl;
     this.team = data.team;
+    this.socketConnections = data.socketConnections;
   }
 
   /** Create a person in the workspace. Experimental. */
@@ -656,8 +659,8 @@ export class SlackFixture {
     return decodeSlackUninstallDeliveries(ctx, data);
   }
 
-  /** Inject a transport fault into the agent's Web API calls. Removed when this session closes. Experimental. */
-  async fault(options: { type: "rate_limit" | "latency" | "error"; operation?: string; retryAfter?: Duration; delay?: Duration; error?: string; times?: number }): Promise<SlackFault> {
+  /** Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental. */
+  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; error?: string; times?: number }): Promise<SlackFault> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), error: options.error, times: options.times } })) as SlackFaultData;
     return new SlackFault(ctx, data);

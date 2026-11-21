@@ -28,6 +28,7 @@ import type {
   SlackWorld,
 } from "../world.ts";
 import { createInteractions, type InteractionKit } from "./interactions.ts";
+import type { SocketMode } from "./socket.ts";
 import type { SlackFault, SlackStore } from "./store.ts";
 import { createViews } from "./views.ts";
 
@@ -109,7 +110,10 @@ export interface FakeSlackWorld extends SlackWorld {
     options: { badSignature: boolean; stale: boolean; headers?: Record<string, string> | undefined },
   ): Promise<DeliveryAttempt>;
   /** Inject a fault into the Web API. It applies to every caller until removed, or until the session closes. */
-  addFault(session: string, fault: Omit<SlackFault, "id" | "session">): string;
+  addFault(
+    session: string,
+    fault: Omit<SlackFault, "id" | "session" | "type"> & { type: SlackFault["type"] | "drop_socket" },
+  ): string;
   removeFault(session: string, id: string): void;
 }
 
@@ -134,7 +138,7 @@ const SLACK_RETRIES: RetryPolicy = {
   },
 };
 
-export function createFakeWorld(context: DriverContext, store: SlackStore): FakeSlackWorld {
+export function createFakeWorld(context: DriverContext, store: SlackStore, socket: SocketMode): FakeSlackWorld {
   const { ids, clock, events, delivery } = context;
 
   const author = (id: string): SlackUserRecord | undefined => store.users.find(id);
@@ -149,7 +153,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
 
   /** Sign an event and hand it to the delivery queue, for the session whose action caused it. */
   const deliver = (session: string, event: Record<string, unknown>): string | undefined => {
-    if (context.webhookUrl === undefined) return undefined;
+    // The app is reached at its request URL, or over the connection it opened (Socket Mode). With neither, nothing is sent.
+    if (context.webhookUrl === undefined && socket.transport() === undefined) return undefined;
     const eventId = ids.next("slack.event");
     const payload = eventCallback({
       event,
@@ -164,7 +169,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       session,
       driver: "slack",
       type: "event_callback",
-      url: context.webhookUrl,
+      url: context.webhookUrl ?? "",
+      transport: socket.transport,
       body: JSON.stringify(payload),
       sign: (body, atMs) => signSlackRequest(context.secret("signingSecret"), body, atMs),
       timeoutMs: ACK_WINDOW_MS,
@@ -613,9 +619,13 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       });
     },
 
+    socketConnections: () => socket.connections(),
+
     addFault(session, fault) {
       const id = `fault_${store.faults.length + 1}_${ids.next("slack.block")}`;
-      store.faults.push({ id, session, ...fault });
+      // Dropping the socket happens once, now; the other faults stay until they are removed.
+      if (fault.type === "drop_socket") socket.drop();
+      else store.faults.push({ id, session, ...fault, type: fault.type });
       action(session, "fault", { fault: id, type: fault.type });
       return id;
     },
@@ -638,6 +648,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     remove: world.remove,
     action,
     emit,
+    transport: socket.transport,
     directMessage: (session, userId) => open(session, userId, [store.app.botUserId]),
     replyAsUser: (...args) => world.replyAsUser(...args),
   };
