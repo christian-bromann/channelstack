@@ -17,6 +17,9 @@
 
 ---
 
+> [!NOTE]
+> channelstack is under construction and not on npm yet. The server spine and the SDK generator are built; the fake platforms are not. This page describes how it will work. See [Status](#status).
+
 channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. Tests script the people, your agent answers through its real code path, and you assert on the conversation a person would see:
 
 ```ts
@@ -37,16 +40,16 @@ There are no hand-built webhook payloads and no mocked SDK calls. Ana posts, the
 
 Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on.
 
-- **Your agent's real code path.** `channelstack env` points your agent's own SDKs at `slack.localhost`, `github.localhost` and friends. Agents with hard-coded hosts use proxy mode instead.
-- **Shapes that can't drift.** Every response and webhook is checked against the providers' own schemas. When a platform changes, your build goes red instead of quietly wrong.
+- **Your agent's real code path.** `channelstack env` prints the URLs and tokens that point your agent's own SDKs at `slack.localhost`, `github.localhost`, `linear.localhost` and `notion.localhost`. Agents that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
+- **Shapes checked against the real platforms.** channelstack's own tests validate what the fakes send against the platforms' published schemas (GitHub, Linear) and against recorded real traffic where no usable schema exists (Slack). When a platform changes, channelstack's build goes red, instead of your tests passing against a stale fake.
 - **People, not payloads.** Write `ana.click("Approve", { message })` instead of hand-building a `block_actions` body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery ids.
 - **Assert what people see.** Streams, status lines, edits and ephemeral messages render into one transcript. `toHaveRepliesFrom(…, { count: 1 })` catches the double post.
 
 ## Channels
 
-One package fakes all four. Use one in a test, or several when your agent spans them.
+Each channel is a fixture your test receives by name (`async ({ slack, github }) => …`). Use one, or several when your agent spans them.
 
-| Channel | Fixture  | What it fakes                                                                    |
+| Channel | In your test | What it fakes                                                                    |
 | ------- | -------- | -------------------------------------------------------------------------------- |
 | Slack   | `slack`  | DMs, mentions, threads, buttons and modals, streaming replies and the agent view |
 | GitHub  | `github` | Apps and installations, issues and pull requests, reviews, check runs            |
@@ -60,7 +63,7 @@ The same tests can also run against the real platforms in sandbox workspaces ([l
 ```mermaid
 flowchart LR
   T["<b>Your test</b><br/>ana.say(…)<br/>expect(thread)"]
-  C["<b>channelstack</b><br/>fake workspaces, people,<br/>platform APIs, schema checks"]
+  C["<b>channelstack</b><br/>fake workspaces, people,<br/>platform APIs"]
   A["<b>Your agent</b><br/>unchanged code,<br/>real SDKs"]
   T -- "script + assert" --> C
   C -- "signed webhooks" --> A
@@ -71,16 +74,16 @@ One server process fakes the platforms in memory. Your test drives it through a 
 
 ## Quick start
 
-> [!NOTE]
-> channelstack isn't on npm yet. This is how it will work once the first release is out; see [Status](#status).
+Once the first release is out:
 
 ```bash
 npm i -D channelstack
-npx channelstack                          # starts the fakes and writes channelstack.config.ts
+npx channelstack                          # first run: starts the local proxy, trusts its CA, writes channelstack.config.ts
 npx channelstack env >> .env.local        # tokens and URLs for your agent
+portless run my-agent pnpm dev            # your usual start command, reachable at https://my-agent.localhost
 ```
 
-Start your agent the way you always do, add the plugin to your test runner, and run your tests:
+Add the plugin to your test runner and run your tests:
 
 ```ts
 // vitest.config.ts
@@ -94,7 +97,7 @@ export default defineConfig({ plugins: [channelstack()] });
 
 ## Status
 
-Under construction, phase by phase. Phase 0 (the server spine, the SDK generator, packaging) is built; the Slack fake is next. The plan, and the check that proves each phase is done, is in [docs/phases.md](docs/phases.md).
+Under construction, phase by phase. Phase 0 (the server spine, the SDK generator, packaging) is merged ([#3](https://github.com/christian-bromann/channelstack/pull/3), tag `phase-0-done`); the Slack fake is next. [docs/phases.md](docs/phases.md) has the plan and the check that proves each phase is done.
 
 ## In this repository
 
