@@ -20,7 +20,6 @@ A test harness for AI agents that live in Slack, GitHub, Linear and Notion. One 
 | — | [docs/niche.md](docs/niche.md), [docs/audience.md](docs/audience.md), [docs/app-developers.md](docs/app-developers.md), [docs/framework-testing.md](docs/framework-testing.md), [docs/competitive-analysis.html](docs/competitive-analysis.html) | Why we build it, for whom, and the market | Background only |
 | 8 | [docs/code-map.md](docs/code-map.md) | Which module owns each concern. Check it before writing any function | **Spec** (kept current) |
 | — | [phase-log/](phase-log/) | Each phase's plan and closing note (reviews live on the PRs) | Working record |
-| — | [probes/](probes/) | Small experiments that back design decisions | Reference |
 | — | [index.html](index.html) | The landing page | Marketing; must match the API (phase 8 checks it) |
 
 **When documents disagree,** the order of precedence is:

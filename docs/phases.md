@@ -47,7 +47,6 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | Spec is current | `pnpm spec:check` | Regenerating `spec/openapi.json` and `spec/ir.json` from the routes gives no diff |
 | SDKs are current | `pnpm sdk:check` | Regenerating every SDK gives no diff |
 | API contract | `pnpm api:check` (from phase 1) | `api/examples/*.test.ts` type-checks against the **generated** TypeScript SDK, not just against `api/*.d.ts` |
-| Signing probes | `pnpm probes` | `probes/delivery-signing` passes (21 of 21) |
 | No secrets in output | `pnpm test:redaction` | A test run with known fake and live-shaped tokens finds none of them in logs, errors, recordings or the UI |
 | No duplicate code | `pnpm check:dupes` | jscpd finds no copy-pasted block over 15 lines (generated code excluded) |
 | Architecture boundaries | `pnpm check:deps` | dependency-cruiser: drivers don't import each other, core doesn't import drivers, nothing imports `generated/` except its SDK |
@@ -127,7 +126,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 |---|---|---|
 | 1.1 | Conversation examples pass | `api/examples/slack.test.ts`: "mentions and threads", "direct messages", "reactions, edits and deletes", "inspecting what the agent did", and the stream and status test, against both reference agents |
 | 1.2 | Delivery basics | "delivery and failures": the 3 s retry, bad and stale signatures, rate limit, uninstall |
-| 1.3 | The fake signs like Slack | The S1–S8 probe cases as integration tests against the fake's real delivery code, received by Bolt |
+| 1.3 | The fake signs like Slack | Delivery cases S1–S8 ([appendix](#appendix-delivery-cases)) as integration tests against the fake's real delivery code, received by Bolt |
 | 1.4 | A real bug is caught | The `mdac-220` agent fails the stream and status test with a message that names the leftover message |
 | 1.5 | Negative matchers wait for quiet | Test: a reply posted 500 ms after a `.not.toHaveReplyFrom` check started makes it fail; one posted after `quietFor` doesn't |
 | 1.6 | CLI and UI | Scripted: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, then `channelstack show` prints the agent's reply; a browser test opens the UI and finds the same reply in the transcript |
@@ -151,7 +150,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 | # | Check | How |
 |---|---|---|
 | 2.1 | Every fake Slack example passes | All of `api/examples/slack.test.ts` except "live mode", against both reference agents |
-| 2.2 | Socket Mode works with Bolt | The DM and modal tests pass with the Bolt reference agent switched to Socket Mode; the K1–K4 probe cases pass against the real fake |
+| 2.2 | Socket Mode works with Bolt | The DM and modal tests pass with the Bolt reference agent switched to Socket Mode; delivery cases K1–K4 ([appendix](#appendix-delivery-cases)) pass against the real fake |
 | 2.3 | Standard checks | `slackChecks({ app: "my-agent" })` passes against both reference agents, and against a deliberately broken agent each check fails (one broken variant per check) |
 
 **Docs to update:** reality-matrix, `devx.md` CLI section.
@@ -176,6 +175,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 | 3.2 | Responses match GitHub's REST description | Every fake response in the test run validates against `github/rest-api-description` |
 | 3.3 | Webhooks match GitHub's schemas | Every delivery validates against `octokit/openapi-webhooks` |
 | 3.4 | Standard checks | `githubChecks()` passes, and each check fails against its broken variant |
+| 3.5 | The fake signs like GitHub | Delivery cases G1–G3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with `@octokit/webhooks` as receiver |
 
 **Docs to update:** reality-matrix, `architecture.md` if the host layout changed.
 
@@ -202,7 +202,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 | 4.1 | Every fake Linear example passes | All of `api/examples/linear.test.ts` except "live mode" |
 | 4.2 | Every fake Notion example passes | All of `api/examples/notion.test.ts` except "live mode" |
 | 4.3 | Linear matches its schema | Every fake GraphQL response validates against the committed introspected schema |
-| 4.4 | Signatures | The L1–L3 and N1–N3 probe cases pass against the real fake, with `LinearWebhookClient` and `verifyWebhookSignature` as receivers |
+| 4.4 | Signatures | Delivery cases L1–L3 and N1–N3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with `LinearWebhookClient` and `verifyWebhookSignature` as receivers |
 | 4.5 | Standard checks | `linearChecks()` and `notionChecks()` pass, and each check fails against its broken variant |
 | 4.6 | All channels in one run | `api/examples/shared.test.ts` passes |
 
@@ -303,3 +303,33 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 ## After 0.1
 
 The full matcher set for Jest and pytest, Discord, Stripe and email drivers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned.
+
+## Appendix: delivery cases
+
+Checks that each fake sends deliveries the platform's **official** receiver accepts. They come from probes run on 2026-11-20 with `@slack/bolt` 5.1.0, `@octokit/webhooks` 14.2.0, `@linear/sdk` 103.0.0, `@notionhq/client` 5.31.1 and Node 24, where all 21 passed. In the phases they're integration tests against the fake's real delivery code (exit checks 1.3, 2.2, 3.5, 4.4).
+
+| Id | The receiver… | Result in the probes |
+|---|---|---|
+| S1 | Bolt accepts an `event_callback` (JSON) signed with the signing secret | accepted |
+| S2 | Bolt routes a `block_actions` (form `payload=`) to the action handler | accepted |
+| S3 | For `view_submission`, the agent's `response_action` comes back in the HTTP response body | `{"response_action":"errors",…}` |
+| S4 | Bolt accepts a slash command (form fields); the immediate reply is in the HTTP body | accepted |
+| S5 | Bolt routes `agent_session_stopped` to the event handler | accepted |
+| S6 | A wrong signing secret is rejected | 401 |
+| S7 | A timestamp 6 minutes old is rejected | 401 |
+| S8 | `X-Slack-Retry-Num` / `X-Slack-Retry-Reason` reach the handler as `context.retryNum` / `retryReason` | 1, `http_timeout` |
+| K1 | A Socket Mode agent whose Slack base URL is the fake calls the fake's `apps.connections.open` with its app token and connects to the fake's WebSocket | connected |
+| K2 | An `events_api` envelope is handled and acked within 3 s | acked |
+| K3 | The ack for `view_submission` carries `response_action` in `payload` | carried |
+| K4 | The ack for a slash command carries the immediate reply | carried |
+| G1 | A payload re-serialized from parsed JSON doesn't verify with the original `X-Hub-Signature-256` (sign the exact bytes you send) | rejected |
+| G2 | Signed with the webhook secret over the sent bytes, `@octokit/webhooks` accepts and dispatches it | accepted |
+| G3 | A wrong secret is rejected | rejected |
+| L1 | `LinearWebhookClient` accepts a `prompted` webhook with `signal: "stop"` | accepted |
+| L2 | A delivery resent after more than 60 s is rejected, because `webhookTimestamp` is inside the signed body | 400 |
+| L3 | The same delivery with a new `webhookTimestamp` and a new signature is accepted (so the fake's redelivery re-stamps) | accepted |
+| N1 | `verifyWebhookSignature` accepts a body signed with the verification token | accepted |
+| N2 | A re-serialized body fails with the original signature | rejected |
+| N3 | Re-signed over the sent bytes, it verifies | accepted |
+
+Side finding: Bolt with a single `token` calls `auth.test` on every incoming request, so the Slack fake serves `auth.test` from phase 1.

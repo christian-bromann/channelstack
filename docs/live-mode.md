@@ -101,23 +101,13 @@ Paths follow implementation plan section 13.
 | W5 | Browser actor with unattended sign-in | `server/src/core/browser/`, `server/src/drivers/<channel>/live/ui.ts` | The A3 rows work for Slack first (click, Stop), then the others; `channelstack doctor` checks saved sessions |
 | W6 | Allowlists, tagging and ledger cleanup | `server/src/core/safety/`, `server/src/core/ledger/` | Acting outside an allowlist is refused; `channelstack sweep` removes leftovers |
 
-Order: W6 → W1 → W2 → W4 → W3 → W5. The fake's delivery signing (phase 1) uses the probes in section 8.1 as its acceptance tests.
+Order: W6 → W1 → W2 → W4 → W3 → W5. The fake's delivery signing (phase 1) uses the delivery cases in phases.md (appendix) as its acceptance tests.
 
 ## 8. Validation
 
-### 8.1 Delivery signing probes (fake mode)
+### 8.1 Delivery signing (fake mode)
 
-[`probes/delivery-signing/`](../probes/delivery-signing/) checks that the deliveries the **fakes** send are accepted by each platform's official receiver. Run it with `npm install && npm run probe`. All 21 pass with `@slack/bolt` 5.1.0, `@octokit/webhooks` 14.2.0, `@linear/sdk` 103.0.0, `@notionhq/client` 5.31.1 and Node 24.
-
-| What | Probes |
-|---|---|
-| Slack signing, form and JSON bodies, `response_action` and command replies in the HTTP response, retry headers, bad secret and stale timestamp rejected | S1–S8 |
-| Slack Socket Mode served by the fake: the agent's client calls the fake's `apps.connections.open`, and acks carry response payloads | K1–K4 |
-| GitHub signature over the exact bytes; a wrong secret is rejected | G1–G3 |
-| Linear signature with `webhookTimestamp` inside the signed body, rejected after 60 s (so fake redelivery re-stamps) | L1–L3 |
-| Notion signature over the exact bytes | N1–N3 |
-
-Side finding: Bolt with a single `token` calls `auth.test` on every incoming request, so the Slack fake must serve `auth.test` from the first milestone.
+Before writing this spec, probes drove each platform's official receiver with the deliveries the fakes would send; all 21 cases passed. The cases are now the acceptance tests for the fakes' delivery code: [phases.md, "Appendix: delivery cases"](phases.md#appendix-delivery-cases).
 
 ### 8.2 Live spike (needs the sandboxes)
 
