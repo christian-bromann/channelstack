@@ -84,7 +84,7 @@ export function renderTranscript(
     viewer: string | undefined;
     principal(userId: string): { id: string; name: string; kind: "user" | "app" };
   },
-): { entries: TranscriptEntry[] } {
+): { entries: TranscriptEntry[]; text: string } {
   const named = (text: string) =>
     text.replace(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g, (_, id: string) => `@${options.principal(id).name}`);
   const entries = messages
@@ -105,5 +105,19 @@ export function renderTranscript(
         depth: message.threadTs === undefined ? 0 : 1,
       };
     });
-  return { entries };
+  // One line per entry, replies indented under their thread: what `toString()` prints and snapshots keep.
+  const text = entries
+    .map((entry) => {
+      const marks = [
+        entry.edited ? "edited" : "",
+        entry.streaming === "open" ? "streaming" : "",
+        entry.visibleTo ? `only ${entry.visibleTo.name} sees this` : "",
+      ]
+        .filter((mark) => mark !== "")
+        .join(", ");
+      const controls = entry.controls.map((control) => ` [${control}]`).join("");
+      return `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${controls}${marks === "" ? "" : ` (${marks})`}`;
+    })
+    .join("\n");
+  return { entries, text };
 }

@@ -29,6 +29,8 @@ interface WaitBinding {
   mode: "next" | "latest";
   /** The item field holding who authored it; the wait's `from` option filters on it. */
   from?: string;
+  /** The wait takes the read's own options as its first argument: `waitForCall({ operation }, { timeout })`. */
+  filter?: true;
   /** What is being waited for, for the timeout message: "a reply". */
   what: string;
 }

@@ -72,6 +72,7 @@ export function messageEvent(
 export function appMentionEvent(
   message: SlackMessageRecord,
   conversation: SlackConversationRecord,
+  author: SlackUserRecord | undefined,
   team: SlackTeam,
 ): Record<string, unknown> {
   return {
@@ -84,6 +85,8 @@ export function appMentionEvent(
     team: team.id,
     blocks: message.blocks,
     ...(message.threadTs === undefined ? {} : { thread_ts: message.threadTs }),
+    // A mention written by another bot says so, which is how an agent can ignore bots.
+    ...(author?.botId === undefined ? {} : { bot_id: author.botId }),
   };
 }
 

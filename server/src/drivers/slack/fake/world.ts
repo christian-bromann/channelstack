@@ -174,7 +174,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     const mentioned = userId !== app.botUserId && mentionedUsers(message.text).includes(app.botUserId);
     // The mention comes first: when a message causes both, `app_mention` is the one tests look at.
     for (const [subscription, event] of [
-      ...(mentioned ? ([["app_mention", appMentionEvent(message, conversation, team)]] as const) : []),
+      ...(mentioned ? ([["app_mention", appMentionEvent(message, conversation, author(userId), team)]] as const) : []),
       [messageSubscription(conversation), messageEvent(message, conversation, author(userId), team, app)] as const,
     ]) {
       const id = emit(conversation, subscription, event);

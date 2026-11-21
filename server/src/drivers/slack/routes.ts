@@ -141,8 +141,9 @@ const SlackTranscript = z
         })
         .openapi("SlackTranscriptEntry"),
     ),
+    text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
   })
-  .openapi("SlackTranscript");
+  .openapi("SlackTranscript", { "x-channelstack-string": "text" });
 
 const SlackApiCall = z
   .object({
@@ -187,6 +188,8 @@ const MessageInput = z
   .openapi("SlackMessageInput", { "x-channelstack-shorthand": "text" });
 
 const participantRef = z.string().openapi(refTo("SlackUser", "SlackApp"));
+/** One participant or several: `ana.invite(slack.app, …)` and `ana.invite([ben, slack.app], …)` both work. */
+const participants = () => z.array(participantRef).min(1).openapi({ "x-channelstack-one-or-many": true });
 const conversationRef = z.string().openapi(refTo("SlackConversation"));
 const messageRef = z.object({ channel: z.string(), ts: z.string() }).openapi(refTo("SlackMessage"));
 const threadRef = z.object({ channel: z.string(), ts: z.string() }).openapi(refTo("SlackThread", "SlackMessage"));
@@ -336,7 +339,7 @@ export function registerSlackRoutes(
     summary: "Post a top-level message in a conversation, or in a DM with the people in `to`",
     params: UserParams,
     body: z
-      .object({ message: MessageInput, channel: conversationRef.optional(), to: z.array(participantRef).optional() })
+      .object({ message: MessageInput, channel: conversationRef.optional(), to: participants().optional() })
       .openapi("SlackSayBody"),
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
@@ -427,7 +430,7 @@ export function registerSlackRoutes(
     path: "/users/{user}/open-dm",
     summary: "Open (or reuse) a DM with the app, another person, or several",
     params: UserParams,
-    body: z.object({ participants: z.array(participantRef).min(1) }).openapi("SlackOpenDmBody"),
+    body: z.object({ participants: participants() }).openapi("SlackOpenDmBody"),
     response: SlackConversation,
     errors: ["not_found"],
     sdkMethod: { on: "SlackUser", name: "openDM", args: ["participants"] },
@@ -441,9 +444,7 @@ export function registerSlackRoutes(
     path: "/users/{user}/invite",
     summary: "Invite people or the app to a channel",
     params: UserParams,
-    body: z
-      .object({ participants: z.array(participantRef).min(1), channel: conversationRef })
-      .openapi("SlackInviteBody"),
+    body: z.object({ participants: participants(), channel: conversationRef }).openapi("SlackInviteBody"),
     errors: ["not_found", "not_in_channel", "already_in_channel"],
     sdkMethod: { on: "SlackUser", name: "invite", args: ["participants"], options: ["channel"] },
     stability,
@@ -718,6 +719,7 @@ export function registerSlackRoutes(
     }),
     response: z.array(SlackApiCall).openapi("SlackApiCalls"),
     sdkMethod: { on: "SlackFixture", name: "calls", options: ["operation", "error"] },
+    waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
     stability,
     handler: ({ session, query }) =>
       deps.events
