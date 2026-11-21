@@ -43,6 +43,8 @@ export interface IrField {
 
 export type IrType =
   | { kind: "string" | "number" | "integer" | "boolean" | "unknown" }
+  /** A length of time. SDKs take `"3s"` or milliseconds and send milliseconds. */
+  | { kind: "duration" }
   | { kind: "literal"; value: string }
   | { kind: "enum"; values: string[] }
   | { kind: "array"; items: IrType }
@@ -133,6 +135,7 @@ export function buildIr(openapi: Json): Ir {
       const discriminator: unknown = schema.discriminator?.propertyName;
       return { kind: "union", types, ...(typeof discriminator === "string" ? { discriminator } : {}) };
     }
+    if (schema["x-channelstack-duration"] === true) return { kind: "duration" };
     if (typeof schema.const === "string") return { kind: "literal", value: schema.const };
     if (Array.isArray(schema.enum)) {
       const [first] = schema.enum;

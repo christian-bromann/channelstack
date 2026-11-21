@@ -1,5 +1,18 @@
 import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType } from "../ir.ts";
-import { BANNER, errorClassName, IrIndex, pathParts, snakeCase } from "./shared.ts";
+import { BANNER, errorClassName, IrIndex, pathParts, snakeCase as toSnakeCase } from "./shared.ts";
+
+/** Words Python reserves. A name that collides gets a trailing underscore, as PEP 8 recommends (`as_`). */
+const KEYWORDS = new Set(
+  "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield".split(
+    " ",
+  ),
+);
+
+/** A Python identifier for an IR name: snake_case, and never a keyword. */
+function snakeCase(name: string): string {
+  const snake = toSnakeCase(name);
+  return KEYWORDS.has(snake) ? `${snake}_` : snake;
+}
 
 const OUT = "sdks/python/channelstack/generated/__init__.py";
 
@@ -29,6 +42,8 @@ export function emitPython(ir: Ir): Map<string, string> {
         return "float";
       case "integer":
         return "int";
+      case "duration":
+        return "Duration";
       case "unknown":
         return "Any";
       case "literal":
@@ -125,6 +140,7 @@ export function emitPython(ir: Ir): Map<string, string> {
         ? `${expr}.${snakeCase(only)}`
         : `{${idFields.map((id) => `${JSON.stringify(id)}: ${expr}.${snakeCase(id)}`).join(", ")}}`;
     }
+    if (type.kind === "duration") return `parse_duration(${expr})`;
     if (type.kind === "array" && type.items.kind === "ref")
       return `[${encodeValue(type.items, "item")} for item in ${expr}]`;
     // A named input type is a dataclass that knows its own wire form.
@@ -265,6 +281,9 @@ export function emitPython(ir: Ir): Map<string, string> {
     "from urllib.parse import quote",
     "",
     "from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, session_of",
+    ...(JSON.stringify(ir).includes('"kind":"duration"')
+      ? ["from ..runtime.duration import Duration, parse_duration"]
+      : []),
     "from ..runtime.transport import ChannelstackError, Transport",
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,

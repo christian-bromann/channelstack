@@ -17,6 +17,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       case "number":
       case "integer":
         return "number";
+      case "duration":
+        return side === "wire" ? "number" : "Duration";
       case "literal":
         return JSON.stringify(type.value);
       case "enum":
@@ -88,6 +90,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   /** Does a value of this type carry handles that have to be sent as ids? */
   const holdsRefs = (type: IrType): boolean =>
     type.kind === "ref" ||
+    type.kind === "duration" ||
     (type.kind === "array" && holdsRefs(type.items)) ||
     (type.kind === "object" && type.fields.some((field) => holdsRefs(field.type)));
 
@@ -98,6 +101,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       const ids = index.refIdFields(type.resources);
       return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
     }
+    if (type.kind === "duration") return `parseDuration(${expr})`;
     if (type.kind === "array") return `${expr}.map((item) => ${encodeValue(type.items, "item")})`;
     if (type.kind === "object") {
       const converted = type.fields
@@ -233,12 +237,14 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   };
 
   const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
+  const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
   const lines = [
     `// ${BANNER}`,
     `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
     "",
