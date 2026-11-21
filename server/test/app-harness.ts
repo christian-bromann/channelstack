@@ -7,6 +7,9 @@ import { Redactor } from "../src/core/redact/index.ts";
 import { Secrets } from "../src/core/secrets/index.ts";
 import { secretSpecs } from "../src/drivers/index.ts";
 
+/** The UI page of the app a harness builds: enough to see what the server fills in. */
+const UI_PAGE = '<script nonce="__NONCE__">const session = "__SESSION__";</script>';
+
 /** The bearer token of the app a harness builds. */
 export const TOKEN = "test-token-0123456789";
 
@@ -38,6 +41,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
     log: createLogger({ level: "debug", redactor, write: (line) => logs.push(line) }),
     urls: () => ({ control: "http://127.0.0.1:4500", driver: (name) => `http://127.0.0.1:4500/${name}` }),
     webhooks,
+    ui: UI_PAGE,
   });
   const send = async (url: string, method: string, body: unknown, token: string | null | undefined): Reply => {
     const response = await app.fetch(

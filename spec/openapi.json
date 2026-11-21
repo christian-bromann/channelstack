@@ -1605,6 +1605,17 @@
         "required": [
           "type"
         ]
+      },
+      "UiLoginLink": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
       }
     },
     "parameters": {}
@@ -4852,6 +4863,48 @@
         "responses": {
           "204": {
             "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/login-links": {
+      "post": {
+        "summary": "A new one-time link that opens the UI in a browser (what `channelstack ui` prints)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Channelstack",
+          "name": "uiLoginLink"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal"
+        ],
+        "x-channelstack-stability": "experimental",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiLoginLink"
+                }
+              }
+            }
           },
           "default": {
             "description": "A protocol error",

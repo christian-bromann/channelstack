@@ -104,6 +104,29 @@
             "internal"
           ],
           "dispose": false
+        },
+        {
+          "name": "uiLoginLink",
+          "kind": "method",
+          "summary": "A new one-time link that opens the UI in a browser (what `channelstack ui` prints)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/ui/login-links",
+            "pathParams": []
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "UiLoginLink"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -3887,6 +3910,21 @@
           "kind": "resource",
           "name": "SlackDelivery"
         }
+      }
+    },
+    {
+      "name": "UiLoginLink",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "url",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
       }
     }
   ],

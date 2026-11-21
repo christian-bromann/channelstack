@@ -308,3 +308,81 @@ describe("named sessions", () => {
     expect((await h.call("POST", "/sessions", { name: "Not A Name" })).body.error).toBe("invalid_argument");
   });
 });
+
+describe("the UI", () => {
+  const open = (h: Harness, path: string, cookie?: string) =>
+    h.app.fetch(new Request(`http://127.0.0.1:4500${path}`, cookie ? { headers: { cookie } } : {}));
+  /** Open a login link the way a browser does, and keep the cookie it sets. */
+  async function login(h: Harness) {
+    const link = new URL(h.app.uiLoginLink());
+    const response = await open(h, `${link.pathname}${link.search}`);
+    return { link, response, cookie: (response.headers.get("set-cookie") ?? "").split(";")[0] ?? "" };
+  }
+
+  test("a login link works once and leaves a cookie scripts can't read", async () => {
+    const h = harness();
+    expect((await open(h, "/")).status).toBe(401);
+
+    const { link, response, cookie } = await login(h);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/");
+    expect(response.headers.get("set-cookie")).toMatch(
+      /^channelstack_ui=[A-Za-z0-9_-]{20,}; Path=\/; HttpOnly; SameSite=Strict$/,
+    );
+
+    // The code in the link is spent: a second visit, or a made-up code, gets nothing.
+    expect((await open(h, `${link.pathname}${link.search}`)).headers.get("set-cookie")).toBeNull();
+    expect((await open(h, "/?login=made-up")).status).toBe(401);
+    expect((await open(h, "/", "channelstack_ui=made-up")).status).toBe(401);
+
+    const page = await open(h, "/", cookie);
+    expect(page.status).toBe(200);
+    const nonce = /script-src 'nonce-([^']+)'/.exec(page.headers.get("content-security-policy") ?? "")?.[1];
+    // The page gets this response's nonce and the shared dev session.
+    const { sessionId } = (await h.call("POST", "/sessions", { name: "dev" })).body;
+    expect(await page.text()).toBe(`<script nonce="${nonce}">const session = "${sessionId}";</script>`);
+    expect(page.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(page.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("the browser session reads what the UI shows and nothing else", async () => {
+    const h = harness();
+    const { cookie } = await login(h);
+    const { sessionId } = (await h.call("POST", "/sessions", { name: "dev" })).body;
+    const as = (method: string, path: string) =>
+      h.app.fetch(new Request(`http://127.0.0.1:4500/_channelstack${path}`, { method, headers: { cookie } }));
+
+    for (const path of ["/status", `/sessions/${sessionId}/events`, `/sessions/${sessionId}/slack/conversations`]) {
+      expect((await as("GET", path)).status, path).toBe(200);
+    }
+    // What the browser reads is scrubbed: a token someone pasted into a message doesn't show in the UI.
+    const slack = `/sessions/${sessionId}/slack`;
+    const ana = (await h.call("POST", `${slack}/users`, { name: "Ana" })).body;
+    const channel = (await h.call("POST", `${slack}/channels`, { participants: [ana.id] })).body;
+    const botToken = h.secrets.get("slack", "botToken");
+    await h.call("POST", `${slack}/users/${ana.id}/say`, {
+      message: { text: `my token is ${botToken}` },
+      channel: channel.id,
+    });
+    const transcript = `${slack}/conversations/${channel.id}/transcript`;
+    expect((await h.call("GET", transcript)).body.text).toBe(`Ana: my token is ${botToken}`);
+    expect(((await (await as("GET", transcript)).json()) as { text: string }).text).toBe("Ana: my token is [redacted]");
+
+    // Not the agent's tokens, and no writes: a page that tricks the browser into a request gains nothing.
+    for (const [method, path] of [
+      ["GET", "/env"],
+      ["GET", `/sessions/${sessionId}/slack`],
+      ["POST", "/sessions"],
+      ["POST", "/reset"],
+      ["POST", "/ui/login-links"],
+      ["DELETE", `/sessions/${sessionId}`],
+      ["POST", `/sessions/${sessionId}/slack/users`],
+    ] as const) {
+      expect((await as(method, path)).status, `${method} ${path}`).toBe(401);
+    }
+    // The CLI asks for a fresh link with the bearer token.
+    expect((await h.call("POST", "/ui/login-links")).body.url).toMatch(
+      /^http:\/\/127\.0\.0\.1:4500\/\?login=[A-Za-z0-9_-]{20,}$/,
+    );
+  });
+});

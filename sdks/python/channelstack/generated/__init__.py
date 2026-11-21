@@ -12,7 +12,7 @@ from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "SlackUsers", "Status", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -511,6 +511,17 @@ class SlackApiCall:
 type SlackUninstallDeliveries = list[SlackDelivery]
 
 
+@dataclass(frozen=True)
+class UiLoginLink:
+    url: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> UiLoginLink:
+        return cls(
+            url=data["url"],
+        )
+
+
 class Channelstack(ClientBase):
     def __init__(self, transport: Transport, stop: Callable[[], Awaitable[None]]) -> None:
         super().__init__(transport, stop)
@@ -538,6 +549,12 @@ class Channelstack(ClientBase):
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/env")
         return data
+
+    async def ui_login_link(self) -> UiLoginLink:
+        """A new one-time link that opens the UI in a browser (what `channelstack ui` prints). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/ui/login-links")
+        return UiLoginLink._from_wire(ctx, data)
 
 
 class Session:

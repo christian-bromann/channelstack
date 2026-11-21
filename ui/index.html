@@ -1,0 +1,187 @@
+<!doctype html>
+<!--
+  The channelstack UI, v0: the dev session's conversations as a person would read them, and an
+  inspector for what went to the agent and what the agent called. One page, no build step. It only
+  reads; everything it shows comes from the control API, the same data the matchers read.
+  The server fills in __NONCE__ (this response's CSP nonce) and __SESSION__ (the dev session).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>channelstack</title>
+    <style nonce="__NONCE__">
+      :root {
+        color-scheme: light dark;
+        --line: color-mix(in srgb, currentColor 18%, transparent);
+        --quiet: color-mix(in srgb, currentColor 60%, transparent);
+        --accent: #3b6fd4;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 system-ui, sans-serif; display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+      header { display: flex; gap: 1rem; align-items: baseline; padding: 0.6rem 1rem; border-bottom: 1px solid var(--line); }
+      header h1 { font-size: 1rem; margin: 0; }
+      header span { color: var(--quiet); }
+      main { display: grid; grid-template-columns: 14rem minmax(0, 1fr) minmax(0, 26rem); min-height: 0; }
+      section { overflow: auto; padding: 0.8rem 1rem; border-right: 1px solid var(--line); }
+      h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--quiet); margin: 0 0 0.6rem; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      nav button { all: unset; display: block; width: 100%; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; }
+      nav button[aria-current="true"] { background: var(--accent); color: white; }
+      .entry { padding: 0.3rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .entry .author { font-weight: 600; }
+      .entry .app { color: var(--accent); }
+      .entry .marks, .empty, time { color: var(--quiet); font-size: 0.85em; }
+      .entry button { margin: 0.2rem 0.3rem 0 0; }
+      details { border-bottom: 1px solid var(--line); padding: 0.25rem 0; }
+      summary { cursor: pointer; font-family: ui-monospace, monospace; font-size: 0.8rem; overflow-wrap: anywhere; }
+      summary .failed { color: #c0392b; }
+      pre { margin: 0.4rem 0; font-size: 0.75rem; overflow: auto; }
+    </style>
+  </head>
+  <body data-session="__SESSION__">
+    <header>
+      <h1>channelstack</h1>
+      <span id="status">connecting…</span>
+    </header>
+    <main>
+      <section>
+        <nav aria-label="Conversations">
+          <h2>Slack</h2>
+          <ul id="conversations" data-testid="conversations"></ul>
+        </nav>
+      </section>
+      <section aria-label="Transcript">
+        <h2 id="title">Transcript</h2>
+        <div id="transcript" data-testid="transcript"></div>
+      </section>
+      <section aria-label="Inspector">
+        <h2>Inspector</h2>
+        <div id="inspector" data-testid="inspector"></div>
+      </section>
+    </main>
+    <script type="module" nonce="__NONCE__">
+      const session = encodeURIComponent(document.body.dataset.session);
+      const api = async (path) => {
+        const response = await fetch(`/_channelstack/sessions/${session}${path}`);
+        if (!response.ok) throw new Error(`${response.status} for ${path}`);
+        return response.json();
+      };
+      // Everything an agent or a person wrote is set as text, never as markup.
+      const element = (tag, text, className) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) node.textContent = text;
+        if (className) node.className = className;
+        return node;
+      };
+      const $ = (id) => document.getElementById(id);
+
+      let chosen; // The conversation the person picked; the most recent one until they do.
+      let shown = ""; // What the transcript pane last rendered, to leave it alone while nothing changes.
+      let cursor; // How far into the event log the inspector has read.
+      const deliveries = new Map(); // Delivery id -> its event type, announced once before its attempts.
+
+      const label = (conversation) =>
+        conversation.name ? `#${conversation.name}` : conversation.kind === "im" ? "Direct message" : "Group message";
+
+      async function conversations() {
+        const list = await api("/slack/conversations");
+        const current = list.find((conversation) => conversation.id === chosen) ?? list.at(-1);
+        $("conversations").replaceChildren(
+          ...list.toReversed().map((conversation) => {
+            const button = element("button", label(conversation));
+            button.setAttribute("aria-current", String(conversation.id === current?.id));
+            button.addEventListener("click", () => {
+              chosen = conversation.id;
+              refresh();
+            });
+            const item = element("li");
+            item.append(button);
+            return item;
+          }),
+        );
+        return current;
+      }
+
+      async function transcript(conversation) {
+        if (!conversation) {
+          $("title").textContent = "Transcript";
+          $("transcript").replaceChildren(
+            element("p", 'Nothing yet. Try: channelstack slack say --as ana --in "#support" "@my-agent hi"', "empty"),
+          );
+          return;
+        }
+        const { entries } = await api(`/slack/conversations/${encodeURIComponent(conversation.id)}/transcript`);
+        const signature = conversation.id + JSON.stringify(entries);
+        if (signature === shown) return;
+        shown = signature;
+        $("title").textContent = label(conversation);
+        $("transcript").replaceChildren(
+          ...entries.map((entry) => {
+            const row = element("div", undefined, "entry");
+            row.style.marginLeft = `${entry.depth * 1.5}rem`;
+            row.append(element("span", entry.author.name, `author ${entry.author.kind}`), element("span", `: ${entry.text}`));
+            const marks = [
+              entry.edited ? "edited" : "",
+              entry.streaming === "open" ? "streaming…" : (entry.streaming ?? ""),
+              entry.visibleTo ? `only ${entry.visibleTo.name} sees this` : "",
+            ].filter(Boolean);
+            if (marks.length > 0) row.append(element("span", ` (${marks.join(", ")})`, "marks"));
+            if (entry.controls.length > 0) {
+              const controls = element("div");
+              // Shown, not clickable yet: acting from the UI comes with the interactivity phase.
+              for (const control of entry.controls) controls.append(Object.assign(element("button", control), { disabled: true }));
+              row.append(controls);
+            }
+            return row;
+          }),
+        );
+      }
+
+      function describe(event) {
+        const { data } = event;
+        if (event.kind === "delivery") deliveries.set(data.id, data.eventType ?? data.type);
+        if (event.kind === "delivery_attempt") {
+          const ok = data.status === "acknowledged";
+          const retry = data.number === 1 ? "" : ` (attempt ${data.number})`;
+          return { text: `→ ${deliveries.get(data.id) ?? "event"}${retry}`, outcome: ok ? String(data.responseStatus) : data.status, ok };
+        }
+        if (event.kind === "api_call") {
+          const ok = data.error === undefined;
+          return { text: `← ${data.operation}`, outcome: ok ? String(data.responseStatus) : `${data.responseStatus} ${data.error}`, ok };
+        }
+      }
+
+      async function inspector() {
+        const page = await api(`/events${cursor === undefined ? "" : `?since=${encodeURIComponent(cursor)}`}`);
+        cursor = page.cursor;
+        for (const event of page.events) {
+          const line = describe(event);
+          if (!line) continue;
+          const details = element("details");
+          const summary = element("summary");
+          summary.append(
+            element("time", `${event.at.slice(11, 23)} `),
+            element("span", `${line.text}  `),
+            element("span", line.outcome, line.ok ? "" : "failed"),
+          );
+          details.append(summary, element("pre", JSON.stringify(event.data, null, 2)));
+          $("inspector").append(details);
+        }
+      }
+
+      async function refresh() {
+        try {
+          await transcript(await conversations());
+          await inspector();
+          $("status").textContent = `session ${document.body.dataset.session}`;
+        } catch (error) {
+          $("status").textContent = `not connected (${error.message})`;
+        }
+      }
+
+      await refresh();
+      setInterval(refresh, 1000);
+    </script>
+  </body>
+</html>

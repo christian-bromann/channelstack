@@ -298,6 +298,10 @@ function decodeSlackUninstallDeliveries(ctx: HandleContext, data: SlackUninstall
   return data.map((item) => new SlackDelivery(ctx, item));
 }
 
+export interface UiLoginLink {
+  url: string;
+}
+
 export class Channelstack extends ClientBase {
   readonly #ctx: HandleContext;
 
@@ -331,6 +335,13 @@ export class Channelstack extends ClientBase {
   async env(): Promise<Env> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/env`)) as Env;
+    return data;
+  }
+
+  /** A new one-time link that opens the UI in a browser (what `channelstack ui` prints). Experimental. */
+  async uiLoginLink(): Promise<UiLoginLink> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/ui/login-links`)) as UiLoginLink;
     return data;
   }
 }

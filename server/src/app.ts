@@ -1,8 +1,10 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 
-import { requireBearer } from "./core/auth/index.ts";
+import { requireAccess } from "./core/auth/index.ts";
+import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { type Clock, systemClock } from "./core/clock/index.ts";
 import { DeliveryQueue } from "./core/delivery/index.ts";
 import { ProtocolError } from "./core/errors/index.ts";
@@ -13,7 +15,7 @@ import { QuietDetector } from "./core/quiet/index.ts";
 import type { Redactor } from "./core/redact/index.ts";
 import { Registry } from "./core/registry/index.ts";
 import { type Driver, DriverRouter, invalidArgument, registerRoute, SessionParams } from "./core/router/index.ts";
-import type { Secrets } from "./core/secrets/index.ts";
+import { randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
 import { DRIVERS } from "./drivers/index.ts";
 
@@ -39,6 +41,11 @@ export interface AppOptions {
   urls: () => ServerUrls;
   /** The agent's endpoint per driver, for the events that driver delivers. */
   webhooks: Readonly<Record<string, string | undefined>>;
+  /**
+   * The UI: one HTML page. `__NONCE__` in it becomes the response's CSP nonce and `__SESSION__`
+   * the id of the shared `dev` session. Without it the server has no UI.
+   */
+  ui?: string;
   clock?: Clock;
 }
 
@@ -50,6 +57,8 @@ export interface App {
   hosts(): string[];
   /** Resolves once no delivery is in flight. */
   settled(): Promise<void>;
+  /** A new one-time link that opens the UI in a browser. */
+  uiLoginLink(): string;
 }
 
 const Status = z.object({ ready: z.boolean(), version: z.string(), drivers: z.array(z.string()) }).openapi("Status");
@@ -130,7 +139,11 @@ export function createApp(options: AppOptions): App {
     await next();
     log.debug("request", { method: c.req.method, path: c.req.path, status: c.res.status });
   });
-  control.use("*", requireBearer(options.token));
+  const ui = new UiAccess((secret) => redactor.register(secret));
+  control.use(
+    "*",
+    requireAccess({ token: options.token, ui, prefix: CONTROL_PREFIX, scrub: (body) => redactor.tokens(body) }),
+  );
   control.onError((error, c) => {
     // A message or its data can quote what the caller sent, so both are scrubbed on the way out.
     if (error instanceof ProtocolError) {
@@ -249,8 +262,46 @@ export function createApp(options: AppOptions): App {
 
   for (const driver of drivers) driver.routes(new DriverRouter(control, driver.name, sessions));
 
+  const uiLoginLink = () => `${options.urls().control}/?login=${ui.issueCode()}`;
+  registerRoute(control, {
+    method: "post",
+    path: "/ui/login-links",
+    summary: "A new one-time link that opens the UI in a browser (what `channelstack ui` prints)",
+    response: z.object({ url: z.string() }).openapi("UiLoginLink"),
+    sdkMethod: { on: "Channelstack", name: "uiLoginLink" },
+    stability: "experimental",
+    handler: () => ({ url: uiLoginLink() }),
+  });
+
   const root = new Hono();
   root.route(CONTROL_PREFIX, control);
+  root.get("/", (c) => {
+    // A login link trades its one-time code for a session cookie, then sends the browser to the plain address.
+    const code = c.req.query("login");
+    const granted = code === undefined ? undefined : ui.redeem(code);
+    if (granted !== undefined) {
+      setCookie(c, UI_COOKIE, granted, {
+        httpOnly: true,
+        sameSite: "Strict",
+        path: "/",
+        secure: options.urls().control.startsWith("https:"),
+      });
+      return c.redirect("/", 302);
+    }
+    c.header("cache-control", "no-store");
+    c.header("referrer-policy", "no-referrer");
+    c.header("x-frame-options", "DENY");
+    if (options.ui === undefined || !ui.knows(getCookie(c, UI_COOKIE))) {
+      return c.text("Open the UI with a login link: `channelstack ui` prints one.\n", 401);
+    }
+    // The page's own script and style run; nothing else does, whatever an agent writes into a message.
+    const nonce = randomToken(16);
+    c.header(
+      "content-security-policy",
+      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    );
+    return c.html(options.ui.replaceAll("__NONCE__", nonce).replaceAll("__SESSION__", sessions.open("dev").id));
+  });
   for (const driver of drivers) root.route(`/${driver.name}`, driver.fake.api);
   root.notFound((c) => c.json(new ProtocolError("not_found", "Nothing is served here").toBody(), 404));
 
@@ -274,5 +325,6 @@ export function createApp(options: AppOptions): App {
       }),
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),
+    uiLoginLink,
   };
 }
