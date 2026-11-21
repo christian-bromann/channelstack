@@ -3,12 +3,16 @@ import { parseArgs } from "node:util";
 
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
-import { homeDir, readPrivateJsonFile } from "./core/home/index.ts";
+import { attach, type Attached } from "./cli/attach.ts";
+import { runSlack } from "./cli/slack.ts";
+import { runShow, runTail } from "./cli/watch.ts";
+import { homeDir } from "./core/home/index.ts";
 import { parseSeed } from "./core/ids/index.ts";
 import { parseLogLevel } from "./core/log/index.ts";
 import { randomSeed, Secrets } from "./core/secrets/index.ts";
 import { DRIVERS, secretSpecs } from "./drivers/index.ts";
-import { serverFilePath, start } from "./serve.ts";
+import { start } from "./serve.ts";
+import { UI_PAGE } from "./ui/page.ts";
 
 const USAGE = `channelstack ${pkg.version}
 
@@ -19,6 +23,17 @@ Usage:
       --server-file <path>        Where to write the control API's URL and token (default <home>/server.json)
       --log-level <level>         debug, info, warn, error or silent (default info)
   channelstack env                Print .env lines for the agent, from the running server
+
+  Attached to the running server (a shared "dev" session; people and channels are created on first use):
+  channelstack slack say   --as <name> --in "#channel" "<text>"
+  channelstack slack reply --as <name> [--thread last] "<text>"
+  channelstack slack react --as <name> <:emoji:> [--on last]
+  channelstack show [--thread last] [--json]    The latest conversation as a person would read it
+  channelstack tail [--once]                    Events to the agent and its API calls, as they happen
+  channelstack ui                               A one-time link that opens the UI in a browser
+      --server <url>              The server to attach to (default: the one in server.json; also CHANNELSTACK_URL
+                                  with CHANNELSTACK_TOKEN)
+
   channelstack secrets rotate     Replace every fake token and signing secret
   channelstack --version
   channelstack --help
@@ -55,6 +70,7 @@ async function runStart(flags: {
     serverFile: flags["server-file"] ?? process.env.CHANNELSTACK_SERVER_FILE,
     seed: seed ? parseSeed(seed) : randomSeed(),
     logLevel: parseLogLevel(flags["log-level"] ?? process.env.CHANNELSTACK_LOG_LEVEL),
+    ui: UI_PAGE,
     webhooks: Object.fromEntries(
       DRIVERS.map((driver) => [
         driver.name,
@@ -68,6 +84,8 @@ async function runStart(flags: {
     "",
     `  Control  ${running.urls.control}${CONTROL_PREFIX}`,
     ...DRIVERS.map((driver) => `  ${driver.name.padEnd(8)} ${running.urls.driver(driver.name)}`),
+    // A one-time link: it signs this browser in. `channelstack ui` prints a fresh one.
+    `  UI       ${running.app.uiLoginLink()}`,
     "",
     "  `channelstack env` prints tokens and URLs as .env lines",
     "",
@@ -88,20 +106,11 @@ async function runStart(flags: {
 }
 
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */
-async function runEnv(flags: { "server-file"?: string }) {
-  const file = flags["server-file"] ?? process.env.CHANNELSTACK_SERVER_FILE ?? serverFilePath(homeDir());
-  const server = readPrivateJsonFile(file) as { url?: string; token?: string } | undefined;
-  if (!server?.url || !server.token) fail("no running server found. Start one with `channelstack start`.");
-  const response = await fetch(`${server.url}${CONTROL_PREFIX}/env`, {
-    headers: { authorization: `Bearer ${server.token}` },
-  }).catch(() => fail(`the server at ${server.url} isn't reachable. Start one with \`channelstack start\`.`));
-  if (!response.ok) fail(`the server at ${server.url} refused the request (${response.status}).`);
-  const env = (await response.json()) as Record<string, string>;
-  process.stdout.write(
-    `${Object.entries(env)
-      .map(([key, value]) => `${key}=${value}`)
-      .join("\n")}\n`,
-  );
+async function runEnv(server: Attached) {
+  const env = await server.request<Record<string, string>>("GET", "/env");
+  return `${Object.entries(env)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n")}\n`;
 }
 
 function runSecrets(action: string | undefined) {
@@ -124,15 +133,32 @@ async function main() {
       port: { type: "string" },
       "server-file": { type: "string" },
       "log-level": { type: "string" },
+      server: { type: "string" },
+      as: { type: "string" },
+      in: { type: "string" },
+      thread: { type: "string" },
+      on: { type: "string" },
+      json: { type: "boolean" },
+      once: { type: "boolean" },
     },
   });
   if (values.version) return void process.stdout.write(`${pkg.version}\n`);
   if (values.help) return void process.stdout.write(USAGE);
 
-  const [command = "start", action] = positionals;
+  const [command = "start", action, ...rest] = positionals;
   if (command === "start") return runStart(values);
-  if (command === "env") return runEnv(values);
   if (command === "secrets") return runSecrets(action);
+
+  // Everything else attaches to the running server.
+  const print = (text: string) => void process.stdout.write(text);
+  if (command === "env") return print(await runEnv(attach(values)));
+  if (command === "slack") return print(await runSlack(attach(values), action, rest, values));
+  if (command === "ui") {
+    const { url } = await attach(values).request<{ url: string }>("POST", "/ui/login-links");
+    return print(`${url}\n`);
+  }
+  if (command === "show") return print(await runShow(attach(values), values));
+  if (command === "tail") return runTail(attach(values), values, print);
   fail(`unknown command "${command}". Run \`channelstack --help\`.`);
 }
 
