@@ -20,6 +20,7 @@ import {
   type TargetKey,
 } from "./lib/packages.ts";
 import { capture, run } from "./lib/process.ts";
+import { startBinary } from "./lib/server.ts";
 import { runSmoke } from "./smoke.ts";
 
 const host = hostTarget();
@@ -99,6 +100,29 @@ try {
   if (version !== serverPackage.version)
     throw new Error(`npx channelstack --version printed "${version}", expected ${serverPackage.version}`);
   console.log(`npx channelstack --version → ${version}`);
+
+  // Stopping the `channelstack` command must stop the server behind it: the shim forwards the signal,
+  // and the server removes its token file on the way out.
+  const shim = join(project, "node_modules", ".bin", "channelstack");
+  const serverFile = join(project, "server.json");
+  const viaShim = await startBinary({
+    bin: shim,
+    args: ["--no-portless", "--port", "0", "--server-file", serverFile],
+    serverFile,
+  });
+  const status = await fetch(`${viaShim.url}/_channelstack/status`, {
+    headers: { authorization: `Bearer ${viaShim.token}` },
+  });
+  if (!status.ok) throw new Error(`The server started through the shim answered ${status.status}`);
+  await viaShim.stop();
+  if (existsSync(serverFile))
+    throw new Error("SIGTERM to the channelstack command left the server's token file behind");
+  const stillUp = await fetch(`${viaShim.url}/_channelstack/status`).then(
+    () => true,
+    () => false,
+  );
+  if (stillUp) throw new Error("SIGTERM to the channelstack command left the server running");
+  console.log("SIGTERM to the channelstack command stopped the server and removed its token file");
 
   // The scenario runner is copied in, so its `channelstack/client` import resolves to the installed package.
   const runner = join(project, "run.ts");
