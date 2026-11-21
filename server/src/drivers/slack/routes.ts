@@ -138,6 +138,10 @@ const SlackTranscript = z
           text: z.string(),
           controls: z.array(z.string()),
           files: z.array(z.string()).openapi({ description: "The names of the files shared with the message." }),
+          alsoInChannel: z
+            .literal(true)
+            .optional()
+            .openapi({ description: "A reply that was also sent to the channel." }),
           edited: z.boolean(),
           streaming: z.enum(["open", "stopped", "completed"]).optional(),
           visibleTo: Principal.optional(),

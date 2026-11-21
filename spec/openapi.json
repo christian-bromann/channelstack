@@ -1394,6 +1394,13 @@
             },
             "description": "The names of the files shared with the message."
           },
+          "alsoInChannel": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "A reply that was also sent to the channel."
+          },
           "edited": {
             "type": "boolean"
           },

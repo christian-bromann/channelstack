@@ -75,6 +75,8 @@ export interface SlackMessageRecord {
   metadata: unknown;
   /** For a message the app streams (`chat.startStream`). */
   stream: SlackStreamRecord | undefined;
+  /** A reply that was also sent to the channel (`reply_broadcast`): it shows among the channel's messages too. */
+  readonly broadcast: boolean;
   /** Files shared with the message. */
   readonly files: readonly SlackFileRecord[];
 }

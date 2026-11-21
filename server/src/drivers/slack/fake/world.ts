@@ -214,6 +214,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       ephemeralFor?: string | undefined;
       metadata?: unknown;
       files?: readonly SlackFileRecord[] | undefined;
+      broadcast?: boolean | undefined;
     },
   ): SlackMessageRecord => {
     const message: SlackMessageRecord = {
@@ -230,6 +231,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       metadata: options.metadata,
       stream: undefined,
       files: options.files ?? [],
+      broadcast: options.broadcast === true,
     };
     store.messagesIn(conversation.id).push(message);
     // An ephemeral message exists only for its recipient: Slack sends no event for it.
@@ -380,6 +382,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       const message = post(conversation, user.id, content(session, input), {
         threadTs: root.threadTs ?? root.ts,
         metadata: input.metadata,
+        broadcast: alsoSendToChannel,
       });
       action(session, "reply", {
         user: user.id,
@@ -535,7 +538,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     messages: (session, channel) =>
       store
         .messagesIn(store.conversations.get(session, channel).id)
-        .filter((message) => message.threadTs === undefined),
+        // A reply that was also sent to the channel shows there too.
+        .filter((message) => message.threadTs === undefined || message.broadcast),
     replies: (session, channel, ts) =>
       store.messagesIn(store.conversations.get(session, channel).id).filter((message) => message.threadTs === ts),
     user: (session, id) => store.users.get(session, id),

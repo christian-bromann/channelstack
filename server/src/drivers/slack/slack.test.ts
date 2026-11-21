@@ -251,6 +251,32 @@ describe("messages and the events they send", () => {
     });
   });
 
+  test("a reply also sent to the channel is a thread_broadcast, and shows among the channel's messages", async () => {
+    const { h, agent, app, user, post, get } = await workspace();
+    const ana = await user({ name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id] });
+    const root = await post(`/users/${ana.id}/say`, { message: { text: "deploy failed" }, channel: channel.id });
+    const thread = { channel: root.channel, ts: root.ts };
+    await post(`/users/${ana.id}/reply`, { message: { text: "looking" }, thread });
+    const fix = await post(`/users/${ana.id}/reply`, { message: { text: "fixed" }, thread, alsoSendToChannel: true });
+    await h.app.settled();
+
+    expect(events(agent as RecordingAgent).at(-1)?.event).toMatchObject({
+      type: "message",
+      subtype: "thread_broadcast",
+      text: "fixed",
+      thread_ts: root.ts,
+    });
+    // The channel lists the root and the broadcast reply, not the plain one.
+    expect(
+      (await get(`/conversations/${channel.id}/messages`)).map((message: { text: string }) => message.text),
+    ).toEqual(["deploy failed", "fixed"]);
+    expect((await get(`/conversations/${channel.id}/threads/${root.ts}/replies`)).at(-1).ts).toBe(fix.ts);
+    expect((await get(`/conversations/${channel.id}/transcript`)).text).toBe(
+      "Ana: deploy failed\n  Ana: looking\n  Ana: fixed (also sent to the channel)",
+    );
+  });
+
   test("edits and deletes reach the app as message_changed and message_deleted", async () => {
     const { h, agent, app, user, post, get } = await workspace();
     const ana = await user({ name: "Ana" });

@@ -3809,6 +3809,14 @@
             "optional": false
           },
           {
+            "name": "alsoInChannel",
+            "type": {
+              "kind": "literal",
+              "value": true
+            },
+            "optional": true
+          },
+          {
             "name": "edited",
             "type": {
               "kind": "boolean"

@@ -11,6 +11,8 @@ export interface TranscriptEntry {
   controls: string[];
   /** The names of the files shared with the message. */
   files: string[];
+  /** A reply that was also sent to the channel. */
+  alsoInChannel?: true;
   edited: boolean;
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: { id: string; name: string; kind: "user" | "app" };
@@ -103,6 +105,7 @@ export function renderTranscript(
         text: named(message.text !== "" ? message.text : fromBlocks.join("\n")),
         controls: blocks.flatMap(blockControls),
         files: message.files.map((file) => file.name),
+        ...(message.broadcast ? { alsoInChannel: true as const } : {}),
         edited: message.edited !== undefined,
         ...(message.stream === undefined ? {} : { streaming: message.stream.state }),
         ...(message.ephemeralFor === undefined ? {} : { visibleTo: options.principal(message.ephemeralFor) }),
@@ -114,6 +117,7 @@ export function renderTranscript(
     .map((entry) => {
       const marks = [
         entry.edited ? "edited" : "",
+        entry.alsoInChannel ? "also sent to the channel" : "",
         entry.streaming === "open" ? "streaming" : "",
         entry.visibleTo ? `only ${entry.visibleTo.name} sees this` : "",
       ]

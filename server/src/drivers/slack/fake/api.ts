@@ -473,7 +473,9 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       const conversation = joined(required(args, "channel"));
       const messages = store
         .messagesIn(conversation.id)
-        .filter((message) => message.threadTs === undefined && message.ephemeralFor === undefined)
+        .filter(
+          (message) => (message.threadTs === undefined || message.broadcast) && message.ephemeralFor === undefined,
+        )
         .map(messageOf)
         .reverse();
       return { messages, has_more: false, pin_count: 0, response_metadata: { next_cursor: "" } };

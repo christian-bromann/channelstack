@@ -52,6 +52,8 @@ export function messageObject(
       ? {}
       : { reactions: message.reactions.map(({ name, users }) => ({ name, users, count: users.length })) }),
     ...(message.metadata === undefined ? {} : { metadata: message.metadata }),
+    // A reply that was also sent to the channel says so.
+    ...(message.broadcast ? { subtype: "thread_broadcast" } : {}),
     // A message that shares files says so, and carries them.
     ...(message.files.length === 0
       ? {}

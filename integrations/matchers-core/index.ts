@@ -10,6 +10,7 @@ import {
   type Duration,
   fromMatches,
   type InSession,
+  parseDuration,
   QUIET,
   untilQuiet,
   waitFor,
@@ -306,12 +307,19 @@ export const matchers = {
   /** The agent answered the delivery with 2xx, within the platform's window. */
   toBeAccepted(state: MatcherState, subject: unknown, options?: Timing & { within?: Duration }) {
     const delivery = subject as Delivery;
+    const within = options?.within === undefined ? undefined : parseDuration(options.within);
     return settle(subject, state, options, {
       onceQuiet: false,
       read: async () => (await delivery.refresh()).attempts.find((attempt) => !attempt.forgedSignature),
-      holds: (attempt) => attempt?.status === "acknowledged",
-      describe: (attempt) =>
-        `Expected delivery ${delivery.id} ${state.isNot ? "not " : ""}to be accepted, its first attempt is ${attempt?.status ?? "missing"}${attempt?.responseStatus === undefined ? "" : ` (HTTP ${attempt.responseStatus})`}`,
+      // Accepted, and with `within`, accepted that fast: the platform's window is only the outer limit.
+      holds: (attempt) =>
+        attempt?.status === "acknowledged" && (within === undefined || (attempt.durationMs ?? 0) <= within),
+      describe: (attempt) => {
+        const expected = `Expected delivery ${delivery.id} ${state.isNot ? "not " : ""}to be accepted${within === undefined ? "" : ` within ${within}ms`}`;
+        const http = attempt?.responseStatus === undefined ? "" : ` (HTTP ${attempt.responseStatus})`;
+        const took = attempt?.durationMs === undefined ? "" : ` after ${attempt.durationMs}ms`;
+        return `${expected}, its first attempt is ${attempt?.status ?? "missing"}${http}${took}`;
+      },
     });
   },
 

@@ -232,6 +232,7 @@ export interface SlackTranscriptEntry {
   text: string;
   controls: string[];
   files: string[];
+  alsoInChannel?: true;
   edited: boolean;
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: SlackPrincipal;
