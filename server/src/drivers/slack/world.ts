@@ -72,7 +72,26 @@ export interface SlackMessageRecord {
   readonly ephemeralFor: string | undefined;
   /** The deliveries this message caused to the agent, in order. */
   readonly deliveries: string[];
-  readonly metadata: unknown;
+  metadata: unknown;
+  /** For a message the app streams (`chat.startStream`). */
+  stream: SlackStreamRecord | undefined;
+}
+
+interface SlackStreamRecord {
+  /** `open` while the app appends, `completed` after `chat.stopStream`, `stopped` when a person pressed Stop. */
+  state: "open" | "stopped" | "completed";
+  /** The text of each call, in order. The message's text is all of them joined. */
+  readonly chunks: string[];
+  readonly startedAt: number;
+  endedAt: number | undefined;
+}
+
+/** What the app has said about its work in one thread. */
+export interface SlackThreadState {
+  /** The status line (`assistant.threads.setStatus`), shown as "<app> <status>". Empty when cleared. */
+  statusText: string;
+  /** The agent session's lifecycle status (`agents.sessions.setStatus`). */
+  sessionStatus: "active" | "processing" | "suspended" | "closed" | undefined;
 }
 
 /** Where a person posts: a conversation, or people to open (or reuse) a DM with. */

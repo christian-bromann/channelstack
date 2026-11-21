@@ -4,6 +4,7 @@ import type {
   SlackConversationRecord,
   SlackMessageRecord,
   SlackTeam,
+  SlackThreadState,
   SlackUserRecord,
 } from "../world.ts";
 
@@ -12,6 +13,7 @@ export class SlackStore {
   readonly users: Collection<SlackUserRecord>;
   readonly conversations: Collection<SlackConversationRecord>;
   readonly #messages = new Map<string, SlackMessageRecord[]>();
+  readonly #threads = new Map<string, SlackThreadState>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
   #team: SlackTeam | undefined;
@@ -34,6 +36,7 @@ export class SlackStore {
 
   seed(team: SlackTeam, app: SlackAppRecord): void {
     this.#messages.clear();
+    this.#threads.clear();
     this.#known.length = 0;
     this.#people.clear();
     this.#team = team;
@@ -48,6 +51,17 @@ export class SlackStore {
       this.#messages.set(conversation, messages);
     }
     return messages;
+  }
+
+  /** What the app has said about its work in a thread. Created on first use. */
+  threadState(conversation: string, threadTs: string): SlackThreadState {
+    const key = `${conversation}:${threadTs}`;
+    let state = this.#threads.get(key);
+    if (!state) {
+      state = { statusText: "", sessionStatus: undefined };
+      this.#threads.set(key, state);
+    }
+    return state;
   }
 
   findMessage(conversation: string, ts: string): SlackMessageRecord | undefined {
@@ -84,6 +98,11 @@ export class SlackStore {
     this.#people.set(session, [...(this.#people.get(session) ?? []), id]);
   }
 
+  /** Every person in the workspace, for the provider API's listings. */
+  allUsers(): SlackUserRecord[] {
+    return [...this.#people.keys()].flatMap((session) => this.usersOf(session));
+  }
+
   usersOf(session: string): SlackUserRecord[] {
     return (this.#people.get(session) ?? [])
       .map((id) => this.users.find(id))
@@ -100,6 +119,7 @@ export class SlackStore {
     for (const id of [...this.#known]) {
       if (this.conversations.owner(id) !== session) continue;
       this.#messages.delete(id);
+      for (const key of [...this.#threads.keys()]) if (key.startsWith(`${id}:`)) this.#threads.delete(key);
       this.#known.splice(this.#known.indexOf(id), 1);
     }
     return people;

@@ -1,6 +1,5 @@
-import { Hono } from "hono";
-
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
+import { createSlackApi } from "./api.ts";
 import { SlackStore } from "./store.ts";
 import { createFakeWorld, type FakeSlackWorld } from "./world.ts";
 
@@ -53,7 +52,7 @@ export function createSlackFake(context: DriverContext): SlackFake {
   const store = new SlackStore(context.registry);
   const world = createFakeWorld(context, store);
   const fake = {
-    api: new Hono(),
+    api: createSlackApi(context, store, world),
     world,
     store,
     seed() {

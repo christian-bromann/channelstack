@@ -136,6 +136,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       ephemeralFor: options.ephemeralFor,
       deliveries: [],
       metadata: options.metadata,
+      stream: undefined,
     };
     store.messagesIn(conversation.id).push(message);
     // An ephemeral message exists only for its recipient: Slack sends no event for it.
