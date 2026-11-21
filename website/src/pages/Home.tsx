@@ -9,15 +9,22 @@ import { Footer } from "../components/Footer";
 import { ArrowRight, Person, Route, Shield, Transcript } from "../components/Icons";
 import { Nav } from "../components/Nav";
 import { Seo } from "../components/Seo";
+import { StackArt } from "../components/StackArt";
 import { Stage } from "../components/Stage";
+import { Voice } from "../components/Voice";
 import { useReveal } from "../lib/hooks";
 import { SITE } from "../lib/site";
 
 /**
- * Official logo files per channel, by theme. A channel is listed here only when its owner's
- * brand guidelines allow this use; see public/logos/SOURCES.md.
+ * Official logo files per channel, by theme, shown unmodified. Sources, guidelines and the
+ * decision to show them are recorded in public/logos/SOURCES.md.
  */
-const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {};
+const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {
+  slack: { onLight: "/logos/slack.svg", onDark: "/logos/slack.svg" },
+  github: { onLight: "/logos/github.svg", onDark: "/logos/github-white.svg" },
+  linear: { onLight: "/logos/linear.svg", onDark: "/logos/linear-light.svg" },
+  notion: { onLight: "/logos/notion.svg", onDark: "/logos/notion.svg" },
+};
 
 const CHANNELS = [
   { id: "slack", name: "Slack", text: "DMs, mentions, threads and the agent view, with progress streams rendered the way people see them.", chips: ["Events API", "block_actions", "chat.startStream", "assistant.threads", "agent_session_stopped"] },
@@ -72,14 +79,6 @@ const COMPARE: Array<[string, Cell, Cell, Cell, Cell]> = [
   ["Same test against the real platform", ["n", "No"], ["n", "No"], ["y", "Yes"], ["y", "Live mode"]],
 ];
 
-/** A fixed, seeded waveform: decoration for the closing section. */
-const WAVE = Array.from({ length: 120 }, (_, i) => {
-  const t = i / 120;
-  const seed = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
-  const env = Math.pow(Math.sin(Math.PI * t), 0.6) * (0.55 + 0.45 * Math.sin(t * 19) * Math.sin(t * 7.3));
-  return Math.max(2, Math.round(Math.abs(env) * 56 * (0.35 + 0.65 * seed)));
-});
-
 export default function Home() {
   const channels = useReveal<HTMLDivElement>();
   const principles = useReveal<HTMLDivElement>();
@@ -94,6 +93,7 @@ export default function Home() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-bg" aria-hidden="true" />
           <div className="wrap">
+            <StackArt />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
               Test harness for agents that live in chat
@@ -139,13 +139,12 @@ export default function Home() {
                   <article key={channel.id} className="channel reveal">
                     <header>
                       {logo ? (
-                        <span className="logo">
-                          <img className="on-light" src={logo.onLight} alt="" width="28" height="28" loading="lazy" decoding="async" />
-                          <img className="on-dark" src={logo.onDark} alt="" width="28" height="28" loading="lazy" decoding="async" />
+                        <span className={logo.onDark === logo.onLight ? "logo same" : "logo"}>
+                          <img className="on-light" src={logo.onLight} alt="" width="32" height="32" loading="lazy" decoding="async" />
+                          {logo.onDark === logo.onLight ? null : <img className="on-dark" src={logo.onDark} alt="" width="32" height="32" loading="lazy" decoding="async" />}
                         </span>
                       ) : null}
                       <h3>{channel.name}</h3>
-                      <code className="fixture">{`{ ${channel.id} }`}</code>
                     </header>
                     <p>{channel.text}</p>
                     <ul>
@@ -302,11 +301,7 @@ export default function Home() {
             </p>
           </div>
           <div className="wrap">
-            <svg className="wave" viewBox="0 0 600 64" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-              {WAVE.map((h, i) => (
-                <rect key={i} className={i % 23 < 6 ? "hi" : undefined} x={i * 5} y={(64 - h) / 2} width="3" height={h} rx="1" />
-              ))}
-            </svg>
+            <Voice />
           </div>
         </section>
       </main>

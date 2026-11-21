@@ -1,23 +1,36 @@
 # Channel logos
 
-**No logo files are shipped yet.** The channel cards on the home page show names only. This file
-records where each official mark comes from and what its owner's guidelines say about showing it
-on a third-party "works with" page, as read on 2026-11-20. Re-read the linked pages before
-adding a logo: the summaries below are paraphrased.
+The channel cards on the home page show each platform's official mark, to say "channelstack works
+with this platform". Every file here is the unmodified official file, byte for byte, taken from the
+company's own brand or media kit on 2026-11-20.
 
-To add a logo: put the unmodified official SVG in this folder, add it to `LOGOS` in
-`src/pages/Home.tsx` (one file for light backgrounds, one for dark), and update this table.
-
-| Channel | Official source of the mark | Guidelines | "Works with" use without written permission | Status |
+| File | Channel | Official source | Original file name | Used on |
 |---|---|---|---|---|
-| Slack | Media kit linked from https://slack.com/media-kit (`SLA-Slack-icon-RGB.svg`) | https://slack.com/terms-of-service/slack-brand | No. The brand terms say not to use the Slack logo; saying in text that an app integrates with Slack is allowed. Other uses need a request to Slack with a mockup. | Not used |
-| Notion | `NotionLogoFiles.zip` on https://notion.notion.site/Media-Kit-205535b1d9c4440497a3d7a2ac096286 (`notion-logo-block-main.svg`) | https://notion.notion.site/Notion-s-brand-usage-guidelines-How-to-use-Notion-s-brand-in-your-marketing-689045e1761348f887a3c5c80295e00f | No. The guidelines say not to use the standalone Notion logo; stating in text that an integration works with Notion is allowed. | Not used |
-| GitHub | https://brand.github.com/GitHub_Logos.zip (`GitHub_Invertocat_Black.svg`, `GitHub_Invertocat_White.svg`) | https://brand.github.com/foundations/logo and https://docs.github.com/en/site-policy/other-site-policies/github-logo-policy | Unclear. "Show integration" is listed as an allowed use, but the same page asks for prior written permission. | Not used, pending a decision |
-| Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip (`logo-dark.svg`, `logo-light.svg`) | https://linear.app/brand | Yes, when the file is unaltered, has room around it and implies no endorsement. | Not used, to keep the row consistent |
+| `slack.svg` | Slack | Media kit linked from https://slack.com/media-kit | `SLA-Slack-icon-RGB.svg` | light and dark |
+| `github.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub_Invertocat_Black.svg` | light |
+| `github-white.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub_Invertocat_White.svg` | dark |
+| `linear.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-dark.svg` | light |
+| `linear-light.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-light.svg` | dark |
+| `notion.svg` | Notion | `NotionLogoFiles.zip` on https://notion.notion.site/Media-Kit-205535b1d9c4440497a3d7a2ac096286 | `notion-logo-block-main.svg` | light and dark |
 
-## Rules to follow when a logo is added
+## Guidelines
 
-- Use the official file byte for byte: no recolouring, cropping, rotation, effects or animation of the mark itself.
-- GitHub: black or white mark only, whichever contrasts best; keep it less prominent than channelstack's own name.
-- Linear: the dark mark (`#222326`) on light backgrounds, the light mark on dark backgrounds.
-- Keep the non-affiliation and trademark line in the footer (`src/components/Footer.tsx`).
+Summaries are paraphrased; read the linked page before changing how a mark is used.
+
+| Channel | Guidelines | What they say about "works with" use on a third-party site |
+|---|---|---|
+| Slack | https://slack.com/terms-of-service/slack-brand | Text statements that an app integrates with Slack are allowed. The terms say not to use the Slack logo without a licence; other uses need a request to Slack with a mockup. |
+| GitHub | https://brand.github.com/foundations/logo, https://docs.github.com/en/site-policy/other-site-policies/github-logo-policy | "Show integration" is listed as an allowed use of a permitted logo; the same page also asks for prior written permission. Black or white mark only. |
+| Linear | https://linear.app/brand | Allowed when the file is unaltered, has room around it and implies no endorsement. |
+| Notion | https://notion.notion.site/Notion-s-brand-usage-guidelines-How-to-use-Notion-s-brand-in-your-marketing-689045e1761348f887a3c5c80295e00f | Text statements that an integration works with Notion are allowed. The guidelines say not to use the standalone Notion logo. |
+
+**Decision.** The maintainer chose to show all four marks on the channel cards, knowing that
+Slack's and Notion's guidelines don't grant this use and GitHub's are ambiguous. Asking Slack and
+Notion for permission, or replacing those two marks with names, are the ways to close that gap.
+
+## How the marks are shown
+
+- Unmodified files, rendered with `<img>` at 32 px: no recolouring, cropping, rotation, effects or animation of a mark.
+- "Works with" use only: one mark per channel card, next to the platform's name, smaller than channelstack's own branding.
+- GitHub and Linear use their official dark-background files in the dark theme; Slack and Notion have one file for both.
+- The footer states that channelstack is not affiliated with or endorsed by these companies and that the names and logos are their trademarks (`src/components/Footer.tsx`).

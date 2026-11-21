@@ -74,6 +74,10 @@ await writeFile(
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+/logos/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'
+
 https://:version.:subdomain.workers.dev/*
   X-Robots-Tag: noindex
 `,

@@ -7,12 +7,15 @@ import slack from "../../samples/slack.test.ts?sample";
 import pytest from "../../samples/test_keys.py?sample";
 import type { Sample } from "../../plugins/samples-plugin";
 import { Code, CopyButton } from "./Code";
+import { GitHubMock, LinearMock, LiveMock, NotionMock, PytestMock, SlackMock } from "./Mocks";
 
 interface Example {
   id: string;
   label: string;
   file: string;
   sample: Sample;
+  /** What the test produces, drawn in the shape of the platform. */
+  mock: ReactNode;
   notes: ReactNode[];
 }
 
@@ -22,6 +25,7 @@ const EXAMPLES: Example[] = [
     label: "Slack",
     file: "mentions.test.ts",
     sample: slack,
+    mock: <SlackMock />,
     notes: [
       <>Delivers a signed <code>app_mention</code> event to your agent</>,
       <>Waits until the thread has been quiet before counting replies</>,
@@ -33,6 +37,7 @@ const EXAMPLES: Example[] = [
     label: "GitHub",
     file: "issues.test.ts",
     sample: github,
+    mock: <GitHubMock />,
     notes: [
       <>Installs the App only on repos you list in <code>apps</code></>,
       <>Signs each delivery with <code>X-Hub-Signature-256</code></>,
@@ -44,6 +49,7 @@ const EXAMPLES: Example[] = [
     label: "Linear",
     file: "sessions.test.ts",
     sample: linear,
+    mock: <LinearMock />,
     notes: [
       <><code>AgentSessionEvent</code> in Linear’s current shape</>,
       <>The <code>prompted</code> event carrying the stop signal</>,
@@ -55,6 +61,7 @@ const EXAMPLES: Example[] = [
     label: "Notion",
     file: "comments.test.ts",
     sample: notion,
+    mock: <NotionMock />,
     notes: [
       <>Connections and their inheritance, like Notion</>,
       <>Webhooks signed with <code>X-Notion-Signature</code></>,
@@ -66,6 +73,7 @@ const EXAMPLES: Example[] = [
     label: "Live mode",
     file: "live.test.ts",
     sample: live,
+    mock: <LiveMock />,
     notes: [
       <>The same test runs against a real sandbox workspace</>,
       <>Acts as real people and reads the result back</>,
@@ -77,6 +85,7 @@ const EXAMPLES: Example[] = [
     label: "pytest",
     file: "test_keys.py",
     sample: pytest,
+    mock: <PytestMock />,
     notes: [
       <>The same fakes from Python through <code>pytest-channelstack</code></>,
       <>One channelstack server shared by JS and Python suites</>,
@@ -144,6 +153,7 @@ export function Examples() {
               </div>
               <Code sample={example.sample} label={`${example.label} example`} />
             </div>
+            <div className="panel-mock">{example.mock}</div>
             <div className="panel-note">
               <h3>
                 <span className="nojs-label">{example.label}: </span>what channelstack handles
