@@ -1257,9 +1257,9 @@ td.p {
 
 .step {
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
   gap: 10px;
-  align-content: start;
   min-width: 0;
 }
 
@@ -1292,6 +1292,7 @@ td.p {
 
 .snippet .code {
   padding-block: 12px;
+  font-size: 12.5px;
 }
 
 .snippet .code + .code {
@@ -1312,6 +1313,7 @@ td.p {
     gap: 40px;
   }
   .step {
+    grid-row: auto;
     grid-template-rows: none;
   }
 }
