@@ -40,8 +40,8 @@ const CHANNELS = {
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
     ],
-    // What the agent's calls and the fake's webhooks look like to GitHub's own schemas (exit checks 3.2, 3.3).
-    suites: ["test/acceptance/github"],
+    // The standard checks as a developer adds them (exit check 3.4).
+    suites: ["test/acceptance/checks/github-checks.test.ts"],
   },
 } as const;
 
@@ -50,6 +50,7 @@ const AGENTS = {
   "bolt-ai-sdk": { channel: "slack", path: "/slack/events" },
   "chat-sdk-slack": { channel: "slack", path: "/slack/events" },
   probot: { channel: "github", path: "/api/github/webhooks" },
+  "chat-sdk-github": { channel: "github", path: "/api/webhooks/github" },
 } as const;
 
 /** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */

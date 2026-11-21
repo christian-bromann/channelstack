@@ -24,7 +24,6 @@ export default defineConfig({
       "api/examples/slack.test.ts",
       "api/examples/github.test.ts",
       "test/acceptance/stack/**/*.test.ts",
-      "test/acceptance/github/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],
     // Runs after each test, while its session is still open (the plugin closes it last).

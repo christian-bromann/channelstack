@@ -53,6 +53,26 @@ export const SLACK_CHECKS = [
 
 type SlackCheck = (typeof SLACK_CHECKS)[number];
 
+/** The ids of the GitHub checks, in the order they are registered. */
+export const GITHUB_CHECKS = [
+  "github.ignores-own-comments",
+  "github.one-comment",
+  "github.review-thread",
+  "github.redelivery",
+  "github.check-conclusion",
+  "github.bad-signature",
+] as const;
+
+type GitHubCheck = (typeof GITHUB_CHECKS)[number];
+
+/** Registers one check as a test, with its id in the name. A check that was skipped, or whose prompt wasn't given, is left out. */
+const registrar =
+  <Id extends string>(options: ChecksOptions) =>
+  (id: Id, title: string, run: (context: TestContext) => Promise<void>, needs: unknown = true): void => {
+    if (options.skip?.includes(id) || needs === undefined) return;
+    test(`${title} [${id}]`, run);
+  };
+
 /**
  * Registers: replies once to a DM · once to a mention · replies in the thread · survives Slack's
  * 3 s retry · handles redelivery idempotently · ignores other bots' messages · rejects a bad
@@ -63,16 +83,7 @@ export function slackChecks(options: ChecksOptions): void {
   const { app } = options;
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
-  const check = (
-    id: SlackCheck,
-    title: string,
-    run: (context: TestContext) => Promise<void>,
-    needs: unknown = true,
-  ) => {
-    // A check whose prompt wasn't given is left out, like one that was skipped by id.
-    if (options.skip?.includes(id) || needs === undefined) return;
-    test(`${title} [${id}]`, run);
-  };
+  const check = registrar<SlackCheck>(options);
 
   describe(`slack checks: ${app}`, () => {
     check("slack.dm-once", "replies once to a DM", async ({ slack }) => {
@@ -228,5 +239,87 @@ export function slackChecks(options: ChecksOptions): void {
       },
       options.approval,
     );
+  });
+}
+
+/**
+ * Registers: ignores its own comments · one comment per trigger · review-thread replies trigger
+ * it · redelivery doesn't duplicate · check runs reach a conclusion · rejects a bad webhook
+ * signature.
+ */
+export function githubChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const prompt = options.prompt ?? `@${app} hello`;
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar<GitHubCheck>(options);
+  /** A repository the App is installed on, with Ana as a collaborator and an issue to talk in. */
+  const setup = async ({ github }: TestContext) => {
+    const ana = await github.createUser({ login: "ana" });
+    const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
+    return { ana, repo };
+  };
+  const pullRequest = async (context: TestContext) => {
+    const { ana, repo } = await setup(context);
+    const pr = await ana.openPullRequest(
+      { from: "change", title: "Greet people", changes: { "greeting.txt": "hello\n" } },
+      { repo },
+    );
+    return { ana, repo, pr };
+  };
+
+  describe(`github checks: ${app}`, () => {
+    check("github.ignores-own-comments", "its own comment doesn't set it off again", async (context) => {
+      const { ana, repo } = await setup(context);
+      const issue = await ana.openIssue({ title: "A question" }, { repo });
+      await ana.comment(prompt, { issue });
+      await expect(issue).toHaveCommentFrom(app, wait);
+      // An agent that answers its own answer keeps going; one that doesn't is quiet with one comment.
+      await expect(issue).toHaveCommentsFrom(app, { count: 1, ...wait });
+    });
+
+    check("github.one-comment", "one comment per trigger", async (context) => {
+      const { ana, repo } = await setup(context);
+      const issue = await ana.openIssue({ title: "Two questions" }, { repo });
+      await ana.comment(prompt, { issue });
+      await issue.waitForComment({ from: app, ...wait });
+      await ana.comment(prompt, { issue });
+      await issue.waitForComment({ from: app, ...wait });
+      await expect(issue).toHaveCommentsFrom(app, { count: 2, ...wait });
+    });
+
+    check("github.review-thread", "answers a mention in a thread on the diff, in that thread", async (context) => {
+      const { ana, pr } = await pullRequest(context);
+      const inline = await ana.reviewComment(prompt, { pr, path: "greeting.txt", line: 1 });
+      const replies = await inline.replies();
+      expect(replies.map((reply) => reply.author.name)).toEqual([app]);
+    });
+
+    check("github.redelivery", "a redelivered webhook doesn't produce a second answer", async (context) => {
+      const { ana, repo } = await setup(context);
+      const issue = await ana.openIssue({ title: "Delivered twice" }, { repo });
+      const comment = await ana.comment(prompt, { issue });
+      await expect(issue).toHaveCommentFrom(app, wait);
+      // GitHub redelivers with the same `X-GitHub-Delivery`, from its UI and its API.
+      await comment.delivery?.redeliver();
+      await expect(issue).toHaveCommentsFrom(app, { count: 1, ...wait });
+    });
+
+    check("github.check-conclusion", "every check run it starts reaches a conclusion", async (context) => {
+      const { pr } = await pullRequest(context);
+      // Quiet means nothing is left open; a check run that never completes is, and the wait says so.
+      await context.channelstack.quiet(wait);
+      const runs = await pr.checkRuns();
+      expect(runs.filter((run) => run.status !== "completed").map((run) => run.name)).toEqual([]);
+    });
+
+    check("github.bad-signature", "rejects a webhook with a bad signature", async (context) => {
+      const { ana, repo } = await setup(context);
+      const issue = await ana.openIssue({ title: "Signed by someone else" }, { repo });
+      const comment = await ana.comment(prompt, { issue });
+      const delivery = comment.delivery;
+      if (!delivery) throw new Error("The comment caused no delivery: is the agent's webhook URL set?");
+      await delivery.resend({ badSignature: true });
+      await expect(delivery).toBeRejected(wait);
+    });
   });
 }
