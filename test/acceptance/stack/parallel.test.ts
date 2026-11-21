@@ -31,8 +31,9 @@ describe(`${COPIES} copies of the DM test in parallel`, () => {
       const calls = await slack.calls();
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) {
-        const request = call.request as { channel?: string; channel_id?: string } | undefined;
-        expect(request?.channel ?? request?.channel_id).toBe(msg.channel);
+        // A call names this copy's DM, or (looking up who wrote) this copy's person. Never another's.
+        const request = call.request as { channel?: string; channel_id?: string; user?: string } | undefined;
+        expect([msg.channel, ana.id]).toContain(request?.channel ?? request?.channel_id ?? request?.user);
       }
       const deliveries = await slack.deliveries();
       expect(deliveries.length).toBeGreaterThan(0);
