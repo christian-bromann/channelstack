@@ -1,4 +1,5 @@
-// Runs after the static build: writes sitemap.xml and the _headers file for Cloudflare.
+// Runs after the static build: moves the charset to the front of each page, and writes
+// sitemap.xml and the _headers file for Cloudflare.
 // The Content-Security-Policy allows only our own files, plus the exact inline scripts the
 // prerenderer emits (by hash), so no 'unsafe-inline' is needed.
 import { createHash } from "node:crypto";
@@ -24,7 +25,13 @@ const hashes = new Set();
 const urls = [];
 
 for (const file of pages) {
-  const html = await readFile(file, "utf8");
+  let html = await readFile(file, "utf8");
+  // The prerenderer puts the page's own tags first in <head>. Browsers only look for the
+  // charset in the first 1024 bytes, so move it back to the front.
+  const charset = /<meta charset="utf-8"\s*\/?>/i;
+  if (!charset.test(html)) throw new Error(`${relative(dist, file)} has no <meta charset>`);
+  html = html.replace(charset, "").replace(/<head[^>]*>/, (head) => `${head}<meta charset="utf-8">`);
+  await writeFile(file, html);
   for (const [, attrs, body] of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
     if (/\ssrc=/.test(attrs) || !body) continue;
     hashes.add(`'sha256-${createHash("sha256").update(body).digest("base64")}'`);
