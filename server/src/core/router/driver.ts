@@ -50,6 +50,8 @@ export interface Driver {
   capabilities(): CapabilityTable;
   /** What `channelstack env` prints for this channel. */
   env(): Record<string, string>;
+  /** How much of the agent's work in a session is still open, such as a stream it hasn't stopped. */
+  openWork(session: string): number;
 }
 
 /** How a driver registers itself with core: its name, the secrets it needs, and how to build it. */

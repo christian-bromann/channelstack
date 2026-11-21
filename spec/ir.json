@@ -189,6 +189,35 @@
           "dispose": false
         },
         {
+          "name": "quiet",
+          "kind": "method",
+          "summary": "Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this",
+          "stability": "stable",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/quiet",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "Quiet"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "echo",
           "kind": "factory",
           "summary": "The echo fixture: the agent's app and where it reaches the fake",
@@ -2610,6 +2639,28 @@
               "values": {
                 "kind": "unknown"
               }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Quiet",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "busy",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "quietForMs",
+            "type": {
+              "kind": "number"
             },
             "optional": false
           }

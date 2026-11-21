@@ -198,6 +198,39 @@ describe("faults and uninstall (decision 0006: undone when the session closes)",
   });
 });
 
+describe("quiet", () => {
+  test("the session is busy while a delivery is pending or a stream is open, and quiet since its last event after", async () => {
+    const { h, agent, api, ana, team, channel, sessionId, say } = await workspace();
+    const quiet = async () => (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    agent.respond = () => ({ status: 200, delayMs: 200 });
+
+    const question = await say("@my-agent write the notes");
+    expect(await quiet()).toEqual({ busy: true, quietForMs: 0 });
+    await h.app.settled();
+    expect((await quiet()).busy).toBe(false);
+
+    const stream = (
+      await api("chat.startStream", {
+        channel: channel.id,
+        thread_ts: question.ts,
+        recipient_user_id: ana.id,
+        recipient_team_id: team.id,
+      })
+    ).body;
+    await h.app.settled();
+    expect(await quiet()).toEqual({ busy: true, quietForMs: 0 });
+    await api("chat.stopStream", { channel: channel.id, ts: stream.ts });
+    await h.app.settled();
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const after = await quiet();
+    expect(after.busy).toBe(false);
+    expect(after.quietForMs).toBeGreaterThanOrEqual(100);
+    expect(after.quietForMs).toBeLessThan(5000);
+    expect((await h.call("GET", "/sessions/ses_none/quiet")).body.error).toBe("session_not_found");
+  });
+});
+
 describe("what a person sees", () => {
   test("thread status: working while a status line is set, streaming while a stream is open, idle after", async () => {
     const { api, ana, team, channel, say, get } = await workspace();

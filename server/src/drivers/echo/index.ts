@@ -17,6 +17,7 @@ export const echo: DriverDefinition = {
       fake,
       routes: (router) => registerEchoRoutes(router, { world: fake.world, apiUrl: context.apiUrl, capabilities }),
       capabilities: () => capabilities,
+      openWork: () => 0,
       env: () => ({
         ECHO_API_URL: context.apiUrl(),
         ECHO_APP_TOKEN: context.secret("appToken"),

@@ -61,6 +61,11 @@ export interface LogEvent {
   data: Record<string, unknown>;
 }
 
+export interface Quiet {
+  busy: boolean;
+  quietForMs: number;
+}
+
 export type Env = Record<string, string>;
 
 export interface EchoMessage {
@@ -332,6 +337,13 @@ export class Session implements AsyncDisposable {
   async events(options: { since?: string } = {}): Promise<EventPage> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/events`, { query: { since: options.since } })) as EventPage;
+    return data;
+  }
+
+  /** Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this. */
+  async quiet(): Promise<Quiet> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/quiet`)) as Quiet;
     return data;
   }
 

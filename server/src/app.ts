@@ -9,6 +9,7 @@ import { ProtocolError } from "./core/errors/index.ts";
 import { EventLog } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
 import type { Logger } from "./core/log/index.ts";
+import { QuietDetector } from "./core/quiet/index.ts";
 import type { Redactor } from "./core/redact/index.ts";
 import { Registry } from "./core/registry/index.ts";
 import { type Driver, DriverRouter, invalidArgument, registerRoute, SessionParams } from "./core/router/index.ts";
@@ -70,6 +71,15 @@ const EventPage = z.object({ events: z.array(LogEvent), cursor: z.string() }).op
 
 const Env = z.record(z.string(), z.string()).openapi("Env");
 
+const Quiet = z
+  .object({
+    busy: z
+      .boolean()
+      .openapi({ description: "A call from the agent is in flight, a delivery hasn't settled, or a stream is open." }),
+    quietForMs: z.number().openapi({ description: "Milliseconds since the last event in the session. 0 while busy." }),
+  })
+  .openapi("Quiet");
+
 export function createApp(options: AppOptions): App {
   const clock = options.clock ?? systemClock;
   const { log, redactor, secrets } = options;
@@ -78,6 +88,8 @@ export function createApp(options: AppOptions): App {
   const registry = new Registry();
   const events = new EventLog(clock, redactor);
   const delivery = new DeliveryQueue({ events, clock, log });
+  const quiet = new QuietDetector(clock);
+  events.onAppend((session) => quiet.touch(session));
 
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
@@ -99,6 +111,7 @@ export function createApp(options: AppOptions): App {
     for (const driver of drivers) driver.fake.release(session.id);
     registry.release(session.id);
     events.drop(session.id);
+    quiet.forget(session.id);
   });
 
   const control = new OpenAPIHono({
@@ -177,6 +190,22 @@ export function createApp(options: AppOptions): App {
   });
 
   registerRoute(control, {
+    method: "get",
+    path: "/sessions/{session}/quiet",
+    summary: "Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this",
+    params: SessionParams,
+    response: Quiet,
+    errors: ["session_not_found"],
+    sdkMethod: { on: "Session", name: "quiet" },
+    stability: "stable",
+    handler: ({ params }) => {
+      const session = sessions.get(params.session).id;
+      const open = delivery.pending(session) + drivers.reduce((total, driver) => total + driver.openWork(session), 0);
+      return quiet.state(session, open);
+    },
+  });
+
+  registerRoute(control, {
     method: "post",
     path: "/reset",
     summary: "Drop the whole world. Avoid in parallel suites",
@@ -214,7 +243,10 @@ export function createApp(options: AppOptions): App {
       // Behind portless every driver has its own name; without it, drivers are path prefixes on one port.
       const host = (request.headers.get("x-forwarded-host") ?? new URL(request.url).host).split(":")[0] ?? "";
       const driver = byHost.get(host);
-      return driver ? driver.fake.api.fetch(request) : root.fetch(request);
+      if (driver) return quiet.during(() => driver.fake.api.fetch(request));
+      // Anything outside the control API is the agent calling a fake: the agent isn't quiet while it runs.
+      const fromAgent = !new URL(request.url).pathname.startsWith(CONTROL_PREFIX);
+      return fromAgent ? quiet.during(() => root.fetch(request)) : root.fetch(request);
     },
     openapi: () =>
       control.getOpenAPI31Document({

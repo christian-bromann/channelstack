@@ -11,7 +11,7 @@ from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, 
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "Status", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "Status", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -142,6 +142,19 @@ class LogEvent:
             driver=data["driver"],
             kind=data["kind"],
             data=data["data"],
+        )
+
+
+@dataclass(frozen=True)
+class Quiet:
+    busy: bool
+    quiet_for_ms: float
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> Quiet:
+        return cls(
+            busy=data["busy"],
+            quiet_for_ms=data["quietForMs"],
         )
 
 
@@ -543,6 +556,12 @@ class Session:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/events", query={"since": since})
         return EventPage._from_wire(ctx, data)
+
+    async def quiet(self) -> Quiet:
+        """Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/quiet")
+        return Quiet._from_wire(ctx, data)
 
     async def echo(self) -> EchoFixture:
         """The echo fixture: the agent's app and where it reaches the fake. Experimental."""

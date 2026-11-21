@@ -39,6 +39,7 @@ export class EventLog {
   readonly #clock: Clock;
   readonly #redactor: Redactor;
   readonly #logs = new Map<string, CursorList<LogEvent>>();
+  readonly #listeners: Array<(session: string) => void> = [];
 
   constructor(clock: Clock, redactor: Redactor) {
     this.#clock = clock;
@@ -52,6 +53,12 @@ export class EventLog {
       this.#logs.set(session, log);
     }
     log.append({ at: new Date(this.#clock()).toISOString(), driver, kind, data: this.#redactor.tokens(data) });
+    for (const listener of this.#listeners) listener(session);
+  }
+
+  /** Hear about every event as it is recorded: how the quiet detector knows a session's last activity. */
+  onAppend(listener: (session: string) => void): void {
+    this.#listeners.push(listener);
   }
 
   read(session: string, since?: string): { events: LogEvent[]; cursor: string } {

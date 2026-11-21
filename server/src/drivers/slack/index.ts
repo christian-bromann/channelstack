@@ -24,6 +24,12 @@ export const slack: DriverDefinition = {
           secret: context.secret,
         }),
       capabilities: () => ({}),
+      // A stream the app started and hasn't stopped is work in progress.
+      openWork: (session) =>
+        fake.store
+          .conversationsOf(session)
+          .flatMap((conversation) => fake.store.messagesIn(conversation.id))
+          .filter((message) => message.stream?.state === "open").length,
       env: () => ({
         SLACK_API_URL: `${context.apiUrl()}/api/`,
         SLACK_BOT_TOKEN: context.secret("botToken"),
