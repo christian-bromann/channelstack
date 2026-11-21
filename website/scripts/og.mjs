@@ -1,4 +1,4 @@
-// Renders og/og.html to the link-preview image and the icons, with a local Chrome.
+// Renders og/og.html to the link-preview image, the icons and the README logo, with a local Chrome.
 // Run it by hand after changing og/og.html; the PNGs are committed.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
@@ -12,13 +12,13 @@ const chrome = [
 ].find((path) => path && existsSync(path));
 if (!chrome) throw new Error("Chrome not found. Set CHROME_PATH.");
 
-function shot(hash, width, height, out, transparent = false) {
+function shot(hash, width, height, out, { transparent = false, scale = 1 } = {}) {
   execFileSync(
     chrome,
     [
       "--headless=new",
       "--hide-scrollbars",
-      "--force-device-scale-factor=1",
+      `--force-device-scale-factor=${scale}`,
       "--allow-file-access-from-files",
       "--virtual-time-budget=3000",
       ...(transparent ? ["--default-background-color=00000000"] : []),
@@ -38,4 +38,8 @@ shot("", 1200, 630, "src/assets/og.png");
 shot("#icon-180", 180, 180, "public/apple-touch-icon.png");
 shot("#icon-192", 192, 192, "public/icon-192.png");
 shot("#icon-512", 512, 512, "public/icon-512.png");
-shot("#favicon-32", 32, 32, "public/favicon-32.png", true);
+shot("#favicon-32", 32, 32, "public/favicon-32.png", { transparent: true });
+// The banner at the top of the repository README, at 2x for sharp rendering. It carries its own
+// dark background, so it reads the same on light and dark pages.
+mkdirSync(`${root}../.github/assets`, { recursive: true });
+shot("#banner", 1280, 340, "../.github/assets/banner.png", { transparent: true, scale: 2 });
