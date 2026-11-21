@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": ".", "declaration": true, "noEmit": false },
+  "include": ["client.ts", "generated", "runtime"],
+  "exclude": ["**/*.test.ts"]
+}

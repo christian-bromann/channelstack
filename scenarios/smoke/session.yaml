@@ -1,0 +1,56 @@
+name: session
+description: Sessions are scopes in one shared world. Runs against a server the SDK's launcher starts itself.
+steps:
+  - call: channelstack.status
+    as: status
+  - expect:
+      - { value: $status.ready, equals: true }
+  - call: channelstack.env
+    as: env
+  - expect:
+      - { value: $env.ECHO_API_URL, matches: "^http://127\\.0\\.0\\.1:\\d+/echo$" }
+
+  - call: session.echo
+    as: echo
+  - call: echo.createUser
+    options: { name: Ana }
+    as: ana
+  # The app isn't in this room, so nothing is delivered to it.
+  - call: echo.createRoom
+    options: { participants: [$ana] }
+    as: room
+  - call: ana.say
+    args: ["anyone here?"]
+    options: { room: $room }
+    as: message
+  - expect:
+      - { value: $message.delivery, equals: null }
+  - call: session.events
+    as: log
+  - expect:
+      - { value: $log.events.length, equals: 3 }
+      - { value: $log.events, contains: { kind: action, data: { action: say, user: $ana.id } } }
+  - call: echo.capabilities
+    as: capabilities
+  - expect:
+      - { value: $capabilities.say.fake, equals: true }
+
+  # Another session can't use this session's people.
+  - call: channelstack.openSession
+    as: other
+  - call: other.echo
+    as: otherEcho
+  - call: otherEcho.createRoom
+    options: { participants: [$ana] }
+    throws: not_found
+
+  # A closed session is gone.
+  - call: other.close
+  - call: other.events
+    throws: session_not_found
+
+  # The runner disposes its own session when the scenario ends. Closing it here first proves that
+  # disposing a session that is already gone is quiet, while closing it again explicitly is an error.
+  - call: session.close
+  - call: session.close
+    throws: session_not_found

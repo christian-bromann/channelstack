@@ -1,0 +1,46 @@
+{
+  "name": "channelstack-repo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm build:sdk && pnpm build:binary",
+    "build:sdk": "pnpm --filter channelstack build",
+    "build:binary": "node scripts/build-binary.ts",
+    "build:binaries": "node scripts/build-binary.ts --all",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p api/tsconfig.json && tsc -p api/tsconfig.jest.json && uv run -q --project sdks/python --frozen pyright",
+    "lint": "bun fmt --check && biome lint . && uv run -q --project sdks/python --frozen ruff check sdks/python scenarios/runners/python && uv run -q --project sdks/python --frozen ruff format --check sdks/python scenarios/runners/python",
+    "format": "bun fmt && biome lint --write . && uv run -q --project sdks/python --frozen ruff check --fix sdks/python scenarios/runners/python && uv run -q --project sdks/python --frozen ruff format sdks/python scenarios/runners/python",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:redaction": "vitest run --project redaction",
+    "test:accept": "node scripts/accept.ts",
+    "test:pack": "node scripts/pack-test.ts",
+    "test:stale": "node scripts/selftest-stale.ts",
+    "spec": "node scripts/spec.ts",
+    "spec:check": "node scripts/spec.ts --check",
+    "sdk": "node scripts/sdk.ts",
+    "sdk:check": "node scripts/sdk.ts --check",
+    "check:dupes": "jscpd",
+    "check:deps": "depcruise server codegen sdks/typescript scenarios scripts --config .dependency-cruiser.cjs",
+    "check:unused": "knip",
+    "verify:phase": "node scripts/verify-phase.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/bun": "1.4.5",
+    "@types/node": "26.6.6",
+    "bun": "1.4.5",
+    "channelstack": "workspace:*",
+    "dependency-cruiser": "18.8.0",
+    "jscpd": "5.4.3",
+    "knip": "6.45.1",
+    "typescript": "6.0.3",
+    "vitest": "5.1.1",
+    "yaml": "2.9.1"
+  }
+}

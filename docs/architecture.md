@@ -95,7 +95,7 @@ Each platform is one folder under `server/src/drivers/<name>/`. Core never chang
 
 ```ts
 interface Driver {
-  name: "slack" | "github" | "linear" | "notion";
+  name: string;                        // "slack", "github", "linear", "notion", and the internal "echo" (decision 0003)
   routes(r: DriverRouter): void        // control API routes + Zod schemas → becomes the SDK surface
   fake: FakeBackend                    // provider API emulation (Hono app + in-memory store)
   live: LiveBackend                    // real API client, as the app or as a person, + cleanup handlers
@@ -105,6 +105,8 @@ interface Driver {
   capabilities(): CapabilityTable      // per action: fake / live / what live needs
 }
 ```
+
+The interface in the code (`server/src/core/router/driver.ts`) has only the members that exist so far; each phase adds the ones it first uses. Phase 0 locks `routes`, `fake` and `capabilities()` with the `echo` driver, and the `FakeBackend` design in [decisions/0001-fake-backend.md](decisions/0001-fake-backend.md).
 
 **One action, two backends.** Each control action is written once against a `World` interface that both backends implement:
 
@@ -131,6 +133,7 @@ That keeps the fake and the real platform from drifting apart in code. The night
 | Safety and ledger | Live allowlists; every live object is tagged and recorded so the session or `channelstack sweep` deletes it |
 | Proxy + CA | For agents with hard-coded hosts: routes `slack.com`, `api.github.com`, … to the fakes, with a name-constrained CA trusted only by the agent |
 | Quiet detector | Knows when the agent is idle (no open stream, no call in flight, a short settle window). Negative and exact-count matchers wait for it |
+| State directory | `~/.channelstack`, or `CHANNELSTACK_HOME`: `secrets.json` and the running server's `server.json` (URL and bearer token), both 0600. A private server started by an SDK writes its token file elsewhere ([decisions/0004-state-directory.md](decisions/0004-state-directory.md)) |
 
 ## 4. Where the API logic lives
 
@@ -167,36 +170,48 @@ We use our own small generator rather than Stainless, Fern or openapi-generator.
 
 ### 5.2 How a route becomes a method
 
-Each route is annotated with OpenAPI extensions that describe the object model:
+Each route is registered with a spec that carries its Zod schemas and how it shows up in the SDKs. The same spec produces the validation, the OpenAPI operation and its extensions:
 
 ```ts
-// server/src/drivers/slack/routes.ts
-r.post("/users/{user}/say", {
-  body: SayBody,                       // { text, blocks?, channel?, to? }
-  response: SayResult,                 // { message: MessageRef, thread: ThreadRef }
-  "x-channelstack-method": { on: "SlackUser", name: "say", args: ["text"], options: ["channel", "to"] },
-  "x-channelstack-error-codes": ["not_in_channel", "fake_actor_in_live_world"],
+// server/src/drivers/echo/routes.ts
+router.route({
+  method: "post",
+  path: "/users/{user}/say",
+  params: UserParams,
+  body: z.object({ text: z.string().min(1), room: z.string().openapi({ "x-channelstack-ref": ["EchoRoom"] }) }),
+  response: EchoMessage,
+  errors: ["not_found", "not_in_room"],
+  sdkMethod: { on: "EchoUser", name: "say", args: ["text"], options: ["room"] },
+  stability: "experimental",
+  handler: ({ session, params, body }) => world.postAsUser(session.id, params.user, body.room, body.text),
 });
 ```
 
-| Extension | Meaning |
-|---|---|
-| `x-channelstack-resource` | The route returns a handle of this type (`SlackUser`, `SlackThread`, …) |
-| `x-channelstack-factory` | A method that creates a handle, on a fixture (`SlackFixture.createUser`) |
-| `x-channelstack-method` | Binds the operation to a method on a handle. Path parameters bind to the handle's id; `args` become positional parameters, `options` the trailing options object |
-| `x-channelstack-error-codes` | Errors the operation can return, mapped to typed exceptions |
+| Extension | On | Meaning |
+|---|---|---|
+| `x-channelstack-resource: { id?, scope? }` | A schema | Values of this schema are handles (`EchoUser`, `Session`, …). `id` names the field that identifies the handle; fixtures have none. `scope: "session"` marks the session itself: its id is the `{session}` of everything created through it |
+| `x-channelstack-ref: [resources]` | A request field | The field takes a handle of one of these types and sends its id |
+| `x-channelstack-factory` | An operation | A method that creates a handle (`EchoFixture.createUser`, `Channelstack.openSession`) |
+| `x-channelstack-method` | An operation | A method on a handle. `args` become positional parameters and `options` the trailing options object. Path parameters bind to the handle: `{session}` to its session, the remaining one to its id, or to the field named in `bind`. `dispose: true` marks the method SDKs call when the handle is disposed |
+| `x-channelstack-error-codes` | An operation | Error codes the operation can return, mapped to typed exceptions |
+| `x-channelstack-stability` | An operation | `experimental` or `stable` (implementation plan 4.5) |
 
-The IR entry for that route:
+Every operation must have a factory or a method binding, and every body field and query parameter must be an argument or an option. The IR builder refuses a spec that no SDK could call.
+
+The IR entry for that route (`spec/ir.json`), under the resource `EchoUser`:
 
 ```json
-{ "resource": "SlackUser", "method": "say",
-  "http": { "verb": "POST", "path": "/sessions/{session}/slack/users/{self}/say" },
-  "args": [{ "name": "text", "type": "SlackMessageInput" }],
-  "options": [{ "name": "channel", "type": "SlackConversation", "ref": true }, { "name": "to", "type": "SlackParticipant[]", "ref": true }],
-  "returns": "SlackMessage", "errors": ["not_in_channel", "fake_actor_in_live_world"] }
+{ "name": "say", "kind": "method", "stability": "experimental",
+  "http": { "verb": "POST", "path": "/sessions/{session}/echo/users/{user}/say",
+            "pathParams": [{ "name": "session", "from": "session" }, { "name": "user", "from": "self", "field": "id" }] },
+  "args": [{ "name": "text", "type": { "kind": "string" }, "optional": false, "in": "body" }],
+  "options": [{ "name": "room", "type": { "kind": "ref", "resources": ["EchoRoom"] }, "optional": false, "in": "body" }],
+  "returns": { "kind": "named", "name": "EchoMessage" },
+  "errors": ["unauthorized", "invalid_argument", "internal", "session_not_found", "not_found", "not_in_room"],
+  "dispose": false }
 ```
 
-Each emitter turns it into that language's idiom:
+Each emitter turns it into that language's idiom. For the Slack route `POST …/slack/users/{user}/say`, bound the same way:
 
 ```ts
 // TypeScript
@@ -204,7 +219,7 @@ const msg = await ana.say("@my-agent hi", { channel });
 ```
 
 ```python
-# Python (async-first, sync facade, snake_case)
+# Python (async-first, snake_case, options as keyword arguments)
 msg = await ana.say("@my-agent hi", channel=channel)
 ```
 
@@ -213,7 +228,7 @@ msg = await ana.say("@my-agent hi", channel=channel)
 let msg = ana.say("@my-agent hi").channel(&channel).send().await?;
 ```
 
-Handles passed as options (`channel`) are sent by id (`"ref": true`); responses come back as ids and are wrapped into handles again.
+Handles passed as arguments or options are sent by id (`kind: "ref"`). In responses, a field whose schema is a resource comes back as that handle's data (`kind: "resource"`) and is wrapped into a handle again.
 
 ### 5.3 The thin runtime per language
 
@@ -221,12 +236,16 @@ Handles passed as options (`channel`) are sent by id (`"ref": true`); responses 
 |---|---|
 | Transport | HTTP client with the bearer token from `~/.channelstack/server.json`, retries while the server starts, error code → typed exception |
 | Launcher | `auto` / `attach` / `start`: attaches to a running server at `https://channelstack.localhost` (or `CHANNELSTACK_URL`), otherwise starts the bundled binary and stops it on exit |
-| Credentials | Reads `CHANNELSTACK_<CHANNEL>_*` env vars for live mode and sends them once; the server never returns them |
-| Disposal | Created resources clean up at the end of the session: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust |
+| Waiting and polling | The one polling loop behind every `waitFor…`, `latest…` and matcher: cursor reads, timeouts, quiet checks |
+| Durations | Parsing `"3s"`, `"750ms"` |
+| Credentials | Reads `CHANNELSTACK_<CHANNEL>_*` env vars for live mode and sends them once; the server never returns them (phase 5) |
+| Disposal | Created resources clean up at the end of the session: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust. Generated from routes marked `dispose` |
+
+The modules have the same names in every language ([code-map.md](code-map.md)).
 
 ### 5.4 Keeping the SDKs honest
 
-- **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`) run through every SDK in CI, like WebDriver's WPT.
+- **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`, defined in [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md)) run through every SDK in CI, like WebDriver's WPT.
 - **No stale output.** CI fails if `openapi.json`, `ir.json` or any generated SDK is out of date with the routes.
 - **The TS contract holds.** CI type-checks `api/examples/*.test.ts` against the generated TypeScript SDK, so the hand-designed API in `api/*.d.ts` and the generated one can't drift.
 - **Versioning.** One tag releases the server, the spec and every SDK at the same version. SDKs check the server's major version on connect.
@@ -245,14 +264,19 @@ Handles passed as options (`channel`) are sent by id (`"ref": true`); responses 
 
 ```
 channelstack/
-  server/            Bun + Hono: src/core/, src/drivers/{slack,github,linear,notion}/, src/cli.ts
+  server/            Bun + Hono: src/app.ts, src/serve.ts, src/cli.ts, src/core/, src/drivers/{echo,slack,github,linear,notion}/
   ui/                functional browser UI (transcripts, inspector, chaos controls)
   api/               hand-designed public types (*.d.ts) + examples: the TS contract
   spec/              openapi.json, ir.json (generated, committed)
-  codegen/           IR builder + emitters/{ts,python,rust}
-  sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/
+  codegen/           src/ir.ts (OpenAPI → IR) + src/emit/{typescript,python,rust}.ts
+  sdks/typescript/   the npm package `channelstack`: runtime/ (hand-written), generated/, bin/ (runs the platform binary)
+  sdks/python/       channelstack/runtime/ (hand-written) + channelstack/generated/
+  sdks/rust/         runtime/ + generated/
   integrations/      vitest, jest, pytest-channelstack, checks
-  scenarios/         smoke/*.yaml (protocol parity) + per-driver differential suites
+  scenarios/         smoke/*.yaml (protocol parity), runners/<language>/, agents/ (reference agents for the scenarios) + per-driver differential suites
+  scripts/           the gate (verify-phase), spec and SDK generation, the binary build, packaging and smoke runs
   conformance/       schema validators, shape differ, coverage page
   docs/
 ```
+
+The server binary and its per-platform npm packages (`@channelstack/server-<platform>`) are build output in `dist/npm/`, not sources.

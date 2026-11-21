@@ -16,7 +16,7 @@ test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
 });
 ```
 
-**Status:** design complete, implementation not started. See [docs/phases.md](docs/phases.md).
+**Status:** under construction, phase by phase. Phase 0 (the server spine, the SDK generator, packaging) is built; the Slack fake is next. See [docs/phases.md](docs/phases.md).
 
 ## Documentation
 

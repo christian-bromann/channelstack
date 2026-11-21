@@ -1,0 +1,30 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "channelstack": [
+        "./index.d.ts"
+      ],
+      "channelstack/vitest": [
+        "./vitest.d.ts"
+      ],
+      "channelstack/checks": [
+        "./checks.d.ts"
+      ]
+    },
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": [
+    "*.d.ts",
+    "examples"
+  ],
+  "exclude": [
+    "jest.d.ts",
+    "examples/jest.usage.test.ts"
+  ]
+}

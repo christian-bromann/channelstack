@@ -1,0 +1,945 @@
+{
+  "version": "0.0.0",
+  "basePath": "/_channelstack",
+  "root": "Channelstack",
+  "resources": [
+    {
+      "name": "Channelstack",
+      "fields": [],
+      "methods": [
+        {
+          "name": "status",
+          "kind": "method",
+          "summary": "Server health, version and loaded drivers",
+          "stability": "stable",
+          "http": {
+            "verb": "GET",
+            "path": "/status",
+            "pathParams": []
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "Status"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "openSession",
+          "kind": "factory",
+          "summary": "Open a session: a scope in the shared world that owns what it creates",
+          "stability": "stable",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions",
+            "pathParams": []
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "Session"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reset",
+          "kind": "method",
+          "summary": "Drop the whole world. Avoid in parallel suites",
+          "stability": "stable",
+          "http": {
+            "verb": "POST",
+            "path": "/reset",
+            "pathParams": []
+          },
+          "args": [],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "env",
+          "kind": "method",
+          "summary": "Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints)",
+          "stability": "stable",
+          "http": {
+            "verb": "GET",
+            "path": "/env",
+            "pathParams": []
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "Env"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "Session",
+      "idField": "sessionId",
+      "scope": "session",
+      "fields": [
+        {
+          "name": "sessionId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "drivers",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "close",
+          "kind": "method",
+          "summary": "Close a session and remove everything it created",
+          "stability": "stable",
+          "http": {
+            "verb": "DELETE",
+            "path": "/sessions/{session}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": true
+        },
+        {
+          "name": "events",
+          "kind": "method",
+          "summary": "The session's event log: actions, deliveries with every attempt, and the agent's API calls",
+          "stability": "stable",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/events",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "since",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "EventPage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "echo",
+          "kind": "factory",
+          "summary": "The echo fixture: the agent's app and where it reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/echo",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "EchoFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "EchoFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "EchoApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/echo/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "EchoUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createRoom",
+          "kind": "factory",
+          "summary": "Create a room. Only the listed participants are members; include the app for it to receive events",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/echo/rooms",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "participants",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "EchoUser",
+                    "EchoApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "EchoRoom"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "capabilities",
+          "kind": "method",
+          "summary": "Per action: works in the fake, works live, and what live needs",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/echo/capabilities",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "Capabilities"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "EchoApp",
+      "idField": "id",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "EchoUser",
+      "idField": "id",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "say",
+          "kind": "method",
+          "summary": "Post a message in a room as this person",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/echo/users/{user}/say",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "room",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "EchoRoom"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "EchoMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_room"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "EchoRoom",
+      "idField": "id",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "members",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "The room's messages, oldest first, with a cursor for the next read",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/echo/rooms/{room}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "room",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "since",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "EchoMessagePage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The room as a person would read it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/echo/rooms/{room}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "room",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "EchoTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Status",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "ready",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "version",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "drivers",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "EventPage",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "events",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "LogEvent"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "cursor",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "LogEvent",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "driver",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "action",
+                "delivery",
+                "delivery_attempt",
+                "api_call"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "data",
+            "type": {
+              "kind": "record",
+              "values": {
+                "kind": "unknown"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Env",
+      "type": {
+        "kind": "record",
+        "values": {
+          "kind": "string"
+        }
+      }
+    },
+    {
+      "name": "EchoMessage",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "room",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "EchoPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "delivery",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "EchoPrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "EchoMessagePage",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "messages",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "EchoMessage"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "cursor",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "EchoTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "EchoTranscriptEntry"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "EchoTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "EchoPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Capabilities",
+      "type": {
+        "kind": "record",
+        "values": {
+          "kind": "named",
+          "name": "Capability"
+        }
+      }
+    },
+    {
+      "name": "Capability",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "fake",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "live",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "liveRequires",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    "internal",
+    "invalid_argument",
+    "not_found",
+    "not_in_room",
+    "session_not_found",
+    "unauthorized"
+  ]
+}

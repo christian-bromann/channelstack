@@ -8,3 +8,7 @@ coverage/
 !.env.example
 .DS_Store
 .auth/
+.venv/
+__pycache__/
+*.tsbuildinfo
+report/

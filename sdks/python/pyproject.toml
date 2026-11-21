@@ -1,0 +1,40 @@
+[project]
+name = "channelstack"
+version = "0.0.0"
+description = "A test harness for AI agents that live in Slack, GitHub, Linear and Notion."
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.414",
+    "pyyaml==6.0.4",
+    "ruff==0.17.6",
+    "types-pyyaml==6.0.12.20261113",
+]
+
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["channelstack"]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["channelstack/generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "S"]
+ignore = ["ASYNC109", "S101", "S603"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["channelstack"]
+
+[tool.pyright]
+include = ["channelstack", "../../scenarios/runners/python"]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
