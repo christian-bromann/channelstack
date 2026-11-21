@@ -14,7 +14,14 @@ export function parseSeed(seed: string): number {
   return createHash("sha256").update(seed).digest().readUInt32BE(0);
 }
 
-const NODE_ID_PREFIX = { User: "U", Bot: "BOT", Repository: "R", Issue: "I", PullRequest: "PR", IssueComment: "IC" } as const;
+const NODE_ID_PREFIX = {
+  User: "U",
+  Bot: "BOT",
+  Repository: "R",
+  Issue: "I",
+  PullRequest: "PR",
+  IssueComment: "IC",
+} as const;
 
 /**
  * A GitHub GraphQL node id, built the way GitHub builds them: a type prefix, then base64url of
@@ -75,7 +82,8 @@ export class IdGenerator {
       throw new ProtocolError("invalid_argument", `"${id}" is not a valid ${kind} id`, { kind, id });
     }
     const used = this.#usedSet(kind);
-    if (used.has(id)) throw new ProtocolError("invalid_argument", `The ${kind} id "${id}" is already in use`, { kind, id });
+    if (used.has(id))
+      throw new ProtocolError("invalid_argument", `The ${kind} id "${id}" is already in use`, { kind, id });
     used.add(id);
     return id;
   }

@@ -38,11 +38,17 @@ export function createEchoApi(context: DriverContext, store: EchoStore, world: F
   /** What the platform refuses: a room that doesn't exist, or one the app isn't a member of. */
   const refusal = (room: EchoRoom | undefined, id: string): Outcome | undefined => {
     if (!room) return ROOM_NOT_FOUND;
-    if (!room.members.includes(store.app.id)) return { status: 403, body: { ok: false, error: "not_in_room" }, room: id };
+    if (!room.members.includes(store.app.id))
+      return { status: 403, body: { ok: false, error: "not_in_room" }, room: id };
     return undefined;
   };
 
-  const handle = (method: "GET" | "POST", path: string, operation: string, run: (request: unknown, room: string) => Outcome) =>
+  const handle = (
+    method: "GET" | "POST",
+    path: string,
+    operation: string,
+    run: (request: unknown, room: string) => Outcome,
+  ) =>
     api.on(method, path, async (c) => {
       const startedAt = context.clock();
       const request: unknown = method === "POST" ? await c.req.json().catch(() => undefined) : undefined;

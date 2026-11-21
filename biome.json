@@ -1,6 +1,10 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
     "includes": [
       "**",
@@ -11,15 +15,25 @@
       "!sdks/typescript/generated",
       "!sdks/python",
       "!**/dist",
-      "!.claude"
+      "!.claude",
+      "!**/*.md",
+      "!phase-log"
     ]
   },
-  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
   "linter": {
     "rules": {
-      "recommended": true,
-      "style": { "noNonNullAssertion": "off" },
-      "suspicious": { "noExplicitAny": "off" }
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off"
+      }
     }
   }
 }

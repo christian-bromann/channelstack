@@ -3,15 +3,14 @@ import { SECRET_FORMATS } from "../secrets/index.ts";
 import { Redactor } from "./index.ts";
 
 describe("redaction", () => {
-  test.each(Object.entries(SECRET_FORMATS).filter(([name]) => !name.endsWith("ingSecret") && name !== "github.webhookSecret"))(
-    "a %s is scrubbed by its shape",
-    (_name, format) => {
-      const token = format.generate();
-      const out = new Redactor().text(`calling with ${token} failed`);
-      expect(out).not.toContain(token);
-      expect(out).toContain("[redacted]");
-    },
-  );
+  test.each(
+    Object.entries(SECRET_FORMATS).filter(([name]) => !name.endsWith("ingSecret") && name !== "github.webhookSecret"),
+  )("a %s is scrubbed by its shape", (_name, format) => {
+    const token = format.generate();
+    const out = new Redactor().text(`calling with ${token} failed`);
+    expect(out).not.toContain(token);
+    expect(out).toContain("[redacted]");
+  });
 
   test("shapeless secrets are scrubbed once registered", () => {
     const secret = SECRET_FORMATS["slack.signingSecret"].generate();

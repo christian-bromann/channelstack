@@ -19,7 +19,12 @@ export function createEchoFake(context: DriverContext): EchoFake {
     world,
     seed() {
       store.clear();
-      store.app = { id: context.ids.next("echo.app"), name: APP_NAME, kind: "app", botUserId: context.ids.next("echo.user") };
+      store.app = {
+        id: context.ids.next("echo.app"),
+        name: APP_NAME,
+        kind: "app",
+        botUserId: context.ids.next("echo.user"),
+      };
     },
     release(session: string) {
       store.releaseRooms(session);

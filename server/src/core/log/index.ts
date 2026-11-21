@@ -17,9 +17,11 @@ export interface Logger {
 /** The one logger: JSON lines, every one of them redacted before it is written. */
 export function createLogger(options: { level: LogLevel; redactor: Redactor; write: (line: string) => void }): Logger {
   const threshold = LEVELS.indexOf(options.level);
-  const at = (level: Exclude<LogLevel, "silent">) => (message: string, fields: Record<string, unknown> = {}) => {
-    if (LEVELS.indexOf(level) < threshold) return;
-    options.write(options.redactor.text(JSON.stringify({ level, message, ...fields })));
-  };
+  const at =
+    (level: Exclude<LogLevel, "silent">) =>
+    (message: string, fields: Record<string, unknown> = {}) => {
+      if (LEVELS.indexOf(level) < threshold) return;
+      options.write(options.redactor.text(JSON.stringify({ level, message, ...fields })));
+    };
   return { debug: at("debug"), info: at("info"), warn: at("warn"), error: at("error") };
 }

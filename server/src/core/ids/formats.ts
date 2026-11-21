@@ -35,7 +35,10 @@ function numeric(min: number, max: number, pattern: RegExp): IdFormat {
 
 /** An echo id: the echo platform is channelstack's own, so this format is ours. */
 function echo(prefix: string): IdFormat {
-  return { pattern: new RegExp(`^${prefix}[0-9A-Z]{10}$`), generate: (draw) => `${prefix}${draw.chars(10, UPPER_ALNUM)}` };
+  return {
+    pattern: new RegExp(`^${prefix}[0-9A-Z]{10}$`),
+    generate: (draw) => `${prefix}${draw.chars(10, UPPER_ALNUM)}`,
+  };
 }
 
 const uuid: IdFormat = {

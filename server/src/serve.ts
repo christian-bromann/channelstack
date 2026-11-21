@@ -75,8 +75,15 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   }
 
   const serverFile = options.serverFile ?? serverFilePath(options.home);
-  writePrivateFile(serverFile, `${JSON.stringify({ url: listening.control, token, pid: process.pid, version: options.version }, null, 2)}\n`);
-  log.info("listening", { address: `${LOOPBACK}:${server.port}`, control: `${listening.control}${CONTROL_PREFIX}`, portless: options.portless });
+  writePrivateFile(
+    serverFile,
+    `${JSON.stringify({ url: listening.control, token, pid: process.pid, version: options.version }, null, 2)}\n`,
+  );
+  log.info("listening", {
+    address: `${LOOPBACK}:${server.port}`,
+    control: `${listening.control}${CONTROL_PREFIX}`,
+    portless: options.portless,
+  });
 
   return {
     urls: listening,

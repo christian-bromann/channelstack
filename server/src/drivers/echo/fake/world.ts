@@ -57,7 +57,10 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
       const user = store.users.get(session, userId);
       const room = store.rooms.get(session, roomId);
       if (!room.members.includes(user.id)) {
-        throw new PlatformError("not_in_room", 403, `${user.id} is not a member of room ${room.id}`, { user: user.id, room: room.id });
+        throw new PlatformError("not_in_room", 403, `${user.id} is not a member of room ${room.id}`, {
+          user: user.id,
+          room: room.id,
+        });
       }
       // The app only hears about rooms it is a member of, and only if it has an endpoint.
       const deliver = context.webhookUrl !== undefined && room.members.includes(store.app.id);

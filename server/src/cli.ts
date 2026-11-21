@@ -35,7 +35,12 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-async function runStart(flags: { "no-portless"?: boolean; port?: string; "server-file"?: string; "log-level"?: string }) {
+async function runStart(flags: {
+  "no-portless"?: boolean;
+  port?: string;
+  "server-file"?: string;
+  "log-level"?: string;
+}) {
   const portless = !flags["no-portless"];
   const port = flags.port === undefined ? (portless ? 0 : DEFAULT_PORT) : Number(flags.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) fail(`--port must be a port number, got "${flags.port}"`);
@@ -50,7 +55,10 @@ async function runStart(flags: { "no-portless"?: boolean; port?: string; "server
     seed: seed ? parseSeed(seed) : randomSeed(),
     logLevel: parseLogLevel(flags["log-level"] ?? process.env.CHANNELSTACK_LOG_LEVEL),
     webhooks: Object.fromEntries(
-      DRIVERS.map((driver) => [driver.name, process.env[`CHANNELSTACK_${driver.name.toUpperCase()}_WEBHOOK_URL`] || undefined]),
+      DRIVERS.map((driver) => [
+        driver.name,
+        process.env[`CHANNELSTACK_${driver.name.toUpperCase()}_WEBHOOK_URL`] || undefined,
+      ]),
     ),
   }).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
 
@@ -83,18 +91,25 @@ async function runEnv(flags: { "server-file"?: string }) {
   const file = flags["server-file"] ?? process.env.CHANNELSTACK_SERVER_FILE ?? serverFilePath(homeDir());
   const server = readJsonFile(file) as { url?: string; token?: string } | undefined;
   if (!server?.url || !server.token) fail("no running server found. Start one with `channelstack start`.");
-  const response = await fetch(`${server.url}${CONTROL_PREFIX}/env`, { headers: { authorization: `Bearer ${server.token}` } }).catch(() =>
-    fail(`the server at ${server.url} isn't reachable. Start one with \`channelstack start\`.`),
-  );
+  const response = await fetch(`${server.url}${CONTROL_PREFIX}/env`, {
+    headers: { authorization: `Bearer ${server.token}` },
+  }).catch(() => fail(`the server at ${server.url} isn't reachable. Start one with \`channelstack start\`.`));
   if (!response.ok) fail(`the server at ${server.url} refused the request (${response.status}).`);
   const env = (await response.json()) as Record<string, string>;
-  process.stdout.write(`${Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n")}\n`);
+  process.stdout.write(
+    `${Object.entries(env)
+      .map(([key, value]) => `${key}=${value}`)
+      .join("\n")}\n`,
+  );
 }
 
 function runSecrets(action: string | undefined) {
-  if (action !== "rotate") fail(`unknown secrets command "${action ?? ""}". Did you mean \`channelstack secrets rotate\`?`);
+  if (action !== "rotate")
+    fail(`unknown secrets command "${action ?? ""}". Did you mean \`channelstack secrets rotate\`?`);
   Secrets.rotate(homeDir(), secretSpecs());
-  process.stdout.write("Rotated every fake token and signing secret. Restart the server and run `channelstack env` again.\n");
+  process.stdout.write(
+    "Rotated every fake token and signing secret. Restart the server and run `channelstack env` again.\n",
+  );
 }
 
 async function main() {

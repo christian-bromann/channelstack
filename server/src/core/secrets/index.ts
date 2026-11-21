@@ -15,7 +15,10 @@ interface SecretsFile {
   secrets: SecretValues;
 }
 
-function generate(specs: Readonly<Record<string, SecretSpec>>, existing: SecretValues): { values: SecretValues; changed: boolean } {
+function generate(
+  specs: Readonly<Record<string, SecretSpec>>,
+  existing: SecretValues,
+): { values: SecretValues; changed: boolean } {
   const values: SecretValues = {};
   let changed = false;
   for (const [driver, spec] of Object.entries(specs)) {

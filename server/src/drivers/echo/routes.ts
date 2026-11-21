@@ -16,7 +16,9 @@ const EchoApp = z
   .object({ id: z.string(), name: z.string(), kind: z.literal("app"), botUserId: z.string() })
   .openapi("EchoApp", resource);
 
-const EchoRoom = z.object({ id: z.string(), name: z.string(), members: z.array(z.string()) }).openapi("EchoRoom", resource);
+const EchoRoom = z
+  .object({ id: z.string(), name: z.string(), members: z.array(z.string()) })
+  .openapi("EchoRoom", resource);
 
 const EchoFixture = z
   .object({ app: EchoApp, apiUrl: z.string() })
@@ -127,7 +129,12 @@ export function registerEchoRoutes(
     path: "/rooms/{room}/messages",
     summary: "The room's messages, oldest first, with a cursor for the next read",
     params: RoomParams,
-    query: z.object({ since: z.string().optional().openapi({ param: { name: "since", in: "query" } }) }),
+    query: z.object({
+      since: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "since", in: "query" } }),
+    }),
     response: EchoMessagePage,
     errors: ["not_found"],
     sdkMethod: { on: "EchoRoom", name: "messages", options: ["since"] },

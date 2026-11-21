@@ -41,7 +41,10 @@ function harness(webhook?: string): Harness {
     const response = await app.fetch(
       new Request(url, {
         method,
-        headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body === undefined ? {} : { "content-type": "application/json" }) },
+        headers: {
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
         ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
       }),
     );
@@ -52,8 +55,10 @@ function harness(webhook?: string): Harness {
     app,
     secrets,
     logs,
-    call: (method, path, body, token = TOKEN) => send(`http://127.0.0.1:4500/_channelstack${path}`, method, body, token),
-    agent: (method, path, body, token = secrets.get("echo", "appToken")) => send(`http://127.0.0.1:4500/echo${path}`, method, body, token),
+    call: (method, path, body, token = TOKEN) =>
+      send(`http://127.0.0.1:4500/_channelstack${path}`, method, body, token),
+    agent: (method, path, body, token = secrets.get("echo", "appToken")) =>
+      send(`http://127.0.0.1:4500/echo${path}`, method, body, token),
   };
 }
 
@@ -91,14 +96,23 @@ describe("control API", () => {
     expect(invalid.body.data.issues[0].path).toBe("name");
     expect((await h.call("POST", `${base}/users`, "{not json")).status).toBe(400);
     expect((await h.call("GET", `${base}/rooms/ER0000000000/messages`)).body.error).toBe("not_found");
-    expect((await h.call("GET", `/sessions/${base.split("/")[2]}/events?since=bogus`)).body.error).toBe("invalid_argument");
+    expect((await h.call("GET", `/sessions/${base.split("/")[2]}/events?since=bogus`)).body.error).toBe(
+      "invalid_argument",
+    );
   });
 
   test("the OpenAPI document carries the SDK extensions", () => {
     const doc = harness().app.openapi() as any;
     const say = doc.paths["/sessions/{session}/echo/users/{user}/say"].post;
     expect(say["x-channelstack-method"]).toEqual({ on: "EchoUser", name: "say", args: ["text"], options: ["room"] });
-    expect(say["x-channelstack-error-codes"]).toEqual(["unauthorized", "invalid_argument", "session_not_found", "not_found", "not_in_room"]);
+    expect(say["x-channelstack-error-codes"]).toEqual([
+      "unauthorized",
+      "invalid_argument",
+      "internal",
+      "session_not_found",
+      "not_found",
+      "not_in_room",
+    ]);
     expect(say["x-channelstack-stability"]).toBe("experimental");
     expect(doc.paths["/sessions"].post["x-channelstack-factory"]).toEqual({ on: "Channelstack", name: "openSession" });
     expect(doc.components.schemas.EchoUser["x-channelstack-resource"]).toEqual({ id: "id" });
@@ -135,7 +149,10 @@ describe("sessions are scopes in one shared world", () => {
 
     expect((await h.call("DELETE", `/sessions/${one.sessionId}`)).status).toBe(204);
     expect((await h.call("GET", `/sessions/${one.sessionId}/events`)).body.error).toBe("session_not_found");
-    expect((await h.agent("POST", "/api/messages", { room: one.room.id, text: "late" })).body).toEqual({ ok: false, error: "room_not_found" });
+    expect((await h.agent("POST", "/api/messages", { room: one.room.id, text: "late" })).body).toEqual({
+      ok: false,
+      error: "room_not_found",
+    });
   });
 
   test("reset drops the world and seeds a new app", async () => {
@@ -158,7 +175,10 @@ describe("the echo pipeline", () => {
     expect(outsider.body.error).toBe("not_in_room");
 
     const quiet = (await h.call("POST", `${base}/rooms`, { participants: [ana.id] })).body;
-    expect((await h.agent("POST", "/api/messages", { room: quiet.id, text: "x" })).body).toEqual({ ok: false, error: "not_in_room" });
+    expect((await h.agent("POST", "/api/messages", { room: quiet.id, text: "x" })).body).toEqual({
+      ok: false,
+      error: "not_in_room",
+    });
     expect((await h.agent("POST", "/api/messages", { room: room.id, text: "x" }, "echo_app_wrong")).status).toBe(401);
     expect((await h.agent("POST", "/api/messages", { room: room.id })).body.error).toBe("invalid_payload");
     expect((await h.agent("GET", "/api/rooms/ER0000000000/messages")).body.error).toBe("room_not_found");
@@ -192,7 +212,12 @@ describe("the echo pipeline", () => {
     const timestamp = String(delivered.headers["x-echo-request-timestamp"]);
     const expected = signEchoDelivery(h.secrets.get("echo", "signingSecret"), delivered.body, Number(timestamp) * 1000);
     expect(delivered.headers["x-echo-signature"]).toBe(expected["x-echo-signature"]);
-    expect(JSON.parse(delivered.body)).toMatchObject({ type: "message.created", event_id: message.delivery, app_id: fixture.app.id, message: { text: "hello" } });
+    expect(JSON.parse(delivered.body)).toMatchObject({
+      type: "message.created",
+      event_id: message.delivery,
+      app_id: fixture.app.id,
+      message: { text: "hello" },
+    });
 
     const reply = await h.agent("POST", "/api/messages", { room: room.id, text: "echo: hello" });
     expect(reply.body.message.author).toEqual({ id: fixture.app.id, name: "echo-agent", kind: "app" });
@@ -202,14 +227,40 @@ describe("the echo pipeline", () => {
     expect(first.messages.map((m: any) => m.text)).toEqual(["hello", "echo: hello"]);
     expect((await h.call("GET", `${base}/rooms/${room.id}/messages?since=${first.cursor}`)).body.messages).toEqual([]);
     const transcript = (await h.call("GET", `${base}/rooms/${room.id}/transcript`)).body;
-    expect(transcript.entries.map((e: any) => `${e.author.name}: ${e.text}`)).toEqual(["Ana: hello", "echo-agent: echo: hello"]);
-    expect((await h.call("GET", `${base}/capabilities`)).body.say).toEqual({ fake: true, live: false, liveRequires: [] });
+    expect(transcript.entries.map((e: any) => `${e.author.name}: ${e.text}`)).toEqual([
+      "Ana: hello",
+      "echo-agent: echo: hello",
+    ]);
+    expect((await h.call("GET", `${base}/capabilities`)).body.say).toEqual({
+      fake: true,
+      live: false,
+      liveRequires: [],
+    });
 
     const { events, cursor } = (await h.call("GET", `/sessions/${sessionId}/events`)).body;
-    expect(events.map((event: any) => event.kind)).toEqual(["action", "action", "action", "delivery", "delivery_attempt", "api_call", "api_call"]);
+    expect(events.map((event: any) => event.kind)).toEqual([
+      "action",
+      "action",
+      "action",
+      "delivery",
+      "delivery_attempt",
+      "api_call",
+      "api_call",
+    ]);
     const attempt = events[4].data;
-    expect(attempt).toMatchObject({ id: message.delivery, number: 1, transport: "http", status: "acknowledged", responseStatus: 200, responseBody: "ok" });
-    expect(events[5].data).toMatchObject({ operation: "messages.create", responseStatus: 200, request: { room: room.id, text: "echo: hello" } });
+    expect(attempt).toMatchObject({
+      id: message.delivery,
+      number: 1,
+      transport: "http",
+      status: "acknowledged",
+      responseStatus: 200,
+      responseBody: "ok",
+    });
+    expect(events[5].data).toMatchObject({
+      operation: "messages.create",
+      responseStatus: 200,
+      request: { room: room.id, text: "echo: hello" },
+    });
     expect((await h.call("GET", `/sessions/${sessionId}/events?since=${cursor}`)).body.events).toEqual([]);
   });
 
@@ -225,10 +276,16 @@ describe("the echo pipeline", () => {
       const message = (await h.call("POST", `${base}/users/${ana.id}/say`, { text: "hi", room: room.id })).body;
       await h.app.settled();
       const events = (await h.call("GET", `/sessions/${sessionId}/events`)).body.events;
-      return { delivery: message.delivery, attempt: events.find((event: any) => event.kind === "delivery_attempt")?.data };
+      return {
+        delivery: message.delivery,
+        attempt: events.find((event: any) => event.kind === "delivery_attempt")?.data,
+      };
     };
 
-    expect((await statusOf(`http://127.0.0.1:${port}/events`)).attempt).toMatchObject({ status: "failed", responseStatus: 500 });
+    expect((await statusOf(`http://127.0.0.1:${port}/events`)).attempt).toMatchObject({
+      status: "failed",
+      responseStatus: 500,
+    });
     expect((await statusOf("http://127.0.0.1:1/events")).attempt).toMatchObject({ status: "unreachable" });
     expect(await statusOf(undefined)).toEqual({ delivery: undefined, attempt: undefined });
   });
@@ -252,10 +309,14 @@ describe("the echo pipeline", () => {
     const h = harness();
     const { room } = await world(h);
     const response = await h.app.fetch(
-      new Request(`http://echo.localhost/api/rooms/${room.id}/messages`, { headers: { authorization: `Bearer ${h.secrets.get("echo", "appToken")}` } }),
+      new Request(`http://echo.localhost/api/rooms/${room.id}/messages`, {
+        headers: { authorization: `Bearer ${h.secrets.get("echo", "appToken")}` },
+      }),
     );
     expect(await response.json()).toEqual({ ok: true, messages: [] });
-    const forwarded = await h.app.fetch(new Request("http://127.0.0.1:4500/api/nope", { headers: { "x-forwarded-host": "echo.localhost" } }));
+    const forwarded = await h.app.fetch(
+      new Request("http://127.0.0.1:4500/api/nope", { headers: { "x-forwarded-host": "echo.localhost" } }),
+    );
     expect(await forwarded.json()).toEqual({ ok: false, error: "unknown_method" });
     expect(h.app.hosts()).toEqual(["channelstack", "echo"]);
     expect((await h.app.fetch(new Request("http://127.0.0.1:4500/elsewhere"))).status).toBe(404);

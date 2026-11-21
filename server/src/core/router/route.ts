@@ -1,5 +1,5 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { ErrorBody, type CoreErrorCode, ProtocolError } from "../errors/index.ts";
+import { type CoreErrorCode, ErrorBody, ProtocolError } from "../errors/index.ts";
 import type { Session, Sessions } from "../sessions/index.ts";
 
 /** How an operation shows up in the SDKs: as a method on a handle (`x-channelstack-method`) or a factory (`x-channelstack-factory`). */
@@ -30,7 +30,7 @@ interface RouteBase<P extends AnyObject, Q extends AnyObject, B extends z.ZodTyp
   body?: B;
   /** The 200 response. Leave it out for 204. */
   response?: R;
-  /** Error codes this operation can return, beyond `unauthorized` and `invalid_argument`: the protocol's own, or a platform's. */
+  /** Error codes this operation can return, beyond the ones every route can return: the protocol's own, or a platform's. */
   errors?: readonly string[];
   factory?: SdkBinding;
   sdkMethod?: SdkBinding;
@@ -43,7 +43,9 @@ interface Input<P extends AnyObject, Q extends AnyObject, B extends z.ZodType> {
   body: z.infer<B>;
 }
 
-type Result<R extends z.ZodType> = [R] extends [z.ZodUndefined] ? void | Promise<void> : z.input<R> | Promise<z.input<R>>;
+type Result<R extends z.ZodType> = [R] extends [z.ZodUndefined]
+  ? void | Promise<void>
+  : z.input<R> | Promise<z.input<R>>;
 
 export interface RouteSpec<P extends AnyObject, Q extends AnyObject, B extends z.ZodType, R extends z.ZodType>
   extends RouteBase<P, Q, B, R> {
@@ -55,7 +57,7 @@ export interface DriverRouteSpec<P extends AnyObject, Q extends AnyObject, B ext
   handler(input: Input<P, Q, B> & { session: Session }): Result<R>;
 }
 
-const ALWAYS: readonly CoreErrorCode[] = ["unauthorized", "invalid_argument"];
+const ALWAYS: readonly CoreErrorCode[] = ["unauthorized", "invalid_argument", "internal"];
 
 /**
  * Register one control API route: validation, the OpenAPI operation and its `x-channelstack-*`
@@ -90,19 +92,22 @@ export function registerRoute<
   });
 
   // The handler's types come from the spec's schemas above; Hono's own inference isn't needed on top.
-  app.openapi(route as never, (async (c: {
-    req: { valid(target: string): unknown };
-    json(body: unknown, status: number): Response;
-    body(body: null, status: number): Response;
-  }) => {
-    const result = await spec.handler({
-      params: (spec.params ? c.req.valid("param") : {}) as z.infer<P>,
-      query: (spec.query ? c.req.valid("query") : {}) as z.infer<Q>,
-      body: (spec.body ? c.req.valid("json") : undefined) as z.infer<B>,
-    });
-    // Parsing the result strips anything the schema doesn't declare, so a store record never leaks through a route.
-    return spec.response ? c.json(spec.response.parse(result), 200) : c.body(null, 204);
-  }) as never);
+  app.openapi(
+    route as never,
+    (async (c: {
+      req: { valid(target: string): unknown };
+      json(body: unknown, status: number): Response;
+      body(body: null, status: number): Response;
+    }) => {
+      const result = await spec.handler({
+        params: (spec.params ? c.req.valid("param") : {}) as z.infer<P>,
+        query: (spec.query ? c.req.valid("query") : {}) as z.infer<Q>,
+        body: (spec.body ? c.req.valid("json") : undefined) as z.infer<B>,
+      });
+      // Parsing the result strips anything the schema doesn't declare, so a store record never leaks through a route.
+      return spec.response ? c.json(spec.response.parse(result), 200) : c.body(null, 204);
+    }) as never,
+  );
 }
 
 export const SessionParams = z.object({

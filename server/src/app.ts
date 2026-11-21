@@ -50,13 +50,11 @@ export interface App {
   settled(): Promise<void>;
 }
 
-const Status = z
-  .object({ ready: z.boolean(), version: z.string(), drivers: z.array(z.string()) })
-  .openapi("Status");
+const Status = z.object({ ready: z.boolean(), version: z.string(), drivers: z.array(z.string()) }).openapi("Status");
 
 const Session = z
   .object({ sessionId: z.string(), drivers: z.array(z.string()) })
-  .openapi("Session", { "x-channelstack-resource": { id: "sessionId" } });
+  .openapi("Session", { "x-channelstack-resource": { id: "sessionId", scope: "session" } });
 
 const LogEvent = z
   .object({
@@ -107,9 +105,17 @@ export function createApp(options: AppOptions): App {
     },
   });
   control.openAPIRegistry.registerComponent("securitySchemes", "bearer", { type: "http", scheme: "bearer" });
+  control.use("*", async (c, next) => {
+    await next();
+    log.debug("request", { method: c.req.method, path: c.req.path, status: c.res.status });
+  });
   control.use("*", requireBearer(options.token));
   control.onError((error, c) => {
-    if (error instanceof ProtocolError) return c.json(error.toBody(), error.status as 400);
+    // A message or its data can quote what the caller sent, so both are scrubbed on the way out.
+    if (error instanceof ProtocolError) {
+      const { error: code, message, data } = error.toBody();
+      return c.json({ error: code, message: redactor.text(message), data: redactor.tokens(data) }, error.status as 400);
+    }
     // Hono refuses a body it can't parse before validation runs.
     if (error instanceof HTTPException && error.status === 400) {
       return c.json(new ProtocolError("invalid_argument", "The request body is not valid JSON").toBody(), 400);
@@ -155,7 +161,12 @@ export function createApp(options: AppOptions): App {
     path: "/sessions/{session}/events",
     summary: "The session's event log: actions, deliveries with every attempt, and the agent's API calls",
     params: SessionParams,
-    query: z.object({ since: z.string().optional().openapi({ param: { name: "since", in: "query" } }) }),
+    query: z.object({
+      since: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "since", in: "query" } }),
+    }),
     response: EventPage,
     errors: ["session_not_found"],
     sdkMethod: { on: "Session", name: "events", options: ["since"] },

@@ -33,7 +33,9 @@ describe("exit check 0.5: ids look real", () => {
 
   test("sequential ids count per scope, like GitHub issue numbers and Linear identifiers", () => {
     const ids = generator();
-    expect([ids.sequence("github.issue:1"), ids.sequence("github.issue:1"), ids.sequence("github.issue:2")]).toEqual([1, 2, 1]);
+    expect([ids.sequence("github.issue:1"), ids.sequence("github.issue:1"), ids.sequence("github.issue:2")]).toEqual([
+      1, 2, 1,
+    ]);
     const identifiers = Array.from({ length: COUNT }, () => ids.linearIdentifier("ENG"));
     expect(identifiers[0]).toBe("ENG-1");
     expect(identifiers.at(-1)).toBe(`ENG-${COUNT}`);

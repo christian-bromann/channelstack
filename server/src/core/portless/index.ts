@@ -27,7 +27,11 @@ const runPortless: Run = (args) =>
  * Register `<name>.localhost` for each name, all pointing at the server's port.
  * Returns the function that removes them again on stop.
  */
-export async function registerAliases(names: readonly string[], port: number, run: Run = runPortless): Promise<() => Promise<void>> {
+export async function registerAliases(
+  names: readonly string[],
+  port: number,
+  run: Run = runPortless,
+): Promise<() => Promise<void>> {
   const registered: string[] = [];
   const remove = async () => {
     for (const name of registered.splice(0)) await run(["alias", "--remove", name]).catch(() => undefined);
