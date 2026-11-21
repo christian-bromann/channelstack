@@ -1,4 +1,4 @@
-import { PlatformError } from "../../../core/errors/index.ts";
+import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { signEchoDelivery } from "../../../core/signing/echo.ts";
 import { messageCreated } from "../payloads.ts";
@@ -57,10 +57,14 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
       const user = store.users.get(session, userId);
       const room = store.rooms.get(session, roomId);
       if (!room.members.includes(user.id)) {
-        throw new PlatformError("not_in_room", 403, `${user.id} is not a member of room ${room.id}`, {
-          user: user.id,
-          room: room.id,
-        });
+        throw new ProtocolError(
+          { platform: "not_in_room", status: 403 },
+          `${user.id} is not a member of room ${room.id}`,
+          {
+            user: user.id,
+            room: room.id,
+          },
+        );
       }
       // The app only hears about rooms it is a member of, and only if it has an endpoint.
       const deliver = context.webhookUrl !== undefined && room.members.includes(store.app.id);

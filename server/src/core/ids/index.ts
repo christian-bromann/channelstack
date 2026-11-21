@@ -109,7 +109,7 @@ export class IdGenerator {
     return `${Math.floor(micros / 1_000_000)}.${String(micros % 1_000_000).padStart(6, "0")}`;
   }
 
-  /** Forget which ids are taken (`POST /reset`). The random sequence continues, so ids still don't repeat. */
+  /** Start sequences and `ts` over for a new world (`POST /reset`). Ids already handed out stay taken, so none repeats. */
   reset(): void {
     this.#sequences.clear();
     this.#lastTs.clear();

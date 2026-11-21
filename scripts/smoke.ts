@@ -20,7 +20,7 @@ export const SDKS: readonly Sdk[] = ["typescript", "python"];
 
 export interface SmokeOptions {
   sdks: readonly Sdk[];
-  /** The server binary. Default: the one `pnpm build:binary` compiled for this machine. */
+  /** The server binary. Default: `CHANNELSTACK_SERVER_BIN`, or the one `pnpm build:binary` compiled for this machine. */
   bin?: string;
   /** The TypeScript runner. Default: the one in the repository, which resolves `channelstack` from the workspace. */
   typescriptRunner?: string;
@@ -48,7 +48,7 @@ function runScenario(
 }
 
 export async function runSmoke(options: SmokeOptions): Promise<void> {
-  const bin = options.bin ?? binaryPath();
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
   const scenarios = readdirSync(SCENARIO_DIR)
     .filter((name) => name.endsWith(".yaml"))

@@ -1,6 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": ["node", "bun"] },
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "bun"],
+    "paths": {
+      "channelstack/client": ["./sdks/typescript/client.ts"]
+    }
+  },
   "include": ["server", "codegen", "sdks/typescript", "scenarios", "scripts", "vitest.config.ts"],
   "exclude": ["**/dist", "**/node_modules"]
 }
