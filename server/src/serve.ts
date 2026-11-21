@@ -37,24 +37,41 @@ export function serverFilePath(home: string): string {
 }
 
 interface ServerFile {
+  /** Where clients reach the server: the portless name, or the loopback origin. */
   url: string;
   token: string;
   pid: number;
   version: string;
+  /** The loopback origin the server listens on, whatever `url` is. */
+  local: string;
 }
 
+/** The server file's contents, if it is there and readable as one. */
 function readServerFile(path: string): Partial<ServerFile> | undefined {
-  const contents = readPrivateJsonFile(path);
-  return typeof contents === "object" && contents !== null ? contents : undefined;
+  try {
+    const contents = readPrivateJsonFile(path);
+    return typeof contents === "object" && contents !== null ? contents : undefined;
+  } catch {
+    // A file that isn't JSON describes no server.
+    return undefined;
+  }
 }
 
-function isAlive(pid: number): boolean {
+/**
+ * Is the server a server file describes still there? Only an answer counts: a pid alone proves
+ * nothing, because after a crash or a reboot it may belong to any other process.
+ */
+async function answers(file: Partial<ServerFile>): Promise<boolean> {
+  const origin = file.local ?? file.url;
+  if (typeof origin !== "string" || typeof file.token !== "string") return false;
   try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // EPERM means the process exists and belongs to someone else.
-    return (error as NodeJS.ErrnoException).code === "EPERM";
+    const response = await fetch(`${origin}${CONTROL_PREFIX}/status`, {
+      headers: { authorization: `Bearer ${file.token}` },
+      signal: AbortSignal.timeout(1000),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -64,9 +81,9 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   // A server file belongs to one server. Taking it over would cut the running server off from
   // the CLI and every SDK that attached to it (decision 0004).
   const existing = readServerFile(serverFile);
-  if (typeof existing?.pid === "number" && existing.pid !== process.pid && isAlive(existing.pid)) {
+  if (existing && (await answers(existing))) {
     throw new Error(
-      `A channelstack server is already running (pid ${existing.pid}, ${existing.url}). ` +
+      `A channelstack server is already running at ${existing.url} (pid ${existing.pid}, from ${serverFile}). ` +
         "Stop it first, or start a private one with --server-file <path>.",
     );
   }
@@ -101,7 +118,13 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   let removeAliases = async () => {};
   try {
     if (options.portless) removeAliases = await registerAliases(app.hosts(), Number(server.port));
-    const file: ServerFile = { url: listening.control, token, pid: process.pid, version: options.version };
+    const file: ServerFile = {
+      url: listening.control,
+      token,
+      pid: process.pid,
+      version: options.version,
+      local: origin,
+    };
     writePrivateFile(serverFile, `${JSON.stringify(file, null, 2)}\n`);
   } catch (error) {
     // Nothing may be left behind by a start that failed: no names pointing at a dead port, no listener.
