@@ -161,10 +161,10 @@ describe("the CLI", () => {
     expect((await shared.control("GET", "/status")).status).toBe(200);
   });
 
-  test("a second default server is refused while the first one runs, and takes over once it is gone", async () => {
+  test("a second default server is refused while the first one answers, and takes over once it is gone", async () => {
     const first = await start();
     await expect(startBinary({ home: first.home })).rejects.toThrow(
-      /already running \(pid \d+, http:\/\/127\.0\.0\.1:\d+\).*--server-file/s,
+      /already running at http:\/\/127\.0\.0\.1:\d+ \(pid \d+, from .*server\.json\).*--server-file/s,
     );
     // The refused start changed nothing for the first server.
     expect(JSON.parse(readFileSync(join(first.home, "server.json"), "utf8")).token).toBe(first.token);
@@ -177,6 +177,49 @@ describe("the CLI", () => {
     const next = await start({ home: first.home });
     expect(next.token).not.toBe(first.token);
     expect((await next.control("GET", "/status")).status).toBe(200);
+  });
+
+  test("a stale server file doesn't block a start, even when its pid belongs to a live process", async () => {
+    const home = temporaryHome();
+    // This test's own pid: alive, and not a channelstack server. Nothing listens at the URL.
+    const stale = {
+      url: "http://127.0.0.1:9",
+      local: "http://127.0.0.1:9",
+      token: "stale-token",
+      pid: process.pid,
+      version: "0.0.0",
+    };
+    writeFileSync(join(home, "server.json"), JSON.stringify(stale));
+
+    const server = await start({ home });
+
+    expect(server.token).not.toBe("stale-token");
+    expect((await server.control("GET", "/status")).status).toBe(200);
+  });
+
+  test.runIf(posix).each(["SIGINT", "SIGTERM", "SIGHUP"] as const)(
+    "%s stops the server cleanly and removes its token file",
+    async (signal) => {
+      const server = await start();
+      const exited = new Promise<number | null>((resolve) => server.child.once("exit", (code) => resolve(code)));
+      server.child.kill(signal);
+      expect(await exited).toBe(0);
+      expect(existsSync(join(server.home, "server.json"))).toBe(false);
+    },
+  );
+
+  test.runIf(posix)("a server whose token file was damaged still stops cleanly", async () => {
+    const portlessLog = join(temporaryHome(), "calls.log");
+    const bin = temporaryHome();
+    writeFileSync(join(bin, "portless"), `#!/bin/sh\necho "$@" >> "${portlessLog}"\n`);
+    chmodSync(join(bin, "portless"), 0o755);
+    const server = await start({ args: [], env: { PATH: `${bin}${delimiter}${process.env.PATH}` } });
+    writeFileSync(join(server.home, "server.json"), "{trunc");
+
+    expect(await server.stop()).toBe(0);
+    // The names are still removed, and the damaged file, which isn't provably this server's, is left alone.
+    expect(readFileSync(portlessLog, "utf8")).toContain("alias --remove channelstack");
+    expect(readFileSync(join(server.home, "server.json"), "utf8")).toBe("{trunc");
   });
 
   test("a secrets.json that isn't JSON stops the start with a message that names the file", async () => {
