@@ -4,12 +4,25 @@
   "description": "A test harness for AI agents that live in Slack, GitHub, Linear and Notion.",
   "license": "MIT",
   "type": "module",
-  "repository": { "type": "git", "url": "git+https://github.com/christian-bromann/channelstack.git" },
-  "engines": { "node": ">=22" },
-  "bin": { "channelstack": "bin/channelstack.mjs" },
-  "files": ["bin", "dist"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/christian-bromann/channelstack.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "channelstack": "bin/channelstack.mjs"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
   "exports": {
-    "./client": { "types": "./dist/client.d.ts", "default": "./dist/client.js" },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
