@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +14,11 @@ export interface StackOptions {
   agent: string;
   /** Which driver delivers to the agent, and at which path of the agent. */
   webhook: { driver: string; path: string };
+  /**
+   * Start the agent in Slack's Socket Mode (`SLACK_SOCKET_MODE=1`): it connects out to the fake,
+   * and the server is given no endpoint to deliver to.
+   */
+  socketMode?: boolean;
 }
 
 export interface RunningStack {
@@ -44,7 +49,7 @@ export async function withStack(
     const server = await startBinary({
       bin: options.bin,
       home,
-      env: { ...env, [webhookVariable]: `http://127.0.0.1:${port}${options.webhook.path}` },
+      env: options.socketMode ? env : { ...env, [webhookVariable]: `http://127.0.0.1:${port}${options.webhook.path}` },
     });
     stops.push(server.stop);
 
@@ -54,17 +59,43 @@ export async function withStack(
         .filter((line) => line.includes("="))
         .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
     );
-    const agent = background(process.execPath, [options.agent], { ...process.env, ...agentEnv, PORT: String(port) });
+    const agent = background(process.execPath, [options.agent], {
+      ...process.env,
+      ...agentEnv,
+      PORT: String(port),
+      ...(options.socketMode ? { SLACK_SOCKET_MODE: "1" } : {}),
+    });
     stops.push(agent.stop);
-    await waitFor("the reference agent to listen", () => {
+    const running = () => {
       if (agent.child.exitCode !== null)
         throw new Error(`The agent ${options.agent} exited with ${agent.child.exitCode}`);
-      return new Promise<true | undefined>((resolve) => {
-        const socket = connect({ host: "127.0.0.1", port });
-        socket.once("connect", () => resolve(socket.destroy() && true));
-        socket.once("error", () => resolve(undefined));
+    };
+    if (options.socketMode) {
+      // In Socket Mode the agent listens nowhere: it is ready once the fake sees its connection.
+      const { url, token } = JSON.parse(readFileSync(join(home, "server.json"), "utf8")) as {
+        url: string;
+        token: string;
+      };
+      const control = (method: string, path: string) =>
+        fetch(`${url}/_channelstack${path}`, { method, headers: { authorization: `Bearer ${token}` } });
+      const { sessionId } = (await (await control("POST", "/sessions")).json()) as { sessionId: string };
+      await waitFor("the reference agent to connect", async () => {
+        running();
+        const fixture = (await (await control("GET", `/sessions/${sessionId}/slack`)).json()) as {
+          socketConnections: number;
+        };
+        return fixture.socketConnections > 0 ? true : undefined;
       });
-    });
+      await control("DELETE", `/sessions/${sessionId}`);
+    } else
+      await waitFor("the reference agent to listen", () => {
+        running();
+        return new Promise<true | undefined>((resolve) => {
+          const socket = connect({ host: "127.0.0.1", port });
+          socket.once("connect", () => resolve(socket.destroy() && true));
+          socket.once("error", () => resolve(undefined));
+        });
+      });
 
     await use({ home, env });
   } finally {

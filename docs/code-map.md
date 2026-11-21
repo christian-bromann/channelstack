@@ -17,7 +17,7 @@
 | Concern | Module | Use it for | Don't |
 |---|---|---|---|
 | Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, quiet, reset, env; mounting each driver's fake; serving the UI page and its login link | Build services or mount routes anywhere else |
-| Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration | Call `Bun.serve` anywhere else (everything else also runs under Node) |
+| Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration, upgrading a WebSocket a fake expects (`app.socket`) | Call `Bun.serve` anywhere else (everything else also runs under Node) |
 | The command line | `cli.ts` | Parsing arguments and dispatching: `start`, `secrets rotate`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
 | Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError` | Read `server.json` or call the control API from another CLI module |
 | Acting from the terminal | `cli/slack.ts` | `slack say`, `reply`, `react`; people and channels by name, created on first use; what `last` means | Resolve names or `last` anywhere else |
@@ -36,7 +36,7 @@
 | Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`). `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
 | Access to the control API | `auth/` | Creating the bearer token, parsing `Authorization: Bearer`, the middleware (`requireAccess`); browser access for the UI (`ui.ts`): one-time login codes, the session cookie, and the short list of reads it allows | Compare tokens with `===`; let a cookie authorize anything but those reads |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
-| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
+| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); another way to the agent than HTTP (`DeliveryTransport`: a connection the agent opened); handing the agent's answer to the driver (`answered`); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
 | Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is in flight or about to be retried, a driver reports open work (named, so a failure can say what was left open), or the agent was told to retry later (`expectMore` until it `arrived`); negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
 | Reality rules | `reality/` *(planned, phase 5)* | Fake or live per object, `unsupported_in_live`, `fake_actor_in_live_world` | Branch on `process.env` credentials in a driver |
 | Safety and cleanup ledger | `safety/`, `ledger/` *(planned, phase 5)* | Live allowlists, tagging, cleanup, `channelstack sweep` | Delete live objects from a driver directly |
@@ -66,6 +66,7 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `blocks.ts` (Slack) | Reading Block Kit: the text and controls a person sees, finding a button or a menu by label or `action_id`, filling in missing `block_id`s and `action_id`s |
 | `views.ts` (Slack) | Reading a modal as a person does: its inputs by label, what is filled in, `state.values` |
 | `fake/views.ts` (Slack) | Modals: `views.open` / `update` / `push`, and a person submitting or closing one. Part of the fake world |
+| `fake/socket.ts` (Slack) | Socket Mode: tickets from `apps.connections.open`, the app's connections, envelopes and acks. It is the delivery queue's transport once the app connects |
 | `fake/interactions.ts` (Slack) | What a person does beyond writing: clicks, menu choices, shortcuts, slash commands, Stop, the agent split view, and the app's answers through `response_url`. Part of the fake world |
 | `transcript.ts` | State → what a person would see |
 | `capabilities.ts` | Per action: fake, live, what live needs |

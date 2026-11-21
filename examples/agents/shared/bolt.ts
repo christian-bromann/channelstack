@@ -5,17 +5,25 @@
  */
 import { App, LogLevel } from "@slack/bolt";
 
-const { SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, SLACK_API_URL, PORT } = process.env;
-if (!SLACK_BOT_TOKEN || !SLACK_SIGNING_SECRET || !PORT) {
-  throw new Error("The agent needs SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET and PORT");
+const { SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, SLACK_APP_TOKEN, SLACK_API_URL, SLACK_SOCKET_MODE, PORT } = process.env;
+/** With `SLACK_SOCKET_MODE=1` the app connects out to Slack over a WebSocket and needs no public URL. */
+const socketMode = SLACK_SOCKET_MODE === "1";
+if (!SLACK_BOT_TOKEN || (socketMode ? !SLACK_APP_TOKEN : !SLACK_SIGNING_SECRET || !PORT)) {
+  throw new Error(
+    socketMode
+      ? "The agent needs SLACK_BOT_TOKEN and SLACK_APP_TOKEN"
+      : "The agent needs SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET and PORT",
+  );
 }
 
 export const app = new App({
   token: SLACK_BOT_TOKEN,
-  signingSecret: SLACK_SIGNING_SECRET,
+  ...(socketMode
+    ? { socketMode: true, appToken: SLACK_APP_TOKEN ?? "" }
+    : { signingSecret: SLACK_SIGNING_SECRET ?? "" }),
   ...(SLACK_API_URL ? { clientOptions: { slackApiUrl: SLACK_API_URL } } : {}),
   logLevel: LogLevel.ERROR,
 });
 
-/** Start listening on `PORT`. */
-export const listen = () => app.start(Number(PORT));
+/** Start: listen on `PORT`, or in Socket Mode, connect. */
+export const listen = () => (socketMode ? app.start() : app.start(Number(PORT)));
