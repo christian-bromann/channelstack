@@ -240,6 +240,15 @@ describe("streams and status", () => {
     expect((await api("assistant.threads.setStatus", { channel_id: channel.id, thread_ts: question.ts })).error).toBe(
       "invalid_arguments",
     );
+    // A title and suggested prompts are accepted under both the assistant and the agent-session names.
+    expect(await api("assistant.threads.setTitle", { ...thread, title: "Thinking it over" })).toEqual({ ok: true });
+    expect(await api("agents.sessions.rename", { ...thread, title: "Thought it over" })).toEqual({ ok: true });
+    expect((await api("agents.sessions.rename", thread)).error).toBe("invalid_arguments");
+    const prompts = [{ title: "Summarize", message: "Summarize this channel" }];
+    expect(await api("assistant.threads.setSuggestedPrompts", { ...thread, prompts })).toEqual({ ok: true });
+    expect((await api("assistant.threads.setSuggestedPrompts", { ...thread, prompts: [] })).error).toBe(
+      "invalid_arguments",
+    );
     await api("chat.postMessage", { channel: channel.id, thread_ts: question.ts, text: "done" });
     // Reads of the status come with the transcript routes; here it is enough that every call was accepted.
     expect((await h.call("GET", "/status")).status).toBe(200);

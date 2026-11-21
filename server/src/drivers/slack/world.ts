@@ -92,6 +92,10 @@ export interface SlackThreadState {
   statusText: string;
   /** The agent session's lifecycle status (`agents.sessions.setStatus`). */
   sessionStatus: "active" | "processing" | "suspended" | "closed" | undefined;
+  /** The thread's name in the person's list of conversations with the app (`assistant.threads.setTitle`). */
+  title?: string;
+  /** The prompts the app offers at the start of the thread (`assistant.threads.setSuggestedPrompts`). */
+  suggestedPrompts?: Array<{ title: string; message: string }>;
 }
 
 /** Where a person posts: a conversation, or people to open (or reuse) a DM with. */

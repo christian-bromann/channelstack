@@ -45,7 +45,10 @@ const SCOPES: Readonly<Record<string, readonly string[]>> = {
   "chat.appendStream": ["chat:write"],
   "chat.stopStream": ["chat:write"],
   "assistant.threads.setStatus": ["chat:write", "assistant:write"],
+  "assistant.threads.setTitle": ["assistant:write"],
+  "assistant.threads.setSuggestedPrompts": ["assistant:write"],
   "agents.sessions.setStatus": ["chat:write"],
+  "agents.sessions.rename": ["chat:write"],
   "reactions.add": ["reactions:write"],
   "reactions.remove": ["reactions:write"],
   "reactions.get": ["reactions:read"],
@@ -229,6 +232,14 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
     message.text += piece;
   };
 
+  /** Name a thread: what the person sees in their list of conversations with the app. */
+  const setTitle = (args: Args) => {
+    const conversation = joined(required(args, "channel_id"));
+    const threadTs = threadRoot(conversation, required(args, "thread_ts")) ?? required(args, "thread_ts");
+    store.threadState(conversation.id, threadTs).title = required(args, "title");
+    return {};
+  };
+
   const methods: Readonly<Record<string, Method>> = {
     "api.test": (args) => ({ args }),
 
@@ -352,6 +363,26 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       // An empty status clears the line, so the argument must be present but may be "".
       if (typeof args.status !== "string") throw new SlackApiError("invalid_arguments");
       store.threadState(conversation.id, threadTs).statusText = args.status;
+      return {};
+    },
+
+    "assistant.threads.setTitle": (args) => setTitle(args),
+    // The same title under the newer name: an agent session is the thread.
+    "agents.sessions.rename": (args) => setTitle(args),
+
+    "assistant.threads.setSuggestedPrompts": (args) => {
+      const conversation = joined(required(args, "channel_id"));
+      const threadTs = threadRoot(conversation, required(args, "thread_ts")) ?? required(args, "thread_ts");
+      const prompts = json(args, "prompts");
+      const valid =
+        Array.isArray(prompts) &&
+        prompts.length > 0 &&
+        prompts.every((prompt) => typeof prompt?.title === "string" && typeof prompt?.message === "string");
+      if (!valid) throw new SlackApiError("invalid_arguments");
+      store.threadState(conversation.id, threadTs).suggestedPrompts = prompts.map(({ title, message }) => ({
+        title,
+        message,
+      }));
       return {};
     },
 
