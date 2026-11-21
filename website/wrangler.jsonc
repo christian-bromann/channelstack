@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Static assets only: there is no Worker script.
+  "name": "channelstack-website",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+  // Production serves channelstack.dev. Preview versions get *.workers.dev URLs.
+  "routes": [{ "pattern": "channelstack.dev", "custom_domain": true }],
+  "workers_dev": true,
+  "preview_urls": true,
+}

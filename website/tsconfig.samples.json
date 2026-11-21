@@ -1,0 +1,23 @@
+{
+  // Type-checks the TypeScript samples shown on the site against the public API in ../api/*.d.ts.
+  // The Python samples are only syntax-checked: see samples/python/README.md.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": {
+      "channelstack": ["../api/index.d.ts"],
+      "channelstack/vitest": ["../api/vitest.d.ts"],
+      "vite": ["./node_modules/vite"],
+      "vitest": ["./node_modules/vitest"],
+      "vitest/*": ["./node_modules/vitest/*"],
+      "@vitest/runner": ["./node_modules/@vitest/runner"]
+    }
+  },
+  "include": ["samples/**/*.ts"]
+}

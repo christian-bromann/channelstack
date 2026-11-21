@@ -20,6 +20,7 @@ test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
 
 ## Documentation
 
+- [channelstack.dev](https://channelstack.dev): the website
 - [AGENTS.md](AGENTS.md): start here if you're implementing channelstack
 - [docs/devx.md](docs/devx.md): how it's used
 - [docs/architecture.md](docs/architecture.md): how it works

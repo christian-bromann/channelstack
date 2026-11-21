@@ -1,0 +1,5 @@
+# The website is its own project: it is not part of the repository's root workspace.
+packages: []
+allowBuilds:
+  esbuild: true
+  workerd: true

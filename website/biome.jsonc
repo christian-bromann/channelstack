@@ -1,0 +1,29 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  // The website follows the repository's lint rules, with the exceptions below.
+  "root": false,
+  "extends": "//",
+  "files": {
+    // Third-party logo files stay byte for byte as published (public/logos/SOURCES.md).
+    "includes": ["**", "!public/logos"],
+  },
+  "linter": {
+    "rules": {
+      "a11y": {
+        // Scrollable code blocks and tables are focusable regions on purpose, so keyboard users can scroll them.
+        "noNoninteractiveTabindex": "off",
+        "useSemanticElements": "off",
+        // Decorative drawings are hidden from assistive technology with aria-hidden instead of a title.
+        "noSvgWithoutTitle": "off",
+      },
+      "suspicious": {
+        // The lists keyed by index are fixed at build time and never reorder.
+        "noArrayIndexKey": "off",
+      },
+      "style": {
+        // Theme and breakpoint overrides are grouped by component, not by specificity.
+        "noDescendingSpecificity": "off",
+      },
+    },
+  },
+}
