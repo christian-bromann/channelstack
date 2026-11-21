@@ -1,6 +1,6 @@
 # Implementation phases
 
-> 2026-11-20. Replaces the milestone list in implementation-plan.md section 14. Each phase ends with a **gate** (automated checks that one command runs) and a **review** (an independent agent checks the phase and writes its findings to disk). A phase is done when the gate is green in CI **and** a review round says *approved*. The next phase doesn't start before that.
+> 2026-11-20. Replaces the milestone list in implementation-plan.md section 14. Each phase ends with a **gate** (automated checks that one command runs) and a **review** (an independent agent checks the phase and posts its findings on the phase's pull request). A phase is done when the gate is green in CI **and** a review round says *approved*. The next phase doesn't start before that.
 >
 > Read [AGENTS.md](../AGENTS.md) first for the reading order and conventions.
 
@@ -41,8 +41,8 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 
 | Check | Command | Passes when |
 |---|---|---|
-| Types | `pnpm typecheck` | No errors in `server/`, `integrations/`, `sdks/typescript/`, `api/` |
-| Lint and format | `pnpm lint` | No errors |
+| Types | `pnpm typecheck` | No errors in `server/`, `codegen/`, `integrations/`, `sdks/typescript/`, `sdks/python/`, `scenarios/`, `scripts/` and `api/` (the examples against `api/*.d.ts`, with the Vitest and Jest versions the contract names) |
+| Lint and format | `pnpm lint` | No errors (Biome for TypeScript, ruff for Python) |
 | Unit tests | `pnpm test` | Green |
 | Spec is current | `pnpm spec:check` | Regenerating `spec/openapi.json` and `spec/ir.json` from the routes gives no diff |
 | SDKs are current | `pnpm sdk:check` | Regenerating every SDK gives no diff |
@@ -51,7 +51,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | No duplicate code | `pnpm check:dupes` | jscpd finds no copy-pasted block over 15 lines (generated code excluded) |
 | Architecture boundaries | `pnpm check:deps` | dependency-cruiser: drivers don't import each other, core doesn't import drivers, nothing imports `generated/` except its SDK |
 | No dead code | `pnpm check:unused` | knip finds no unused files, exports or dependencies |
-| Flake-free acceptance | `pnpm test:accept --repeat 3` (from phase 1) | The acceptance tests pass three runs in a row |
+| Flake-free acceptance | `pnpm test:accept --repeat 3` | The acceptance tests pass three runs in a row. In phase 0 these are the smoke scenarios through every SDK; the `api/examples` suites join from phase 1 |
 | Docs updated | The phase review | The phase's "Docs to update" list is done, and `docs/code-map.md` matches the code |
 
 ### Rules for exit checks

@@ -11,18 +11,18 @@ Goal: the spine. The `echo` driver drives the same compiled binary from TypeScri
 | 0.3 Packaging works | `scripts/pack-test.ts` (`npm pack`, install into an empty project, `npx channelstack --version`, the TS smoke scenario), in the CI `packaging` job on `macos-latest` (arm64) and `ubuntu-latest` (x64) | `sdks/typescript/bin/`, `npm/server-<platform>/`, `scripts/build-binary.ts` |
 | 0.4 The stale checks catch drift | `scripts/selftest-stale.ts` (changes a route, expects `spec:check` and `sdk:check` to fail, restores the file) | `scripts/spec.ts`, `scripts/sdk.ts` |
 | 0.5 Ids look real | `server/src/core/ids/ids.test.ts` (10,000 ids per kind match the pattern, no collisions, same seed gives the same ids) | `server/src/core/ids/`, `server/src/core/clock/` |
-| 0.6 Secrets are stored safely | `server/src/core/secrets/secrets.test.ts`, `server/src/core/home/home.test.ts` (mode 0600 for `secrets.json` and `server.json`, `secrets rotate` changes every value) | `server/src/core/secrets/`, `server/src/core/home/`, `server/src/cli.ts` |
+| 0.6 Secrets are stored safely | `server/src/core/secrets/secrets.test.ts`, `server/src/core/home/home.test.ts`, and against the binary in `server/test/integration/control-api.test.ts` (mode 0600 for `secrets.json` and `server.json`, `secrets rotate` changes every value) | `server/src/core/secrets/`, `server/src/core/home/`, `server/src/cli.ts` |
 | 0.7 The fake store design is locked | `server/src/drivers/echo/fake-backend.test.ts` (the decision exists and names the interface; the echo fake `satisfies FakeBackend`) | `docs/decisions/0001-fake-backend.md`, `server/src/core/router/driver.ts`, `server/src/drivers/echo/fake/` |
 
 Standing checks, all wired into `pnpm verify:phase 0` (`scripts/verify-phase.ts`):
 
 | Check | How |
 |---|---|
-| `pnpm typecheck` | `tsc --noEmit` over `server/`, `codegen/`, `sdks/typescript/`, `scenarios/`, `scripts/`, and `api/` (examples resolved against `api/*.d.ts` until phase 1 turns on `api:check`); pyright over `sdks/python/` |
+| `pnpm typecheck` | `tsc --noEmit` over `server/`, `codegen/`, `sdks/typescript/`, `scenarios/`, `scripts/`; `api/` with its own tsconfigs (examples against `api/*.d.ts`, with the Vitest and Jest versions the contract names, until phase 1 turns on `api:check`); pyright over `sdks/python/` and the Python runner |
 | `pnpm lint` | Biome (lint and format) for TypeScript; ruff for Python |
 | `pnpm test` | Vitest unit tests |
 | `pnpm spec:check`, `pnpm sdk:check` | Regenerate in memory from the routes and compare with the committed files |
-| `pnpm test:redaction` | `server/test/integration/redaction.test.ts`: drives the binary with known fake secrets and live-shaped tokens, then searches logs, error bodies and the event log |
+| `pnpm test:redaction` | `server/test/integration/redaction.test.ts`: drives the binary with known fake secrets and live-shaped tokens, then searches logs, error bodies and the event log. Recordings and the UI don't exist yet; they join this check in the phases that build them |
 | `pnpm check:dupes` | jscpd, 15 lines, generated code excluded |
 | `pnpm check:deps` | dependency-cruiser with the rules from `docs/code-map.md` |
 | `pnpm check:unused` | knip |
@@ -72,13 +72,13 @@ Runtime (in the binary or an SDK):
 | `@hono/zod-openapi` | 1.6.3 | Routes → OpenAPI (settled in AGENTS.md) | MIT | Yes |
 | `zod` | 4.6.7 | Validation; peer of `@hono/zod-openapi` | MIT | Yes |
 | `pure-rand` | 8.4.2 | Seeded, reproducible random source for ids | MIT | Yes |
-| `httpx` (Python) | pinned in `uv.lock` | HTTP client for the Python SDK (implementation plan 11.3) | BSD-3-Clause | Yes |
+| `httpx` (Python) | 0.28.1 | HTTP client for the Python SDK (implementation plan 11.3) | BSD-3-Clause | Yes |
 
 Development only:
 
 | Package | Version | Why | License |
 |---|---|---|---|
-| `typescript` | 7.0.2 | Type checks and the SDK build | Apache-2.0 |
+| `typescript` | 6.0.3 | Type checks and the SDK build. 6.x because dependency-cruiser 18 can't read TypeScript 7.0's API | Apache-2.0 |
 | `vitest` | 5.1.1 | Unit and integration tests | MIT |
 | `@biomejs/biome` | 2.6.8 | Lint and format | MIT OR Apache-2.0 |
 | `jscpd` | 5.4.3 | `check:dupes` (named in phases.md) | MIT |
@@ -86,7 +86,8 @@ Development only:
 | `knip` | 6.45.1 | `check:unused` (named in phases.md) | ISC |
 | `yaml` | 2.9.1 | Parsing smoke scenarios in the TypeScript runner | ISC |
 | `@types/node`, `@types/bun` | 26.6.6, 1.4.5 | Types | MIT |
-| `pyyaml`, `ruff`, `pyright` (Python) | pinned in `uv.lock` | Scenario parsing, lint, type check | MIT |
+| `vitest`, `@vitest/runner`, `vite`, `@types/jest` (in `api/` only) | 3.2.7, 3.2.7, 7.3.8, 30.0.0 | Type-checking `api/` against the framework versions the contract names (Vitest 3.2, Jest 30). Types only; nothing runs them | MIT |
+| `pyyaml`, `types-pyyaml`, `ruff`, `pyright`, `hatchling` (Python) | 6.0.4, 6.0.12.20261113, 0.17.6, 1.1.414, 1.33.0 | Scenario parsing, lint, type check, wheel build | MIT, Apache-2.0 |
 
 `portless` is not a dependency: the server calls the user's installed CLI, and `--no-portless` works without it.
 

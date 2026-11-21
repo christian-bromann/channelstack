@@ -532,17 +532,18 @@ channelstack holds real tokens and can post into real workspaces, so these are r
 ```
 channelstack/
   server/                    Bun + Hono + @hono/zod-openapi
-    src/core/                sessions, registry, reality rules, event log, delivery, vault, safety, ledger, proxy, ca, recorder
-    src/drivers/{slack,github,linear,notion}/
-      routes.ts  world.ts  fake/  live/  inbound.ts  transcript.ts  capabilities.ts
-    src/cli.ts               channelstack [start] | env | doctor | reset | mcp | <channel> <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets | spec
+    src/core/                sessions, registry, ids, secrets, signing, reality rules, event log, delivery, errors, redaction, safety, ledger, proxy, ca, recorder (docs/code-map.md names the module for each)
+    src/drivers/{echo,slack,github,linear,notion}/
+      routes.ts  world.ts  fake/  live/  payloads.ts  transcript.ts  capabilities.ts
+    src/cli.ts               channelstack [start] | env | doctor | reset | mcp | <channel> <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets
   ui/                        the functional browser UI (transcript view, inspector, chaos controls), served at channelstack.localhost
   spec/                      openapi.json, ir.json (generated, committed)
   codegen/                   ir builder + emitters/{ts,python,rust}
   api/                       hand-designed public types (*.d.ts) + examples; the generated TS SDK must satisfy them
-  sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/
+  sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/ (Python: inside the `channelstack` package)
   integrations/              vitest, jest (TS) · pytest-channelstack (Python) · checks (standard behaviour checks)
-  scenarios/                 smoke/*.yaml (protocol parity) + <driver>/*.test.ts (differential suite)
+  scenarios/                 smoke/*.yaml (protocol parity), runners/, agents/ + <driver>/*.test.ts (differential suite)
+  scripts/                   the gate, spec and SDK generation, the binary build, packaging and smoke runs
   conformance/               schema validators, shape differ, divergences.yaml, coverage page generator
   examples/agents/{bolt-ai-sdk,chat-sdk-slack,chat-sdk-github,probot,linear-sdk,notion-sdk,mdac-220,mda}/
   docs/

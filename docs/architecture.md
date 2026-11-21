@@ -95,7 +95,7 @@ Each platform is one folder under `server/src/drivers/<name>/`. Core never chang
 
 ```ts
 interface Driver {
-  name: "slack" | "github" | "linear" | "notion";
+  name: string;                        // "slack", "github", "linear", "notion", and the internal "echo" (decision 0003)
   routes(r: DriverRouter): void        // control API routes + Zod schemas → becomes the SDK surface
   fake: FakeBackend                    // provider API emulation (Hono app + in-memory store)
   live: LiveBackend                    // real API client, as the app or as a person, + cleanup handlers
@@ -105,6 +105,8 @@ interface Driver {
   capabilities(): CapabilityTable      // per action: fake / live / what live needs
 }
 ```
+
+The interface in the code (`server/src/core/router/driver.ts`) has only the members that exist so far; each phase adds the ones it first uses. Phase 0 locks `routes`, `fake` and `capabilities()` with the `echo` driver, and the `FakeBackend` design in [decisions/0001-fake-backend.md](decisions/0001-fake-backend.md).
 
 **One action, two backends.** Each control action is written once against a `World` interface that both backends implement:
 
@@ -131,6 +133,7 @@ That keeps the fake and the real platform from drifting apart in code. The night
 | Safety and ledger | Live allowlists; every live object is tagged and recorded so the session or `channelstack sweep` deletes it |
 | Proxy + CA | For agents with hard-coded hosts: routes `slack.com`, `api.github.com`, … to the fakes, with a name-constrained CA trusted only by the agent |
 | Quiet detector | Knows when the agent is idle (no open stream, no call in flight, a short settle window). Negative and exact-count matchers wait for it |
+| State directory | `~/.channelstack`, or `CHANNELSTACK_HOME`: `secrets.json` and the running server's `server.json` (URL and bearer token), both 0600. A private server started by an SDK writes its token file elsewhere ([decisions/0004-state-directory.md](decisions/0004-state-directory.md)) |
 
 ## 4. Where the API logic lives
 
@@ -221,12 +224,16 @@ Handles passed as options (`channel`) are sent by id (`"ref": true`); responses 
 |---|---|
 | Transport | HTTP client with the bearer token from `~/.channelstack/server.json`, retries while the server starts, error code → typed exception |
 | Launcher | `auto` / `attach` / `start`: attaches to a running server at `https://channelstack.localhost` (or `CHANNELSTACK_URL`), otherwise starts the bundled binary and stops it on exit |
-| Credentials | Reads `CHANNELSTACK_<CHANNEL>_*` env vars for live mode and sends them once; the server never returns them |
-| Disposal | Created resources clean up at the end of the session: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust |
+| Waiting and polling | The one polling loop behind every `waitFor…`, `latest…` and matcher: cursor reads, timeouts, quiet checks |
+| Durations | Parsing `"3s"`, `"750ms"` |
+| Credentials | Reads `CHANNELSTACK_<CHANNEL>_*` env vars for live mode and sends them once; the server never returns them (phase 5) |
+| Disposal | Created resources clean up at the end of the session: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust. Generated from routes marked `dispose` |
+
+The modules have the same names in every language ([code-map.md](code-map.md)).
 
 ### 5.4 Keeping the SDKs honest
 
-- **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`) run through every SDK in CI, like WebDriver's WPT.
+- **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`, defined in [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md)) run through every SDK in CI, like WebDriver's WPT.
 - **No stale output.** CI fails if `openapi.json`, `ir.json` or any generated SDK is out of date with the routes.
 - **The TS contract holds.** CI type-checks `api/examples/*.test.ts` against the generated TypeScript SDK, so the hand-designed API in `api/*.d.ts` and the generated one can't drift.
 - **Versioning.** One tag releases the server, the spec and every SDK at the same version. SDKs check the server's major version on connect.
@@ -245,14 +252,19 @@ Handles passed as options (`channel`) are sent by id (`"ref": true`); responses 
 
 ```
 channelstack/
-  server/            Bun + Hono: src/core/, src/drivers/{slack,github,linear,notion}/, src/cli.ts
+  server/            Bun + Hono: src/app.ts, src/serve.ts, src/cli.ts, src/core/, src/drivers/{echo,slack,github,linear,notion}/
   ui/                functional browser UI (transcripts, inspector, chaos controls)
   api/               hand-designed public types (*.d.ts) + examples: the TS contract
   spec/              openapi.json, ir.json (generated, committed)
-  codegen/           IR builder + emitters/{ts,python,rust}
-  sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/
+  codegen/           src/ir.ts (OpenAPI → IR) + src/emit/{typescript,python,rust}.ts
+  sdks/typescript/   the npm package `channelstack`: runtime/ (hand-written), generated/, bin/ (runs the platform binary)
+  sdks/python/       channelstack/runtime/ (hand-written) + channelstack/generated/
+  sdks/rust/         runtime/ + generated/
   integrations/      vitest, jest, pytest-channelstack, checks
-  scenarios/         smoke/*.yaml (protocol parity) + per-driver differential suites
+  scenarios/         smoke/*.yaml (protocol parity), runners/<language>/, agents/ (reference agents for the scenarios) + per-driver differential suites
+  scripts/           the gate (verify-phase), spec and SDK generation, the binary build, packaging and smoke runs
   conformance/       schema validators, shape differ, coverage page
   docs/
 ```
+
+The server binary and its per-platform npm packages (`@channelstack/server-<platform>`) are build output in `dist/npm/`, not sources.
