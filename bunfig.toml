@@ -1,0 +1,4 @@
+# `bun fmt` formats the TypeScript, JSON and YAML in this repository. Python is formatted by ruff.
+[fmt]
+printWidth = 120
+sortImports = true

@@ -1,0 +1,11 @@
+{
+  "path": ["server", "codegen", "sdks", "scenarios", "scripts"],
+  "format": ["typescript", "javascript", "python"],
+  "minLines": 15,
+  "minTokens": 50,
+  "threshold": 0,
+  "gitignore": true,
+  "ignore": ["**/node_modules/**", "**/dist/**", "**/generated/**", "**/.venv/**"],
+  "reporters": ["console"],
+  "exitCode": 1
+}

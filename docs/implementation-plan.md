@@ -123,7 +123,7 @@ The agent is a separate process that channelstack never starts or wraps. `channe
 
 Sessions work like WebDriver's, with one difference: they're **scopes in one shared world, not separate worlds**. The agent is configured once, with one token and one base URL per channel, so every session talks to the same workspace, org and integration.
 
-- **`POST /sessions`** opens a scope and returns `{ sessionId, capabilities }`. Each test-framework fixture opens one per test. The CLI, UI and MCP share a long-lived session named `dev`.
+- **`POST /sessions`** opens a scope and returns `{ sessionId, drivers }`. Per-action capabilities are read per driver (`GET …/<driver>/capabilities`, section 4.3). Each test-framework fixture opens one per test. The CLI, UI and MCP share a long-lived session named `dev`.
 - **Isolation comes from ownership.** A session owns what it created (users, channels, repos, teams, pages), and generated names (`test-<id>`) never collide. Tests running in parallel therefore don't see each other's conversations, even in one workspace.
 - **Reads are scoped.** `GET …/events` returns only deliveries and API calls caused by the session's own resources. Attribution follows the conversation: the agent's `chat.postMessage` into a channel the session owns belongs to that session.
 - **`DELETE /sessions/{sid}`** removes everything the session created, in the fake and, through the cleanup ledger, on live platforms.
@@ -479,10 +479,14 @@ server routes (zod-openapi) ──► spec/openapi.json ──► spec/ir.json �
 
 | Extension | Meaning |
 |---|---|
-| `x-channelstack-resource: SlackUser` | Marks a route that returns a handle |
-| `x-channelstack-method: { on: SlackUser, name: say, args: [text], options: [channel, to] }` | Binds an operation to a method on a handle. Path parameters bind to the handle's id; `args` become positional parameters and `options` the trailing options object (`ana.say(text, { channel })`) |
+| `x-channelstack-resource: { id?, scope? }` on a schema | Values of the schema are handles; `id` names the identifying field |
+| `x-channelstack-ref: [SlackChannel]` on a request field | The field takes a handle and sends its id |
+| `x-channelstack-method: { on: SlackUser, name: say, args: [text], options: [channel, to] }` | Binds an operation to a method on a handle. Path parameters bind to the handle's session and id; `args` become positional parameters and `options` the trailing options object (`ana.say(text, { channel })`) |
 | `x-channelstack-factory: { on: SlackFixture, name: createUser }` | Declares a factory method |
 | `x-channelstack-error-codes` | Lists the error codes an operation can return |
+| `x-channelstack-stability` | `experimental` or `stable` (section 4.5) |
+
+The exact shapes, with the IR they produce, are in [architecture.md](architecture.md) 5.2.
 
 **The IR** is a language-neutral description of resources, methods, arguments, return types, enums and errors. Emitters only read the IR.
 
@@ -532,17 +536,18 @@ channelstack holds real tokens and can post into real workspaces, so these are r
 ```
 channelstack/
   server/                    Bun + Hono + @hono/zod-openapi
-    src/core/                sessions, registry, reality rules, event log, delivery, vault, safety, ledger, proxy, ca, recorder
-    src/drivers/{slack,github,linear,notion}/
-      routes.ts  world.ts  fake/  live/  inbound.ts  transcript.ts  capabilities.ts
-    src/cli.ts               channelstack [start] | env | doctor | reset | mcp | <channel> <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets | spec
+    src/core/                sessions, registry, ids, secrets, signing, reality rules, event log, delivery, errors, redaction, safety, ledger, proxy, ca, recorder (docs/code-map.md names the module for each)
+    src/drivers/{echo,slack,github,linear,notion}/
+      routes.ts  world.ts  fake/  live/  payloads.ts  transcript.ts  capabilities.ts
+    src/cli.ts               channelstack [start] | env | doctor | reset | mcp | <channel> <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets
   ui/                        the functional browser UI (transcript view, inspector, chaos controls), served at channelstack.localhost
   spec/                      openapi.json, ir.json (generated, committed)
   codegen/                   ir builder + emitters/{ts,python,rust}
   api/                       hand-designed public types (*.d.ts) + examples; the generated TS SDK must satisfy them
-  sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/
+  sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/ (Python: inside the `channelstack` package)
   integrations/              vitest, jest (TS) · pytest-channelstack (Python) · checks (standard behaviour checks)
-  scenarios/                 smoke/*.yaml (protocol parity) + <driver>/*.test.ts (differential suite)
+  scenarios/                 smoke/*.yaml (protocol parity), runners/, agents/ + <driver>/*.test.ts (differential suite)
+  scripts/                   the gate, spec and SDK generation, the binary build, packaging and smoke runs
   conformance/               schema validators, shape differ, divergences.yaml, coverage page generator
   examples/agents/{bolt-ai-sdk,chat-sdk-slack,chat-sdk-github,probot,linear-sdk,notion-sdk,mdac-220,mda}/
   docs/

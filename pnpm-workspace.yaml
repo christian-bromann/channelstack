@@ -1,0 +1,12 @@
+packages:
+  - api
+  - server
+  - codegen
+  - sdks/typescript
+
+# esbuild arrives through the Vitest 3.2 types the api contract is checked against. Nothing runs it,
+# so its install script isn't needed.
+allowBuilds:
+  # The bun package fetches the Bun binary for this platform when it installs.
+  bun: true
+  esbuild: false
