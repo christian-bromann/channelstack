@@ -2,6 +2,7 @@ import { createServer, type IncomingHttpHeaders } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { type App, createApp } from "../src/app.ts";
+import type { Timers } from "../src/core/clock/index.ts";
 import { createLogger } from "../src/core/log/index.ts";
 import { Redactor } from "../src/core/redact/index.ts";
 import { Secrets } from "../src/core/secrets/index.ts";
@@ -15,8 +16,44 @@ export const TOKEN = "test-token-0123456789";
 
 type Reply = Promise<{ status: number; body: any }>;
 
+/** Timers a test moves itself: nothing scheduled runs until the test lets time pass. */
+export interface ManualTimers extends Timers {
+  /** Let this much time pass, running what falls due, in order. */
+  advance(ms: number): void;
+  /** How many tasks are waiting. */
+  waiting(): number;
+}
+
+export function manualTimers(): ManualTimers {
+  let now = 0;
+  let tasks: Array<{ at: number; run: () => void }> = [];
+  return {
+    after(delayMs, run) {
+      const task = { at: now + delayMs, run };
+      tasks.push(task);
+      return () => {
+        tasks = tasks.filter((other) => other !== task);
+      };
+    },
+    advance(ms) {
+      const until = now + ms;
+      for (;;) {
+        const [next] = tasks.filter((task) => task.at <= until).sort((a, b) => a.at - b.at);
+        if (!next) break;
+        tasks = tasks.filter((task) => task !== next);
+        now = next.at;
+        next.run();
+      }
+      now = until;
+    },
+    waiting: () => tasks.length,
+  };
+}
+
 export interface Harness {
   app: App;
+  /** The app's timers: retries and pauses happen when the test advances them. */
+  timers: ManualTimers;
   secrets: Secrets;
   /** Every line the app logged. */
   logs: string[];
@@ -32,6 +69,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
   const redactor = new Redactor();
   redactor.register(TOKEN, ...secrets.all());
   const logs: string[] = [];
+  const timers = manualTimers();
   const app = createApp({
     version: "0.0.0-test",
     token: TOKEN,
@@ -42,6 +80,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
     urls: () => ({ control: "http://127.0.0.1:4500", driver: (name) => `http://127.0.0.1:4500/${name}` }),
     webhooks,
     ui: UI_PAGE,
+    timers,
   });
   const send = async (url: string, method: string, body: unknown, token: string | null | undefined): Reply => {
     const response = await app.fetch(
@@ -59,6 +98,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
   };
   return {
     app,
+    timers,
     secrets,
     logs,
     call: (method, path, body, token = TOKEN) =>
@@ -76,6 +116,7 @@ export interface RecordingAgent {
   respond: (delivery: { headers: IncomingHttpHeaders; body: string }) => {
     status: number;
     body?: string;
+    headers?: Record<string, string>;
     delayMs?: number;
   };
   close(): void;
@@ -98,7 +139,7 @@ export async function recordingAgent(): Promise<RecordingAgent> {
       const delivery = { headers: request.headers, body };
       agent.received.push(delivery);
       const answer = agent.respond(delivery);
-      setTimeout(() => response.writeHead(answer.status).end(answer.body ?? ""), answer.delayMs ?? 0);
+      setTimeout(() => response.writeHead(answer.status, answer.headers).end(answer.body ?? ""), answer.delayMs ?? 0);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

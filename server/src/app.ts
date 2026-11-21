@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
-import { type Clock, systemClock } from "./core/clock/index.ts";
+import { type Clock, systemClock, systemTimers, type Timers } from "./core/clock/index.ts";
 import { DeliveryQueue } from "./core/delivery/index.ts";
 import { ProtocolError } from "./core/errors/index.ts";
 import { EventLog } from "./core/events/index.ts";
@@ -47,6 +47,8 @@ export interface AppOptions {
    */
   ui?: string;
   clock?: Clock;
+  /** How things happen later (a platform's retry). Tests pass timers they move themselves. */
+  timers?: Timers;
 }
 
 export interface App {
@@ -102,7 +104,8 @@ export function createApp(options: AppOptions): App {
   const sessions = new Sessions(ids, clock);
   const registry = new Registry();
   const events = new EventLog(clock, redactor);
-  const delivery = new DeliveryQueue({ events, clock, log });
+  const timers = options.timers ?? systemTimers;
+  const delivery = new DeliveryQueue({ events, clock, timers, log });
 
   const quiet = new QuietDetector(clock);
   events.onAppend((session) => quiet.touch(session));
@@ -111,6 +114,7 @@ export function createApp(options: AppOptions): App {
     definition.create({
       ids,
       clock,
+      timers,
       registry,
       events,
       delivery,

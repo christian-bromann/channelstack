@@ -115,7 +115,83 @@ describe("deliveries", () => {
     expect((await get(`/deliveries/${message.delivery.id}`)).status).toBe("pending");
     await h.app.settled();
     expect((await get(`/deliveries/${message.delivery.id}`)).attempts[0]).toMatchObject({ status: "timed_out" });
+
+    // Slack tries again almost at once, and says why.
+    agent.respond = () => ({ status: 200 });
+    h.timers.advance(0);
+    await h.app.settled();
+    const { attempts, status } = await get(`/deliveries/${message.delivery.id}`);
+    expect(status).toBe("acknowledged");
+    expect(attempts[1].requestHeaders).toMatchObject({
+      "x-slack-retry-num": "1",
+      "x-slack-retry-reason": "http_timeout",
+    });
   }, 10_000);
+
+  test("Slack retries by itself: at once, after a minute, after five, then it gives up", async () => {
+    const { h, agent, sessionId, say, get } = await workspace();
+    agent.respond = () => ({ status: 500 });
+    // A plain message causes one delivery.
+    const message = await say("no mention here");
+    const delivery = () => get(`/deliveries/${message.delivery.id}`);
+    const quiet = async () => (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    await h.app.settled();
+    expect((await delivery()).attempts).toHaveLength(1);
+    // A retry that is scheduled is work in progress: the session isn't quiet.
+    expect(await quiet()).toMatchObject({ busy: true, open: ["1 delivery that hasn't settled"] });
+
+    for (const [wait, attempts] of [
+      [0, 2],
+      [59_999, 2],
+      [1, 3],
+      [299_999, 3],
+      [1, 4],
+    ] as const) {
+      h.timers.advance(wait);
+      await h.app.settled();
+      expect((await delivery()).attempts, `after ${wait} ms more`).toHaveLength(attempts);
+    }
+    // Three retries, each saying which one it is and why; then nothing more is scheduled.
+    expect(
+      agent.received.map(({ headers }) => [headers["x-slack-retry-num"], headers["x-slack-retry-reason"]]),
+    ).toEqual([
+      [undefined, undefined],
+      ["1", "http_error"],
+      ["2", "http_error"],
+      ["3", "http_error"],
+    ]);
+    expect(new Set(agent.received.map(({ body }) => body)).size).toBe(1);
+    expect(h.timers.waiting()).toBe(0);
+    expect((await delivery()).status).toBe("failed");
+    expect((await quiet()).busy).toBe(false);
+  });
+
+  test("the retries end when the agent answers, when it says X-Slack-No-Retry, and when the session closes", async () => {
+    const { h, agent, sessionId, say, get } = await workspace();
+    const attemptsOf = async (id: string) => (await get(`/deliveries/${id}`)).attempts.length;
+
+    // It answers the first retry.
+    agent.respond = ({ headers }) => ({ status: headers["x-slack-retry-num"] ? 200 : 503 });
+    const recovered = await say("first");
+    await h.app.settled();
+    h.timers.advance(0);
+    await h.app.settled();
+    expect([await attemptsOf(recovered.delivery.id), h.timers.waiting()]).toEqual([2, 0]);
+
+    // It fails and asks not to be retried.
+    agent.respond = () => ({ status: 500, headers: { "x-slack-no-retry": "1" } });
+    const refused = await say("second");
+    await h.app.settled();
+    expect([await attemptsOf(refused.delivery.id), h.timers.waiting()]).toEqual([1, 0]);
+
+    // A retry is scheduled when the session closes: it is called off.
+    agent.respond = () => ({ status: 500 });
+    await say("third");
+    await h.app.settled();
+    expect(h.timers.waiting()).toBe(1);
+    await h.call("DELETE", `/sessions/${sessionId}`);
+    expect(h.timers.waiting()).toBe(0);
+  });
 });
 
 describe("faults and uninstall (decision 0006: undone when the session closes)", () => {
@@ -160,10 +236,19 @@ describe("faults and uninstall (decision 0006: undone when the session closes)",
       "message_not_found",
     );
 
+    // The call is held for as long as the fault says, on the server's timers.
     await post("/faults", { type: "latency", delay: 250, times: 1 });
-    const started = Date.now();
-    expect((await api("auth.test")).body.ok).toBe(true);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(240);
+    let answered = false;
+    const slow = api("auth.test").then((response) => {
+      answered = true;
+      return response;
+    });
+    await expect.poll(() => h.timers.waiting()).toBe(1);
+    h.timers.advance(249);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(answered).toBe(false);
+    h.timers.advance(1);
+    expect((await slow).body.ok).toBe(true);
   });
 
   test("faults a session set are gone when it closes", async () => {

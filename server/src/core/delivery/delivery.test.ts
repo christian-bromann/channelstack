@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { systemClock } from "../clock/index.ts";
+import { systemClock, systemTimers } from "../clock/index.ts";
 import { EventLog } from "../events/index.ts";
 import { createLogger } from "../log/index.ts";
 import { Redactor } from "../redact/index.ts";
@@ -32,6 +32,7 @@ function queue() {
   const delivery = new DeliveryQueue({
     events,
     clock: systemClock,
+    timers: systemTimers,
     log: createLogger({ level: "silent", redactor, write: () => {} }),
   });
   const send = (session: string, url: string, timeoutMs = 3000) =>

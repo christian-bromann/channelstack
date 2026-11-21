@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 
-import type { Clock } from "../clock/index.ts";
+import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { IdGenerator } from "../ids/index.ts";
@@ -29,6 +29,8 @@ export type CapabilityTable = Readonly<Record<string, { fake: boolean; live: boo
 export interface DriverContext {
   readonly ids: IdGenerator;
   readonly clock: Clock;
+  /** For anything that happens later: a retry after a pause, a fault's latency. */
+  readonly timers: Timers;
   readonly registry: Registry;
   readonly events: EventLog;
   /** The hook into the delivery queue: the only way an event reaches the agent. */

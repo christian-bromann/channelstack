@@ -1,4 +1,4 @@
-import type { Clock } from "../clock/index.ts";
+import type { Clock, Timers } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { Logger } from "../log/index.ts";
@@ -23,6 +23,22 @@ export interface DeliveryRequest {
   readonly timeoutMs: number;
   /** What the driver wants to find again on the delivery: the inner event type, the object that caused it. */
   readonly meta?: Readonly<Record<string, unknown>>;
+  /** How the platform retries a delivery the agent didn't acknowledge. Without it, there is one attempt. */
+  readonly retry?: RetryPolicy;
+}
+
+/** A platform's own retry behaviour, asked after each attempt of the chain it started itself. */
+export interface RetryPolicy {
+  /**
+   * The next retry after an attempt that wasn't acknowledged: when, and with which headers.
+   * `retries` counts the retries already sent. Undefined ends the chain: the platform gives up,
+   * or the agent's response told it not to retry.
+   */
+  next(
+    attempt: DeliveryAttempt,
+    retries: number,
+    responseHeaders: Headers | undefined,
+  ): { afterMs: number; headers: Record<string, string> } | undefined;
 }
 
 /** One attempt to deliver, as `api/common.d.ts` describes it. */
@@ -44,6 +60,8 @@ export interface DeliveryAttempt {
 export interface DeliveryRecord {
   readonly request: DeliveryRequest;
   readonly attempts: DeliveryAttempt[];
+  /** Calls off the retry the platform has scheduled, while one is. */
+  cancelRetry?: (() => void) | undefined;
 }
 
 /** How a later attempt differs from the first: what a platform's retry, or a test's forged delivery, changes. */
@@ -65,14 +83,16 @@ const RESPONSE_BODY_LIMIT = 2048;
 export class DeliveryQueue {
   readonly #events: EventLog;
   readonly #clock: Clock;
+  readonly #timers: Timers;
   readonly #log: Logger;
   readonly #inFlight = new Set<Promise<unknown>>();
   /** Per session: its deliveries, and the switch that aborts the ones in flight when it closes. */
   readonly #sessions = new Map<string, { canceller: AbortController; records: Map<string, DeliveryRecord> }>();
 
-  constructor(deps: { events: EventLog; clock: Clock; log: Logger }) {
+  constructor(deps: { events: EventLog; clock: Clock; timers: Timers; log: Logger }) {
     this.#events = deps.events;
     this.#clock = deps.clock;
+    this.#timers = deps.timers;
     this.#log = deps.log;
   }
 
@@ -82,13 +102,29 @@ export class DeliveryQueue {
     const record: DeliveryRecord = { request, attempts: [] };
     this.#session(session).records.set(id, record);
     this.#events.append(session, driver, "delivery", { id, type, url, ...(request.meta ?? {}) });
-    this.#track(this.#attempt(record, {}));
+    this.#track(this.#chain(record, {}, 0));
     return record;
+  }
+
+  /**
+   * One attempt of the chain the platform runs by itself: the first delivery, then its retries
+   * for as long as the platform's policy asks for one. Attempts a test sends (`again`) are not part of it.
+   */
+  async #chain(record: DeliveryRecord, options: AttemptOptions, retries: number): Promise<void> {
+    const { attempt, responseHeaders } = await this.#send(record, options);
+    const cancelled = this.#sessions.get(record.request.session)?.records.get(record.request.id) !== record;
+    if (cancelled || attempt.status === "acknowledged") return;
+    const next = record.request.retry?.next(attempt, retries, responseHeaders);
+    if (!next) return;
+    record.cancelRetry = this.#timers.after(next.afterMs, () => {
+      record.cancelRetry = undefined;
+      this.#track(this.#chain(record, { headers: next.headers }, retries + 1));
+    });
   }
 
   /** Send a delivery again: a platform retry, a redelivery, or a forged copy. Resolves with the new attempt. */
   again(session: string, id: string, options: AttemptOptions = {}): Promise<DeliveryAttempt> {
-    return this.#track(this.#attempt(this.get(session, id), options));
+    return this.#track(this.#send(this.get(session, id), options).then(({ attempt }) => attempt));
   }
 
   get(session: string, id: string): DeliveryRecord {
@@ -101,12 +137,14 @@ export class DeliveryQueue {
     return [...(this.#sessions.get(session)?.records.values() ?? [])];
   }
 
-  /** Deliveries with an attempt still in flight, across all sessions or for one. */
+  /** Deliveries with an attempt still in flight or a retry scheduled, across all sessions or for one. */
   pending(session?: string): number {
     const sessions = session === undefined ? [...this.#sessions.values()] : [this.#sessions.get(session)];
     return sessions
       .flatMap((entry) => [...(entry?.records.values() ?? [])])
-      .filter((record) => record.attempts.some((attempt) => attempt.status === "pending")).length;
+      .filter(
+        (record) => record.cancelRetry !== undefined || record.attempts.some((attempt) => attempt.status === "pending"),
+      ).length;
   }
 
   /**
@@ -114,7 +152,9 @@ export class DeliveryQueue {
    * recorded for it, so its event log stays gone.
    */
   cancel(session: string): void {
-    this.#sessions.get(session)?.canceller.abort();
+    const entry = this.#sessions.get(session);
+    for (const record of entry?.records.values() ?? []) record.cancelRetry?.();
+    entry?.canceller.abort();
     this.#sessions.delete(session);
   }
 
@@ -140,7 +180,10 @@ export class DeliveryQueue {
     return tracked;
   }
 
-  async #attempt(record: DeliveryRecord, options: AttemptOptions): Promise<DeliveryAttempt> {
+  async #send(
+    record: DeliveryRecord,
+    options: AttemptOptions,
+  ): Promise<{ attempt: DeliveryAttempt; responseHeaders: Headers | undefined }> {
     const { request } = record;
     const cancelled = this.#session(request.session).canceller.signal;
     const sentAt = this.#clock();
@@ -162,6 +205,7 @@ export class DeliveryQueue {
     record.attempts.push({ ...started, status: "pending" });
 
     let outcome: Pick<DeliveryAttempt, "status" | "responseStatus" | "responseBody">;
+    let responseHeaders: Headers | undefined;
     try {
       const response = await fetch(request.url, {
         method: "POST",
@@ -170,6 +214,7 @@ export class DeliveryQueue {
         redirect: "manual",
         signal: AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]),
       });
+      responseHeaders = response.headers;
       const responseBody = (await response.text()).slice(0, RESPONSE_BODY_LIMIT);
       outcome = { status: response.ok ? "acknowledged" : "failed", responseStatus: response.status, responseBody };
     } catch (error) {
@@ -177,10 +222,10 @@ export class DeliveryQueue {
       outcome = { status: name === "TimeoutError" || name === "AbortError" ? "timed_out" : "unreachable" };
     }
     const attempt: DeliveryAttempt = { ...started, ...outcome, durationMs: this.#clock() - sentAt };
-    if (cancelled.aborted) return attempt;
+    if (cancelled.aborted) return { attempt, responseHeaders };
     record.attempts[index] = attempt;
     this.#events.append(request.session, request.driver, "delivery_attempt", { id: request.id, ...attempt });
     this.#log.debug("delivery attempt", { id: request.id, driver: request.driver, type: request.type, ...outcome });
-    return attempt;
+    return { attempt, responseHeaders };
   }
 }

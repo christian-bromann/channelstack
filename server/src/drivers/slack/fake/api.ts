@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { bearerFrom } from "../../../core/auth/index.ts";
+import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import {
@@ -619,7 +620,7 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
           (candidate.remaining === undefined || candidate.remaining > 0),
       );
       if (fault?.remaining !== undefined) fault.remaining -= 1;
-      if (fault?.type === "latency") await new Promise((resolve) => setTimeout(resolve, fault.delayMs));
+      if (fault?.type === "latency") await delay(context.timers, fault.delayMs);
       if (fault?.type === "rate_limit") {
         // Slack answers 429 with Retry-After in seconds.
         status = 429;

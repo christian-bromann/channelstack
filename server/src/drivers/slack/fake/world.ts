@@ -1,4 +1,5 @@
-import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
+import { delay } from "../../../core/clock/index.ts";
+import type { DeliveryAttempt, DeliveryRecord, RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
@@ -76,6 +77,27 @@ export interface FakeSlackWorld extends SlackWorld {
   removeFault(session: string, id: string): void;
 }
 
+/** When Slack retries an event the app didn't acknowledge: almost at once, after a minute, after five. */
+const RETRY_DELAYS_MS = [0, 60_000, 300_000];
+
+/**
+ * Slack's retries: the same payload up to three more times, saying which retry it is and why.
+ * A response with `X-Slack-No-Retry: 1` ends them.
+ */
+const SLACK_RETRIES: RetryPolicy = {
+  next(attempt, retries, responseHeaders) {
+    const afterMs = RETRY_DELAYS_MS[retries];
+    if (afterMs === undefined || responseHeaders?.get("x-slack-no-retry") === "1") return undefined;
+    const reason =
+      attempt.status === "timed_out"
+        ? "http_timeout"
+        : attempt.status === "failed"
+          ? "http_error"
+          : "connection_failed";
+    return { afterMs, headers: { "x-slack-retry-num": String(retries + 1), "x-slack-retry-reason": reason } };
+  },
+};
+
 export function createFakeWorld(context: DriverContext, store: SlackStore): FakeSlackWorld {
   const { ids, clock, events, delivery } = context;
 
@@ -111,6 +133,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       sign: (body, atMs) => signSlackRequest(context.secret("signingSecret"), body, atMs),
       timeoutMs: ACK_WINDOW_MS,
       meta: { eventType: event.type, payload },
+      retry: SLACK_RETRIES,
     });
     return eventId;
   };
@@ -497,7 +520,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
 
     async retry(session, id, options) {
       const record = delivery.get(session, id);
-      if (options.afterMs > 0) await new Promise((resolve) => setTimeout(resolve, options.afterMs));
+      await delay(context.timers, options.afterMs);
       // Slack repeats the same payload and says which retry this is, and why.
       return delivery.again(session, id, {
         headers: { "x-slack-retry-num": String(record.attempts.length), "x-slack-retry-reason": options.reason },
