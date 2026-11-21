@@ -205,9 +205,9 @@ describe("quiet", () => {
     agent.respond = () => ({ status: 200, delayMs: 200 });
 
     const question = await say("@my-agent write the notes");
-    expect(await quiet()).toEqual({ busy: true, quietForMs: 0 });
+    expect(await quiet()).toEqual({ busy: true, quietForMs: 0, open: ["2 deliveries that haven't settled"] });
     await h.app.settled();
-    expect((await quiet()).busy).toBe(false);
+    expect(await quiet()).toMatchObject({ busy: false, open: [] });
 
     const stream = (
       await api("chat.startStream", {
@@ -215,10 +215,16 @@ describe("quiet", () => {
         thread_ts: question.ts,
         recipient_user_id: ana.id,
         recipient_team_id: team.id,
+        markdown_text: "Thinking…\nand a second line nobody needs in a failure message",
       })
     ).body;
     await h.app.settled();
-    expect(await quiet()).toEqual({ busy: true, quietForMs: 0 });
+    // What is open is named, so a wait that gives up can say what the agent left behind.
+    expect(await quiet()).toEqual({
+      busy: true,
+      quietForMs: 0,
+      open: ['a stream my-agent started and never stopped: "Thinking…"'],
+    });
     await api("chat.stopStream", { channel: channel.id, ts: stream.ts });
     await h.app.settled();
 

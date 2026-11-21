@@ -29,7 +29,9 @@ async def quiet_of(context: HandleContext) -> QuietState:
     """Ask the server whether the agent is quiet in the session a handle lives in."""
     session = quote(session_of(context), safe="")
     state = await context.transport.request("GET", f"/sessions/{session}/quiet")
-    return QuietState(busy=bool(state["busy"]), quiet_for_ms=float(state["quietForMs"]))
+    return QuietState(
+        busy=bool(state["busy"]), quiet_for_ms=float(state["quietForMs"]), open=tuple(state.get("open", ()))
+    )
 
 
 async def dispose_quietly(dispose: Callable[[], Awaitable[None]]) -> None:

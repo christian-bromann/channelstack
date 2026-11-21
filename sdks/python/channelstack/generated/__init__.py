@@ -150,12 +150,14 @@ class LogEvent:
 class Quiet:
     busy: bool
     quiet_for_ms: float
+    open: list[str]
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> Quiet:
         return cls(
             busy=data["busy"],
             quiet_for_ms=data["quietForMs"],
+            open=data["open"],
         )
 
 

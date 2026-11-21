@@ -40,8 +40,8 @@ expect.extend(
   Object.fromEntries(
     (Object.keys(matchers) as MatcherName[]).map((name) => [
       name,
-      function (this: { isNot: boolean }, subject: unknown, ...args: unknown[]) {
-        const state: MatcherState = { isNot: this.isNot, timeout: server.timeout, quietFor: server.quietFor };
+      function (this: { isNot?: boolean }, subject: unknown, ...args: unknown[]) {
+        const state: MatcherState = { isNot: this.isNot === true, timeout: server.timeout, quietFor: server.quietFor };
         return (matchers[name] as (state: MatcherState, subject: unknown, ...rest: unknown[]) => unknown)(
           state,
           subject,

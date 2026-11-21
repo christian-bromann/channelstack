@@ -15,7 +15,7 @@ class WaitTimeoutError(Exception):
 
 
 async def wait_for[T](
-    what: str,
+    what: str | Callable[[], str],
     read: Callable[[], Awaitable[T | None]],
     *,
     timeout: Duration = "10s",
@@ -30,7 +30,7 @@ async def wait_for[T](
         if value is not None:
             return value
         if time.monotonic() + interval_ms / 1000 > deadline:
-            raise WaitTimeoutError(what, timeout_ms)
+            raise WaitTimeoutError(what if isinstance(what, str) else what(), timeout_ms)
         await asyncio.sleep(interval_ms / 1000)
 
 
@@ -40,6 +40,8 @@ class QuietState:
 
     busy: bool
     quiet_for_ms: float
+    open: Sequence[str] = ()
+    """What is still open, in words: a delivery that hasn't settled, a stream the agent never stopped."""
 
 
 class Author(Protocol):
@@ -98,15 +100,33 @@ async def until_quiet(
     *,
     timeout: Duration = "10s",
     quiet_for: Duration = "750ms",
+    watching: bool = False,
 ) -> None:
-    """Resolve once the agent has been quiet for `quiet_for`. Negative and exact-count checks read after this."""
+    """Resolve once the agent has been quiet for `quiet_for`. Negative and exact-count checks read after this.
+
+    With `watching`, the quiet time counts from now at the earliest: the caller wants to have looked
+    for the whole window. An agent that is thinking makes no sound, so a session that went quiet a
+    while ago says nothing about what arrives next.
+    """
     quiet_for_ms = parse_duration(quiet_for)
+    started = time.monotonic()
+
+    still_open: Sequence[str] = ()
 
     async def settled() -> bool | None:
+        nonlocal still_open
         state = await quiet()
+        still_open = state.open
+        if watching and (time.monotonic() - started) * 1000 < quiet_for_ms:
+            return None
         return True if not state.busy and state.quiet_for_ms >= quiet_for_ms else None
 
-    await wait_for(f"the agent to be quiet for {quiet_for_ms:g}ms", settled, timeout=timeout)
+    def what() -> str:
+        # A wait that gives up says what the agent left open: that is usually the bug.
+        left = f". Still open: {'; '.join(still_open)}" if still_open else ""
+        return f"the agent to be quiet for {quiet_for_ms:g}ms{left}"
+
+    await wait_for(what, settled, timeout=timeout)
 
 
 async def latest_once_quiet[T](

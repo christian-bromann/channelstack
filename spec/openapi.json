@@ -141,11 +141,19 @@
           "quietForMs": {
             "type": "number",
             "description": "Milliseconds since the last event in the session. 0 while busy."
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What is still open, in words: deliveries that haven't settled, streams never stopped."
           }
         },
         "required": [
           "busy",
-          "quietForMs"
+          "quietForMs",
+          "open"
         ]
       },
       "Env": {

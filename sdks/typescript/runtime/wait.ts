@@ -19,7 +19,7 @@ export class WaitTimeoutError extends Error {
  * timeout passes. Every `waitFor…`, `latest…` and matcher is built on it; tests never sleep.
  */
 export async function waitFor<T>(
-  what: string,
+  what: string | (() => string),
   read: () => Promise<T | undefined>,
   options: WaitOptions = {},
 ): Promise<T> {
@@ -29,7 +29,7 @@ export async function waitFor<T>(
   for (;;) {
     const value = await read();
     if (value !== undefined) return value;
-    if (Date.now() + interval > deadline) throw new WaitTimeoutError(what, timeout);
+    if (Date.now() + interval > deadline) throw new WaitTimeoutError(typeof what === "string" ? what : what(), timeout);
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
 }
@@ -46,6 +46,8 @@ export interface QuietOptions extends WaitOptions {
 export interface QuietState {
   busy: boolean;
   quietForMs: number;
+  /** What is still open, in words: a delivery that hasn't settled, a stream the agent never stopped. */
+  open: string[];
 }
 
 /** Anyone who can author something: a handle with an id and a name. */
@@ -90,13 +92,27 @@ export function waitForNext<T>(
   );
 }
 
-/** Resolve once the agent has been quiet for `quietFor`. Negative and exact-count checks read after this. */
-export async function untilQuiet(quiet: () => Promise<QuietState>, options: QuietOptions = {}): Promise<void> {
+/**
+ * Resolve once the agent has been quiet for `quietFor`. Negative and exact-count checks read after this.
+ *
+ * With `watching`, the quiet time counts from now at the earliest: the caller wants to have looked
+ * for the whole window. An agent that is thinking makes no sound, so a session that went quiet a
+ * while ago says nothing about what arrives next.
+ */
+export async function untilQuiet(
+  quiet: () => Promise<QuietState>,
+  options: QuietOptions & { watching?: boolean } = {},
+): Promise<void> {
   const quietFor = parseDuration(options.quietFor ?? "750ms");
+  const started = Date.now();
+  let open: string[] = [];
   await waitFor(
-    `the agent to be quiet for ${quietFor}ms`,
+    // A wait that gives up says what the agent left open: that is usually the bug.
+    () => `the agent to be quiet for ${quietFor}ms${open.length > 0 ? `. Still open: ${open.join("; ")}` : ""}`,
     async () => {
       const state = await quiet();
+      open = state.open;
+      if (options.watching && Date.now() - started < quietFor) return undefined;
       return !state.busy && state.quietForMs >= quietFor ? true : undefined;
     },
     options,

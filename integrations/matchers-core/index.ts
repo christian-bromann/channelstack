@@ -103,7 +103,12 @@ async function settle<T>(
   if (options.onceQuiet || state.isNot) {
     const handle = subject as Partial<InSession>;
     if (typeof handle[QUIET] !== "function") throw new TypeError("This matcher needs a channelstack handle");
-    await untilQuiet(() => (handle as InSession)[QUIET](), { timeout, quietFor: timing?.quietFor ?? state.quietFor });
+    // The check watches for the whole quiet window: what arrives while it looks counts.
+    await untilQuiet(() => (handle as InSession)[QUIET](), {
+      timeout,
+      quietFor: timing?.quietFor ?? state.quietFor,
+      watching: true,
+    });
     value = await options.read();
   } else {
     let last: T | undefined;
@@ -121,7 +126,17 @@ async function settle<T>(
       value = last as T;
     }
   }
-  return { pass: options.holds(value), message: () => options.describe(value) };
+  const pass = options.holds(value);
+  // A failed check also says what the agent left open (a stream it never stopped): often that is the bug.
+  const open = pass === state.isNot ? await stillOpen(subject) : [];
+  const leftover = open.length === 0 ? "" : `\nStill open: ${open.join("; ")}`;
+  return { pass, message: () => `${options.describe(value)}${leftover}` };
+}
+
+/** What the agent has left open in the subject's session, in words. Nothing for a subject outside a session. */
+async function stillOpen(subject: unknown): Promise<string[]> {
+  const handle = subject as Partial<InSession>;
+  return typeof handle[QUIET] === "function" ? (await (handle as InSession)[QUIET]()).open : [];
 }
 
 const from = (author: AuthorRef, text?: string | RegExp) => (message: Message) =>

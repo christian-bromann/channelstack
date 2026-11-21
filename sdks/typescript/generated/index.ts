@@ -65,6 +65,7 @@ export interface LogEvent {
 export interface Quiet {
   busy: boolean;
   quietForMs: number;
+  open: string[];
 }
 
 export type Env = Record<string, string>;

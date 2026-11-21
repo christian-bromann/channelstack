@@ -2906,6 +2906,16 @@
               "kind": "number"
             },
             "optional": false
+          },
+          {
+            "name": "open",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
           }
         ]
       }
