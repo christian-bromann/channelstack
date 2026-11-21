@@ -32,6 +32,8 @@ function context(): DriverContext {
     events,
     delivery: new DeliveryQueue({ events, clock: systemClock, log }),
     log,
+    expectMore: () => {},
+    arrived: () => {},
     secret: (name) => `secret-for-${name}`,
     apiUrl: () => "http://127.0.0.1:4500/echo",
     webhookUrl: undefined,

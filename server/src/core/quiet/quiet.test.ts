@@ -34,6 +34,21 @@ describe("quiet detector", () => {
     expect(quiet.state("ses_a", 0)).toEqual({ busy: false, quietForMs: 5000 });
 
     await expect(quiet.during(() => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
-    expect(quiet.state("ses_a", 0).busy).toBe(false);
+
+    // Told to retry in a second: busy until then, quiet after.
+    quiet.expectMore("ses_a", "chat.postMessage", 1000);
+    now += 900;
+    expect(quiet.state("ses_a", 0).busy).toBe(true);
+    now += 200;
+    // Quiet counts from the end of that window, not from the event before it.
+    expect(quiet.state("ses_a", 0)).toEqual({ busy: false, quietForMs: 100 });
+
+    // The retry arrives early: the wait ends there, and quiet counts from the retry.
+    quiet.expectMore("ses_a", "chat.postMessage", 5000);
+    now += 1500;
+    quiet.touch("ses_a");
+    quiet.arrived("ses_a", "chat.postMessage");
+    now += 300;
+    expect(quiet.state("ses_a", 0)).toEqual({ busy: false, quietForMs: 300 });
   });
 });

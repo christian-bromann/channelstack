@@ -88,6 +88,7 @@ export function createApp(options: AppOptions): App {
   const registry = new Registry();
   const events = new EventLog(clock, redactor);
   const delivery = new DeliveryQueue({ events, clock, log });
+
   const quiet = new QuietDetector(clock);
   events.onAppend((session) => quiet.touch(session));
 
@@ -99,6 +100,8 @@ export function createApp(options: AppOptions): App {
       events,
       delivery,
       log,
+      expectMore: (session, what, withinMs) => quiet.expectMore(session, what, withinMs),
+      arrived: (session, what) => quiet.arrived(session, what),
       secret: (name) => secrets.get(definition.name, name),
       apiUrl: () => options.urls().driver(definition.name),
       webhookUrl: options.webhooks[definition.name],

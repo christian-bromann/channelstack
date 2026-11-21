@@ -16,6 +16,8 @@ export interface QuietState {
 export class QuietDetector {
   readonly #clock: Clock;
   readonly #lastActivity = new Map<string, number>();
+  /** Per session: what is expected (a retry of an operation) and until when. */
+  readonly #expecting = new Map<string, Map<string, number>>();
   #callsInFlight = 0;
 
   constructor(clock: Clock) {
@@ -37,13 +39,35 @@ export class QuietDetector {
     this.#lastActivity.set(session, this.#clock());
   }
 
+  /**
+   * More is known to be coming: the agent was told to retry something after a while (a rate
+   * limit). The session stays busy until it arrives or the time is up, so a check doesn't
+   * conclude in the middle of the agent's backoff.
+   */
+  expectMore(session: string, what: string, withinMs: number): void {
+    const expected = this.#expecting.get(session) ?? new Map<string, number>();
+    expected.set(what, Math.max(expected.get(what) ?? 0, this.#clock() + withinMs));
+    this.#expecting.set(session, expected);
+  }
+
+  /** What was expected has arrived: the agent retried. */
+  arrived(session: string, what: string): void {
+    this.#expecting.get(session)?.delete(what);
+  }
+
   forget(session: string): void {
     this.#lastActivity.delete(session);
+    this.#expecting.delete(session);
   }
 
   state(session: string, openWork: number): QuietState {
-    const busy = this.#callsInFlight > 0 || openWork > 0;
+    const now = this.#clock();
+    const expectingUntil = Math.max(0, ...(this.#expecting.get(session)?.values() ?? []));
+    const busy = this.#callsInFlight > 0 || openWork > 0 || expectingUntil > now;
     const last = this.#lastActivity.get(session);
-    return { busy, quietForMs: busy ? 0 : last === undefined ? Number.MAX_SAFE_INTEGER : this.#clock() - last };
+    if (busy) return { busy, quietForMs: 0 };
+    if (last === undefined) return { busy, quietForMs: Number.MAX_SAFE_INTEGER };
+    // Quiet is counted from the last event, or from the end of a window in which more was expected.
+    return { busy, quietForMs: now - Math.max(last, expectingUntil) };
   }
 }

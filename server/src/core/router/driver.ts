@@ -34,6 +34,10 @@ export interface DriverContext {
   /** The hook into the delivery queue: the only way an event reaches the agent. */
   readonly delivery: DeliveryQueue;
   readonly log: Logger;
+  /** Tell the quiet detector that the agent will do this again within this time: it was told to retry later. */
+  expectMore(session: string, what: string, withinMs: number): void;
+  /** The agent did it again: the quiet detector stops waiting for it. */
+  arrived(session: string, what: string): void;
   /** One of the secrets the driver declared in `secrets`. */
   secret(name: string): string;
   /** Where the agent reaches this driver's fake, e.g. `https://echo.localhost`. */

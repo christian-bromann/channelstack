@@ -31,6 +31,8 @@ type Method = (args: Args) => Record<string, unknown>;
 /** Slack's limits (https://docs.slack.dev/reference/methods/chat.postMessage, chat.startStream). */
 const MAX_TEXT_LENGTH = 40_000;
 const MAX_STREAM_LENGTH = 12_000;
+/** How long after Retry-After a retry may still come: clients add their own backoff (Slack's WebClient: 1 to 2 seconds). */
+const RETRY_GRACE_MS = 3000;
 const SESSION_STATUSES = ["active", "processing", "suspended", "closed"] as const;
 
 /** The scope each method needs. A method that isn't listed needs none beyond a valid token. */
@@ -565,6 +567,11 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
         ...(body.ok === false ? { error: body.error } : {}),
         durationMs: clock() - startedAt,
       });
+    }
+    // A rate-limited agent backs off and retries: until the retry arrives, its session isn't quiet.
+    if (session !== undefined) {
+      if (status === 429) context.expectMore(session, name, Number(headers["retry-after"]) * 1000 + RETRY_GRACE_MS);
+      else context.arrived(session, name);
     }
     return c.json(body, status, headers);
   });
