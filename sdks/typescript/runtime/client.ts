@@ -1,5 +1,6 @@
 import { launch, type LaunchOptions } from "./launcher.ts";
-import { ChannelstackError, type ErrorClasses, Transport } from "./transport.ts";
+import { ChannelstackError, type ErrorClasses, segment, Transport } from "./transport.ts";
+import type { QuietState } from "./wait.ts";
 
 /** What a handle needs to call the server: the transport, and the session it lives in. */
 export interface HandleContext {
@@ -11,6 +12,11 @@ export interface HandleContext {
 export function sessionOf(context: HandleContext): string {
   if (context.session === undefined) throw new Error("This handle doesn't belong to a session");
   return context.session;
+}
+
+/** Ask the server whether the agent is quiet in the session a handle lives in. */
+export async function quietOf(context: HandleContext): Promise<QuietState> {
+  return (await context.transport.request("GET", `/sessions/${segment(sessionOf(context))}/quiet`)) as QuietState;
 }
 
 /**

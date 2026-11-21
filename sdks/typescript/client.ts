@@ -6,4 +6,11 @@ export * from "./generated/index.ts";
 export { type Duration, parseDuration } from "./runtime/duration.ts";
 export type { LaunchOptions } from "./runtime/launcher.ts";
 export { ChannelstackError } from "./runtime/transport.ts";
-export { type WaitOptions, WaitTimeoutError, waitFor } from "./runtime/wait.ts";
+export {
+  type QuietOptions,
+  type QuietState,
+  untilQuiet,
+  type WaitOptions,
+  WaitTimeoutError,
+  waitFor,
+} from "./runtime/wait.ts";

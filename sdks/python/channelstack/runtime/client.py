@@ -3,9 +3,11 @@
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Self
+from urllib.parse import quote
 
 from .launcher import Mode, launch
 from .transport import ChannelstackError, Transport
+from .wait import QuietState
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,13 @@ def session_of(context: HandleContext) -> str:
     if context.session is None:
         raise RuntimeError("This handle doesn't belong to a session")
     return context.session
+
+
+async def quiet_of(context: HandleContext) -> QuietState:
+    """Ask the server whether the agent is quiet in the session a handle lives in."""
+    session = quote(session_of(context), safe="")
+    state = await context.transport.request("GET", f"/sessions/{session}/quiet")
+    return QuietState(busy=bool(state["busy"]), quiet_for_ms=float(state["quietForMs"]))
 
 
 async def dispose_quietly(dispose: Callable[[], Awaitable[None]]) -> None:

@@ -1,4 +1,4 @@
-import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType } from "../ir.ts";
+import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
 import { BANNER, errorClassName, IrIndex, pathParts } from "./shared.ts";
 
 const OUT = "sdks/typescript/generated/index.ts";
@@ -174,9 +174,34 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ];
   };
 
+  /** `thread.waitForReply()`, `thread.latestReply()`: waits generated from a list read. */
+  const wait = (w: IrWait): string[] => {
+    const item = typeOf(w.item, "public");
+    const fromField =
+      w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
+    const from = fromField ? `from?: ${typeOf(fromField.type, "public")} | string` : undefined;
+    const options = `${from ? `{ ${from} } & ` : ""}${w.mode === "next" ? "WaitOptions" : "QuietOptions"}`;
+    const matches = from ? `(item) => fromMatches(item.${w.from}, options.from)` : "() => true";
+    const what = from ? `describeWait(${JSON.stringify(w.what)}, options.from)` : JSON.stringify(w.what);
+    return [
+      "",
+      w.mode === "next"
+        ? `  /** Wait for the next new ${w.what.replace(/^an? /, "")}${from ? " matching `from` (anyone if omitted)" : ""}, after the last one this handle saw. */`
+        : `  /** The latest ${w.what.replace(/^an? /, "")}${from ? " matching `from`" : ""}, once the agent is quiet. Waits for at least one. */`,
+      `  async ${w.name}(options: ${options} = {}): Promise<${item}> {`,
+      w.mode === "next"
+        ? `    return waitForNext(this.#seen, ${JSON.stringify(w.name)}, () => this.${w.read}(), ${matches}, ${what}, options);`
+        : `    return latestOnceQuiet(() => this.${w.read}(), ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
+      "  }",
+    ];
+  };
+
   const resourceClass = (resource: IrResource): string[] => {
     const isRoot = resource.name === ir.root;
     const disposable = !isRoot && index.disposer(resource) !== undefined;
+    const waits = resource.waits ?? [];
+    const seen = waits.some((w) => w.mode === "next") ? ["  readonly #seen = new Map<string, number>();"] : [];
+    const tail = [...resource.methods.flatMap((m) => method(resource, m)), ...waits.flatMap(wait), "}", ""];
     return [
       ...(isRoot
         ? []
@@ -193,6 +218,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         (field) => `  readonly ${field.name}: ${typeOf(field.type, "public")}${field.optional ? " | undefined" : ""};`,
       ),
       "  readonly #ctx: HandleContext;",
+      ...seen,
       "",
       "  /** @internal Handles come from the SDK, never from `new`. */",
       ...(isRoot
@@ -214,12 +240,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
             }),
           ]),
       "  }",
-      ...resource.methods.flatMap((m) => method(resource, m)),
-      "}",
-      "",
+      ...tail,
     ];
   };
-
   const dataType = ({ name, type }: Ir["types"][number]): string[] => {
     const declare = (suffix: string, side: "public" | "wire") =>
       type.kind === "object"
@@ -238,15 +261,22 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
 
   const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
   const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
+  const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
+  const waitImports = [
+    ...(allWaits.some((w) => w.from !== undefined) ? ["describeWait", "fromMatches"] : []),
+    ...(allWaits.some((w) => w.mode === "latest") ? ["latestOnceQuiet", "type QuietOptions"] : []),
+    ...(allWaits.some((w) => w.mode === "next") ? ["waitForNext", "type WaitOptions"] : []),
+  ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
   const lines = [
     `// ${BANNER}`,
-    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${allWaits.some((w) => w.mode === "latest") ? ", quietOf" : ""}${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
+    ...(waitImports.length > 0 ? [`import { ${waitImports.join(", ")} } from "../runtime/wait.ts";`] : []),
     "",
     "/** The server version this SDK was generated for. */",
     `export const VERSION = ${JSON.stringify(ir.version)};`,

@@ -27,6 +27,22 @@ export interface IrResource {
   scope?: "session";
   fields: IrField[];
   methods: IrMethod[];
+  /** Waits built on this handle's list reads: `thread.waitForReply()`. */
+  waits?: IrWait[];
+}
+
+export interface IrWait {
+  name: string;
+  /** `next`: the first new matching item since the handle last looked. `latest`: the last matching item once the agent is quiet. */
+  mode: "next" | "latest";
+  /** The list read to poll. */
+  read: string;
+  /** The type of one item of that list. */
+  item: IrType;
+  /** The item field holding its author, which the `from` option filters on. */
+  from?: string;
+  /** What is waited for, for the timeout message. */
+  what: string;
 }
 
 /** A named data type: plain values with no identity. */
@@ -199,6 +215,14 @@ export function buildIr(openapi: Json): Ir {
     });
   }
 
+  /** The item type of a list read: an array, or a named alias of one. */
+  const itemOf = (type: IrType | null, where: string): IrType => {
+    const resolved = type?.kind === "named" ? types.find((candidate) => candidate.name === type.name)?.type : type;
+    if (resolved?.kind !== "array")
+      throw new SpecError(where, "x-channelstack-waits needs an operation that returns a list");
+    return resolved.items;
+  };
+
   const errors = new Set<string>();
   for (const [path, operations] of Object.entries<Json>(openapi.paths ?? {})) {
     for (const [verb, operation] of Object.entries<Json>(operations)) {
@@ -263,6 +287,20 @@ export function buildIr(openapi: Json): Ir {
         throw new SpecError(where, `"${query.name}" must be an option: positional arguments are required body fields`);
 
       const responseSchema: Json | undefined = operation.responses?.["200"]?.content?.["application/json"]?.schema;
+      for (const wait of (operation["x-channelstack-waits"] ?? []) as Json[]) {
+        const item = itemOf(responseSchema ? typeOf(responseSchema, `${where} → 200`) : null, where);
+        owner.waits = [
+          ...(owner.waits ?? []),
+          {
+            name: wait.name,
+            mode: wait.mode,
+            read: binding.name,
+            item,
+            ...(wait.from ? { from: wait.from } : {}),
+            what: wait.what,
+          },
+        ];
+      }
       owner.methods.push({
         name: binding.name,
         kind: factory ? "factory" : "method",

@@ -2,7 +2,9 @@
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
+from typing import Protocol
 
 from .duration import Duration, parse_duration
 
@@ -30,3 +32,99 @@ async def wait_for[T](
         if time.monotonic() + interval_ms / 1000 > deadline:
             raise WaitTimeoutError(what, timeout_ms)
         await asyncio.sleep(interval_ms / 1000)
+
+
+@dataclass(frozen=True)
+class QuietState:
+    """What the server says about the agent's activity in a session (GET /sessions/{sid}/quiet)."""
+
+    busy: bool
+    quiet_for_ms: float
+
+
+class Author(Protocol):
+    """Anyone who can author something: a handle with an id and a name."""
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def name(self) -> str: ...
+
+
+def from_matches(author: Author, from_: Author | str | None) -> bool:
+    """Does an item's author match a `from_` filter: a handle, a name, or nothing (anyone)?"""
+    if from_ is None:
+        return True
+    if isinstance(from_, str):
+        return from_ in (author.name, author.id)
+    return author.id == from_.id
+
+
+def describe_wait(what: str, from_: Author | str | None) -> str:
+    """ "a reply" -> "a reply from my-agent", for timeout messages."""
+    if from_ is None:
+        return what
+    return f"{what} from {from_ if isinstance(from_, str) else from_.name}"
+
+
+async def wait_for_next[T](
+    seen: dict[str, int],
+    key: str,
+    read: Callable[[], Awaitable[Sequence[T]]],
+    matches: Callable[[T], bool],
+    what: str,
+    *,
+    timeout: Duration = "10s",
+) -> T:
+    """Wait for the next new item of a list that matches, after the last one this handle returned.
+
+    `seen` belongs to the handle and remembers, per wait, how far it has looked.
+    """
+
+    async def look() -> T | None:
+        items = await read()
+        for position in range(seen.get(key, 0), len(items)):
+            if matches(items[position]):
+                seen[key] = position + 1
+                return items[position]
+        return None
+
+    return await wait_for(what, look, timeout=timeout)
+
+
+async def until_quiet(
+    quiet: Callable[[], Awaitable[QuietState]],
+    *,
+    timeout: Duration = "10s",
+    quiet_for: Duration = "750ms",
+) -> None:
+    """Resolve once the agent has been quiet for `quiet_for`. Negative and exact-count checks read after this."""
+    quiet_for_ms = parse_duration(quiet_for)
+
+    async def settled() -> bool | None:
+        state = await quiet()
+        return True if not state.busy and state.quiet_for_ms >= quiet_for_ms else None
+
+    await wait_for(f"the agent to be quiet for {quiet_for_ms:g}ms", settled, timeout=timeout)
+
+
+async def latest_once_quiet[T](
+    read: Callable[[], Awaitable[Sequence[T]]],
+    matches: Callable[[T], bool],
+    quiet: Callable[[], Awaitable[QuietState]],
+    what: str,
+    *,
+    timeout: Duration = "10s",
+    quiet_for: Duration = "750ms",
+) -> T:
+    """The last item of a list that matches, read once the agent is quiet. Waits for at least one first."""
+
+    async def latest() -> T | None:
+        matching = [item for item in await read() if matches(item)]
+        return matching[-1] if matching else None
+
+    await wait_for(what, latest, timeout=timeout)
+    await until_quiet(quiet, timeout=timeout, quiet_for=quiet_for)
+    # The agent may have said more while it was settling: the answer is what is there now.
+    return await wait_for(what, latest, timeout=timeout)

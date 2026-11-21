@@ -33,3 +33,87 @@ export async function waitFor<T>(
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
 }
+
+export interface QuietOptions extends WaitOptions {
+  /**
+   * How long the agent must be quiet (no call in flight, no delivery pending, no open stream)
+   * before the result is read. Default: 750ms.
+   */
+  quietFor?: Duration;
+}
+
+/** What the server says about the agent's activity in a session (`GET /sessions/{sid}/quiet`). */
+export interface QuietState {
+  busy: boolean;
+  quietForMs: number;
+}
+
+/** Anyone who can author something: a handle with an id and a name. */
+interface Author {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** Does an item's author match a `from` filter: a handle, a name, or nothing (anyone)? */
+export function fromMatches(author: Author, from: Author | string | undefined): boolean {
+  if (from === undefined) return true;
+  return typeof from === "string" ? author.name === from || author.id === from : author.id === from.id;
+}
+
+/** "a reply" → "a reply from my-agent", for timeout messages. */
+export function describeWait(what: string, from: Author | string | undefined): string {
+  return from === undefined ? what : `${what} from ${typeof from === "string" ? from : from.name}`;
+}
+
+/**
+ * Wait for the next new item of a list that matches, after the last one this handle returned.
+ * `seen` belongs to the handle and remembers, per wait, how far it has looked.
+ */
+export function waitForNext<T>(
+  seen: Map<string, number>,
+  key: string,
+  read: () => Promise<readonly T[]>,
+  matches: (item: T) => boolean,
+  what: string,
+  options: WaitOptions = {},
+): Promise<T> {
+  return waitFor(
+    what,
+    async () => {
+      const items = await read();
+      const index = items.findIndex((item, position) => position >= (seen.get(key) ?? 0) && matches(item));
+      if (index === -1) return undefined;
+      seen.set(key, index + 1);
+      return items[index];
+    },
+    options,
+  );
+}
+
+/** Resolve once the agent has been quiet for `quietFor`. Negative and exact-count checks read after this. */
+export async function untilQuiet(quiet: () => Promise<QuietState>, options: QuietOptions = {}): Promise<void> {
+  const quietFor = parseDuration(options.quietFor ?? "750ms");
+  await waitFor(
+    `the agent to be quiet for ${quietFor}ms`,
+    async () => {
+      const state = await quiet();
+      return !state.busy && state.quietForMs >= quietFor ? true : undefined;
+    },
+    options,
+  );
+}
+
+/** The last item of a list that matches, read once the agent is quiet. Waits for at least one first. */
+export async function latestOnceQuiet<T>(
+  read: () => Promise<readonly T[]>,
+  matches: (item: T) => boolean,
+  quiet: () => Promise<QuietState>,
+  what: string,
+  options: QuietOptions = {},
+): Promise<T> {
+  const latest = async () => (await read()).filter(matches).at(-1);
+  await waitFor(what, latest, options);
+  await untilQuiet(quiet, options);
+  // The agent may have said more while it was settling: the answer is what is there now.
+  return waitFor(what, latest, options);
+}

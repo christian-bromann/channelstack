@@ -1,4 +1,4 @@
-import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType } from "../ir.ts";
+import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
 import { BANNER, errorClassName, IrIndex, pathParts, snakeCase as toSnakeCase } from "./shared.ts";
 
 /** Words Python reserves. A name that collides gets a trailing underscore, as PEP 8 recommends (`as_`). */
@@ -196,9 +196,42 @@ export function emitPython(ir: Ir): Map<string, string> {
     ];
   };
 
+  /** `thread.wait_for_reply()`, `thread.latest_reply()`: waits generated from a list read. */
+  const wait = (w: IrWait): string[] => {
+    const fromField =
+      w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
+    const from = fromField ? [`from_: ${typeOf(fromField.type)} | str | None = None`] : [];
+    const parameters = [
+      "self",
+      "*",
+      ...from,
+      'timeout: Duration = "10s"',
+      ...(w.mode === "latest" ? ['quiet_for: Duration = "750ms"'] : []),
+    ];
+    const matches = fromField
+      ? `lambda item: from_matches(item.${snakeCase(w.from ?? "")}, from_)`
+      : "lambda item: True";
+    const what = fromField ? `describe_wait(${JSON.stringify(w.what)}, from_)` : JSON.stringify(w.what);
+    const noun = w.what.replace(/^an? /, "");
+    return [
+      "",
+      `    async def ${snakeCase(w.name)}(${parameters.join(", ")}) -> ${typeOf(w.item)}:`,
+      w.mode === "next"
+        ? `        """Wait for the next new ${noun}${fromField ? " matching `from_` (anyone if omitted)" : ""}, after the last one this handle saw."""`
+        : `        """The latest ${noun}${fromField ? " matching `from_`" : ""}, once the agent is quiet. Waits for at least one."""`,
+      w.mode === "next"
+        ? `        return await wait_for_next(self._seen, ${JSON.stringify(w.name)}, self.${snakeCase(w.read)}, ${matches}, ${what}, timeout=timeout)`
+        : `        return await latest_once_quiet(self.${snakeCase(w.read)}, ${matches}, lambda: quiet_of(self._ctx), ${what}, timeout=timeout, quiet_for=quiet_for)`,
+    ];
+  };
+
+  const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
+  const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
+
   const resourceClass = (resource: IrResource): string[] => {
     const isRoot = resource.name === ir.root;
     const disposer = isRoot ? undefined : index.disposer(resource);
+    const waits = resource.waits ?? [];
     return [
       "",
       "",
@@ -212,11 +245,13 @@ export function emitPython(ir: Ir): Map<string, string> {
         : [
             "    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:",
             "        self._ctx = ctx",
+            ...(waits.some((w) => w.mode === "next") ? ["        self._seen: dict[str, int] = {}"] : []),
             ...resource.fields.map(
               (field) => `        self.${snakeCase(field.name)}: ${annotation(field)} = ${fieldDecode(field, "data")}`,
             ),
           ]),
       ...resource.methods.flatMap(method),
+      ...waits.flatMap(wait),
       ...(disposer
         ? [
             "",
@@ -280,11 +315,14 @@ export function emitPython(ir: Ir): Map<string, string> {
     "from typing import Any, Literal, Self",
     "from urllib.parse import quote",
     "",
-    "from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, session_of",
-    ...(JSON.stringify(ir).includes('"kind":"duration"')
-      ? ["from ..runtime.duration import Duration, parse_duration"]
+    `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") ? ", quiet_of" : ""}, session_of`,
+    ...(usesDurations || allWaits.length > 0
+      ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
       : []),
     "from ..runtime.transport import ChannelstackError, Transport",
+    ...(allWaits.length > 0
+      ? ["from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for_next"]
+      : []),
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,
     "",

@@ -19,6 +19,20 @@ interface SdkBinding {
   dispose?: boolean;
 }
 
+/**
+ * A wait built on a list read (`x-channelstack-waits`): SDKs poll the read until an item matches.
+ * `next` resolves with the first new matching item since the handle last looked; `latest` waits
+ * until the agent is quiet and resolves with the last matching item.
+ */
+interface WaitBinding {
+  name: string;
+  mode: "next" | "latest";
+  /** The item field holding who authored it; the wait's `from` option filters on it. */
+  from?: string;
+  /** What is being waited for, for the timeout message: "a reply". */
+  what: string;
+}
+
 type AnyObject = z.ZodObject<z.ZodRawShape>;
 
 interface RouteBase<P extends AnyObject, Q extends AnyObject, B extends z.ZodType, R extends z.ZodType> {
@@ -35,6 +49,8 @@ interface RouteBase<P extends AnyObject, Q extends AnyObject, B extends z.ZodTyp
   errors?: readonly string[];
   factory?: SdkBinding;
   sdkMethod?: SdkBinding;
+  /** Waits SDKs build on this list read. */
+  waits?: readonly WaitBinding[];
   stability: "experimental" | "stable";
 }
 
@@ -96,6 +112,7 @@ export function registerRoute<
     },
     ...(spec.factory ? { "x-channelstack-factory": spec.factory } : {}),
     ...(spec.sdkMethod ? { "x-channelstack-method": spec.sdkMethod } : {}),
+    ...(spec.waits ? { "x-channelstack-waits": spec.waits } : {}),
     "x-channelstack-error-codes": [...new Set([...ALWAYS, ...(spec.errors ?? [])])],
     "x-channelstack-stability": spec.stability,
   });
