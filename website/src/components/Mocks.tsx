@@ -85,67 +85,6 @@ export function SlackMock({ step }: MockProps) {
   );
 }
 
-/** Live mode: the same API in a real workspace, in a channel the test created. */
-export function LiveMock({ step }: MockProps) {
-  return (
-    <SlackShell
-      composer="Reply…"
-      title={
-        <>
-          <b>Thread</b>
-          <span className={when(step, 1, "sl-channel")}># cs-test-4f2a</span>
-          <span className="spacer" />
-          <span className="sl-live">
-            <i /> live
-          </span>
-        </>
-      }
-    >
-      <SlackMessage who="Ana" time="2:10 PM" className={when(step, 2, "sl-msg")}>
-        <p>
-          <Mention>@robin</Mention> summarize #support today
-        </p>
-      </SlackMessage>
-      <p className={when(step, 3, "sl-divider")}>1 reply</p>
-      <SlackMessage who="robin" bot time="2:10 PM" className={when(step, 3, "sl-msg")}>
-        <p>Today in #support: 12 new tickets, 9 closed. Two are waiting on billing.</p>
-      </SlackMessage>
-    </SlackShell>
-  );
-}
-
-/** The pytest example: Ana rejects, and the agent leaves the keys alone. */
-export function PytestMock({ step }: MockProps) {
-  return (
-    <SlackShell
-      composer="Reply…"
-      title={
-        <>
-          <b>Thread</b>
-          <span className="sl-channel"># ops</span>
-        </>
-      }
-    >
-      <SlackMessage who="Ana" time="11:20 AM" className={when(step, 1, "sl-msg")}>
-        <p>
-          <Mention>@robin</Mention> rotate the staging keys
-        </p>
-      </SlackMessage>
-      <p className={when(step, 2, "sl-divider")}>{step >= 4 ? "2 replies" : "1 reply"}</p>
-      <SlackMessage who="robin" bot time="11:20 AM" className={when(step, 2, "sl-msg")}>
-        <p>Rotate the staging keys? This restarts three services.</p>
-        <p className="sl-actions">
-          <span className="sl-btn primary">Approve</span>
-          <span className={step >= 3 ? "sl-btn is-clicked" : "sl-btn"}>Reject</span>
-        </p>
-      </SlackMessage>
-      <SlackMessage who="robin" bot time="11:21 AM" className={when(step, 4, "sl-msg")}>
-        <p>Okay, I left the keys alone.</p>
-      </SlackMessage>
-    </SlackShell>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // GitHub
 

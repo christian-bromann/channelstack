@@ -161,6 +161,45 @@ html:not(.js) .panel + .panel {
   flex: 1;
 }
 
+/* the TS | Py switch */
+.lang {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--code-raise);
+}
+
+.lang button {
+  min-width: 34px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--code-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms;
+}
+
+.lang button:hover {
+  color: var(--code-fg);
+}
+
+.lang button[aria-pressed="true"] {
+  background: var(--code-line);
+  color: var(--code-fg);
+}
+
+.lang button:focus-visible {
+  outline-color: var(--code-key);
+}
+
+html:not(.js) .lang {
+  display: none;
+}
+
 /* the line highlight: one line tall, moved and stretched with transform */
 .hot {
   position: absolute;
@@ -376,7 +415,7 @@ html:not(.js) .panel + .panel {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .app :is(.sl-msg, .sl-status, .sl-divider, .sl-channel, .gh-issue, .gh-comment, .gh-event, .ln-issue, .ln-label, .ln-row, .ln-session, .ln-thought, .ln-stopped, .ln-delegate, .nt-doc, .nt-crumb, .nt-comment, .nt-reply) {
+  .app :is(.sl-msg, .sl-status, .gh-issue, .gh-comment, .gh-event, .ln-issue, .ln-label, .ln-row, .ln-session, .ln-thought, .ln-stopped, .ln-delegate, .nt-doc, .nt-crumb, .nt-comment, .nt-reply) {
     transition: opacity 380ms var(--ease), transform 380ms var(--ease);
   }
   .checks li,
@@ -431,29 +470,6 @@ html:not(.js) .panel + .panel {
 
 .sl-head b {
   font-weight: 800;
-}
-
-.sl-channel {
-  color: #ababad;
-  font-size: 13px;
-}
-
-.sl-live {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #ff7b72;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.sl-live i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ff5449;
 }
 
 .sl-body {
@@ -557,21 +573,6 @@ html:not(.js) .panel + .panel {
   border-color: transparent;
   background: #007a5a;
   color: #fff;
-}
-
-.sl-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #ababad;
-  font-size: 13px;
-}
-
-.sl-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #35373b;
 }
 
 .sl-composer {

@@ -2,22 +2,30 @@ import { type ComponentType, type KeyboardEvent, type ReactNode, useEffect, useR
 import github from "../../samples/github.test.ts?sample";
 import slack from "../../samples/hero.test.ts?sample";
 import linear from "../../samples/linear.test.ts?sample";
-import live from "../../samples/live.test.ts?sample";
 import notion from "../../samples/notion.test.ts?sample";
-import pytest from "../../samples/test_keys.py?sample";
+import notionPy from "../../samples/python/test_comments.py?sample";
+import slackPy from "../../samples/python/test_deploy.py?sample";
+import githubPy from "../../samples/python/test_issues.py?sample";
+import linearPy from "../../samples/python/test_sessions.py?sample";
 import type { Sample } from "../../plugins/samples-plugin";
 import { prefersReducedMotion, useInView } from "../lib/hooks";
 import { CopyButton } from "./Code";
 import { Check, Pause, Play, Replay } from "./Icons";
-import { GitHubMock, LinearMock, LiveMock, type MockProps, NotionMock, PytestMock, SlackMock } from "./Mocks";
+import { GitHubMock, LinearMock, type MockProps, NotionMock, SlackMock } from "./Mocks";
+
+type Lang = "ts" | "py";
+const LANGS: Array<{ id: Lang; label: string; name: string }> = [
+  { id: "ts", label: "TS", name: "TypeScript" },
+  { id: "py", label: "Py", name: "Python" },
+];
 
 interface Example {
   id: string;
   label: string;
-  file: string;
   /** The address shown above the mock-up. */
   host: string;
-  sample: Sample;
+  /** The same test in each language. Both carry the same playback steps. */
+  code: Record<Lang, { file: string; sample: Sample }>;
   Mock: ComponentType<MockProps>;
   /** What the test asserts, each shown once playback reaches its step. */
   checks: Array<{ step: number; text: string }>;
@@ -28,9 +36,8 @@ const EXAMPLES: Example[] = [
   {
     id: "slack",
     label: "Slack",
-    file: "deploy.test.ts",
     host: "slack.localhost",
-    sample: slack,
+    code: { ts: { file: "deploy.test.ts", sample: slack }, py: { file: "test_deploy.py", sample: slackPy } },
     Mock: SlackMock,
     checks: [
       { step: 2, text: "status reads “checking CI”" },
@@ -46,9 +53,8 @@ const EXAMPLES: Example[] = [
   {
     id: "github",
     label: "GitHub",
-    file: "issues.test.ts",
     host: "github.localhost",
-    sample: github,
+    code: { ts: { file: "issues.test.ts", sample: github }, py: { file: "test_issues.py", sample: githubPy } },
     Mock: GitHubMock,
     checks: [
       { step: 3, text: "robin commented, mentioning Safari" },
@@ -63,9 +69,8 @@ const EXAMPLES: Example[] = [
   {
     id: "linear",
     label: "Linear",
-    file: "sessions.test.ts",
     host: "linear.localhost",
-    sample: linear,
+    code: { ts: { file: "sessions.test.ts", sample: linear }, py: { file: "test_sessions.py", sample: linearPy } },
     Mock: LinearMock,
     checks: [
       { step: 3, text: "the session shows a thought" },
@@ -80,9 +85,8 @@ const EXAMPLES: Example[] = [
   {
     id: "notion",
     label: "Notion",
-    file: "comments.test.ts",
     host: "notion.localhost",
-    sample: notion,
+    code: { ts: { file: "comments.test.ts", sample: notion }, py: { file: "test_comments.py", sample: notionPy } },
     Mock: NotionMock,
     checks: [
       { step: 3, text: "robin answered in the same discussion" },
@@ -94,45 +98,15 @@ const EXAMPLES: Example[] = [
       <><code>page.content_updated</code> batched the way Notion does</>,
     ],
   },
-  {
-    id: "live",
-    label: "Live mode",
-    file: "live.test.ts",
-    host: "app.slack.com",
-    sample: live,
-    Mock: LiveMock,
-    checks: [
-      { step: 3, text: "reply from robin within 30s" },
-      { step: 4, text: "cleaned up: 1 channel, 2 messages" },
-    ],
-    notes: [
-      <>The same test runs against a real sandbox workspace</>,
-      <>Acts as real people and reads the result back</>,
-      <>Removes everything the test created</>,
-    ],
-  },
-  {
-    id: "pytest",
-    label: "pytest",
-    file: "test_keys.py",
-    host: "slack.localhost",
-    sample: pytest,
-    Mock: PytestMock,
-    checks: [{ step: 4, text: "“Okay, I left the keys alone.” appears once" }],
-    notes: [
-      <>The same fakes from Python through <code>pytest-channelstack</code></>,
-      <>One channelstack server shared by JS and Python suites</>,
-      <>Fixtures named after each platform</>,
-    ],
-  },
 ];
 
 /** The step after the last tagged line or check: the finished run. */
-const doneOf = (example: Example) => Math.max(...example.sample.steps, ...example.checks.map((c) => c.step)) + 1;
+const doneOf = (example: Example) => Math.max(...example.code.ts.sample.steps, ...example.checks.map((c) => c.step)) + 1;
 
-function Panel({ example, active, step, controls }: { example: Example; active: boolean; step: number; controls: ReactNode }) {
+function Panel({ example, active, step, lang, onLang, controls }: { example: Example; active: boolean; step: number; lang: Lang; onLang: (lang: Lang) => void; controls: ReactNode }) {
   const bar = useRef<HTMLSpanElement>(null);
-  const { sample, Mock } = example;
+  const { Mock } = example;
+  const { file, sample } = example.code[lang];
 
   // The highlight bar moves with transform only. It is positioned here, not with a style
   // attribute, so the prerendered HTML carries no inline styles.
@@ -158,11 +132,18 @@ function Panel({ example, active, step, controls }: { example: Example; active: 
             <i />
             <i />
           </span>
-          <span>{example.file}</span>
+          <span>{file}</span>
           <span className="spacer" />
+          <span className="lang" role="group" aria-label="Language">
+            {LANGS.map((item) => (
+              <button key={item.id} type="button" aria-pressed={item.id === lang} aria-label={item.name} title={item.name} onClick={() => onLang(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </span>
           <CopyButton text={sample.code} label={`Copy the ${example.label} example`} />
         </div>
-        <pre className="code" tabIndex={0} role="region" aria-label={`${example.label} example test`}>
+        <pre className="code" tabIndex={0} role="region" aria-label={`${example.label} example test in ${lang === "ts" ? "TypeScript" : "Python"}`}>
           <code>
             <span className="hot" ref={bar} aria-hidden="true" />
             {sample.lines.map((html, i) => (
@@ -209,7 +190,7 @@ function Panel({ example, active, step, controls }: { example: Example; active: 
 }
 
 /**
- * One example per platform: the test on the left "plays" against the conversation it produces
+ * One example per platform, in TypeScript or Python: the test on the left "plays" against the conversation it produces
  * on the right. Tabs follow the WAI-ARIA pattern (arrow keys, Home and End). Everything renders
  * finished, so it reads without script; without script every example shows, one after the other.
  */
@@ -217,6 +198,7 @@ export function Player() {
   const [active, setActive] = useState(0);
   const [step, setStep] = useState(() => doneOf(EXAMPLES[0]!));
   const [playing, setPlaying] = useState(false);
+  const [lang, setLang] = useState<Lang>("ts");
   const [root, inView] = useInView<HTMLDivElement>(0.3);
   const list = useRef<HTMLDivElement>(null);
   const ink = useRef<HTMLSpanElement>(null);
@@ -306,7 +288,7 @@ export function Player() {
       </div>
       <div className="panels">
         {EXAMPLES.map((item, i) => (
-          <Panel key={item.id} example={item} active={i === active} step={i === active ? step : doneOf(item)} controls={i === active ? controls : null} />
+          <Panel key={item.id} example={item} active={i === active} lang={lang} onLang={setLang} step={i === active ? step : doneOf(item)} controls={i === active ? controls : null} />
         ))}
       </div>
     </div>
