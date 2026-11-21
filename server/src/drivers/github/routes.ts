@@ -1,0 +1,1551 @@
+import { z } from "@hono/zod-openapi";
+
+import type { DeliveryRecord } from "../../core/delivery/index.ts";
+import { ProtocolError } from "../../core/errors/index.ts";
+import type { EventLog } from "../../core/events/index.ts";
+import type { DriverRouter } from "../../core/router/index.ts";
+import { apiCallSchema, CallsQuery, DeliveryAttempt, DeliveryStatus, readCalls } from "../../core/router/inspect.ts";
+import type { FakeGitHubWorld } from "./fake/world.ts";
+import { githubTime } from "./payloads.ts";
+import { renderTranscript } from "./transcript.ts";
+import {
+  type GitHubCheckRunRecord,
+  type GitHubCommentRecord,
+  type GitHubCommitInfo,
+  type GitHubIssueRecord,
+  type GitHubRepoRecord,
+  type GitHubReviewCommentRecord,
+  type GitHubReviewRecord,
+  type GitHubUserRecord,
+  REACTIONS,
+} from "./world.ts";
+
+const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
+const pathParam = (name: string) => z.string().openapi({ param: { name, in: "path" } });
+const numberParam = (name: string) =>
+  z.coerce
+    .number()
+    .int()
+    .openapi({ param: { name, in: "path" }, type: "integer" });
+
+const GitHubUser = z
+  .object({
+    id: z.string(),
+    name: z.string().openapi({ description: "The login: what an author is matched by." }),
+    kind: z.literal("user"),
+    login: z.string(),
+    numericId: z.number().int(),
+    displayName: z.string().optional(),
+    email: z.string().optional(),
+    role: z.enum(["member", "admin", "outside_collaborator"]),
+  })
+  .openapi("GitHubUser", { "x-channelstack-resource": { id: "id" } });
+
+const GitHubApp = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    kind: z.literal("app"),
+    slug: z.string(),
+    botLogin: z.string(),
+    botUserId: z.string(),
+    appId: z.number().int(),
+    privateKey: z.string(),
+    webhookSecret: z.string(),
+  })
+  .openapi("GitHubApp", { "x-channelstack-resource": { id: "id" } });
+
+const GitHubAuthor = z.discriminatedUnion("kind", [GitHubUser, GitHubApp]);
+
+const GitHubRepo = z
+  .object({
+    id: z.string(),
+    owner: z.string(),
+    name: z.string(),
+    fullName: z.string(),
+    defaultBranch: z.string(),
+    private: z.boolean(),
+  })
+  .openapi("GitHubRepo", { "x-channelstack-resource": { id: "id" } });
+
+const GitHubDelivery = z
+  .object({
+    id: z.string(),
+    channel: z.literal("github"),
+    type: z.string().openapi({ description: "`X-GitHub-Event`, e.g. `issue_comment`." }),
+    action: z.string().optional(),
+    guid: z.string().openapi({ description: "`X-GitHub-Delivery`." }),
+    payload: z.unknown(),
+    attempts: z.array(DeliveryAttempt),
+    status: DeliveryStatus,
+  })
+  .openapi("GitHubDelivery", { "x-channelstack-resource": { id: "id" } });
+
+const issueShape = {
+  repoId: z.string(),
+  number: z.number().int(),
+  repo: GitHubRepo,
+  url: z.string(),
+  author: GitHubAuthor,
+};
+const issueId = ["repoId", "number"];
+
+const GitHubIssue = z.object(issueShape).openapi("GitHubIssue", { "x-channelstack-resource": { id: issueId } });
+
+const GitHubPullRequest = z
+  .object({ ...issueShape, head: z.string(), base: z.string() })
+  .openapi("GitHubPullRequest", { "x-channelstack-resource": { id: issueId, extends: "GitHubIssue" } });
+
+const GitHubCommit = z
+  .object({
+    repoId: z.string(),
+    sha: z.string(),
+    message: z.string(),
+    author: GitHubAuthor.optional().openapi({ description: "Absent when the commit's author is nobody on GitHub." }),
+    branch: z.string(),
+    committedAt: z.string(),
+  })
+  .openapi("GitHubCommit", { "x-channelstack-resource": { id: ["repoId", "sha"] } });
+
+const GitHubComment = z
+  .object({
+    id: z.number().int(),
+    url: z.string(),
+    issue: GitHubIssue,
+    author: GitHubAuthor,
+    body: z.string(),
+    createdAt: z.string(),
+    delivery: GitHubDelivery.optional(),
+  })
+  .openapi("GitHubComment", { "x-channelstack-resource": { id: "id" } });
+
+const GitHubReviewComment = z
+  .object({
+    id: z.number().int(),
+    pr: GitHubPullRequest,
+    author: GitHubAuthor,
+    path: z.string(),
+    line: z.number().int(),
+    side: z.enum(["LEFT", "RIGHT"]),
+    body: z.string(),
+    delivery: GitHubDelivery.optional(),
+  })
+  .openapi("GitHubReviewComment", { "x-channelstack-resource": { id: "id" } });
+
+const GitHubReview = z
+  .object({
+    id: z.number().int(),
+    author: GitHubAuthor,
+    state: z.enum(["COMMENTED", "APPROVED", "CHANGES_REQUESTED", "DISMISSED", "PENDING"]),
+    body: z.string(),
+    comments: z.array(GitHubReviewComment),
+    delivery: GitHubDelivery.optional(),
+  })
+  .openapi("GitHubReview");
+
+const GitHubCheckRun = z
+  .object({
+    id: z.number().int(),
+    name: z.string(),
+    app: z.object({ slug: z.string() }),
+    headSha: z.string(),
+    status: z.enum(["queued", "in_progress", "completed"]),
+    conclusion: z
+      .enum(["success", "failure", "neutral", "cancelled", "skipped", "timed_out", "action_required"])
+      .optional(),
+    title: z.string().optional(),
+    summary: z.string().optional(),
+    annotations: z.array(
+      z.object({
+        path: z.string(),
+        startLine: z.number().int(),
+        endLine: z.number().int(),
+        level: z.enum(["notice", "warning", "failure"]),
+        message: z.string(),
+      }),
+    ),
+    actions: z.array(z.string()).openapi({ description: "The identifiers of the buttons the App put on the run." }),
+  })
+  .openapi("GitHubCheckRun", { "x-channelstack-resource": { id: "id" } });
+
+const Principal = z
+  .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })
+  .openapi("GitHubPrincipal");
+
+const GitHubTranscript = z
+  .object({
+    entries: z.array(
+      z
+        .object({
+          id: z.string(),
+          author: Principal,
+          at: z.string(),
+          text: z.string(),
+          controls: z.array(z.string()),
+          edited: z.boolean(),
+          depth: z.number().int(),
+        })
+        .openapi("GitHubTranscriptEntry"),
+    ),
+    text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
+  })
+  .openapi("GitHubTranscript", { "x-channelstack-string": "text" });
+
+const GitHubApiCall = apiCallSchema("github", "GitHubApiCall");
+
+const GitHubFixture = z
+  .object({ app: GitHubApp, apiUrl: z.string(), org: z.string() })
+  .openapi("GitHubFixture", { "x-channelstack-resource": {} });
+
+const userRef = z.string().openapi(refTo("GitHubUser"));
+const authorRef = z.string().openapi(refTo("GitHubUser", "GitHubApp"));
+/** One author or several: `ana.assign(ben, …)` and `ana.assign([ben, github.app], …)` both work. */
+const authors = () => z.array(authorRef).min(1).openapi({ "x-channelstack-one-or-many": true });
+const repoRef = z.string().openapi(refTo("GitHubRepo"));
+const issueRef = z.object({ repoId: z.string(), number: z.number().int() }).openapi(refTo("GitHubIssue"));
+const pullRef = z.object({ repoId: z.string(), number: z.number().int() }).openapi(refTo("GitHubPullRequest"));
+const commentRef = z.number().int().openapi(refTo("GitHubComment", "GitHubReviewComment"));
+const reviewCommentRef = z.number().int().openapi(refTo("GitHubReviewComment"));
+const checkRunRef = z.number().int().openapi(refTo("GitHubCheckRun"));
+
+/** A file as it travels: its path in the repository and its bytes in base64. SDKs read files and directories into this. */
+const FileOnWire = z.object({ path: z.string().min(1), content: z.string() });
+const files = () => z.array(FileOnWire).openapi({ "x-channelstack-files": "tree" });
+/** Changes to a branch: files with their new contents, or `null` for a file that goes away. */
+const changes = () =>
+  z
+    .array(z.object({ path: z.string().min(1), content: z.string().nullable() }))
+    .openapi({ "x-channelstack-files": "changes" });
+
+const UserParams = z.object({ user: pathParam("user") });
+const RepoParams = z.object({ repo: pathParam("repo") });
+const IssueParams = RepoParams.extend({ number: numberParam("number") });
+const CommitParams = RepoParams.extend({ sha: pathParam("sha") });
+const issueBinding = { repo: "repoId", number: "number" };
+const commitBinding = { repo: "repoId", sha: "sha" };
+
+/** The GitHub driver's control API: what a test's people do, and what a test reads back. */
+export function registerGitHubRoutes(
+  router: DriverRouter,
+  deps: { world: FakeGitHubWorld; events: EventLog; apiUrl: () => string; secret: (name: string) => string },
+): void {
+  const { world } = deps;
+  const { kit, repos, issues, pulls, checks } = world;
+  const { store, git } = kit;
+  const stability = "experimental";
+
+  // --- Records → wire ---------------------------------------------------------------------------
+
+  const userWire = (user: GitHubUserRecord) => ({
+    id: String(user.id),
+    name: user.login,
+    kind: "user" as const,
+    login: user.login,
+    numericId: user.id,
+    displayName: user.name,
+    email: user.email,
+    role: user.role,
+  });
+  const appWire = () => ({
+    id: String(store.app.id),
+    name: store.app.name,
+    kind: "app" as const,
+    slug: store.app.slug,
+    botLogin: store.bot.login,
+    botUserId: String(store.bot.id),
+    appId: store.app.id,
+    privateKey: deps.secret("privateKey"),
+    webhookSecret: deps.secret("webhookSecret"),
+  });
+  const authorWire = (id: number) => (id === store.bot.id ? appWire() : userWire(store.actor(id)));
+  const principal = (id: number) => {
+    const { id: principalId, name, kind } = authorWire(id);
+    return { id: principalId, name, kind };
+  };
+  const repoWire = (repo: GitHubRepoRecord) => ({
+    id: String(repo.id),
+    owner: repo.owner,
+    name: repo.name,
+    fullName: `${repo.owner}/${repo.name}`,
+    defaultBranch: repo.defaultBranch,
+    private: repo.private,
+  });
+  const issueWire = (issue: GitHubIssueRecord) => {
+    const repo = store.repo(issue.repo);
+    return {
+      repoId: String(repo.id),
+      number: issue.number,
+      repo: repoWire(repo),
+      url: `${kit.objects.repoWeb(repo)}/${issue.pull ? "pull" : "issues"}/${issue.number}`,
+      author: authorWire(issue.author),
+    };
+  };
+  const pullWire = (issue: GitHubIssueRecord) => ({
+    ...issueWire(issue),
+    head: issue.pull?.head ?? "",
+    base: issue.pull?.base ?? "",
+  });
+  const deliveryWire = ({ request, attempts }: DeliveryRecord) => ({
+    id: request.id,
+    channel: "github" as const,
+    type: request.type,
+    action: typeof request.meta?.action === "string" ? request.meta.action : undefined,
+    guid: request.id,
+    payload: request.meta?.payload,
+    attempts,
+    status: attempts.at(-1)?.status ?? ("pending" as const),
+  });
+  /** The delivery an action caused, when the App could be told. */
+  const caused = (session: string, guid: string | undefined) =>
+    guid === undefined ? null : deliveryWire(world.delivery(session, guid));
+  const delivered = (session: string, guids: ReadonlyArray<string | undefined>) =>
+    guids.flatMap((guid) => (guid === undefined ? [] : [deliveryWire(world.delivery(session, guid))]));
+  const commentWire = (session: string, comment: GitHubCommentRecord) => {
+    const repo = store.repo(comment.repo);
+    const issue = kit.requireIssue(repo, comment.issue);
+    return {
+      id: comment.id,
+      url: `${issueWire(issue).url}#issuecomment-${comment.id}`,
+      issue: issueWire(issue),
+      author: authorWire(comment.author),
+      body: comment.body,
+      createdAt: githubTime(comment.createdAt),
+      delivery: caused(session, comment.delivery) ?? undefined,
+    };
+  };
+  const reviewCommentWire = (session: string, comment: GitHubReviewCommentRecord) => ({
+    id: comment.id,
+    pr: pullWire(kit.requirePull(store.repo(comment.repo), comment.pull)),
+    author: authorWire(comment.author),
+    path: comment.path,
+    line: comment.line,
+    side: comment.side,
+    body: comment.body,
+    delivery: caused(session, comment.delivery) ?? undefined,
+  });
+  const reviewWire = (session: string, review: GitHubReviewRecord) => ({
+    id: review.id,
+    author: authorWire(review.author),
+    state: review.state,
+    body: review.body,
+    comments: store
+      .reviewCommentsOf(store.repo(review.repo), review.pull)
+      .filter((comment) => comment.review === review.id)
+      .map((comment) => reviewCommentWire(session, comment)),
+    delivery: caused(session, review.delivery) ?? undefined,
+  });
+  const checkRunWire = (run: GitHubCheckRunRecord) => ({
+    id: run.id,
+    name: run.name,
+    app: { slug: store.app.slug },
+    headSha: run.headSha,
+    status: run.status,
+    conclusion: run.conclusion,
+    title: run.title,
+    summary: run.summary,
+    annotations: run.annotations.map((annotation) => ({
+      path: annotation.path,
+      startLine: annotation.start_line,
+      endLine: annotation.end_line,
+      level: annotation.annotation_level,
+      message: annotation.message,
+    })),
+    actions: run.actions.map((action) => action.identifier),
+  });
+  const commitWire = (repo: GitHubRepoRecord, info: GitHubCommitInfo, branch: string) => {
+    const author = repos.commitAuthor(repo, info);
+    return {
+      repoId: String(repo.id),
+      sha: info.sha,
+      message: info.message,
+      author: author ? authorWire(author.id) : undefined,
+      branch,
+      committedAt: githubTime(info.committer.date),
+    };
+  };
+
+  // --- Handles → records ------------------------------------------------------------------------
+
+  const person = (session: string, id: string) => store.users.get(session, id).id;
+  /** A person of this session, or the App's bot. */
+  const author = (session: string, id: string) => (id === String(store.app.id) ? store.bot.id : person(session, id));
+  const repoOf = (session: string, id: string) => store.repos.get(session, id);
+  const issueOf = (session: string, ref: { repoId: string; number: number }) => {
+    const issue = store.issue(repoOf(session, ref.repoId), ref.number);
+    if (!issue) throw new ProtocolError("not_found", `No issue or pull request #${ref.number} in that repository`);
+    return issue;
+  };
+  const pullOf = (session: string, ref: { repoId: string; number: number }) => {
+    const issue = issueOf(session, ref);
+    if (!issue.pull) throw new ProtocolError("not_found", `#${ref.number} is an issue, not a pull request`);
+    return issue as GitHubIssueRecord & { pull: NonNullable<GitHubIssueRecord["pull"]> };
+  };
+  const reviewCommentOf = (session: string, id: number) => store.reviewComments.get(session, String(id));
+  /** A conversation comment or a comment on the diff, whichever the id is. */
+  const anyComment = (session: string, id: number) => {
+    const review = store.reviewComments.find(String(id));
+    return review && store.reviewComments.owner(String(id)) === session
+      ? { review, comment: undefined }
+      : { review: undefined, comment: store.comments.get(session, String(id)) };
+  };
+  const checkRunOf = (session: string, id: number) => store.checkRuns.get(session, String(id));
+  const bytes = (content: string) => Buffer.from(content, "base64");
+  const changeMap = (list: ReadonlyArray<{ path: string; content: string | null }>) =>
+    new Map(list.map(({ path, content }) => [path.replace(/^\.?\//, ""), content === null ? null : bytes(content)]));
+
+  // --- The fixture ----------------------------------------------------------------------------
+
+  router.route({
+    method: "get",
+    path: "",
+    summary: "The GitHub fixture: the agent's App, the org, and where the agent reaches the fake",
+    response: GitHubFixture,
+    factory: { on: "Session", name: "github" },
+    stability,
+    handler: () => ({ app: appWire(), apiUrl: deps.apiUrl(), org: store.org.login }),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users",
+    summary: "Create a person in the org",
+    body: z
+      .object({
+        login: z.string().min(1),
+        id: z.number().int().positive().optional(),
+        name: z.string().optional(),
+        email: z.string().optional(),
+        role: z.enum(["member", "admin", "outside_collaborator"]).optional(),
+      })
+      .openapi("GitHubUserOptions"),
+    response: GitHubUser,
+    factory: { on: "GitHubFixture", name: "createUser", options: ["login", "id", "name", "email", "role"] },
+    stability,
+    handler: ({ session, body }) => userWire(repos.createUser(session.id, body)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/repos",
+    summary:
+      "Create a repository in the org. The App hears about it only when it is listed in `apps`: an App must be installed on a repository",
+    body: z
+      .object({
+        name: z.string().min(1).optional(),
+        private: z.boolean().optional(),
+        defaultBranch: z.string().min(1).optional(),
+        files: files().optional(),
+        collaborators: z
+          .array(
+            z
+              .object({
+                user: userRef,
+                permission: z.enum(["read", "triage", "write", "maintain", "admin"]).default("write"),
+              })
+              .openapi({ "x-channelstack-shorthand": "user" }),
+          )
+          .optional(),
+        apps: z.array(z.string().openapi(refTo("GitHubApp"))).optional(),
+        labels: z
+          .array(
+            z
+              .object({ name: z.string().min(1), color: z.string().optional(), description: z.string().optional() })
+              .openapi({ "x-channelstack-shorthand": "name" }),
+          )
+          .optional(),
+      })
+      .openapi("GitHubRepoOptions"),
+    response: GitHubRepo,
+    factory: {
+      on: "GitHubFixture",
+      name: "createRepo",
+      options: ["name", "private", "defaultBranch", "files", "collaborators", "apps", "labels"],
+    },
+    stability,
+    handler: async ({ session, body }) =>
+      repoWire(
+        await repos.createRepo(session.id, {
+          name: body.name,
+          private: body.private,
+          defaultBranch: body.defaultBranch,
+          files: body.files?.map((file) => ({ path: file.path, content: bytes(file.content) })),
+          collaborators: body.collaborators?.map(({ user, permission }) => ({
+            user: person(session.id, user),
+            permission,
+          })),
+          installed: (body.apps?.length ?? 0) > 0,
+          labels: body.labels,
+        }),
+      ),
+  });
+
+  router.route({
+    method: "post",
+    path: "/installation-id",
+    summary: "The id of the App's installation, for a repository it is installed on",
+    body: z.object({ repo: repoRef }).openapi("GitHubInstallationIdBody"),
+    response: z.number().int(),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubApp", name: "installationId", args: ["repo"] },
+    stability,
+    handler: ({ session, body }) => {
+      const repo = repoOf(session.id, body.repo);
+      if (!repo.installed)
+        throw new ProtocolError("not_found", `The App isn't installed on ${repo.owner}/${repo.name}`);
+      return store.app.installationId;
+    },
+  });
+
+  // --- Repositories -----------------------------------------------------------------------------
+
+  for (const [path, name, installed] of [
+    ["install", "installApp", true],
+    ["uninstall", "uninstallApp", false],
+  ] as const) {
+    router.route({
+      method: "post",
+      path: `/repos/{repo}/${path}`,
+      summary: installed
+        ? "Install the App on this repository. Sends `installation_repositories`"
+        : "Take the App off this repository. Sends `installation_repositories`",
+      params: RepoParams,
+      body: z
+        .object({ app: z.string().openapi(refTo("GitHubApp")) })
+        .openapi(`GitHub${installed ? "Install" : "Uninstall"}Body`),
+      response: GitHubDelivery.nullable(),
+      errors: ["not_found", "validation_failed"],
+      sdkMethod: { on: "GitHubRepo", name, args: ["app"] },
+      stability,
+      handler: ({ session, params }) =>
+        caused(session.id, repos.setInstalled(repoOf(session.id, params.repo), installed)),
+    });
+  }
+
+  router.route({
+    method: "get",
+    path: "/repos/{repo}/issue",
+    summary: "An issue of this repository by its number",
+    params: RepoParams,
+    query: z.object({
+      number: z.coerce
+        .number()
+        .int()
+        .openapi({ param: { name: "number", in: "query", required: true }, type: "integer" }),
+    }),
+    response: GitHubIssue,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubRepo", name: "issue", args: ["number"] },
+    stability,
+    handler: ({ session, params, query }) =>
+      issueWire(issueOf(session.id, { repoId: params.repo, number: query.number })),
+  });
+
+  router.route({
+    method: "get",
+    path: "/repos/{repo}/pull",
+    summary: "A pull request of this repository by its number",
+    params: RepoParams,
+    query: z.object({
+      number: z.coerce
+        .number()
+        .int()
+        .openapi({ param: { name: "number", in: "query", required: true }, type: "integer" }),
+    }),
+    response: GitHubPullRequest,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubRepo", name: "pullRequest", args: ["number"] },
+    stability,
+    handler: ({ session, params, query }) =>
+      pullWire(pullOf(session.id, { repoId: params.repo, number: query.number })),
+  });
+
+  router.route({
+    method: "get",
+    path: "/repos/{repo}/file",
+    summary: "A file's text as it is on a branch (the default branch without `ref`), or nothing when it isn't there",
+    params: RepoParams,
+    query: z.object({
+      path: z.string().openapi({ param: { name: "path", in: "query" } }),
+      ref: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "ref", in: "query" } }),
+    }),
+    response: z.string().nullable(),
+    errors: ["not_found"],
+    // The agent writes files after it hears about something: read once it has gone quiet.
+    sdkMethod: { on: "GitHubRepo", name: "readFile", args: ["path"], options: ["ref"], onceQuiet: true },
+    stability,
+    handler: async ({ session, params, query }) => {
+      const content = await repos.readFile(repoOf(session.id, params.repo), query.path, query.ref);
+      return content === undefined ? null : Buffer.from(content).toString("utf8");
+    },
+  });
+
+  router.route({
+    method: "get",
+    path: "/repos/{repo}/commits",
+    summary: "The commits of a branch (the default branch without `branch`), newest first",
+    params: RepoParams,
+    query: z.object({
+      branch: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "branch", in: "query" } }),
+    }),
+    response: z.array(GitHubCommit).openapi("GitHubCommits"),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubRepo", name: "commits", options: ["branch"] },
+    stability,
+    handler: async ({ session, params, query }) => {
+      const repo = repoOf(session.id, params.repo);
+      const branch = query.branch ?? repo.defaultBranch;
+      const tip = await git.branch(kit.dir(repo), branch);
+      if (!tip) throw new ProtocolError("not_found", `No branch "${branch}" in ${repo.owner}/${repo.name}`);
+      return (await git.log(kit.dir(repo), tip)).map((info) => commitWire(repo, info, branch));
+    },
+  });
+
+  router.route({
+    method: "get",
+    path: "/repos/{repo}/commits/{sha}/check-runs",
+    summary: "The check runs on this commit: the newest of each name",
+    params: CommitParams,
+    response: z.array(GitHubCheckRun).openapi("GitHubCheckRuns"),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubCommit", name: "checkRuns", bind: commitBinding },
+    stability,
+    handler: ({ session, params }) => checks.latest(repoOf(session.id, params.repo), params.sha).map(checkRunWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/repos/{repo}/commits/{sha}/statuses",
+    summary: "The commit statuses on this commit: the newest of each context",
+    params: CommitParams,
+    response: z
+      .array(
+        z.object({
+          context: z.string(),
+          state: z.enum(["pending", "success", "failure", "error"]),
+          author: GitHubAuthor,
+        }),
+      )
+      .openapi("GitHubStatuses"),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubCommit", name: "statuses", bind: commitBinding },
+    stability,
+    handler: ({ session, params }) => {
+      const byContext = new Map(
+        store.statusesOf(repoOf(session.id, params.repo), params.sha).map((status) => [status.context, status]),
+      );
+      return [...byContext.values()].map((status) => ({
+        context: status.context,
+        state: status.state,
+        author: authorWire(status.creator),
+      }));
+    },
+  });
+
+  // --- What people do: code ---------------------------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/push",
+    summary:
+      "Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it",
+    params: UserParams,
+    body: z
+      .object({ changes: changes(), repo: repoRef, branch: z.string().min(1), message: z.string().optional() })
+      .openapi("GitHubPushBody"),
+    response: GitHubCommit,
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "push", args: ["changes"], options: ["repo", "branch", "message"] },
+    stability,
+    handler: async ({ session, params, body }) => {
+      const repo = repoOf(session.id, body.repo);
+      const actor = person(session.id, params.user);
+      kit.allow(repo, actor, "write");
+      kit.action(repo, "push", { user: actor, branch: body.branch });
+      const paths = body.changes.map((change) => change.path);
+      const message = body.message ?? `Update ${paths.length === 1 ? paths[0] : `${paths.length} files`}`;
+      const { sha } = await repos.commitTo(repo, actor, body.branch, changeMap(body.changes), message);
+      const info = await git.readCommit(kit.dir(repo), sha);
+      if (!info) throw new ProtocolError("internal", "The commit that was just made is gone");
+      return commitWire(repo, info, body.branch);
+    },
+  });
+
+  // --- What people do: issues and pull requests -----------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/issues",
+    summary: "Open an issue. Sends `issues` (action `opened`)",
+    params: UserParams,
+    body: z
+      .object({
+        issue: z.object({
+          title: z.string().min(1),
+          body: z.string().optional(),
+          labels: z.array(z.string()).optional(),
+          assignees: z.array(authorRef).optional(),
+        }),
+        repo: repoRef,
+      })
+      .openapi("GitHubOpenIssueBody"),
+    response: GitHubIssue,
+    errors: ["not_found", "forbidden", "validation_failed"],
+    sdkMethod: { on: "GitHubUser", name: "openIssue", args: ["issue"], options: ["repo"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const repo = repoOf(session.id, body.repo);
+      const actor = person(session.id, params.user);
+      kit.allow(repo, actor, "read");
+      // Only people who can triage may label and assign; from anyone else GitHub drops both silently.
+      const triage = kit.can(repo, actor, "triage");
+      kit.action(repo, "openIssue", { user: actor, title: body.issue.title });
+      const { issue } = issues.openIssue(repo, actor, {
+        title: body.issue.title,
+        body: body.issue.body,
+        labels: triage ? body.issue.labels : [],
+        assignees: triage ? body.issue.assignees?.map((id) => author(session.id, id)) : [],
+      });
+      return issueWire(issue);
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/pulls",
+    summary:
+      "Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`)",
+    params: UserParams,
+    body: z
+      .object({
+        pr: z.object({
+          from: z.string().min(1),
+          to: z.string().optional(),
+          title: z.string().optional(),
+          body: z.string().optional(),
+          changes: changes().optional(),
+          draft: z.boolean().optional(),
+          reviewers: z.array(authorRef).optional(),
+        }),
+        repo: repoRef,
+      })
+      .openapi("GitHubOpenPullRequestBody"),
+    response: GitHubPullRequest,
+    errors: ["not_found", "forbidden", "validation_failed"],
+    sdkMethod: { on: "GitHubUser", name: "openPullRequest", args: ["pr"], options: ["repo"] },
+    stability,
+    handler: async ({ session, params, body }) => {
+      const repo = repoOf(session.id, body.repo);
+      const actor = person(session.id, params.user);
+      const { pr } = body;
+      kit.allow(repo, actor, pr.changes ? "write" : "read");
+      kit.action(repo, "openPullRequest", { user: actor, from: pr.from });
+      if (pr.changes) {
+        const paths = pr.changes.map((change) => change.path);
+        const message = pr.title ?? `Update ${paths.length === 1 ? paths[0] : `${paths.length} files`}`;
+        await repos.commitTo(repo, actor, pr.from, changeMap(pr.changes), message);
+      }
+      const { issue } = await pulls.openPull(repo, actor, {
+        head: pr.from,
+        base: pr.to,
+        title: pr.title,
+        body: pr.body,
+        draft: pr.draft,
+      });
+      if (pr.reviewers?.length) {
+        pulls.requestReviewers(
+          issue,
+          actor,
+          pr.reviewers.map((id) => author(session.id, id)),
+        );
+      }
+      return pullWire(issue);
+    },
+  });
+
+  /** May this person change an issue someone else opened? Its author always may. */
+  const mayChange = (issue: GitHubIssueRecord, actor: number) =>
+    kit.allow(store.repo(issue.repo), actor, issue.author === actor ? "read" : "triage");
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/edit-issue",
+    summary:
+      "Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`)",
+    params: UserParams,
+    body: z
+      .object({
+        changes: z.object({ title: z.string().min(1).optional(), body: z.string().optional() }),
+        issue: issueRef,
+      })
+      .openapi("GitHubEditIssueBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "editIssue", args: ["changes"], options: ["issue"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const issue = issueOf(session.id, body.issue);
+      const actor = person(session.id, params.user);
+      mayChange(issue, actor);
+      kit.action(store.repo(issue.repo), "editIssue", { user: actor, number: issue.number });
+      return caused(session.id, issues.updateIssue(issue, actor, body.changes));
+    },
+  });
+
+  for (const [path, state] of [
+    ["close", "closed"],
+    ["reopen", "open"],
+  ] as const) {
+    router.route({
+      method: "post",
+      path: `/users/{user}/${path}`,
+      summary: `${path === "close" ? "Close" : "Reopen"} an issue or a pull request. Sends \`issues\` or \`pull_request\` (action \`${path === "close" ? "closed" : "reopened"}\`)`,
+      params: UserParams,
+      body: z.object({ issue: issueRef }).openapi(`GitHub${path === "close" ? "Close" : "Reopen"}Body`),
+      response: GitHubDelivery.nullable(),
+      errors: ["not_found", "forbidden", "validation_failed"],
+      sdkMethod: { on: "GitHubUser", name: path, options: ["issue"] },
+      stability,
+      handler: ({ session, params, body }) => {
+        const issue = issueOf(session.id, body.issue);
+        const actor = person(session.id, params.user);
+        mayChange(issue, actor);
+        kit.action(store.repo(issue.repo), path, { user: actor, number: issue.number });
+        return caused(session.id, issues.updateIssue(issue, actor, { state }));
+      },
+    });
+  }
+
+  for (const name of ["label", "unlabel"] as const) {
+    router.route({
+      method: "post",
+      path: `/users/{user}/${name}`,
+      summary:
+        name === "label"
+          ? "Put labels on an issue or a pull request. Sends one `labeled` event per label"
+          : "Take labels off an issue or a pull request. Sends one `unlabeled` event per label",
+      params: UserParams,
+      body: z
+        .object({
+          labels: z.array(z.string().min(1)).min(1).openapi({ "x-channelstack-one-or-many": true }),
+          issue: issueRef,
+        })
+        .openapi(`GitHub${name === "label" ? "Label" : "Unlabel"}Body`),
+      response: z.array(GitHubDelivery).openapi(`GitHub${name === "label" ? "Label" : "Unlabel"}Deliveries`),
+      errors: ["not_found", "forbidden"],
+      sdkMethod: { on: "GitHubUser", name, args: ["labels"], options: ["issue"] },
+      stability,
+      handler: ({ session, params, body }) => {
+        const issue = issueOf(session.id, body.issue);
+        const repo = store.repo(issue.repo);
+        const actor = person(session.id, params.user);
+        kit.allow(repo, actor, "triage");
+        // A person picks from the labels the repository has.
+        const unknown = body.labels.filter((label) => !repo.labels.has(label.toLowerCase()));
+        if (unknown.length > 0) {
+          throw new ProtocolError(
+            "not_found",
+            `${repo.owner}/${repo.name} has no label ${unknown.map((label) => `"${label}"`).join(", ")}. Its labels: ${[...repo.labels.values()].map((label) => label.name).join(", ")}`,
+          );
+        }
+        kit.action(repo, name, { user: actor, number: issue.number, labels: body.labels });
+        return delivered(
+          session.id,
+          name === "label"
+            ? issues.addLabels(issue, actor, body.labels)
+            : issues.removeLabels(issue, actor, body.labels),
+        );
+      },
+    });
+  }
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/assign",
+    summary: "Assign people or the App's bot. Sends one `assigned` event per assignee",
+    params: UserParams,
+    body: z.object({ assignees: authors(), issue: issueRef }).openapi("GitHubAssignBody"),
+    response: z.array(GitHubDelivery).openapi("GitHubAssignDeliveries"),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "assign", args: ["assignees"], options: ["issue"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const issue = issueOf(session.id, body.issue);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(issue.repo), actor, "triage");
+      kit.action(store.repo(issue.repo), "assign", { user: actor, number: issue.number });
+      return delivered(
+        session.id,
+        issues.assign(
+          issue,
+          actor,
+          body.assignees.map((id) => author(session.id, id)),
+        ),
+      );
+    },
+  });
+
+  // --- What people do: the conversation -------------------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/comment",
+    summary: "Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`)",
+    params: UserParams,
+    body: z.object({ body: z.string().min(1), issue: issueRef }).openapi("GitHubCommentBody"),
+    response: GitHubComment,
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "comment", args: ["body"], options: ["issue"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const issue = issueOf(session.id, body.issue);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(issue.repo), actor, "read");
+      kit.action(store.repo(issue.repo), "comment", { user: actor, number: issue.number });
+      return commentWire(session.id, issues.comment(issue, actor, body.body));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/edit",
+    summary: "Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`",
+    params: UserParams,
+    body: z.object({ body: z.string().min(1), comment: commentRef }).openapi("GitHubEditBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "edit", args: ["body"], options: ["comment"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const actor = person(session.id, params.user);
+      const { review, comment } = anyComment(session.id, body.comment);
+      const target = review ?? comment;
+      // GitHub lets you edit your own comment; someone else's needs write access.
+      kit.allow(store.repo(target.repo), actor, target.author === actor ? "read" : "write");
+      kit.action(store.repo(target.repo), "edit", { user: actor, comment: target.id });
+      return caused(
+        session.id,
+        review
+          ? pulls.editReviewComment(kit.requirePull(store.repo(review.repo), review.pull), review, body.body)
+          : issues.editComment(comment, actor, body.body),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/delete",
+    summary: "Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`",
+    params: UserParams,
+    body: z.object({ comment: commentRef }).openapi("GitHubDeleteBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "delete", options: ["comment"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const actor = person(session.id, params.user);
+      const { review, comment } = anyComment(session.id, body.comment);
+      const target = review ?? comment;
+      kit.allow(store.repo(target.repo), actor, target.author === actor ? "read" : "write");
+      kit.action(store.repo(target.repo), "delete", { user: actor, comment: target.id });
+      return caused(
+        session.id,
+        review
+          ? pulls.deleteReviewComment(kit.requirePull(store.repo(review.repo), review.pull), review)
+          : issues.deleteComment(comment, actor),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/react",
+    summary: "React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction",
+    params: UserParams,
+    body: z
+      .object({ content: z.enum(REACTIONS), issue: issueRef.optional(), comment: commentRef.optional() })
+      .openapi("GitHubReactBody"),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "react", args: ["content"], options: ["issue", "comment"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const actor = person(session.id, params.user);
+      if ((body.issue === undefined) === (body.comment === undefined)) {
+        throw new ProtocolError("invalid_argument", "React to one thing: an issue or a comment");
+      }
+      const found = body.comment === undefined ? undefined : anyComment(session.id, body.comment);
+      const target = body.issue ? issueOf(session.id, body.issue) : (found?.review ?? found?.comment);
+      if (!target) throw new ProtocolError("not_found", "Nothing to react to");
+      kit.allow(store.repo(target.repo), actor, "read");
+      kit.action(store.repo(target.repo), "react", { user: actor, content: body.content });
+      issues.react(target, actor, body.content);
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/minimize",
+    summary: "Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it",
+    params: UserParams,
+    body: z
+      .object({
+        comment: z.number().int().openapi(refTo("GitHubComment")),
+        reason: z.enum(["OUTDATED", "SPAM", "OFF_TOPIC", "RESOLVED"]).default("OUTDATED"),
+      })
+      .openapi("GitHubMinimizeBody"),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "minimize", options: ["comment", "reason"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const actor = person(session.id, params.user);
+      const comment = store.comments.get(session.id, String(body.comment));
+      kit.allow(store.repo(comment.repo), actor, comment.author === actor ? "read" : "triage");
+      kit.action(store.repo(comment.repo), "minimize", { user: actor, comment: comment.id, reason: body.reason });
+      issues.minimize(comment, body.reason);
+    },
+  });
+
+  // --- What people do: reviews --------------------------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/review",
+    summary:
+      "Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment",
+    params: UserParams,
+    body: z
+      .object({
+        review: z.object({
+          pr: pullRef,
+          event: z.enum(["COMMENT", "APPROVE", "REQUEST_CHANGES"]),
+          body: z.string().optional(),
+          comments: z
+            .array(
+              z.object({
+                path: z.string().min(1),
+                line: z.number().int().positive(),
+                side: z.enum(["LEFT", "RIGHT"]).optional(),
+                startLine: z.number().int().positive().optional(),
+                body: z.string().min(1),
+              }),
+            )
+            .optional(),
+        }),
+      })
+      .openapi("GitHubReviewBody"),
+    response: GitHubReview,
+    errors: ["not_found", "forbidden", "validation_failed"],
+    sdkMethod: { on: "GitHubUser", name: "review", args: ["review"] },
+    stability,
+    handler: async ({ session, params, body }) => {
+      const pull = pullOf(session.id, body.review.pr);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(pull.repo), actor, "read");
+      kit.action(store.repo(pull.repo), "review", { user: actor, number: pull.number, event: body.review.event });
+      const { review } = await pulls.review(pull, actor, body.review);
+      return reviewWire(session.id, review);
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/review-comment",
+    summary: "One comment on the diff, outside a review. Sends `pull_request_review_comment`",
+    params: UserParams,
+    body: z
+      .object({
+        body: z.string().min(1),
+        pr: pullRef,
+        path: z.string().min(1),
+        line: z.number().int().positive(),
+        side: z.enum(["LEFT", "RIGHT"]).optional(),
+      })
+      .openapi("GitHubReviewCommentBody"),
+    response: GitHubReviewComment,
+    errors: ["not_found", "forbidden", "validation_failed"],
+    sdkMethod: { on: "GitHubUser", name: "reviewComment", args: ["body"], options: ["pr", "path", "line", "side"] },
+    stability,
+    handler: async ({ session, params, body }) => {
+      const pull = pullOf(session.id, body.pr);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(pull.repo), actor, "read");
+      kit.action(store.repo(pull.repo), "reviewComment", { user: actor, number: pull.number, path: body.path });
+      return reviewCommentWire(session.id, await pulls.reviewComment(pull, actor, body));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/reply",
+    summary: "Reply in a thread on the diff. Sends `pull_request_review_comment`",
+    params: UserParams,
+    body: z.object({ body: z.string().min(1), comment: reviewCommentRef }).openapi("GitHubReplyBody"),
+    response: GitHubReviewComment,
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "reply", args: ["body"], options: ["comment"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const to = reviewCommentOf(session.id, body.comment);
+      const pull = kit.requirePull(store.repo(to.repo), to.pull);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(to.repo), actor, "read");
+      kit.action(store.repo(to.repo), "reply", { user: actor, comment: to.id });
+      return reviewCommentWire(session.id, pulls.reply(pull, actor, to, body.body));
+    },
+  });
+
+  for (const name of ["resolve", "unresolve"] as const) {
+    router.route({
+      method: "post",
+      path: `/users/{user}/${name}`,
+      summary: `${name === "resolve" ? "Resolve" : "Reopen"} a thread on the diff. Sends \`pull_request_review_thread\``,
+      params: UserParams,
+      body: z
+        .object({ comment: reviewCommentRef })
+        .openapi(`GitHub${name === "resolve" ? "Resolve" : "Unresolve"}Body`),
+      response: GitHubDelivery.nullable(),
+      errors: ["not_found", "forbidden"],
+      sdkMethod: { on: "GitHubUser", name, options: ["comment"] },
+      stability,
+      handler: ({ session, params, body }) => {
+        const comment = reviewCommentOf(session.id, body.comment);
+        const pull = kit.requirePull(store.repo(comment.repo), comment.pull);
+        const actor = person(session.id, params.user);
+        // Whoever opened the pull request or started the thread may resolve it; anyone else needs write access.
+        const own = pull.author === actor || pulls.rootOf(comment).author === actor;
+        kit.allow(store.repo(comment.repo), actor, own ? "read" : "write");
+        kit.action(store.repo(comment.repo), name, { user: actor, comment: comment.id });
+        return caused(session.id, pulls.setResolved(pull, actor, comment, name === "resolve"));
+      },
+    });
+  }
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/request-review",
+    summary:
+      "Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer",
+    params: UserParams,
+    body: z.object({ reviewers: authors(), pr: pullRef }).openapi("GitHubRequestReviewBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden", "validation_failed"],
+    sdkMethod: { on: "GitHubUser", name: "requestReview", args: ["reviewers"], options: ["pr"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const pull = pullOf(session.id, body.pr);
+      const actor = person(session.id, params.user);
+      mayChange(pull, actor);
+      kit.action(store.repo(pull.repo), "requestReview", { user: actor, number: pull.number });
+      const sent = pulls.requestReviewers(
+        pull,
+        actor,
+        body.reviewers.map((id) => author(session.id, id)),
+      );
+      return caused(
+        session.id,
+        sent.find((guid) => guid !== undefined),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/mark-ready",
+    summary: "Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`)",
+    params: UserParams,
+    body: z.object({ pr: pullRef }).openapi("GitHubMarkReadyBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden", "validation_failed"],
+    sdkMethod: { on: "GitHubUser", name: "markReady", options: ["pr"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const pull = pullOf(session.id, body.pr);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(pull.repo), actor, pull.author === actor ? "read" : "write");
+      kit.action(store.repo(pull.repo), "markReady", { user: actor, number: pull.number });
+      return caused(session.id, pulls.markReady(pull, actor));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/merge",
+    summary: "Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged)",
+    params: UserParams,
+    body: z
+      .object({ pr: pullRef, method: z.enum(["merge", "squash", "rebase"]).default("merge") })
+      .openapi("GitHubMergeBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden", "not_allowed"],
+    sdkMethod: { on: "GitHubUser", name: "merge", options: ["pr", "method"] },
+    stability,
+    handler: async ({ session, params, body }) => {
+      const pull = pullOf(session.id, body.pr);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(pull.repo), actor, "write");
+      kit.action(store.repo(pull.repo), "merge", { user: actor, number: pull.number, method: body.method });
+      return caused(session.id, (await pulls.merge(pull, actor, { method: body.method })).delivery);
+    },
+  });
+
+  // --- What people do: checks -----------------------------------------------------------------------
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/rerun",
+    summary: 'Click "Re-run" on a check run. Sends `check_run` (action `rerequested`)',
+    params: UserParams,
+    body: z.object({ checkRun: checkRunRef }).openapi("GitHubRerunBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden"],
+    sdkMethod: { on: "GitHubUser", name: "rerun", options: ["checkRun"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const run = checkRunOf(session.id, body.checkRun);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(run.repo), actor, "write");
+      return caused(session.id, checks.rerun(run, actor));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/request-action",
+    summary: "Click one of the buttons the App put on a check run. Sends `check_run` (action `requested_action`)",
+    params: UserParams,
+    body: z.object({ identifier: z.string().min(1), checkRun: checkRunRef }).openapi("GitHubRequestActionBody"),
+    response: GitHubDelivery.nullable(),
+    errors: ["not_found", "forbidden"],
+    // The button is there once the App has put it there: a person would wait for it.
+    sdkMethod: { on: "GitHubUser", name: "requestAction", args: ["identifier"], options: ["checkRun"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const run = checkRunOf(session.id, body.checkRun);
+      const actor = person(session.id, params.user);
+      kit.allow(store.repo(run.repo), actor, "write");
+      return caused(session.id, checks.requestAction(run, actor, body.identifier));
+    },
+  });
+
+  // --- Reading an issue ---------------------------------------------------------------------------
+
+  const issueRead = <R extends z.ZodType>(
+    path: string,
+    name: string,
+    summary: string,
+    response: R,
+    read: (issue: GitHubIssueRecord, session: string) => z.input<R>,
+    extra: { on?: string; onceQuiet?: boolean; waits?: Parameters<DriverRouter["route"]>[0]["waits"] } = {},
+  ) =>
+    router.route({
+      method: "get",
+      path: `/repos/{repo}/issues/{number}${path}`,
+      summary,
+      params: IssueParams,
+      response,
+      errors: ["not_found"],
+      sdkMethod: {
+        on: extra.on ?? "GitHubIssue",
+        name,
+        bind: issueBinding,
+        ...(extra.onceQuiet ? { onceQuiet: true } : {}),
+      },
+      ...(extra.waits ? { waits: extra.waits } : {}),
+      stability,
+      handler: ({ session, params }) =>
+        read(issueOf(session.id, { repoId: params.repo, number: params.number }), session.id) as never,
+    });
+
+  issueRead("", "refresh", "Read the issue again", GitHubIssue, issueWire);
+  issueRead("/title", "title", "The issue's title as it is now", z.string(), (issue) => issue.title);
+  issueRead(
+    "/state",
+    "state",
+    "Open or closed, once the agent is quiet",
+    z.enum(["open", "closed"]),
+    (issue) => issue.state,
+    {
+      onceQuiet: true,
+    },
+  );
+  issueRead("/labels", "labels", "The names of the labels on it", z.array(z.string()), (issue) => [...issue.labels]);
+  issueRead("/assignees", "assignees", "Who it is assigned to", z.array(GitHubAuthor), (issue) =>
+    issue.assignees.map(authorWire),
+  );
+  issueRead(
+    "/comments",
+    "comments",
+    "The comments of the conversation, oldest first",
+    z.array(GitHubComment).openapi("GitHubComments"),
+    (issue, session) =>
+      store.commentsOn(store.repo(issue.repo), issue.number).map((comment) => commentWire(session, comment)),
+    {
+      waits: [
+        { name: "waitForComment", mode: "next", from: "author", text: "body", what: "a comment" },
+        { name: "latestComment", mode: "latest", from: "author", what: "a comment" },
+      ],
+    },
+  );
+  issueRead(
+    "/transcript",
+    "transcript",
+    "The issue or pull request as a person reads it: description, comments, reviews and threads",
+    GitHubTranscript,
+    (issue) => {
+      const repo = store.repo(issue.repo);
+      return renderTranscript(
+        {
+          issue,
+          comments: store.commentsOn(repo, issue.number),
+          reviews: store.reviewsOf(repo, issue.number),
+          reviewComments: store.reviewCommentsOf(repo, issue.number),
+        },
+        principal,
+      );
+    },
+  );
+
+  // --- Reading a pull request ---------------------------------------------------------------------
+
+  const pullRead = <R extends z.ZodType>(
+    path: string,
+    name: string,
+    summary: string,
+    response: R,
+    read: (pull: ReturnType<typeof pullOf>, session: string) => z.input<R> | Promise<z.input<R>>,
+    onceQuiet = false,
+  ) =>
+    router.route({
+      method: "get",
+      path: `/repos/{repo}/pulls/{number}${path}`,
+      summary,
+      params: IssueParams,
+      response,
+      errors: ["not_found"],
+      sdkMethod: { on: "GitHubPullRequest", name, bind: issueBinding, ...(onceQuiet ? { onceQuiet: true } : {}) },
+      stability,
+      handler: ({ session, params }) =>
+        read(pullOf(session.id, { repoId: params.repo, number: params.number }), session.id) as never,
+    });
+
+  pullRead("", "refresh", "Read the pull request again", GitHubPullRequest, pullWire);
+  pullRead(
+    "/head-commit",
+    "headCommit",
+    "The newest commit of the pull request's branch, once the agent is quiet",
+    GitHubCommit,
+    async (pull) => {
+      const repo = store.repo(pull.repo);
+      await repos.refreshPull(repo, pull);
+      const info = await git.readCommit(kit.dir(repo), pull.pull.headSha);
+      if (!info) throw new ProtocolError("not_found", "The pull request's head commit is gone");
+      return commitWire(repo, info, pull.pull.head);
+    },
+    true,
+  );
+  pullRead(
+    "/reviews",
+    "reviews",
+    "The submitted reviews, oldest first",
+    z.array(GitHubReview).openapi("GitHubReviews"),
+    (pull, session) =>
+      store
+        .reviewsOf(store.repo(pull.repo), pull.number)
+        .filter((review) => review.state !== "PENDING")
+        .map((review) => reviewWire(session, review)),
+  );
+  pullRead(
+    "/review-comments",
+    "reviewComments",
+    "The comments on the diff, oldest first",
+    z.array(GitHubReviewComment).openapi("GitHubReviewComments"),
+    (pull, session) =>
+      store.reviewCommentsOf(store.repo(pull.repo), pull.number).map((comment) => reviewCommentWire(session, comment)),
+  );
+  pullRead(
+    "/check-runs",
+    "checkRuns",
+    "The check runs on the pull request's newest commit: the newest of each name",
+    z.array(GitHubCheckRun).openapi("GitHubPullCheckRuns"),
+    async (pull) => {
+      const repo = store.repo(pull.repo);
+      await repos.refreshPull(repo, pull);
+      return checks.latest(repo, pull.pull.headSha).map(checkRunWire);
+    },
+  );
+  pullRead("/merged", "merged", "Has the pull request been merged?", z.boolean(), (pull) => pull.pull.merged);
+
+  // --- Reading comments ---------------------------------------------------------------------------
+
+  const CommentParams = z.object({ comment: numberParam("comment") });
+
+  router.route({
+    method: "get",
+    path: "/comments/{comment}",
+    summary: "Read a conversation comment again",
+    params: CommentParams,
+    response: GitHubComment,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubComment", name: "refresh" },
+    stability,
+    handler: ({ session, params }) => commentWire(session.id, store.comments.get(session.id, String(params.comment))),
+  });
+
+  router.route({
+    method: "get",
+    path: "/comments/{comment}/reactions",
+    summary: "The reactions on a conversation comment, by content",
+    params: CommentParams,
+    response: z
+      .array(z.object({ content: z.enum(REACTIONS), by: z.array(GitHubAuthor) }).openapi("GitHubReaction"))
+      .openapi("GitHubReactions"),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubComment", name: "reactions" },
+    stability,
+    handler: ({ session, params }) => {
+      const { reactions } = store.comments.get(session.id, String(params.comment));
+      return REACTIONS.filter((content) => reactions.some((reaction) => reaction.content === content)).map(
+        (content) => ({
+          content,
+          by: reactions.filter((reaction) => reaction.content === content).map((reaction) => authorWire(reaction.user)),
+        }),
+      );
+    },
+  });
+
+  /** The thread a comment on the diff is in: the comment that started it, then the replies. */
+  const threadOf = (session: string, id: number) => {
+    const root = pulls.rootOf(reviewCommentOf(session, id));
+    const all = store.reviewCommentsOf(store.repo(root.repo), root.pull);
+    return { root, replies: all.filter((comment) => comment.inReplyTo === root.id) };
+  };
+
+  router.route({
+    method: "get",
+    path: "/review-comments/{comment}/replies",
+    summary: "The replies in this comment's thread, once the agent is quiet",
+    params: CommentParams,
+    response: z.array(GitHubReviewComment).openapi("GitHubReviewCommentReplies"),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubReviewComment", name: "replies", onceQuiet: true },
+    stability,
+    handler: ({ session, params }) =>
+      threadOf(session.id, params.comment).replies.map((comment) => reviewCommentWire(session.id, comment)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/review-comments/{comment}/resolved",
+    summary: "Is this comment's thread resolved?",
+    params: CommentParams,
+    response: z.boolean(),
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubReviewComment", name: "resolved" },
+    stability,
+    handler: ({ session, params }) => threadOf(session.id, params.comment).root.resolved,
+  });
+
+  router.route({
+    method: "get",
+    path: "/review-comments/{comment}/transcript",
+    summary: "This comment's thread as a person reads it",
+    params: CommentParams,
+    response: GitHubTranscript,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubReviewComment", name: "transcript" },
+    stability,
+    handler: ({ session, params }) => {
+      const { root, replies } = threadOf(session.id, params.comment);
+      return renderTranscript({ comments: [], reviews: [], reviewComments: [root, ...replies] }, principal);
+    },
+  });
+
+  // --- Deliveries and calls -------------------------------------------------------------------------
+
+  const DeliveryParams = z.object({ delivery: pathParam("delivery") });
+
+  router.route({
+    method: "get",
+    path: "/deliveries",
+    summary: "Every webhook channelstack sent the agent for this session, with every attempt",
+    query: z.object({
+      type: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "type", in: "query" }, description: "Only this event, e.g. `issue_comment`." }),
+      resource: z
+        .string()
+        .optional()
+        .openapi({
+          param: { name: "resource", in: "query" },
+          description: "Only deliveries about this repository.",
+          ...refTo("GitHubRepo"),
+        }),
+    }),
+    response: z.array(GitHubDelivery).openapi("GitHubDeliveries"),
+    sdkMethod: { on: "GitHubFixture", name: "deliveries", options: ["type", "resource"] },
+    stability,
+    handler: ({ session, query }) =>
+      world
+        .deliveries(session.id)
+        .filter(({ request }) => query.type === undefined || request.type === query.type)
+        .filter(({ request }) => query.resource === undefined || String(request.meta?.repo) === query.resource)
+        .map(deliveryWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/deliveries/{delivery}",
+    summary: "Re-read a delivery: its attempts and status",
+    params: DeliveryParams,
+    response: GitHubDelivery,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubDelivery", name: "refresh" },
+    waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
+    stability,
+    handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/deliveries/{delivery}/redeliver",
+    summary: "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
+    params: DeliveryParams,
+    response: DeliveryAttempt,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubDelivery", name: "redeliver" },
+    stability,
+    handler: ({ session, params }) => world.redeliver(session.id, params.delivery),
+  });
+
+  router.route({
+    method: "post",
+    path: "/deliveries/{delivery}/resend",
+    summary: "Send the delivery again, unchanged or signed with a secret that isn't the App's",
+    params: DeliveryParams,
+    body: z.object({ badSignature: z.boolean().default(false) }).openapi("GitHubResendBody"),
+    response: DeliveryAttempt,
+    errors: ["not_found"],
+    sdkMethod: { on: "GitHubDelivery", name: "resend", options: ["badSignature"] },
+    stability,
+    handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+  });
+
+  router.route({
+    method: "get",
+    path: "/calls",
+    summary:
+      "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
+    query: CallsQuery,
+    response: z.array(GitHubApiCall).openapi("GitHubApiCalls"),
+    sdkMethod: { on: "GitHubFixture", name: "calls", options: ["operation", "error"] },
+    waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
+    stability,
+    handler: ({ session, query }) => readCalls(deps.events, session.id, "github", query),
+  });
+}

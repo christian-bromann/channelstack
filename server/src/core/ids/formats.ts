@@ -85,7 +85,18 @@ export const ID_FORMATS = {
   "github.comment": numeric(3_000_000_000, 3_999_999_999, /^3\d{9}$/),
   "github.review": numeric(3_000_000_000, 3_999_999_999, /^3\d{9}$/),
   "github.checkRun": numeric(50_000_000_000, 59_999_999_999, /^5\d{10}$/),
+  // An App's client id, as GitHub issues them now.
+  "github.clientId": {
+    pattern: /^Iv23li[A-Za-z0-9]{14}$/,
+    generate: (draw) => `Iv23li${draw.chars(14, `${UPPER_ALNUM}${LOWER_ALNUM.slice(10)}`)}`,
+  },
   "github.delivery": uuid,
+  // The id of a delivery in the App's delivery log (`/app/hook/deliveries`).
+  "github.hookDelivery": numeric(20_000_000_000, 29_999_999_999, /^2\d{10}$/),
+  "github.label": numeric(7_000_000_000, 7_999_999_999, /^7\d{9}$/),
+  "github.reaction": numeric(200_000_000, 299_999_999, /^2\d{8}$/),
+  "github.status": numeric(30_000_000_000, 39_999_999_999, /^3\d{10}$/),
+  "github.pull": numeric(2_000_000_000, 2_999_999_999, /^2\d{9}$/),
   "linear.uuid": uuid,
   "notion.uuid": uuid,
   "echo.app": echo("EA"),

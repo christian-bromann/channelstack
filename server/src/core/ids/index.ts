@@ -24,10 +24,16 @@ export function parseSeed(seed: string): number {
 const NODE_ID_PREFIX = {
   User: "U",
   Bot: "BOT",
+  Organization: "O",
   Repository: "R",
   Issue: "I",
   PullRequest: "PR",
   IssueComment: "IC",
+  PullRequestReview: "PRR",
+  PullRequestReviewComment: "PRRC",
+  CheckRun: "CR",
+  CheckSuite: "CS",
+  Label: "LA",
 } as const;
 
 /**
@@ -35,14 +41,17 @@ const NODE_ID_PREFIX = {
  * msgpack `[0, ...databaseIds]`. A user is `U_kgDO…`; an issue (repo id, issue id) is `I_kwDO…`.
  */
 export function githubNodeId(type: keyof typeof NODE_ID_PREFIX, databaseIds: readonly number[]): string {
-  const bytes = Buffer.alloc(2 + databaseIds.length * 5);
-  bytes[0] = 0x90 | (databaseIds.length + 1);
-  bytes[1] = 0x00;
-  databaseIds.forEach((id, i) => {
-    bytes[2 + i * 5] = 0xce;
-    bytes.writeUInt32BE(id, 3 + i * 5);
-  });
-  return `${NODE_ID_PREFIX[type]}_${bytes.toString("base64url")}`;
+  const parts: Buffer[] = [Buffer.from([0x90 | (databaseIds.length + 1), 0x00])];
+  for (const id of databaseIds) {
+    // msgpack: a 32-bit unsigned integer where it fits, 64 bits for the larger ids (check runs).
+    const wide = id > 0xffff_ffff;
+    const bytes = Buffer.alloc(wide ? 9 : 5);
+    bytes[0] = wide ? 0xcf : 0xce;
+    if (wide) bytes.writeBigUInt64BE(BigInt(id), 1);
+    else bytes.writeUInt32BE(id, 1);
+    parts.push(bytes);
+  }
+  return `${NODE_ID_PREFIX[type]}_${Buffer.concat(parts).toString("base64url")}`;
 }
 
 /**

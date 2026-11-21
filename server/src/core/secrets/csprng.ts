@@ -1,4 +1,4 @@
-import { randomBytes, randomInt } from "node:crypto";
+import { generateKeyPairSync, randomBytes, randomInt } from "node:crypto";
 
 /** The only source of randomness for anything secret. Ids use the seeded source in `core/ids` instead. */
 
@@ -17,4 +17,10 @@ export function randomToken(bytes = 32): string {
 /** A 32-bit seed for runs that don't set `CHANNELSTACK_SEED`. */
 export function randomSeed(): number {
   return randomInt(0x1_0000_0000);
+}
+
+/** A new RSA private key in PEM (PKCS#1), the form GitHub hands out for an App. */
+export function randomRsaPrivateKey(): string {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  return privateKey.export({ type: "pkcs1", format: "pem" }).toString();
 }

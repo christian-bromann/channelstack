@@ -54,8 +54,12 @@ export function emitPython(ir: Ir): Map<string, string> {
         return type.oneOrMany ? `${typeOf(type.items)} | list[${typeOf(type.items)}]` : `list[${typeOf(type.items)}]`;
       case "record":
         return `dict[str, ${typeOf(type.values)}]`;
-      case "object":
-        return "dict[str, Any]";
+      case "object": {
+        const short = type.fields.find((field) => field.name === type.shorthand);
+        return short ? `${typeOf(short.type)} | dict[str, Any]` : "dict[str, Any]";
+      }
+      case "files":
+        return type.mode === "tree" ? "TreeInput" : "ChangesInput";
       case "named":
       case "resource":
         return type.name;
@@ -137,8 +141,18 @@ export function emitPython(ir: Ir): Map<string, string> {
 
   const annotation = (field: IrField) => `${typeOf(field.type)}${field.optional ? " | None" : ""}`;
 
+  /** Does a value of this type have to be converted before it goes on the wire? */
+  const holdsRefs = (type: IrType): boolean =>
+    type.kind === "ref" ||
+    type.kind === "duration" ||
+    type.kind === "files" ||
+    (type.kind === "named" && isDataclass(type.name)) ||
+    (type.kind === "array" && (type.oneOrMany === true || holdsRefs(type.items))) ||
+    (type.kind === "object" && (type.shorthand !== undefined || type.fields.some((field) => holdsRefs(field.type))));
+
   /** An expression that turns a value into what goes on the wire: handles become their ids. */
   const encodeValue = (type: IrType, expr: string): string => {
+    if (!holdsRefs(type)) return expr;
     if (type.kind === "ref") {
       const idFields = index.refIdFields(type.resources);
       const [only] = idFields;
@@ -147,13 +161,33 @@ export function emitPython(ir: Ir): Map<string, string> {
         : `{${idFields.map((id) => `${JSON.stringify(id)}: ${expr}.${snakeCase(id)}`).join(", ")}}`;
     }
     if (type.kind === "duration") return `parse_duration(${expr})`;
-    if (type.kind === "array" && (type.items.kind === "ref" || type.oneOrMany)) {
+    if (type.kind === "files") return `${type.mode === "tree" ? "read_tree" : "read_changes"}(${expr})`;
+    if (type.kind === "array") {
       const list = type.oneOrMany ? `(${expr} if isinstance(${expr}, list) else [${expr}])` : expr;
       const item = encodeValue(type.items, "item");
       return item === "item" ? list : `[${item} for item in ${list}]`;
     }
     // A named input type is a dataclass that knows its own wire form.
-    if (type.kind === "named" && isDataclass(type.name)) return `${expr}._to_wire()`;
+    if (type.kind === "named") return `${expr}._to_wire()`;
+    if (type.kind === "object") {
+      // An object argument is a dict with the API's own key names; what it holds is converted, and absent keys stay absent.
+      const converted = type.fields
+        .filter((field) => holdsRefs(field.type))
+        .map((field) => {
+          const key = JSON.stringify(field.name);
+          const value = encodeValue(field.type, `${expr}[${key}]`);
+          return `${key}: None if ${expr}.get(${key}) is None else ${value}`;
+        });
+      const whole =
+        converted.length > 0
+          ? `{key: value for key, value in {**${expr}, ${converted.join(", ")}}.items() if value is not None}`
+          : expr;
+      const short = type.fields.find((field) => field.name === type.shorthand);
+      if (!short) return whole;
+      // The value of one field stands for the whole object: a handle, or a plain string.
+      const given = short.type.kind === "ref" ? `(${short.type.resources.join(", ")},)` : "str";
+      return `({${JSON.stringify(short.name)}: ${encodeValue(short.type, expr)}} if isinstance(${expr}, ${given}) else ${whole})`;
+    }
     return expr;
   };
 
@@ -186,7 +220,7 @@ export function emitPython(ir: Ir): Map<string, string> {
         if (typeof part === "string") return part;
         return part.from === "session"
           ? "{quote(session_of(ctx), safe='')}"
-          : `{quote(self.${snakeCase(part.field ?? "")}, safe='')}`;
+          : `{quote(str(self.${snakeCase(part.field ?? "")}), safe='')}`;
       })
       .join("");
     const params = [...m.args, ...m.options];
@@ -265,6 +299,14 @@ export function emitPython(ir: Ir): Map<string, string> {
 
   const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
   const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
+  const usesFiles = JSON.stringify(ir).includes('"kind":"files"');
+
+  /** Does a resource this one extends already keep the `_seen` map its waits use? */
+  const inheritsSeen = (resource: IrResource): boolean => {
+    if (resource.extends === undefined) return false;
+    const parent = index.resource(resource.extends);
+    return (parent.waits ?? []).some((w) => w.mode === "next") || inheritsSeen(parent);
+  };
 
   const resourceClass = (resource: IrResource): string[] => {
     const isRoot = resource.name === ir.root;
@@ -273,7 +315,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     return [
       "",
       "",
-      `class ${resource.name}${isRoot ? "(ClientBase)" : ""}:`,
+      `class ${resource.name}${isRoot ? "(ClientBase)" : resource.extends === undefined ? "" : `(${resource.extends})`}:`,
       ...(isRoot
         ? [
             "    def __init__(self, transport: Transport, stop: Callable[[], Awaitable[None]]) -> None:",
@@ -282,11 +324,17 @@ export function emitPython(ir: Ir): Map<string, string> {
           ]
         : [
             "    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:",
-            "        self._ctx = ctx",
-            ...(waits.some((w) => w.mode === "next") ? ["        self._seen: dict[str, int] = {}"] : []),
-            ...resource.fields.map(
-              (field) => `        self.${snakeCase(field.name)}: ${annotation(field)} = ${fieldDecode(field, "data")}`,
-            ),
+            ...(resource.extends === undefined ? ["        self._ctx = ctx"] : ["        super().__init__(ctx, data)"]),
+            // A handle that extends another shares its parent's place in the lists it waits on.
+            ...(waits.some((w) => w.mode === "next") && !inheritsSeen(resource)
+              ? ["        self._seen: dict[str, int] = {}"]
+              : []),
+            ...index
+              .ownFields(resource)
+              .map(
+                (field) =>
+                  `        self.${snakeCase(field.name)}: ${annotation(field)} = ${fieldDecode(field, "data")}`,
+              ),
           ]),
       ...resource.methods.flatMap(method),
       ...waits.flatMap((w) => wait(resource, w)),
@@ -371,6 +419,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...(usesDurations || allWaits.length > 0
       ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
       : []),
+    ...(usesFiles ? ["from ..runtime.files import ChangesInput, TreeInput, read_changes, read_tree"] : []),
     "from ..runtime.transport import ChannelstackError, Transport",
     ...(waitImports.length > 0 ? [`from ..runtime.wait import ${waitImports.join(", ")}`] : []),
     "",

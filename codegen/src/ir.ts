@@ -25,6 +25,11 @@ export interface IrResource {
   idFields?: string[];
   /** This resource is the session: its id is the `{session}` of everything created through it. */
   scope?: "session";
+  /**
+   * The resource this one is a kind of: a pull request is an issue. It has every field and method
+   * of its parent (its own `fields` list them too), and goes wherever the parent is accepted.
+   */
+  extends?: string;
   fields: IrField[];
   methods: IrMethod[];
   /** Waits built on this handle's list reads: `thread.waitForReply()`. */
@@ -75,7 +80,13 @@ export type IrType =
   /** `oneOrMany`: as an argument, a single item is accepted in place of a list of one. */
   | { kind: "array"; items: IrType; oneOrMany?: true }
   | { kind: "record"; values: IrType }
-  | { kind: "object"; fields: IrField[] }
+  /** `shorthand`: as an argument, the value of that one field stands for the whole object (`[ana]` for `[{ user: ana }]`). */
+  | { kind: "object"; fields: IrField[]; shorthand?: string }
+  /**
+   * Files a test hands over. SDKs take a directory, files on disk or inline contents and send
+   * paths with base64 contents: a whole tree (`tree`), or changes where `null` deletes (`changes`).
+   */
+  | { kind: "files"; mode: "tree" | "changes" }
   /** A named data type from `types`. */
   | { kind: "named"; name: string }
   /** In a response: the wire data of a handle, which SDKs wrap into the handle again. */
@@ -188,12 +199,19 @@ export function buildIr(openapi: Json): Ir {
       return { kind: "union", types, ...(typeof discriminator === "string" ? { discriminator } : {}) };
     }
     if (schema["x-channelstack-duration"] === true) return { kind: "duration" };
+    const files: unknown = schema["x-channelstack-files"];
+    if (files === "tree" || files === "changes") return { kind: "files", mode: files };
     if (typeof schema.const === "string") return { kind: "literal", value: schema.const };
     if (Array.isArray(schema.enum)) {
       const [first] = schema.enum;
       return schema.enum.length === 1 && (typeof first === "string" || typeof first === "boolean")
         ? { kind: "literal", value: first }
         : { kind: "enum", values: schema.enum.map(String) };
+    }
+    // "A string, or null", the way OpenAPI 3.1 writes a nullable value: a type list with "null".
+    if (Array.isArray(schema.type) && schema.type.length === 2 && schema.type.includes("null")) {
+      const [present] = schema.type.filter((name: string) => name !== "null");
+      return { kind: "nullable", type: typeOf({ ...schema, type: present }, where) };
     }
     switch (schema.type) {
       case "string":
@@ -208,7 +226,15 @@ export function buildIr(openapi: Json): Ir {
           ...(schema["x-channelstack-one-or-many"] === true ? { oneOrMany: true as const } : {}),
         };
       case "object": {
-        if (schema.properties) return { kind: "object", fields: fieldsOf(schema, where) };
+        if (schema.properties) {
+          const fields = fieldsOf(schema, where);
+          const shorthand: unknown = schema["x-channelstack-shorthand"];
+          if (typeof shorthand !== "string") return { kind: "object", fields };
+          if (!fields.some((field) => field.name === shorthand)) {
+            throw new SpecError(where, `x-channelstack-shorthand names "${shorthand}", which the object doesn't have`);
+          }
+          return { kind: "object", fields, shorthand };
+        }
         const values = schema.additionalProperties;
         return {
           kind: "record",
@@ -251,9 +277,22 @@ export function buildIr(openapi: Json): Ir {
       name,
       ...(idFields === undefined ? {} : { idFields }),
       ...(marker.scope === undefined ? {} : { scope: marker.scope }),
+      ...(typeof marker.extends === "string" ? { extends: marker.extends } : {}),
       fields,
       methods: [],
     });
+  }
+  for (const resource of resources.values()) {
+    if (resource.extends === undefined) continue;
+    const parent = resources.get(resource.extends);
+    if (!parent) throw new SpecError(resource.name, `extends unknown resource "${resource.extends}"`);
+    const missing = parent.fields.filter((field) => !resource.fields.some((own) => own.name === field.name));
+    if (missing.length > 0 || parent.idFields?.join() !== resource.idFields?.join()) {
+      throw new SpecError(
+        resource.name,
+        `extends ${parent.name}, so it needs the same id and every field of it (missing: ${missing.map((field) => field.name).join(", ") || "none"})`,
+      );
+    }
   }
 
   /** The item type of a list read: an array, or a named alias of one. */
@@ -323,12 +362,12 @@ export function buildIr(openapi: Json): Ir {
       const options = take(binding.options);
       if (available.size > 0)
         throw new SpecError(where, `doesn't expose ${[...available.keys()].join(", ")} as an argument or option`);
-      // Positional arguments are body fields, and required ones. Only the last may be optional: `modal.submit(values?)`.
-      const query = args.find((arg, position) => arg.in === "query" || (arg.optional && position < args.length - 1));
-      if (query)
+      // Positional arguments are required ones. Only the last may be optional: `modal.submit(values?)`.
+      const misplaced = args.find((arg, position) => arg.optional && position < args.length - 1);
+      if (misplaced)
         throw new SpecError(
           where,
-          `"${query.name}" must be an option: positional arguments are body fields, and only the last may be optional`,
+          `"${misplaced.name}" must be an option: only the last positional argument may be optional`,
         );
 
       const responseSchema: Json | undefined = operation.responses?.["200"]?.content?.["application/json"]?.schema;
@@ -405,7 +444,10 @@ export function buildIr(openapi: Json): Ir {
     version: openapi.info.version,
     basePath: openapi.servers?.[0]?.url ?? "",
     root: ROOT,
-    resources: [...resources.values()],
+    // A resource comes after the one it extends, so emitters can declare them in this order.
+    resources: [...resources.values()].sort(
+      (a, b) => Number(a.extends !== undefined) - Number(b.extends !== undefined),
+    ),
     types: types.filter((type) => reachable.has(type.name)),
     errors: [...errors].sort(),
   };

@@ -66,6 +66,31 @@ export class IrIndex {
     }
   }
 
+  /** A resource's own fields: the ones it doesn't have from the resource it extends. */
+  ownFields(resource: IrResource): IrResource["fields"] {
+    if (resource.extends === undefined) return resource.fields;
+    const inherited = new Set(this.resource(resource.extends).fields.map((field) => field.name));
+    return resource.fields.filter((field) => !inherited.has(field.name));
+  }
+
+  /** Does a resource it extends, however far up, have a method or a wait of this name? */
+  inherits(resource: IrResource, name: string): boolean {
+    if (resource.extends === undefined) return false;
+    const parent = this.resource(resource.extends);
+    return (
+      parent.methods.some((method) => method.name === name) ||
+      (parent.waits ?? []).some((wait) => wait.name === name) ||
+      this.inherits(parent, name)
+    );
+  }
+
+  /** The id fields of the resources a `ref` accepts, with their types. */
+  refIds(resources: readonly string[]): IrResource["fields"] {
+    const [first = ""] = resources;
+    const fields = this.resource(first).fields;
+    return this.refIdFields(resources).flatMap((id) => fields.find((field) => field.name === id) ?? []);
+  }
+
   /** The id fields shared by the resources a `ref` accepts: what gets sent in place of the handle. */
   refIdFields(resources: readonly string[]): string[] {
     const [first, ...rest] = resources.map((name) => this.resource(name).idFields ?? []);

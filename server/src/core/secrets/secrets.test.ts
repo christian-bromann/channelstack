@@ -16,8 +16,10 @@ const specs: Record<string, SecretSpec> = { all: everyFormat, echo: { appToken: 
 const home = () => mkdtempSync(join(tmpdir(), "cs-secrets-"));
 
 describe("secret formats", () => {
-  test.each(Object.entries(SECRET_FORMATS))("%s matches the platform's layout", (_name, format) => {
-    for (let i = 0; i < 200; i++) expect(format.generate()).toMatch(format.pattern);
+  test.each(Object.entries(SECRET_FORMATS))("%s matches the platform's layout", (name, format) => {
+    // An RSA key takes a moment to make, and its layout doesn't vary: a few are enough.
+    const draws = name === "github.privateKey" ? 3 : 200;
+    for (let i = 0; i < draws; i++) expect(format.generate()).toMatch(format.pattern);
   });
 
   test("values come from the CSPRNG and don't repeat", () => {

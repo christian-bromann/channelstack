@@ -233,7 +233,7 @@ describe("emitters", () => {
     expect(code).toContain(
       'async def update(self, label: str, *, parent: Widget | None = None, mode: Literal["a", "b"] | None = None, since: str | None = None) -> dict[str, Any]:',
     );
-    expect(code).toContain("f\"/sessions/{quote(session_of(ctx), safe='')}/widgets/{quote(self.id, safe='')}\"");
+    expect(code).toContain("f\"/sessions/{quote(session_of(ctx), safe='')}/widgets/{quote(str(self.id), safe='')}\"");
     expect(code).toContain(
       'body={"label": label, "parent": None if parent is None else parent.id, "mode": mode}, query={"since": since}',
     );

@@ -5,6 +5,14 @@ import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { slackTsTime } from "../../core/ids/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
+import {
+  apiCallSchema,
+  CallsQuery,
+  DeliveryAttempt,
+  DeliveryStatus,
+  duration,
+  readCalls,
+} from "../../core/router/inspect.ts";
 import { plain } from "./blocks.ts";
 import type { FakeSlackWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
@@ -71,23 +79,6 @@ const SlackStream = z
     endedAt: z.string().optional(),
   })
   .openapi("SlackStream", { "x-channelstack-resource": { id: ["channel", "ts"] } });
-
-const DeliveryStatus = z.enum(["pending", "acknowledged", "failed", "timed_out", "unreachable"]);
-
-const DeliveryAttempt = z
-  .object({
-    number: z.number().int(),
-    sentAt: z.string(),
-    transport: z.enum(["http", "socket"]),
-    url: z.string().optional(),
-    requestHeaders: z.record(z.string(), z.string()),
-    status: DeliveryStatus,
-    responseStatus: z.number().int().optional(),
-    responseBody: z.string().optional(),
-    durationMs: z.number().optional(),
-    forgedSignature: z.boolean(),
-  })
-  .openapi("DeliveryAttempt");
 
 const SlackDelivery = z
   .object({
@@ -174,24 +165,7 @@ const SlackTranscript = z
   })
   .openapi("SlackTranscript", { "x-channelstack-string": "text" });
 
-const SlackApiCall = z
-  .object({
-    id: z.string(),
-    channel: z.literal("slack"),
-    operation: z.string(),
-    method: z.string(),
-    path: z.string(),
-    at: z.string(),
-    durationMs: z.number(),
-    request: z.unknown(),
-    responseStatus: z.number().int(),
-    response: z.unknown(),
-    error: z.string().optional(),
-  })
-  .openapi("SlackApiCall");
-
-const duration = (description: string) =>
-  z.number().int().min(0).openapi({ description, "x-channelstack-duration": true });
+const SlackApiCall = apiCallSchema("slack", "SlackApiCall");
 
 const SlackFixture = z
   .object({
@@ -1100,38 +1074,12 @@ export function registerSlackRoutes(
     path: "/calls",
     summary:
       "The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session",
-    query: z.object({
-      operation: z
-        .string()
-        .optional()
-        .openapi({ param: { name: "operation", in: "query" } }),
-      // In the query it is text either way; the union is what the SDKs accept: `true` or a code.
-      error: z
-        .union([z.literal(true), z.string()])
-        .optional()
-        .openapi({ param: { name: "error", in: "query" }, description: "`true` for any error, or one error code" }),
-    }),
+    query: CallsQuery,
     response: z.array(SlackApiCall).openapi("SlackApiCalls"),
     sdkMethod: { on: "SlackFixture", name: "calls", options: ["operation", "error"] },
     waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
     stability,
-    handler: ({ session, query }) =>
-      deps.events
-        .read(session.id)
-        .events.map((event, index) => ({ event, id: `call_${index + 1}` }))
-        .filter(({ event }) => event.kind === "api_call" && event.driver === "slack")
-        .map(({ event, id }) => ({
-          ...(event.data as z.infer<typeof SlackApiCall>),
-          id,
-          channel: "slack" as const,
-          at: event.at,
-        }))
-        .filter((call) => query.operation === undefined || call.operation === query.operation)
-        .filter(
-          (call) =>
-            query.error === undefined ||
-            (query.error === "true" ? call.error !== undefined : call.error === query.error),
-        ),
+    handler: ({ session, query }) => readCalls(deps.events, session.id, "slack", query),
   });
 
   router.route({
