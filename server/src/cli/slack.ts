@@ -14,6 +14,7 @@ interface Message {
   channel: string;
   ts: string;
   threadTs?: string;
+  author: Person;
 }
 
 export interface SlackFlags {
@@ -76,7 +77,7 @@ export async function slackDev(server: Attached) {
 
 const where = (message: Message) => `${message.channel}:${message.ts}`;
 
-/** `channelstack slack <say|reply|react> …`: act as a person in the dev session. */
+/** `channelstack slack <say|reply|react|click|stop> …`: act as a person in the dev session. */
 export async function runSlack(server: Attached, action: string | undefined, args: string[], flags: SlackFlags) {
   const slack = await slackDev(server);
   if (action === "say") {
@@ -115,5 +116,27 @@ export async function runSlack(server: Attached, action: string | undefined, arg
     });
     return `${actor.name} reacted with ${emoji} (${where(target)})\n`;
   }
-  throw new CliError(`unknown slack command "${action ?? ""}". Try \`say\`, \`reply\` or \`react\`.`);
+  if (action === "click") {
+    const [label] = args;
+    if (!label) throw new CliError('click what? e.g. `channelstack slack click --as ana "Approve"`.');
+    const actor = await slack.person(flags.as);
+    // The button in the latest message that has it, in the conversation people last spoke in.
+    const latest = await slack.last();
+    await slack.join(latest.channel, actor);
+    await slack.post(`/users/${segment(actor.id)}/click`, { button: { label }, channel: latest.channel });
+    return `${actor.name} clicked "${label}"\n`;
+  }
+  if (action === "stop") {
+    const target = await slack.message(flags.thread, "--thread");
+    const thread = { channel: target.channel, ts: target.threadTs ?? target.ts };
+    // Stop is pressed by `--as`, or by whoever started the thread.
+    const root = flags.as === undefined ? await slack.message(`${thread.channel}:${thread.ts}`, "--thread") : undefined;
+    if (root && root.author.kind !== "user") throw new CliError("say who presses Stop with `--as <name>`.");
+    const actor = root ? root.author : await slack.person(flags.as);
+    await slack.post(`/users/${segment(actor.id)}/stop`, { thread });
+    return `${actor.name} pressed Stop (${thread.channel}:${thread.ts})\n`;
+  }
+  throw new CliError(
+    `unknown slack command "${action ?? ""}". Try \`say\`, \`reply\`, \`react\`, \`click\` or \`stop\`.`,
+  );
 }

@@ -8,7 +8,7 @@ Goal: Slack interactivity and Socket Mode. Every fake Slack example passes.
 |---|---|---|
 | 2.1 Every fake Slack example passes | `api/examples/slack.test.ts`, everything but "live mode", unchanged, against `examples/agents/bolt-ai-sdk` and `examples/agents/chat-sdk-slack` (`pnpm test:accept`; `scripts/examples.ts` enables the remaining blocks) | `server/src/drivers/slack/` (interactions, views, commands, Stop, the agent split view), `integrations/matchers-core/` (`toHaveOpenedModal`), `examples/agents/` |
 | 2.2 Socket Mode works with Bolt | `test/acceptance/socket-mode.test.ts`: the DM and modal examples against the Bolt agent started in Socket Mode. `server/test/integration/slack-delivery.test.ts`: delivery cases S2–S5 over HTTP, and K1–K4 over the fake's WebSocket, received by Bolt | `server/src/core/delivery/` (a second transport), `server/src/drivers/slack/fake/socket.ts`, `server/src/serve.ts` (WebSocket upgrade) |
-| 2.3 Standard checks | `test/acceptance/checks.test.ts`: `slackChecks({ app: "my-agent" })` passes against both reference agents; `test/acceptance/checks-broken.test.ts`: against `examples/agents/broken-slack` each check fails, one broken variant per check | `integrations/checks/`, `examples/agents/broken-slack/` |
+| 2.3 Standard checks | `test/acceptance/checks/slack-checks.test.ts`: `slackChecks({ app: "my-agent", … })` passes against both reference agents; `test/acceptance/checks-broken.test.ts`: against `examples/agents/broken-slack` each check fails, one broken variant per check | `integrations/checks/`, `examples/agents/broken-slack/` |
 
 Standing checks: `pnpm api:check` now covers every fake Slack example (the "later phases" list shrinks to "live mode").
 
@@ -22,7 +22,7 @@ Standing checks: `pnpm api:check` now covers every fake Slack example (the "late
 6. Reference agents grow the handlers the examples need (approval buttons with an allowlist, a select menu, the incident modal, `/deploy`, the ticket shortcut, Stop, suggested prompts).
 7. Socket Mode: `apps.connections.open`, the WebSocket endpoint, envelopes, acks with payloads, the `drop_socket` fault; delivery cases K1–K4; exit check 2.2.
 8. `slackChecks()` and the broken agent; exit check 2.3.
-9. Attach CLI: `slack click`, `slack stop`. UI: buttons in the transcript become clickable.
+9. Attach CLI: `slack click`, `slack stop`. (Clickable buttons in the UI were planned here and left out: the browser session is read-only by decision 0008, and the phase's Build list doesn't ask for them.)
 10. Docs.
 
 ## Reuse
@@ -56,6 +56,10 @@ Added to this table if that changes.
 - `docs/devx.md`: the CLI section (`click`, `stop`).
 - `docs/code-map.md` matches the code.
 - Carried over from phase 1: `phase-log/phase-1/closed.md` and the status table in `docs/phases.md` (the phase 1 merge came before them).
+
+## Decisions taken in this phase
+
+- `docs/decisions/0012-interactions-and-socket-mode.md`: acting and reading wait like a person, one request URL for now, Socket Mode as a transport, two more options for the checks, and what isn't verified against Slack.
 
 ## Open points to settle while building
 

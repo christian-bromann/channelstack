@@ -86,17 +86,17 @@ Every feature runs in the fake server (in memory). The question this document an
 | `ana.edit(text, { message })` | Done | Yes | User token (`chat.update`) | Only the person's own messages, as in Slack |
 | `ana.delete({ message })` | Done | Yes | User token (`chat.delete`) | |
 | `ana.react` / `unreact` | Done | Yes | User token (`reactions.add` / `remove`) | |
-| `ben.click("Approve", { message })` | Yes | Yes, with browser | Browser | Confirmed: `block_actions` is only sent when a real person clicks; there's no API to trigger it |
-| `ana.select(option, { menu, message })` | Yes | Yes, with browser | Browser | Same as click |
-| `ben.waitForModal()` | Yes | Yes, with proxy or browser | Proxy (sees `views.open`) or Browser (sees the modal) | |
-| `modal.submit(values)` / `close()` | Yes | Yes, with browser | Browser | Confirmed: no API sends `view_submission` as a user |
-| `ana.shortcut(callbackId, { message })` | Yes | Yes, with browser | Browser | |
-| `ana.runCommand("/deploy web", { channel })` | Yes | Yes, with browser | Browser | Confirmed: the official docs only cover receiving commands. `chat.command` exists only in community sources (undocumented, legacy tokens), so channelstack doesn't use it |
-| `ana.stop({ thread })` | Yes | Yes, with browser | Browser | Confirmed: Stop is a native client button that sends the app `agent_session_stopped`. It only appears when the app subscribes to that event, and no API presses it. The fake models the follow-up too: `chat.appendStream` returns `stopped_by_user` |
+| `ben.click("Approve", { message })` | Done | Yes, with browser | Browser | Confirmed: `block_actions` is only sent when a real person clicks; there's no API to trigger it |
+| `ana.select(option, { menu, message })` | Done | Yes, with browser | Browser | Same as click |
+| `ben.waitForModal()` | Done | Yes, with proxy or browser | Proxy (sees `views.open`) or Browser (sees the modal) | |
+| `modal.submit(values)` / `close()` | Done | Yes, with browser | Browser | Confirmed: no API sends `view_submission` as a user |
+| `ana.shortcut(callbackId, { message })` | Done | Yes, with browser | Browser | |
+| `ana.runCommand("/deploy web", { channel })` | Done | Yes, with browser | Browser | Confirmed: the official docs only cover receiving commands. `chat.command` exists only in community sources (undocumented, legacy tokens), so channelstack doesn't use it |
+| `ana.stop({ thread })` | Done | Yes, with browser | Browser | Confirmed: Stop is a native client button that sends the app `agent_session_stopped`. It only appears when the app subscribes to that event, and no API presses it. The fake models the follow-up too: `chat.appendStream` returns `stopped_by_user` |
 | `ana.openDM(slack.app)` | Done | Yes | User token (`conversations.open`) | |
-| `ana.openAgentThread()` | Yes | Yes, with browser | Browser | Confirmed: `assistant_thread_started` fires only when the person opens the assistant container, and no API triggers it |
-| `ana.pickPrompt(title, { thread })` | Yes | Partial | Browser, or User token | The browser clicks the suggested prompt. A User-token fallback posts the prompt's text into the thread, which looks the same to the agent but isn't a click |
-| `ana.switchContext(channel, { thread })` | Yes | Yes, with browser | Browser | `assistant_thread_context_changed` comes from the client |
+| `ana.openAgentThread()` | Done | Yes, with browser | Browser | Confirmed: `assistant_thread_started` fires only when the person opens the assistant container, and no API triggers it |
+| `ana.pickPrompt(title, { thread })` | Done | Partial | Browser, or User token | The browser clicks the suggested prompt. A User-token fallback posts the prompt's text into the thread, which looks the same to the agent but isn't a click |
+| `ana.switchContext(channel, { thread })` | Done | Yes, with browser | Browser | `assistant_thread_context_changed` comes from the client |
 | `ana.invite` / `kick` | Done | Yes | User token (`conversations.invite` / `kick`) | Kicking needs the right workspace role |
 | `ana.renameChannel` / `archiveChannel` | Yes | Yes | User token | |
 | `ana.ephemeral()` | Done | Yes, with proxy or browser | Proxy (sees `chat.postEphemeral`) or Browser | Confirmed: ephemeral messages aren't stored and don't persist across reloads, so no read API returns them. The browser only sees them while the page stays open |
@@ -104,12 +104,12 @@ Every feature runs in the fake server (in memory). The question this document an
 | `message.reactions()` | Done | Yes | User token (`reactions.get`) | |
 | `message.stream` (chunks and state) | Done | Partial | Proxy (sees `chat.startStream` / `appendStream` / `stopStream`) | **unverified**: whether history returns partial text during a stream. The docs only say a stream that times out after 10 minutes keeps what was streamed. Without proxy, count on seeing only the final text |
 | `thread.status()`, `toHaveStatus`, `toHaveStatusText` | Done | Yes, with proxy or browser | Proxy (sees `assistant.threads.setStatus` and its replacement `agents.sessions.setStatus`) or Browser | Confirmed: only write methods exist, nothing reads the status back. The fake serves both method names |
-| `agentThread.suggestedPrompts()` | Yes | Yes, with proxy or browser | Proxy or Browser | Confirmed: no read API |
-| `toBeEphemeralFor(user)` | Yes | Yes, with proxy or browser | Same as `ephemeral()` | |
+| `agentThread.suggestedPrompts()` | Done | Yes, with proxy or browser | Proxy or Browser | Confirmed: no read API |
+| `toBeEphemeralFor(user)` | Done | Yes, with proxy or browser | Same as `ephemeral()` | |
 | `toHaveButton(label)` | Done | Yes | User token (the blocks are in history) | |
-| `toHaveOpenedModal(title)` | Yes | Yes, with proxy or browser | Same as `waitForModal` | |
+| `toHaveOpenedModal(title)` | Done | Yes, with proxy or browser | Same as `waitForModal` | |
 | `delivery.retry({ after: "3s" })` | Done | No | — | Fake-only. channelstack doesn't sit between the platform and the agent live |
-| Socket Mode delivery | Yes | Agent's concern | — | Live, the agent connects to Slack itself |
+| Socket Mode delivery | Done | Agent's concern | — | Live, the agent connects to Slack itself |
 
 ---
 

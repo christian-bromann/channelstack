@@ -127,7 +127,7 @@ The CLI attaches to a running server. It finds it through portless (`channelstac
 # Slack
 channelstack slack say   --as ana --in "#support" "@my-agent what broke last night?"
 channelstack slack reply --as ben --thread last "and the one before?"
-channelstack slack click --as ana "Approve"              # the button in the latest agent message
+channelstack slack click --as ana "Approve"              # the button in the latest message that has it
 channelstack slack react --as ben :eyes: --on last
 channelstack slack stop  --thread last                   # press Stop on the stream
 channelstack slack dm    --as cara my-agent "hi"
@@ -384,6 +384,8 @@ githubChecks({ app: "my-agent" });   // ignores its own comments, one comment pe
 ```
 
 Each check is named after a bug class found in real apps (`app-developers.md`). The UI's **Checks** panel runs the same set.
+
+Ten of the Slack checks need nothing but the prompt. The stream and Stop checks need `streamPrompt` (text that makes the agent stream a longer answer), and the two click checks need `approval: { prompt, button }` (text that makes it ask for an approval, and the button's label). Without those options the checks are left out, as with `skip: ["slack.stream-stop"]`. Every check's id is in its test name.
 
 ## 6. The model is yours
 

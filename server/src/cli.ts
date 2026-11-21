@@ -28,6 +28,8 @@ Usage:
   channelstack slack say   --as <name> --in "#channel" "<text>"
   channelstack slack reply --as <name> [--thread last] "<text>"
   channelstack slack react --as <name> <:emoji:> [--on last]
+  channelstack slack click --as <name> "<button>"       The button in the latest message that has it
+  channelstack slack stop  [--as <name>] [--thread last]   Press Stop on the agent's work in a thread
   channelstack show [--thread last] [--json]    The latest conversation as a person would read it
   channelstack tail [--once]                    Events to the agent and its API calls, as they happen
   channelstack ui                               A one-time link that opens the UI in a browser
