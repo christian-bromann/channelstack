@@ -47,7 +47,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       case "unknown":
         return "Any";
       case "literal":
-        return `Literal[${JSON.stringify(type.value)}]`;
+        return `Literal[${typeof type.value === "boolean" ? (type.value ? "True" : "False") : JSON.stringify(type.value)}]`;
       case "enum":
         return `Literal[${type.values.map((value) => JSON.stringify(value)).join(", ")}]`;
       case "array":

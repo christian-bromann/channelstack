@@ -75,6 +75,22 @@ export interface SlackMessageRecord {
   metadata: unknown;
   /** For a message the app streams (`chat.startStream`). */
   stream: SlackStreamRecord | undefined;
+  /** Files shared with the message. */
+  readonly files: readonly SlackFileRecord[];
+}
+
+/** A file the app uploaded (files upload v2). It has no bytes until the upload arrived. */
+export interface SlackFileRecord {
+  readonly id: string;
+  readonly name: string;
+  title: string;
+  /** The size the app announced, then the size of what arrived. */
+  size: number;
+  readonly user: string;
+  readonly created: number;
+  bytes: Uint8Array | undefined;
+  /** Where the file was shared, once it was. */
+  conversation: string | undefined;
 }
 
 interface SlackStreamRecord {

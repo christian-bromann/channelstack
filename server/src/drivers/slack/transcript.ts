@@ -7,6 +7,8 @@ export interface TranscriptEntry {
   at: string;
   text: string;
   controls: string[];
+  /** The names of the files shared with the message. */
+  files: string[];
   edited: boolean;
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: { id: string; name: string; kind: "user" | "app" };
@@ -99,6 +101,7 @@ export function renderTranscript(
         // A message's text is what Slack shows when it has no blocks; with blocks, people read the blocks.
         text: named(message.text !== "" ? message.text : fromBlocks.join("\n")),
         controls: blocks.flatMap(blockControls),
+        files: message.files.map((file) => file.name),
         edited: message.edited !== undefined,
         ...(message.stream === undefined ? {} : { streaming: message.stream.state }),
         ...(message.ephemeralFor === undefined ? {} : { visibleTo: options.principal(message.ephemeralFor) }),
@@ -115,7 +118,9 @@ export function renderTranscript(
       ]
         .filter((mark) => mark !== "")
         .join(", ");
-      const controls = entry.controls.map((control) => ` [${control}]`).join("");
+      const controls = [...entry.controls, ...entry.files.map((file) => `file: ${file}`)]
+        .map((control) => ` [${control}]`)
+        .join("");
       return `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${controls}${marks === "" ? "" : ` (${marks})`}`;
     })
     .join("\n");

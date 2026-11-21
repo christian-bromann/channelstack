@@ -68,7 +68,7 @@ export type IrType =
   | { kind: "string" | "number" | "integer" | "boolean" | "unknown" }
   /** A length of time. SDKs take `"3s"` or milliseconds and send milliseconds. */
   | { kind: "duration" }
-  | { kind: "literal"; value: string }
+  | { kind: "literal"; value: string | boolean }
   | { kind: "enum"; values: string[] }
   /** `oneOrMany`: as an argument, a single item is accepted in place of a list of one. */
   | { kind: "array"; items: IrType; oneOrMany?: true }
@@ -163,7 +163,7 @@ export function buildIr(openapi: Json): Ir {
     if (typeof schema.const === "string") return { kind: "literal", value: schema.const };
     if (Array.isArray(schema.enum)) {
       const [first] = schema.enum;
-      return schema.enum.length === 1 && typeof first === "string"
+      return schema.enum.length === 1 && (typeof first === "string" || typeof first === "boolean")
         ? { kind: "literal", value: first }
         : { kind: "enum", values: schema.enum.map(String) };
     }

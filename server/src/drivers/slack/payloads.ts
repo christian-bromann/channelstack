@@ -1,6 +1,7 @@
 import type {
   SlackAppRecord,
   SlackConversationRecord,
+  SlackFileRecord,
   SlackMessageRecord,
   SlackTeam,
   SlackUserRecord,
@@ -51,6 +52,38 @@ export function messageObject(
       ? {}
       : { reactions: message.reactions.map(({ name, users }) => ({ name, users, count: users.length })) }),
     ...(message.metadata === undefined ? {} : { metadata: message.metadata }),
+    // A message that shares files says so, and carries them.
+    ...(message.files.length === 0
+      ? {}
+      : { subtype: "file_share", upload: false, files: message.files.map((file) => fileObject(file)) }),
+  };
+}
+
+const MIME_TYPES: Readonly<Record<string, string>> = {
+  csv: "text/csv",
+  json: "application/json",
+  md: "text/markdown",
+  pdf: "application/pdf",
+  png: "image/png",
+  txt: "text/plain",
+};
+
+/** A file as Slack describes it in messages and `files.info`. */
+export function fileObject(file: SlackFileRecord): Record<string, unknown> {
+  const filetype = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toLowerCase() ?? "binary";
+  return {
+    id: file.id,
+    created: file.created,
+    timestamp: file.created,
+    name: file.name,
+    title: file.title,
+    mimetype: MIME_TYPES[filetype] ?? "application/octet-stream",
+    filetype,
+    user: file.user,
+    size: file.size,
+    mode: "hosted",
+    is_external: false,
+    is_public: false,
   };
 }
 

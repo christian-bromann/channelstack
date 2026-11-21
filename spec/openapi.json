@@ -1383,6 +1383,13 @@
               "type": "string"
             }
           },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the files shared with the message."
+          },
           "edited": {
             "type": "boolean"
           },
@@ -1407,6 +1414,7 @@
           "at",
           "text",
           "controls",
+          "files",
           "edited",
           "depth"
         ]
@@ -4661,7 +4669,17 @@
           },
           {
             "schema": {
-              "type": "string",
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
               "description": "`true` for any error, or one error code"
             },
             "required": false,

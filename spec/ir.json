@@ -1017,7 +1017,16 @@
             {
               "name": "error",
               "type": {
-                "kind": "string"
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
               },
               "optional": true,
               "in": "query"
@@ -3698,6 +3707,16 @@
           },
           {
             "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "files",
             "type": {
               "kind": "array",
               "items": {

@@ -136,6 +136,7 @@ const SlackTranscript = z
           at: z.string(),
           text: z.string(),
           controls: z.array(z.string()),
+          files: z.array(z.string()).openapi({ description: "The names of the files shared with the message." }),
           edited: z.boolean(),
           streaming: z.enum(["open", "stopped", "completed"]).optional(),
           visibleTo: Principal.optional(),
@@ -769,8 +770,9 @@ export function registerSlackRoutes(
         .string()
         .optional()
         .openapi({ param: { name: "operation", in: "query" } }),
+      // In the query it is text either way; the union is what the SDKs accept: `true` or a code.
       error: z
-        .string()
+        .union([z.literal(true), z.string()])
         .optional()
         .openapi({ param: { name: "error", in: "query" }, description: "`true` for any error, or one error code" }),
     }),

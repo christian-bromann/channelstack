@@ -81,7 +81,10 @@ export class IrIndex {
         member.kind === "resource"
           ? this.resource(member.name).fields.find((candidate) => candidate.name === discriminator)
           : undefined;
-      return field?.type.kind === "literal" ? { value: field.type.value, member } : undefined;
+      // A discriminator is a text tag (`kind: "user"`); a boolean literal doesn't tell handles apart.
+      return field?.type.kind === "literal" && typeof field.type.value === "string"
+        ? { value: field.type.value, member }
+        : undefined;
     });
     return tagged.every((entry) => entry !== undefined) ? tagged : undefined;
   }

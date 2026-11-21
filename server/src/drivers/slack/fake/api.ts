@@ -4,6 +4,7 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import {
+  fileObject,
   membershipEvent,
   messageChangedEvent,
   messageDeletedEvent,
@@ -31,6 +32,8 @@ type Method = (args: Args) => Record<string, unknown>;
 /** Slack's limits (https://docs.slack.dev/reference/methods/chat.postMessage, chat.startStream). */
 const MAX_TEXT_LENGTH = 40_000;
 const MAX_STREAM_LENGTH = 12_000;
+/** The fake keeps uploads in memory, so it takes small files only. */
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 /** How long after Retry-After a retry may still come: clients add their own backoff (Slack's WebClient: 1 to 2 seconds). */
 const RETRY_GRACE_MS = 3000;
 const SESSION_STATUSES = ["active", "processing", "suspended", "closed"] as const;
@@ -49,6 +52,9 @@ const SCOPES: Readonly<Record<string, readonly string[]>> = {
   "assistant.threads.setSuggestedPrompts": ["assistant:write"],
   "agents.sessions.setStatus": ["chat:write"],
   "agents.sessions.rename": ["chat:write"],
+  "files.getUploadURLExternal": ["files:write"],
+  "files.completeUploadExternal": ["files:write"],
+  "files.info": ["files:read"],
   "reactions.add": ["reactions:write"],
   "reactions.remove": ["reactions:write"],
   "reactions.get": ["reactions:read"],
@@ -395,6 +401,57 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       return { status, agent_status: status };
     },
 
+    // Files upload v2: ask where to upload, send the bytes there, then share the file.
+    "files.getUploadURLExternal": (args) => {
+      const name = required(args, "filename");
+      const length = Number(args.length);
+      if (!Number.isInteger(length) || length <= 0) throw new SlackApiError("invalid_arguments");
+      const id = ids.next("slack.file");
+      store.files.set(id, {
+        id,
+        name,
+        title: name,
+        size: length,
+        user: bot(),
+        created: Math.floor(clock() / 1000),
+        bytes: undefined,
+        conversation: undefined,
+      });
+      return { upload_url: `${context.apiUrl()}/upload/v1/${id}`, file_id: id };
+    },
+
+    "files.completeUploadExternal": (args) => {
+      const listed = json(args, "files");
+      if (!Array.isArray(listed) || listed.length === 0) throw new SlackApiError("invalid_arguments");
+      const files = listed.map((entry: { id?: unknown; title?: unknown }) => {
+        const file = typeof entry?.id === "string" ? store.files.get(entry.id) : undefined;
+        // A file is there to share once its bytes arrived, and only once.
+        if (!file || file.bytes === undefined || file.conversation !== undefined)
+          throw new SlackApiError("file_not_found");
+        if (typeof entry.title === "string" && entry.title !== "") file.title = entry.title;
+        return file;
+      });
+      const channel = string(args, "channel_id");
+      // Without a channel the files stay private to the app.
+      if (channel !== undefined) {
+        const conversation = joined(channel);
+        const message = world.postAsApp(
+          conversation,
+          { text: string(args, "initial_comment") ?? "" },
+          { threadTs: threadRoot(conversation, string(args, "thread_ts")), files },
+        );
+        for (const file of files) file.conversation = conversation.id;
+        answeredIn(message);
+      }
+      return { files: files.map(({ id, title }) => ({ id, title })) };
+    },
+
+    "files.info": (args) => {
+      const file = store.files.get(required(args, "file"));
+      if (!file) throw new SlackApiError("file_not_found");
+      return { file: fileObject(file) };
+    },
+
     "reactions.add": (args) => {
       const conversation = joined(required(args, "channel"));
       const message = messageIn(conversation, required(args, "timestamp"));
@@ -605,6 +662,25 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       else context.arrived(session, name);
     }
     return c.json(body, status, headers);
+  });
+
+  // Where `files.getUploadURLExternal` sends the app with a file's bytes.
+  api.post("/upload/v1/:file", async (c) => {
+    const token = bearerFrom(c.req.header("authorization"));
+    const file = store.files.get(c.req.param("file"));
+    if (token === undefined || !constantTimeEqual(token, context.secret("botToken")) || !file || file.bytes) {
+      return c.text("Not Found", 404);
+    }
+    const type = c.req.header("content-type") ?? "";
+    // Slack takes the raw bytes, or a multipart form with the file in it.
+    const part = type.startsWith("multipart/form-data")
+      ? [...(await c.req.formData()).values()].find((value) => typeof value !== "string")
+      : undefined;
+    const bytes = new Uint8Array(part ? await (part as Blob).arrayBuffer() : await c.req.arrayBuffer());
+    if (bytes.length > MAX_FILE_BYTES) return c.text("Request Entity Too Large", 413);
+    file.bytes = bytes;
+    file.size = bytes.length;
+    return c.text(`OK - ${bytes.length}`);
   });
 
   api.all("*", (c) => c.json({ ok: false, error: "unknown_method" }, 404));

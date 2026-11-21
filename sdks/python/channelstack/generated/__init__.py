@@ -430,6 +430,7 @@ class SlackTranscriptEntry:
     at: str
     text: str
     controls: list[str]
+    files: list[str]
     edited: bool
     depth: int
     streaming: Literal["open", "stopped", "completed"] | None = None
@@ -443,6 +444,7 @@ class SlackTranscriptEntry:
             at=data["at"],
             text=data["text"],
             controls=data["controls"],
+            files=data["files"],
             edited=data["edited"],
             depth=data["depth"],
             streaming=data.get("streaming"),
@@ -704,7 +706,7 @@ class SlackFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries")
         return [SlackDelivery(ctx, item) for item in data]
 
-    async def calls(self, *, operation: str | None = None, error: str | None = None) -> SlackApiCalls:
+    async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> SlackApiCalls:
         """The Web API calls the agent made about this session's conversations. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/calls", query={"operation": operation, "error": error})
@@ -722,7 +724,7 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "error": error, "times": times})
         return SlackFault(ctx, data)
 
-    async def wait_for_call(self, *, operation: str | None = None, error: str | None = None, timeout: Duration = "10s") -> SlackApiCall:
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> SlackApiCall:
         """Wait for the next new API call from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForCall", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
 

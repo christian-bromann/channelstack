@@ -19,6 +19,7 @@ import {
 import type {
   SlackConversationKind,
   SlackConversationRecord,
+  SlackFileRecord,
   SlackMessageInput,
   SlackMessageRecord,
   SlackUserRecord,
@@ -44,7 +45,11 @@ export interface FakeSlackWorld extends SlackWorld {
   postAsApp(
     conversation: SlackConversationRecord,
     message: SlackMessageInput,
-    options: { threadTs?: string | undefined; ephemeralFor?: string | undefined },
+    options: {
+      threadTs?: string | undefined;
+      ephemeralFor?: string | undefined;
+      files?: readonly SlackFileRecord[] | undefined;
+    },
   ): SlackMessageRecord;
   /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
@@ -151,7 +156,12 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     conversation: SlackConversationRecord,
     userId: string,
     body: { text: string; blocks: unknown[] },
-    options: { threadTs?: string | undefined; ephemeralFor?: string | undefined; metadata?: unknown },
+    options: {
+      threadTs?: string | undefined;
+      ephemeralFor?: string | undefined;
+      metadata?: unknown;
+      files?: readonly SlackFileRecord[] | undefined;
+    },
   ): SlackMessageRecord => {
     const message: SlackMessageRecord = {
       ts: ids.slackTs(conversation.id),
@@ -166,6 +176,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       deliveries: [],
       metadata: options.metadata,
       stream: undefined,
+      files: options.files ?? [],
     };
     store.messagesIn(conversation.id).push(message);
     // An ephemeral message exists only for its recipient: Slack sends no event for it.

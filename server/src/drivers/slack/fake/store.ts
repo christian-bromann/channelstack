@@ -2,6 +2,7 @@ import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type {
   SlackAppRecord,
   SlackConversationRecord,
+  SlackFileRecord,
   SlackMessageRecord,
   SlackTeam,
   SlackThreadState,
@@ -28,6 +29,8 @@ export class SlackStore {
   readonly conversations: Collection<SlackConversationRecord>;
   readonly #messages = new Map<string, SlackMessageRecord[]>();
   readonly #threads = new Map<string, SlackThreadState>();
+  /** Files the app uploaded, by id. */
+  readonly files = new Map<string, SlackFileRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
   readonly #known: string[] = [];
   /** The session that uninstalled the app, so closing it installs the app again. */
@@ -146,6 +149,7 @@ export class SlackStore {
     for (const id of [...this.#known]) {
       if (this.conversations.owner(id) !== session) continue;
       this.#messages.delete(id);
+      for (const file of [...this.files.values()]) if (file.conversation === id) this.files.delete(file.id);
       for (const key of [...this.#threads.keys()]) if (key.startsWith(`${id}:`)) this.#threads.delete(key);
       this.#known.splice(this.#known.indexOf(id), 1);
     }

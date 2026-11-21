@@ -369,3 +369,68 @@ describe("what the agent did is recorded", () => {
     expect(JSON.stringify(recorded)).not.toContain(h.secrets.get("slack", "botToken"));
   });
 });
+
+describe("files (upload v2, the basics)", () => {
+  test("the app uploads a file in three steps and it lands in the thread", async () => {
+    const { h, agent, app, channel, say, api, get } = await workspace();
+    const question = await say("@my-agent export the report");
+    await h.app.settled();
+    const content = "quarter,revenue\nQ3,42\n";
+
+    const ticket = await api("files.getUploadURLExternal", { filename: "report.csv", length: content.length });
+    expect(ticket).toMatchObject({ ok: true, file_id: expect.stringMatching(/^F0[0-9A-Z]{9}$/) });
+    // The upload URL is on the fake, and takes the bytes with the bot token like Slack's does.
+    const path = new URL(ticket.upload_url).pathname.replace(/^\//, "");
+    expect(path).toBe(`slack/upload/v1/${ticket.file_id}`);
+
+    // Sharing a file that has no bytes yet is refused.
+    const share = {
+      files: [{ id: ticket.file_id, title: "Q3 report" }],
+      channel_id: channel.id,
+      thread_ts: question.ts,
+    };
+    expect((await api("files.completeUploadExternal", share)).error).toBe("file_not_found");
+
+    const uploaded = await h.app.fetch(
+      new Request(`http://127.0.0.1:4500/${path}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${app.botToken}` },
+        body: content,
+      }),
+    );
+    expect([uploaded.status, await uploaded.text()]).toEqual([200, `OK - ${content.length}`]);
+
+    const done = await api("files.completeUploadExternal", { ...share, initial_comment: "Here it is." });
+    expect(done).toMatchObject({ ok: true, files: [{ id: ticket.file_id, title: "Q3 report" }] });
+    await h.app.settled();
+
+    // The app's own message comes back as a file share, with the file on it.
+    const event = JSON.parse(agent.received.at(-1)?.body ?? "{}").event;
+    expect(event).toMatchObject({
+      type: "message",
+      subtype: "file_share",
+      text: "Here it is.",
+      thread_ts: question.ts,
+      files: [{ id: ticket.file_id, name: "report.csv", title: "Q3 report", filetype: "csv", size: content.length }],
+    });
+    expect((await api("files.info", { file: ticket.file_id })).file).toMatchObject({
+      name: "report.csv",
+      mimetype: "text/csv",
+    });
+    // A person reads it as the comment with the file's name.
+    expect((await get(`/conversations/${channel.id}/transcript`)).text).toBe(
+      "Ana: @my-agent export the report\n  my-agent: Here it is. [file: report.csv]",
+    );
+  });
+
+  test("what Slack refuses", async () => {
+    const { api, channel } = await workspace();
+    expect((await api("files.getUploadURLExternal", { filename: "a.txt" })).error).toBe("invalid_arguments");
+    expect((await api("files.getUploadURLExternal", { filename: "a.txt", length: 0 })).error).toBe("invalid_arguments");
+    expect((await api("files.info", { file: "F0NOSUCHFIL" })).error).toBe("file_not_found");
+    expect(
+      (await api("files.completeUploadExternal", { files: [{ id: "F0NOSUCHFIL" }], channel_id: channel.id })).error,
+    ).toBe("file_not_found");
+    expect((await api("files.completeUploadExternal", { files: [] })).error).toBe("invalid_arguments");
+  });
+});

@@ -238,6 +238,7 @@ export interface SlackTranscriptEntry {
   at: string;
   text: string;
   controls: string[];
+  files: string[];
   edited: boolean;
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: SlackPrincipal;
@@ -613,7 +614,7 @@ export class SlackFixture {
   }
 
   /** The Web API calls the agent made about this session's conversations. Experimental. */
-  async calls(options: { operation?: string; error?: string } = {}): Promise<SlackApiCalls> {
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<SlackApiCalls> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/calls`, { query: { operation: options.operation, error: options.error } })) as SlackApiCalls;
     return data;
@@ -634,7 +635,7 @@ export class SlackFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: string }, options: WaitOptions = {}): Promise<SlackApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<SlackApiCall> {
     return waitForNext(this.#seen, "waitForCall", () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
