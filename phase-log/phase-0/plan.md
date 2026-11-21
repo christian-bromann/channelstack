@@ -83,7 +83,7 @@ Development only:
 | `@biomejs/biome` | 2.6.8 | Lint and format | MIT OR Apache-2.0 |
 | `jscpd` | 5.4.3 | `check:dupes` (named in phases.md) | MIT |
 | `dependency-cruiser` | 18.8.0 | `check:deps` (named in phases.md) | MIT |
-| `knip` | 6.47.0 | `check:unused` (named in phases.md) | ISC |
+| `knip` | 6.45.1 | `check:unused` (named in phases.md) | ISC |
 | `yaml` | 2.9.1 | Parsing smoke scenarios in the TypeScript runner | ISC |
 | `@types/node`, `@types/bun` | 26.6.6, 1.4.5 | Types | MIT |
 | `pyyaml`, `ruff`, `pyright` (Python) | pinned in `uv.lock` | Scenario parsing, lint, type check | MIT |
