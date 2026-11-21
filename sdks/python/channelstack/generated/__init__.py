@@ -761,10 +761,10 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall")
         return [SlackDelivery(ctx, item) for item in data]
 
-    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
+    async def fault(self, *, type: Literal["rate_limit", "latency", "error", "drop_socket"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, after: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
         """Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "error": error, "times": times})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "after": None if after is None else parse_duration(after), "error": error, "times": times})
         return SlackFault(ctx, data)
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> SlackApiCall:

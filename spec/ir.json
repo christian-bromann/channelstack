@@ -1137,6 +1137,14 @@
               "in": "body"
             },
             {
+              "name": "after",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
               "name": "error",
               "type": {
                 "kind": "string"

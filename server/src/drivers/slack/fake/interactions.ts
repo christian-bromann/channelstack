@@ -56,6 +56,8 @@ export interface InteractionKit {
   replyAsUser: SlackWorld["replyAsUser"];
   /** The app's Socket Mode connection, once it has chosen that over a request URL. */
   transport(): DeliveryTransport | undefined;
+  /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
+  hears(conversation: SlackConversationRecord, subscription: string): boolean;
   /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
 }
@@ -172,7 +174,14 @@ export function createInteractions(kit: InteractionKit): Interactions {
     member(session, user.id, conversation);
     const visible = (message: SlackMessageRecord) =>
       message.ephemeralFor === undefined || message.ephemeralFor === user.id;
-    if ("message" in where) return { conversation, messages: [requireMessage(conversation, where.message.ts)] };
+    if ("message" in where) {
+      // A message only someone else can see isn't there for this person.
+      const message = requireMessage(conversation, where.message.ts);
+      if (!visible(message)) {
+        throw new ProtocolError("not_found", `No message ${where.message.ts} in ${conversation.id}`);
+      }
+      return { conversation, messages: [message] };
+    }
     const all = store.messagesIn(conversation.id).filter(visible);
     if ("channel" in where) return { conversation, messages: all.toReversed() };
     const root = requireMessage(conversation, where.thread.ts);
@@ -304,6 +313,13 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const user = member(session, userId, conversation);
       const root = requireMessage(conversation, thread.ts);
       const rootTs = root.threadTs ?? root.ts;
+      // The client only shows Stop for an app that listens for it. Refused before anything changes.
+      if (!kit.hears(conversation, "agent_session_stopped")) {
+        throw refuse(
+          "stop_unavailable",
+          "The app doesn't receive agent_session_stopped here, so there is no Stop to press",
+        );
+      }
       // Slack ends what is streaming in the thread, then tells the app which messages those were.
       const streaming = store
         .messagesIn(conversation.id)
@@ -317,22 +333,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
       }
       store.threadState(conversation.id, rootTs).statusText = "";
       kit.action(session, "stop", { user: user.id, channel: conversation.id, ts: rootTs });
-      const delivery = kit.emit(conversation, "agent_session_stopped", {
-        type: "agent_session_stopped",
-        channel: conversation.id,
-        thread_ts: rootTs,
-        user: user.id,
-        streaming_message_ts: streaming.map((message) => message.ts),
-        event_ts: ids.slackTs(conversation.id),
-      });
-      // The client only shows Stop for an app that listens for it.
-      if (delivery === undefined) {
-        throw refuse(
-          "stop_unavailable",
-          "The app doesn't receive agent_session_stopped here, so there is no Stop to press",
-        );
-      }
-      return delivery;
+      return (
+        kit.emit(conversation, "agent_session_stopped", {
+          type: "agent_session_stopped",
+          channel: conversation.id,
+          thread_ts: rootTs,
+          user: user.id,
+          streaming_message_ts: streaming.map((message) => message.ts),
+          event_ts: ids.slackTs(conversation.id),
+        }) ?? ""
+      );
     },
 
     openAgentThread(session, userId, from) {
@@ -369,16 +379,17 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const dm = store.conversations.get(session, thread.channel);
       const user = member(session, userId, dm);
       const context = store.conversations.get(session, channel);
-      kit.action(session, "switchContext", { user: user.id, channel: context.id, ts: thread.ts });
-      const delivery = kit.emit(
-        dm,
-        "assistant_thread_context_changed",
-        assistantThreadEvent("assistant_thread_context_changed", user, dm, thread.ts, context),
-      );
-      if (delivery === undefined) {
+      if (!kit.hears(dm, "assistant_thread_context_changed")) {
         throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_context_changed");
       }
-      return delivery;
+      kit.action(session, "switchContext", { user: user.id, channel: context.id, ts: thread.ts });
+      return (
+        kit.emit(
+          dm,
+          "assistant_thread_context_changed",
+          assistantThreadEvent("assistant_thread_context_changed", user, dm, thread.ts, context),
+        ) ?? ""
+      );
     },
 
     suggestedPrompts: (session, channel, ts) => {

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { freePort } from "../../../scripts/lib/process.ts";
 import { waitFor } from "../../../sdks/typescript/runtime/wait.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
-import { SUMMARY_VIEW } from "./slack-fixtures.ts";
+import { slackSession, SUMMARY_VIEW } from "./slack-fixtures.ts";
 
 /**
  * The fake signs like Slack. The fake's real delivery code, in the compiled binary, sends to a
@@ -167,23 +167,11 @@ describe("exit check 1.3: the fake signs like Slack", () => {
 });
 
 describe("exit check 2.2: interactions reach Bolt's handlers, and its answers come back", () => {
-  /** A session with Ana in a channel with the app, and what a test needs to act and look. */
   async function workspace() {
-    const { sessionId } = (await server.control("POST", "/sessions")).body;
-    const base = `/sessions/${sessionId}/slack`;
-    const ana = (await server.control("POST", `${base}/users`, { name: "Ana" })).body;
-    const { app } = (await server.control("GET", base)).body;
-    const channel = (await server.control("POST", `${base}/channels`, { participants: [ana.id, app.id] })).body;
-    const act = (path: string, body?: unknown) =>
-      server.control("POST", `${base}${path}`, body).then((response) => response.body);
-    const settled = (id: string) =>
-      waitFor("the delivery to settle", async () => {
-        const current = (await server.control("GET", `${base}/deliveries/${id}`)).body;
-        return current.status === "pending" ? undefined : current;
-      });
+    const session = await slackSession(server);
     const handled = (kind: string) =>
       waitFor(`Bolt's ${kind} handler`, async () => interactions.findLast((seenOne) => seenOne.kind === kind));
-    return { base, ana, channel, act, settled, handled };
+    return { ...session, handled };
   }
   const approval = [
     {

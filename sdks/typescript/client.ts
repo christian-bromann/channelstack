@@ -11,6 +11,7 @@ export {
   fromMatches,
   type QuietOptions,
   type QuietState,
+  textMatches,
   untilQuiet,
   type WaitOptions,
   WaitTimeoutError,

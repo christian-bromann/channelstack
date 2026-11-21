@@ -1154,6 +1154,7 @@ export function registerSlackRoutes(
         operation: z.string().optional(),
         retryAfter: duration("For rate_limit: what Retry-After says.").default(1000),
         delay: duration("For latency: how long each call takes longer.").default(0),
+        after: duration("For drop_socket: how long until the connection drops. Default: now.").default(0),
         error: z.string().default("internal_error"),
         times: z.number().int().min(1).optional(),
       })
@@ -1162,7 +1163,7 @@ export function registerSlackRoutes(
     sdkMethod: {
       on: "SlackFixture",
       name: "fault",
-      options: ["type", "operation", "retryAfter", "delay", "error", "times"],
+      options: ["type", "operation", "retryAfter", "delay", "after", "error", "times"],
     },
     stability,
     handler: ({ session, body }) => ({
@@ -1171,7 +1172,8 @@ export function registerSlackRoutes(
         operation: body.operation,
         remaining: body.times,
         retryAfterMs: body.retryAfter,
-        delayMs: body.delay,
+        // One delay field in the record: a latency fault's per-call delay, or how long until the socket drops.
+        delayMs: body.type === "drop_socket" ? body.after : body.delay,
         error: body.error,
       }),
     }),

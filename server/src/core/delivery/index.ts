@@ -145,11 +145,23 @@ export class DeliveryQueue {
     const cancelled = this.#sessions.get(record.request.session)?.records.get(record.request.id) !== record;
     if (cancelled) return;
     if (attempt.status === "acknowledged") {
-      record.request.answered?.({
-        status: attempt.responseStatus ?? 200,
-        contentType: responseHeaders?.get("content-type") ?? "",
-        body: responseText ?? "",
-      });
+      try {
+        record.request.answered?.({
+          status: attempt.responseStatus ?? 200,
+          contentType: responseHeaders?.get("content-type") ?? "",
+          body: responseText ?? "",
+        });
+      } catch (error) {
+        // The agent acknowledged with something the platform can't act on (a view that isn't one, a
+        // reply it refuses). The delivery stands; what went wrong is in the log and the event log.
+        const problem = error instanceof Error ? error.message : String(error);
+        this.#log.warn("the agent's answer could not be acted on", { id: record.request.id, problem });
+        this.#events.append(record.request.session, record.request.driver, "action", {
+          action: "answer_refused",
+          delivery: record.request.id,
+          problem,
+        });
+      }
       return;
     }
     const next = record.request.retry?.next(attempt, retries, responseHeaders);

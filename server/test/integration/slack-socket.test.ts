@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { waitFor } from "../../../sdks/typescript/runtime/wait.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
-import { SUMMARY_VIEW } from "./slack-fixtures.ts";
+import { slackSession, SUMMARY_VIEW } from "./slack-fixtures.ts";
 
 /**
  * Exit check 2.2: Socket Mode. A Bolt app in Socket Mode, whose Slack base URL is the fake,
@@ -49,22 +49,7 @@ afterAll(async () => {
   await server?.stop();
 });
 
-async function workspace() {
-  const { sessionId } = (await server.control("POST", "/sessions")).body;
-  const base = `/sessions/${sessionId}/slack`;
-  const fixture = async () => (await server.control("GET", base)).body;
-  const { app } = await fixture();
-  const ana = (await server.control("POST", `${base}/users`, { name: "Ana" })).body;
-  const channel = (await server.control("POST", `${base}/channels`, { participants: [ana.id, app.id] })).body;
-  const act = (path: string, body?: unknown) =>
-    server.control("POST", `${base}${path}`, body).then((response) => response.body);
-  const settled = (id: string) =>
-    waitFor("the delivery to settle", async () => {
-      const current = (await server.control("GET", `${base}/deliveries/${id}`)).body;
-      return current.status === "pending" ? undefined : current;
-    });
-  return { base, fixture, app, ana, channel, act, settled };
-}
+const workspace = () => slackSession(server);
 
 describe("exit check 2.2: Socket Mode works with Bolt", () => {
   test("K1: Bolt opens a connection with its app token and connects to the fake's WebSocket", async () => {

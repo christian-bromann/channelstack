@@ -52,7 +52,12 @@ async function workspace() {
 describe("Socket Mode", () => {
   test("K1: the app asks for a connection with its app-level token and connects with a one-time ticket", async () => {
     const { h, app, openUrl, connect, get } = await workspace();
-    expect((await openUrl(app.botToken)).error).toBe("invalid_auth");
+    // A token of the wrong kind is told so; something that is no token at all is just refused.
+    expect((await openUrl(app.botToken)).error).toBe("not_allowed_token_type");
+    expect((await openUrl("xapp-made-up")).error).toBe("invalid_auth");
+    expect((await h.provider("POST", "slack/api/auth.test", {}, app.appToken)).body.error).toBe(
+      "not_allowed_token_type",
+    );
 
     const { url, received } = await connect();
     expect(url).toMatch(
@@ -145,5 +150,15 @@ describe("Socket Mode", () => {
     expect(second.envelopes()[0]).toMatchObject({ type: "events_api", payload: { event: { text: "still there?" } } });
     expect((await get(`/deliveries/${message.delivery.id}`)).status).toBe("acknowledged");
     expect(first.envelopes()).toHaveLength(0);
+  });
+
+  test("drop_socket with `after` cuts the connection later", async () => {
+    const { h, connect, post } = await workspace();
+    const connection = await connect();
+    await post("/faults", { type: "drop_socket", after: 2000 });
+    h.timers.advance(1999);
+    expect(connection.isClosed()).toBe(false);
+    h.timers.advance(1);
+    expect(connection.isClosed()).toBe(true);
   });
 });

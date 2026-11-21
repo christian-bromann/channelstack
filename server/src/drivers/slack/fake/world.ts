@@ -180,13 +180,15 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     return eventId;
   };
 
-  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
+  /** Would the app be told about this kind of event in this conversation? */
+  const hears = (conversation: SlackConversationRecord, subscription: string): boolean => {
     const { app } = store;
+    return app.installed && app.botEvents.includes(subscription) && conversation.members.has(app.botUserId);
+  };
+
+  const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
     const session = store.conversations.owner(conversation.id);
-    if (session === undefined) return undefined;
-    if (!app.installed || !app.botEvents.includes(subscription) || !conversation.members.has(app.botUserId)) {
-      return undefined;
-    }
+    if (session === undefined || !hears(conversation, subscription)) return undefined;
     return deliver(session, event);
   };
 
@@ -624,8 +626,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     addFault(session, fault) {
       const id = `fault_${store.faults.length + 1}_${ids.next("slack.block")}`;
       // Dropping the socket happens once, now; the other faults stay until they are removed.
-      if (fault.type === "drop_socket") socket.drop();
-      else store.faults.push({ id, session, ...fault, type: fault.type });
+      if (fault.type === "drop_socket") {
+        if (fault.delayMs > 0) context.timers.after(fault.delayMs, () => socket.drop());
+        else socket.drop();
+      }
+      if (fault.type !== "drop_socket") store.faults.push({ id, session, ...fault, type: fault.type });
       action(session, "fault", { fault: id, type: fault.type });
       return id;
     },
@@ -647,6 +652,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     edit: world.edit,
     remove: world.remove,
     action,
+    hears,
     emit,
     transport: socket.transport,
     directMessage: (session, userId) => open(session, userId, [store.app.botUserId]),

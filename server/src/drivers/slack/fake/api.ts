@@ -4,6 +4,7 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
+import { identified } from "../blocks.ts";
 import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
 import { NOBODY, type SlackConversationRecord, type SlackMessageRecord, type SlackUserRecord } from "../world.ts";
@@ -363,7 +364,9 @@ export function createSlackApi(
       const stream = message.stream;
       if (!stream) throw new SlackApiError("message_not_in_streaming_state");
       const blocks = json(args, "blocks");
-      if (Array.isArray(blocks)) message.blocks = [...message.blocks, ...blocks];
+      if (Array.isArray(blocks)) {
+        message.blocks = [...message.blocks, ...identified(blocks, () => ids.next("slack.block"))];
+      }
       const metadata = json(args, "metadata");
       if (metadata !== undefined) message.metadata = metadata;
       stream.state = "completed";
@@ -629,8 +632,14 @@ export function createSlackApi(
     try {
       if (token === undefined) throw new SlackApiError("not_authed");
       // Socket Mode connections are opened with the app-level token; everything else takes the bot token.
-      const expected = context.secret(name === "apps.connections.open" ? "appToken" : "botToken");
-      if (!constantTimeEqual(token, expected)) throw new SlackApiError("invalid_auth");
+      const [expected, other] =
+        name === "apps.connections.open" ? (["appToken", "botToken"] as const) : (["botToken", "appToken"] as const);
+      if (!constantTimeEqual(token, context.secret(expected))) {
+        // A real token of the wrong kind is told so; anything else is simply not a token.
+        throw new SlackApiError(
+          constantTimeEqual(token, context.secret(other)) ? "not_allowed_token_type" : "invalid_auth",
+        );
+      }
       if (!store.app.installed) throw new SlackApiError("account_inactive");
       if (!method) throw new SlackApiError("unknown_method", { req_method: name });
 

@@ -1991,6 +1991,13 @@
             "description": "For latency: how long each call takes longer.",
             "x-channelstack-duration": true
           },
+          "after": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "For drop_socket: how long until the connection drops. Default: now.",
+            "x-channelstack-duration": true
+          },
           "error": {
             "type": "string",
             "default": "internal_error"
@@ -6317,6 +6324,7 @@
             "operation",
             "retryAfter",
             "delay",
+            "after",
             "error",
             "times"
           ]

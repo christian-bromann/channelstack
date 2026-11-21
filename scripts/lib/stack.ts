@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -78,10 +78,7 @@ export async function withStack(
     };
     if (options.socketMode) {
       // In Socket Mode the agent listens nowhere: it is ready once the fake sees its connection.
-      const { url, token } = JSON.parse(readFileSync(join(home, "server.json"), "utf8")) as {
-        url: string;
-        token: string;
-      };
+      const { url, token } = server;
       const control = (method: string, path: string) =>
         fetch(`${url}/_channelstack${path}`, { method, headers: { authorization: `Bearer ${token}` } });
       const { sessionId } = (await (await control("POST", "/sessions")).json()) as { sessionId: string };

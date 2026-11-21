@@ -13,6 +13,7 @@ import {
   parseDuration,
   QUIET,
   type SlackConversation,
+  textMatches,
   untilQuiet,
   waitFor,
   WaitTimeoutError,
@@ -75,13 +76,6 @@ interface Delivery {
 }
 
 const nameOf = (author: AuthorRef) => (typeof author === "string" ? author : author.name);
-/** Does a pattern match? A `RegExp` with the `g` or `y` flag remembers where it stopped; every test starts afresh. */
-const patternMatches = (text: string, pattern: RegExp) => {
-  pattern.lastIndex = 0;
-  return pattern.test(text);
-};
-const textMatches = (text: string, expected: string | RegExp | undefined) =>
-  expected === undefined || (typeof expected === "string" ? text.includes(expected) : patternMatches(text, expected));
 const show = (expected: string | RegExp) =>
   typeof expected === "string" ? JSON.stringify(expected) : String(expected);
 const listing = (lines: readonly string[]) =>
@@ -400,7 +394,7 @@ export const matchers = {
         return {
           calls,
           matching: calls.filter((call) =>
-            typeof operation === "string" ? call.operation === operation : patternMatches(call.operation, operation),
+            typeof operation === "string" ? call.operation === operation : textMatches(call.operation, operation),
           ),
         };
       },

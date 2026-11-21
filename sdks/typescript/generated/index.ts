@@ -660,9 +660,9 @@ export class SlackFixture {
   }
 
   /** Inject a fault: into the agent's Web API calls (removed when this session closes), or drop its Socket Mode connection once. Experimental. */
-  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; error?: string; times?: number }): Promise<SlackFault> {
+  async fault(options: { type: "rate_limit" | "latency" | "error" | "drop_socket"; operation?: string; retryAfter?: Duration; delay?: Duration; after?: Duration; error?: string; times?: number }): Promise<SlackFault> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), error: options.error, times: options.times } })) as SlackFaultData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/faults`, { body: { type: options.type, operation: options.operation, retryAfter: options.retryAfter === undefined ? undefined : parseDuration(options.retryAfter), delay: options.delay === undefined ? undefined : parseDuration(options.delay), after: options.after === undefined ? undefined : parseDuration(options.after), error: options.error, times: options.times } })) as SlackFaultData;
     return new SlackFault(ctx, data);
   }
 

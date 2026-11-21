@@ -423,7 +423,7 @@ describe("modals", () => {
   });
 
   test("the app's response_action comes back in the response body: errors keep the modal open, update replaces it", async () => {
-    const { h, agent, ana, api, get, post, triggerId } = await clicked();
+    const { h, agent, ana, sessionId, api, get, post, triggerId } = await clicked();
     const { view } = await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW });
     const json = (body: unknown) => ({
       status: 200,
@@ -451,6 +451,14 @@ describe("modals", () => {
     agent.respond = () => json({ response_action: "update", view: thanks });
     await post(`/modals/${view.id}/submit`, { values: { Summary: "Checkout errors" } });
     await h.app.settled();
+    expect(await get(`/users/${ana.id}/modals`)).toMatchObject([{ viewId: view.id, title: "Filed" }]);
+
+    // An answer the fake can't act on (an update without a view) is on record, and the modal stays as it was.
+    agent.respond = () => json({ response_action: "update" });
+    await post(`/modals/${view.id}/submit`);
+    await h.app.settled();
+    const { events } = (await h.call("GET", `/sessions/${sessionId}/events`)).body;
+    expect(events.at(-1)).toMatchObject({ kind: "action", data: { action: "answer_refused" } });
     expect(await get(`/users/${ana.id}/modals`)).toMatchObject([{ viewId: view.id, title: "Filed" }]);
 
     // Required inputs must be filled, as in the client, and unknown inputs are refused.
@@ -547,6 +555,50 @@ describe("Stop", () => {
     await post(`/users/${ana.id}/stop`, { thread });
     await h.app.settled();
     expect(JSON.parse(agent.received.at(-1)?.body ?? "{}").event.streaming_message_ts).toEqual([]);
+  });
+});
+
+describe("where the app can't be told", () => {
+  test("Stop is refused where the app isn't listening, and nothing changes", async () => {
+    const { h, ana, sessionId, post } = await workspace();
+    // A channel the app is not in: there is no Stop to press.
+    const quiet = await post("/channels", { participants: [ana.id] });
+    const message = await post(`/users/${ana.id}/say`, { message: { text: "hello?" }, channel: quiet.id });
+    expect(await refusal(post(`/users/${ana.id}/stop`, { thread: { channel: quiet.id, ts: message.ts } }))).toBe(
+      "stop_unavailable",
+    );
+    // Nothing was pressed: the session's log has no Stop in it.
+    const { events } = (await h.call("GET", `/sessions/${sessionId}/events`)).body;
+    expect(events.map((event: { data: { action?: string } }) => event.data.action)).not.toContain("stop");
+  });
+
+  test("switching context is refused once the app is uninstalled", async () => {
+    const { ana, channel, post } = await workspace();
+    const thread = await post(`/users/${ana.id}/agent-threads`, {});
+    await post("/uninstall");
+    expect(
+      await refusal(
+        post(`/users/${ana.id}/switch-context`, {
+          channel: channel.id,
+          thread: { channel: thread.channel, ts: thread.ts },
+        }),
+      ),
+    ).toBe("split_view_unavailable");
+  });
+
+  test("a message only someone else sees can't be acted on", async () => {
+    const { h, ana, app, channel, api, post } = await workspace();
+    const ben = await post("/users", { name: "Ben" });
+    await post(`/users/${ana.id}/invite`, { participants: [ben.id], channel: channel.id });
+    const blocks = [
+      { type: "actions", elements: [{ type: "button", action_id: "go", text: { type: "plain_text", text: "Go" } }] },
+    ];
+    const whisper = await api("chat.postEphemeral", { channel: channel.id, user: ana.id, text: "For you", blocks });
+    await h.app.settled();
+    const message = { channel: channel.id, ts: whisper.message_ts };
+    expect(await refusal(post(`/users/${ben.id}/click`, { button: { label: "Go" }, message }))).toBe("not_found");
+    expect((await post(`/users/${ana.id}/click`, { button: { label: "Go" }, message })).type).toBe("block_actions");
+    expect(app.id).toBeDefined();
   });
 });
 

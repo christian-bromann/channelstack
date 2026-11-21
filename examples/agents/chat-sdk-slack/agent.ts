@@ -5,11 +5,11 @@
  * reads its configuration from the environment (`channelstack env` prints it): the Slack adapter
  * picks up `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and `SLACK_API_URL` by itself.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingHttpHeaders } from "node:http";
 
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createMemoryState } from "@chat-adapter/state-memory";
+import { isValidSlackRequest } from "@slack/bolt";
 import { streamText } from "ai";
 import {
   Actions,
@@ -191,16 +191,16 @@ bot.onReaction(async (event) => {
   await event.thread.post("Filed ENG-1024 for this.");
 });
 
-/** Slack's request signature: an HMAC over the timestamp and the exact body, no older than five minutes. */
-function signedBySlack(headers: IncomingHttpHeaders, body: string): boolean {
-  const timestamp = String(headers["x-slack-request-timestamp"] ?? "");
-  const expected = `v0=${createHmac("sha256", SLACK_SIGNING_SECRET ?? "")
-    .update(`v0:${timestamp}:${body}`)
-    .digest("hex")}`;
-  const given = String(headers["x-slack-signature"] ?? "");
-  const fresh = Math.abs(Date.now() / 1000 - Number(timestamp)) < 300;
-  return fresh && given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
-}
+/** Slack's request signature, checked with Slack's own verifier: an HMAC over the timestamp and the exact body. */
+const signedBySlack = (headers: IncomingHttpHeaders, body: string): boolean =>
+  isValidSlackRequest({
+    signingSecret: SLACK_SIGNING_SECRET ?? "",
+    body,
+    headers: {
+      "x-slack-signature": String(headers["x-slack-signature"] ?? ""),
+      "x-slack-request-timestamp": Number(headers["x-slack-request-timestamp"] ?? 0),
+    },
+  });
 
 /**
  * Message shortcuts aren't something the Chat SDK handles, so this one is answered next to it:
