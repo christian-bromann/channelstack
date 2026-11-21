@@ -5,7 +5,7 @@ import live from "../../samples/live.test.ts?sample";
 import notion from "../../samples/notion.test.ts?sample";
 import slack from "../../samples/slack.test.ts?sample";
 import pytest from "../../samples/test_keys.py?sample";
-import type { Sample } from "../../build/samples-plugin";
+import type { Sample } from "../../plugins/samples-plugin";
 import { Code, CopyButton } from "./Code";
 
 interface Example {

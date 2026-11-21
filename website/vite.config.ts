@@ -5,8 +5,8 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig } from "vite";
 import type {} from "vite-react-ssg";
-import rehypeHighlight from "./build/rehype-highlight";
-import samples from "./build/samples-plugin";
+import rehypeHighlight from "./plugins/rehype-highlight";
+import samples from "./plugins/samples-plugin";
 
 export default defineConfig({
   plugins: [

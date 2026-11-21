@@ -1,5 +1,5 @@
 declare module "*?sample" {
-  const sample: import("../build/samples-plugin").Sample;
+  const sample: import("../plugins/samples-plugin").Sample;
   export default sample;
 }
 

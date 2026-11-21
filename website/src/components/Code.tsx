@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { Sample } from "../../build/samples-plugin";
+import type { Sample } from "../../plugins/samples-plugin";
 import { Check, Clipboard } from "./Icons";
 
-/** A highlighted sample. The HTML comes from our own files at build time (see build/samples-plugin.ts). */
+/** A highlighted sample. The HTML comes from our own files at build time (see plugins/samples-plugin.ts). */
 export function Code({ sample, label, plain = false }: { sample: Sample; label: string; plain?: boolean }) {
   return (
     <pre className={plain ? "code plain" : "code"} tabIndex={0} role="region" aria-label={label}>
