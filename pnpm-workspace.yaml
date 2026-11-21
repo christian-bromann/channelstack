@@ -1,0 +1,6 @@
+packages:
+  - server
+  - codegen
+  - sdks/typescript
+minimumReleaseAgeExclude:
+  - knip@6.47.0
