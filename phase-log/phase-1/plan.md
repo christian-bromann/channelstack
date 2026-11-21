@@ -42,7 +42,9 @@ Standing checks added in this phase: `pnpm api:check` (the examples type-check a
 | Polling and durations | `sdks/typescript/runtime/{wait,duration}.ts` | Every matcher and `waitFor…` uses `waitFor` |
 | Starting the binary in tests | `scripts/lib/server.ts`, `server/test/integration/harness.ts` | Used by the acceptance runner |
 | new: `server/src/core/quiet/` | Quiet detector | Planned in the code map for this phase |
-| new: `server/src/core/config/` | Loading `channelstack.config.ts` and the Slack manifest | No phase owned config loading; the Slack app's scopes, events and URLs come from it |
+| not built: `server/src/core/config/` | Loading `channelstack.config.ts` and the Slack manifest | Planned here, then left out: no phase in docs/phases.md owns config loading. The fake app has default scopes and event subscriptions (`drivers/slack/fake/index.ts`); flagged in the PR |
+| new: `server/src/cli/`, `server/src/core/auth/ui.ts`, `server/src/ui/` | The attach CLI, browser access for the UI, the page in the binary | Decisions 0008 and 0010 |
+| new: `test/acceptance/`, `scripts/{examples,api-check}.ts`, `scripts/lib/stack.ts` | The acceptance tests that aren't examples, their runner, `api:check` | In the code map |
 | new: `integrations/matchers-core/`, `integrations/vitest/` | Matchers and the Vitest plugin | Planned in the code map for this phase |
 | new: `ui/` | UI v0 | Planned in architecture.md |
 | new: `examples/agents/` | Reference agents | Planned in implementation-plan.md 13 |
@@ -51,10 +53,14 @@ Standing checks added in this phase: `pnpm api:check` (the examples type-check a
 
 - `docs/decisions/0006-shared-world-collisions.md`: fixed names, fixed ids and global actions in the shared world.
 - `docs/decisions/0007-vitest-version.md`: the Vitest integration targets Vitest 5.
+- `docs/decisions/0008-ui-access.md`: how a browser gets into the UI, and what it may do.
+- `docs/decisions/0009-quiet-means-watched.md`: what "the agent is quiet" means to a check.
+- `docs/decisions/0010-dev-session-and-attach-cli.md`: the shared `dev` session and what the attach CLI needs from the server.
+- `docs/decisions/0011-reference-agents.md`: the reference agents.
 
 ## New dependencies
 
-Filled in as they are added; each with version, reason and license.
+All development-only: nothing new ships in the binary or the SDKs. (Reading a Slack manifest with `yaml` was planned here; config loading has no phase in docs/phases.md, so it wasn't built.)
 
 | Package | Version | Where | Why a library and not our code | License |
 |---|---|---|---|---|
@@ -62,7 +68,6 @@ Filled in as they are added; each with version, reason and license.
 | `ai` | 7.0.177 | reference agent | Streaming and the framework's mock model | Apache-2.0 |
 | `chat`, `@chat-adapter/slack`, `@chat-adapter/state-memory` | 4.45.0 | reference agent | The Chat SDK Slack adapter | MIT |
 | `webdriverio` | 10.2.0 | exit check 1.6 | The browser test for the UI | MIT |
-| `yaml` | 2.9.1 | server | Reading a real Slack manifest (already a development dependency) | ISC |
 
 ## Docs to update
 
