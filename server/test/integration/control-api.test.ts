@@ -42,7 +42,7 @@ describe("exit check 0.1: the control API needs the token", () => {
 
     const ok = await server.control("GET", "/status");
     expect(ok.status).toBe(200);
-    expect(ok.body).toEqual({ ready: true, version: cli(["--version"]).stdout.trim(), drivers: ["echo"] });
+    expect(ok.body).toEqual({ ready: true, version: cli(["--version"]).stdout.trim(), drivers: ["echo", "slack"] });
 
     for (const token of [null, "not-the-token", `${server.token}x`, server.token.slice(0, -1)]) {
       const refused = await server.control("GET", "/status", undefined, token);
@@ -248,10 +248,12 @@ describe.runIf(posix)("portless", () => {
     const server = await start({ args: [], env: { PATH: portless.path } });
 
     expect(server.url).toBe("https://channelstack.localhost");
-    const [first, second] = portless.calls();
-    const port = first?.split(" ")[2];
-    expect(first).toMatch(/^alias channelstack \d+$/);
-    expect(second).toBe(`alias echo ${port}`);
+    // One name for the UI and control API, and one per driver, all on the server's one port.
+    const names = ["channelstack", "echo", "slack"];
+    const registered = portless.calls();
+    const port = registered[0]?.split(" ")[2];
+    expect(port).toMatch(/^\d+$/);
+    expect(registered).toEqual(names.map((name) => `alias ${name} ${port}`));
     // The names point at the loopback port the server really listens on.
     const direct = await fetch(`http://127.0.0.1:${port}/_channelstack/status`, {
       headers: { authorization: `Bearer ${server.token}` },
@@ -259,7 +261,7 @@ describe.runIf(posix)("portless", () => {
     expect(direct.status).toBe(200);
 
     expect(await server.stop()).toBe(0);
-    expect(portless.calls().slice(2)).toEqual(["alias --remove channelstack", "alias --remove echo"]);
+    expect(portless.calls().slice(names.length)).toEqual(names.map((name) => `alias --remove ${name}`));
   });
 
   test("a failing or missing portless stops the start with a clear message", async () => {
