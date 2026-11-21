@@ -4,6 +4,7 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import { emitPython } from "../codegen/src/emit/python.ts";
 import { emitTypeScript } from "../codegen/src/emit/typescript.ts";
 import { filesBelow, ROOT, specFromRoutes, staleFiles } from "./lib/generate.ts";

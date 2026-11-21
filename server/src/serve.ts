@@ -1,4 +1,5 @@
 import { join } from "node:path";
+
 import { type App, type AppOptions, CONTROL_PREFIX, createApp, type ServerUrls } from "./app.ts";
 import { createBearerToken } from "./core/auth/index.ts";
 import { readPrivateJsonFile, removeFile, writePrivateFile } from "./core/home/index.ts";

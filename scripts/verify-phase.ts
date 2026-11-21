@@ -4,6 +4,7 @@
  * an earlier one fails, so one run shows everything that is red.
  */
 import { spawnSync } from "node:child_process";
+
 import { ROOT } from "./lib/generate.ts";
 
 interface Check {

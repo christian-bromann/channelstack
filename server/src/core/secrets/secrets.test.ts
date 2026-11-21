@@ -1,9 +1,11 @@
 import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, expect, test } from "vitest";
+
 import { randomString } from "./csprng.ts";
-import { SECRET_FORMATS, type SecretFormatName, type SecretSpec, Secrets } from "./index.ts";
+import { SECRET_FORMATS, type SecretFormatName, Secrets, type SecretSpec } from "./index.ts";
 
 const posix = process.platform !== "win32";
 const everyFormat = Object.fromEntries(Object.keys(SECRET_FORMATS).map((name) => [name, name])) as Record<

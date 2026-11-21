@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "vitest";
+
 import { systemClock } from "../../core/clock/index.ts";
 import { DeliveryQueue } from "../../core/delivery/index.ts";
 import { EventLog } from "../../core/events/index.ts";

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+
 import { readPrivateJsonFile, writePrivateFile } from "../home/index.ts";
 import { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
 

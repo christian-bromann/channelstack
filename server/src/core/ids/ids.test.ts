@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import { ProtocolError } from "../errors/index.ts";
 import { githubNodeId, ID_FORMATS, IdGenerator, type IdKind, parseSeed, SLACK_TS_PATTERN } from "./index.ts";
 

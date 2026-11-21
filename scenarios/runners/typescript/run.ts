@@ -3,6 +3,7 @@
  * Usage: node run.ts <scenario.yaml> [--mode auto|attach|start]
  */
 import { readFileSync } from "node:fs";
+
 import { ChannelstackError, connect, waitFor } from "channelstack/client";
 import { parse } from "yaml";
 

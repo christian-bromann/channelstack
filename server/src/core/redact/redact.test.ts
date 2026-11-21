@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+
 import { SECRET_FORMATS } from "../secrets/index.ts";
 import { Redactor } from "./index.ts";
 

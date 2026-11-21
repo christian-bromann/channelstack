@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from "hono";
+
 import { ProtocolError } from "../errors/index.ts";
 import { randomToken } from "../secrets/index.ts";
 import { constantTimeEqual } from "../signing/hmac.ts";

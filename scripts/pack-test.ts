@@ -6,6 +6,7 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+
 import rootPackage from "../package.json" with { type: "json" };
 import sdkPackage from "../sdks/typescript/package.json" with { type: "json" };
 import serverPackage from "../server/package.json" with { type: "json" };
@@ -16,8 +17,8 @@ import {
   NPM_DIR,
   platformPackageDir,
   platformPackageName,
-  TARGETS,
   type TargetKey,
+  TARGETS,
 } from "./lib/packages.ts";
 import { capture, run } from "./lib/process.ts";
 import { startBinary } from "./lib/server.ts";

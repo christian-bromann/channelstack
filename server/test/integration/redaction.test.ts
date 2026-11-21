@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
+
 import { afterAll, expect, test } from "vitest";
+
 import { SECRET_FORMATS } from "../../src/core/secrets/index.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 

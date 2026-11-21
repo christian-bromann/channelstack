@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+
 import { uniformInt } from "pure-rand/distribution/uniformInt";
 import { xoroshiro128plus } from "pure-rand/generator/xoroshiro128plus";
 import type { RandomGenerator } from "pure-rand/types/RandomGenerator";
+
 import type { Clock } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import { type Draw, ID_FORMATS, type IdKind } from "./formats.ts";

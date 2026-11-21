@@ -2,11 +2,12 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { binaryPath } from "../../../scripts/lib/packages.ts";
 import {
+  startBinary as startExecutable,
   type StartBinaryOptions,
   type StartedBinary,
-  startBinary as startExecutable,
 } from "../../../scripts/lib/server.ts";
 
 /** The compiled binary under test: `CHANNELSTACK_SERVER_BIN`, or the one `pnpm build:binary` made for this machine. */

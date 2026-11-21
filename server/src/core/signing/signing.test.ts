@@ -1,5 +1,7 @@
 import { createHmac } from "node:crypto";
+
 import { describe, expect, test } from "vitest";
+
 import { signEchoDelivery } from "./echo.ts";
 import { constantTimeEqual, hmacSha256Hex } from "./hmac.ts";
 

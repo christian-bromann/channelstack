@@ -2,7 +2,9 @@ import { chmodSync, existsSync, readFileSync, statSync, writeFileSync } from "no
 import { connect } from "node:net";
 import { networkInterfaces } from "node:os";
 import { delimiter, join } from "node:path";
+
 import { afterEach, describe, expect, test } from "vitest";
+
 import { cli, type RunningBinary, startBinary, temporaryHome } from "./harness.ts";
 
 const running: RunningBinary[] = [];

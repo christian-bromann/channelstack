@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import serverPackage from "../server/package.json" with { type: "json" };
 import { ROOT, toJson } from "./lib/generate.ts";
 import {
@@ -13,8 +14,8 @@ import {
   hostTarget,
   platformPackageDir,
   platformPackageName,
-  TARGETS,
   type TargetKey,
+  TARGETS,
 } from "./lib/packages.ts";
 
 const keys = process.argv.includes("--all") ? (Object.keys(TARGETS) as TargetKey[]) : [hostTarget()];

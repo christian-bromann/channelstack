@@ -1,4 +1,5 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+
 import { type CoreErrorCode, ErrorBody, ProtocolError } from "../errors/index.ts";
 import type { Session, Sessions } from "../sessions/index.ts";
 
@@ -47,13 +48,21 @@ type Result<R extends z.ZodType> = [R] extends [z.ZodUndefined]
   ? void | Promise<void>
   : z.input<R> | Promise<z.input<R>>;
 
-export interface RouteSpec<P extends AnyObject, Q extends AnyObject, B extends z.ZodType, R extends z.ZodType>
-  extends RouteBase<P, Q, B, R> {
+export interface RouteSpec<
+  P extends AnyObject,
+  Q extends AnyObject,
+  B extends z.ZodType,
+  R extends z.ZodType,
+> extends RouteBase<P, Q, B, R> {
   handler(input: Input<P, Q, B>): Result<R>;
 }
 
-export interface DriverRouteSpec<P extends AnyObject, Q extends AnyObject, B extends z.ZodType, R extends z.ZodType>
-  extends RouteBase<P, Q, B, R> {
+export interface DriverRouteSpec<
+  P extends AnyObject,
+  Q extends AnyObject,
+  B extends z.ZodType,
+  R extends z.ZodType,
+> extends RouteBase<P, Q, B, R> {
   handler(input: Input<P, Q, B> & { session: Session }): Result<R>;
 }
 

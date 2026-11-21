@@ -1,6 +1,8 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { afterEach, describe, expect, test } from "vitest";
+
 import { type App, createApp } from "./app.ts";
 import { createLogger } from "./core/log/index.ts";
 import { Redactor } from "./core/redact/index.ts";

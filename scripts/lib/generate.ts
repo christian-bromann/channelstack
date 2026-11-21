@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { buildIr, type Ir } from "../../codegen/src/ir.ts";
 import serverPackage from "../../server/package.json" with { type: "json" };
 import { createApp } from "../../server/src/app.ts";

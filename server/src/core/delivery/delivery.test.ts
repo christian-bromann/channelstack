@@ -1,6 +1,8 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { afterEach, describe, expect, test } from "vitest";
+
 import { systemClock } from "../clock/index.ts";
 import { EventLog } from "../events/index.ts";
 import { createLogger } from "../log/index.ts";

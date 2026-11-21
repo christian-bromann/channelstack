@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
+
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
 import { homeDir, readPrivateJsonFile } from "./core/home/index.ts";

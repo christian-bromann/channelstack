@@ -1,7 +1,9 @@
 import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, expect, test } from "vitest";
+
 import { homeDir, readPrivateJsonFile, removeFile, writePrivateFile } from "./index.ts";
 
 const posix = process.platform !== "win32";

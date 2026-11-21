@@ -1,11 +1,13 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+
 import { afterEach, describe, expect, test } from "vitest";
+
 import { connectWith, sessionOf } from "./client.ts";
 import { parseDuration } from "./duration.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, segment, Transport } from "./transport.ts";
-import { WaitTimeoutError, waitFor } from "./wait.ts";
+import { waitFor, WaitTimeoutError } from "./wait.ts";
 
 const servers: Server[] = [];
 afterEach(() => {

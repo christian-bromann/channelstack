@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+
 import { Redactor } from "../redact/index.ts";
 import { createLogger, parseLogLevel } from "./index.ts";
 

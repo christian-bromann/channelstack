@@ -4,6 +4,7 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import { ROOT, specFromRoutes, staleFiles, toJson } from "./lib/generate.ts";
 
 const { openapi, ir } = specFromRoutes();

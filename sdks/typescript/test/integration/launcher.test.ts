@@ -2,7 +2,9 @@ import { spawnSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { afterEach, describe, expect, test } from "vitest";
+
 import { BINARY, type RunningBinary, startBinary, temporaryHome } from "../../../../server/test/integration/harness.ts";
 import { launch, type ServerConnection } from "../../runtime/launcher.ts";
 import { waitFor } from "../../runtime/wait.ts";

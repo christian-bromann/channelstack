@@ -5,6 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { ROOT } from "./lib/generate.ts";
 
 const ROUTES = "server/src/drivers/echo/routes.ts";
