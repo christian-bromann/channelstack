@@ -1435,6 +1435,10 @@
             "type": "array",
             "items": {}
           },
+          "open": {
+            "type": "boolean",
+            "description": "False once it was submitted or closed."
+          },
           "errors": {
             "type": "object",
             "additionalProperties": {
@@ -1448,6 +1452,7 @@
           "user",
           "title",
           "blocks",
+          "open",
           "errors"
         ],
         "x-channelstack-resource": {
@@ -3959,7 +3964,8 @@
           "invalid_argument",
           "internal",
           "session_not_found",
-          "not_found"
+          "not_found",
+          "split_view_unavailable"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -4257,7 +4263,7 @@
     },
     "/sessions/{session}/slack/users/{user}/modals": {
       "get": {
-        "summary": "The modals the app has open for this person, the one on top last",
+        "summary": "The modals the app opened for this person, in the order it opened them; `open` says which are still up",
         "security": [
           {
             "bearer": []

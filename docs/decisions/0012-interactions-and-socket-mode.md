@@ -18,6 +18,8 @@ Slack has separate request URLs for events, interactivity and slash commands. Un
 ## Socket Mode
 
 - An app chooses Socket Mode by calling `apps.connections.open`. From then on deliveries go over its connection, not to its request URL. This is a second **transport** of the one delivery queue (`DeliveryTransport`), not a second queue: attempts, retries, the quiet rule and the event log are the same.
+- The way back: while the app is between connections, deliveries wait for it to reconnect (a Socket Mode client does within seconds). An app that also has a request URL and has held no connection for 30 seconds is reached at its request URL again, so a long-running `channelstack start` serves an agent restarted over HTTP. Without a request URL, deliveries keep waiting for a socket and time out.
+- A modal that was submitted or closed stays on record with `open: false`: `user.modals()` lists what the app opened, in order, so `waitForModal` finds a second modal after the first is gone.
 - While the app is disconnected, an attempt waits for it to reconnect until the ack window ends. That is what makes `drop_socket` survivable for an agent that reconnects.
 - `drop_socket` cuts the connections once, without a goodbye. It is not stored like the Web API faults.
 - The WebSocket is served by `serve.ts` (the only place that calls `Bun.serve`); the fake only sees a `SocketSession`, so its logic is unit-tested without a socket.

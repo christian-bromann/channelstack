@@ -102,6 +102,21 @@ describe("buttons and menus", () => {
     expect(agent.received.filter(({ body }) => body.startsWith("payload="))).toHaveLength(1);
   });
 
+  test("only controls get an action_id; an image next to a text doesn't", async () => {
+    const { channel, api } = await workspace();
+    const blocks = [
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: "The build" },
+        accessory: { type: "image", image_url: "https://example.com/build.png", alt_text: "build" },
+      },
+      { type: "actions", elements: [{ type: "button", text: { type: "plain_text", text: "Go" } }] },
+    ];
+    const { message } = await api("chat.postMessage", { channel: channel.id, text: "Build", blocks });
+    expect(message.blocks[0].accessory).toEqual(blocks[0]?.accessory);
+    expect(message.blocks[1].elements[0].action_id).toEqual(expect.any(String));
+  });
+
   test("a button is found by action_id too, in the latest message of a thread or channel that has it", async () => {
     const { h, ana, channel, say, api, post, last } = await workspace();
     const question = await say("@my-agent deploy");
@@ -154,6 +169,12 @@ describe("buttons and menus", () => {
     expect(
       await refusal(post(`/users/${ana.id}/select`, { option: ["qa"], menu: { label: "Environment" }, message })),
     ).toBe("not_found");
+    // A menu that takes one value is not given two.
+    expect(
+      await refusal(
+        post(`/users/${ana.id}/select`, { option: ["staging", "production"], menu: { label: "Environment" }, message }),
+      ),
+    ).toBe("invalid_argument");
   });
 
   test("only someone who can see the message can act on it", async () => {
@@ -418,8 +439,30 @@ describe("modals", () => {
       response_urls: [],
     });
     expect(payload.trigger_id).toBeDefined();
-    expect(await get(`/users/${ana.id}/modals`)).toEqual([]);
+    // The modal is gone from the screen and stays on record: a test can still ask what the app opened.
+    expect(await get(`/users/${ana.id}/modals`)).toMatchObject([{ viewId: view.id, open: false }]);
     expect((await api("views.update", { view_id: view.id, view: INCIDENT_VIEW })).error).toBe("not_found");
+    expect(await refusal(post(`/modals/${view.id}/submit`))).toBe("not_found");
+    expect(await refusal(post(`/modals/${view.id}/close`))).toBe("not_found");
+  });
+
+  test("a second modal, opened after the first was submitted, comes after it in the list", async () => {
+    const { h, agent, ana, channel, api, get, post, last, triggerId } = await clicked();
+    const first = (await api("views.open", { trigger_id: triggerId, view: INCIDENT_VIEW })).view;
+    agent.respond = () => ({ status: 200 });
+    await post(`/modals/${first.id}/submit`, { values: { Severity: "SEV1", Summary: "Checkout errors" } });
+    await h.app.settled();
+
+    await post(`/users/${ana.id}/click`, { button: { label: "Open form" }, channel: channel.id });
+    await h.app.settled();
+    const followUp = { type: "modal", title: { type: "plain_text", text: "Who is on call?" }, blocks: [] };
+    const second = (await api("views.open", { trigger_id: last().payload.trigger_id, view: followUp })).view;
+
+    // The list only grows, so a wait that remembers how far it has read finds the new one.
+    expect(await get(`/users/${ana.id}/modals`)).toMatchObject([
+      { viewId: first.id, open: false },
+      { viewId: second.id, title: "Who is on call?", open: true },
+    ]);
   });
 
   test("the app's response_action comes back in the response body: errors keep the modal open, update replaces it", async () => {
@@ -495,7 +538,7 @@ describe("modals", () => {
     await h.app.settled();
     expect(closed).toMatchObject({ type: "view_closed" });
     expect(last().payload).toMatchObject({ type: "view_closed", view: { id: view.id }, is_cleared: false });
-    expect(await get(`/users/${ana.id}/modals`)).toEqual([]);
+    expect(await get(`/users/${ana.id}/modals`)).toMatchObject([{ viewId: view.id, open: false }]);
 
     // Without notify_on_close the app hears nothing, and there is no delivery to hand back.
     const channel = (await get("/conversations"))[0].id;
@@ -587,7 +630,7 @@ describe("where the app can't be told", () => {
   });
 
   test("a message only someone else sees can't be acted on", async () => {
-    const { h, ana, app, channel, api, post } = await workspace();
+    const { h, ana, channel, api, post, last } = await workspace();
     const ben = await post("/users", { name: "Ben" });
     await post(`/users/${ana.id}/invite`, { participants: [ben.id], channel: channel.id });
     const blocks = [
@@ -598,13 +641,70 @@ describe("where the app can't be told", () => {
     const message = { channel: channel.id, ts: whisper.message_ts };
     expect(await refusal(post(`/users/${ben.id}/click`, { button: { label: "Go" }, message }))).toBe("not_found");
     expect((await post(`/users/${ana.id}/click`, { button: { label: "Go" }, message })).type).toBe("block_actions");
-    expect(app.id).toBeDefined();
+    await h.app.settled();
+    // The app is told the message was one only Ana saw.
+    expect(last().payload.container).toMatchObject({ message_ts: whisper.message_ts, is_ephemeral: true });
+  });
+
+  test("answering a click on an ephemeral message changes it without an event", async () => {
+    const { h, agent, ana, channel, api, post, get, last } = await workspace();
+    const blocks = [
+      { type: "actions", elements: [{ type: "button", action_id: "go", text: { type: "plain_text", text: "Go" } }] },
+    ];
+    const whisper = await api("chat.postEphemeral", { channel: channel.id, user: ana.id, text: "For you", blocks });
+    await post(`/users/${ana.id}/click`, {
+      button: { label: "Go" },
+      message: { channel: channel.id, ts: whisper.message_ts },
+    });
+    await h.app.settled();
+    const { response_url: url } = last().payload;
+    const received = agent.received.length;
+    const respond = (body: unknown) => h.app.fetch(new Request(url, { method: "POST", body: JSON.stringify(body) }));
+    const seen = async () => (await get(`/conversations/${channel.id}/transcript?as=${ana.id}`)).text;
+
+    expect((await respond({ text: "Done" })).status).toBe(200);
+    await h.app.settled();
+    expect(await seen()).toBe("my-agent: Done (only Ana sees this)");
+    expect((await respond({ delete_original: true })).status).toBe(200);
+    await h.app.settled();
+    expect(await seen()).toBe("");
+    // Slack sends no events about messages only one person sees.
+    expect(agent.received).toHaveLength(received);
+  });
+
+  test("Stop is refused once the app is uninstalled, and what is streaming keeps streaming", async () => {
+    const { h, ana, team, channel, say, api, post, get } = await workspace();
+    const question = await say("@my-agent write a long report");
+    const stream = await api("chat.startStream", {
+      channel: channel.id,
+      thread_ts: question.ts,
+      markdown_text: "Q3 was",
+      recipient_user_id: ana.id,
+      recipient_team_id: team.id,
+    });
+    await h.app.settled();
+    await post("/uninstall");
+    await h.app.settled();
+
+    expect(await refusal(post(`/users/${ana.id}/stop`, { thread: { channel: channel.id, ts: question.ts } }))).toBe(
+      "stop_unavailable",
+    );
+    expect((await get(`/conversations/${channel.id}/messages/${stream.ts}/stream`)).state).toBe("open");
+  });
+
+  test("the split view can't be opened for an app that isn't installed, and no thread is made", async () => {
+    const { ana, sessionId, h, post } = await workspace();
+    await post("/uninstall");
+    await h.app.settled();
+    expect(await refusal(post(`/users/${ana.id}/agent-threads`, {}))).toBe("split_view_unavailable");
+    const { events } = (await h.call("GET", `/sessions/${sessionId}/events`)).body;
+    expect(events.map((event: { data: { action?: string } }) => event.data.action)).not.toContain("openAgentThread");
   });
 });
 
 describe("the agent split view", () => {
   test("opening it starts a thread in the DM, the app offers prompts, and the person picks one", async () => {
-    const { h, agent, app, team, ana, channel, api, post, get } = await workspace();
+    const { h, agent, team, ana, channel, api, post, get } = await workspace();
     const events = () => agent.received.map(({ body }) => JSON.parse(body).event);
 
     const thread = await post(`/users/${ana.id}/agent-threads`, { from: channel.id });
@@ -649,7 +749,13 @@ describe("the agent split view", () => {
         post(`/users/${ana.id}/pick-prompt`, { title: "Nope", thread: { channel: thread.channel, ts: thread.ts } }),
       ),
     ).toBe("not_found");
-    expect(app.id).toBeDefined();
+
+    // A prompt belongs to the thread: naming a reply in it finds the same prompts.
+    const again = await post(`/users/${ana.id}/pick-prompt`, {
+      title: "What changed?",
+      thread: { channel: thread.channel, ts: picked.ts },
+    });
+    expect(again).toMatchObject({ text: "What changed in this channel today?", threadTs: thread.ts });
   });
 
   test("moving to another channel with the view open tells the app the new context", async () => {

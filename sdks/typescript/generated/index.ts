@@ -842,7 +842,7 @@ export class SlackUser {
     return new SlackDelivery(ctx, data);
   }
 
-  /** The modals the app has open for this person, the one on top last. Experimental. */
+  /** The modals the app opened for this person, in the order it opened them; `open` says which are still up. Experimental. */
   async modals(): Promise<SlackModals> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/modals`)) as SlackModalsWire;
@@ -1242,6 +1242,7 @@ export interface SlackModalData {
   user: SlackUserData;
   title: string;
   blocks: unknown[];
+  open: boolean;
   errors: Record<string, string>;
 }
 
@@ -1250,6 +1251,7 @@ export class SlackModal {
   readonly user: SlackUser;
   readonly title: string;
   readonly blocks: unknown[];
+  readonly open: boolean;
   readonly errors: Record<string, string>;
   readonly #ctx: HandleContext;
 
@@ -1260,6 +1262,7 @@ export class SlackModal {
     this.user = new SlackUser(ctx, data.user);
     this.title = data.title;
     this.blocks = data.blocks;
+    this.open = data.open;
     this.errors = data.errors;
   }
 

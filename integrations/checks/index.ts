@@ -209,10 +209,18 @@ export function slackChecks(options: ChecksOptions): void {
         const admin = await slack.createUser({ name: "Ben", admin: true });
         const channel = await slack.createChannel({ participants: [ana, admin, slack.app] });
         const msg = await ana.say(approval.prompt, { channel });
-        const ask = await msg.thread.latestReply({ from: app, ...wait });
-        await admin.click(approval.button, { message: ask });
-        await admin.click(approval.button, { message: ask });
-        // The ask, and one message for the one approval.
+        const ask = await msg.thread.waitForReply({ from: app, ...wait });
+        // Both presses are on their way before the agent can answer the first. An agent that takes the
+        // button away once it has acted leaves nothing for a later press to find, and that is fine.
+        const nothingToPress = (error: unknown) => {
+          if ((error as { code?: string }).code !== "not_found") throw error;
+        };
+        await Promise.all([
+          admin.click(approval.button, { message: ask }),
+          admin.click(approval.button, { message: ask }).catch(nothingToPress),
+        ]);
+        // The approval shows up first; then the thread holds the ask and one message for the one approval.
+        await msg.thread.waitForReply({ from: app, ...wait });
         await expect(msg.thread).toHaveRepliesFrom(app, { count: 2, ...wait });
       },
       options.approval,

@@ -13,6 +13,8 @@ export interface SlackFixture extends Inspectable<SlackDelivery> {
   readonly app: SlackApp;
   /** Base URL to give the agent, e.g. `https://slack.localhost/api/`. */
   readonly apiUrl: string;
+  /** How many Socket Mode connections the agent has open right now. 0 for an agent on a request URL. */
+  readonly socketConnections: number;
 
   createUser(options: SlackUserOptions): Promise<SlackUser>;
 
@@ -126,6 +128,8 @@ export interface SlackUser extends User {
   stop(target: { thread: SlackThread | SlackMessage }): Promise<SlackDelivery>;
   /** Wait for the agent to open a modal for this person (via `views.open`). */
   waitForModal(options?: WaitOptions & { title?: string | RegExp }): Promise<SlackModal>;
+  /** Every modal the agent opened for this person, in the order it opened them. `open` says which are still up. */
+  modals(): Promise<SlackModal[]>;
 
   // ------------------------------------------------------------ conversations
   /** Open (or reuse) a DM with the app, another person, or several (a group DM). */
@@ -261,6 +265,10 @@ export interface SlackModal {
   readonly user: SlackUser;
   readonly title: string;
   readonly blocks: readonly unknown[];
+  /** False once it was submitted or closed. */
+  readonly open: boolean;
+  /** What the agent said is wrong after a submission (`response_action: "errors"`), by the label of the input. */
+  readonly errors: Readonly<Record<string, string>>;
   /** Input labels or `action_id`s, mapped to their current values. */
   values(): Promise<Record<string, string | string[] | undefined>>;
   /** Fill inputs by label or `block_id.action_id`, then submit. Sends `view_submission`. */

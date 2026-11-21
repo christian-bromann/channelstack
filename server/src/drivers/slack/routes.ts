@@ -128,6 +128,7 @@ const SlackModal = z
     user: SlackUser,
     title: z.string(),
     blocks: z.array(z.unknown()),
+    open: z.boolean().openapi({ description: "False once it was submitted or closed." }),
     errors: z
       .record(z.string(), z.string())
       .openapi({ description: "What the app said is wrong after a submission, by the label of the input." }),
@@ -620,7 +621,7 @@ export function registerSlackRoutes(
     params: UserParams,
     body: z.object({ from: conversationRef.optional() }).openapi("SlackAgentThreadOptions"),
     response: SlackThread,
-    errors: ["not_found"],
+    errors: ["not_found", "split_view_unavailable"],
     sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from"] },
     stability,
     handler: ({ session, params, body }) =>
@@ -676,6 +677,7 @@ export function registerSlackRoutes(
       user: userWire(world.user(session, view.user)),
       title: plain(view.definition.title),
       blocks: view.definition.blocks,
+      open: !view.closed,
       // What the app said is wrong, by the label of the input it is shown at.
       errors: Object.fromEntries(
         Object.entries(view.errors).map(([block, message]) => [
@@ -689,7 +691,7 @@ export function registerSlackRoutes(
   router.route({
     method: "get",
     path: "/users/{user}/modals",
-    summary: "The modals the app has open for this person, the one on top last",
+    summary: "The modals the app opened for this person, in the order it opened them; `open` says which are still up",
     params: UserParams,
     response: z.array(SlackModal).openapi("SlackModals"),
     errors: ["not_found"],

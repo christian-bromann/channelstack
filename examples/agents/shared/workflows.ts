@@ -17,6 +17,7 @@ export const texts = {
   askEnvironment: (service: string) => `Where should ${service} go?`,
   deploying: (service: string, environment: string) => `Deploying ${service} to ${environment}…`,
   mayNotApprove: "Only workspace admins may approve a deploy.",
+  approved: "Approved.",
   askIncident: "I can file that. Open the form when you're ready.",
   incidentFiled: (severity: string, summary: string) => `${severity} incident filed: ${summary}`,
   ticketCreated: "Created ticket ENG-1025 for this message.",

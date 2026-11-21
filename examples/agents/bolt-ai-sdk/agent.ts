@@ -187,8 +187,10 @@ app.message(async ({ message, body, client, say }) => {
     if (stream !== undefined && !stop.signal.aborted)
       await client.chat.stopStream({ channel: message.channel, ts: stream });
   } catch (error) {
-    // Stop can land between the check above and the next append.
-    if (!stop.signal.aborted) throw error;
+    // Stop can land between the check above and the next append: Slack has ended the stream by then and
+    // says so, sometimes before the event about it arrives.
+    const stoppedByUser = (error as { data?: { error?: string } }).data?.error === "stopped_by_user";
+    if (!stop.signal.aborted && !stoppedByUser) throw error;
   } finally {
     writing.delete(`${message.channel}:${thread}`);
   }

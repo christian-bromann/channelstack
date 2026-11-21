@@ -871,7 +871,7 @@ class SlackUser:
         return SlackDelivery(ctx, data)
 
     async def modals(self) -> SlackModals:
-        """The modals the app has open for this person, the one on top last. Experimental."""
+        """The modals the app opened for this person, in the order it opened them; `open` says which are still up. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/modals")
         return [SlackModal(ctx, item) for item in data]
@@ -1110,6 +1110,7 @@ class SlackModal:
         self.user: SlackUser = SlackUser(ctx, data["user"])
         self.title: str = data["title"]
         self.blocks: list[Any] = data["blocks"]
+        self.open: bool = data["open"]
         self.errors: dict[str, str] = data["errors"]
 
     async def values(self) -> SlackModalValues:

@@ -4,6 +4,8 @@ import { randomToken } from "../../../core/secrets/index.ts";
 
 /** How long a ticket from `apps.connections.open` is good for. */
 const TICKET_LIFETIME_MS = 30_000;
+/** How long deliveries wait for a Socket Mode app to reconnect before its request URL is used again. */
+const RECONNECT_WINDOW_MS = 30_000;
 
 /** The envelope type Socket Mode wraps each kind of delivery in. */
 const ENVELOPE_TYPE: Readonly<Record<string, string>> = {
@@ -43,6 +45,11 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
   /** Attempts waiting for the app to (re)connect. */
   let waiting: Array<() => void> = [];
   let chosen = false;
+  /** When the app last had, or asked for, a connection: an app that reconnects does so within seconds. */
+  let lastSeen = 0;
+  /** An app that also has a request URL counts as back on HTTP once it has held no socket for this long. */
+  const backOnHttp = () =>
+    context.webhookUrl !== undefined && peers.size === 0 && clock() - lastSeen > RECONNECT_WINDOW_MS;
 
   const url = () => `${context.apiUrl().replace(/^http/, "ws")}/link`;
 
@@ -99,6 +106,7 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
   return {
     ticket() {
       chosen = true;
+      lastSeen = clock();
       const ticket = randomToken(24);
       tickets.set(ticket, clock() + TICKET_LIFETIME_MS);
       return `${url()}/?ticket=${ticket}&app_id=${appId()}`;
@@ -136,19 +144,22 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
         },
         closed() {
           if (self) peers.delete(self);
+          lastSeen = clock();
         },
       };
     },
 
     connections: () => peers.size,
 
-    transport: () => (chosen ? { url: url(), send } : undefined),
+    // While the app is between connections, deliveries wait for it; one that stays away is reached at its request URL.
+    transport: () => (chosen && !backOnHttp() ? { url: url(), send } : undefined),
 
     drop() {
       for (const peer of [...peers]) {
         peers.delete(peer);
         peer.close();
       }
+      lastSeen = clock();
     },
   };
 }

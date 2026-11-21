@@ -138,6 +138,8 @@ export interface SlackViewRecord {
   readonly previousViewId: string | null;
   /** What the app said is wrong after a submission, by `block_id`. */
   errors: Record<string, string>;
+  /** Submitted or closed. The record stays, so a test can still ask which modals the app opened. */
+  closed: boolean;
 }
 
 /** A control a person means: by the label they see, by its `action_id`, or both. */
@@ -255,7 +257,7 @@ export interface SlackWorld {
   /** How many Socket Mode connections the app holds open. 0 for an app that receives over HTTP. */
   socketConnections(): number;
 
-  /** The modals open for a person, the one on top last. */
+  /** The modals the app opened for a person, in the order it opened them, closed ones included. */
   modals(session: string, user: string): SlackViewRecord[];
   modal(session: string, view: string): SlackViewRecord;
   /** Fill in inputs (by label, `block_id.action_id`, `action_id` or `block_id`) and submit. Returns the `view_submission` delivery. */

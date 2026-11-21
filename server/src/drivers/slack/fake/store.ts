@@ -49,6 +49,8 @@ export class SlackStore {
   readonly responseUrls = new Map<string, SlackResponseUrl>();
   /** `trigger_id`s the app may open a modal with, and until when. */
   readonly triggers = new Map<string, { session: string; user: string; expiresAt: number; used: boolean }>();
+  /** `drop_socket` faults that haven't fired yet, by fault id. */
+  readonly pendingDrops = new Map<string, { session: string; cancel(): void }>();
   /** The modals that are open, by view id. */
   readonly views = new Map<string, SlackViewRecord>();
   /** Conversation ids in creation order: the registry has no listing, and Slack lists conversations. */
@@ -167,6 +169,11 @@ export class SlackStore {
     for (const [key, url] of this.responseUrls) if (url.session === session) this.responseUrls.delete(key);
     for (const [id, trigger] of this.triggers) if (trigger.session === session) this.triggers.delete(id);
     for (const [id, view] of this.views) if (view.session === session) this.views.delete(id);
+    for (const [id, drop] of this.pendingDrops) {
+      if (drop.session !== session) continue;
+      drop.cancel();
+      this.pendingDrops.delete(id);
+    }
     const people = this.usersOf(session);
     this.#people.delete(session);
     for (const id of [...this.#known]) {

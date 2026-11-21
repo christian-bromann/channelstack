@@ -3,7 +3,7 @@ import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signSlackRequest } from "../../../core/signing/slack.ts";
-import { type Block, blockControls, findButton, findSelect, plain, selectOptions } from "../blocks.ts";
+import { type Block, blockControls, findButton, findSelect, identified, plain, selectOptions } from "../blocks.ts";
 import {
   blockActionsPayload,
   type InteractionContext,
@@ -209,6 +209,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
   ) => {
     const payload = blockActionsPayload(answerable(session, "actions", user, conversation, message), {
       message: kit.messageObject(message),
+      ephemeral: message.ephemeralFor !== undefined,
       actions: [action],
     });
     return send(session, "block_actions", payloadForm(payload), payload);
@@ -259,6 +260,9 @@ export function createInteractions(kit: InteractionKit): Interactions {
         return option;
       });
       const many = String(found.element.type).startsWith("multi_");
+      if (!many && chosen.length !== 1) {
+        throw new ProtocolError("invalid_argument", "That menu takes one option");
+      }
       kit.action(session, "select", { user: user.id, channel: conversation.id, ts: message.ts, options: [...options] });
       return blockActions(
         session,
@@ -349,6 +353,10 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const user = store.users.get(session, userId);
       const context = from === undefined ? undefined : store.conversations.get(session, from);
       const dm = kit.directMessage(session, user.id);
+      // The split view belongs to an app that is installed and listening. Refused before a thread exists.
+      if (!kit.hears(dm, "assistant_thread_started")) {
+        throw refuse("split_view_unavailable", "The app doesn't receive assistant_thread_started");
+      }
       // The thread hangs on an anchor nobody sees; what people and the app write are its replies.
       const anchor = kit.postAsApp(dm, { text: "" }, { ephemeralFor: NOBODY });
       kit.action(session, "openAgentThread", { user: user.id, channel: dm.id, ts: anchor.ts });
@@ -362,11 +370,11 @@ export function createInteractions(kit: InteractionKit): Interactions {
 
     pickPrompt(session, userId, title, thread) {
       const conversation = store.conversations.get(session, thread.channel);
-      const prompt = store
-        .threadState(conversation.id, thread.ts)
-        .suggestedPrompts?.find((offered) => offered.title === title);
+      // Prompts belong to the thread, whichever of its messages was named.
+      const named = requireMessage(conversation, thread.ts);
+      const offered = store.threadState(conversation.id, named.threadTs ?? named.ts).suggestedPrompts ?? [];
+      const prompt = offered.find((known) => known.title === title);
       if (!prompt) {
-        const offered = store.threadState(conversation.id, thread.ts).suggestedPrompts ?? [];
         throw new ProtocolError(
           "not_found",
           `No suggested prompt "${title}" there. Suggested: ${offered.length === 0 ? "none" : offered.map((known) => known.title).join(", ")}`,
@@ -404,14 +412,19 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const conversation = store.conversations.find(url.conversation);
       if (!conversation) return false;
       const source = url.source === undefined ? undefined : store.findMessage(conversation.id, url.source);
+      // An ephemeral message was never the app's to hear about: it changes or goes without an event.
+      const quietly = source?.ephemeralFor !== undefined;
       if (body.delete_original === true) {
-        if (source) kit.remove(conversation, source);
+        if (source && quietly) store.removeMessage(conversation.id, source.ts);
+        else if (source) kit.remove(conversation, source);
         return true;
       }
       // An answer replaces the message the control was on, unless it says otherwise or there is none.
       if (source && body.replace_original !== false) {
         const text = typeof body.text === "string" ? body.text : "";
-        kit.edit(conversation, source, { text, blocks: Array.isArray(body.blocks) ? body.blocks : [] });
+        const blocks = Array.isArray(body.blocks) ? body.blocks : [];
+        if (quietly) Object.assign(source, { text, blocks: identified(blocks, () => ids.next("slack.block")) });
+        else kit.edit(conversation, source, { text, blocks });
         return true;
       }
       publish(conversation, url.user, url.threadTs, body);

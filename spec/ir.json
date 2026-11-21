@@ -1953,7 +1953,8 @@
             "invalid_argument",
             "internal",
             "session_not_found",
-            "not_found"
+            "not_found",
+            "split_view_unavailable"
           ],
           "dispose": false
         },
@@ -2083,7 +2084,7 @@
         {
           "name": "modals",
           "kind": "method",
-          "summary": "The modals the app has open for this person, the one on top last",
+          "summary": "The modals the app opened for this person, in the order it opened them; `open` says which are still up",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -3590,6 +3591,13 @@
             "items": {
               "kind": "unknown"
             }
+          },
+          "optional": false
+        },
+        {
+          "name": "open",
+          "type": {
+            "kind": "boolean"
           },
           "optional": false
         },

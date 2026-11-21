@@ -47,8 +47,9 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
 
   const owned = (session: string, id: string): SlackViewRecord => {
     const view = store.views.get(id);
-    if (!view || view.session !== session)
+    if (!view || view.session !== session || view.closed) {
       throw new ProtocolError("not_found", `No open modal "${id}" in this session`);
+    }
     return view;
   };
 
@@ -62,7 +63,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
   /** Close a modal and everything stacked on it or under it, as the client does when a flow ends. */
   const closeStack = (view: SlackViewRecord) => {
     for (const other of [...store.views.values()]) {
-      if (other.rootViewId === view.rootViewId) store.views.delete(other.id);
+      if (other.rootViewId === view.rootViewId) other.closed = true;
     }
   };
 
@@ -109,13 +110,14 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
           rootViewId: view.rootViewId,
           previousViewId: view.id,
           errors: {},
+          closed: false,
         });
         return;
       }
       default:
         // An empty answer closes this view; `clear` closes the whole stack. With one view they are the same.
         if (response.response_action === "clear") closeStack(view);
-        else store.views.delete(view.id);
+        else view.closed = true;
     }
   };
 
@@ -128,7 +130,9 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
       if (trigger.expiresAt < clock()) throw refuse("expired_trigger_id", "A trigger_id is good for three seconds");
       const definition = definitionOf(view);
       trigger.used = true;
-      const under = onTop ? [...store.views.values()].findLast((open) => open.user === trigger.user) : undefined;
+      const under = onTop
+        ? [...store.views.values()].findLast((open) => open.user === trigger.user && !open.closed)
+        : undefined;
       const id = ids.next("slack.view");
       const record: SlackViewRecord = {
         id,
@@ -140,6 +144,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
         rootViewId: under?.rootViewId ?? id,
         previousViewId: under?.id ?? null,
         errors: {},
+        closed: false,
       };
       store.views.set(id, record);
       return described(record);
@@ -147,7 +152,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
 
     updateView(viewId, hash, view) {
       const record = store.views.get(viewId);
-      if (!record) throw refuse("not_found", "No such open view");
+      if (!record || record.closed) throw refuse("not_found", "No such open view");
       if (hash !== undefined && hash !== record.hash) throw refuse("hash_conflict", "The view changed since this hash");
       record.definition = definitionOf(view);
       record.values = valuesFor(record.definition, record.values);
@@ -203,7 +208,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
     closeModal(session, id) {
       const view = owned(session, id);
       kit.action(session, "close", { user: view.user, view: view.id });
-      store.views.delete(view.id);
+      view.closed = true;
       if (view.definition.notify_on_close !== true) return undefined;
       const payload = viewClosedPayload(viewContext(view), described(view));
       return dispatch.send(session, "view_closed", payloadForm(payload), payload);

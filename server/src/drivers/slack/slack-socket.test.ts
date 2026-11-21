@@ -161,4 +161,30 @@ describe("Socket Mode", () => {
     h.timers.advance(1);
     expect(connection.isClosed()).toBe(true);
   });
+
+  test("a drop that is still to come is called off with its fault, and with its session", async () => {
+    const { h, sessionId, connect, post } = await workspace();
+    const connection = await connect();
+    const fault = await post("/faults", { type: "drop_socket", after: 2000 });
+    await h.call("DELETE", `/sessions/${sessionId}/slack/faults/${fault.id}`);
+    h.timers.advance(2000);
+    expect(connection.isClosed()).toBe(false);
+
+    await post("/faults", { type: "drop_socket", after: 2000 });
+    await h.call("DELETE", `/sessions/${sessionId}`);
+    h.timers.advance(2000);
+    expect(connection.isClosed()).toBe(false);
+  });
+
+  test("an app that stays off the socket is reached at its request URL again", async () => {
+    const { h, agent, connect, say, post } = await workspace();
+    await connect();
+    await post("/faults", { type: "drop_socket" });
+    // Half a minute without a connection: the app runs over HTTP now.
+    h.clock.advance(31_000);
+    const received = agent.received.length;
+    await say("over HTTP now?");
+    await h.app.settled();
+    expect(agent.received.length).toBe(received + 1);
+  });
 });

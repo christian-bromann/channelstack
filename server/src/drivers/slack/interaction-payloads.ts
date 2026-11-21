@@ -34,7 +34,7 @@ const base = ({ user, team, app, conversation, verificationToken, triggerId, res
 /** A click on a button or a choice in a menu, in a message. `message` is the message as `conversations.history` shows it. */
 export function blockActionsPayload(
   context: InteractionContext,
-  input: { message: Record<string, unknown>; actions: Array<Record<string, unknown>> },
+  input: { message: Record<string, unknown>; ephemeral: boolean; actions: Array<Record<string, unknown>> },
 ): Record<string, unknown> {
   const { message } = input;
   return {
@@ -44,7 +44,7 @@ export function blockActionsPayload(
       type: "message",
       message_ts: message.ts,
       channel_id: context.conversation.id,
-      is_ephemeral: false,
+      is_ephemeral: input.ephemeral,
       ...(message.thread_ts === undefined ? {} : { thread_ts: message.thread_ts }),
     },
     message,

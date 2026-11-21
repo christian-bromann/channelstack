@@ -183,7 +183,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   /** Would the app be told about this kind of event in this conversation? */
   const hears = (conversation: SlackConversationRecord, subscription: string): boolean => {
     const { app } = store;
-    return app.installed && app.botEvents.includes(subscription) && conversation.members.has(app.botUserId);
+    // Reachable at all: at its request URL, or over the socket it opened.
+    const reachable = context.webhookUrl !== undefined || socket.transport() !== undefined;
+    return (
+      reachable && app.installed && app.botEvents.includes(subscription) && conversation.members.has(app.botUserId)
+    );
   };
 
   const emit: FakeSlackWorld["emit"] = (conversation, subscription, event) => {
@@ -627,8 +631,14 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       const id = `fault_${store.faults.length + 1}_${ids.next("slack.block")}`;
       // Dropping the socket happens once, now; the other faults stay until they are removed.
       if (fault.type === "drop_socket") {
-        if (fault.delayMs > 0) context.timers.after(fault.delayMs, () => socket.drop());
-        else socket.drop();
+        if (fault.delayMs > 0) {
+          // A drop that is still to come is called off with its fault, and with its session.
+          const cancel = context.timers.after(fault.delayMs, () => {
+            store.pendingDrops.delete(id);
+            socket.drop();
+          });
+          store.pendingDrops.set(id, { session, cancel });
+        } else socket.drop();
       }
       if (fault.type !== "drop_socket") store.faults.push({ id, session, ...fault, type: fault.type });
       action(session, "fault", { fault: id, type: fault.type });
@@ -638,6 +648,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     removeFault(session, id) {
       const index = store.faults.findIndex((fault) => fault.id === id && fault.session === session);
       if (index !== -1) store.faults.splice(index, 1);
+      const drop = store.pendingDrops.get(id);
+      if (drop?.session === session) {
+        drop.cancel();
+        store.pendingDrops.delete(id);
+      }
     },
   };
 

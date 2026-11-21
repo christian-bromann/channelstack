@@ -120,13 +120,20 @@ export function selectOptions(element: Block): Array<{ text: unknown; value: str
   );
 }
 
+/** The element types a person can act on. */
+const INTERACTIVE = /^(button|workflow_button|overflow|checkboxes|radio_buttons|file_input)$|select$|picker$|_input$/;
+
 /**
  * Blocks as Slack stores them: every block has a `block_id` and every control an `action_id`.
  * What the app left out is filled in, the way Slack generates them.
  */
 export function identified(blocks: readonly unknown[], nextId: () => string): unknown[] {
+  // Only what a person can act on has an `action_id`: an image in a section doesn't.
   const control = (element: unknown): unknown =>
-    typeof element === "object" && element !== null && !("action_id" in element) && "type" in element
+    typeof element === "object" &&
+    element !== null &&
+    !("action_id" in element) &&
+    INTERACTIVE.test(String((element as Block).type))
       ? { ...element, action_id: nextId() }
       : element;
   return blocks.map((raw) => {

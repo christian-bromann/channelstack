@@ -2,6 +2,9 @@
  * An agent with one switchable fault per standard check. With `BROKEN` unset it does everything
  * right; with `BROKEN=slack.dm-once` (any check id) it has exactly the bug that check exists to
  * catch. The test suite uses it to prove that each check fails when it should.
+ *
+ * `REMOVES_BUTTON=1` is not a fault: the agent then replaces the approval question once it has
+ * acted, the usual way to make a second click impossible. The checks must pass for it too.
  */
 import { createApp, listen } from "../shared/bolt.ts";
 import { answer, sendOrShorten, wantsWriting } from "../shared/scripted-model.ts";
@@ -120,6 +123,7 @@ app.action("approve_deploy", async ({ ack, body, action, client, respond }) => {
   if (approved.has(body.message.ts) && !broken("slack.double-click")) return;
   approved.add(body.message.ts);
   const [service = "", environment = ""] = (action.value ?? "").split(":");
+  if (process.env.REMOVES_BUTTON === "1") await respond({ replace_original: true, text: texts.approved });
   await client.chat.postMessage({
     channel: body.channel.id,
     thread_ts: body.message.thread_ts ?? body.message.ts,
