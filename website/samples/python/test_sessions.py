@@ -1,3 +1,6 @@
+from pytest_channelstack import expect
+
+
 async def test_stop_ends_a_working_session(linear):
     kai = await linear.create_user(name="Kai")
     team = await linear.create_team(key="ENG", members=[kai])

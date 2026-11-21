@@ -1,7 +1,8 @@
 /**
  * `import sample from "../samples/slack.test.ts?sample"` gives the highlighted sample.
  *
- * Samples are real files that `pnpm typecheck:samples` checks against ../api/*.d.ts.
+ * Samples are real files. `pnpm typecheck:samples` checks the TypeScript ones against
+ * ../api/*.d.ts; the Python ones are only syntax-checked (samples/python/README.md).
  * Two comment markers control what the site shows:
  *   // @show:start … // @show:end   show only this region (the whole file otherwise)
  *   // [!step 2]                    at the end of a line: tag it for the hero playback

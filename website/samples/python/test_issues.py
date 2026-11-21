@@ -1,3 +1,6 @@
+from pytest_channelstack import expect
+
+
 async def test_answers_on_the_issue_and_ignores_itself(github):
     mo = await github.create_user(login="mo")
     repo = await github.create_repo(collaborators=[mo], apps=[github.app])

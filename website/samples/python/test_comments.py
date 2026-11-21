@@ -1,3 +1,6 @@
+from pytest_channelstack import expect
+
+
 async def test_answers_a_comment_mention_in_the_same_discussion(notion):
     ana = await notion.create_user(name="Ana")
     page = await notion.create_page(  # [!step 1]

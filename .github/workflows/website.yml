@@ -24,6 +24,8 @@ defaults:
 env:
   # Actions never interpolate the branch name into a script; steps read it from here.
   BRANCH: ${{ github.head_ref || github.ref_name }}
+  # The commit that is checked out and built. On pull_request events GITHUB_SHA is the merge commit.
+  HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   preview:
@@ -58,17 +60,6 @@ jobs:
       - run: pnpm typecheck:samples
       - run: pnpm build
 
-      - name: Create the Worker if it doesn't exist yet
-        # `wrangler versions upload` can't create a Worker. The first run creates it on
-        # workers.dev only; the custom domain is attached by the production deploy.
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if ! pnpm exec wrangler deployments status > /dev/null 2>&1; then
-            pnpm exec wrangler deploy --config wrangler.bootstrap.jsonc
-          fi
-
       - name: Upload a preview version
         id: preview
         env:
@@ -83,7 +74,7 @@ jobs:
           if [ "${#alias}" -gt 40 ]; then
             alias="$(printf '%s' "$alias" | cut -c1-32 | sed -E 's/-+$//')-$(printf '%s' "$BRANCH" | sha256sum | cut -c1-7)"
           fi
-          pnpm exec wrangler versions upload --preview-alias "$alias" --message "$BRANCH @ ${GITHUB_SHA::7}" | tee upload.log
+          pnpm exec wrangler versions upload --preview-alias "$alias" --message "$BRANCH @ ${HEAD_SHA::7}" | tee upload.log
           url="$(grep -oE "https://${alias}-[a-z0-9.-]+\.workers\.dev" upload.log | head -n 1)"
           if [ -z "$url" ]; then
             echo "::error::wrangler did not print a preview alias URL"
@@ -104,7 +95,7 @@ jobs:
             exit 0
           fi
           marker="<!-- website-preview -->"
-          body="$(printf '%s\n**Website preview:** %s\n\nBuilt from %s. This comment is updated on every push.' "$marker" "$PREVIEW_URL" "${GITHUB_SHA::7}")"
+          body="$(printf '%s\n**Website preview:** %s\n\nBuilt from %s. This comment is updated on every push.' "$marker" "$PREVIEW_URL" "${HEAD_SHA::7}")"
           comment="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty" | head -n 1)"
           if [ -n "$comment" ]; then
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment" -f body="$body" > /dev/null

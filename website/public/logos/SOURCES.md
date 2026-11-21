@@ -4,14 +4,16 @@ The channel cards on the home page show each platform's official mark, to say "c
 with this platform". Every file here is the unmodified official file, byte for byte, taken from the
 company's own brand or media kit on 2026-11-20.
 
-| File | Channel | Official source | Original file name | Used on |
-|---|---|---|---|---|
-| `slack.svg` | Slack | Media kit linked from https://slack.com/media-kit | `SLA-Slack-icon-RGB.svg` | light and dark |
-| `github.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub_Invertocat_Black.svg` | light |
-| `github-white.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub_Invertocat_White.svg` | dark |
-| `linear.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-dark.svg` | light |
-| `linear-light.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-light.svg` | dark |
-| `notion.svg` | Notion | `NotionLogoFiles.zip` on https://notion.notion.site/Media-Kit-205535b1d9c4440497a3d7a2ac096286 | `notion-logo-block-main.svg` | light and dark |
+| File | Channel | Official source | Path inside the kit | Used on | SHA-256 |
+|---|---|---|---|---|---|
+| `slack.svg` | Slack | Media kit linked from https://slack.com/media-kit | `SLA-Slack-icon-RGB.svg` | light and dark | `08f20f65a7d900c40358ca441caa7b834d82083356aa40d1f17d0844e8b3f73f` |
+| `github.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub Logos/SVG/GitHub_Invertocat_Black.svg` | light | `693d7abe6f899646cc2e96856723b45e95f71885a54910b2749f6decdf7e1ee1` |
+| `github-white.svg` | GitHub | https://brand.github.com/GitHub_Logos.zip | `GitHub Logos/SVG/GitHub_Invertocat_White.svg` | dark | `ccd84c89b1056345608fc3489357f8acc7397e49a3cdc2d418b6c8016911d47b` |
+| `linear.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-dark.svg` | light | `e683e95a5eb9b360ae06360c0350fd1b5fcf3d2222ef9de8e71fa0bc413dccc3` |
+| `linear-light.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-light.svg` | dark | `32f9883452188b39787f8242c7bfce723ded255f35f13254e727871d3dae2fd1` |
+| `notion.svg` | Notion | `NotionLogoFiles.zip` on https://notion.notion.site/Media-Kit-205535b1d9c4440497a3d7a2ac096286 | `notion-logo-block-main.svg` | light and dark | `840a6f78e87f39cc4a4b0743a00cc6fd82c07ba5dc51d778d7976b6575bcf4fb` |
+
+To re-check a file, download the kit, and compare `shasum -a 256` of the file at that path with the sum above.
 
 ## Guidelines
 
@@ -31,6 +33,6 @@ Notion for permission, or replacing those two marks with names, are the ways to 
 ## How the marks are shown
 
 - Unmodified files, rendered with `<img>` at 32 px: no recolouring, cropping, rotation, effects or animation of a mark.
-- "Works with" use only: one mark per channel card, next to the platform's name, smaller than channelstack's own branding.
+- "Works with" use only: one mark per channel card, next to the platform's name, and nowhere else on the site.
 - GitHub and Linear use their official dark-background files in the dark theme; Slack and Notion have one file for both.
 - The footer states that channelstack is not affiliated with or endorsed by these companies and that the names and logos are their trademarks (`src/components/Footer.tsx`).

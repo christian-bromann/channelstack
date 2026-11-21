@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SITE } from "../lib/site";
+import { Pause, Play } from "./Icons";
 import { Mark } from "./Mark";
 
 const DOCS = [
@@ -13,6 +15,17 @@ const DOCS = [
 ] as const;
 
 export function Footer() {
+  const [paused, setPaused] = useState(false);
+
+  // Pauses the looping decorations (hero waves, diagram, waveform); see `data-motion` in base.css.
+  function toggleMotion() {
+    const next = !paused;
+    setPaused(next);
+    if (next) document.documentElement.setAttribute("data-motion", "paused");
+    else document.documentElement.removeAttribute("data-motion");
+    for (const animation of document.getAnimations()) next ? animation.pause() : animation.play();
+  }
+
   return (
     <footer className="footer">
       <div className="wrap">
@@ -24,6 +37,10 @@ export function Footer() {
           <p className="legal">
             MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear or Notion. Their names and logos are trademarks of their owners.
           </p>
+          <button type="button" className="motion-toggle" aria-pressed={paused} onClick={toggleMotion}>
+            {paused ? <Play size={12} /> : <Pause size={12} />}
+            {paused ? "Play animations" : "Pause animations"}
+          </button>
         </div>
         <nav aria-labelledby="footer-docs">
           <h2 id="footer-docs">Docs</h2>

@@ -70,7 +70,8 @@ export function Voice() {
       return animation;
     });
     const observer = new IntersectionObserver(([entry]) => {
-      animations.forEach((animation) => (entry?.isIntersecting ? animation.play() : animation.pause()));
+      const run = entry?.isIntersecting && document.documentElement.getAttribute("data-motion") !== "paused";
+      animations.forEach((animation) => (run ? animation.play() : animation.pause()));
     });
     observer.observe(el);
     return () => {

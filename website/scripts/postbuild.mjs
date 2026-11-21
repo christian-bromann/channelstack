@@ -21,6 +21,11 @@ async function htmlFiles(dir) {
 }
 
 const pages = await htmlFiles(dist);
+
+// The headline is the largest paint, so its font is preloaded instead of swapped in late.
+const headingFont = (await readdir(join(dist, "assets"))).find((name) => /^familjen-grotesk-latin-wght-normal-.*\.woff2$/.test(name));
+if (!headingFont) throw new Error("heading font not found in dist/assets");
+const preload = `<link rel="preload" href="/assets/${headingFont}" as="font" type="font/woff2" crossorigin>`;
 const hashes = new Set();
 const urls = [];
 
@@ -30,7 +35,7 @@ for (const file of pages) {
   // charset in the first 1024 bytes, so move it back to the front.
   const charset = /<meta charset="utf-8"\s*\/?>/i;
   if (!charset.test(html)) throw new Error(`${relative(dist, file)} has no <meta charset>`);
-  html = html.replace(charset, "").replace(/<head[^>]*>/, (head) => `${head}<meta charset="utf-8">`);
+  html = html.replace(charset, "").replace(/<head[^>]*>/, (head) => `${head}<meta charset="utf-8">${preload}`);
   await writeFile(file, html);
   for (const [, attrs, body] of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)) {
     if (/\ssrc=/.test(attrs) || !body) continue;

@@ -60,125 +60,93 @@ main > .hero {
   position: relative;
 }
 
-/* the stack of channels: four layers seen from above, floating, with a signal crossing each */
-.stack-art {
+/* voice waves drifting past in the free space beside the headline */
+.hero-waves {
   display: none;
   position: absolute;
-  top: -30px;
-  right: -20px;
-  width: 520px;
-  height: 520px;
+  top: 24px;
+  right: -32px;
+  width: min(46%, 560px);
+  height: 300px;
   pointer-events: none;
+  -webkit-mask-image: radial-gradient(60% 62% at 55% 50%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(60% 62% at 55% 50%, #000 35%, transparent 100%);
 }
 
 @media (min-width: 1180px) {
-  .stack-art {
+  .hero-waves {
     display: block;
   }
 }
 
-.stack-scene {
-  position: absolute;
-  inset: 180px 110px 50px 110px;
-  transform: rotateX(58deg) rotateZ(-45deg);
-  transform-style: preserve-3d;
-}
-
-.layer {
+.wave-layer {
   position: absolute;
   inset: 0;
-  border: 1px solid color-mix(in srgb, var(--muted) 50%, transparent);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--bg-raise) 88%, transparent);
   overflow: hidden;
 }
 
-.layer:nth-child(1) { transform: translateZ(0); }
-.layer:nth-child(2) { transform: translateZ(54px); }
-.layer:nth-child(3) { transform: translateZ(108px); }
-.layer:nth-child(4) {
-  transform: translateZ(162px);
-  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
-  background: color-mix(in srgb, var(--accent-soft) 92%, transparent);
+/* each drawing holds two identical periods; sliding by half its width loops seamlessly */
+.wave-layer svg {
+  width: 200%;
+  height: 100%;
 }
 
-.layer-name {
-  position: absolute;
-  top: 16px;
-  left: 18px;
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 13px;
+.wave-layer rect {
+  fill: var(--muted);
 }
 
-.layer:nth-child(4) .layer-name {
-  color: var(--accent);
+.wave-layer path {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
 }
 
-.layer-lines {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  left: 18px;
-  display: grid;
-  gap: 8px;
+.wave-layer.bars {
+  opacity: 0.28;
 }
 
-.layer-lines i {
-  height: 6px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--muted) 45%, transparent);
+.wave-layer.line-a {
+  opacity: 0.75;
 }
 
-.layer-lines i:nth-child(1) { width: 72%; }
-.layer-lines i:nth-child(2) { width: 46%; }
-.layer-lines i:nth-child(3) { width: 60%; }
-
-.layer-signal {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 8px;
-  opacity: 0;
+.wave-layer.line-a path {
+  stroke: var(--accent);
 }
 
-.layer-signal i {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+.wave-layer.line-b {
+  opacity: 0.4;
+}
+
+.wave-layer.line-b path {
+  stroke: var(--muted);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .layer {
-    animation: float-1 7s ease-in-out infinite;
+  .wave-layer svg {
+    animation: drift 46s linear infinite;
   }
-  .layer:nth-child(2) { animation-name: float-2; animation-delay: -1.2s; }
-  .layer:nth-child(3) { animation-name: float-3; animation-delay: -2.4s; }
-  .layer:nth-child(4) { animation-name: float-4; animation-delay: -3.6s; }
-  .layer-signal {
-    animation: signal 6s linear infinite;
+  .wave-layer.line-a svg {
+    animation-duration: 30s;
   }
-  .layer:nth-child(3) .layer-signal { animation-delay: 1.5s; }
-  .layer:nth-child(2) .layer-signal { animation-delay: 3s; }
-  .layer:nth-child(1) .layer-signal { animation-delay: 4.5s; }
+  .wave-layer.line-b svg {
+    animation-duration: 64s;
+    animation-direction: reverse;
+  }
+  /* the whole layer swells and settles, like a voice getting louder and quieter */
+  .wave-layer.bars {
+    animation: swell 7s ease-in-out infinite;
+  }
+  .wave-layer.line-a {
+    animation: swell 9s ease-in-out -3s infinite;
+  }
 }
 
-@keyframes float-1 { 50% { transform: translateZ(-8px); } }
-@keyframes float-2 { 50% { transform: translateZ(62px); } }
-@keyframes float-3 { 50% { transform: translateZ(100px); } }
-@keyframes float-4 { 50% { transform: translateZ(174px); } }
+@keyframes drift {
+  to { transform: translateX(-50%); }
+}
 
-@keyframes signal {
-  0% { opacity: 0; transform: translateX(0); }
-  3% { opacity: 1; }
-  21% { opacity: 1; }
-  24%, 100% { opacity: 0; transform: translateX(calc(100% - 8px)); }
+@keyframes swell {
+  50% { transform: scaleY(0.72); }
 }
 
 .eyebrow {

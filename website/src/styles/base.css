@@ -579,6 +579,44 @@ button {
   }
 }
 
+/* ---------- pausing motion ---------- */
+
+/* The "Pause animations" button in the footer stops every looping decoration. */
+:root[data-motion="paused"] *,
+:root[data-motion="paused"] *::before,
+:root[data-motion="paused"] *::after {
+  animation-play-state: paused !important;
+}
+
+.motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.motion-toggle:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+html:not(.js) .motion-toggle {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-toggle {
+    display: none;
+  }
+}
+
 /* ---------- footer ---------- */
 
 .footer {

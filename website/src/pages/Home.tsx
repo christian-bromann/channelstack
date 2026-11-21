@@ -5,10 +5,10 @@ import vitestConfig from "../../samples/quickstart/vitest.config.ts?sample";
 import { Code, CopyButton, Terminal } from "../components/Code";
 import { Flow } from "../components/Flow";
 import { Footer } from "../components/Footer";
+import { HeroWaves } from "../components/HeroWaves";
 import { ArrowRight, Person, Route, Shield, Transcript } from "../components/Icons";
 import { Nav } from "../components/Nav";
 import { Seo } from "../components/Seo";
-import { StackArt } from "../components/StackArt";
 import { Player } from "../components/Player";
 import { Voice } from "../components/Voice";
 import { useReveal } from "../lib/hooks";
@@ -92,7 +92,7 @@ export default function Home() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-bg" aria-hidden="true" />
           <div className="wrap">
-            <StackArt />
+            <HeroWaves />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
               Test harness for agents that live in chat
