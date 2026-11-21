@@ -5,7 +5,8 @@ import { Redactor } from "./index.ts";
 
 describe("redaction", () => {
   test.each(
-    Object.entries(SECRET_FORMATS).filter(([name]) => !name.endsWith("ingSecret") && name !== "github.webhookSecret"),
+    // Secrets with no prefix have no shape to recognise; they are scrubbed once registered (next test).
+    Object.entries(SECRET_FORMATS).filter(([, format]) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern))),
   )("a %s is scrubbed by its shape", (_name, format) => {
     const token = format.generate();
     const out = new Redactor().text(`calling with ${token} failed`);

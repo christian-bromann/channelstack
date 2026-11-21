@@ -90,6 +90,11 @@ export class IdGenerator {
     return id;
   }
 
+  /** Give a reserved id back when the session that held it closes, so a later test can claim it again. */
+  release(kind: IdKind, id: string): void {
+    this.#used.get(kind)?.delete(id);
+  }
+
   /** The next number in a sequence, starting at 1: GitHub issue numbers per repo, Linear issue numbers per team. */
   sequence(scope: string): number {
     const next = (this.#sequences.get(scope) ?? 0) + 1;
