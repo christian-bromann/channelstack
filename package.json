@@ -21,6 +21,7 @@
     "test:accept": "node scripts/accept.ts",
     "test:pack": "node scripts/pack-test.ts",
     "test:stale": "node scripts/selftest-stale.ts",
+    "api:check": "node scripts/api-check.ts",
     "spec": "node scripts/spec.ts",
     "spec:check": "node scripts/spec.ts --check",
     "sdk": "node scripts/sdk.ts",

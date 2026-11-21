@@ -31,17 +31,19 @@ const ENABLED = [
   "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
 ];
 
+/** Matches the full name ("describe > test") of every example test this phase has enabled. */
+export const ENABLED_TESTS = new RegExp(`^(${ENABLED.join("|")})`);
+
 export async function runExamples(
   options: { agents?: ReadonlyArray<keyof typeof AGENTS>; bin?: string } = {},
 ): Promise<void> {
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
-  const pattern = `^(${ENABLED.join("|")})`;
   for (const name of options.agents ?? (Object.keys(AGENTS) as Array<keyof typeof AGENTS>)) {
     console.log(`\napi/examples against ${name}`);
     await withStack({ bin, agent: AGENTS[name], webhook: { driver: "slack", path: "/slack/events" } }, ({ env }) => {
       const vitest = ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts"];
-      run("pnpm", [...vitest, "api/examples", "-t", pattern], { cwd: ROOT, env });
+      run("pnpm", [...vitest, "api/examples", "-t", ENABLED_TESTS.source], { cwd: ROOT, env });
       // The tests that need a server and an agent but aren't examples (quiet, parallel sessions).
       run("pnpm", [...vitest, "test/acceptance/stack"], { cwd: ROOT, env });
     });
