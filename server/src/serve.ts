@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { type App, type AppOptions, CONTROL_PREFIX, createApp, type ServerUrls } from "./app.ts";
 import { createBearerToken } from "./core/auth/index.ts";
-import { removeFile, writePrivateFile } from "./core/home/index.ts";
+import { readPrivateJsonFile, removeFile, writePrivateFile } from "./core/home/index.ts";
 import { createLogger, type LogLevel } from "./core/log/index.ts";
 import { registerAliases } from "./core/portless/index.ts";
 import { Redactor } from "./core/redact/index.ts";
@@ -36,8 +36,40 @@ export function serverFilePath(home: string): string {
   return join(home, "server.json");
 }
 
+interface ServerFile {
+  url: string;
+  token: string;
+  pid: number;
+  version: string;
+}
+
+function readServerFile(path: string): Partial<ServerFile> | undefined {
+  const contents = readPrivateJsonFile(path);
+  return typeof contents === "object" && contents !== null ? contents : undefined;
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM means the process exists and belongs to someone else.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 /** Start the server: load the install's secrets, bind loopback, register portless names, and write the token file. */
 export async function start(options: StartOptions): Promise<RunningServer> {
+  const serverFile = options.serverFile ?? serverFilePath(options.home);
+  // A server file belongs to one server. Taking it over would cut the running server off from
+  // the CLI and every SDK that attached to it (decision 0004).
+  const existing = readServerFile(serverFile);
+  if (typeof existing?.pid === "number" && existing.pid !== process.pid && isAlive(existing.pid)) {
+    throw new Error(
+      `A channelstack server is already running (pid ${existing.pid}, ${existing.url}). ` +
+        "Stop it first, or start a private one with --server-file <path>.",
+    );
+  }
   const secrets = Secrets.load(options.home, secretSpecs());
   const token = createBearerToken();
   const redactor = new Redactor();
@@ -69,16 +101,14 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   let removeAliases = async () => {};
   try {
     if (options.portless) removeAliases = await registerAliases(app.hosts(), Number(server.port));
+    const file: ServerFile = { url: listening.control, token, pid: process.pid, version: options.version };
+    writePrivateFile(serverFile, `${JSON.stringify(file, null, 2)}\n`);
   } catch (error) {
+    // Nothing may be left behind by a start that failed: no names pointing at a dead port, no listener.
+    await removeAliases();
     await server.stop(true);
     throw error;
   }
-
-  const serverFile = options.serverFile ?? serverFilePath(options.home);
-  writePrivateFile(
-    serverFile,
-    `${JSON.stringify({ url: listening.control, token, pid: process.pid, version: options.version }, null, 2)}\n`,
-  );
   log.info("listening", {
     address: `${LOOPBACK}:${server.port}`,
     control: `${listening.control}${CONTROL_PREFIX}`,
@@ -89,7 +119,8 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     urls: listening,
     app,
     async stop() {
-      removeFile(serverFile);
+      // Only this server's own file: after a crash and restart it may already describe another one.
+      if (readServerFile(serverFile)?.token === token) removeFile(serverFile);
       await removeAliases();
       await server.stop(true);
     },
