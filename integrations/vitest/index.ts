@@ -76,12 +76,13 @@ const sibling = (name: string) => fileURLToPath(new URL(`./${name}${extname(impo
 export default function channelstack(options: ChannelstackIntegrationOptions = {}) {
   return {
     name: "channelstack",
-    config: () => ({
-      test: {
-        globalSetup: [sibling("global-setup")],
-        setupFiles: [sibling("setup")],
-        env: { [OPTIONS_ENV]: JSON.stringify(options) },
-      },
-    }),
+    config(config: { test?: { setupFiles?: string | string[] } }) {
+      // The plugin's setup comes before the project's own setup files: its `beforeEach` (the
+      // fixtures) runs first and its `afterEach` (closing the session) last, so a project's own
+      // hooks can still use the fixtures.
+      config.test ??= {};
+      config.test.setupFiles = [sibling("setup"), ...[config.test.setupFiles ?? []].flat()];
+      return { test: { globalSetup: [sibling("global-setup")], env: { [OPTIONS_ENV]: JSON.stringify(options) } } };
+    },
   };
 }

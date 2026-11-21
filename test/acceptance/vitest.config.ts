@@ -27,6 +27,8 @@ export default defineConfig({
       "test/acceptance/github/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],
+    // Runs after each test, while its session is still open (the plugin closes it last).
+    setupFiles: [fileURLToPath(new URL("./github-schemas.setup.ts", import.meta.url))],
     testTimeout: 30_000,
     // Exit check 1.7 runs 20 tests at the same moment; Vitest's default is 5 at a time.
     maxConcurrency: 20,
