@@ -42,7 +42,12 @@ class Transport:
         query: Mapping[str, str | None] | None = None,
     ) -> Any:
         response = await self._send(method, f"{self._base_path}{path}", _without_none(body), _without_none(query))
-        payload: Any = response.json() if response.content else None
+        try:
+            payload: Any = response.json() if response.content else None
+        except ValueError:
+            # Not the control API talking: a proxy's error page, for example.
+            status = response.status_code
+            raise ChannelstackError("internal", status, f"HTTP {status}: the response is not JSON") from None
         if response.is_success:
             return payload
         error: dict[str, Any] = payload if isinstance(payload, dict) else {}

@@ -8,7 +8,7 @@ import tempfile
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 import httpx
 
@@ -37,7 +37,10 @@ def _read_server_file(path: Path) -> ServerConnection | None:
         data = json.loads(path.read_text())
     except (OSError, ValueError):
         return None
-    url, token = data.get("url"), data.get("token")
+    if not isinstance(data, dict):
+        return None
+    contents = cast(dict[str, Any], data)
+    url, token = contents.get("url"), contents.get("token")
     return ServerConnection(url, token) if isinstance(url, str) and isinstance(token, str) else None
 
 

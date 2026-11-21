@@ -92,19 +92,20 @@ async function startServer(env: NodeJS.ProcessEnv): Promise<ServerConnection> {
     ["start", "--no-portless", "--port", "0", "--server-file", serverFile],
     { env, stdio: ["ignore", "ignore", "inherit"] },
   );
-  let exited: number | null | undefined;
+  // Set once the process is gone: how it ended, in words for the error message.
+  let ended: string | undefined;
   const exit = new Promise<void>((resolve) => {
-    child.once("exit", (code) => {
-      exited = code;
+    child.once("exit", (code, signal) => {
+      ended = `exited with ${code ?? signal}`;
       resolve();
     });
-    child.once("error", () => {
-      exited = null;
+    child.once("error", (error) => {
+      ended = `could not be started: ${error.message}`;
       resolve();
     });
   });
   const stop = async () => {
-    if (exited === undefined) child.kill("SIGTERM");
+    if (ended === undefined) child.kill("SIGTERM");
     await exit;
     rmSync(directory, { recursive: true, force: true });
   };
@@ -112,8 +113,7 @@ async function startServer(env: NodeJS.ProcessEnv): Promise<ServerConnection> {
     const server = await waitFor(
       "the channelstack server to start",
       async () => {
-        if (exited !== undefined)
-          throw new Error(`The channelstack server exited before it was ready (code ${exited})`);
+        if (ended !== undefined) throw new Error(`The channelstack server ${ended} before it was ready`);
         const file = readServerFile(serverFile);
         return file && (await isUp(file)) ? file : undefined;
       },

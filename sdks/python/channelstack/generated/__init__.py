@@ -288,7 +288,6 @@ class EchoApp:
         self.id: str = data["id"]
         self.name: str = data["name"]
         self.kind: Literal["app"] = data["kind"]
-        self.bot_user_id: str = data["botUserId"]
 
 
 class EchoUser:

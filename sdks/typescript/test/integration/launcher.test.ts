@@ -76,6 +76,6 @@ describe("launcher", () => {
         { mode: "start" },
         { CHANNELSTACK_HOME: temporaryHome(), CHANNELSTACK_SERVER_BIN: "/nonexistent/channelstack" },
       ),
-    ).rejects.toThrow(/exited before it was ready/);
+    ).rejects.toThrow(/could not be started: spawn \/nonexistent\/channelstack ENOENT before it was ready/);
   });
 });

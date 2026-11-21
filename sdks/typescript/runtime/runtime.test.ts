@@ -147,6 +147,39 @@ describe("transport", () => {
     });
   });
 
+  test("a response that isn't JSON is a ChannelstackError, not a SyntaxError", async () => {
+    const server = createServer((_request, response) =>
+      response.writeHead(502, { "content-type": "text/html" }).end("<h1>Bad gateway</h1>"),
+    );
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const error = await transport(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+      .request("GET", "/status")
+      .catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(ChannelstackError);
+    expect(error).toMatchObject({ code: "internal", status: 502, message: "HTTP 502: the response is not JSON" });
+  });
+
+  test("a connection that drops after the request was sent is not retried, so a POST never runs twice", async () => {
+    let requests = 0;
+    const server = createServer((request) => {
+      requests++;
+      request.socket.destroy();
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const started = Date.now();
+
+    await expect(
+      transport(`http://127.0.0.1:${(server.address() as AddressInfo).port}`).request("POST", "/sessions", {
+        body: {},
+      }),
+    ).rejects.toThrow(TypeError);
+
+    expect(requests).toBe(1);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   test("a connection that is refused is retried while the server starts", async () => {
     const url = await serve(() => [200, { ready: true }]);
     const server = servers[0] as Server;

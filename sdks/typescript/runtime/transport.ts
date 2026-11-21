@@ -34,6 +34,12 @@ export interface RequestOptions {
 const CONNECT_RETRY_MS = 5000;
 const CONNECT_RETRY_INTERVAL_MS = 100;
 
+/** Node reports a refused connection as `cause.code === "ECONNREFUSED"`, Bun as `code === "ConnectionRefused"`. */
+function isConnectionRefused(error: unknown): boolean {
+  const codes = [(error as { code?: unknown }).code, (error as { cause?: { code?: unknown } }).cause?.code];
+  return codes.includes("ECONNREFUSED") || codes.includes("ConnectionRefused");
+}
+
 /** One path segment, escaped. */
 export function segment(value: string): string {
   return encodeURIComponent(value);
@@ -61,13 +67,19 @@ export class Transport {
       ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });
     const text = await response.text();
-    const payload: unknown = text === "" ? undefined : JSON.parse(text);
+    let payload: unknown;
+    try {
+      payload = text === "" ? undefined : JSON.parse(text);
+    } catch {
+      // Not the control API talking: a proxy's error page, for example.
+      throw new ChannelstackError("internal", response.status, `HTTP ${response.status}: the response is not JSON`);
+    }
     if (response.ok) return payload;
     const {
       error = "internal",
       message = `HTTP ${response.status}`,
       data = {},
-    } = (payload ?? {}) as {
+    } = (typeof payload === "object" && payload !== null ? payload : {}) as {
       error?: string;
       message?: string;
       data?: Record<string, unknown>;
@@ -82,8 +94,9 @@ export class Transport {
       try {
         return await fetch(url, init);
       } catch (error) {
-        // fetch rejects with a TypeError when the connection fails; nothing was sent, so retrying is safe.
-        if (!(error instanceof TypeError) || Date.now() > deadline) throw error;
+        // Only a refused connection is retried: the server isn't listening yet, so nothing was sent.
+        // Any other failure may have happened after the request went out, and a POST must not run twice.
+        if (!isConnectionRefused(error) || Date.now() > deadline) throw error;
         await new Promise((resolve) => setTimeout(resolve, CONNECT_RETRY_INTERVAL_MS));
       }
     }
