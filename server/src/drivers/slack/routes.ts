@@ -54,12 +54,14 @@ const SlackThread = z
 
 const SlackStream = z
   .object({
+    channel: z.string(),
+    ts: z.string(),
     state: z.enum(["open", "stopped", "completed"]),
     chunks: z.array(z.string()),
     startedAt: z.string(),
     endedAt: z.string().optional(),
   })
-  .openapi("SlackStream");
+  .openapi("SlackStream", { "x-channelstack-resource": { id: ["channel", "ts"] } });
 
 const DeliveryStatus = z.enum(["pending", "acknowledged", "failed", "timed_out", "unreachable"]);
 
@@ -245,6 +247,8 @@ export function registerSlackRoutes(
       message.stream === undefined
         ? undefined
         : {
+            channel: message.conversation,
+            ts: message.ts,
             state: message.stream.state,
             chunks: [...message.stream.chunks],
             startedAt: new Date(message.stream.startedAt).toISOString(),
@@ -621,6 +625,23 @@ export function registerSlackRoutes(
     stability,
     handler: ({ session, params }) =>
       world.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/messages/{ts}/stream",
+    summary: "Re-read a streamed message's stream: its state and what was streamed so far",
+    params: MessageParams,
+    response: SlackStream,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackStream", name: "refresh", bind: messageBinding },
+    waits: [{ name: "ended", mode: "until", field: "state", not: ["open"], what: "the stream to end" }],
+    stability,
+    handler: ({ session, params }) => {
+      const { stream } = messageWire(session.id, world.message(session.id, params.channel, params.ts));
+      if (!stream) throw new ProtocolError("not_found", `Message ${params.ts} isn't a stream`, { ts: params.ts });
+      return stream;
+    },
   });
 
   router.route({

@@ -2070,7 +2070,7 @@
         {
           "name": "stream",
           "type": {
-            "kind": "named",
+            "kind": "resource",
             "name": "SlackStream"
           },
           "optional": true
@@ -2619,6 +2619,123 @@
       ]
     },
     {
+      "name": "SlackStream",
+      "idFields": [
+        "channel",
+        "ts"
+      ],
+      "fields": [
+        {
+          "name": "channel",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "ts",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "state",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "open",
+              "stopped",
+              "completed"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "chunks",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "startedAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "endedAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a streamed message's stream: its state and what was streamed so far",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/stream",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackStream"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "ended",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "SlackStream"
+          },
+          "field": "state",
+          "not": [
+            "open"
+          ],
+          "what": "the stream to end"
+        }
+      ]
+    },
+    {
       "name": "SlackFault",
       "idFields": [
         "id"
@@ -3144,50 +3261,6 @@
               "kind": "boolean"
             },
             "optional": false
-          }
-        ]
-      }
-    },
-    {
-      "name": "SlackStream",
-      "type": {
-        "kind": "object",
-        "fields": [
-          {
-            "name": "state",
-            "type": {
-              "kind": "enum",
-              "values": [
-                "open",
-                "stopped",
-                "completed"
-              ]
-            },
-            "optional": false
-          },
-          {
-            "name": "chunks",
-            "type": {
-              "kind": "array",
-              "items": {
-                "kind": "string"
-              }
-            },
-            "optional": false
-          },
-          {
-            "name": "startedAt",
-            "type": {
-              "kind": "string"
-            },
-            "optional": false
-          },
-          {
-            "name": "endedAt",
-            "type": {
-              "kind": "string"
-            },
-            "optional": true
           }
         ]
       }

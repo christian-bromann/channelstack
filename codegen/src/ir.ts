@@ -34,11 +34,14 @@ export interface IrResource {
 export interface IrWait {
   name: string;
   /** `next`: the first new matching item since the handle last looked. `latest`: the last matching item once the agent is quiet. */
-  mode: "next" | "latest";
-  /** The list read to poll. */
+  /** `until`: the read's value, once `field` is no longer one of `not`. */
+  mode: "next" | "latest" | "until";
+  /** The read to poll: a list for `next` and `latest`, one value for `until`. */
   read: string;
-  /** The type of one item of that list. */
+  /** The type the wait resolves with: one item of the list, or the value itself. */
   item: IrType;
+  field?: string;
+  not?: string[];
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
   /** The wait's first argument is the read's own options, passed through to it. */
@@ -298,7 +301,17 @@ export function buildIr(openapi: Json): Ir {
 
       const responseSchema: Json | undefined = operation.responses?.["200"]?.content?.["application/json"]?.schema;
       for (const wait of (operation["x-channelstack-waits"] ?? []) as Json[]) {
-        const item = itemOf(responseSchema ? typeOf(responseSchema, `${where} → 200`) : null, where);
+        const returned = responseSchema ? typeOf(responseSchema, `${where} → 200`) : null;
+        if (
+          wait.mode === "until" &&
+          (returned === null || typeof wait.field !== "string" || !Array.isArray(wait.not))
+        ) {
+          throw new SpecError(
+            where,
+            "an `until` wait needs a response, a `field` and the values it must leave (`not`)",
+          );
+        }
+        const item = wait.mode === "until" && returned ? returned : itemOf(returned, where);
         owner.waits = [
           ...(owner.waits ?? []),
           {
@@ -308,6 +321,7 @@ export function buildIr(openapi: Json): Ir {
             item,
             ...(wait.from ? { from: wait.from } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
+            ...(wait.mode === "until" ? { field: wait.field, not: wait.not } : {}),
             what: wait.what,
           },
         ];

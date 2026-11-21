@@ -3,7 +3,7 @@ import { ClientBase, connectWith, disposeQuietly, type HandleContext, printsAs, 
 import { type Duration, parseDuration } from "../runtime/duration.ts";
 import type { LaunchOptions } from "../runtime/launcher.ts";
 import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";
-import { describeWait, fromMatches, latestOnceQuiet, type QuietOptions, waitForNext, type WaitOptions, type QuietState } from "../runtime/wait.ts";
+import { describeWait, fromMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, type QuietState } from "../runtime/wait.ts";
 
 /** The server version this SDK was generated for. */
 export const VERSION = "0.0.0";
@@ -127,13 +127,6 @@ export interface DeliveryAttempt {
   responseBody?: string;
   durationMs?: number;
   forgedSignature: boolean;
-}
-
-export interface SlackStream {
-  state: "open" | "stopped" | "completed";
-  chunks: string[];
-  startedAt: string;
-  endedAt?: string;
 }
 
 export interface SlackMessageInput {
@@ -831,7 +824,7 @@ export interface SlackMessageData {
   visibleTo?: SlackUserData;
   thread: SlackThreadData;
   delivery?: SlackDeliveryData;
-  stream?: SlackStream;
+  stream?: SlackStreamData;
 }
 
 export class SlackMessage {
@@ -865,7 +858,7 @@ export class SlackMessage {
     this.visibleTo = data.visibleTo === undefined ? undefined : new SlackUser(ctx, data.visibleTo);
     this.thread = new SlackThread(ctx, data.thread);
     this.delivery = data.delivery === undefined ? undefined : new SlackDelivery(ctx, data.delivery);
-    this.stream = data.stream;
+    this.stream = data.stream === undefined ? undefined : new SlackStream(ctx, data.stream);
   }
 
   /** Re-read a message: its latest text, edits and deliveries. Experimental. */
@@ -1009,6 +1002,57 @@ export class SlackDelivery {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale, headers: options.headers } })) as DeliveryAttempt;
     return data;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link SlackStream}. */
+export interface SlackStreamData {
+  channel: string;
+  ts: string;
+  state: "open" | "stopped" | "completed";
+  chunks: string[];
+  startedAt: string;
+  endedAt?: string;
+}
+
+export class SlackStream {
+  readonly channel: string;
+  readonly ts: string;
+  readonly state: "open" | "stopped" | "completed";
+  readonly chunks: string[];
+  readonly startedAt: string;
+  readonly endedAt: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: SlackStreamData) {
+    this.#ctx = ctx;
+    this.channel = data.channel;
+    this.ts = data.ts;
+    this.state = data.state;
+    this.chunks = data.chunks;
+    this.startedAt = data.startedAt;
+    this.endedAt = data.endedAt;
+  }
+
+  /** Re-read a streamed message's stream: its state and what was streamed so far. Experimental. */
+  async refresh(): Promise<SlackStream> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/messages/${segment(this.ts)}/stream`)) as SlackStreamData;
+    return new SlackStream(ctx, data);
+  }
+
+  /** Wait for the stream to end, and resolve with the value as it is then. */
+  async ended(options: WaitOptions = {}): Promise<SlackStream> {
+    return waitFor("the stream to end", async () => {
+      const value = await this.refresh();
+      return value.state === "open" ? undefined : value;
+    }, options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

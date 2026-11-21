@@ -194,6 +194,19 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }, ` : "";
     const call = `() => this.${w.read}(${filter === "" ? "" : "filter"})`;
     const noun = w.what.replace(/^an? /, "");
+    if (w.mode === "until") {
+      const pending = (w.not ?? []).map((value) => `value.${w.field} === ${JSON.stringify(value)}`).join(" || ");
+      return [
+        "",
+        `  /** Wait for ${w.what}, and resolve with the value as it is then. */`,
+        `  async ${w.name}(options: WaitOptions = {}): Promise<${item}> {`,
+        `    return waitFor(${JSON.stringify(w.what)}, async () => {`,
+        `      const value = await this.${w.read}();`,
+        `      return ${pending} ? undefined : value;`,
+        "    }, options);",
+        "  }",
+      ];
+    }
     return [
       "",
       w.mode === "next"
@@ -301,7 +314,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const waitImports = [
     ...(allWaits.some((w) => w.from !== undefined) ? ["describeWait", "fromMatches"] : []),
     ...(allWaits.some((w) => w.mode === "latest") ? ["latestOnceQuiet", "type QuietOptions"] : []),
-    ...(allWaits.some((w) => w.mode === "next") ? ["waitForNext", "type WaitOptions"] : []),
+    ...(allWaits.some((w) => w.mode === "until") ? ["waitFor"] : []),
+    ...(allWaits.some((w) => w.mode === "next") ? ["waitForNext"] : []),
+    ...(allWaits.some((w) => w.mode !== "latest") ? ["type WaitOptions"] : []),
   ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),

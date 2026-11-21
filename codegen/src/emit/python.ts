@@ -222,6 +222,20 @@ export function emitPython(ir: Ir): Map<string, string> {
       : "lambda item: True";
     const what = fromField ? `describe_wait(${JSON.stringify(w.what)}, from_)` : JSON.stringify(w.what);
     const noun = w.what.replace(/^an? /, "");
+    if (w.mode === "until") {
+      const pending = `value.${snakeCase(w.field ?? "")} in (${(w.not ?? []).map((value) => JSON.stringify(value)).join(", ")},)`;
+      return [
+        "",
+        `    async def ${snakeCase(w.name)}(self, *, timeout: Duration = "10s") -> ${typeOf(w.item)}:`,
+        `        """Wait for ${w.what}, and resolve with the value as it is then."""`,
+        "",
+        `        async def settled() -> ${typeOf(w.item)} | None:`,
+        `            value = await self.${snakeCase(w.read)}()`,
+        `            return None if ${pending} else value`,
+        "",
+        `        return await wait_for(${JSON.stringify(w.what)}, settled, timeout=timeout)`,
+      ];
+    }
     return [
       "",
       `    async def ${snakeCase(w.name)}(${parameters.join(", ")}) -> ${typeOf(w.item)}:`,
@@ -333,7 +347,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       : []),
     "from ..runtime.transport import ChannelstackError, Transport",
     ...(allWaits.length > 0
-      ? ["from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for_next"]
+      ? ["from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next"]
       : []),
     "",
     `__all__ = [${exported.map((name) => JSON.stringify(name)).join(", ")}]`,

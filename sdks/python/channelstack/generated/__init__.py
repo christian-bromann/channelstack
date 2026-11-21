@@ -10,7 +10,7 @@ from urllib.parse import quote
 from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
-from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for_next
+from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
 
 __all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReactResult", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUnreactResult", "SlackUser", "Status", "UnauthorizedError", "VERSION", "connect"]
 
@@ -302,23 +302,6 @@ class DeliveryAttempt:
             response_status=data.get("responseStatus"),
             response_body=data.get("responseBody"),
             duration_ms=data.get("durationMs"),
-        )
-
-
-@dataclass(frozen=True)
-class SlackStream:
-    state: Literal["open", "stopped", "completed"]
-    chunks: list[str]
-    started_at: str
-    ended_at: str | None = None
-
-    @classmethod
-    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackStream:
-        return cls(
-            state=data["state"],
-            chunks=data["chunks"],
-            started_at=data["startedAt"],
-            ended_at=data.get("endedAt"),
         )
 
 
@@ -837,7 +820,7 @@ class SlackMessage:
         self.visible_to: SlackUser | None = None if data.get("visibleTo") is None else SlackUser(ctx, data["visibleTo"])
         self.thread: SlackThread = SlackThread(ctx, data["thread"])
         self.delivery: SlackDelivery | None = None if data.get("delivery") is None else SlackDelivery(ctx, data["delivery"])
-        self.stream: SlackStream | None = None if data.get("stream") is None else SlackStream._from_wire(ctx, data["stream"])
+        self.stream: SlackStream | None = None if data.get("stream") is None else SlackStream(ctx, data["stream"])
 
     async def refresh(self) -> SlackMessage:
         """Re-read a message: its latest text, edits and deliveries. Experimental."""
@@ -922,6 +905,32 @@ class SlackDelivery:
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(self.id, safe='')}/resend", body={"badSignature": bad_signature, "stale": stale, "headers": headers})
         return DeliveryAttempt._from_wire(ctx, data)
+
+
+class SlackStream:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.channel: str = data["channel"]
+        self.ts: str = data["ts"]
+        self.state: Literal["open", "stopped", "completed"] = data["state"]
+        self.chunks: list[str] = data["chunks"]
+        self.started_at: str = data["startedAt"]
+        self.ended_at: str | None = data.get("endedAt")
+
+    async def refresh(self) -> SlackStream:
+        """Re-read a streamed message's stream: its state and what was streamed so far. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/stream")
+        return SlackStream(ctx, data)
+
+    async def ended(self, *, timeout: Duration = "10s") -> SlackStream:
+        """Wait for the stream to end, and resolve with the value as it is then."""
+
+        async def settled() -> SlackStream | None:
+            value = await self.refresh()
+            return None if value.state in ("open",) else value
+
+        return await wait_for("the stream to end", settled, timeout=timeout)
 
 
 class SlackFault:

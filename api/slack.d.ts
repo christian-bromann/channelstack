@@ -25,8 +25,11 @@ export interface SlackFixture extends Inspectable<SlackDelivery> {
   /** Simulate the workspace uninstalling the app (`app_uninstalled`, `tokens_revoked`). */
   uninstallApp(): Promise<SlackDelivery[]>;
 
-  /** Inject transport faults for the agent's API calls. Undo with the returned function. */
-  fault(fault: SlackFault): Promise<() => Promise<void>>;
+  /**
+   * Inject a transport fault for the agent's API calls. It applies to the whole workspace until it
+   * is undone, or until the test's session closes. `await using` undoes it at the end of the scope.
+   */
+  fault(fault: SlackFault): Promise<SlackInjectedFault>;
 }
 
 export interface SlackUserOptions {
@@ -61,6 +64,12 @@ export interface SlackChannelOptions {
   purpose?: string;
   /** Shared with another organization (Slack Connect). */
   shared?: boolean;
+}
+
+/** A fault that is in effect. */
+export interface SlackInjectedFault extends AsyncDisposable {
+  readonly id: string;
+  undo(): Promise<void>;
 }
 
 export type SlackFault =

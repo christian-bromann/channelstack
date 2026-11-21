@@ -22,11 +22,15 @@ interface SdkBinding {
 /**
  * A wait built on a list read (`x-channelstack-waits`): SDKs poll the read until an item matches.
  * `next` resolves with the first new matching item since the handle last looked; `latest` waits
- * until the agent is quiet and resolves with the last matching item.
+ * until the agent is quiet and resolves with the last matching item. `until` is for a read of
+ * one value: it resolves once `field` is no longer one of `not` (`stream.ended()`).
  */
 interface WaitBinding {
   name: string;
-  mode: "next" | "latest";
+  mode: "next" | "latest" | "until";
+  /** For `until`: the field to watch, and the values that mean "not yet". */
+  field?: string;
+  not?: readonly string[];
   /** The item field holding who authored it; the wait's `from` option filters on it. */
   from?: string;
   /** The wait takes the read's own options as its first argument: `waitForCall({ operation }, { timeout })`. */
