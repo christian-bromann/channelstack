@@ -15,7 +15,7 @@ import {
 } from "../payloads.ts";
 import type { SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "../world.ts";
 import type { SlackStore } from "./store.ts";
-import type { FakeSlackWorld } from "./world.ts";
+import { type FakeSlackWorld, SlackRefusal } from "./world.ts";
 
 /** A Web API refusal: Slack answers 200 with `{ ok: false, error }`. */
 class SlackApiError extends Error {
@@ -31,7 +31,6 @@ type Args = Record<string, unknown>;
 type Method = (args: Args) => Record<string, unknown>;
 
 /** Slack's limits (https://docs.slack.dev/reference/methods/chat.postMessage, chat.startStream). */
-const MAX_TEXT_LENGTH = 40_000;
 const MAX_STREAM_LENGTH = 12_000;
 /** The fake keeps uploads in memory, so it takes small files only. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -204,8 +203,7 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
   const text = (args: Args): { text: string; blocks: unknown[] } => {
     const blocks = json(args, "blocks");
     const value = string(args, "text") ?? string(args, "markdown_text") ?? "";
-    if (value === "" && !(Array.isArray(blocks) && blocks.length > 0)) throw new SlackApiError("no_text");
-    if (value.length > MAX_TEXT_LENGTH) throw new SlackApiError("msg_too_long");
+    world.checkContent(value, Array.isArray(blocks) ? blocks : undefined);
     return { text: value, blocks: Array.isArray(blocks) ? blocks : [] };
   };
 
@@ -288,15 +286,7 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       const conversation = joined(required(args, "channel"));
       const message = messageIn(conversation, required(args, "ts"));
       if (message.user !== bot()) throw new SlackApiError("cant_update_message");
-      const previous = messageOf(message);
-      Object.assign(message, text(args));
-      const eventTs = ids.slackTs(conversation.id);
-      message.edited = eventTs;
-      world.emit(
-        conversation,
-        messageSubscription(conversation),
-        messageChangedEvent(messageOf(message), previous, conversation, eventTs),
-      );
+      world.edit(conversation, message, text(args));
       return { channel: conversation.id, ts: message.ts, text: message.text, message: messageOf(message) };
     },
 
@@ -304,13 +294,7 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       const conversation = joined(required(args, "channel"));
       const message = messageIn(conversation, required(args, "ts"));
       if (message.user !== bot()) throw new SlackApiError("cant_delete_message");
-      const previous = messageOf(message);
-      store.removeMessage(conversation.id, message.ts);
-      world.emit(
-        conversation,
-        messageSubscription(conversation),
-        messageDeletedEvent(previous, conversation, ids.slackTs(conversation.id)),
-      );
+      world.remove(conversation, message);
       return { channel: conversation.id, ts: message.ts };
     },
 
@@ -455,32 +439,24 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
     "reactions.add": (args) => {
       const conversation = joined(required(args, "channel"));
-      const message = messageIn(conversation, required(args, "timestamp"));
-      const name = required(args, "name").replace(/^:|:$/g, "");
-      const reaction = message.reactions.find((candidate) => candidate.name === name);
-      if (reaction?.users.includes(bot())) throw new SlackApiError("already_reacted");
-      if (reaction) reaction.users.push(bot());
-      else message.reactions.push({ name, users: [bot()] });
-      world.emit(
+      world.react(
         conversation,
-        "reaction_added",
-        reactionEvent("add", { user: bot(), reaction: name, message, eventTs: ids.slackTs(conversation.id) }),
+        messageIn(conversation, required(args, "timestamp")),
+        bot(),
+        required(args, "name"),
+        "add",
       );
       return {};
     },
 
     "reactions.remove": (args) => {
       const conversation = joined(required(args, "channel"));
-      const message = messageIn(conversation, required(args, "timestamp"));
-      const name = required(args, "name").replace(/^:|:$/g, "");
-      const reaction = message.reactions.find((candidate) => candidate.name === name);
-      if (!reaction?.users.includes(bot())) throw new SlackApiError("no_reaction");
-      reaction.users.splice(reaction.users.indexOf(bot()), 1);
-      if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
-      world.emit(
+      world.react(
         conversation,
-        "reaction_removed",
-        reactionEvent("remove", { user: bot(), reaction: name, message, eventTs: ids.slackTs(conversation.id) }),
+        messageIn(conversation, required(args, "timestamp")),
+        bot(),
+        required(args, "name"),
+        "remove",
       );
       return {};
     },
@@ -635,8 +611,10 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       }
       body = { ok: true, ...method(args) };
     } catch (error) {
-      if (!(error instanceof SlackApiError)) throw error;
-      body = { ok: false, error: error.message, ...error.extra };
+      // What the fake world refuses, it refuses with Slack's own code: that is the app's answer too.
+      if (error instanceof SlackRefusal) body = { ok: false, error: error.code };
+      else if (error instanceof SlackApiError) body = { ok: false, error: error.message, ...error.extra };
+      else throw error;
     }
 
     // The call belongs to the session that owns the conversation it was about, if it named one.

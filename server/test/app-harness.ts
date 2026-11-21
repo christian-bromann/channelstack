@@ -17,14 +17,14 @@ export const TOKEN = "test-token-0123456789";
 type Reply = Promise<{ status: number; body: any }>;
 
 /** Timers a test moves itself: nothing scheduled runs until the test lets time pass. */
-export interface ManualTimers extends Timers {
+interface ManualTimers extends Timers {
   /** Let this much time pass, running what falls due, in order. */
   advance(ms: number): void;
   /** How many tasks are waiting. */
   waiting(): number;
 }
 
-export function manualTimers(): ManualTimers {
+function manualTimers(): ManualTimers {
   let now = 0;
   let tasks: Array<{ at: number; run: () => void }> = [];
   return {

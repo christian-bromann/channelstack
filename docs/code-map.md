@@ -31,12 +31,12 @@
 |---|---|---|---|
 | Sessions and ownership | `sessions/` | Opening and closing scopes, `onClose` cleanup; sessions shared by name (`dev`, for the CLI, the UI and MCP) | Track ownership inside a driver |
 | Object registry and handles | `registry/` | Typed collections per driver and type; resolving handle ids for a session (`get`), from the platform's side (`find`), and their owner | Keep a private `Map` of objects in a route |
-| Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`) | Call `crypto.randomUUID()` or format ids by hand |
+| Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`); reading the time out of a Slack `ts` (`slackTsTime`) | Call `crypto.randomUUID()` or format ids by hand |
 | Secrets | `secrets/` | Fake tokens and signing secrets (the CSPRNG helpers, the token formats, `~/.channelstack/secrets.json`, 0600, rotation); live credentials in memory *(planned, phase 5)* | Generate or store a secret anywhere else |
 | Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`). `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
 | Access to the control API | `auth/` | Creating the bearer token, parsing `Authorization: Bearer`, the middleware (`requireAccess`); browser access for the UI (`ui.ts`): one-time login codes, the session cookie, and the short list of reads it allows | Compare tokens with `===`; let a cookie authorize anything but those reads |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
-| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
+| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
 | Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is pending, a driver reports open work (named, so a failure can say what was left open), or the agent was told to retry later (`expectMore` until it `arrived`); negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
 | Reality rules | `reality/` *(planned, phase 5)* | Fake or live per object, `unsupported_in_live`, `fake_actor_in_live_world` | Branch on `process.env` credentials in a driver |
 | Safety and cleanup ledger | `safety/`, `ledger/` *(planned, phase 5)* | Live allowlists, tagging, cleanup, `channelstack sweep` | Delete live objects from a driver directly |
@@ -45,7 +45,7 @@
 | Logging | `log/` | The one logger: JSON lines, redacted | Write to stdout or stderr from core or a driver |
 | Routing helpers | `router/` | `registerRoute`, `DriverRouter`, zod-openapi registration, `x-channelstack-*` extensions; the `Driver`, `DriverContext` and `FakeBackend` contracts | Register Hono routes on the control API without the extensions |
 | State directory | `home/` | `CHANNELSTACK_HOME`, writing 0600 files atomically, reading JSON state | Write a file with a secret any other way |
-| Time | `clock/` | The injected clock | Call `Date.now()` in core or a driver |
+| Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency | Call `Date.now()` or `setTimeout` in core or a driver |
 | portless | `portless/` | Registering and removing `*.localhost` names through the `portless` CLI | Spawn `portless` anywhere else |
 | Proxy and CA | `proxy/`, `ca/` *(planned, phase 6)* | Host routing to fakes, the name-constrained CA | — |
 
@@ -58,7 +58,7 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `index.ts` | The driver's definition: its name, the secrets it needs, and how it is built from a `DriverContext` |
 | `routes.ts` | Control API routes and schemas for this channel |
 | `world.ts` | The `World` interface: each action written once; the channel's record types |
-| `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`, and what only a fake can do: forged deliveries, faults), `index.ts` (the `FakeBackend`) |
+| `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`: every change to the state happens here once, for people and for the app alike, and the caller brings the permission check; also what only a fake can do: forged deliveries, faults), `index.ts` (the `FakeBackend`) |
 | `mentions.ts` (Slack) | `@name` in a test's text → the platform's mention syntax, and back |
 | `live/` | Real API calls as the app or a person, reads, cleanup handlers *(phase 5)* |
 | `payloads.ts` | Builders for every event payload this platform sends (used by the fake's delivery) |
@@ -116,7 +116,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Building the spec from the routes; comparing generated files | `lib/generate.ts` | Used by `spec.ts` and `sdk.ts` (write, or `--check`) |
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
-| The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener) and `recordingAgent` (a stand-in agent endpoint). Every driver's unit tests use it |
+| The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener, with timers the test advances itself) and `recordingAgent` (a stand-in agent endpoint). Every driver's unit tests use it |
 | Starting a server executable for a test or a smoke run | `lib/server.ts` | `startBinary`: spawn, wait for the server file, collect output, stop. The SDK launchers have their own start, because they ship |
 | The binary under test, with a control API client | `server/test/integration/harness.ts` | `BINARY`, `cli`, `startBinary` (adds `control` to `lib/server.ts`'s). Shared by the server's and the SDK's integration tests |
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |

@@ -35,10 +35,15 @@ const STALE_MS = 6 * 60_000;
 /** Slack's limit for a message's text. */
 const MAX_TEXT_LENGTH = 40_000;
 
-/** A refusal with Slack's own error code, surfaced through the control API. */
-function refuse(code: string, message: string, data: Record<string, unknown> = {}): ProtocolError {
-  return new ProtocolError({ platform: code, status: 409 }, message, data);
+/** A refusal with Slack's own error code. The control API surfaces it; the fake Web API answers with the code. */
+export class SlackRefusal extends ProtocolError {
+  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
+    super({ platform: code, status: 409 }, message, data);
+  }
 }
+
+const refuse = (code: string, message: string, data: Record<string, unknown> = {}) =>
+  new SlackRefusal(code, message, data);
 
 /** What the fake `SlackWorld` adds for the provider API, where the agent acts as the app. */
 export interface FakeSlackWorld extends SlackWorld {
@@ -52,6 +57,27 @@ export interface FakeSlackWorld extends SlackWorld {
       files?: readonly SlackFileRecord[] | undefined;
     },
   ): SlackMessageRecord;
+  /**
+   * What happens to a message once the caller has decided the author may do it. People (the
+   * control API) and the app (the fake Web API) both end up here; each brings its own permission check.
+   */
+  checkContent(text: string, blocks: unknown[] | undefined): void;
+  /** Replace a message's content and tell the app. Returns the delivery, if one was sent. */
+  edit(
+    conversation: SlackConversationRecord,
+    message: SlackMessageRecord,
+    body: { text: string; blocks: unknown[] },
+  ): string | undefined;
+  /** Remove a message and tell the app. */
+  remove(conversation: SlackConversationRecord, message: SlackMessageRecord): void;
+  /** Add or remove one person's (or the app's) reaction and tell the app. Returns the delivery, if one was sent. */
+  react(
+    conversation: SlackConversationRecord,
+    message: SlackMessageRecord,
+    userId: string,
+    emoji: string,
+    direction: "add" | "remove",
+  ): string | undefined;
   /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
   /** The user a name in a test's text refers to, in this session. */
@@ -164,13 +190,17 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     return store.users.get(session, id).id;
   };
 
-  const content = (session: string, input: SlackMessageInput): { text: string; blocks: unknown[] } => {
-    const text = resolveMentions(input.text ?? "", (name) => resolveName(session, name));
-    if (text === "" && (input.blocks === undefined || input.blocks.length === 0)) {
+  const checkContent: FakeSlackWorld["checkContent"] = (text, blocks) => {
+    if (text === "" && (blocks === undefined || blocks.length === 0)) {
       throw refuse("no_text", "A message needs text or blocks");
     }
     if (text.length > MAX_TEXT_LENGTH)
       throw refuse("msg_too_long", `A message's text is limited to ${MAX_TEXT_LENGTH} characters`);
+  };
+
+  const content = (session: string, input: SlackMessageInput): { text: string; blocks: unknown[] } => {
+    const text = resolveMentions(input.text ?? "", (name) => resolveName(session, name));
+    checkContent(text, input.blocks);
     return { text, blocks: input.blocks ?? [richTextBlock(text, ids.next("slack.block"))] };
   };
 
@@ -370,14 +400,12 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       );
     },
 
-    editAsUser(session, userId, input, target) {
-      const conversation = store.conversations.get(session, target.channel);
-      const user = member(session, userId, conversation);
-      const message = requireMessage(conversation, target.ts);
-      if (message.user !== user.id) throw refuse("cant_update_message", "People can only edit their own messages");
+    checkContent,
+
+    edit(conversation, message, body) {
       const { app, team } = store;
       const previous = messageObject(message, author(message.user), team, app);
-      Object.assign(message, content(session, input));
+      Object.assign(message, body);
       const eventTs = ids.slackTs(conversation.id);
       message.edited = eventTs;
       const current = messageObject(message, author(message.user), team, app);
@@ -387,6 +415,46 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
         messageChangedEvent(current, previous, conversation, eventTs),
       );
       if (id !== undefined) message.deliveries.push(id);
+      return id;
+    },
+
+    remove(conversation, message) {
+      const previous = messageObject(message, author(message.user), store.team, store.app);
+      store.removeMessage(conversation.id, message.ts);
+      emit(
+        conversation,
+        messageSubscription(conversation),
+        messageDeletedEvent(previous, conversation, ids.slackTs(conversation.id)),
+      );
+    },
+
+    react(conversation, message, userId, emoji, direction) {
+      const name = emoji.replace(/^:|:$/g, "");
+      const reaction = message.reactions.find((candidate) => candidate.name === name);
+      if (direction === "add") {
+        if (reaction?.users.includes(userId))
+          throw refuse("already_reacted", `${userId} already reacted with :${name}:`);
+        if (reaction) reaction.users.push(userId);
+        else message.reactions.push({ name, users: [userId] });
+      } else {
+        if (!reaction?.users.includes(userId))
+          throw refuse("no_reaction", `${userId} has no :${name}: reaction to remove`);
+        reaction.users.splice(reaction.users.indexOf(userId), 1);
+        if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
+      }
+      return emit(
+        conversation,
+        direction === "add" ? "reaction_added" : "reaction_removed",
+        reactionEvent(direction, { user: userId, reaction: name, message, eventTs: ids.slackTs(conversation.id) }),
+      );
+    },
+
+    editAsUser(session, userId, input, target) {
+      const conversation = store.conversations.get(session, target.channel);
+      const user = member(session, userId, conversation);
+      const message = requireMessage(conversation, target.ts);
+      if (message.user !== user.id) throw refuse("cant_update_message", "People can only edit their own messages");
+      this.edit(conversation, message, content(session, input));
       action(session, "edit", { user: user.id, channel: conversation.id, ts: message.ts });
       return message;
     },
@@ -398,13 +466,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       if (message.user !== user.id && !user.isAdmin) {
         throw refuse("cant_delete_message", "People can only delete their own messages, unless they are an admin");
       }
-      const previous = messageObject(message, author(message.user), store.team, store.app);
-      store.removeMessage(conversation.id, message.ts);
-      emit(
-        conversation,
-        messageSubscription(conversation),
-        messageDeletedEvent(previous, conversation, ids.slackTs(conversation.id)),
-      );
+      this.remove(conversation, message);
       action(session, "delete", { user: user.id, channel: conversation.id, ts: message.ts });
     },
 
@@ -412,30 +474,14 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       const conversation = store.conversations.get(session, target.channel);
       const user = member(session, userId, conversation);
       const message = requireMessage(conversation, target.ts);
-      const name = emoji.replace(/^:|:$/g, "");
-      const reaction = message.reactions.find((candidate) => candidate.name === name);
-      if (direction === "add") {
-        if (reaction?.users.includes(user.id))
-          throw refuse("already_reacted", `${user.id} already reacted with :${name}:`);
-        if (reaction) reaction.users.push(user.id);
-        else message.reactions.push({ name, users: [user.id] });
-      } else {
-        if (!reaction?.users.includes(user.id))
-          throw refuse("no_reaction", `${user.id} has no :${name}: reaction to remove`);
-        reaction.users.splice(reaction.users.indexOf(user.id), 1);
-        if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
-      }
+      const delivery = this.react(conversation, message, user.id, emoji, direction);
       action(session, direction === "add" ? "react" : "unreact", {
         user: user.id,
         channel: conversation.id,
         ts: message.ts,
-        emoji: name,
+        emoji: emoji.replace(/^:|:$/g, ""),
       });
-      return emit(
-        conversation,
-        direction === "add" ? "reaction_added" : "reaction_removed",
-        reactionEvent(direction, { user: user.id, reaction: name, message, eventTs: ids.slackTs(conversation.id) }),
-      );
+      return delivery;
     },
 
     invite(session, userId, participants, channel) {

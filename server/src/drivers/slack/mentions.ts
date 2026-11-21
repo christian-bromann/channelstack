@@ -14,7 +14,15 @@ export function resolveMentions(text: string, lookup: (name: string) => string |
   });
 }
 
+/** A mention in Slack mrkdwn: `<@U…>`, or `<@U…|label>`. */
+const MENTION = /<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g;
+
 /** The user ids mentioned in Slack mrkdwn. */
 export function mentionedUsers(text: string): string[] {
-  return [...text.matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)].map((match) => match[1] as string);
+  return [...text.matchAll(MENTION)].map((match) => match[1] as string);
+}
+
+/** Slack mrkdwn → what a person reads: every mention as `@name`. */
+export function nameMentions(text: string, nameOf: (userId: string) => string): string {
+  return text.replace(MENTION, (_, id: string) => `@${nameOf(id)}`);
 }

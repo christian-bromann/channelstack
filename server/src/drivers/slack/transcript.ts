@@ -1,3 +1,5 @@
+import { slackTsTime } from "../../core/ids/index.ts";
+import { nameMentions } from "./mentions.ts";
 import type { SlackMessageRecord } from "./world.ts";
 
 /** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
@@ -87,8 +89,7 @@ export function renderTranscript(
     principal(userId: string): { id: string; name: string; kind: "user" | "app" };
   },
 ): { entries: TranscriptEntry[]; text: string } {
-  const named = (text: string) =>
-    text.replace(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g, (_, id: string) => `@${options.principal(id).name}`);
+  const named = (text: string) => nameMentions(text, (id) => options.principal(id).name);
   const entries = messages
     .filter((message) => message.ephemeralFor === undefined || message.ephemeralFor === options.viewer)
     .map((message): TranscriptEntry => {
@@ -97,7 +98,7 @@ export function renderTranscript(
       return {
         id: message.ts,
         author: options.principal(message.user),
-        at: new Date(Number(message.ts.split(".")[0]) * 1000).toISOString(),
+        at: slackTsTime(message.ts),
         // A message's text is what Slack shows when it has no blocks; with blocks, people read the blocks.
         text: named(message.text !== "" ? message.text : fromBlocks.join("\n")),
         controls: blocks.flatMap(blockControls),

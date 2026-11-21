@@ -3,6 +3,7 @@ import { z } from "@hono/zod-openapi";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
+import { slackTsTime } from "../../core/ids/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
 import type { FakeSlackWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
@@ -232,8 +233,7 @@ export function registerSlackRoutes(
     author: participantWire(session, message.user),
     text: message.text,
     blocks: message.blocks,
-    // A Slack `ts` is the time the message was posted: seconds, then a counter.
-    postedAt: new Date(Number(message.ts.split(".")[0]) * 1000).toISOString(),
+    postedAt: slackTsTime(message.ts),
     threadTs: message.threadTs,
     edited: message.edited !== undefined,
     visibleTo: message.ephemeralFor === undefined ? undefined : userWire(world.user(session, message.ephemeralFor)),
