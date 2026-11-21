@@ -41,8 +41,10 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    # One group per event and branch: a newer push replaces an older one, but the run for a newly
+    # opened pull request doesn't cancel the push's run (a cancelled run shows as a failed check).
     concurrency:
-      group: website-preview-${{ github.head_ref || github.ref_name }}
+      group: website-preview-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
