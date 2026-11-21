@@ -3,66 +3,22 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, test } from "vitest";
 
-import { type App, createApp } from "./app.ts";
-import { createLogger } from "./core/log/index.ts";
-import { Redactor } from "./core/redact/index.ts";
-import { Secrets } from "./core/secrets/index.ts";
+import { type Harness, harness, TOKEN } from "../test/app-harness.ts";
 import { signEchoDelivery } from "./core/signing/echo.ts";
-import { secretSpecs } from "./drivers/index.ts";
 
-const TOKEN = "test-token-0123456789";
 const servers: Server[] = [];
 afterEach(() => {
   for (const server of servers.splice(0)) server.close();
 });
 
-interface Harness {
-  app: App;
-  secrets: Secrets;
-  logs: string[];
-  call(method: string, path: string, body?: unknown, token?: string | null): Promise<{ status: number; body: any }>;
-  agent(method: string, path: string, body?: unknown, token?: string): Promise<{ status: number; body: any }>;
-}
-
-function harness(webhook?: string): Harness {
-  const secrets = Secrets.ephemeral(secretSpecs());
-  const redactor = new Redactor();
-  redactor.register(TOKEN, ...secrets.all());
-  const logs: string[] = [];
-  const app = createApp({
-    version: "0.0.0-test",
-    token: TOKEN,
-    seed: 1,
-    secrets,
-    redactor,
-    log: createLogger({ level: "debug", redactor, write: (line) => logs.push(line) }),
-    urls: () => ({ control: "http://127.0.0.1:4500", driver: (name) => `http://127.0.0.1:4500/${name}` }),
-    webhooks: { echo: webhook },
-  });
-  const send = async (url: string, method: string, body: unknown, token: string | null | undefined) => {
-    const response = await app.fetch(
-      new Request(url, {
-        method,
-        headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
-        },
-        ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
-      }),
-    );
-    const text = await response.text();
-    return { status: response.status, body: text ? JSON.parse(text) : undefined };
-  };
-  return {
-    app,
-    secrets,
-    logs,
-    call: (method, path, body, token = TOKEN) =>
-      send(`http://127.0.0.1:4500/_channelstack${path}`, method, body, token),
-    agent: (method, path, body, token = secrets.get("echo", "appToken")) =>
-      send(`http://127.0.0.1:4500/echo${path}`, method, body, token),
-  };
-}
+/** The echo provider API, as the echo agent calls it. */
+const echoAgent = (
+  h: Harness,
+  method: string,
+  path: string,
+  body?: unknown,
+  token = h.secrets.get("echo", "appToken"),
+) => h.provider(method, `echo${path}`, body, token);
 
 async function world(h: Harness) {
   const { sessionId } = (await h.call("POST", "/sessions")).body;
@@ -76,7 +32,11 @@ async function world(h: Harness) {
 describe("control API", () => {
   test("every route needs the bearer token", async () => {
     const h = harness();
-    expect((await h.call("GET", "/status")).body).toEqual({ ready: true, version: "0.0.0-test", drivers: ["echo"] });
+    expect((await h.call("GET", "/status")).body).toEqual({
+      ready: true,
+      version: "0.0.0-test",
+      drivers: ["echo", "slack"],
+    });
     for (const token of [null, "wrong-token-0123456789", `${TOKEN}x`]) {
       const refused = await h.call("GET", "/status", undefined, token);
       expect(refused.status).toBe(401);
@@ -124,10 +84,13 @@ describe("control API", () => {
 
   test("env hands the agent its fake credentials and API URL", async () => {
     const h = harness();
-    expect((await h.call("GET", "/env")).body).toEqual({
+    expect((await h.call("GET", "/env")).body).toMatchObject({
       ECHO_API_URL: "http://127.0.0.1:4500/echo",
       ECHO_APP_TOKEN: h.secrets.get("echo", "appToken"),
       ECHO_SIGNING_SECRET: h.secrets.get("echo", "signingSecret"),
+      SLACK_API_URL: "http://127.0.0.1:4500/slack/api/",
+      SLACK_BOT_TOKEN: h.secrets.get("slack", "botToken"),
+      SLACK_SIGNING_SECRET: h.secrets.get("slack", "signingSecret"),
     });
   });
 });
@@ -151,7 +114,7 @@ describe("sessions are scopes in one shared world", () => {
 
     expect((await h.call("DELETE", `/sessions/${one.sessionId}`)).status).toBe(204);
     expect((await h.call("GET", `/sessions/${one.sessionId}/events`)).body.error).toBe("session_not_found");
-    expect((await h.agent("POST", "/api/messages", { room: one.room.id, text: "late" })).body).toEqual({
+    expect((await echoAgent(h, "POST", "/api/messages", { room: one.room.id, text: "late" })).body).toEqual({
       ok: false,
       error: "room_not_found",
     });
@@ -177,14 +140,16 @@ describe("the echo pipeline", () => {
     expect(outsider.body.error).toBe("not_in_room");
 
     const quiet = (await h.call("POST", `${base}/rooms`, { participants: [ana.id] })).body;
-    expect((await h.agent("POST", "/api/messages", { room: quiet.id, text: "x" })).body).toEqual({
+    expect((await echoAgent(h, "POST", "/api/messages", { room: quiet.id, text: "x" })).body).toEqual({
       ok: false,
       error: "not_in_room",
     });
-    expect((await h.agent("POST", "/api/messages", { room: room.id, text: "x" }, "echo_app_wrong")).status).toBe(401);
-    expect((await h.agent("POST", "/api/messages", { room: room.id })).body.error).toBe("invalid_payload");
-    expect((await h.agent("GET", "/api/rooms/ER0000000000/messages")).body.error).toBe("room_not_found");
-    expect((await h.agent("GET", "/api/nope")).body.error).toBe("unknown_method");
+    expect((await echoAgent(h, "POST", "/api/messages", { room: room.id, text: "x" }, "echo_app_wrong")).status).toBe(
+      401,
+    );
+    expect((await echoAgent(h, "POST", "/api/messages", { room: room.id })).body.error).toBe("invalid_payload");
+    expect((await echoAgent(h, "GET", "/api/rooms/ER0000000000/messages")).body.error).toBe("room_not_found");
+    expect((await echoAgent(h, "GET", "/api/nope")).body.error).toBe("unknown_method");
   });
 
   test("a message is signed, delivered, answered through the provider API, and all of it is in the event log", async () => {
@@ -201,7 +166,7 @@ describe("the echo pipeline", () => {
     });
     servers.push(agent);
     await new Promise<void>((resolve) => agent.listen(0, "127.0.0.1", resolve));
-    const h = harness(`http://127.0.0.1:${(agent.address() as AddressInfo).port}/events`);
+    const h = harness({ echo: `http://127.0.0.1:${(agent.address() as AddressInfo).port}/events` });
     const { sessionId, base, fixture, ana, room } = await world(h);
 
     const message = (await h.call("POST", `${base}/users/${ana.id}/say`, { text: "hello", room: room.id })).body;
@@ -221,9 +186,9 @@ describe("the echo pipeline", () => {
       message: { text: "hello" },
     });
 
-    const reply = await h.agent("POST", "/api/messages", { room: room.id, text: "echo: hello" });
+    const reply = await echoAgent(h, "POST", "/api/messages", { room: room.id, text: "echo: hello" });
     expect(reply.body.message.author).toEqual({ id: fixture.app.id, name: "echo-agent", kind: "app" });
-    expect((await h.agent("GET", `/api/rooms/${room.id}/messages`)).body.messages).toHaveLength(2);
+    expect((await echoAgent(h, "GET", `/api/rooms/${room.id}/messages`)).body.messages).toHaveLength(2);
 
     const first = (await h.call("GET", `${base}/rooms/${room.id}/messages`)).body;
     expect(first.messages.map((m: any) => m.text)).toEqual(["hello", "echo: hello"]);
@@ -273,7 +238,7 @@ describe("the echo pipeline", () => {
     const port = (failing.address() as AddressInfo).port;
 
     const statusOf = async (webhook: string | undefined) => {
-      const h = harness(webhook);
+      const h = harness({ echo: webhook });
       const { sessionId, base, ana, room } = await world(h);
       const message = (await h.call("POST", `${base}/users/${ana.id}/say`, { text: "hi", room: room.id })).body;
       await h.app.settled();
@@ -293,11 +258,11 @@ describe("the echo pipeline", () => {
   });
 
   test("nothing secret reaches the log or the event log", async () => {
-    const h = harness("http://127.0.0.1:1/events");
+    const h = harness({ echo: "http://127.0.0.1:1/events" });
     const { sessionId, base, ana, room } = await world(h);
     const token = h.secrets.get("echo", "appToken");
     await h.call("POST", `${base}/users/${ana.id}/say`, { text: `my token is ${token}`, room: room.id });
-    await h.agent("POST", "/api/messages", { room: room.id, text: `leaking ${token}` });
+    await echoAgent(h, "POST", "/api/messages", { room: room.id, text: `leaking ${token}` });
     await h.app.settled();
 
     const recorded = JSON.stringify((await h.call("GET", `/sessions/${sessionId}/events`)).body);
@@ -320,7 +285,7 @@ describe("the echo pipeline", () => {
       new Request("http://127.0.0.1:4500/api/nope", { headers: { "x-forwarded-host": "echo.localhost" } }),
     );
     expect(await forwarded.json()).toEqual({ ok: false, error: "unknown_method" });
-    expect(h.app.hosts()).toEqual(["channelstack", "echo"]);
+    expect(h.app.hosts()).toEqual(["channelstack", "echo", "slack"]);
     expect((await h.app.fetch(new Request("http://127.0.0.1:4500/elsewhere"))).status).toBe(404);
   });
 });
