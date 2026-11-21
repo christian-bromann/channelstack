@@ -25,7 +25,7 @@ import { startBinary } from "./lib/server.ts";
 import { runSmoke } from "./smoke.ts";
 
 const host = hostTarget();
-if (!existsSync(binaryPath(host)) || !existsSync(join(ROOT, "sdks/typescript/dist/client.js"))) {
+if (!existsSync(binaryPath(host)) || !existsSync(join(ROOT, "sdks/typescript/dist/sdks/typescript/client.js"))) {
   throw new Error("Nothing to pack. Run `pnpm build` first.");
 }
 if (sdkPackage.version !== serverPackage.version) {

@@ -10,6 +10,11 @@ import { type Draw, ID_FORMATS, type IdKind } from "./formats.ts";
 
 export { ID_FORMATS, type IdKind, SLACK_TS_PATTERN } from "./formats.ts";
 
+/** When a Slack `ts` was issued, as an ISO time: a `ts` is seconds since the epoch, then a counter. */
+export function slackTsTime(ts: string): string {
+  return new Date(Number(ts.split(".")[0]) * 1000).toISOString();
+}
+
 /** A seed from `CHANNELSTACK_SEED`: a number as is, any other text hashed to 32 bits. */
 export function parseSeed(seed: string): number {
   if (/^\d{1,9}$/.test(seed)) return Number(seed);
@@ -88,6 +93,11 @@ export class IdGenerator {
       throw new ProtocolError("invalid_argument", `The ${kind} id "${id}" is already in use`, { kind, id });
     used.add(id);
     return id;
+  }
+
+  /** Give a reserved id back when the session that held it closes, so a later test can claim it again. */
+  release(kind: IdKind, id: string): void {
+    this.#used.get(kind)?.delete(id);
   }
 
   /** The next number in a sequence, starting at 1: GitHub issue numbers per repo, Linear issue numbers per team. */

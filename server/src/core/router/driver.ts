@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 
-import type { Clock } from "../clock/index.ts";
+import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { IdGenerator } from "../ids/index.ts";
@@ -29,11 +29,17 @@ export type CapabilityTable = Readonly<Record<string, { fake: boolean; live: boo
 export interface DriverContext {
   readonly ids: IdGenerator;
   readonly clock: Clock;
+  /** For anything that happens later: a retry after a pause, a fault's latency. */
+  readonly timers: Timers;
   readonly registry: Registry;
   readonly events: EventLog;
   /** The hook into the delivery queue: the only way an event reaches the agent. */
   readonly delivery: DeliveryQueue;
   readonly log: Logger;
+  /** Tell the quiet detector that the agent will do this again within this time: it was told to retry later. */
+  expectMore(session: string, what: string, withinMs: number): void;
+  /** The agent did it again: the quiet detector stops waiting for it. */
+  arrived(session: string, what: string): void;
   /** One of the secrets the driver declared in `secrets`. */
   secret(name: string): string;
   /** Where the agent reaches this driver's fake, e.g. `https://echo.localhost`. */
@@ -50,6 +56,11 @@ export interface Driver {
   capabilities(): CapabilityTable;
   /** What `channelstack env` prints for this channel. */
   env(): Record<string, string>;
+  /**
+   * What of the agent's work in a session is still open, in words a failure message can show:
+   * a stream it hasn't stopped, for example. Empty when nothing is.
+   */
+  openWork(session: string): string[];
 }
 
 /** How a driver registers itself with core: its name, the secrets it needs, and how to build it. */

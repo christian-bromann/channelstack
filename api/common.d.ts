@@ -124,8 +124,8 @@ export interface Delivery<TType extends string = string, TPayload = unknown> {
   /** Status of the latest attempt. */
   readonly status: DeliveryStatus;
 
-  /** Wait until an attempt reaches a final status. */
-  settled(options?: WaitOptions): Promise<DeliveryAttempt>;
+  /** Wait until the latest attempt reaches a final status. Resolves with the delivery, read again. */
+  settled(options?: WaitOptions): Promise<this>;
 
   /** Send the same delivery again, unchanged or with a twist (bad signature, stale timestamp). */
   resend(options?: ResendOptions): Promise<DeliveryAttempt>;

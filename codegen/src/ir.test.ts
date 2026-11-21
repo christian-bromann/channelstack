@@ -98,7 +98,7 @@ describe("OpenAPI → IR", () => {
       errors: ["not_found", "unauthorized"],
     });
     expect(ir.resources.map((resource) => resource.name)).toEqual(["Channelstack", "Session", "Widget"]);
-    expect(ir.resources[1]).toMatchObject({ idField: "sessionId", scope: "session" });
+    expect(ir.resources[1]).toMatchObject({ idFields: ["sessionId"], scope: "session" });
 
     const update = ir.resources[2]?.methods[0];
     expect(update).toMatchObject({
@@ -198,11 +198,7 @@ describe("OpenAPI → IR", () => {
       { Bad: { type: "object", properties: {}, "x-channelstack-resource": { id: "id" } } },
       /names id field "id"/,
     ],
-    [
-      "a schema the IR can't express",
-      { Bad: { oneOf: [{ type: "string" }, { type: "number" }] } },
-      /unsupported schema/,
-    ],
+    ["a schema the IR can't express", { Bad: { not: { type: "string" } } }, /unsupported schema/],
     [
       "a reference to a missing schema",
       { Bad: { type: "object", properties: { x: ref("Missing") } } },
@@ -224,7 +220,7 @@ describe("emitters", () => {
     );
     expect(code).toContain("`/sessions/$" + "{segment(sessionOf(ctx))}/widgets/$" + "{segment(this.id)}`");
     expect(code).toContain(
-      "body: { label, parent: options.parent?.id, mode: options.mode }, query: { since: options.since }",
+      "body: { label, parent: options.parent === undefined ? undefined : options.parent.id, mode: options.mode }, query: { since: options.since }",
     );
     expect(code).toContain("items: data.items.map((item) => new Widget(ctx, item))");
     expect(code).toContain("new Session({ transport: ctx.transport, session: data.sessionId }, data)");

@@ -7,12 +7,34 @@ from dataclasses import dataclass
 from typing import Any, Literal, Self
 from urllib.parse import quote
 
-from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, session_of
+from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
+from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
+from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
 
-__all__ = ["Capabilities", "Capability", "Channelstack", "ChannelstackError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "NotFoundError", "NotInRoomError", "Session", "SessionNotFoundError", "Status", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
+
+
+class AccountInactiveError(ChannelstackError):
+    pass
+
+
+class AlreadyInChannelError(ChannelstackError):
+    pass
+
+
+class AlreadyReactedError(ChannelstackError):
+    pass
+
+
+class CantDeleteMessageError(ChannelstackError):
+    pass
+
+
+class CantUpdateMessageError(ChannelstackError):
+    pass
 
 
 class InternalError(ChannelstackError):
@@ -23,7 +45,27 @@ class InvalidArgumentError(ChannelstackError):
     pass
 
 
+class MsgTooLongError(ChannelstackError):
+    pass
+
+
+class NameTakenError(ChannelstackError):
+    pass
+
+
+class NoReactionError(ChannelstackError):
+    pass
+
+
+class NoTextError(ChannelstackError):
+    pass
+
+
 class NotFoundError(ChannelstackError):
+    pass
+
+
+class NotInChannelError(ChannelstackError):
     pass
 
 
@@ -40,9 +82,19 @@ class UnauthorizedError(ChannelstackError):
 
 
 _ERRORS: dict[str, type[ChannelstackError]] = {
+    "account_inactive": AccountInactiveError,
+    "already_in_channel": AlreadyInChannelError,
+    "already_reacted": AlreadyReactedError,
+    "cant_delete_message": CantDeleteMessageError,
+    "cant_update_message": CantUpdateMessageError,
     "internal": InternalError,
     "invalid_argument": InvalidArgumentError,
+    "msg_too_long": MsgTooLongError,
+    "name_taken": NameTakenError,
+    "no_reaction": NoReactionError,
+    "no_text": NoTextError,
     "not_found": NotFoundError,
+    "not_in_channel": NotInChannelError,
     "not_in_room": NotInRoomError,
     "session_not_found": SessionNotFoundError,
     "unauthorized": UnauthorizedError,
@@ -83,6 +135,7 @@ class LogEvent:
     driver: str
     kind: Literal["action", "delivery", "delivery_attempt", "api_call"]
     data: dict[str, Any]
+    summary: dict[str, Any] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LogEvent:
@@ -91,6 +144,22 @@ class LogEvent:
             driver=data["driver"],
             kind=data["kind"],
             data=data["data"],
+            summary=data.get("summary"),
+        )
+
+
+@dataclass(frozen=True)
+class Quiet:
+    busy: bool
+    quiet_for_ms: float
+    open: list[str]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> Quiet:
+        return cls(
+            busy=data["busy"],
+            quiet_for_ms=data["quietForMs"],
+            open=data["open"],
         )
 
 
@@ -198,6 +267,245 @@ class Capability:
         )
 
 
+@dataclass(frozen=True)
+class SlackTeam:
+    id: str
+    name: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackTeam:
+        return cls(
+            id=data["id"],
+            name=data["name"],
+        )
+
+
+type SlackUsers = list[SlackUser]
+
+
+type SlackConversations = list[SlackConversation]
+
+
+@dataclass(frozen=True)
+class DeliveryAttempt:
+    number: int
+    sent_at: str
+    transport: Literal["http", "socket"]
+    request_headers: dict[str, str]
+    status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"]
+    forged_signature: bool
+    url: str | None = None
+    response_status: int | None = None
+    response_body: str | None = None
+    duration_ms: float | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DeliveryAttempt:
+        return cls(
+            number=data["number"],
+            sent_at=data["sentAt"],
+            transport=data["transport"],
+            request_headers=data["requestHeaders"],
+            status=data["status"],
+            forged_signature=data["forgedSignature"],
+            url=data.get("url"),
+            response_status=data.get("responseStatus"),
+            response_body=data.get("responseBody"),
+            duration_ms=data.get("durationMs"),
+        )
+
+
+@dataclass(frozen=True)
+class SlackMessageInput:
+    text: str | None = None
+    blocks: list[Any] | None = None
+    metadata: SlackMessageMetadata | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackMessageInput:
+        return cls(
+            text=data.get("text"),
+            blocks=data.get("blocks"),
+            metadata=None if data.get("metadata") is None else SlackMessageMetadata._from_wire(ctx, data["metadata"]),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"text": self.text, "blocks": self.blocks, "metadata": self.metadata}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class SlackMessageMetadata:
+    event_type: str
+    event_payload: dict[str, Any]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackMessageMetadata:
+        return cls(
+            event_type=data["event_type"],
+            event_payload=data["event_payload"],
+        )
+
+
+type SlackMessages = list[SlackMessage]
+
+
+type SlackMembers = list[SlackUser | SlackApp]
+
+
+type SlackReplies = list[SlackMessage]
+
+
+type SlackReactions = list[SlackReaction]
+
+
+@dataclass(frozen=True)
+class SlackReaction:
+    emoji: str
+    by: list[SlackUser | SlackApp]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackReaction:
+        return cls(
+            emoji=data["emoji"],
+            by=[SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data["by"]],
+        )
+
+
+@dataclass(frozen=True)
+class SlackThreadStatus:
+    state: Literal["working", "streaming", "stopped", "idle"]
+    text: str | None = None
+    session_status: Literal["active", "processing", "suspended", "closed"] | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackThreadStatus:
+        return cls(
+            state=data["state"],
+            text=data.get("text"),
+            session_status=data.get("sessionStatus"),
+        )
+
+
+@dataclass(frozen=True)
+class SlackTranscript:
+    entries: list[SlackTranscriptEntry]
+    text: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackTranscript:
+        return cls(
+            entries=[SlackTranscriptEntry._from_wire(ctx, item) for item in data["entries"]],
+            text=data["text"],
+        )
+
+    def __str__(self) -> str:
+        return self.text
+
+
+@dataclass(frozen=True)
+class SlackTranscriptEntry:
+    id: str
+    author: SlackPrincipal
+    at: str
+    text: str
+    controls: list[str]
+    files: list[str]
+    edited: bool
+    depth: int
+    also_in_channel: Literal[True] | None = None
+    streaming: Literal["open", "stopped", "completed"] | None = None
+    visible_to: SlackPrincipal | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackTranscriptEntry:
+        return cls(
+            id=data["id"],
+            author=SlackPrincipal._from_wire(ctx, data["author"]),
+            at=data["at"],
+            text=data["text"],
+            controls=data["controls"],
+            files=data["files"],
+            edited=data["edited"],
+            depth=data["depth"],
+            also_in_channel=data.get("alsoInChannel"),
+            streaming=data.get("streaming"),
+            visible_to=None if data.get("visibleTo") is None else SlackPrincipal._from_wire(ctx, data["visibleTo"]),
+        )
+
+
+@dataclass(frozen=True)
+class SlackPrincipal:
+    id: str
+    name: str
+    kind: Literal["user", "app"]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackPrincipal:
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            kind=data["kind"],
+        )
+
+
+type SlackEphemeralMessages = list[SlackMessage]
+
+
+type SlackMessageDeliveries = list[SlackDelivery]
+
+
+type SlackDeliveries = list[SlackDelivery]
+
+
+type SlackApiCalls = list[SlackApiCall]
+
+
+@dataclass(frozen=True)
+class SlackApiCall:
+    id: str
+    channel: Literal["slack"]
+    operation: str
+    method: str
+    path: str
+    at: str
+    duration_ms: float
+    response_status: int
+    request: Any | None = None
+    response: Any | None = None
+    error: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackApiCall:
+        return cls(
+            id=data["id"],
+            channel=data["channel"],
+            operation=data["operation"],
+            method=data["method"],
+            path=data["path"],
+            at=data["at"],
+            duration_ms=data["durationMs"],
+            response_status=data["responseStatus"],
+            request=data.get("request"),
+            response=data.get("response"),
+            error=data.get("error"),
+        )
+
+
+type SlackUninstallDeliveries = list[SlackDelivery]
+
+
+@dataclass(frozen=True)
+class UiLoginLink:
+    url: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> UiLoginLink:
+        return cls(
+            url=data["url"],
+        )
+
+
 class Channelstack(ClientBase):
     def __init__(self, transport: Transport, stop: Callable[[], Awaitable[None]]) -> None:
         super().__init__(transport, stop)
@@ -209,10 +517,10 @@ class Channelstack(ClientBase):
         data = await ctx.transport.request("GET", f"/status")
         return Status._from_wire(ctx, data)
 
-    async def open_session(self) -> Session:
+    async def open_session(self, *, name: str | None = None) -> Session:
         """Open a session: a scope in the shared world that owns what it creates."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions")
+        data = await ctx.transport.request("POST", f"/sessions", body={"name": name})
         return Session(HandleContext(ctx.transport, data["sessionId"]), data)
 
     async def reset(self) -> None:
@@ -225,6 +533,12 @@ class Channelstack(ClientBase):
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/env")
         return data
+
+    async def ui_login_link(self) -> UiLoginLink:
+        """A new one-time link that opens the UI in a browser (what `channelstack ui` prints). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/ui/login-links")
+        return UiLoginLink._from_wire(ctx, data)
 
 
 class Session:
@@ -244,11 +558,23 @@ class Session:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/events", query={"since": since})
         return EventPage._from_wire(ctx, data)
 
+    async def quiet(self) -> Quiet:
+        """Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/quiet")
+        return Quiet._from_wire(ctx, data)
+
     async def echo(self) -> EchoFixture:
         """The echo fixture: the agent's app and where it reaches the fake. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/echo")
         return EchoFixture(ctx, data)
+
+    async def slack(self) -> SlackFixture:
+        """The Slack fixture: the agent's app, the workspace, and where the agent reaches the fake. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack")
+        return SlackFixture(ctx, data)
 
     async def __aenter__(self) -> Self:
         return self
@@ -324,7 +650,349 @@ class EchoRoom:
         return EchoTranscript._from_wire(ctx, data)
 
 
-async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None) -> Channelstack:
+class SlackFixture:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.app: SlackApp = SlackApp(ctx, data["app"])
+        self.api_url: str = data["apiUrl"]
+        self.team: SlackTeam = SlackTeam._from_wire(ctx, data["team"])
+
+    async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, real_name: str | None = None, email: str | None = None, timezone: str | None = None, admin: bool | None = None, owner: bool | None = None, guest: bool | None = None, bot: bool | None = None) -> SlackUser:
+        """Create a person in the workspace. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users", body={"name": name, "id": id, "displayName": display_name, "realName": real_name, "email": email, "timezone": timezone, "admin": admin, "owner": owner, "guest": guest, "bot": bot})
+        return SlackUser(ctx, data)
+
+    async def users(self) -> SlackUsers:
+        """The people this session created. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users")
+        return [SlackUser(ctx, item) for item in data]
+
+    async def conversations(self) -> SlackConversations:
+        """The session's conversations, the one with the newest message last. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations")
+        return [SlackConversation(ctx, item) for item in data]
+
+    async def create_channel(self, *, name: str | None = None, private: bool | None = None, participants: list[SlackUser | SlackApp] | None = None, topic: str | None = None, purpose: str | None = None) -> SlackConversation:
+        """Create a channel. Only the listed participants are members; include the app for it to receive events. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/channels", body={"name": name, "private": private, "participants": None if participants is None else [item.id for item in participants], "topic": topic, "purpose": purpose})
+        return SlackConversation(ctx, data)
+
+    async def deliveries(self) -> SlackDeliveries:
+        """Every event channelstack sent the agent for this session, with every attempt. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries")
+        return [SlackDelivery(ctx, item) for item in data]
+
+    async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> SlackApiCalls:
+        """The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/calls", query={"operation": operation, "error": error})
+        return [SlackApiCall._from_wire(ctx, item) for item in data]
+
+    async def uninstall_app(self) -> SlackUninstallDeliveries:
+        """The workspace uninstalls the app. Undone when this session closes; run such tests on their own. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/uninstall")
+        return [SlackDelivery(ctx, item) for item in data]
+
+    async def fault(self, *, type: Literal["rate_limit", "latency", "error"], operation: str | None = None, retry_after: Duration | None = None, delay: Duration | None = None, error: str | None = None, times: int | None = None) -> SlackFault:
+        """Inject a transport fault into the agent's Web API calls. Removed when this session closes. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "error": error, "times": times})
+        return SlackFault(ctx, data)
+
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> SlackApiCall:
+        """Wait for the next new API call from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
+
+
+class SlackApp:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.name: str = data["name"]
+        self.kind: Literal["app"] = data["kind"]
+        self.bot_user_id: str = data["botUserId"]
+        self.bot_id: str = data["botId"]
+        self.bot_token: str = data["botToken"]
+        self.app_token: str = data["appToken"]
+        self.signing_secret: str = data["signingSecret"]
+        self.scopes: list[str] = data["scopes"]
+
+
+class SlackUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.name: str = data["name"]
+        self.kind: Literal["user"] = data["kind"]
+        self.display_name: str = data["displayName"]
+        self.real_name: str = data["realName"]
+        self.email: str | None = data.get("email")
+        self.is_admin: bool = data["isAdmin"]
+        self.is_bot: bool = data["isBot"]
+
+    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: SlackUser | SlackApp | list[SlackUser | SlackApp] | None = None) -> SlackMessage:
+        """Post a top-level message in a conversation, or in a DM with the people in `to`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        return SlackMessage(ctx, data)
+
+    async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage, also_send_to_channel: bool | None = None) -> SlackMessage:
+        """Reply in a thread: pass the message that starts it, or any reply in it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/reply", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "thread": {"channel": thread.channel, "ts": thread.ts}, "alsoSendToChannel": also_send_to_channel})
+        return SlackMessage(ctx, data)
+
+    async def edit(self, text: str | SlackMessageInput, *, message: SlackMessage) -> SlackMessage:
+        """Edit one of this person's own messages. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/edit", body={"text": {"text": text} if isinstance(text, str) else text._to_wire(), "message": {"channel": message.channel, "ts": message.ts}})
+        return SlackMessage(ctx, data)
+
+    async def delete(self, *, message: SlackMessage) -> None:
+        """Delete a message: this person's own, or anyone's for an admin. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/delete", body={"message": {"channel": message.channel, "ts": message.ts}})
+
+    async def react(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
+        """Add an emoji reaction to a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/react", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
+        return (None if data is None else SlackDelivery(ctx, data))
+
+    async def unreact(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
+        """Remove this person's emoji reaction from a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/unreact", body={"emoji": emoji, "message": {"channel": message.channel, "ts": message.ts}})
+        return (None if data is None else SlackDelivery(ctx, data))
+
+    async def open_d_m(self, participants: SlackUser | SlackApp | list[SlackUser | SlackApp]) -> SlackConversation:
+        """Open (or reuse) a DM with the app, another person, or several. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/open-dm", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])]})
+        return SlackConversation(ctx, data)
+
+    async def invite(self, participants: SlackUser | SlackApp | list[SlackUser | SlackApp], *, channel: SlackConversation) -> None:
+        """Invite people or the app to a channel. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/invite", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])], "channel": channel.id})
+
+    async def kick(self, participant: SlackUser | SlackApp, *, channel: SlackConversation) -> None:
+        """Remove someone from a channel. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/kick", body={"participant": participant.id, "channel": channel.id})
+
+    async def ephemeral(self) -> SlackEphemeralMessages:
+        """Messages only this person can see. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/ephemeral")
+        return [SlackMessage(ctx, item) for item in data]
+
+
+class SlackConversation:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.kind: Literal["channel", "private_channel", "im", "mpim"] = data["kind"]
+        self.name: str | None = data.get("name")
+
+    async def latest_message(self) -> SlackMessage:
+        """The newest message of a conversation, replies included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/latest")
+        return SlackMessage(ctx, data)
+
+    async def messages(self) -> SlackMessages:
+        """Top-level messages of a conversation, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/messages")
+        return [SlackMessage(ctx, item) for item in data]
+
+    async def members(self) -> SlackMembers:
+        """The people and apps in a conversation. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/members")
+        return [SlackUser(ctx, item) if item["kind"] == "user" else SlackApp(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
+        """The conversation as a person would read it, threads included. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.id, safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return SlackTranscript._from_wire(ctx, data)
+
+    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
+
+
+class SlackMessage:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.channel: str = data["channel"]
+        self.ts: str = data["ts"]
+        self.conversation: SlackConversation = SlackConversation(ctx, data["conversation"])
+        self.author: SlackUser | SlackApp = SlackUser(ctx, data["author"]) if data["author"]["kind"] == "user" else SlackApp(ctx, data["author"])
+        self.text: str = data["text"]
+        self.blocks: list[Any] = data["blocks"]
+        self.posted_at: str = data["postedAt"]
+        self.thread_ts: str | None = data.get("threadTs")
+        self.edited: bool = data["edited"]
+        self.visible_to: SlackUser | None = None if data.get("visibleTo") is None else SlackUser(ctx, data["visibleTo"])
+        self.thread: SlackThread = SlackThread(ctx, data["thread"])
+        self.delivery: SlackDelivery | None = None if data.get("delivery") is None else SlackDelivery(ctx, data["delivery"])
+        self.stream: SlackStream | None = None if data.get("stream") is None else SlackStream(ctx, data["stream"])
+
+    async def refresh(self) -> SlackMessage:
+        """Re-read a message: its latest text, edits and deliveries. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}")
+        return SlackMessage(ctx, data)
+
+    async def reactions(self) -> SlackReactions:
+        """The reactions on a message, and who added each. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/reactions")
+        return [SlackReaction._from_wire(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
+        """A message and the replies under it as a person would read them. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return SlackTranscript._from_wire(ctx, data)
+
+    async def deliveries(self) -> SlackMessageDeliveries:
+        """Every delivery this message caused to the agent. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/deliveries")
+        return [SlackDelivery(ctx, item) for item in data]
+
+
+class SlackThread:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.channel: str = data["channel"]
+        self.ts: str = data["ts"]
+        self.conversation: SlackConversation = SlackConversation(ctx, data["conversation"])
+
+    async def replies(self) -> SlackReplies:
+        """Replies in a thread, oldest first, without the message that starts it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/replies")
+        return [SlackMessage(ctx, item) for item in data]
+
+    async def status(self) -> SlackThreadStatus:
+        """What the agent is doing in a thread: its status line, an open stream, or idle. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/state")
+        return SlackThreadStatus._from_wire(ctx, data)
+
+    async def transcript(self, *, as_: SlackUser | SlackApp | None = None) -> SlackTranscript:
+        """A thread as a person would read it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/threads/{quote(self.ts, safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return SlackTranscript._from_wire(ctx, data)
+
+    async def wait_for_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
+        """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
+
+    async def latest_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> SlackMessage:
+        """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
+
+
+class SlackDelivery:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.channel: Literal["slack"] = data["channel"]
+        self.type: str = data["type"]
+        self.event_type: str | None = data.get("eventType")
+        self.event_id: str | None = data.get("eventId")
+        self.payload: Any | None = data.get("payload")
+        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
+        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
+
+    async def refresh(self) -> SlackDelivery:
+        """Re-read a delivery: its attempts and status. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(self.id, safe='')}")
+        return SlackDelivery(ctx, data)
+
+    async def retry(self, *, after: Duration | None = None, reason: Literal["http_timeout", "http_error", "too_many_redirects"] | None = None) -> DeliveryAttempt:
+        """Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(self.id, safe='')}/retry", body={"after": None if after is None else parse_duration(after), "reason": reason})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None, headers: dict[str, str] | None = None) -> DeliveryAttempt:
+        """Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(self.id, safe='')}/resend", body={"badSignature": bad_signature, "stale": stale, "headers": headers})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration = "10s") -> SlackDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> SlackDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
+
+
+class SlackStream:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.channel: str = data["channel"]
+        self.ts: str = data["ts"]
+        self.state: Literal["open", "stopped", "completed"] = data["state"]
+        self.chunks: list[str] = data["chunks"]
+        self.started_at: str = data["startedAt"]
+        self.ended_at: str | None = data.get("endedAt")
+
+    async def refresh(self) -> SlackStream:
+        """Re-read a streamed message's stream: its state and what was streamed so far. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(self.channel, safe='')}/messages/{quote(self.ts, safe='')}/stream")
+        return SlackStream(ctx, data)
+
+    async def ended(self, *, timeout: Duration = "10s") -> SlackStream:
+        """Wait for the stream to end, and resolve with the value as it is then."""
+
+        async def settled() -> SlackStream | None:
+            value = await self.refresh()
+            return None if value.state in ("open",) else value
+
+        return await wait_for("the stream to end", settled, timeout=timeout)
+
+
+class SlackFault:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+
+    async def undo(self) -> None:
+        """Remove a fault. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("DELETE", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults/{quote(self.id, safe='')}")
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await dispose_quietly(self.undo)
+
+
+async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> Channelstack:
     """Attach to a running channelstack server, or start one, and return the client."""
     protocol = Protocol(base_path="/_channelstack", errors=_ERRORS, version=VERSION)
-    return await connect_with(Channelstack, protocol, mode=mode, server=server)
+    return await connect_with(Channelstack, protocol, mode=mode, server=server, token=token)

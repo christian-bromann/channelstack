@@ -1,4 +1,4 @@
-import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType } from "../ir.ts";
+import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
 import { BANNER, errorClassName, IrIndex, pathParts } from "./shared.ts";
 
 const OUT = "sdks/typescript/generated/index.ts";
@@ -17,13 +17,16 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       case "number":
       case "integer":
         return "number";
+      case "duration":
+        return side === "wire" ? "number" : "Duration";
       case "literal":
         return JSON.stringify(type.value);
       case "enum":
         return type.values.map((value) => JSON.stringify(value)).join(" | ");
       case "array": {
         const items = typeOf(type.items, side);
-        return items.includes(" ") ? `Array<${items}>` : `${items}[]`;
+        const list = items.includes(" ") ? `Array<${items}>` : `${items}[]`;
+        return type.oneOrMany && side === "public" ? `${items} | ${list}` : list;
       }
       case "record":
         return `Record<string, ${typeOf(type.values, side)}>`;
@@ -33,8 +36,15 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return side === "wire" && index.holdsResources(type) ? `${type.name}Wire` : type.name;
       case "resource":
         return side === "wire" ? `${type.name}Data` : type.name;
-      case "ref":
-        return side === "wire" ? "string" : type.resources.join(" | ");
+      case "ref": {
+        if (side === "public") return type.resources.join(" | ");
+        const ids = index.refIdFields(type.resources);
+        return ids.length === 1 ? "string" : `{ ${ids.map((id) => `${id}: string`).join("; ")} }`;
+      }
+      case "nullable":
+        return `${typeOf(type.type, side)} | ${side === "wire" ? "null" : "undefined"}`;
+      case "union":
+        return type.types.map((member) => typeOf(member, side)).join(" | ");
     }
   };
 
@@ -48,37 +58,88 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       case "resource": {
         const resource = index.resource(type.name);
         const context =
-          resource.scope === "session" ? `{ transport: ctx.transport, session: ${expr}.${resource.idField} }` : "ctx";
+          resource.scope === "session"
+            ? `{ transport: ctx.transport, session: ${expr}.${resource.idFields?.[0]} }`
+            : "ctx";
         return `new ${type.name}(${context}, ${expr})`;
       }
       case "array":
         return `${expr}.map((item) => ${decode(type.items, "item")})`;
       case "named":
         return `decode${type.name}(ctx, ${expr})`;
+      case "nullable":
+        return `(${expr} === null ? undefined : ${decode(type.type, expr)})`;
       case "object":
         return `{ ...${expr}, ${type.fields
           .filter((field) => index.holdsResources(field.type))
           .map((field) => `${field.name}: ${decode(field.type, `${expr}.${field.name}`)}`)
           .join(", ")} }`;
+      case "union": {
+        // Handle data in a union is told apart by its discriminator field, e.g. `kind: "user" | "app"`.
+        const members = index.discriminated(type);
+        if (!members)
+          throw new Error("A union that holds handles needs a discriminator every member declares as a literal");
+        return members
+          .map(({ value, member }, position) =>
+            position === members.length - 1
+              ? decode(member, expr)
+              : `${expr}.${type.discriminator} === ${JSON.stringify(value)} ? ${decode(member, expr)} : `,
+          )
+          .join("");
+      }
       default:
         throw new Error(`Can't decode handles inside a ${type.kind}`);
     }
   };
 
-  /** An expression that turns an argument into what goes on the wire: handles become their ids. */
-  const encode = (param: IrParam, expr: string): string => {
-    const access = param.optional ? "?." : ".";
-    if (param.type.kind === "ref") return `${expr}${access}${index.refIdField(param.type.resources)}`;
-    if (param.type.kind === "array" && param.type.items.kind === "ref") {
-      return `${expr}${access}map((item) => item.${index.refIdField(param.type.items.resources)})`;
+  /** Does a value of this type carry handles that have to be sent as ids? */
+  const holdsRefs = (type: IrType): boolean =>
+    type.kind === "ref" ||
+    type.kind === "duration" ||
+    (type.kind === "array" && type.oneOrMany === true) ||
+    (type.kind === "array" && holdsRefs(type.items)) ||
+    (type.kind === "object" && type.fields.some((field) => holdsRefs(field.type)));
+
+  /** An expression that turns a value into what goes on the wire: handles become their ids. */
+  const encodeValue = (type: IrType, expr: string): string => {
+    if (!holdsRefs(type)) return expr;
+    if (type.kind === "ref") {
+      const ids = index.refIdFields(type.resources);
+      return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
+    }
+    if (type.kind === "duration") return `parseDuration(${expr})`;
+    if (type.kind === "array") {
+      const list = type.oneOrMany ? `[${expr}].flat()` : expr;
+      const item = encodeValue(type.items, "item");
+      return item === "item" ? list : `${list}.map((item) => ${item})`;
+    }
+    if (type.kind === "object") {
+      const converted = type.fields
+        .filter((field) => holdsRefs(field.type))
+        .map((field) => `${field.name}: ${encodeField(field, `${expr}.${field.name}`)}`);
+      return `{ ...${expr}, ${converted.join(", ")} }`;
     }
     return expr;
   };
 
+  const encodeField = (field: IrField, expr: string): string =>
+    field.optional && holdsRefs(field.type)
+      ? `${expr} === undefined ? undefined : ${encodeValue(field.type, expr)}`
+      : encodeValue(field.type, expr);
+
+  /** An argument or option as it goes on the wire. A string where an object is expected is its shorthand. */
+  const encode = (param: IrParam, expr: string): string =>
+    param.shorthand === undefined
+      ? encodeField(param, expr)
+      : `typeof ${expr} === "string" ? { ${param.shorthand}: ${expr} } : ${encodeField(param, expr)}`;
+
+  const parameterType = (param: IrParam): string =>
+    `${param.shorthand === undefined ? "" : "string | "}${typeOf(param.type, "public")}`;
+
   const method = (resource: IrResource, m: IrMethod): string[] => {
     const optionsOptional = m.options.every((option) => option.optional);
     const parameters = [
-      ...m.args.map((arg) => `${arg.name}: ${typeOf(arg.type, "public")}`),
+      ...m.args.map((arg) => `${arg.name}: ${parameterType(arg)}`),
       ...(m.options.length > 0
         ? [`options: { ${fields(m.options, "public").join("; ")} }${optionsOptional ? " = {}" : ""}`]
         : []),
@@ -123,9 +184,68 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ];
   };
 
+  /** `thread.waitForReply()`, `thread.latestReply()`: waits generated from a list read. */
+  const wait = (resource: IrResource, w: IrWait): string[] => {
+    const item = typeOf(w.item, "public");
+    const fromField =
+      w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
+    const from = fromField ? `from?: ${typeOf(fromField.type, "public")} | string` : undefined;
+    const options = `${from ? `{ ${from} } & ` : ""}${w.mode === "next" ? "WaitOptions" : "QuietOptions"}`;
+    const matches = from ? `(item) => fromMatches(item.${w.from}, options.from)` : "() => true";
+    const what = from ? `describeWait(${JSON.stringify(w.what)}, options.from)` : JSON.stringify(w.what);
+    // With `filter`, the read's own options come first and are passed through to it.
+    const read = resource.methods.find((m) => m.name === w.read);
+    const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }, ` : "";
+    const call = `() => this.${w.read}(${filter === "" ? "" : "filter"})`;
+    const noun = w.what.replace(/^an? /, "");
+    if (w.mode === "until") {
+      const pending = (w.not ?? []).map((value) => `value.${w.field} === ${JSON.stringify(value)}`).join(" || ");
+      return [
+        "",
+        `  /** Wait for ${w.what}, and resolve with the value as it is then. */`,
+        `  async ${w.name}(options: WaitOptions = {}): Promise<${item}> {`,
+        `    return waitFor(${JSON.stringify(w.what)}, async () => {`,
+        `      const value = await this.${w.read}();`,
+        `      return ${pending} ? undefined : value;`,
+        "    }, options);",
+        "  }",
+      ];
+    }
+    return [
+      "",
+      w.mode === "next"
+        ? `  /** Wait for the next new ${noun}${from ? " matching `from` (anyone if omitted)" : ""}, after the last one this handle saw. */`
+        : `  /** The latest ${noun}${from ? " matching `from`" : ""}, once the agent is quiet. Waits for at least one. */`,
+      `  async ${w.name}(${filter}options: ${options} = {}): Promise<${item}> {`,
+      w.mode === "next"
+        ? // A filtered read is its own list, so each filter keeps its own place in it.
+          `    return waitForNext(this.#seen, ${filter ? `\`${w.name}:\${JSON.stringify(filter)}\`` : JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options);`
+        : `    return latestOnceQuiet(${call}, ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
+      "  }",
+    ];
+  };
+
   const resourceClass = (resource: IrResource): string[] => {
     const isRoot = resource.name === ir.root;
     const disposable = !isRoot && index.disposer(resource) !== undefined;
+    const waits = resource.waits ?? [];
+    const seen = waits.some((w) => w.mode === "next") ? ["  readonly #seen = new Map<string, number>();"] : [];
+    const quiet = isRoot
+      ? []
+      : [
+          "",
+          "  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */",
+          "  [QUIET](): Promise<QuietState> {",
+          "    return quietOf(this.#ctx);",
+          "  }",
+        ];
+    const tail = [
+      ...resource.methods.flatMap((m) => method(resource, m)),
+      ...waits.flatMap((w) => wait(resource, w)),
+      ...quiet,
+      "}",
+      "",
+    ];
     return [
       ...(isRoot
         ? []
@@ -137,8 +257,12 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
             "",
           ]),
       `export class ${resource.name}${isRoot ? " extends ClientBase" : disposable ? " implements AsyncDisposable" : ""} {`,
-      ...fields(resource.fields, "public").map((f) => `  readonly ${f};`),
+      // An optional field is always present on a handle, as undefined when the server didn't send it.
+      ...resource.fields.map(
+        (field) => `  readonly ${field.name}: ${typeOf(field.type, "public")}${field.optional ? " | undefined" : ""};`,
+      ),
       "  readonly #ctx: HandleContext;",
+      ...seen,
       "",
       "  /** @internal Handles come from the SDK, never from `new`. */",
       ...(isRoot
@@ -150,40 +274,65 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         : [
             `  constructor(ctx: HandleContext, data: ${resource.name}Data) {`,
             "    this.#ctx = ctx;",
-            ...resource.fields.map((field) => `    this.${field.name} = ${decode(field.type, `data.${field.name}`)};`),
+            ...resource.fields.map((field) => {
+              const value = decode(field.type, `data.${field.name}`);
+              const guarded =
+                field.optional && value !== `data.${field.name}`
+                  ? `data.${field.name} === undefined ? undefined : ${value}`
+                  : value;
+              return `    this.${field.name} = ${guarded};`;
+            }),
           ]),
       "  }",
-      ...resource.methods.flatMap((m) => method(resource, m)),
-      "}",
-      "",
+      ...tail,
     ];
   };
-
-  const dataType = ({ name, type }: Ir["types"][number]): string[] => {
+  const dataType = ({ name, type, stringField }: Ir["types"][number]): string[] => {
+    // A value with a text form prints as that text: `transcript.toString()`.
+    const printable = stringField !== undefined && type.kind === "object";
     const declare = (suffix: string, side: "public" | "wire") =>
       type.kind === "object"
-        ? [`export interface ${name}${suffix} {`, ...fields(type.fields, side).map((f) => `  ${f};`), "}", ""]
+        ? [
+            `export interface ${name}${suffix} {`,
+            ...fields(type.fields, side).map((f) => `  ${f};`),
+            ...(printable && side === "public" ? ["  toString(): string;"] : []),
+            "}",
+            "",
+          ]
         : [`export type ${name}${suffix} = ${typeOf(type, side)};`, ""];
-    if (!index.holdsResources(type)) return declare("", "public");
+    if (!printable && !index.holdsResources(type)) return declare("", "public");
+    const fieldsToConvert = type.kind === "object" && type.fields.some((field) => index.holdsResources(field.type));
+    const decoded = type.kind !== "object" || fieldsToConvert ? decode(type, "data") : "{ ...data }";
     return [
       ...declare("", "public"),
       ...declare("Wire", "wire"),
-      `function decode${name}(ctx: HandleContext, data: ${name}Wire): ${name} {`,
-      `  return ${decode(type, "data")};`,
+      `function decode${name}(${fieldsToConvert || type.kind !== "object" ? "ctx" : "_ctx"}: HandleContext, data: ${name}Wire): ${name} {`,
+      printable ? `  return printsAs(${decoded}, data.${stringField});` : `  return ${decoded};`,
       "}",
       "",
     ];
   };
 
   const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
+  const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
+  const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
+  const waitImports = [
+    ...(allWaits.some((w) => w.from !== undefined) ? ["describeWait", "fromMatches"] : []),
+    ...(allWaits.some((w) => w.mode === "latest") ? ["latestOnceQuiet", "type QuietOptions"] : []),
+    ...(allWaits.some((w) => w.mode === "until") ? ["waitFor"] : []),
+    ...(allWaits.some((w) => w.mode === "next") ? ["waitForNext"] : []),
+    ...(allWaits.some((w) => w.mode !== "latest") ? ["type WaitOptions"] : []),
+  ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
   const lines = [
     `// ${BANNER}`,
-    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
+    `import { ${[...waitImports, "type QuietState"].join(", ")} } from "../runtime/wait.ts";`,
     "",
     "/** The server version this SDK was generated for. */",
     `export const VERSION = ${JSON.stringify(ir.version)};`,

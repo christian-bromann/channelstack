@@ -4,9 +4,20 @@
     "noEmit": true,
     "types": ["node", "bun"],
     "paths": {
-      "channelstack/client": ["./sdks/typescript/client.ts"]
+      "channelstack/client": ["./sdks/typescript/client.ts"],
+      "channelstack/vitest": ["./integrations/vitest/index.ts"]
     }
   },
-  "include": ["server", "codegen", "sdks/typescript", "scenarios", "scripts", "vitest.config.ts"],
+  "include": [
+    "server",
+    "codegen",
+    "sdks/typescript",
+    "integrations",
+    "examples",
+    "scenarios",
+    "scripts",
+    "test",
+    "vitest.config.ts"
+  ],
   "exclude": ["**/dist", "**/node_modules"]
 }

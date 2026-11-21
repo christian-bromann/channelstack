@@ -39,7 +39,7 @@ class Transport:
         path: str,
         *,
         body: Mapping[str, Any] | None = None,
-        query: Mapping[str, str | None] | None = None,
+        query: Mapping[str, str | bool | None] | None = None,
     ) -> Any:
         response = await self._send(method, f"{self._base_path}{path}", _without_none(body), _without_none(query))
         try:

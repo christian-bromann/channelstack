@@ -34,7 +34,7 @@ afterAll(async () => {
   agent.close();
 });
 
-test("no fake secret and no live-shaped token reaches logs, errors or the event log", async () => {
+test("no fake secret and no live-shaped token reaches logs, errors, the event log or the UI", async () => {
   await new Promise<void>((resolve) => agent.listen(0, "127.0.0.1", resolve));
   const webhook = `http://127.0.0.1:${(agent.address() as AddressInfo).port}/events`;
   server = await startBinary({
@@ -93,6 +93,18 @@ test("no fake secret and no live-shaped token reaches logs, errors or the event 
     )
     .toBe(secrets.length);
   const events = JSON.stringify((await control("GET", `/sessions/${sessionId}/events`)).body);
+
+  // The UI: a browser that opened a login link sees the page and the event log, both without secrets.
+  const link: string = note(await control("POST", "/ui/login-links")).url;
+  const opened = await fetch(link, { redirect: "manual" });
+  const cookie = (opened.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+  const asBrowser = async (path: string) => (await fetch(`${server?.url}${path}`, { headers: { cookie } })).text();
+  const ui = [await asBrowser("/"), await asBrowser(`/_channelstack/sessions/${sessionId}/events`)].join("\n");
+  expect(ui).toContain("<title>channelstack</title>");
+  expect(ui).toContain("delivery_attempt");
+  const uiSecrets = [new URL(link).searchParams.get("login") ?? "", cookie.split("=")[1] ?? ""];
+  expect(uiSecrets.every((secret) => secret.length >= 20)).toBe(true);
+
   await server.stop();
   const logs = server.output();
 
@@ -104,7 +116,10 @@ test("no fake secret and no live-shaped token reaches logs, errors or the event 
     expect(logs, "logs").not.toContain(secret);
     expect(JSON.stringify(errors), "error responses").not.toContain(secret);
     expect(events, "event log").not.toContain(secret);
+    expect(ui, "the UI").not.toContain(secret);
   }
+  // The login code and the browser's session never reach the logs. (The start banner prints its own link, once, by design.)
+  for (const secret of uiSecrets) expect(logs, "logs").not.toContain(secret);
   // Emails are scrubbed from logs and errors. The event log keeps message content, which is what tests read.
   expect(logs).not.toContain(email);
   expect(JSON.stringify(errors)).not.toContain(email);

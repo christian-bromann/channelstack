@@ -2,7 +2,7 @@
 // The `channelstack` command: runs the server binary installed for this platform, with the same arguments.
 import { spawn } from "node:child_process";
 
-import { resolveServerBinary } from "../dist/runtime/launcher.js";
+import { resolveServerBinary } from "../dist/sdks/typescript/runtime/launcher.js";
 
 let binary;
 try {

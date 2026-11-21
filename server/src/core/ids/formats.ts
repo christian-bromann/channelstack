@@ -66,6 +66,11 @@ export const ID_FORMATS = {
   "slack.event": slack("Ev"),
   "slack.view": slack("V"),
   "slack.file": slack("F"),
+  // Block ids in a message a person typed: a few base-62 characters, as Slack's clients generate.
+  "slack.block": {
+    pattern: /^[A-Za-z0-9]{5}$/,
+    generate: (draw) => draw.chars(5, `${UPPER_ALNUM}${LOWER_ALNUM.slice(10)}`),
+  },
   "slack.trigger": {
     pattern: /^\d{13}\.\d{13}\.[0-9a-f]{32}$/,
     accepts: /^\d{9,13}\.\d{9,13}\.[0-9a-f]{32}$/,

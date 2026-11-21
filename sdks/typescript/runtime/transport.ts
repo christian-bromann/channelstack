@@ -27,7 +27,7 @@ export interface TransportOptions {
 
 export interface RequestOptions {
   body?: unknown;
-  query?: Readonly<Record<string, string | undefined>>;
+  query?: Readonly<Record<string, string | boolean | undefined>>;
 }
 
 /** How long to keep retrying a connection that is refused, while the server starts. */
@@ -56,7 +56,7 @@ export class Transport {
   async request(method: string, path: string, options: RequestOptions = {}): Promise<unknown> {
     const url = new URL(`${this.#options.basePath}${path}`, this.#options.url);
     for (const [name, value] of Object.entries(options.query ?? {})) {
-      if (value !== undefined) url.searchParams.set(name, value);
+      if (value !== undefined) url.searchParams.set(name, String(value));
     }
     const response = await this.#send(url, {
       method,

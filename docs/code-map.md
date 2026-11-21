@@ -16,24 +16,28 @@
 
 | Concern | Module | Use it for | Don't |
 |---|---|---|---|
-| Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, reset, env; mounting each driver's fake | Build services or mount routes anywhere else |
+| Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, quiet, reset, env; mounting each driver's fake; serving the UI page and its login link | Build services or mount routes anywhere else |
 | Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration | Call `Bun.serve` anywhere else (everything else also runs under Node) |
-| The command line | `cli.ts` | `start`, `env`, `secrets rotate`, `--version` | Read `process.argv` or `process.env` flags in core |
+| The command line | `cli.ts` | Parsing arguments and dispatching: `start`, `secrets rotate`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
+| Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError` | Read `server.json` or call the control API from another CLI module |
+| Acting from the terminal | `cli/slack.ts` | `slack say`, `reply`, `react`; people and channels by name, created on first use; what `last` means | Resolve names or `last` anywhere else |
+| Watching from the terminal | `cli/watch.ts` | `show` (a transcript as text or JSON) and `tail` (deliveries and API calls as they happen) | — |
+| The UI page in the binary | `ui/page.ts` (the page itself is `ui/index.html`) | Importing the page as text, for the binary's entry only | Import it from `app.ts`: the app takes the page as an option, so it also runs under Node |
 | The list of drivers | `drivers/index.ts` | `DRIVERS`, `secretSpecs()` | Import a driver from core |
 
 ## Server: core (`server/src/core/`)
 
 | Concern | Module | Use it for | Don't |
 |---|---|---|---|
-| Sessions and ownership | `sessions/` | Opening and closing scopes, `onClose` cleanup | Track ownership inside a driver |
+| Sessions and ownership | `sessions/` | Opening and closing scopes, `onClose` cleanup; sessions shared by name (`dev`, for the CLI, the UI and MCP) | Track ownership inside a driver |
 | Object registry and handles | `registry/` | Typed collections per driver and type; resolving handle ids for a session (`get`), from the platform's side (`find`), and their owner | Keep a private `Map` of objects in a route |
-| Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`) | Call `crypto.randomUUID()` or format ids by hand |
+| Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`); reading the time out of a Slack `ts` (`slackTsTime`) | Call `crypto.randomUUID()` or format ids by hand |
 | Secrets | `secrets/` | Fake tokens and signing secrets (the CSPRNG helpers, the token formats, `~/.channelstack/secrets.json`, 0600, rotation); live credentials in memory *(planned, phase 5)* | Generate or store a secret anywhere else |
-| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer. Slack v0, `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
-| Control API bearer token | `auth/` | Creating the token, parsing `Authorization: Bearer`, the middleware | Compare tokens with `===` |
+| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`). `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
+| Access to the control API | `auth/` | Creating the bearer token, parsing `Authorization: Bearer`, the middleware (`requireAccess`); browser access for the UI (`ui.ts`): one-time login codes, the session cookie, and the short list of reads it allows | Compare tokens with `===`; let a cookie authorize anything but those reads |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
-| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window, recording every attempt. Retries, Socket Mode, faults and forged deliveries *(planned, phases 1–2)* | Call `fetch` to the agent from a driver |
-| Quiet detector | `quiet/` *(planned, phase 1)* | "Is the agent idle?" for negative and exact-count matchers | Add sleeps or ad-hoc settle timers |
+| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
+| Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is in flight or about to be retried, a driver reports open work (named, so a failure can say what was left open), or the agent was told to retry later (`expectMore` until it `arrived`); negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
 | Reality rules | `reality/` *(planned, phase 5)* | Fake or live per object, `unsupported_in_live`, `fake_actor_in_live_world` | Branch on `process.env` credentials in a driver |
 | Safety and cleanup ledger | `safety/`, `ledger/` *(planned, phase 5)* | Live allowlists, tagging, cleanup, `channelstack sweep` | Delete live objects from a driver directly |
 | Errors | `errors/` | The protocol's error codes and their HTTP status (`ProtocolError`), including a platform's own refusal surfaced through the control API (`{ platform, status }`) | Throw ad-hoc error shapes from routes |
@@ -41,7 +45,7 @@
 | Logging | `log/` | The one logger: JSON lines, redacted | Write to stdout or stderr from core or a driver |
 | Routing helpers | `router/` | `registerRoute`, `DriverRouter`, zod-openapi registration, `x-channelstack-*` extensions; the `Driver`, `DriverContext` and `FakeBackend` contracts | Register Hono routes on the control API without the extensions |
 | State directory | `home/` | `CHANNELSTACK_HOME`, writing 0600 files atomically, reading JSON state | Write a file with a secret any other way |
-| Time | `clock/` | The injected clock | Call `Date.now()` in core or a driver |
+| Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency | Call `Date.now()` or `setTimeout` in core or a driver |
 | portless | `portless/` | Registering and removing `*.localhost` names through the `portless` CLI | Spawn `portless` anywhere else |
 | Proxy and CA | `proxy/`, `ca/` *(planned, phase 6)* | Host routing to fakes, the name-constrained CA | — |
 
@@ -54,7 +58,8 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `index.ts` | The driver's definition: its name, the secrets it needs, and how it is built from a `DriverContext` |
 | `routes.ts` | Control API routes and schemas for this channel |
 | `world.ts` | The `World` interface: each action written once; the channel's record types |
-| `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`), `index.ts` (the `FakeBackend`) |
+| `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`: every change to the state happens here once, for people and for the app alike, and the caller brings the permission check; also what only a fake can do: forged deliveries, faults), `index.ts` (the `FakeBackend`) |
+| `mentions.ts` (Slack) | `@name` in a test's text → the platform's mention syntax, and back (`nameMentions`, `splitAtMentions`); an emoji's name (`emojiName`) |
 | `live/` | Real API calls as the app or a person, reads, cleanup handlers *(phase 5)* |
 | `payloads.ts` | Builders for every event payload this platform sends (used by the fake's delivery) |
 | `transcript.ts` | State → what a person would see |
@@ -78,7 +83,7 @@ The same modules with the same names in every language.
 | Launcher | `launcher` | `auto` / `attach` / `start`; finding the server binary and its per-platform package name |
 | Client base | `client` | What generated handles share: `HandleContext`, the root client's `close`, the version check on connect |
 | Credentials | `credentials` *(planned, phase 5)* | `CHANNELSTACK_<CHANNEL>_*` lookup |
-| Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, quiet checks. Every `waitFor…`, `latest…` and matcher uses it |
+| Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it |
 | Durations | `duration` | Parsing `"3s"`, `"750ms"` |
 
 The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary.
@@ -91,6 +96,18 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 | Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module |
 | Reference agents | `agents/` | Plain programs with no channelstack code in them, configured from `channelstack env` |
 
+## Examples (`examples/agents/`)
+
+Reference agents for the acceptance suite: real frameworks, written as a developer would, with no channelstack code in them (`pnpm check:deps` enforces it).
+
+| Concern | Module | Notes |
+|---|---|---|
+| What the agents answer | `shared/scripted-model.ts` | The scripted "model": short answers, and the AI SDK's mock model for streamed long-form. Every agent answers from here, so they behave the same |
+| The Bolt app the Bolt agents start from | `shared/bolt.ts` | Configuration from the environment, `listen` |
+| Bolt + AI SDK | `bolt-ai-sdk/agent.ts` | Mentions, DMs, reactions, native streaming |
+| Chat SDK | `chat-sdk-slack/agent.ts` | The same behaviour on Vercel's Chat SDK and its Slack adapter |
+| A deliberately broken agent | `mdac-220/agent.ts` | Leaves a lone "Thinking…" stream behind; exit check 1.4 proves the suite catches it |
+
 ## Scripts (`scripts/`)
 
 | Concern | Module | Notes |
@@ -99,11 +116,16 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 | Building the spec from the routes; comparing generated files | `lib/generate.ts` | Used by `spec.ts` and `sdk.ts` (write, or `--check`) |
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
+| The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener, with timers the test advances itself) and `recordingAgent` (a stand-in agent endpoint). Every driver's unit tests use it |
 | Starting a server executable for a test or a smoke run | `lib/server.ts` | `startBinary`: spawn, wait for the server file, collect output, stop. The SDK launchers have their own start, because they ship |
 | The binary under test, with a control API client | `server/test/integration/harness.ts` | `BINARY`, `cli`, `startBinary` (adds `control` to `lib/server.ts`'s). Shared by the server's and the SDK's integration tests |
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |
 | Running the server from source | `dev-server.sh` | Stands in for the binary (`CHANNELSTACK_SERVER_BIN`) on machines that block freshly compiled executables. CI never uses it |
 | Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check |
+| A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints. Everything that needs both uses it |
+| `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack` |
+| The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |
+| Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) |
 | Packaging check | `pack-test.ts` | `npm pack` into an empty project |
 | Stale-check self-test | `selftest-stale.ts` | Proves `spec:check` and `sdk:check` fail on drift |
 
@@ -111,8 +133,8 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 
 | Concern | Module | Notes |
 |---|---|---|
-| Matcher logic | `integrations/matchers-core/` *(planned, phase 1)* | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
-| Vitest | `integrations/vitest/` *(planned, phase 1)* | Plugin, fixtures, the `expect.extend` adapter |
+| Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
+| Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test and the `expect.extend` adapter (`setup.ts`) |
 | Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
 | Checks | `integrations/checks/` *(planned, phase 2)* | `slackChecks()` and friends, built on the public API only |
 | pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |

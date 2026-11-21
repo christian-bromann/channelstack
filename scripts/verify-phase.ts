@@ -22,6 +22,7 @@ const STANDING: readonly Check[] = [
   { name: "Unit tests", script: ["test"] },
   { name: "Spec is current", script: ["spec:check"] },
   { name: "SDKs are current", script: ["sdk:check"] },
+  { name: "The examples type-check against the generated SDK", script: ["api:check"] },
   { name: "No secrets in output", script: ["test:redaction"] },
   { name: "No duplicate code", script: ["check:dupes"] },
   { name: "Architecture boundaries", script: ["check:deps"] },
@@ -39,6 +40,10 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
     { name: "0.3 Packaging works", script: ["test:pack"] },
     { name: "0.4 The stale checks catch drift", script: ["test:stale"] },
   ],
+  // Phase 1's exit checks all run in checks above. The acceptance run (standing) covers 1.1 and
+  // 1.2 (`api/examples` against both reference agents), 1.5 and 1.7 (`test/acceptance/stack`),
+  // 1.4 and 1.6 (`test/acceptance`). 1.3 (delivery cases against Bolt) is in `test:integration`.
+  1: [],
 };
 
 const phase = Number(process.argv[2]);

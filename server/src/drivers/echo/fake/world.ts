@@ -81,6 +81,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
           body: JSON.stringify(payload),
           sign: (body, atMs) => signEchoDelivery(context.secret("signingSecret"), body, atMs),
           timeoutMs: ACK_WINDOW_MS,
+          meta: { payload },
         });
       }
       return message;

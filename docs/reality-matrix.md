@@ -6,6 +6,13 @@ Every feature runs in the fake server (in memory). The question this document an
 
 ## Legend
 
+**Fake column**
+
+| Value | Meaning |
+|---|---|
+| **Yes** | The fake will do it; not built yet |
+| **Done** | Built and covered by a test in the phase gate. In the cross-cutting table: for the channels built so far (Slack) |
+
 **Live column**
 
 | Value | Meaning |
@@ -37,6 +44,8 @@ Every feature runs in the fake server (in memory). The question this document an
 | Plus a user token per sandbox person | Most of the matrix: say, reply, react, edit, DMs, comments, reviews, delegation, reads |
 | Plus unattended sign-in secrets per person | The browser rows, as real UI actions |
 
+**Where the fake is deliberately more lenient than the platform:** a channel name is unique per session, not per workspace, so parallel tests can each have a `#support` ([decision 0006](decisions/0006-shared-world-collisions.md)). Real Slack refuses the second one with `name_taken`; live, places get a run-specific name.
+
 **Two rules the fake follows so fake and live don't drift:**
 1. **When the real platform refuses something, the fake refuses it too,** with the same error. For example, requesting a review from an app's bot.
 2. **When live needs proxy or browser, the fake still runs without them.** Only live runs have the extra requirement.
@@ -47,18 +56,18 @@ Every feature runs in the fake server (in memory). The question this document an
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `createUser({ name })` | Yes | Partial | Pre-provisioned | No platform lets an API create real people in a test workspace. Slack: SCIM only on Business+/Enterprise, `admin.users.invite` is Enterprise-only and invites rather than creates, and developer sandboxes cap at 8 users. Linear: invites only (`organizationInviteCreate`). GitHub and Notion: no user-creation API. Live tests use a fixed pool of sandbox accounts, so options like `admin` or `guest` must match the account |
-| `createUser({ id })` (fixed id) | Yes | No | — | Real ids are assigned by the platform. Live tests read the id from the pre-provisioned account instead |
-| Isolation per test (fresh places) | Yes | Yes | Seeding credentials | Live places get a `channelstack-run-<id>` name and are deleted at the end of the session (cleanup ledger) |
-| `delivery.attempts`, `status`, `settled()` | Yes | No (GitHub: read-only, see below) | — | Fake-only. Live, the platform delivers to the agent directly and channelstack isn't in the path |
-| `toBeAccepted({ within })` | Yes | No (GitHub: from the delivery log) | — | Fake-only, except GitHub's delivery log records the agent's response time |
-| `delivery.resend({ badSignature, stale })` | Yes | No | — | Fake-only |
-| `toBeRejected()` | Yes | No (GitHub: from the delivery log) | — | Fake-only, except GitHub's delivery log records the agent's status code |
-| `calls()`, `waitForCall()`, `toHaveReceivedCall()` | Yes | Yes, with proxy | Proxy | In base-URL mode the agent talks straight to the platform, so channelstack sees nothing |
-| `fault(...)`: rate limits, latency, errors | Yes | Yes, with proxy | Proxy | Injected by the proxy on the way to the real platform. Real rate limits also apply |
-| "Agent is quiet" (negative and exact-count matchers) | Yes | Partial | Proxy, or polling | With proxy: no call in flight and no open stream. Without proxy: the transcript is unchanged for `quietFor`, which is slower and less exact |
-| `transcript()` and all `toContainText…` matchers | Yes | Yes | User token or App credentials | Built from the platform's read APIs, using the same renderer as the fake |
-| `channelstack reset` | Yes | No | — | Live cleanup is per session (cleanup ledger) plus `channelstack sweep`. A real workspace is never wiped |
+| `createUser({ name })` | Done | Partial | Pre-provisioned | No platform lets an API create real people in a test workspace. Slack: SCIM only on Business+/Enterprise, `admin.users.invite` is Enterprise-only and invites rather than creates, and developer sandboxes cap at 8 users. Linear: invites only (`organizationInviteCreate`). GitHub and Notion: no user-creation API. Live tests use a fixed pool of sandbox accounts, so options like `admin` or `guest` must match the account |
+| `createUser({ id })` (fixed id) | Done | No | — | Real ids are assigned by the platform. Live tests read the id from the pre-provisioned account instead |
+| Isolation per test (fresh places) | Done | Yes | Seeding credentials | Live places get a `channelstack-run-<id>` name and are deleted at the end of the session (cleanup ledger) |
+| `delivery.attempts`, `status`, `settled()` | Done | No (GitHub: read-only, see below) | — | Fake-only. Live, the platform delivers to the agent directly and channelstack isn't in the path |
+| `toBeAccepted({ within })` | Done | No (GitHub: from the delivery log) | — | Fake-only, except GitHub's delivery log records the agent's response time |
+| `delivery.resend({ badSignature, stale })` | Done | No | — | Fake-only |
+| `toBeRejected()` | Done | No (GitHub: from the delivery log) | — | Fake-only, except GitHub's delivery log records the agent's status code |
+| `calls()`, `waitForCall()`, `toHaveReceivedCall()` | Done | Yes, with proxy | Proxy | In base-URL mode the agent talks straight to the platform, so channelstack sees nothing |
+| `fault(...)`: rate limits, latency, errors | Done | Yes, with proxy | Proxy | Injected by the proxy on the way to the real platform. Real rate limits also apply |
+| "Agent is quiet" (negative and exact-count matchers) | Done | Partial | Proxy, or polling | With proxy: no call in flight and no open stream. Without proxy: the transcript is unchanged for `quietFor`, which is slower and less exact |
+| `transcript()` and all `toContainText…` matchers | Done | Yes | User token or App credentials | Built from the platform's read APIs, using the same renderer as the fake |
+| `channelstack reset` | Done | No | — | Live cleanup is per session (cleanup ledger) plus `channelstack sweep`. A real workspace is never wiped |
 
 ---
 
@@ -66,17 +75,17 @@ Every feature runs in the fake server (in memory). The question this document an
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `slack.createChannel({ participants, private })` | Yes | Yes | Seeding credentials (`conversations.create`, `conversations.invite`) | Including `slack.app` invites the bot |
+| `slack.createChannel({ participants, private })` | Done | Yes | Seeding credentials (`conversations.create`, `conversations.invite`) | Including `slack.app` invites the bot |
 | `slack.createChannel({ shared: true })` (Slack Connect) | Yes | No | — | Needs a second organization and manual approval |
-| `slack.uninstallApp()` | Yes | Partial | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run |
-| `ana.say(text, { channel })` | Yes | Yes | User token (`chat.postMessage` as the user) | The platform sends real `message` and `app_mention` events |
-| `ana.say(text, { to: slack.app })` (DM) | Yes | Yes | User token (`conversations.open`, then `chat.postMessage`) | Fires `message.im` |
-| `ana.say(text, { to: [ben, slack.app] })` (group DM) | Yes | Yes | User token | |
+| `slack.uninstallApp()` | Done | Partial | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run |
+| `ana.say(text, { channel })` | Done | Yes | User token (`chat.postMessage` as the user) | The platform sends real `message` and `app_mention` events |
+| `ana.say(text, { to: slack.app })` (DM) | Done | Yes | User token (`conversations.open`, then `chat.postMessage`) | Fires `message.im` |
+| `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Yes | User token | |
 | `ana.say({ files })` | Yes | Yes | User token (files upload v2) | |
-| `ana.reply(text, { thread })` | Yes | Yes | User token (`chat.postMessage` with `thread_ts`) | `alsoSendToChannel` → `reply_broadcast` |
-| `ana.edit(text, { message })` | Yes | Yes | User token (`chat.update`) | Only the person's own messages, as in Slack |
-| `ana.delete({ message })` | Yes | Yes | User token (`chat.delete`) | |
-| `ana.react` / `unreact` | Yes | Yes | User token (`reactions.add` / `remove`) | |
+| `ana.reply(text, { thread })` | Done | Yes | User token (`chat.postMessage` with `thread_ts`) | `alsoSendToChannel` → `reply_broadcast` |
+| `ana.edit(text, { message })` | Done | Yes | User token (`chat.update`) | Only the person's own messages, as in Slack |
+| `ana.delete({ message })` | Done | Yes | User token (`chat.delete`) | |
+| `ana.react` / `unreact` | Done | Yes | User token (`reactions.add` / `remove`) | |
 | `ben.click("Approve", { message })` | Yes | Yes, with browser | Browser | Confirmed: `block_actions` is only sent when a real person clicks; there's no API to trigger it |
 | `ana.select(option, { menu, message })` | Yes | Yes, with browser | Browser | Same as click |
 | `ben.waitForModal()` | Yes | Yes, with proxy or browser | Proxy (sees `views.open`) or Browser (sees the modal) | |
@@ -84,22 +93,22 @@ Every feature runs in the fake server (in memory). The question this document an
 | `ana.shortcut(callbackId, { message })` | Yes | Yes, with browser | Browser | |
 | `ana.runCommand("/deploy web", { channel })` | Yes | Yes, with browser | Browser | Confirmed: the official docs only cover receiving commands. `chat.command` exists only in community sources (undocumented, legacy tokens), so channelstack doesn't use it |
 | `ana.stop({ thread })` | Yes | Yes, with browser | Browser | Confirmed: Stop is a native client button that sends the app `agent_session_stopped`. It only appears when the app subscribes to that event, and no API presses it. The fake models the follow-up too: `chat.appendStream` returns `stopped_by_user` |
-| `ana.openDM(slack.app)` | Yes | Yes | User token (`conversations.open`) | |
+| `ana.openDM(slack.app)` | Done | Yes | User token (`conversations.open`) | |
 | `ana.openAgentThread()` | Yes | Yes, with browser | Browser | Confirmed: `assistant_thread_started` fires only when the person opens the assistant container, and no API triggers it |
 | `ana.pickPrompt(title, { thread })` | Yes | Partial | Browser, or User token | The browser clicks the suggested prompt. A User-token fallback posts the prompt's text into the thread, which looks the same to the agent but isn't a click |
 | `ana.switchContext(channel, { thread })` | Yes | Yes, with browser | Browser | `assistant_thread_context_changed` comes from the client |
-| `ana.invite` / `kick` | Yes | Yes | User token (`conversations.invite` / `kick`) | Kicking needs the right workspace role |
+| `ana.invite` / `kick` | Done | Yes | User token (`conversations.invite` / `kick`) | Kicking needs the right workspace role |
 | `ana.renameChannel` / `archiveChannel` | Yes | Yes | User token | |
-| `ana.ephemeral()` | Yes | Yes, with proxy or browser | Proxy (sees `chat.postEphemeral`) or Browser | Confirmed: ephemeral messages aren't stored and don't persist across reloads, so no read API returns them. The browser only sees them while the page stays open |
-| `channel.messages()`, `thread.replies()`, `waitForReply`, `latestReply` | Yes | Yes | User token (`conversations.history` / `replies`) | Polled |
-| `message.reactions()` | Yes | Yes | User token (`reactions.get`) | |
-| `message.stream` (chunks and state) | Yes | Partial | Proxy (sees `chat.startStream` / `appendStream` / `stopStream`) | **unverified**: whether history returns partial text during a stream. The docs only say a stream that times out after 10 minutes keeps what was streamed. Without proxy, count on seeing only the final text |
-| `thread.status()`, `toHaveStatus`, `toHaveStatusText` | Yes | Yes, with proxy or browser | Proxy (sees `assistant.threads.setStatus` and its replacement `agents.sessions.setStatus`) or Browser | Confirmed: only write methods exist, nothing reads the status back. The fake serves both method names |
+| `ana.ephemeral()` | Done | Yes, with proxy or browser | Proxy (sees `chat.postEphemeral`) or Browser | Confirmed: ephemeral messages aren't stored and don't persist across reloads, so no read API returns them. The browser only sees them while the page stays open |
+| `channel.messages()`, `thread.replies()`, `waitForReply`, `latestReply` | Done | Yes | User token (`conversations.history` / `replies`) | Polled |
+| `message.reactions()` | Done | Yes | User token (`reactions.get`) | |
+| `message.stream` (chunks and state) | Done | Partial | Proxy (sees `chat.startStream` / `appendStream` / `stopStream`) | **unverified**: whether history returns partial text during a stream. The docs only say a stream that times out after 10 minutes keeps what was streamed. Without proxy, count on seeing only the final text |
+| `thread.status()`, `toHaveStatus`, `toHaveStatusText` | Done | Yes, with proxy or browser | Proxy (sees `assistant.threads.setStatus` and its replacement `agents.sessions.setStatus`) or Browser | Confirmed: only write methods exist, nothing reads the status back. The fake serves both method names |
 | `agentThread.suggestedPrompts()` | Yes | Yes, with proxy or browser | Proxy or Browser | Confirmed: no read API |
 | `toBeEphemeralFor(user)` | Yes | Yes, with proxy or browser | Same as `ephemeral()` | |
-| `toHaveButton(label)` | Yes | Yes | User token (the blocks are in history) | |
+| `toHaveButton(label)` | Done | Yes | User token (the blocks are in history) | |
 | `toHaveOpenedModal(title)` | Yes | Yes, with proxy or browser | Same as `waitForModal` | |
-| `delivery.retry({ after: "3s" })` | Yes | No | — | Fake-only. channelstack doesn't sit between the platform and the agent live |
+| `delivery.retry({ after: "3s" })` | Done | No | — | Fake-only. channelstack doesn't sit between the platform and the agent live |
 | Socket Mode delivery | Yes | Agent's concern | — | Live, the agent connects to Slack itself |
 
 ---

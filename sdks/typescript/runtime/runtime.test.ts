@@ -7,7 +7,7 @@ import { connectWith, sessionOf } from "./client.ts";
 import { parseDuration } from "./duration.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, segment, Transport } from "./transport.ts";
-import { waitFor, WaitTimeoutError } from "./wait.ts";
+import { untilQuiet, waitFor, WaitTimeoutError } from "./wait.ts";
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -78,6 +78,29 @@ describe("waiting", () => {
       waitFor("a reply from my-agent", async () => undefined, { timeout: "60ms", interval: "10ms" }),
     ).rejects.toThrow(new WaitTimeoutError("a reply from my-agent", 60));
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  test("a wait for quiet that gives up says what the agent left open", async () => {
+    const open = ['a stream my-agent started and never stopped: "Thinking…"'];
+    await expect(
+      untilQuiet(async () => ({ busy: true, quietForMs: 0, open }), { timeout: "40ms", interval: "10ms" }),
+    ).rejects.toThrow(
+      'Timed out after 40ms waiting for the agent to be quiet for 750ms. Still open: a stream my-agent started and never stopped: "Thinking…"',
+    );
+    await expect(
+      untilQuiet(async () => ({ busy: false, quietForMs: 10, open: [] }), { timeout: "40ms", interval: "10ms" }),
+    ).rejects.toThrow(new WaitTimeoutError("the agent to be quiet for 750ms", 40));
+  });
+
+  test("a watching wait for quiet looks for the whole window, however long the agent has been quiet", async () => {
+    const longQuiet = async () => ({ busy: false, quietForMs: 60_000, open: [] });
+    let started = Date.now();
+    await untilQuiet(longQuiet, { quietFor: "80ms", interval: "5ms" });
+    expect(Date.now() - started).toBeLessThan(60);
+
+    started = Date.now();
+    await untilQuiet(longQuiet, { quietFor: "80ms", interval: "5ms", watching: true });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(80);
   });
 
   test("an error from the read is not swallowed", async () => {

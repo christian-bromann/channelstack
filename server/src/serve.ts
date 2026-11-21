@@ -25,6 +25,8 @@ export interface StartOptions {
   seed: number;
   logLevel: LogLevel;
   webhooks: AppOptions["webhooks"];
+  /** The UI page (see `AppOptions.ui`). Without it the server has no UI. */
+  ui?: string;
 }
 
 export interface RunningServer {
@@ -103,6 +105,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     redactor,
     log,
     webhooks: options.webhooks,
+    ...(options.ui === undefined ? {} : { ui: options.ui }),
     urls: () => {
       if (!urls) throw new Error("The server isn't listening yet");
       return urls;

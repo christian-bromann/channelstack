@@ -16,8 +16,8 @@ import type { NotionFixture } from "./notion";
 import type { ChannelstackFixture, ChannelstackIntegrationOptions } from "./server";
 import type { ChannelstackMatchers } from "./matchers";
 
-// `vitest` re-exports TestContext from `@vitest/runner`, so the fixtures are merged there.
-declare module "@vitest/runner" {
+// Vitest 5 reads custom fixtures from `TestContext` and custom matchers from `Matchers`, both in `vitest`.
+declare module "vitest" {
   interface TestContext {
     channelstack: ChannelstackFixture;
     slack: SlackFixture;
@@ -25,11 +25,9 @@ declare module "@vitest/runner" {
     linear: LinearFixture;
     notion: NotionFixture;
   }
-}
 
-declare module "vitest" {
-  // Vitest ≥ 3.2 merges custom matchers through `Matchers`.
-  interface Matchers<T = any> extends ChannelstackMatchers<void> {}
+  // Vitest 5 declares `Matchers<R, T>`; the parameters have to be identical to merge with it.
+  interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> extends ChannelstackMatchers<void> {}
 }
 
 export default function channelstack(options?: ChannelstackIntegrationOptions): Plugin;

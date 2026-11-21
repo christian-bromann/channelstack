@@ -1,9 +1,10 @@
 import type { DriverDefinition } from "../core/router/index.ts";
 import type { SecretSpec } from "../core/secrets/index.ts";
 import { echo } from "./echo/index.ts";
+import { slack } from "./slack/index.ts";
 
 /** Every driver in the binary. Core never imports a driver; drivers are handed to it from here. */
-export const DRIVERS: readonly DriverDefinition[] = [echo];
+export const DRIVERS: readonly DriverDefinition[] = [echo, slack];
 
 /** The secrets every driver declared, for loading and rotating `secrets.json`. */
 export function secretSpecs(): Record<string, SecretSpec> {

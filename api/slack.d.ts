@@ -25,8 +25,11 @@ export interface SlackFixture extends Inspectable<SlackDelivery> {
   /** Simulate the workspace uninstalling the app (`app_uninstalled`, `tokens_revoked`). */
   uninstallApp(): Promise<SlackDelivery[]>;
 
-  /** Inject transport faults for the agent's API calls. Undo with the returned function. */
-  fault(fault: SlackFault): Promise<() => Promise<void>>;
+  /**
+   * Inject a transport fault for the agent's API calls. It applies to the whole workspace until it
+   * is undone, or until the test's session closes. `await using` undoes it at the end of the scope.
+   */
+  fault(fault: SlackFault): Promise<SlackInjectedFault>;
 }
 
 export interface SlackUserOptions {
@@ -61,6 +64,12 @@ export interface SlackChannelOptions {
   purpose?: string;
   /** Shared with another organization (Slack Connect). */
   shared?: boolean;
+}
+
+/** A fault that is in effect. */
+export interface SlackInjectedFault extends AsyncDisposable {
+  readonly id: string;
+  undo(): Promise<void>;
 }
 
 export type SlackFault =
@@ -217,8 +226,17 @@ export interface SlackThread extends HasTranscript {
   waitForReply(options?: { from?: SlackParticipant | string } & WaitOptions): Promise<SlackMessage>;
   /** The latest reply matching `from`, once the agent is quiet. Waits for at least one. */
   latestReply(options?: { from?: SlackParticipant | string } & QuietOptions): Promise<SlackMessage>;
-  /** The agent's current status line (`assistant.threads.setStatus`), if any. */
-  status(): Promise<string | undefined>;
+  /** What the agent is doing in the thread right now. `toHaveStatus` and `toHaveStatusText` read this. */
+  status(): Promise<SlackThreadStatus>;
+}
+
+export interface SlackThreadStatus {
+  /** `working` while a status line is set, `streaming` while a reply is being streamed, `stopped` after Stop. */
+  readonly state: "working" | "streaming" | "stopped" | "idle";
+  /** The agent's status line (`assistant.threads.setStatus`), if one is set. */
+  readonly text?: string;
+  /** The agent session's lifecycle status (`agents.sessions.setStatus`), if the agent set one. */
+  readonly sessionStatus?: "active" | "processing" | "suspended" | "closed";
 }
 
 /** A thread in the agent / assistant split view. */

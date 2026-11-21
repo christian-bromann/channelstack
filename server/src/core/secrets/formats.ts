@@ -34,6 +34,8 @@ export const SECRET_FORMATS = {
     generate: () => `xapp-1-A${randomString(10, UPPER_ALNUM)}-${digits(13)}-${hex(64)}`,
   },
   "slack.signingSecret": { pattern: /^[a-f0-9]{32}$/, generate: () => hex(32) },
+  // The deprecated verification token Slack still puts in every payload as `token`.
+  "slack.verificationToken": { pattern: /^[A-Za-z0-9]{24}$/, generate: () => alnum(24) },
   "github.webhookSecret": { pattern: /^[a-f0-9]{40}$/, generate: () => hex(40) },
   "github.installationToken": { pattern: /^ghs_[A-Za-z0-9]{36}$/, generate: () => `ghs_${alnum(36)}` },
   "linear.oauthToken": { pattern: /^lin_oauth_[a-f0-9]{64}$/, generate: () => `lin_oauth_${hex(64)}` },

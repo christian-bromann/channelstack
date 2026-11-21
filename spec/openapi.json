@@ -122,6 +122,26 @@
           "data": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "outcome": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "text",
+              "outcome",
+              "ok"
+            ],
+            "description": "Delivery attempts and API calls in one line, e.g. `← slack chat.postMessage` and `200`."
           }
         },
         "required": [
@@ -129,6 +149,31 @@
           "driver",
           "kind",
           "data"
+        ]
+      },
+      "Quiet": {
+        "type": "object",
+        "properties": {
+          "busy": {
+            "type": "boolean",
+            "description": "A call from the agent is in flight, a delivery is in flight or about to be retried, or a stream is open."
+          },
+          "quietForMs": {
+            "type": "number",
+            "description": "Milliseconds since the last event in the session. 0 while busy."
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What is still open, in words: deliveries in flight or about to be retried, streams never stopped."
+          }
+        },
+        "required": [
+          "busy",
+          "quietForMs",
+          "open"
         ]
       },
       "Env": {
@@ -429,6 +474,1167 @@
           "live",
           "liveRequires"
         ]
+      },
+      "SlackFixture": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/SlackApp"
+          },
+          "apiUrl": {
+            "type": "string"
+          },
+          "team": {
+            "$ref": "#/components/schemas/SlackTeam"
+          }
+        },
+        "required": [
+          "app",
+          "apiUrl",
+          "team"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "SlackApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ]
+          },
+          "botUserId": {
+            "type": "string"
+          },
+          "botId": {
+            "type": "string"
+          },
+          "botToken": {
+            "type": "string"
+          },
+          "appToken": {
+            "type": "string"
+          },
+          "signingSecret": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "botUserId",
+          "botId",
+          "botToken",
+          "appToken",
+          "signingSecret",
+          "scopes"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "SlackTeam": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SlackUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "realName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "isAdmin": {
+            "type": "boolean"
+          },
+          "isBot": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "displayName",
+          "realName",
+          "isAdmin",
+          "isBot"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "SlackUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "realName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "admin": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "boolean"
+          },
+          "guest": {
+            "type": "boolean"
+          },
+          "bot": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SlackUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackUser"
+        }
+      },
+      "SlackConversations": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackConversation"
+        }
+      },
+      "SlackConversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "channel",
+              "private_channel",
+              "im",
+              "mpim"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "SlackMessage": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/SlackConversation"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SlackUser"
+              },
+              {
+                "$ref": "#/components/schemas/SlackApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/SlackUser",
+                "app": "#/components/schemas/SlackApp"
+              }
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {}
+          },
+          "postedAt": {
+            "type": "string"
+          },
+          "threadTs": {
+            "type": "string"
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "visibleTo": {
+            "$ref": "#/components/schemas/SlackUser"
+          },
+          "thread": {
+            "$ref": "#/components/schemas/SlackThread"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/SlackDelivery"
+          },
+          "stream": {
+            "$ref": "#/components/schemas/SlackStream"
+          }
+        },
+        "required": [
+          "channel",
+          "ts",
+          "conversation",
+          "author",
+          "text",
+          "blocks",
+          "postedAt",
+          "edited",
+          "thread"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "channel",
+            "ts"
+          ]
+        }
+      },
+      "SlackThread": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/SlackConversation"
+          }
+        },
+        "required": [
+          "channel",
+          "ts",
+          "conversation"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "channel",
+            "ts"
+          ]
+        }
+      },
+      "SlackDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "slack"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "payload": {},
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttempt"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "type",
+          "attempts",
+          "status"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "DeliveryAttempt": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "sentAt": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "http",
+              "socket"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "requestHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "responseStatus": {
+            "type": "integer"
+          },
+          "responseBody": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "forgedSignature": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "sentAt",
+          "transport",
+          "requestHeaders",
+          "status",
+          "forgedSignature"
+        ]
+      },
+      "SlackStream": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "stopped",
+              "completed"
+            ]
+          },
+          "chunks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "ts",
+          "state",
+          "chunks",
+          "startedAt"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "channel",
+            "ts"
+          ]
+        }
+      },
+      "SlackChannelOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "private": {
+            "type": "boolean"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "default": []
+          },
+          "topic": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
+      },
+      "SlackSayBody": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/SlackMessageInput"
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "SlackConversation"
+            ]
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "SlackMessageInput": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {}
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/SlackMessageMetadata"
+          }
+        },
+        "x-channelstack-shorthand": "text"
+      },
+      "SlackMessageMetadata": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string"
+          },
+          "event_payload": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "event_type",
+          "event_payload"
+        ]
+      },
+      "SlackReplyBody": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/SlackMessageInput"
+          },
+          "thread": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "ts": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channel",
+              "ts"
+            ],
+            "x-channelstack-ref": [
+              "SlackThread",
+              "SlackMessage"
+            ]
+          },
+          "alsoSendToChannel": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "message",
+          "thread"
+        ]
+      },
+      "SlackEditBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/SlackMessageInput"
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "ts": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channel",
+              "ts"
+            ],
+            "x-channelstack-ref": [
+              "SlackMessage"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "message"
+        ]
+      },
+      "SlackDeleteBody": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "ts": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channel",
+              "ts"
+            ],
+            "x-channelstack-ref": [
+              "SlackMessage"
+            ]
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "SlackReactBody": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "ts": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channel",
+              "ts"
+            ],
+            "x-channelstack-ref": [
+              "SlackMessage"
+            ]
+          }
+        },
+        "required": [
+          "emoji",
+          "message"
+        ]
+      },
+      "SlackUnreactBody": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "ts": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channel",
+              "ts"
+            ],
+            "x-channelstack-ref": [
+              "SlackMessage"
+            ]
+          }
+        },
+        "required": [
+          "emoji",
+          "message"
+        ]
+      },
+      "SlackOpenDmBody": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          }
+        },
+        "required": [
+          "participants"
+        ]
+      },
+      "SlackInviteBody": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "SlackConversation"
+            ]
+          }
+        },
+        "required": [
+          "participants",
+          "channel"
+        ]
+      },
+      "SlackKickBody": {
+        "type": "object",
+        "properties": {
+          "participant": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "SlackUser",
+              "SlackApp"
+            ]
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "SlackConversation"
+            ]
+          }
+        },
+        "required": [
+          "participant",
+          "channel"
+        ]
+      },
+      "SlackMessages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackMessage"
+        }
+      },
+      "SlackMembers": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/SlackUser"
+            },
+            {
+              "$ref": "#/components/schemas/SlackApp"
+            }
+          ],
+          "discriminator": {
+            "propertyName": "kind",
+            "mapping": {
+              "user": "#/components/schemas/SlackUser",
+              "app": "#/components/schemas/SlackApp"
+            }
+          }
+        }
+      },
+      "SlackReplies": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackMessage"
+        }
+      },
+      "SlackReactions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackReaction"
+        }
+      },
+      "SlackReaction": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string"
+          },
+          "by": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SlackUser"
+                },
+                {
+                  "$ref": "#/components/schemas/SlackApp"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "user": "#/components/schemas/SlackUser",
+                  "app": "#/components/schemas/SlackApp"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "emoji",
+          "by"
+        ]
+      },
+      "SlackThreadStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "working",
+              "streaming",
+              "stopped",
+              "idle"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sessionStatus": {
+            "type": "string",
+            "enum": [
+              "active",
+              "processing",
+              "suspended",
+              "closed"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "SlackTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlackTranscriptEntry"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcript as plain text, one entry per line."
+          }
+        },
+        "required": [
+          "entries",
+          "text"
+        ],
+        "x-channelstack-string": "text"
+      },
+      "SlackTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/SlackPrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the files shared with the message."
+          },
+          "alsoInChannel": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "A reply that was also sent to the channel."
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "streaming": {
+            "type": "string",
+            "enum": [
+              "open",
+              "stopped",
+              "completed"
+            ]
+          },
+          "visibleTo": {
+            "$ref": "#/components/schemas/SlackPrincipal"
+          },
+          "depth": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "files",
+          "edited",
+          "depth"
+        ]
+      },
+      "SlackPrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "SlackEphemeralMessages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackMessage"
+        }
+      },
+      "SlackMessageDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackDelivery"
+        }
+      },
+      "SlackDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackDelivery"
+        }
+      },
+      "SlackRetryBody": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 3000,
+            "description": "How long to wait before the retry. Slack's first retry comes after about 3 seconds.",
+            "x-channelstack-duration": true
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "http_timeout",
+              "http_error",
+              "too_many_redirects"
+            ],
+            "default": "http_timeout"
+          }
+        }
+      },
+      "SlackResendBody": {
+        "type": "object",
+        "properties": {
+          "badSignature": {
+            "type": "boolean",
+            "default": false
+          },
+          "stale": {
+            "type": "boolean",
+            "default": false
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SlackApiCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackApiCall"
+        }
+      },
+      "SlackApiCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "slack"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "request": {},
+          "responseStatus": {
+            "type": "integer"
+          },
+          "response": {},
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "operation",
+          "method",
+          "path",
+          "at",
+          "durationMs",
+          "responseStatus"
+        ]
+      },
+      "SlackUninstallDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SlackDelivery"
+        }
+      },
+      "SlackFault": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "SlackFaultBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "rate_limit",
+              "latency",
+              "error"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "retryAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1000,
+            "description": "For rate_limit: what Retry-After says.",
+            "x-channelstack-duration": true
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "For latency: how long each call takes longer.",
+            "x-channelstack-duration": true
+          },
+          "error": {
+            "type": "string",
+            "default": "internal_error"
+          },
+          "times": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "UiLoginLink": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
       }
     },
     "parameters": {}
@@ -486,7 +1692,10 @@
         ],
         "x-channelstack-factory": {
           "on": "Channelstack",
-          "name": "openSession"
+          "name": "openSession",
+          "options": [
+            "name"
+          ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
@@ -494,6 +1703,23 @@
           "internal"
         ],
         "x-channelstack-stability": "stable",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$",
+                    "description": "Share the session: the open session of this name is returned if there is one."
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -614,6 +1840,60 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/quiet": {
+      "get": {
+        "summary": "Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Session",
+          "name": "quiet"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "stable",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quiet"
                 }
               }
             }
@@ -1152,6 +2432,2634 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack": {
+      "get": {
+        "summary": "The Slack fixture: the agent's app, the workspace, and where the agent reaches the fake",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "slack"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users": {
+      "post": {
+        "summary": "Create a person in the workspace",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "SlackFixture",
+          "name": "createUser",
+          "options": [
+            "name",
+            "id",
+            "displayName",
+            "realName",
+            "email",
+            "timezone",
+            "admin",
+            "owner",
+            "guest",
+            "bot"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackUserOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The people this session created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFixture",
+          "name": "users"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackUsers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations": {
+      "get": {
+        "summary": "The session's conversations, the one with the newest message last",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFixture",
+          "name": "conversations"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackConversations"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/latest": {
+      "get": {
+        "summary": "The newest message of a conversation, replies included",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackConversation",
+          "name": "latestMessage"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/channels": {
+      "post": {
+        "summary": "Create a channel. Only the listed participants are members; include the app for it to receive events",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "SlackFixture",
+          "name": "createChannel",
+          "options": [
+            "name",
+            "private",
+            "participants",
+            "topic",
+            "purpose"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "name_taken"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackChannelOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/say": {
+      "post": {
+        "summary": "Post a top-level message in a conversation, or in a DM with the people in `to`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "say",
+          "args": [
+            "message"
+          ],
+          "options": [
+            "channel",
+            "to"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "no_text",
+          "msg_too_long"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackSayBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/reply": {
+      "post": {
+        "summary": "Reply in a thread: pass the message that starts it, or any reply in it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "reply",
+          "args": [
+            "message"
+          ],
+          "options": [
+            "thread",
+            "alsoSendToChannel"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "no_text",
+          "msg_too_long"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/edit": {
+      "post": {
+        "summary": "Edit one of this person's own messages",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "edit",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "cant_update_message",
+          "no_text"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackEditBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/delete": {
+      "post": {
+        "summary": "Delete a message: this person's own, or anyone's for an admin",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "delete",
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "cant_delete_message"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackDeleteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/react": {
+      "post": {
+        "summary": "Add an emoji reaction to a message",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "react",
+          "args": [
+            "emoji"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "already_reacted"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackReactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SlackDelivery"
+                    },
+                    {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/unreact": {
+      "post": {
+        "summary": "Remove this person's emoji reaction from a message",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "unreact",
+          "args": [
+            "emoji"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "no_reaction"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackUnreactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SlackDelivery"
+                    },
+                    {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/open-dm": {
+      "post": {
+        "summary": "Open (or reuse) a DM with the app, another person, or several",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "openDM",
+          "args": [
+            "participants"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackOpenDmBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackConversation"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/invite": {
+      "post": {
+        "summary": "Invite people or the app to a channel",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "invite",
+          "args": [
+            "participants"
+          ],
+          "options": [
+            "channel"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel",
+          "already_in_channel"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackInviteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/kick": {
+      "post": {
+        "summary": "Remove someone from a channel",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "kick",
+          "args": [
+            "participant"
+          ],
+          "options": [
+            "channel"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_channel"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackKickBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages": {
+      "get": {
+        "summary": "Top-level messages of a conversation, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackConversation",
+          "name": "messages"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForMessage",
+            "mode": "next",
+            "from": "author",
+            "what": "a message"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/members": {
+      "get": {
+        "summary": "The people and apps in a conversation",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackConversation",
+          "name": "members"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMembers"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}": {
+      "get": {
+        "summary": "Re-read a message: its latest text, edits and deliveries",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackMessage",
+          "name": "refresh",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/replies": {
+      "get": {
+        "summary": "Replies in a thread, oldest first, without the message that starts it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackThread",
+          "name": "replies",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForReply",
+            "mode": "next",
+            "from": "author",
+            "what": "a reply"
+          },
+          {
+            "name": "latestReply",
+            "mode": "latest",
+            "from": "author",
+            "what": "a reply"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackReplies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/reactions": {
+      "get": {
+        "summary": "The reactions on a message, and who added each",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackMessage",
+          "name": "reactions",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackReactions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/state": {
+      "get": {
+        "summary": "What the agent is doing in a thread: its status line, an open stream, or idle",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackThread",
+          "name": "status",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackThreadStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/transcript": {
+      "get": {
+        "summary": "A message and the replies under it as a person would read them",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackMessage",
+          "name": "transcript",
+          "options": [
+            "as"
+          ],
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "required": false,
+            "name": "as",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/threads/{ts}/transcript": {
+      "get": {
+        "summary": "A thread as a person would read it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackThread",
+          "name": "transcript",
+          "options": [
+            "as"
+          ],
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "required": false,
+            "name": "as",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/transcript": {
+      "get": {
+        "summary": "The conversation as a person would read it, threads included",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackConversation",
+          "name": "transcript",
+          "options": [
+            "as"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "SlackUser",
+                "SlackApp"
+              ]
+            },
+            "required": false,
+            "name": "as",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/users/{user}/ephemeral": {
+      "get": {
+        "summary": "Messages only this person can see",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackUser",
+          "name": "ephemeral"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackEphemeralMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/stream": {
+      "get": {
+        "summary": "Re-read a streamed message's stream: its state and what was streamed so far",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackStream",
+          "name": "refresh",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "ended",
+            "mode": "until",
+            "field": "state",
+            "not": [
+              "open"
+            ],
+            "what": "the stream to end"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackStream"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/conversations/{channel}/messages/{ts}/deliveries": {
+      "get": {
+        "summary": "Every delivery this message caused to the agent",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackMessage",
+          "name": "deliveries",
+          "bind": {
+            "channel": "channel",
+            "ts": "ts"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "ts",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackMessageDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/deliveries": {
+      "get": {
+        "summary": "Every event channelstack sent the agent for this session, with every attempt",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFixture",
+          "name": "deliveries"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/deliveries/{delivery}": {
+      "get": {
+        "summary": "Re-read a delivery: its attempts and status",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackDelivery",
+          "name": "refresh"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "settled",
+            "mode": "until",
+            "field": "status",
+            "not": [
+              "pending"
+            ],
+            "what": "the delivery to settle"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/deliveries/{delivery}/retry": {
+      "post": {
+        "summary": "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackDelivery",
+          "name": "retry",
+          "options": [
+            "after",
+            "reason"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackRetryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/deliveries/{delivery}/resend": {
+      "post": {
+        "summary": "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackDelivery",
+          "name": "resend",
+          "options": [
+            "badSignature",
+            "stale",
+            "headers"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackResendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/calls": {
+      "get": {
+        "summary": "The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFixture",
+          "name": "calls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "filter": true,
+            "what": "an API call from the agent"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/uninstall": {
+      "post": {
+        "summary": "The workspace uninstalls the app. Undone when this session closes; run such tests on their own",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFixture",
+          "name": "uninstallApp"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "account_inactive"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackUninstallDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/faults": {
+      "post": {
+        "summary": "Inject a transport fault into the agent's Web API calls. Removed when this session closes",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFixture",
+          "name": "fault",
+          "options": [
+            "type",
+            "operation",
+            "retryAfter",
+            "delay",
+            "error",
+            "times"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackFaultBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlackFault"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/faults/{fault}": {
+      "delete": {
+        "summary": "Remove a fault",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackFault",
+          "name": "undo",
+          "dispose": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "fault",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ui/login-links": {
+      "post": {
+        "summary": "A new one-time link that opens the UI in a browser (what `channelstack ui` prints)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Channelstack",
+          "name": "uiLoginLink"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal"
+        ],
+        "x-channelstack-stability": "experimental",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiLoginLink"
                 }
               }
             }

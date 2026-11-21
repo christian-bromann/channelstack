@@ -83,6 +83,8 @@ describe("fixed ids", () => {
     const ids = generator();
     expect(ids.reserve("slack.user", "U0ADMIN01")).toBe("U0ADMIN01");
     expect(() => ids.reserve("slack.user", "U0ADMIN01")).toThrow(/already in use/);
+    ids.release("slack.user", "U0ADMIN01");
+    expect(ids.reserve("slack.user", "U0ADMIN01")).toBe("U0ADMIN01");
   });
 
   test("an id in the wrong format is refused with invalid_argument", () => {

@@ -20,8 +20,10 @@ export class IrIndex {
   readonly ir: Ir;
   readonly #resources: Map<string, IrResource>;
   readonly #types: Map<string, IrType>;
+  readonly #printable: Set<string>;
 
   constructor(ir: Ir) {
+    this.#printable = new Set(ir.types.filter((type) => type.stringField !== undefined).map((type) => type.name));
     this.ir = ir;
     this.#resources = new Map(ir.resources.map((resource) => [resource.name, resource]));
     this.#types = new Map(ir.types.map((type) => [type.name, type.type]));
@@ -33,7 +35,10 @@ export class IrIndex {
     return resource;
   }
 
-  /** Does a response of this type carry handle data that has to be wrapped into handles again? */
+  /**
+   * Does wire data of this type have to be converted before SDK users see it: handle data wrapped
+   * into handles again, or a value that prints as text?
+   */
   holdsResources(type: IrType | null, seen = new Set<string>()): boolean {
     if (!type) return false;
     switch (type.kind) {
@@ -43,9 +48,14 @@ export class IrIndex {
         return this.holdsResources(type.items, seen);
       case "record":
         return this.holdsResources(type.values, seen);
+      case "nullable":
+        return this.holdsResources(type.type, seen);
       case "object":
         return type.fields.some((field) => this.holdsResources(field.type, seen));
+      case "union":
+        return type.types.some((member) => this.holdsResources(member, seen));
       case "named": {
+        if (this.#printable.has(type.name)) return true;
         if (seen.has(type.name)) return false;
         seen.add(type.name);
         return this.holdsResources(this.#types.get(type.name) ?? null, seen);
@@ -55,14 +65,30 @@ export class IrIndex {
     }
   }
 
-  /** The id field shared by the resources a `ref` accepts: what gets sent in place of the handle. */
-  refIdField(resources: readonly string[]): string {
-    const fields = new Set(resources.map((name) => this.resource(name).idField));
-    const [field] = fields;
-    if (fields.size !== 1 || field === undefined) {
-      throw new Error(`A reference to ${resources.join(" | ")} needs resources that share one id field`);
+  /** The id fields shared by the resources a `ref` accepts: what gets sent in place of the handle. */
+  refIdFields(resources: readonly string[]): string[] {
+    const [first, ...rest] = resources.map((name) => this.resource(name).idFields ?? []);
+    if (first === undefined || first.length === 0 || rest.some((fields) => fields.join() !== first.join())) {
+      throw new Error(`A reference to ${resources.join(" | ")} needs resources that share the same id fields`);
     }
-    return field;
+    return first;
+  }
+
+  /** In a union of handles, the value of the discriminator field for each member: what tells their data apart. */
+  discriminated(type: Extract<IrType, { kind: "union" }>): Array<{ value: string; member: IrType }> | undefined {
+    const { discriminator } = type;
+    if (discriminator === undefined) return undefined;
+    const tagged = type.types.map((member) => {
+      const field =
+        member.kind === "resource"
+          ? this.resource(member.name).fields.find((candidate) => candidate.name === discriminator)
+          : undefined;
+      // A discriminator is a text tag (`kind: "user"`); a boolean literal doesn't tell handles apart.
+      return field?.type.kind === "literal" && typeof field.type.value === "string"
+        ? { value: field.type.value, member }
+        : undefined;
+    });
+    return tagged.every((entry) => entry !== undefined) ? tagged : undefined;
   }
 
   /** The method SDKs call when a handle is disposed, if the resource has one. */

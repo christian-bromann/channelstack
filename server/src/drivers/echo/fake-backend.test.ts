@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
-import { systemClock } from "../../core/clock/index.ts";
+import { systemClock, systemTimers } from "../../core/clock/index.ts";
 import { DeliveryQueue } from "../../core/delivery/index.ts";
 import { EventLog } from "../../core/events/index.ts";
 import { IdGenerator } from "../../core/ids/index.ts";
@@ -28,10 +28,13 @@ function context(): DriverContext {
   return {
     ids: new IdGenerator({ seed: 1, clock: systemClock }),
     clock: systemClock,
+    timers: systemTimers,
     registry: new Registry(),
     events,
-    delivery: new DeliveryQueue({ events, clock: systemClock, log }),
+    delivery: new DeliveryQueue({ events, clock: systemClock, timers: systemTimers, log }),
     log,
+    expectMore: () => {},
+    arrived: () => {},
     secret: (name) => `secret-for-${name}`,
     apiUrl: () => "http://127.0.0.1:4500/echo",
     webhookUrl: undefined,

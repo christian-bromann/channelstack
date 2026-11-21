@@ -2,8 +2,15 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.ts", "scenarios/agents/*.ts", "scenarios/runners/typescript/*.ts"],
-      "project": ["scripts/**/*.ts", "scenarios/**/*.ts"]
+      "entry": [
+        "scripts/*.ts",
+        "scenarios/agents/*.ts",
+        "scenarios/runners/typescript/*.ts",
+        "integrations/vitest/*.ts",
+        "examples/agents/*/agent.ts",
+        "test/acceptance/*.ts"
+      ],
+      "project": ["scripts/**/*.ts", "scenarios/**/*.ts", "integrations/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
     },
     "server": {
       "entry": ["src/cli.ts", "src/**/*.test.ts", "test/**/*.test.ts"],
@@ -15,12 +22,12 @@
     },
     "sdks/typescript": {
       "entry": ["client.ts", "**/*.test.ts"],
-      "project": ["**/*.ts"]
+      "project": ["**/*.ts"],
+      "ignoreDependencies": ["vitest"]
     },
     "api": {
       "entry": ["*.d.ts", "examples/*.ts"],
-      "project": ["**/*.ts"],
-      "ignoreDependencies": ["@vitest/runner"]
+      "project": ["**/*.ts"]
     }
   },
   "ignoreBinaries": ["uv", "portless"]
