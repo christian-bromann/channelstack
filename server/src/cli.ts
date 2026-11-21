@@ -82,8 +82,8 @@ async function runStart(flags: {
       () => process.exit(1),
     );
   };
-  process.on("SIGINT", stop);
-  process.on("SIGTERM", stop);
+  // SIGHUP is what a closed terminal tab sends: it must clean up like the others.
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, stop);
 }
 
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */
