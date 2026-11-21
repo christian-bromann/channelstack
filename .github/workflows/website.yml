@@ -104,7 +104,7 @@ jobs:
             exit 0
           fi
           marker="<!-- website-preview -->"
-          body="$(printf '%s\n**Website preview:** %s\n\nBuilt from `%s`. This comment is updated on every push.' "$marker" "$PREVIEW_URL" "${GITHUB_SHA::7}")"
+          body="$(printf '%s\n**Website preview:** %s\n\nBuilt from %s. This comment is updated on every push.' "$marker" "$PREVIEW_URL" "${GITHUB_SHA::7}")"
           comment="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr/comments" --paginate --jq "[.[] | select(.body | startswith(\"$marker\"))][0].id // empty" | head -n 1)"
           if [ -n "$comment" ]; then
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment" -f body="$body" > /dev/null
