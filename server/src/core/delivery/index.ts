@@ -2,7 +2,7 @@ import type { Clock } from "../clock/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { Logger } from "../log/index.ts";
 
-export type DeliveryStatus = "acknowledged" | "failed" | "timed_out" | "unreachable";
+type DeliveryStatus = "acknowledged" | "failed" | "timed_out" | "unreachable";
 
 export interface DeliveryRequest {
   /** The platform's id for this delivery. */

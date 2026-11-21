@@ -3,7 +3,7 @@ import { type CoreErrorCode, ErrorBody, ProtocolError } from "../errors/index.ts
 import type { Session, Sessions } from "../sessions/index.ts";
 
 /** How an operation shows up in the SDKs: as a method on a handle (`x-channelstack-method`) or a factory (`x-channelstack-factory`). */
-export interface SdkBinding {
+interface SdkBinding {
   /** The resource the method lives on, e.g. `EchoUser`. */
   on: string;
   /** The method name, in camelCase. Emitters turn it into each language's idiom. */

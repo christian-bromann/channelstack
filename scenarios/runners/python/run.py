@@ -134,7 +134,7 @@ class Runner:
         invoke = cast(Callable[..., Awaitable[Any]], target)
         args = cast(list[Any], self.resolve(step.get("args", [])))
         options = cast(dict[str, Any], self.resolve(step.get("options", {})))
-        return await target(
+        return await invoke(
             *args, **{snake_case(key): value for key, value in options.items()}
         )
 

@@ -27,7 +27,7 @@ export interface IrResource {
 }
 
 /** A named data type: plain values with no identity. */
-export interface IrNamedType {
+interface IrNamedType {
   name: string;
   type: IrType;
 }
@@ -56,7 +56,7 @@ export interface IrParam extends IrField {
   in: "body" | "query";
 }
 
-export interface IrPathParam {
+interface IrPathParam {
   name: string;
   /** Bound to the session the handle lives in, or to a field of the handle itself. */
   from: "session" | "self";
