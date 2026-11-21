@@ -8,8 +8,8 @@
 
 | Phase | Status | Closed |
 |---|---|---|
-| 0 | not started | |
-| 1 | not started | |
+| 0 | done | 2026-11-21, [#3](https://github.com/christian-bromann/channelstack/pull/3) |
+| 1 | in progress | |
 | 2 | not started | |
 | 3 | not started | |
 | 4 | not started | |
