@@ -63,7 +63,7 @@ export function Seo({
                 applicationCategory: "DeveloperApplication",
                 operatingSystem: "macOS, Linux, Windows",
                 license: "https://opensource.org/license/mit",
-                codeRepository: SITE.repo,
+                sameAs: SITE.repo,
               },
             ],
           })}

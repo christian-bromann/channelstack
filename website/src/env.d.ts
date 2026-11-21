@@ -14,8 +14,3 @@ declare module "*.md" {
   export * from "*.mdx";
   export { default } from "*.mdx";
 }
-
-declare module "*.png" {
-  const url: string;
-  export default url;
-}
