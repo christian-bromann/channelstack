@@ -1,11 +1,13 @@
 import { Link, NavLink } from "react-router-dom";
+
 import { SITE } from "../lib/site";
 import { Moon, Sun } from "./Icons";
 import { Mark } from "./Mark";
 
 function toggleTheme() {
   const root = document.documentElement;
-  const current = root.getAttribute("data-theme") ?? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const current =
+    root.getAttribute("data-theme") ?? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
   const next = current === "dark" ? "light" : "dark";
   root.setAttribute("data-theme", next);
   try {
@@ -44,7 +46,12 @@ export function Nav() {
           <a className="nav-gh" href={SITE.repo}>
             GitHub
           </a>
-          <button type="button" className="icon-btn theme-toggle" onClick={toggleTheme} aria-label="Switch between dark and light theme">
+          <button
+            type="button"
+            className="icon-btn theme-toggle"
+            onClick={toggleTheme}
+            aria-label="Switch between dark and light theme"
+          >
             <Sun className="sun" />
             <Moon className="moon" />
           </button>

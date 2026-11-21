@@ -214,7 +214,9 @@ main > .hero {
 }
 
 @keyframes rec {
-  50% { opacity: 0.3; }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .hero h1 {
@@ -295,7 +297,10 @@ main > .hero {
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .channel {
-    transition: opacity 600ms var(--ease), transform 600ms var(--ease), border-color 200ms;
+    transition:
+      opacity 600ms var(--ease),
+      transform 600ms var(--ease),
+      border-color 200ms;
   }
   .channel:hover {
     border-color: var(--line-strong);
@@ -339,15 +344,26 @@ main > .hero {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .logo:not(.same) .on-light { display: none; }
-  :root:not([data-theme="light"]) .logo .on-dark { display: block; }
+  :root:not([data-theme="light"]) .logo:not(.same) .on-light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .logo .on-dark {
+    display: block;
+  }
 }
 
-:root[data-theme="dark"] .logo:not(.same) .on-light { display: none; }
-:root[data-theme="dark"] .logo .on-dark { display: block; }
-:root[data-theme="light"] .logo .on-light { display: block; }
-:root[data-theme="light"] .logo .on-dark { display: none; }
-
+:root[data-theme="dark"] .logo:not(.same) .on-light {
+  display: none;
+}
+:root[data-theme="dark"] .logo .on-dark {
+  display: block;
+}
+:root[data-theme="light"] .logo .on-light {
+  display: block;
+}
+:root[data-theme="light"] .logo .on-dark {
+  display: none;
+}
 
 .channel > p {
   color: var(--muted);
@@ -445,7 +461,10 @@ main > .hero {
 
 .flow-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(110px, 13vw, 170px) minmax(0, 1.15fr) clamp(110px, 13vw, 170px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) clamp(110px, 13vw, 170px) minmax(0, 1.15fr) clamp(110px, 13vw, 170px) minmax(
+      0,
+      1fr
+    );
   align-items: stretch;
 }
 
@@ -563,31 +582,72 @@ main > .hero {
   .js .track {
     animation: 5.4s linear infinite both;
   }
-  .js .w1 .track { animation-name: go-1; }
-  .js .w2 .track { animation-name: go-2; }
-  .js .w3 .track { animation-name: go-3; }
+  .js .w1 .track {
+    animation-name: go-1;
+  }
+  .js .w2 .track {
+    animation-name: go-2;
+  }
+  .js .w3 .track {
+    animation-name: go-3;
+  }
 }
 
 /* one loop: test → channelstack, channelstack → agent (webhook), agent → channelstack (API call) */
 @keyframes go-1 {
-  0% { opacity: 0; transform: translateX(0); }
-  3% { opacity: 1; }
-  22% { opacity: 1; }
-  25%, 100% { opacity: 0; transform: translateX(calc(100% - 8px)); }
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  3% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0;
+    transform: translateX(calc(100% - 8px));
+  }
 }
 
 @keyframes go-2 {
-  0%, 27% { opacity: 0; transform: translateX(0); }
-  30% { opacity: 1; }
-  49% { opacity: 1; }
-  52%, 100% { opacity: 0; transform: translateX(calc(100% - 8px)); }
+  0%,
+  27% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  30% {
+    opacity: 1;
+  }
+  49% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    opacity: 0;
+    transform: translateX(calc(100% - 8px));
+  }
 }
 
 @keyframes go-3 {
-  0%, 56% { opacity: 0; transform: translateX(calc(100% - 8px)); }
-  59% { opacity: 1; }
-  78% { opacity: 1; }
-  81%, 100% { opacity: 0; transform: translateX(0); }
+  0%,
+  56% {
+    opacity: 0;
+    transform: translateX(calc(100% - 8px));
+  }
+  59% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  81%,
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
 }
 
 .flow figcaption {
@@ -651,22 +711,57 @@ main > .hero {
     left: 18.5px;
   }
   @keyframes go-1 {
-    0% { opacity: 0; transform: translateY(0); }
-    3% { opacity: 1; }
-    22% { opacity: 1; }
-    25%, 100% { opacity: 0; transform: translateY(calc(100% - 8px)); }
+    0% {
+      opacity: 0;
+      transform: translateY(0);
+    }
+    3% {
+      opacity: 1;
+    }
+    22% {
+      opacity: 1;
+    }
+    25%,
+    100% {
+      opacity: 0;
+      transform: translateY(calc(100% - 8px));
+    }
   }
   @keyframes go-2 {
-    0%, 27% { opacity: 0; transform: translateY(0); }
-    30% { opacity: 1; }
-    49% { opacity: 1; }
-    52%, 100% { opacity: 0; transform: translateY(calc(100% - 8px)); }
+    0%,
+    27% {
+      opacity: 0;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+    }
+    49% {
+      opacity: 1;
+    }
+    52%,
+    100% {
+      opacity: 0;
+      transform: translateY(calc(100% - 8px));
+    }
   }
   @keyframes go-3 {
-    0%, 56% { opacity: 0; transform: translateY(calc(100% - 8px)); }
-    59% { opacity: 1; }
-    78% { opacity: 1; }
-    81%, 100% { opacity: 0; transform: translateY(0); }
+    0%,
+    56% {
+      opacity: 0;
+      transform: translateY(calc(100% - 8px));
+    }
+    59% {
+      opacity: 1;
+    }
+    78% {
+      opacity: 1;
+    }
+    81%,
+    100% {
+      opacity: 0;
+      transform: translateY(0);
+    }
   }
 }
 
@@ -872,9 +967,32 @@ td.p {
   margin-top: 48px;
 }
 
+.voice-wave {
+  position: relative;
+}
+
 .voice svg {
   width: 100%;
   height: 96px;
+}
+
+/* the playhead: a thin line that crosses the wave as the word is spoken */
+.playhead {
+  position: absolute;
+  inset: -6px 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playhead i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1.5px;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 12px 1px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .voice rect {
@@ -898,9 +1016,15 @@ td.p {
   text-align: center;
 }
 
-.syllables span:nth-child(1) { flex: 40; }
-.syllables span:nth-child(2) { flex: 20; }
-.syllables span:nth-child(3) { flex: 60; }
+.syllables span:nth-child(1) {
+  flex: 40;
+}
+.syllables span:nth-child(2) {
+  flex: 20;
+}
+.syllables span:nth-child(3) {
+  flex: 60;
+}
 
 @media (max-width: 860px) {
   .closing-grid {

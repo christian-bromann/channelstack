@@ -3,7 +3,7 @@
  * are not imported from a sample file. This file exercises each of them, so `pnpm typecheck:samples`
  * fails when the API they quote changes. Keep it in step with those snippets.
  */
-import { test, expect } from "vitest";
+import { expect, test } from "vitest";
 
 test("the calls quoted in the page copy exist", async ({ slack }) => {
   const ana = await slack.createUser({ name: "Ana" });

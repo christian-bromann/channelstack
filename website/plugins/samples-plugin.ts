@@ -5,15 +5,19 @@
  * ../api/*.d.ts; the Python ones are only syntax-checked (samples/python/README.md).
  * Two comment markers control what the site shows:
  *   // @show:start … // @show:end   show only this region (the whole file otherwise)
- *   // [!step 2]                    at the end of a line: tag it for the hero playback
+ *   // [!step 2]                    on a line of its own: tags the lines below it for playback,
+ *                                   up to the next marker, blank line or shallower line. The
+ *                                   marker line itself is not shown. (`# [!step 2]` in Python.)
  */
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
+
 import type { Plugin } from "vite";
+
 import { highlightLines } from "./highlight";
 
 const QUERY = "?sample";
-const STEP = /\s*(?:\/\/|#)\s*\[!step (\d+)\]\s*$/;
+const STEP = /^(\s*)(?:\/\/|#)\s*\[!step (\d+)\]\s*$/;
 const LANG: Record<string, string> = { ".ts": "ts", ".tsx": "tsx", ".py": "python", ".sh": "bash", ".json": "json" };
 
 export interface Sample {
@@ -32,12 +36,23 @@ export function parseSample(source: string): { code: string; steps: number[] } {
   const end = lines.findIndex((l) => /@show:end/.test(l));
   if (start !== -1 && end > start) lines = lines.slice(start + 1, end);
   const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^ */)![0].length));
+  const shown: string[] = [];
   const steps: number[] = [];
-  lines = lines.map((line) => {
-    const match = STEP.exec(line);
-    steps.push(match ? Number(match[1]) : 0);
-    return (match ? line.slice(0, match.index) : line).slice(indent);
-  });
+  let current = 0;
+  let depth = 0;
+  for (const line of lines) {
+    const marker = STEP.exec(line);
+    if (marker) {
+      current = Number(marker[2]);
+      depth = marker[1]!.length;
+      continue;
+    }
+    // A marker's reach ends at a blank line or when the code steps back out.
+    if (!line.trim() || line.match(/^ */)![0].length < depth) current = 0;
+    steps.push(current);
+    shown.push(line.slice(indent));
+  }
+  lines = shown;
   return { code: lines.join("\n"), steps };
 }
 

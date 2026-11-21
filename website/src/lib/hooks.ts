@@ -35,44 +35,39 @@ export function useReveal<T extends HTMLElement>() {
     if (!el || prefersReducedMotion() || typeof IntersectionObserver === "undefined") return;
     if (el.getBoundingClientRect().top < window.innerHeight) return;
     const items = Array.from(el.querySelectorAll<HTMLElement>(".reveal"));
-    items.forEach((item) => item.classList.add("is-waiting"));
+    for (const item of items) item.classList.add("is-waiting");
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting) return;
         observer.disconnect();
-        items.forEach((item) => item.classList.remove("is-waiting"));
+        for (const item of items) item.classList.remove("is-waiting");
       },
       { rootMargin: "0px 0px -12% 0px" },
     );
     observer.observe(el);
     return () => {
       observer.disconnect();
-      items.forEach((item) => item.classList.remove("is-waiting"));
+      for (const item of items) item.classList.remove("is-waiting");
     };
   }, []);
   return ref;
 }
 
 /**
- * Runs script-driven (Web Animations) loops only while their element is on screen and the
- * footer's "Pause animations" button is not pressed. Returns a cleanup function.
+ * Runs script-driven (Web Animations) loops only while their element is on screen.
+ * Returns a cleanup function.
  */
 export function runWhileVisible(el: Element, animations: Animation[]) {
-  let visible = false;
-  const sync = () => {
-    const run = visible && document.documentElement.getAttribute("data-motion") !== "paused";
-    animations.forEach((animation) => (run ? animation.play() : animation.pause()));
-  };
+  for (const animation of animations) animation.pause();
   const observer = new IntersectionObserver(([entry]) => {
-    visible = Boolean(entry?.isIntersecting);
-    sync();
+    for (const animation of animations) {
+      if (entry?.isIntersecting) animation.play();
+      else animation.pause();
+    }
   });
   observer.observe(el);
-  document.addEventListener("motionchange", sync);
-  sync();
   return () => {
     observer.disconnect();
-    document.removeEventListener("motionchange", sync);
-    animations.forEach((animation) => animation.cancel());
+    for (const animation of animations) animation.cancel();
   };
 }

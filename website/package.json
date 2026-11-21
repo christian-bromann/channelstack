@@ -10,7 +10,9 @@
     "preview": "wrangler dev",
     "typecheck": "tsc -p tsconfig.json",
     "typecheck:samples": "tsc -p tsconfig.samples.json && node scripts/check-python-samples.mjs",
-    "og": "node scripts/og.mjs"
+    "og": "node scripts/og.mjs",
+    "deploy": "wrangler deploy",
+    "preview:upload": "wrangler versions upload"
   },
   "dependencies": {
     "react": "19.3.1",

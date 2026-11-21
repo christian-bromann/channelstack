@@ -64,7 +64,8 @@ export function Flow() {
       </div>
       <figcaption>
         <span className="sr-only">
-          Your test scripts people and asserts through channelstack. channelstack sends signed webhooks to your agent, and your agent’s API calls go back to channelstack’s fake platform APIs.{" "}
+          Your test scripts people and asserts through channelstack. channelstack sends signed webhooks to your agent,
+          and your agent’s API calls go back to channelstack’s fake platform APIs.{" "}
         </span>
         In proxy mode, requests to hosts channelstack doesn’t emulate pass through untouched.
       </figcaption>

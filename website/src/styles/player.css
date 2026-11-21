@@ -98,7 +98,9 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .js .panel {
-    transition: opacity 280ms var(--ease), visibility 0s linear 280ms;
+    transition:
+      opacity 280ms var(--ease),
+      visibility 0s linear 280ms;
   }
   .js .panel.is-active {
     transition-delay: 0s;
@@ -179,7 +181,9 @@ html:not(.js) .panel + .panel {
   border-radius: 6px;
   background: none;
   cursor: pointer;
-  transition: background-color 150ms, box-shadow 150ms;
+  transition:
+    background-color 150ms,
+    box-shadow 150ms;
 }
 
 /* the logos keep their own colours; the selected language gets a raised tile */
@@ -220,7 +224,9 @@ html:not(.js) .lang {
 
 @media (prefers-reduced-motion: no-preference) {
   .hot {
-    transition: transform 420ms var(--ease), opacity 250ms;
+    transition:
+      transform 420ms var(--ease),
+      opacity 250ms;
   }
 }
 
@@ -422,8 +428,28 @@ html:not(.js) .lang {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .app :is(.sl-msg, .sl-status, .gh-issue, .gh-comment, .gh-event, .ln-issue, .ln-label, .ln-row, .ln-session, .ln-thought, .ln-stopped, .ln-delegate, .nt-doc, .nt-crumb, .nt-comment, .nt-reply) {
-    transition: opacity 380ms var(--ease), transform 380ms var(--ease);
+  .app
+    :is(
+      .sl-msg,
+      .sl-status,
+      .gh-issue,
+      .gh-comment,
+      .gh-event,
+      .ln-issue,
+      .ln-label,
+      .ln-row,
+      .ln-session,
+      .ln-thought,
+      .ln-stopped,
+      .ln-delegate,
+      .nt-doc,
+      .nt-crumb,
+      .nt-comment,
+      .nt-reply
+    ) {
+    transition:
+      opacity 380ms var(--ease),
+      transform 380ms var(--ease);
   }
   .checks li,
   .checks svg {
@@ -452,8 +478,14 @@ html:not(.js) .lang {
 }
 
 @keyframes press {
-  0% { opacity: 1; transform: scale(0.9); }
-  100% { opacity: 0; transform: scale(1.25); }
+  0% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
 }
 
 /* ---------- Slack ---------- */
@@ -802,7 +834,9 @@ html:not(.js) .lang {
   border: 2px solid var(--bg);
   border-radius: 50%;
   background: var(--chip);
-  box-shadow: inset 0 0 0 9px var(--chip), inset 0 0 0 11px var(--dim);
+  box-shadow:
+    inset 0 0 0 9px var(--chip),
+    inset 0 0 0 11px var(--dim);
 }
 
 .gh-event b {

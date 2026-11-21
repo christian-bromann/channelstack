@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+
 import { prefersReducedMotion, runWhileVisible } from "../lib/hooks";
 
 /**
@@ -33,14 +34,21 @@ const TURNS: Array<{ voice: VoiceId; from: number; to: number; syllables: number
 const HANDOFFS = TURNS.map((turn, n) => {
   const next = TURNS[(n + 1) % TURNS.length]!;
   const toAgent = turn.voice === "person";
-  return { toAgent, from: turn.to - 0.012, to: n === TURNS.length - 1 ? 0.998 : next.from + 0.012, start: toAgent ? 0.35 : 0.65, end: toAgent ? 0.65 : 0.35 };
+  return {
+    toAgent,
+    from: turn.to - 0.012,
+    to: n === TURNS.length - 1 ? 0.998 : next.from + 0.012,
+    start: toAgent ? 0.35 : 0.65,
+    end: toAgent ? 0.65 : 0.35,
+  };
 });
 
 const noise = (n: number) => Math.abs(Math.sin(n * 12.9898 + 78.233) * 43758.5453) % 1;
 /** How loud a voice can get at bar `i`: a bell around the voice's side of the picture. */
-const reach = (i: number, centre: number) => Math.exp(-Math.pow((i / (COUNT - 1) - centre) / 0.17, 2));
+const reach = (i: number, centre: number) => Math.exp(-(((i / (COUNT - 1) - centre) / 0.17) ** 2));
 /** The still pose: both voices mid-word. */
-const pose = (i: number, centre: number, seed: number) => Math.max(3, Math.round(HEIGHT * 0.9 * reach(i, centre) * (0.5 + 0.5 * noise(i * 7 + seed))));
+const pose = (i: number, centre: number, seed: number) =>
+  Math.max(3, Math.round(HEIGHT * 0.9 * reach(i, centre) * (0.5 + 0.5 * noise(i * 7 + seed))));
 
 /**
  * Keyframes for one bar across all of its voice's turns. A turn starts softly, runs through its
@@ -64,8 +72,17 @@ function speak(i: number, height: number, voice: (typeof VOICES)[number], lag: n
       const syllable = 0.5 + 0.7 * noise(s * 17 + turn.seed * 53);
       const grain = 0.7 + 0.3 * noise(i * 13 + s * 29 + turn.seed * 101);
       const level = gain * shape * syllable * grain;
-      frames.push({ transform: `scaleY(${level.toFixed(2)})`, offset: start + beat * (s + 0.5), easing: "ease-in-out" });
-      if (left > 0) frames.push({ transform: `scaleY(${(level * 0.32).toFixed(2)})`, offset: start + beat * (s + 1), easing: "ease-in-out" });
+      frames.push({
+        transform: `scaleY(${level.toFixed(2)})`,
+        offset: start + beat * (s + 0.5),
+        easing: "ease-in-out",
+      });
+      if (left > 0)
+        frames.push({
+          transform: `scaleY(${(level * 0.32).toFixed(2)})`,
+          offset: start + beat * (s + 1),
+          easing: "ease-in-out",
+        });
     }
     // settle within one beat of the last, quiet syllable
     frames.push({ transform: rest, offset: start + beat * (turn.syllables + 0.6) });
@@ -79,13 +96,22 @@ export function HeroWaves() {
 
   useEffect(() => {
     const el = root.current;
-    if (!el || prefersReducedMotion() || typeof el.animate !== "function" || typeof IntersectionObserver === "undefined") return;
+    if (
+      !el ||
+      prefersReducedMotion() ||
+      typeof el.animate !== "function" ||
+      typeof IntersectionObserver === "undefined"
+    )
+      return;
     if (getComputedStyle(el).display === "none") return;
     const animations: Animation[] = [];
     const timing = { duration: CYCLE, iterations: Infinity } as const;
 
     for (const voice of VOICES) {
-      for (const [layer, lag, gain] of [["voice", 0, 1.12], ["echo", 0.012, 1.3]] as const) {
+      for (const [layer, lag, gain] of [
+        ["voice", 0, 1.12],
+        ["echo", 0.012, 1.3],
+      ] as const) {
         el.querySelectorAll<SVGRectElement>(`.${layer}-${voice.id} rect`).forEach((rect, i) => {
           animations.push(rect.animate(speak(i, Number(rect.getAttribute("height")), voice, lag, gain), timing));
         });
@@ -96,7 +122,12 @@ export function HeroWaves() {
         const frames: Keyframe[] = [{ opacity: 0.4, offset: 0 }];
         for (const turn of TURNS) {
           if (turn.voice !== voice.id) continue;
-          frames.push({ opacity: 0.4, offset: turn.from }, { opacity: 1, offset: turn.from + 0.02 }, { opacity: 1, offset: turn.to - 0.02 }, { opacity: 0.4, offset: turn.to });
+          frames.push(
+            { opacity: 0.4, offset: turn.from },
+            { opacity: 1, offset: turn.from + 0.02 },
+            { opacity: 1, offset: turn.to - 0.02 },
+            { opacity: 0.4, offset: turn.to },
+          );
         }
         frames.push({ opacity: 0.4, offset: 1 });
         animations.push(label.animate(frames, timing));
@@ -116,7 +147,12 @@ export function HeroWaves() {
         const travel = handoff.end - handoff.start;
         frames.push(
           { opacity: 0, transform: at(handoff.start), offset: handoff.from, easing: "cubic-bezier(0.5, 0, 0.2, 1)" },
-          { opacity: 1, transform: at(handoff.start + travel * 0.2), offset: handoff.from + length * 0.25, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+          {
+            opacity: 1,
+            transform: at(handoff.start + travel * 0.2),
+            offset: handoff.from + length * 0.25,
+            easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+          },
           { opacity: 1, transform: at(handoff.start + travel * 0.85), offset: handoff.from + length * 0.8 },
           { opacity: 0, transform: at(handoff.end), offset: handoff.to },
         );

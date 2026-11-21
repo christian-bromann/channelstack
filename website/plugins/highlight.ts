@@ -7,7 +7,14 @@ import { createCssVariablesTheme, createHighlighter, type Highlighter } from "sh
 const PREFIX = "--t-";
 const theme = createCssVariablesTheme({ name: "channelstack", variablePrefix: PREFIX, fontStyle: false });
 const LANGS = ["ts", "tsx", "js", "python", "bash", "json", "jsonc", "yaml", "diff"] as const;
-const ALIASES: Record<string, string> = { typescript: "ts", javascript: "js", py: "python", sh: "bash", shell: "bash", yml: "yaml" };
+const ALIASES: Record<string, string> = {
+  typescript: "ts",
+  javascript: "js",
+  py: "python",
+  sh: "bash",
+  shell: "bash",
+  yml: "yaml",
+};
 
 export interface Token {
   /** Class name without the `t-` prefix, or undefined for plain text. */
@@ -28,7 +35,10 @@ export async function tokenize(code: string, lang: string | undefined): Promise<
   const name = resolveLang(lang);
   if (!name) return code.split("\n").map((text) => [{ text }]);
   highlighter ??= createHighlighter({ themes: [theme], langs: [...LANGS] });
-  const { tokens } = (await highlighter).codeToTokens(code, { lang: name as (typeof LANGS)[number], theme: "channelstack" });
+  const { tokens } = (await highlighter).codeToTokens(code, {
+    lang: name as (typeof LANGS)[number],
+    theme: "channelstack",
+  });
   return tokens.map((line) =>
     line.map((token) => {
       const match = /--t-token-([a-z-]+)/.exec(token.color ?? "");

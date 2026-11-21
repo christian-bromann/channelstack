@@ -1,8 +1,19 @@
 import { Head } from "vite-react-ssg";
+
 import { SITE } from "../lib/site";
 
 /** Title, description, canonical URL and social tags for one page. `path` starts with "/". */
-export function Seo({ title, description = SITE.description, path, noindex = false }: { title: string; description?: string; path: string; noindex?: boolean }) {
+export function Seo({
+  title,
+  description = SITE.description,
+  path,
+  noindex = false,
+}: {
+  title: string;
+  description?: string;
+  path: string;
+  noindex?: boolean;
+}) {
   const url = SITE.url + (path === "/" ? "" : path);
   const image = `${SITE.url}/og.png`;
   return (

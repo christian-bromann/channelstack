@@ -1,4 +1,6 @@
 import { type ComponentType, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+
+import type { Sample } from "../../plugins/samples-plugin";
 import github from "../../samples/github.test.ts?sample";
 import slack from "../../samples/hero.test.ts?sample";
 import linear from "../../samples/linear.test.ts?sample";
@@ -7,7 +9,6 @@ import notionPy from "../../samples/python/test_comments.py?sample";
 import slackPy from "../../samples/python/test_deploy.py?sample";
 import githubPy from "../../samples/python/test_issues.py?sample";
 import linearPy from "../../samples/python/test_sessions.py?sample";
-import type { Sample } from "../../plugins/samples-plugin";
 import { prefersReducedMotion, useInView } from "../lib/hooks";
 import { CopyButton } from "./Code";
 import { Check, Pause, Play, Replay } from "./Icons";
@@ -46,8 +47,12 @@ const EXAMPLES: Example[] = [
       { step: 5, text: "“Deployed” appears once, no leftover “Thinking…”" },
     ],
     notes: [
-      <>Delivers a signed <code>message.im</code> event to your agent</>,
-      <>Sends <code>block_actions</code> when Ana clicks Approve</>,
+      <>
+        Delivers a signed <code>message.im</code> event to your agent
+      </>,
+      <>
+        Sends <code>block_actions</code> when Ana clicks Approve
+      </>,
       <>Renders status lines and messages the way people see them</>,
     ],
   },
@@ -62,8 +67,12 @@ const EXAMPLES: Example[] = [
       { step: 5, text: "one comment from robin after the redelivery" },
     ],
     notes: [
-      <>Installs the App only on repos you list in <code>apps</code></>,
-      <>Signs each delivery with <code>X-Hub-Signature-256</code></>,
+      <>
+        Installs the App only on repos you list in <code>apps</code>
+      </>,
+      <>
+        Signs each delivery with <code>X-Hub-Signature-256</code>
+      </>,
       <>Redelivers with the same GUID, the way GitHub does</>,
     ],
   },
@@ -78,8 +87,12 @@ const EXAMPLES: Example[] = [
       { step: 5, text: "after Stop, the session is complete" },
     ],
     notes: [
-      <><code>AgentSessionEvent</code> in Linear’s current shape</>,
-      <>The <code>prompted</code> event carrying the stop signal</>,
+      <>
+        <code>AgentSessionEvent</code> in Linear’s current shape
+      </>,
+      <>
+        The <code>prompted</code> event carrying the stop signal
+      </>,
       <>Every GraphQL response checked against Linear’s schema</>,
     ],
   },
@@ -95,16 +108,35 @@ const EXAMPLES: Example[] = [
     ],
     notes: [
       <>Connections and their inheritance, like Notion</>,
-      <>Webhooks signed with <code>X-Notion-Signature</code></>,
-      <><code>page.content_updated</code> batched the way Notion does</>,
+      <>
+        Webhooks signed with <code>X-Notion-Signature</code>
+      </>,
+      <>
+        <code>page.content_updated</code> batched the way Notion does
+      </>,
     ],
   },
 ];
 
 /** The step after the last tagged line or check: the finished run. */
-const doneOf = (example: Example) => Math.max(...example.code.ts.sample.steps, ...example.checks.map((c) => c.step)) + 1;
+const doneOf = (example: Example) =>
+  Math.max(...example.code.ts.sample.steps, ...example.checks.map((c) => c.step)) + 1;
 
-function Panel({ example, active, step, lang, onLang, controls }: { example: Example; active: boolean; step: number; lang: Lang; onLang: (lang: Lang) => void; controls: ReactNode }) {
+function Panel({
+  example,
+  active,
+  step,
+  lang,
+  onLang,
+  controls,
+}: {
+  example: Example;
+  active: boolean;
+  step: number;
+  lang: Lang;
+  onLang: (lang: Lang) => void;
+  controls: ReactNode;
+}) {
   const bar = useRef<HTMLSpanElement>(null);
   const { Mock } = example;
   const { file, sample } = example.code[lang];
@@ -125,7 +157,12 @@ function Panel({ example, active, step, lang, onLang, controls }: { example: Exa
   }, [active, step, sample]);
 
   return (
-    <div className={active ? "panel is-active" : "panel"} role="tabpanel" id={`panel-${example.id}`} aria-labelledby={`tab-${example.id}`}>
+    <div
+      className={active ? "panel is-active" : "panel"}
+      role="tabpanel"
+      id={`panel-${example.id}`}
+      aria-labelledby={`tab-${example.id}`}
+    >
       <div className="panel-code">
         <div className="pane-head">
           <span className="dots" aria-hidden="true">
@@ -137,14 +174,26 @@ function Panel({ example, active, step, lang, onLang, controls }: { example: Exa
           <span className="spacer" />
           <span className="lang" role="group" aria-label="Language">
             {LANGS.map((item) => (
-              <button key={item.id} type="button" aria-pressed={item.id === lang} aria-label={item.name} title={item.name} onClick={() => onLang(item.id)}>
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={item.id === lang}
+                aria-label={item.name}
+                title={item.name}
+                onClick={() => onLang(item.id)}
+              >
                 <img src={item.logo} alt="" width="18" height="18" decoding="async" />
               </button>
             ))}
           </span>
           <CopyButton text={sample.code} label={`Copy the ${example.label} example`} />
         </div>
-        <pre className="code" tabIndex={0} role="region" aria-label={`${example.label} example test in ${lang === "ts" ? "TypeScript" : "Python"}`}>
+        <pre
+          className="code"
+          tabIndex={0}
+          role="region"
+          aria-label={`${example.label} example test in ${lang === "ts" ? "TypeScript" : "Python"}`}
+        >
           <code>
             <span className="hot" ref={bar} aria-hidden="true" />
             {sample.lines.map((html, i) => (
@@ -249,11 +298,19 @@ export function Player() {
   function onKeyDown(event: KeyboardEvent) {
     const last = EXAMPLES.length - 1;
     const next =
-      event.key === "ArrowRight" ? (active === last ? 0 : active + 1)
-      : event.key === "ArrowLeft" ? (active === 0 ? last : active - 1)
-      : event.key === "Home" ? 0
-      : event.key === "End" ? last
-      : -1;
+      event.key === "ArrowRight"
+        ? active === last
+          ? 0
+          : active + 1
+        : event.key === "ArrowLeft"
+          ? active === 0
+            ? last
+            : active - 1
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : -1;
     if (next === -1) return;
     event.preventDefault();
     select(next);
@@ -281,7 +338,16 @@ export function Player() {
       <h2 className="sr-only">Examples: one test per platform</h2>
       <div className="tabs" role="tablist" aria-label="Examples by platform" ref={list} onKeyDown={onKeyDown}>
         {EXAMPLES.map((item, i) => (
-          <button key={item.id} type="button" role="tab" id={`tab-${item.id}`} aria-controls={`panel-${item.id}`} aria-selected={i === active} tabIndex={i === active ? 0 : -1} onClick={() => select(i)}>
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            id={`tab-${item.id}`}
+            aria-controls={`panel-${item.id}`}
+            aria-selected={i === active}
+            tabIndex={i === active ? 0 : -1}
+            onClick={() => select(i)}
+          >
             {item.label}
           </button>
         ))}
@@ -289,7 +355,15 @@ export function Player() {
       </div>
       <div className="panels">
         {EXAMPLES.map((item, i) => (
-          <Panel key={item.id} example={item} active={i === active} lang={lang} onLang={setLang} step={i === active ? step : doneOf(item)} controls={i === active ? controls : null} />
+          <Panel
+            key={item.id}
+            example={item}
+            active={i === active}
+            lang={lang}
+            onLang={setLang}
+            step={i === active ? step : doneOf(item)}
+            controls={i === active ? controls : null}
+          />
         ))}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+
 import config from "../../samples/quickstart/channelstack.config.ts?sample";
 import vitestConfig from "../../samples/quickstart/vitest.config.ts?sample";
 import { Code, CopyButton, Terminal } from "../components/Code";
@@ -8,8 +9,8 @@ import { Footer } from "../components/Footer";
 import { HeroWaves } from "../components/HeroWaves";
 import { ArrowRight, Person, Route, Shield, Transcript } from "../components/Icons";
 import { Nav } from "../components/Nav";
-import { Seo } from "../components/Seo";
 import { Player } from "../components/Player";
+import { Seo } from "../components/Seo";
 import { Voice } from "../components/Voice";
 import { useReveal } from "../lib/hooks";
 import { SITE } from "../lib/site";
@@ -26,10 +27,30 @@ const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {
 };
 
 const CHANNELS = [
-  { id: "slack", name: "Slack", text: "DMs, mentions, threads and the agent view, with progress streams rendered the way people see them.", chips: ["Events API", "block_actions", "chat.startStream", "assistant.threads", "agent_session_stopped"] },
-  { id: "github", name: "GitHub", text: "Apps with installations, signed deliveries with real GUIDs, and redelivery for dedupe tests.", chips: ["App manifests", "issue_comment", "pull_request", "check_run", "redeliver"] },
-  { id: "linear", name: "Linear", text: "Agent sessions end to end: delegation, prompts, questions, activities and the Stop signal.", chips: ["delegation", "AgentSessionEvent", "agentActivityCreate", "stop signal"] },
-  { id: "notion", name: "Notion", text: "Pages, databases and comments, with webhooks when someone mentions your integration.", chips: ["page webhooks", "comments", "database queries", "blocks"] },
+  {
+    id: "slack",
+    name: "Slack",
+    text: "DMs, mentions, threads and the agent view, with progress streams rendered the way people see them.",
+    chips: ["Events API", "block_actions", "chat.startStream", "assistant.threads", "agent_session_stopped"],
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    text: "Apps with installations, signed deliveries with real GUIDs, and redelivery for dedupe tests.",
+    chips: ["App manifests", "issue_comment", "pull_request", "check_run", "redeliver"],
+  },
+  {
+    id: "linear",
+    name: "Linear",
+    text: "Agent sessions end to end: delegation, prompts, questions, activities and the Stop signal.",
+    chips: ["delegation", "AgentSessionEvent", "agentActivityCreate", "stop signal"],
+  },
+  {
+    id: "notion",
+    name: "Notion",
+    text: "Pages, databases and comments, with webhooks when someone mentions your integration.",
+    chips: ["page webhooks", "comments", "database queries", "blocks"],
+  },
 ];
 
 const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
@@ -38,21 +59,29 @@ const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
     title: "Your agent’s real code path",
     body: (
       <>
-        <code>channelstack env</code> points your agent’s own SDKs at <code>slack.localhost</code>, <code>github.localhost</code> and friends. Agents with hard-coded hosts use proxy mode instead: set <code>HTTPS_PROXY</code> and trust a CA that only that agent sees.
+        <code>channelstack env</code> points your agent’s own SDKs at <code>slack.localhost</code>,{" "}
+        <code>github.localhost</code> and friends. Agents with hard-coded hosts use proxy mode instead: set{" "}
+        <code>HTTPS_PROXY</code> and trust a CA that only that agent sees.
       </>
     ),
   },
   {
     icon: <Shield size={22} />,
     title: "Shapes that can’t drift",
-    body: <>Every response and webhook is checked against the providers’ own schemas: OpenAPI descriptions, GraphQL introspection and recorded traffic. When a platform changes, your build goes red instead of quietly wrong.</>,
+    body: (
+      <>
+        Every response and webhook is checked against the providers’ own schemas: OpenAPI descriptions, GraphQL
+        introspection and recorded traffic. When a platform changes, your build goes red instead of quietly wrong.
+      </>
+    ),
   },
   {
     icon: <Person size={22} />,
     title: "People, not payloads",
     body: (
       <>
-        Write <code>ana.click("Approve", {"{ message }"})</code> instead of hand-building a <code>block_actions</code> body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery IDs.
+        Write <code>ana.click("Approve", {"{ message }"})</code> instead of hand-building a <code>block_actions</code>{" "}
+        body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery IDs.
       </>
     ),
   },
@@ -61,7 +90,9 @@ const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
     title: "Assert what people see",
     body: (
       <>
-        Streams, status lines, edits and ephemeral messages render into one transcript. <code>toHaveRepliesFrom(…, {"{ count: 1 }"})</code> catches the double post. <code>not.toContainText</code> catches the leftover “Thinking…” reply.
+        Streams, status lines, edits and ephemeral messages render into one transcript.{" "}
+        <code>toHaveRepliesFrom(…, {"{ count: 1 }"})</code> catches the double post. <code>not.toContainText</code>{" "}
+        catches the leftover “Thinking…” reply.
       </>
     ),
   },
@@ -69,8 +100,20 @@ const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
 
 type Cell = [tone: "y" | "n" | "p", text: string];
 const COMPARE: Array<[string, Cell, Cell, Cell, Cell]> = [
-  ["Agent code unchanged", ["n", "No"], ["p", "Base URL overrides"], ["y", "Yes"], ["y", "Yes: a base URL, or a proxy"]],
-  ["Platform calls your agent", ["n", "No"], ["p", "Some webhooks"], ["y", "Yes"], ["y", "Signed, retried, replayable"]],
+  [
+    "Agent code unchanged",
+    ["n", "No"],
+    ["p", "Base URL overrides"],
+    ["y", "Yes"],
+    ["y", "Yes: a base URL, or a proxy"],
+  ],
+  [
+    "Platform calls your agent",
+    ["n", "No"],
+    ["p", "Some webhooks"],
+    ["y", "Yes"],
+    ["y", "Signed, retried, replayable"],
+  ],
   ["Scripted people", ["n", "No"], ["n", "No"], ["p", "Manual or second bot"], ["y", "Built in"]],
   ["Payload shapes checked", ["n", "No"], ["n", "No"], ["y", "They’re real"], ["y", "Against provider schemas"]],
   ["Assert on what people see", ["n", "No"], ["n", "Raw state"], ["p", "Screenshots"], ["y", "Rendered transcript"]],
@@ -101,7 +144,9 @@ export default function Home() {
               Your agent’s whole world, <em>on localhost.</em>
             </h1>
             <p className="lede">
-              channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine. Script the people, let your agent answer through its real code path, and assert on the conversation a person would see. Signed webhooks, real payload shapes and real ids, with no changes to how your agent works.
+              channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine. Script the
+              people, let your agent answer through its real code path, and assert on the conversation a person would
+              see. Signed webhooks, real payload shapes and real ids, with no changes to how your agent works.
             </p>
             <div className="cta">
               <a className="btn primary" href="#quick-start">
@@ -129,7 +174,10 @@ export default function Home() {
             <div className="sec-head">
               <p className="kicker">Four platforms, one API</p>
               <h2 id="channels-title">Everywhere your agent gets a message.</h2>
-              <p className="sec-lede">One package fakes all four, with the people, events and API calls agents actually use. Use one in a test, or several when your agent spans them. Discord, Stripe and email come next.</p>
+              <p className="sec-lede">
+                One package fakes all four, with the people, events and API calls agents actually use. Use one in a
+                test, or several when your agent spans them. Discord, Stripe and email come next.
+              </p>
             </div>
             <div className="channels" ref={channels}>
               {CHANNELS.map((channel) => {
@@ -139,8 +187,26 @@ export default function Home() {
                     <header>
                       {logo ? (
                         <span className={logo.onDark === logo.onLight ? "logo same" : "logo"}>
-                          <img className="on-light" src={logo.onLight} alt="" width="32" height="32" loading="lazy" decoding="async" />
-                          {logo.onDark === logo.onLight ? null : <img className="on-dark" src={logo.onDark} alt="" width="32" height="32" loading="lazy" decoding="async" />}
+                          <img
+                            className="on-light"
+                            src={logo.onLight}
+                            alt=""
+                            width="32"
+                            height="32"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                          {logo.onDark === logo.onLight ? null : (
+                            <img
+                              className="on-dark"
+                              src={logo.onDark}
+                              alt=""
+                              width="32"
+                              height="32"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          )}
                         </span>
                       ) : null}
                       <h3>{channel.name}</h3>
@@ -163,7 +229,10 @@ export default function Home() {
             <div className="sec-head">
               <p className="kicker">Why channelstack</p>
               <h2 id="why-title">Mocks test your mock. channelstack tests your agent.</h2>
-              <p className="sec-lede">Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on. channelstack closes those gaps.</p>
+              <p className="sec-lede">
+                Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that
+                changed last month, a stray progress message nobody asserted on. channelstack closes those gaps.
+              </p>
             </div>
             <div className="principles" ref={principles}>
               {PRINCIPLES.map((p) => (
@@ -186,7 +255,10 @@ export default function Home() {
             <div className="sec-head">
               <p className="kicker">How it works</p>
               <h2 id="how-title">One server between your test and your agent.</h2>
-              <p className="sec-lede">Your test scripts the people. channelstack delivers what the platform would deliver, and your agent answers with its real SDKs, into the same fake workspace your test reads back.</p>
+              <p className="sec-lede">
+                Your test scripts the people. channelstack delivers what the platform would deliver, and your agent
+                answers with its real SDKs, into the same fake workspace your test reads back.
+              </p>
             </div>
             <div ref={flow}>
               <Flow />
@@ -199,7 +271,10 @@ export default function Home() {
             <div className="sec-head">
               <p className="kicker">Compared</p>
               <h2 id="compare-title">Between mocks and a real workspace.</h2>
-              <p className="sec-lede">Real sandbox workspaces are slow, shared and flaky in CI. Mocks are fast but only prove your code matches your own guess. channelstack keeps the speed and drops the guessing.</p>
+              <p className="sec-lede">
+                Real sandbox workspaces are slow, shared and flaky in CI. Mocks are fast but only prove your code
+                matches your own guess. channelstack keeps the speed and drops the guessing.
+              </p>
             </div>
             <div className="table-wrap" tabIndex={0} role="region" aria-labelledby="compare-title">
               <table>
@@ -249,11 +324,17 @@ export default function Home() {
               <li className="step reveal">
                 <p className="step-n">Step 2</p>
                 <h3>Point your agent at it</h3>
-                <p>Describe your agent’s app, then start the agent the way you always do, with channelstack’s environment.</p>
+                <p>
+                  Describe your agent’s app, then start the agent the way you always do, with channelstack’s
+                  environment.
+                </p>
                 <div className="snippet">
                   <p className="snippet-file">channelstack.config.ts</p>
                   <Code plain sample={config} label="channelstack.config.ts" />
-                  <Terminal label="Commands to start your agent" lines={["$ npx channelstack env >> .env.local", "$ portless run robin pnpm dev"]} />
+                  <Terminal
+                    label="Commands to start your agent"
+                    lines={["$ npx channelstack env >> .env.local", "$ portless run robin pnpm dev"]}
+                  />
                 </div>
               </li>
               <li className="step reveal">
@@ -285,7 +366,9 @@ export default function Home() {
               </div>
             </div>
             <p className="why-name">
-              <strong>Why “channelstack”?</strong> Your agent lives in a stack of channels: Slack, GitHub, Linear, Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the conversation end to end before your users have it.
+              <strong>Why “channelstack”?</strong> Your agent lives in a stack of channels: Slack, GitHub, Linear,
+              Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the
+              conversation end to end before your users have it.
             </p>
           </div>
           <div className="wrap">

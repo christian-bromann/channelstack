@@ -1,9 +1,11 @@
 // Runs before first paint: marks JavaScript as available and applies a saved theme choice.
-(function () {
-  var root = document.documentElement;
+(() => {
+  const root = document.documentElement;
   root.classList.add("js");
   try {
-    var theme = localStorage.getItem("theme");
+    const theme = localStorage.getItem("theme");
     if (theme === "light" || theme === "dark") root.setAttribute("data-theme", theme);
-  } catch (e) {}
+  } catch {
+    // storage is unavailable (private mode): keep the system theme
+  }
 })();

@@ -34,7 +34,13 @@ export function toEntries(meta: Record<string, Frontmatter | undefined>): DocEnt
   return Object.entries(meta)
     .map(([file, fm]) => {
       const slug = slugOf(file);
-      return { title: fm?.title ?? (slug || "Docs"), order: fm?.order, description: fm?.description, slug, path: slug ? `/docs/${slug}` : "/docs" };
+      return {
+        title: fm?.title ?? (slug || "Docs"),
+        order: fm?.order,
+        description: fm?.description,
+        slug,
+        path: slug ? `/docs/${slug}` : "/docs",
+      };
     })
     .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.title.localeCompare(b.title));
 }

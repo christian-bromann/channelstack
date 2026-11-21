@@ -7,6 +7,7 @@ import "./styles/home.css";
 import "./styles/player.css";
 import "./styles/docs.css";
 import { ViteReactSSG } from "vite-react-ssg";
+
 import { routes } from "./routes";
 
 export const createRoot = ViteReactSSG({ routes });

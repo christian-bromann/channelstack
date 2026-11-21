@@ -276,35 +276,65 @@ button {
   transform-origin: center;
 }
 
-.mark i:nth-child(1) { height: 8px; }
-.mark i:nth-child(2) { height: 14px; }
-.mark i:nth-child(3) { height: 10px; }
-.mark i:nth-child(4) { height: 16px; }
-.mark i:nth-child(5) { height: 6px; }
+.mark i:nth-child(1) {
+  height: 8px;
+}
+.mark i:nth-child(2) {
+  height: 14px;
+}
+.mark i:nth-child(3) {
+  height: 10px;
+}
+.mark i:nth-child(4) {
+  height: 16px;
+}
+.mark i:nth-child(5) {
+  height: 6px;
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .mark i {
     animation: meter 900ms var(--ease) both;
   }
-  .mark i:nth-child(2) { animation-delay: 60ms; }
-  .mark i:nth-child(3) { animation-delay: 120ms; }
-  .mark i:nth-child(4) { animation-delay: 180ms; }
-  .mark i:nth-child(5) { animation-delay: 240ms; }
+  .mark i:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .mark i:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .mark i:nth-child(4) {
+    animation-delay: 180ms;
+  }
+  .mark i:nth-child(5) {
+    animation-delay: 240ms;
+  }
   .brand:hover .mark i {
     animation-name: meter-hover;
   }
 }
 
 @keyframes meter {
-  0% { transform: scaleY(0.2); }
-  55% { transform: scaleY(1.25); }
-  100% { transform: scaleY(1); }
+  0% {
+    transform: scaleY(0.2);
+  }
+  55% {
+    transform: scaleY(1.25);
+  }
+  100% {
+    transform: scaleY(1);
+  }
 }
 
 @keyframes meter-hover {
-  0% { transform: scaleY(1); }
-  45% { transform: scaleY(0.45); }
-  100% { transform: scaleY(1); }
+  0% {
+    transform: scaleY(1);
+  }
+  45% {
+    transform: scaleY(0.45);
+  }
+  100% {
+    transform: scaleY(1);
+  }
 }
 
 .nav-links {
@@ -327,7 +357,9 @@ button {
   font-size: 14.5px;
   font-weight: 500;
   text-decoration: none;
-  transition: color 150ms, background-color 150ms;
+  transition:
+    color 150ms,
+    background-color 150ms;
 }
 
 .nav-links a:hover,
@@ -376,7 +408,9 @@ button {
   background: none;
   color: var(--muted);
   cursor: pointer;
-  transition: color 150ms, background-color 150ms;
+  transition:
+    color 150ms,
+    background-color 150ms;
 }
 
 .icon-btn:hover {
@@ -394,12 +428,20 @@ button {
 }
 
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .theme-toggle .sun { display: none; }
-  :root:not([data-theme="dark"]) .theme-toggle .moon { display: block; }
+  :root:not([data-theme="dark"]) .theme-toggle .sun {
+    display: none;
+  }
+  :root:not([data-theme="dark"]) .theme-toggle .moon {
+    display: block;
+  }
 }
 
-:root[data-theme="light"] .theme-toggle .sun { display: none; }
-:root[data-theme="light"] .theme-toggle .moon { display: block; }
+:root[data-theme="light"] .theme-toggle .sun {
+  display: none;
+}
+:root[data-theme="light"] .theme-toggle .moon {
+  display: block;
+}
 
 @media (max-width: 760px) {
   .nav-links .optional,
@@ -436,7 +478,10 @@ button {
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
-  transition: transform 150ms var(--ease), border-color 150ms, background-color 150ms;
+  transition:
+    transform 150ms var(--ease),
+    border-color 150ms,
+    background-color 150ms;
 }
 
 .btn:hover {
@@ -522,15 +567,33 @@ button {
   padding-left: 18px;
 }
 
-.t-keyword { color: var(--code-key); }
+.t-keyword {
+  color: var(--code-key);
+}
 .t-string,
-.t-string-expression { color: var(--code-str); }
-.t-function { color: var(--code-fn); }
-.t-constant { color: var(--code-const); }
-.t-comment { color: var(--code-dim); font-style: italic; }
-.t-punctuation { color: var(--code-punct); }
-.t-parameter { color: var(--code-fg); }
-.t-link { color: var(--code-fn); text-decoration: underline; }
+.t-string-expression {
+  color: var(--code-str);
+}
+.t-function {
+  color: var(--code-fn);
+}
+.t-constant {
+  color: var(--code-const);
+}
+.t-comment {
+  color: var(--code-dim);
+  font-style: italic;
+}
+.t-punctuation {
+  color: var(--code-punct);
+}
+.t-parameter {
+  color: var(--code-fg);
+}
+.t-link {
+  color: var(--code-fn);
+  text-decoration: underline;
+}
 
 .prompt {
   color: var(--code-dim);
@@ -569,7 +632,9 @@ button {
 
 .copy svg {
   grid-area: 1 / 1;
-  transition: opacity 180ms, transform 180ms var(--ease);
+  transition:
+    opacity 180ms,
+    transform 180ms var(--ease);
 }
 
 .copy .check {
@@ -592,52 +657,22 @@ button {
 
 @media (prefers-reduced-motion: no-preference) {
   .reveal {
-    transition: opacity 600ms var(--ease), transform 600ms var(--ease);
+    transition:
+      opacity 600ms var(--ease),
+      transform 600ms var(--ease);
   }
-  .reveal:nth-child(2) { transition-delay: 70ms; }
-  .reveal:nth-child(3) { transition-delay: 140ms; }
-  .reveal:nth-child(4) { transition-delay: 210ms; }
+  .reveal:nth-child(2) {
+    transition-delay: 70ms;
+  }
+  .reveal:nth-child(3) {
+    transition-delay: 140ms;
+  }
+  .reveal:nth-child(4) {
+    transition-delay: 210ms;
+  }
   .reveal.is-waiting {
     opacity: 0;
     transform: translateY(14px);
-  }
-}
-
-/* ---------- pausing motion ---------- */
-
-/* The "Pause animations" button in the footer stops every looping decoration. */
-:root[data-motion="paused"] *,
-:root[data-motion="paused"] *::before,
-:root[data-motion="paused"] *::after {
-  animation-play-state: paused !important;
-}
-
-.motion-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-  padding: 6px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: none;
-  color: var(--muted);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.motion-toggle:hover {
-  color: var(--ink);
-  border-color: var(--muted);
-}
-
-html:not(.js) .motion-toggle {
-  display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .motion-toggle {
-    display: none;
   }
 }
 

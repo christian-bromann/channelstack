@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
+
 import { Footer } from "../components/Footer";
 import { ArrowRight } from "../components/Icons";
 import { Nav } from "../components/Nav";
@@ -54,7 +55,11 @@ export function DocPage({ slug, mod }: { slug: string; mod: DocModule }) {
   const title = entry?.title ?? "Docs";
   return (
     <>
-      <Seo title={slug ? `${title} · channelstack docs` : "channelstack docs"} description={entry?.description} path={entry?.path ?? "/docs"} />
+      <Seo
+        title={slug ? `${title} · channelstack docs` : "channelstack docs"}
+        description={entry?.description}
+        path={entry?.path ?? "/docs"}
+      />
       <article className="prose">
         <Content />
       </article>

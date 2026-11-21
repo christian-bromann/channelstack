@@ -1,4 +1,5 @@
 import type { RouteRecord } from "vite-react-ssg";
+
 import { docLoaders, slugOf } from "./lib/docs";
 import Home from "./pages/Home";
 

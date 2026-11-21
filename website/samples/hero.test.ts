@@ -1,15 +1,19 @@
-import { test, expect } from "vitest";
+import { expect, test } from "vitest";
 
 test("ships a PR from a Slack DM", async ({ slack }) => {
   const ana = await slack.createUser({ name: "ana" });
-  const msg = await ana.say("@robin ship #812 to staging", // [!step 1]
-    { to: slack.app }); // [!step 1]
+  // [!step 1]
+  const msg = await ana.say("@robin ship #812 to staging", { to: slack.app });
 
-  await expect(msg.thread).toHaveStatusText(/checking CI/); // [!step 2]
-  const ask = await msg.thread.waitForReply({ from: "robin" }); // [!step 3]
-  await expect(ask).toHaveButton("Approve"); // [!step 3]
+  // [!step 2]
+  await expect(msg.thread).toHaveStatusText(/checking CI/);
+  // [!step 3]
+  const ask = await msg.thread.waitForReply({ from: "robin" });
+  await expect(ask).toHaveButton("Approve");
 
-  await ana.click("Approve", { message: ask }); // [!step 4]
-  await expect(msg.thread).toContainText(/Deployed/, { count: 1 }); // [!step 5]
-  await expect(msg.thread).not.toContainText("Thinking…"); // [!step 5]
+  // [!step 4]
+  await ana.click("Approve", { message: ask });
+  // [!step 5]
+  await expect(msg.thread).toContainText(/Deployed/, { count: 1 });
+  await expect(msg.thread).not.toContainText("Thinking…");
 });

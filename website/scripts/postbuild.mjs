@@ -23,7 +23,9 @@ async function htmlFiles(dir) {
 const pages = await htmlFiles(dist);
 
 // The headline is the largest paint, so its font is preloaded instead of swapped in late.
-const headingFont = (await readdir(join(dist, "assets"))).find((name) => /^familjen-grotesk-latin-wght-normal-.*\.woff2$/.test(name));
+const headingFont = (await readdir(join(dist, "assets"))).find((name) =>
+  /^familjen-grotesk-latin-wght-normal-.*\.woff2$/.test(name),
+);
 if (!headingFont) throw new Error("heading font not found in dist/assets");
 const preload = `<link rel="preload" href="/assets/${headingFont}" as="font" type="font/woff2" crossorigin>`;
 const hashes = new Set();
@@ -44,7 +46,11 @@ for (const file of pages) {
   if (/<style[\s>]/.test(html) || /\sstyle="/.test(html)) {
     throw new Error(`${relative(dist, file)} contains inline styles, which the Content-Security-Policy blocks`);
   }
-  const route = "/" + relative(dist, file).replace(/\.html$/, "").replace(/(^|\/)index$/, "");
+  const route =
+    "/" +
+    relative(dist, file)
+      .replace(/\.html$/, "")
+      .replace(/(^|\/)index$/, "");
   if (route !== "/404") urls.push(SITE + (route === "/" ? "/" : route));
 }
 

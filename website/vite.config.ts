@@ -5,13 +5,17 @@ import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig } from "vite";
 import type {} from "vite-react-ssg";
+
 import rehypeHighlight from "./plugins/rehype-highlight";
 import samples from "./plugins/samples-plugin";
 
 export default defineConfig({
   plugins: [
     samples(),
-    { enforce: "pre", ...mdx({ remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm], rehypePlugins: [rehypeHighlight] }) },
+    {
+      enforce: "pre",
+      ...mdx({ remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm], rehypePlugins: [rehypeHighlight] }),
+    },
     react(),
   ],
   build: { cssCodeSplit: false, assetsInlineLimit: 0 },

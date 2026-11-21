@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import type { Sample } from "../../plugins/samples-plugin";
 import { Check, Clipboard } from "./Icons";
 

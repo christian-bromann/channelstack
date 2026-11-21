@@ -19,7 +19,19 @@ const Mention = ({ children }: { children: string }) => <span className="mention
 // ---------------------------------------------------------------------------
 // Slack
 
-function SlackMessage({ who, bot = false, time, className, children }: { who: string; bot?: boolean; time: string; className: string; children: ReactNode }) {
+function SlackMessage({
+  who,
+  bot = false,
+  time,
+  className,
+  children,
+}: {
+  who: string;
+  bot?: boolean;
+  time: string;
+  className: string;
+  children: ReactNode;
+}) {
   return (
     <div className={className}>
       <span className={bot ? "sl-avatar bot" : "sl-avatar"} aria-hidden="true">
@@ -55,7 +67,9 @@ export function SlackMock({ step }: MockProps) {
       composer="Message robin"
       title={
         <>
-          <span className="sl-avatar bot small" aria-hidden="true">R</span>
+          <span className="sl-avatar bot small" aria-hidden="true">
+            R
+          </span>
           <b>robin</b>
           <span className="sl-app">APP</span>
         </>
@@ -88,7 +102,17 @@ export function SlackMock({ step }: MockProps) {
 // ---------------------------------------------------------------------------
 // GitHub
 
-function GitHubComment({ who, bot = false, className, children }: { who: string; bot?: boolean; className: string; children: ReactNode }) {
+function GitHubComment({
+  who,
+  bot = false,
+  className,
+  children,
+}: {
+  who: string;
+  bot?: boolean;
+  className: string;
+  children: ReactNode;
+}) {
   return (
     <div className={className}>
       <span className={bot ? "gh-avatar bot" : "gh-avatar"} aria-hidden="true">
@@ -170,11 +194,15 @@ export function LinearMock({ step }: MockProps) {
               In Progress
             </span>
             <span>
-              <i className="ln-avatar" aria-hidden="true">K</i>
+              <i className="ln-avatar" aria-hidden="true">
+                K
+              </i>
               Kai
             </span>
             <span className={when(step, 2, "ln-delegate")}>
-              <i className="ln-avatar bot" aria-hidden="true">R</i>
+              <i className="ln-avatar bot" aria-hidden="true">
+                R
+              </i>
               robin
             </span>
           </p>
@@ -182,20 +210,26 @@ export function LinearMock({ step }: MockProps) {
         <p className={when(step, 1, "ln-label")}>Activity</p>
         <ul className="ln-activity">
           <li className={when(step, 1, "ln-row")}>
-            <i className="ln-avatar" aria-hidden="true">K</i>
+            <i className="ln-avatar" aria-hidden="true">
+              K
+            </i>
             <span>
               <b>Kai</b> created the issue
             </span>
           </li>
           <li className={when(step, 2, "ln-row")}>
-            <i className="ln-avatar" aria-hidden="true">K</i>
+            <i className="ln-avatar" aria-hidden="true">
+              K
+            </i>
             <span>
               <b>Kai</b> delegated the issue to <b>robin</b>
             </span>
           </li>
           <li className={when(step, 2, "ln-session")}>
             <p className="ln-session-head">
-              <i className="ln-avatar bot" aria-hidden="true">R</i>
+              <i className="ln-avatar bot" aria-hidden="true">
+                R
+              </i>
               <b>robin</b>
               <span className="ln-agent">Agent</span>
               <span className="spacer" />
@@ -216,7 +250,17 @@ export function LinearMock({ step }: MockProps) {
 // ---------------------------------------------------------------------------
 // Notion
 
-function NotionComment({ who, bot = false, className, children }: { who: string; bot?: boolean; className: string; children: ReactNode }) {
+function NotionComment({
+  who,
+  bot = false,
+  className,
+  children,
+}: {
+  who: string;
+  bot?: boolean;
+  className: string;
+  children: ReactNode;
+}) {
   return (
     <div className={className}>
       <span className={bot ? "nt-avatar bot" : "nt-avatar"} aria-hidden="true">
