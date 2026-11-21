@@ -181,7 +181,8 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
   const messageIn = (conversation: SlackConversationRecord, ts: string): SlackMessageRecord => {
     const message = store.findMessage(conversation.id, ts);
-    if (!message) throw new SlackApiError("message_not_found");
+    // An ephemeral message can't be found again: Slack doesn't keep it, so nothing can edit, delete or react to it.
+    if (!message || message.ephemeralFor !== undefined) throw new SlackApiError("message_not_found");
     return message;
   };
 
@@ -197,6 +198,24 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
     const value = string(args, "text") ?? string(args, "markdown_text") ?? "";
     world.checkContent(value, Array.isArray(blocks) ? blocks : undefined);
     return { text: value, blocks: Array.isArray(blocks) ? blocks : [] };
+  };
+
+  /**
+   * The part of a list a history call asks for: `oldest` and `latest` bound it (exclusive unless
+   * `inclusive`), `limit` cuts it, and `has_more` says whether something was cut. Paging on with
+   * a cursor isn't built, so a cursor is refused instead of answered with the first page again.
+   */
+  const page = (args: Args, messages: SlackMessageRecord[]) => {
+    if (string(args, "cursor") !== undefined) throw new SlackApiError("invalid_cursor");
+    const inclusive = args.inclusive === true || args.inclusive === "true" || args.inclusive === "1";
+    const oldest = string(args, "oldest") ?? "0";
+    const latest = string(args, "latest");
+    const after = (ts: string) => (inclusive ? Number(ts) >= Number(oldest) : Number(ts) > Number(oldest));
+    const before = (ts: string) =>
+      latest === undefined || (inclusive ? Number(ts) <= Number(latest) : Number(ts) < Number(latest));
+    const inWindow = messages.filter((message) => after(message.ts) && before(message.ts));
+    const limit = Math.max(1, Math.min(Number(args.limit ?? 100) || 100, 999));
+    return { messages: inWindow.slice(0, limit), has_more: inWindow.length > limit };
   };
 
   /** The app answered, so its status line in that thread is cleared, as Slack does. */
@@ -328,6 +347,9 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
     "chat.stopStream": (args) => {
       const conversation = joined(required(args, "channel"));
       const message = messageIn(conversation, required(args, "ts"));
+      // Everything is checked before anything changes: a refused call leaves the stream open for a corrected one.
+      const status = string(args, "session_status") ?? "active";
+      if (!SESSION_STATUSES.some((known) => known === status)) throw new SlackApiError("invalid_arguments");
       appendToStream(message, streamed(args));
       const stream = message.stream;
       if (!stream) throw new SlackApiError("message_not_in_streaming_state");
@@ -337,8 +359,6 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       if (metadata !== undefined) message.metadata = metadata;
       stream.state = "completed";
       stream.endedAt = clock();
-      const status = string(args, "session_status") ?? "active";
-      if (!SESSION_STATUSES.some((known) => known === status)) throw new SlackApiError("invalid_arguments");
       store.threadState(conversation.id, message.threadTs ?? message.ts).sessionStatus =
         status as (typeof SESSION_STATUSES)[number];
       return { channel: conversation.id, ts: message.ts, message: messageOf(message) };
@@ -467,27 +487,28 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
     "conversations.history": (args) => {
       const conversation = joined(required(args, "channel"));
-      const messages = store
-        .messagesIn(conversation.id)
-        .filter(
-          (message) => (message.threadTs === undefined || message.broadcast) && message.ephemeralFor === undefined,
-        )
-        .map(messageOf)
-        .reverse();
-      return { messages, has_more: false, pin_count: 0, response_metadata: { next_cursor: "" } };
+      const { messages, has_more } = page(
+        args,
+        store
+          .messagesIn(conversation.id)
+          .filter(
+            (message) => (message.threadTs === undefined || message.broadcast) && message.ephemeralFor === undefined,
+          )
+          .reverse(),
+      );
+      return { messages: messages.map(messageOf), has_more, pin_count: 0, response_metadata: { next_cursor: "" } };
     },
 
     "conversations.replies": (args) => {
       const conversation = joined(required(args, "channel"));
       const root = messageIn(conversation, required(args, "ts"));
       const rootTs = root.threadTs ?? root.ts;
-      const messages = store
+      const thread = store
         .messagesIn(conversation.id)
-        .filter(
-          (message) => (message.ts === rootTs || message.threadTs === rootTs) && message.ephemeralFor === undefined,
-        )
-        .map(messageOf);
-      return { messages, has_more: false, response_metadata: { next_cursor: "" } };
+        .filter((message) => message.threadTs === rootTs && message.ephemeralFor === undefined);
+      // The root is always first; the window and the limit apply to the replies under it.
+      const { messages, has_more } = page(args, thread);
+      return { messages: [root, ...messages].map(messageOf), has_more, response_metadata: { next_cursor: "" } };
     },
 
     "conversations.members": (args) => ({
@@ -653,11 +674,9 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
   // Where `files.getUploadURLExternal` sends the app with a file's bytes.
   api.post("/upload/v1/:file", async (c) => {
-    const token = bearerFrom(c.req.header("authorization"));
+    // The URL is the credential, as with Slack's pre-signed upload URLs: clients post the bytes without a token.
     const file = store.files.get(c.req.param("file"));
-    if (token === undefined || !constantTimeEqual(token, context.secret("botToken")) || !file || file.bytes) {
-      return c.text("Not Found", 404);
-    }
+    if (!file || file.bytes) return c.text("Not Found", 404);
     const type = c.req.header("content-type") ?? "";
     // Slack takes the raw bytes, or a multipart form with the file in it.
     const part = type.startsWith("multipart/form-data")

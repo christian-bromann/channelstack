@@ -89,9 +89,11 @@ export function renderTranscript(
     /** Who is reading. Without one, ephemeral messages are left out. */
     viewer: string | undefined;
     principal(userId: string): { id: string; name: string; kind: "user" | "app" };
+    /** The name of a mentioned user, or nothing when the id is nobody the reader's session knows. */
+    mentionName(userId: string): string | undefined;
   },
 ): { entries: TranscriptEntry[]; text: string } {
-  const named = (text: string) => nameMentions(text, (id) => options.principal(id).name);
+  const named = (text: string) => nameMentions(text, options.mentionName);
   const entries = messages
     .filter((message) => message.ephemeralFor === undefined || message.ephemeralFor === options.viewer)
     .map((message): TranscriptEntry => {

@@ -238,7 +238,9 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     // An ephemeral message exists only for its recipient: Slack sends no event for it.
     if (message.ephemeralFor !== undefined) return message;
     const { app, team } = store;
-    const mentioned = userId !== app.botUserId && mentionedUsers(message.text).includes(app.botUserId);
+    // Slack doesn't send `app_mention` for a DM with the app, mentioned or not: that arrives as `message.im` only.
+    const mentioned =
+      conversation.kind !== "im" && userId !== app.botUserId && mentionedUsers(message.text).includes(app.botUserId);
     // The mention comes first: when a message causes both, `app_mention` is the one tests look at.
     for (const [subscription, event] of [
       ...(mentioned ? ([["app_mention", appMentionEvent(message, conversation, author(userId), team)]] as const) : []),
@@ -539,10 +541,15 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     messages: (session, channel) =>
       store
         .messagesIn(store.conversations.get(session, channel).id)
-        // A reply that was also sent to the channel shows there too.
-        .filter((message) => message.threadTs === undefined || message.broadcast),
+        // A reply that was also sent to the channel shows there too. An ephemeral message is not
+        // part of the conversation: only its recipient sees it (`ephemeral`, or a transcript read as them).
+        .filter(
+          (message) => (message.threadTs === undefined || message.broadcast) && message.ephemeralFor === undefined,
+        ),
     replies: (session, channel, ts) =>
-      store.messagesIn(store.conversations.get(session, channel).id).filter((message) => message.threadTs === ts),
+      store
+        .messagesIn(store.conversations.get(session, channel).id)
+        .filter((message) => message.threadTs === ts && message.ephemeralFor === undefined),
     user: (session, id) => store.users.get(session, id),
     thread: (session, channel, ts) => {
       const conversation = store.conversations.get(session, channel);

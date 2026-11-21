@@ -279,6 +279,15 @@ export function registerSlackRoutes(
     const { id: principalId, name, kind } = participantWire(session, id);
     return { id: principalId, name, kind };
   };
+  /** The name a mention shows as, or nothing for an id that is nobody this session knows. */
+  const mentionName = (session: string) => (id: string) => {
+    try {
+      return participantWire(session, id).name;
+    } catch (error) {
+      if (error instanceof ProtocolError && error.code === "not_found") return undefined;
+      throw error;
+    }
+  };
 
   router.route({
     method: "get",
@@ -348,7 +357,10 @@ export function registerSlackRoutes(
     sdkMethod: { on: "SlackConversation", name: "latestMessage" },
     stability: "experimental",
     handler: ({ session, params }) => {
-      const latest = world.everything(session.id, params.channel).at(-1);
+      const latest = world
+        .everything(session.id, params.channel)
+        .filter((message) => message.ephemeralFor === undefined)
+        .at(-1);
       if (!latest) throw new ProtocolError("not_found", "The conversation has no messages yet");
       return messageWire(session.id, latest);
     },
@@ -631,6 +643,7 @@ export function registerSlackRoutes(
       renderTranscript(world.thread(session.id, params.channel, params.ts), {
         viewer: query.as,
         principal: principal(session.id),
+        mentionName: mentionName(session.id),
       }),
   });
 
@@ -650,6 +663,7 @@ export function registerSlackRoutes(
       renderTranscript(world.thread(session.id, params.channel, params.ts), {
         viewer: query.as,
         principal: principal(session.id),
+        mentionName: mentionName(session.id),
       }),
   });
 
@@ -669,6 +683,7 @@ export function registerSlackRoutes(
       renderTranscript(world.everything(session.id, params.channel), {
         viewer: query.as,
         principal: principal(session.id),
+        mentionName: mentionName(session.id),
       }),
   });
 

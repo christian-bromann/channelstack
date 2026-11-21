@@ -164,10 +164,65 @@ describe("chat", () => {
     expect((await api("chat.postEphemeral", { channel: channel.id, user: "U0NOBODY000", text: "x" })).error).toBe(
       "user_not_in_channel",
     );
-    const [message] = await get(`/conversations/${channel.id}/messages`);
-    expect(message).toMatchObject({ text: "Only you can approve this", visibleTo: { id: ana.id } });
+    // It isn't part of the conversation: not among its messages, not its newest message, not in history.
+    expect(await get(`/conversations/${channel.id}/messages`)).toEqual([]);
+    expect((await get(`/conversations/${channel.id}/latest`)).error).toBe("not_found");
     expect((await api("conversations.history", { channel: channel.id })).messages).toEqual([]);
     expect(agent.received).toHaveLength(0);
+    // Only its recipient reads it: in their ephemeral messages, and in a transcript read as them.
+    const [message] = await get(`/users/${ana.id}/ephemeral`);
+    expect(message).toMatchObject({ text: "Only you can approve this", visibleTo: { id: ana.id } });
+    expect((await get(`/conversations/${channel.id}/transcript`)).text).toBe("");
+    expect((await get(`/conversations/${channel.id}/transcript?as=${ana.id}`)).text).toBe(
+      "my-agent: Only you can approve this (only Ana sees this)",
+    );
+    // Slack doesn't keep it, so the app can't edit it, delete it or react to it.
+    const target = { channel: channel.id, ts: sent.message_ts };
+    expect((await api("chat.update", { ...target, text: "changed" })).error).toBe("message_not_found");
+    expect((await api("chat.delete", target)).error).toBe("message_not_found");
+    expect((await api("reactions.add", { channel: channel.id, timestamp: sent.message_ts, name: "eyes" })).error).toBe(
+      "message_not_found",
+    );
+  });
+
+  test("an ephemeral reply in a thread is not one of the thread's replies", async () => {
+    const { api, ana, channel, say, get } = await workspace();
+    const question = await say("@my-agent may I approve?");
+    await api("chat.postEphemeral", { channel: channel.id, user: ana.id, thread_ts: question.ts, text: "You may not" });
+    expect(await get(`/conversations/${channel.id}/threads/${question.ts}/replies`)).toEqual([]);
+    expect((await api("conversations.replies", { channel: channel.id, ts: question.ts })).messages).toHaveLength(1);
+  });
+
+  test("history and replies honour oldest, latest, inclusive and limit; a cursor is refused", async () => {
+    const { api, channel, say } = await workspace();
+    const [first, second, third] = [await say("one"), await say("two"), await say("three")];
+    const history = (args: Record<string, unknown>) => api("conversations.history", { channel: channel.id, ...args });
+    const texts = (response: { messages: Array<{ text: string }> }) => response.messages.map(({ text }) => text);
+
+    // Slack's way to fetch one message by its ts.
+    const one = await history({ latest: first.ts, inclusive: true, limit: 1 });
+    expect([texts(one), one.has_more]).toEqual([["one"], false]);
+    expect(texts(await history({ oldest: first.ts }))).toEqual(["three", "two"]);
+    expect(texts(await history({ oldest: first.ts, latest: third.ts }))).toEqual(["two"]);
+    const limited = await history({ limit: 2 });
+    expect([texts(limited), limited.has_more]).toEqual([["three", "two"], true]);
+    expect((await history({ cursor: "bmV4dA==" })).error).toBe("invalid_cursor");
+
+    await api("chat.postMessage", { channel: channel.id, thread_ts: second.ts, text: "a" });
+    const late = await api("chat.postMessage", { channel: channel.id, thread_ts: second.ts, text: "b" });
+    const replies = await api("conversations.replies", {
+      channel: channel.id,
+      ts: second.ts,
+      oldest: late.ts,
+      inclusive: true,
+    });
+    expect(texts(replies)).toEqual(["two", "b"]);
+  });
+
+  test("a mention of someone nobody knows doesn't break the transcript", async () => {
+    const { api, channel, get } = await workspace();
+    await api("chat.postMessage", { channel: channel.id, text: "Thanks <@U0HALLUCIN8> and <@U0LABELLED0|sam>!" });
+    expect((await get(`/conversations/${channel.id}/transcript`)).text).toBe("my-agent: Thanks @U0HALLUCIN8 and @sam!");
   });
 });
 

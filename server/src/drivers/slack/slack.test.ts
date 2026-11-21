@@ -220,6 +220,21 @@ describe("messages and the events they send", () => {
     expect(group).toMatchObject({ kind: "mpim", id: expect.stringMatching(/^G0/) });
   });
 
+  test("a mention in a DM with the app is a message.im only; in a group DM it is an app_mention too", async () => {
+    const { h, agent, app, user, post } = await workspace();
+    const ana = await user({ name: "Ana" });
+    const ben = await user({ name: "Ben" });
+    await post(`/users/${ana.id}/say`, { message: { text: "@my-agent hi" }, to: [app.id] });
+    await h.app.settled();
+    const types = () =>
+      events(agent as RecordingAgent).map(({ event }) => `${event.type}/${event.channel_type ?? "-"}`);
+    expect(types()).toEqual(["message/im"]);
+
+    await post(`/users/${ana.id}/say`, { message: { text: "@my-agent and Ben" }, to: [ben.id, app.id] });
+    await h.app.settled();
+    expect(types().slice(1).sort()).toEqual(["app_mention/-", "message/mpim"]);
+  });
+
   test("replies stay in the thread, and reads separate them from the channel", async () => {
     const { h, agent, app, user, post, get } = await workspace();
     const ana = await user({ name: "Ana" });
