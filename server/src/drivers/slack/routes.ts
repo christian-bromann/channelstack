@@ -786,7 +786,8 @@ export function registerSlackRoutes(
   router.route({
     method: "get",
     path: "/calls",
-    summary: "The Web API calls the agent made about this session's conversations",
+    summary:
+      "The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session",
     query: z.object({
       operation: z
         .string()

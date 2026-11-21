@@ -8,11 +8,11 @@ Goal: the Slack fake, core conversations. The Slack conversation examples pass a
 |---|---|---|
 | 1.1 Conversation examples pass | `api/examples/slack.test.ts`: "mentions and threads", "direct messages", "reactions, edits and deletes", "inspecting what the agent did", and "streams a reply and shows a status while working", run by `pnpm test:accept` against `examples/agents/bolt-ai-sdk` and `examples/agents/chat-sdk-slack` | `server/src/drivers/slack/`, `integrations/vitest/`, `integrations/matchers-core/`, `examples/agents/` |
 | 1.2 Delivery basics | `api/examples/slack.test.ts`, "delivery and failures": the 3 s retry, bad and stale signatures, rate limit, uninstall (the Socket Mode test is phase 2) | `server/src/core/delivery/`, `server/src/drivers/slack/` |
-| 1.3 The fake signs like Slack | `server/test/integration/slack-delivery.test.ts`: cases S1–S8, the fake's real delivery code received by a Bolt app | `server/src/core/signing/slack.ts`, `server/src/core/delivery/` |
+| 1.3 The fake signs like Slack | `server/test/integration/slack-delivery.test.ts`: cases S1 and S6–S8 (S2–S5 are interactions and moved to exit check 2.2), the fake's real delivery code received by a Bolt app | `server/src/core/signing/slack.ts`, `server/src/core/delivery/` |
 | 1.4 A real bug is caught | `test/acceptance/mdac-220.test.ts`: the stream and status test run against `examples/agents/mdac-220` fails, and the message names the leftover "Thinking…" message | `integrations/matchers-core/`, `examples/agents/mdac-220` |
-| 1.5 Negative matchers wait for quiet | `integrations/vitest/quiet.test.ts`: a reply 500 ms after a `.not.toHaveReplyFrom` started makes it fail; one after `quietFor` doesn't | `server/src/core/quiet/`, `integrations/matchers-core/` |
+| 1.5 Negative matchers wait for quiet | `test/acceptance/stack/quiet.test.ts`: a reply 500 ms after a `.not.toHaveReplyFrom` started makes it fail; one after `quietFor` doesn't | `server/src/core/quiet/`, `integrations/matchers-core/` |
 | 1.6 CLI and UI | `test/acceptance/cli-ui.test.ts`: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, then `channelstack show` prints the agent's reply; a browser opens the UI and finds the same reply | `server/src/cli/`, `ui/` |
-| 1.7 Parallel sessions are isolated | `test/acceptance/parallel.test.ts`: 20 copies of the DM test in parallel, every one passes, no cross-session events | `server/src/core/sessions/`, `server/src/drivers/slack/` |
+| 1.7 Parallel sessions are isolated | `test/acceptance/stack/parallel.test.ts`: 20 copies of the DM test in parallel, every one passes, no cross-session events | `server/src/core/sessions/`, `server/src/drivers/slack/` |
 
 Standing checks added in this phase: `pnpm api:check` (the examples type-check against the generated TypeScript SDK and the integrations, not only against `api/*.d.ts`), and `pnpm test:accept --repeat 3` now runs the `api/examples` suites as well as the smoke scenarios.
 

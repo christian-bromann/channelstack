@@ -56,7 +56,7 @@ async def _is_up(server: ServerConnection) -> bool:
         return False
 
 
-def _attach_target(server: str | None, env: Mapping[str, str]) -> ServerConnection | None:
+def _attach_target(server: str | None, token: str | None, env: Mapping[str, str]) -> ServerConnection | None:
     """The running server a client should attach to, if there is one: an explicit URL, or the one in server.json."""
     # An empty variable (an unset CI secret) counts as not set, and a trailing slash doesn't matter.
     url = (server or env.get("CHANNELSTACK_URL") or "").rstrip("/") or None
@@ -64,8 +64,9 @@ def _attach_target(server: str | None, env: Mapping[str, str]) -> ServerConnecti
     from_file = _read_server_file(home / "server.json")
     if url is None:
         return from_file
-    token = env.get("CHANNELSTACK_TOKEN") or (from_file.token if from_file and from_file.url == url else None)
-    return None if token is None else ServerConnection(url, token)
+    # A token the caller has is used as it is: it then never needs to be in the environment.
+    found = token or env.get("CHANNELSTACK_TOKEN") or (from_file.token if from_file and from_file.url == url else None)
+    return None if found is None else ServerConnection(url, found)
 
 
 def resolve_server_binary(env: Mapping[str, str]) -> str:
@@ -123,11 +124,14 @@ async def _start_server(env: Mapping[str, str]) -> ServerConnection:
 
 
 async def launch(
-    mode: Mode = "auto", server: str | None = None, env: Mapping[str, str] | None = None
+    mode: Mode = "auto",
+    server: str | None = None,
+    env: Mapping[str, str] | None = None,
+    token: str | None = None,
 ) -> ServerConnection:
     env = os.environ if env is None else env
     if mode != "start":
-        target = _attach_target(server, env)
+        target = _attach_target(server, token, env)
         if target and await _is_up(target):
             return target
         if mode == "attach":

@@ -369,10 +369,10 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...ir.resources.flatMap(resourceClass),
     "",
     "",
-    `async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None) -> ${ir.root}:`,
+    `async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> ${ir.root}:`,
     '    """Attach to a running channelstack server, or start one, and return the client."""',
     `    protocol = Protocol(base_path=${JSON.stringify(ir.basePath)}, errors=_ERRORS, version=VERSION)`,
-    `    return await connect_with(${ir.root}, protocol, mode=mode, server=server)`,
+    `    return await connect_with(${ir.root}, protocol, mode=mode, server=server, token=token)`,
     "",
   ];
   return new Map([[OUT, lines.join("\n")]]);

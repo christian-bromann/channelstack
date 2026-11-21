@@ -80,9 +80,10 @@ async def connect_with[T](
     *,
     mode: Mode,
     server: str | None,
+    token: str | None = None,
 ) -> T:
     """Find or start the server, check that it speaks this SDK's major version, and build the root client."""
-    connection = await launch(mode, server)
+    connection = await launch(mode, server, token=token)
     transport = Transport(
         url=connection.url, token=connection.token, base_path=protocol.base_path, errors=protocol.errors
     )

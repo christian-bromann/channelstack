@@ -689,7 +689,7 @@ class SlackFixture:
         return [SlackDelivery(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> SlackApiCalls:
-        """The Web API calls the agent made about this session's conversations. Experimental."""
+        """The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/calls", query={"operation": operation, "error": error})
         return [SlackApiCall._from_wire(ctx, item) for item in data]
@@ -992,7 +992,7 @@ class SlackFault:
         await dispose_quietly(self.undo)
 
 
-async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None) -> Channelstack:
+async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> Channelstack:
     """Attach to a running channelstack server, or start one, and return the client."""
     protocol = Protocol(base_path="/_channelstack", errors=_ERRORS, version=VERSION)
-    return await connect_with(Channelstack, protocol, mode=mode, server=server)
+    return await connect_with(Channelstack, protocol, mode=mode, server=server, token=token)

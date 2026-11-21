@@ -2,13 +2,13 @@ import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createSlackFake } from "./fake/index.ts";
 import { registerSlackRoutes } from "./routes.ts";
 
-/** The Slack driver: the fake Web API and Events API, and the control actions a test's people take. */
 /** The start of a text, short enough for one line of a failure message. */
 const excerpt = (text: string): string => {
   const line = text.split("\n", 1)[0] ?? "";
   return line.length > 80 ? `${line.slice(0, 79)}…` : line;
 };
 
+/** The Slack driver: the fake Web API and Events API, and the control actions a test's people take. */
 export const slack: DriverDefinition = {
   name: "slack",
   secrets: {

@@ -607,7 +607,7 @@ export class SlackFixture {
     return decodeSlackDeliveries(ctx, data);
   }
 
-  /** The Web API calls the agent made about this session's conversations. Experimental. */
+  /** The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session. Experimental. */
   async calls(options: { operation?: string; error?: true | string } = {}): Promise<SlackApiCalls> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/calls`, { query: { operation: options.operation, error: options.error } })) as SlackApiCalls;

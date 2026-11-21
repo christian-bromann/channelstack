@@ -44,6 +44,8 @@ Every feature runs in the fake server (in memory). The question this document an
 | Plus a user token per sandbox person | Most of the matrix: say, reply, react, edit, DMs, comments, reviews, delegation, reads |
 | Plus unattended sign-in secrets per person | The browser rows, as real UI actions |
 
+**Where the fake is deliberately more lenient than the platform:** a channel name is unique per session, not per workspace, so parallel tests can each have a `#support` ([decision 0006](decisions/0006-shared-world-collisions.md)). Real Slack refuses the second one with `name_taken`; live, places get a run-specific name.
+
 **Two rules the fake follows so fake and live don't drift:**
 1. **When the real platform refuses something, the fake refuses it too,** with the same error. For example, requesting a review from an app's bot.
 2. **When live needs proxy or browser, the fake still runs without them.** Only live runs have the extra requirement.

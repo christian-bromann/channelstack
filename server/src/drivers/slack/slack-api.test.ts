@@ -370,6 +370,35 @@ describe("what the agent did is recorded", () => {
   });
 });
 
+describe("calls that name no channel", () => {
+  test("a call about a person, or a file shared in a conversation, lands in that session; auth.test in none", async () => {
+    const { h, ana, channel, api, calls, say } = await workspace();
+    await api("auth.test");
+    await api("users.info", { user: ana.id });
+    await api("users.info", { user: "U0NOBODY000" });
+    await api("conversations.open", { users: ana.id });
+
+    const ticket = await api("files.getUploadURLExternal", { filename: "a.txt", length: 2 });
+    await h.app.fetch(
+      new Request(ticket.upload_url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${h.secrets.get("slack", "botToken")}` },
+        body: "hi",
+      }),
+    );
+    await say("share it");
+    await api("files.completeUploadExternal", { files: [{ id: ticket.file_id }], channel_id: channel.id });
+    await api("files.info", { file: ticket.file_id });
+
+    expect((await calls()).map((call: { operation: string }) => call.operation)).toEqual([
+      "users.info",
+      "conversations.open",
+      "files.completeUploadExternal",
+      "files.info",
+    ]);
+  });
+});
+
 describe("files (upload v2, the basics)", () => {
   test("the app uploads a file in three steps and it lands in the thread", async () => {
     const { h, agent, app, channel, say, api, get } = await workspace();

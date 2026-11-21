@@ -8,9 +8,9 @@ const server = inject("channelstack");
 
 let client: Promise<Channelstack> | undefined;
 const connected = () => {
-  // The worker attaches to the server the global setup found; it never starts one itself.
-  process.env.CHANNELSTACK_TOKEN = server.token;
-  client ??= connect({ mode: "attach", server: server.url });
+  // The worker attaches to the server the global setup found; it never starts one itself. The
+  // token is handed over directly, so nothing a test spawns inherits it.
+  client ??= connect({ mode: "attach", server: server.url, token: server.token });
   return client;
 };
 

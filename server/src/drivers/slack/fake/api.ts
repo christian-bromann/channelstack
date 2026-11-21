@@ -4,15 +4,7 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
-import {
-  fileObject,
-  membershipEvent,
-  messageChangedEvent,
-  messageDeletedEvent,
-  messageObject,
-  messageSubscription,
-  reactionEvent,
-} from "../payloads.ts";
+import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
 import type { SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "../world.ts";
 import type { SlackStore } from "./store.ts";
 import { type FakeSlackWorld, SlackRefusal } from "./world.ts";
@@ -230,7 +222,7 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
   const appendToStream = (message: SlackMessageRecord, piece: string) => {
     const stream = message.stream;
-    if (!stream || stream.state !== "open") throw new SlackApiError("message_not_in_streaming_state");
+    if (stream?.state !== "open") throw new SlackApiError("message_not_in_streaming_state");
     if (piece === "") return;
     if (message.text.length + piece.length > MAX_STREAM_LENGTH) throw new SlackApiError("msg_too_long");
     stream.chunks.push(piece);
@@ -619,12 +611,22 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       else throw error;
     }
 
-    // The call belongs to the session that owns the conversation it was about, if it named one.
-    const about =
-      string(args, "channel") ??
-      string(args, "channel_id") ??
-      (typeof body.channel === "string" ? body.channel : undefined);
-    const session = about === undefined ? undefined : (store.conversations.owner(about) ?? store.users.owner(about));
+    // The call belongs to the session that owns what it was about: the conversation it named, else
+    // the person, else the conversation a file was shared in. A call about nothing a session owns
+    // (`auth.test`, `users.list`, a file not shared yet) is in no session's log.
+    const file = store.files.get(string(args, "file") ?? "");
+    const session = [
+      string(args, "channel"),
+      string(args, "channel_id"),
+      typeof body.channel === "string" ? body.channel : undefined,
+      string(args, "user"),
+      ...(string(args, "users")?.split(",") ?? []),
+      file?.conversation,
+    ]
+      .map((about) =>
+        about === undefined ? undefined : (store.conversations.owner(about) ?? store.users.owner(about)),
+      )
+      .find((owner) => owner !== undefined);
     if (session !== undefined) {
       context.events.append(session, "slack", "api_call", {
         operation: name,

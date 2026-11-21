@@ -14,6 +14,8 @@ export interface LaunchOptions {
   mode?: "auto" | "attach" | "start";
   /** Attach to this server instead of the one in `server.json`. Also `CHANNELSTACK_URL`, with `CHANNELSTACK_TOKEN`. */
   server?: string;
+  /** The token for `server`, when the caller has it. It then never needs to be in the environment. */
+  token?: string;
 }
 
 /** A server to talk to. `stop` only stops a server this launcher started. */
@@ -62,7 +64,7 @@ function attachTarget(options: LaunchOptions, env: NodeJS.ProcessEnv): ServerFil
   const home = env.CHANNELSTACK_HOME || join(homedir(), ".channelstack");
   const file = readServerFile(join(home, "server.json"));
   if (url === undefined) return file;
-  const token = env.CHANNELSTACK_TOKEN || (file?.url === url ? file.token : undefined);
+  const token = options.token || env.CHANNELSTACK_TOKEN || (file?.url === url ? file.token : undefined);
   return token === undefined ? undefined : { url, token };
 }
 
