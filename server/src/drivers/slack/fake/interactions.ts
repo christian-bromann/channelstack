@@ -48,6 +48,8 @@ export interface InteractionKit {
   ): void;
   remove(conversation: SlackConversationRecord, message: SlackMessageRecord): void;
   action(session: string, name: string, data: Record<string, unknown>): void;
+  /** Send an event about a conversation to the app, if it is subscribed, installed and a member. */
+  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
 }
 
 /** Sending an interaction to the app, for the parts of the fake that have their own (modals). */
@@ -62,7 +64,10 @@ export interface InteractionDispatch {
   ): string;
 }
 
-type Interactions = Pick<SlackWorld, "clickAsUser" | "selectAsUser" | "shortcutAsUser" | "commandAsUser"> & {
+type Interactions = Pick<
+  SlackWorld,
+  "clickAsUser" | "selectAsUser" | "shortcutAsUser" | "commandAsUser" | "stopAsUser"
+> & {
   dispatch: InteractionDispatch;
   /**
    * The app answers an interaction through its `response_url`. False when the URL is unknown,
@@ -275,6 +280,42 @@ export function createInteractions(kit: InteractionKit): Interactions {
         }
         publish(conversation, user.id, undefined, message);
       });
+    },
+
+    stopAsUser(session, userId, thread) {
+      const conversation = store.conversations.get(session, thread.channel);
+      const user = member(session, userId, conversation);
+      const root = requireMessage(conversation, thread.ts);
+      const rootTs = root.threadTs ?? root.ts;
+      // Slack ends what is streaming in the thread, then tells the app which messages those were.
+      const streaming = store
+        .messagesIn(conversation.id)
+        .filter(
+          (message) => (message.ts === rootTs || message.threadTs === rootTs) && message.stream?.state === "open",
+        );
+      for (const message of streaming) {
+        if (!message.stream) continue;
+        message.stream.state = "stopped";
+        message.stream.endedAt = clock();
+      }
+      store.threadState(conversation.id, rootTs).statusText = "";
+      kit.action(session, "stop", { user: user.id, channel: conversation.id, ts: rootTs });
+      const delivery = kit.emit(conversation, "agent_session_stopped", {
+        type: "agent_session_stopped",
+        channel: conversation.id,
+        thread_ts: rootTs,
+        user: user.id,
+        streaming_message_ts: streaming.map((message) => message.ts),
+        event_ts: ids.slackTs(conversation.id),
+      });
+      // The client only shows Stop for an app that listens for it.
+      if (delivery === undefined) {
+        throw refuse(
+          "stop_unavailable",
+          "The app doesn't receive agent_session_stopped here, so there is no Stop to press",
+        );
+      }
+      return delivery;
     },
 
     respond(key, body) {

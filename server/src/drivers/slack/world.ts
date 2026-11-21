@@ -231,6 +231,9 @@ export interface SlackWorld {
   /** Run a slash command in a conversation: `/deploy web staging`. Returns the command's delivery. */
   commandAsUser(session: string, user: string, command: string, channel: string): string;
 
+  /** Press Stop on the app's work in a thread: open streams end, and the app is told. Returns the delivery. */
+  stopAsUser(session: string, user: string, thread: { channel: string; ts: string }): string;
+
   /** The modals open for a person, the one on top last. */
   modals(session: string, user: string): SlackViewRecord[];
   modal(session: string, view: string): SlackViewRecord;

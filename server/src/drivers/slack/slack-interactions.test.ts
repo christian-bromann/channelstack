@@ -503,3 +503,49 @@ describe("modals", () => {
     expect(agent.received).toHaveLength(before);
   });
 });
+
+describe("Stop", () => {
+  test("pressing Stop ends the open stream, tells the app, and later appends are refused", async () => {
+    const { h, agent, ana, team, channel, say, api, post, get } = await workspace();
+    const question = await say("@my-agent write a long report");
+    const thread = { channel: channel.id, ts: question.ts };
+    const recipient = { recipient_user_id: ana.id, recipient_team_id: team.id };
+    await api("assistant.threads.setStatus", { channel_id: channel.id, thread_ts: question.ts, status: "is writing…" });
+    const stream = await api("chat.startStream", {
+      channel: channel.id,
+      thread_ts: question.ts,
+      markdown_text: "Q3 was",
+      ...recipient,
+    });
+    await h.app.settled();
+    const status = async () => (await get(`/conversations/${channel.id}/threads/${question.ts}/state`)).state;
+    expect(await status()).toBe("streaming");
+
+    const stopped = await post(`/users/${ana.id}/stop`, { thread });
+    await h.app.settled();
+
+    expect(stopped).toMatchObject({ type: "event_callback", eventType: "agent_session_stopped" });
+    expect(JSON.parse(agent.received.at(-1)?.body ?? "{}").event).toMatchObject({
+      type: "agent_session_stopped",
+      channel: channel.id,
+      thread_ts: question.ts,
+      user: ana.id,
+      streaming_message_ts: [stream.ts],
+    });
+    expect(await status()).toBe("stopped");
+    expect((await get(`/conversations/${channel.id}/messages/${stream.ts}/stream`)).state).toBe("stopped");
+    // What was streamed stays; nothing more can be added to it.
+    expect(
+      (await api("chat.appendStream", { channel: channel.id, ts: stream.ts, markdown_text: " great" })).error,
+    ).toBe("stopped_by_user");
+    expect((await api("chat.stopStream", { channel: channel.id, ts: stream.ts })).error).toBe("stopped_by_user");
+    expect((await get(`/conversations/${channel.id}/threads/${question.ts}/transcript`)).text).toContain(
+      "my-agent: Q3 was",
+    );
+
+    // With nothing streaming, Stop still reaches the app, with no stream to name.
+    await post(`/users/${ana.id}/stop`, { thread });
+    await h.app.settled();
+    expect(JSON.parse(agent.received.at(-1)?.body ?? "{}").event.streaming_message_ts).toEqual([]);
+  });
+});

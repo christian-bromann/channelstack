@@ -242,6 +242,8 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
 
   const appendToStream = (message: SlackMessageRecord, piece: string) => {
     const stream = message.stream;
+    // After a person pressed Stop, the stream takes nothing more, and says why.
+    if (stream?.state === "stopped") throw new SlackApiError("stopped_by_user");
     if (stream?.state !== "open") throw new SlackApiError("message_not_in_streaming_state");
     if (piece === "") return;
     if (message.text.length + piece.length > MAX_STREAM_LENGTH) throw new SlackApiError("msg_too_long");

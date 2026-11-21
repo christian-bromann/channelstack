@@ -1839,6 +1839,56 @@
           "dispose": false
         },
         {
+          "name": "stop",
+          "kind": "method",
+          "summary": "Press Stop on the app's work in a thread: what is streaming there ends, and the app is told",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/stop",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "stop_unavailable"
+          ],
+          "dispose": false
+        },
+        {
           "name": "modals",
           "kind": "method",
           "summary": "The modals the app has open for this person, the one on top last",
@@ -4640,6 +4690,7 @@
     "not_in_channel",
     "not_in_room",
     "session_not_found",
+    "stop_unavailable",
     "unauthorized"
   ]
 }

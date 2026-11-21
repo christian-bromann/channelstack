@@ -41,6 +41,9 @@ const DEFAULT_APP = {
     "member_left_channel",
     "app_uninstalled",
     "tokens_revoked",
+    "agent_session_stopped",
+    "assistant_thread_started",
+    "assistant_thread_context_changed",
   ],
 };
 

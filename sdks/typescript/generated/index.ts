@@ -24,6 +24,7 @@ export class NotFoundError extends ChannelstackError {}
 export class NotInChannelError extends ChannelstackError {}
 export class NotInRoomError extends ChannelstackError {}
 export class SessionNotFoundError extends ChannelstackError {}
+export class StopUnavailableError extends ChannelstackError {}
 export class UnauthorizedError extends ChannelstackError {}
 
 const ERRORS: ErrorClasses = {
@@ -43,6 +44,7 @@ const ERRORS: ErrorClasses = {
   not_in_channel: NotInChannelError,
   not_in_room: NotInRoomError,
   session_not_found: SessionNotFoundError,
+  stop_unavailable: StopUnavailableError,
   unauthorized: UnauthorizedError,
 };
 
@@ -796,6 +798,13 @@ export class SlackUser {
   async runCommand(command: string, options: { channel: SlackConversation }): Promise<SlackDelivery> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Press Stop on the app's work in a thread: what is streaming there ends, and the app is told. Experimental. */
+  async stop(options: { thread: SlackThread | SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/stop`, { body: { thread: { channel: options.thread.channel, ts: options.thread.ts } } })) as SlackDeliveryData;
     return new SlackDelivery(ctx, data);
   }
 

@@ -637,6 +637,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     edit: world.edit,
     remove: world.remove,
     action,
+    emit,
   };
   const { dispatch, ...interactions } = createInteractions(kit);
   return Object.assign(world, interactions, createViews(kit, dispatch));

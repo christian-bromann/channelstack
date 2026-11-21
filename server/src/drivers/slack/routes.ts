@@ -570,6 +570,20 @@ export function registerSlackRoutes(
       interaction(session.id, world.commandAsUser(session.id, params.user, body.command, body.channel)),
   });
 
+  router.route({
+    method: "post",
+    path: "/users/{user}/stop",
+    summary: "Press Stop on the app's work in a thread: what is streaming there ends, and the app is told",
+    params: UserParams,
+    body: z.object({ thread: threadRef }).openapi("SlackStopBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "stop_unavailable"],
+    sdkMethod: { on: "SlackUser", name: "stop", args: [], options: ["thread"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.stopAsUser(session.id, params.user, body.thread)),
+  });
+
   const ViewParams = z.object({ view: z.string().openapi({ param: { name: "view", in: "path" } }) });
   const modalWire = (session: string, view: SlackViewRecord) => {
     const inputs = viewInputs(view.definition.blocks);
