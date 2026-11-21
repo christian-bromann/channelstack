@@ -29,10 +29,14 @@ interface ServerFile {
 
 const STATUS_PATH = "/_channelstack/status";
 
+function withoutTrailingSlash(url: string | undefined): string | undefined {
+  return url ? url.replace(/\/+$/, "") : undefined;
+}
+
 function readServerFile(path: string): ServerFile | undefined {
   try {
     const { url, token } = JSON.parse(readFileSync(path, "utf8")) as Partial<ServerFile>;
-    return typeof url === "string" && typeof token === "string" ? { url, token } : undefined;
+    return typeof url === "string" && typeof token === "string" ? { url: url.replace(/\/+$/, ""), token } : undefined;
   } catch {
     return undefined;
   }
@@ -52,11 +56,12 @@ async function isUp({ url, token }: ServerFile): Promise<boolean> {
 
 /** The running server a client should attach to, if there is one: an explicit URL, or the one in `server.json`. */
 function attachTarget(options: LaunchOptions, env: NodeJS.ProcessEnv): ServerFile | undefined {
-  const url = options.server ?? env.CHANNELSTACK_URL;
+  // An empty variable (an unset CI secret) counts as not set, and a trailing slash doesn't matter.
+  const url = withoutTrailingSlash(options.server || env.CHANNELSTACK_URL);
   const home = env.CHANNELSTACK_HOME || join(homedir(), ".channelstack");
   const file = readServerFile(join(home, "server.json"));
   if (url === undefined) return file;
-  const token = env.CHANNELSTACK_TOKEN ?? (file?.url === url ? file.token : undefined);
+  const token = env.CHANNELSTACK_TOKEN || (file?.url === url ? file.token : undefined);
   return token === undefined ? undefined : { url, token };
 }
 
@@ -104,7 +109,14 @@ async function startServer(env: NodeJS.ProcessEnv): Promise<ServerConnection> {
       resolve();
     });
   });
+  // If this process ends without closing the client, the server must not outlive it.
+  const onProcessExit = () => {
+    child.kill("SIGTERM");
+    rmSync(directory, { recursive: true, force: true });
+  };
+  process.once("exit", onProcessExit);
   const stop = async () => {
+    process.removeListener("exit", onProcessExit);
     if (ended === undefined) child.kill("SIGTERM");
     await exit;
     rmSync(directory, { recursive: true, force: true });

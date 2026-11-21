@@ -1,7 +1,11 @@
-import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 import { BINARY, type RunningBinary, startBinary, temporaryHome } from "../../../../server/test/integration/harness.ts";
 import { launch, type ServerConnection } from "../../runtime/launcher.ts";
+import { waitFor } from "../../runtime/wait.ts";
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
@@ -68,6 +72,44 @@ describe("launcher", () => {
     cleanups.push(fresh.stop);
     expect(await status(fresh)).toBe(200);
     expect(existsSync(BINARY)).toBe(true);
+  });
+
+  test("an empty CHANNELSTACK_URL counts as unset, and a trailing slash doesn't matter", async () => {
+    const server = await running();
+    const viaFile = await launch(
+      { mode: "attach" },
+      { CHANNELSTACK_HOME: server.home, CHANNELSTACK_URL: "", CHANNELSTACK_TOKEN: "" },
+    );
+    expect(viaFile).toMatchObject({ url: server.url, token: server.token });
+    const withSlash = await launch({ mode: "attach", server: `${server.url}/` }, { CHANNELSTACK_HOME: server.home });
+    expect(withSlash).toMatchObject({ url: server.url, token: server.token });
+    expect(await status(withSlash)).toBe(200);
+  });
+
+  test("a private server doesn't outlive a process that exits without closing the client", async () => {
+    // A separate process starts a private server, prints where it is, and exits without stopping it.
+    const script = join(temporaryHome(), "leaky.ts");
+    writeFileSync(
+      script,
+      `import { launch } from ${JSON.stringify(fileURLToPath(new URL("../../runtime/launcher.ts", import.meta.url)))};
+const server = await launch({ mode: "start" });
+console.log(JSON.stringify({ url: server.url, token: server.token }));
+process.exit(0);
+`,
+    );
+    const leaked = spawnSync(process.execPath, [script], {
+      encoding: "utf8",
+      env: { ...process.env, CHANNELSTACK_HOME: temporaryHome(), CHANNELSTACK_SERVER_BIN: BINARY },
+    });
+    expect(leaked.status, leaked.stderr).toBe(0);
+    const server = JSON.parse(leaked.stdout) as ServerConnection;
+
+    await waitFor("the private server to be gone", () =>
+      status(server).then(
+        () => undefined,
+        () => true,
+      ),
+    );
   });
 
   test("a binary that can't start is reported, not waited on", async () => {

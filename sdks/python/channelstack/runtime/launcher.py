@@ -1,6 +1,7 @@
 """Find or start the server: `auto` attaches if one is running and starts one otherwise."""
 
 import asyncio
+import atexit
 import json
 import os
 import shutil
@@ -41,7 +42,7 @@ def _read_server_file(path: Path) -> ServerConnection | None:
         return None
     contents = cast(dict[str, Any], data)
     url, token = contents.get("url"), contents.get("token")
-    return ServerConnection(url, token) if isinstance(url, str) and isinstance(token, str) else None
+    return ServerConnection(url.rstrip("/"), token) if isinstance(url, str) and isinstance(token, str) else None
 
 
 async def _is_up(server: ServerConnection) -> bool:
@@ -57,7 +58,8 @@ async def _is_up(server: ServerConnection) -> bool:
 
 def _attach_target(server: str | None, env: Mapping[str, str]) -> ServerConnection | None:
     """The running server a client should attach to, if there is one: an explicit URL, or the one in server.json."""
-    url = server or env.get("CHANNELSTACK_URL")
+    # An empty variable (an unset CI secret) counts as not set, and a trailing slash doesn't matter.
+    url = (server or env.get("CHANNELSTACK_URL") or "").rstrip("/") or None
     home = Path(env.get("CHANNELSTACK_HOME") or Path.home() / ".channelstack")
     from_file = _read_server_file(home / "server.json")
     if url is None:
@@ -91,7 +93,16 @@ async def _start_server(env: Mapping[str, str]) -> ServerConnection:
         stdout=asyncio.subprocess.DEVNULL,
     )
 
+    # If this process ends without closing the client, the server must not outlive it.
+    def on_process_exit() -> None:
+        if process.returncode is None:
+            process.terminate()
+        shutil.rmtree(directory, ignore_errors=True)
+
+    atexit.register(on_process_exit)
+
     async def stop() -> None:
+        atexit.unregister(on_process_exit)
         if process.returncode is None:
             process.terminate()
         await process.wait()
