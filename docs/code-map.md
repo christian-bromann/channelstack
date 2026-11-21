@@ -29,11 +29,11 @@
 | Object registry and handles | `registry/` | Typed collections per driver and type; resolving handle ids for a session (`get`), from the platform's side (`find`), and their owner | Keep a private `Map` of objects in a route |
 | Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`) | Call `crypto.randomUUID()` or format ids by hand |
 | Secrets | `secrets/` | Fake tokens and signing secrets (the CSPRNG helpers, the token formats, `~/.channelstack/secrets.json`, 0600, rotation); live credentials in memory *(planned, phase 5)* | Generate or store a secret anywhere else |
-| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer. Slack v0, `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
+| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`). `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
 | Control API bearer token | `auth/` | Creating the token, parsing `Authorization: Bearer`, the middleware | Compare tokens with `===` |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
-| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window, recording every attempt. Retries, Socket Mode, faults and forged deliveries *(planned, phases 1–2)* | Call `fetch` to the agent from a driver |
-| Quiet detector | `quiet/` *(planned, phase 1)* | "Is the agent idle?" for negative and exact-count matchers | Add sleeps or ad-hoc settle timers |
+| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); cancelling a closed session's deliveries. Socket Mode *(planned, phase 2)* | Call `fetch` to the agent from a driver |
+| Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is pending or a driver reports open work; negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
 | Reality rules | `reality/` *(planned, phase 5)* | Fake or live per object, `unsupported_in_live`, `fake_actor_in_live_world` | Branch on `process.env` credentials in a driver |
 | Safety and cleanup ledger | `safety/`, `ledger/` *(planned, phase 5)* | Live allowlists, tagging, cleanup, `channelstack sweep` | Delete live objects from a driver directly |
 | Errors | `errors/` | The protocol's error codes and their HTTP status (`ProtocolError`), including a platform's own refusal surfaced through the control API (`{ platform, status }`) | Throw ad-hoc error shapes from routes |
@@ -54,7 +54,8 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `index.ts` | The driver's definition: its name, the secrets it needs, and how it is built from a `DriverContext` |
 | `routes.ts` | Control API routes and schemas for this channel |
 | `world.ts` | The `World` interface: each action written once; the channel's record types |
-| `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`), `index.ts` (the `FakeBackend`) |
+| `fake/` | `api.ts` (the fake provider API), `store.ts` (in-memory state), `world.ts` (the fake `World`, and what only a fake can do: forged deliveries, faults), `index.ts` (the `FakeBackend`) |
+| `mentions.ts` (Slack) | `@name` in a test's text → the platform's mention syntax, and back |
 | `live/` | Real API calls as the app or a person, reads, cleanup handlers *(phase 5)* |
 | `payloads.ts` | Builders for every event payload this platform sends (used by the fake's delivery) |
 | `transcript.ts` | State → what a person would see |
@@ -99,6 +100,7 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 | Building the spec from the routes; comparing generated files | `lib/generate.ts` | Used by `spec.ts` and `sdk.ts` (write, or `--check`) |
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
+| The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener) and `recordingAgent` (a stand-in agent endpoint). Every driver's unit tests use it |
 | Starting a server executable for a test or a smoke run | `lib/server.ts` | `startBinary`: spawn, wait for the server file, collect output, stop. The SDK launchers have their own start, because they ship |
 | The binary under test, with a control API client | `server/test/integration/harness.ts` | `BINARY`, `cli`, `startBinary` (adds `control` to `lib/server.ts`'s). Shared by the server's and the SDK's integration tests |
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |
