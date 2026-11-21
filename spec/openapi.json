@@ -1,0 +1,1178 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "channelstack control API",
+    "version": "0.0.0"
+  },
+  "servers": [
+    {
+      "url": "/_channelstack"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          },
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ready",
+          "version",
+          "drivers"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "A stable error code.",
+            "example": "not_found"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "error",
+          "message",
+          "data"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "drivers"
+        ],
+        "x-channelstack-resource": {
+          "id": "sessionId",
+          "scope": "session"
+        }
+      },
+      "EventPage": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LogEvent"
+            }
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "events",
+          "cursor"
+        ]
+      },
+      "LogEvent": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "driver": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "action",
+              "delivery",
+              "delivery_attempt",
+              "api_call"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "at",
+          "driver",
+          "kind",
+          "data"
+        ]
+      },
+      "Env": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "EchoFixture": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/EchoApp"
+          },
+          "apiUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "app",
+          "apiUrl"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "EchoApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ]
+          },
+          "botUserId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "botUserId"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "EchoUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "EchoUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "EchoRoom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "members"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "EchoRoomOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "EchoUser",
+                "EchoApp"
+              ]
+            },
+            "default": []
+          }
+        }
+      },
+      "EchoMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "room": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/EchoPrincipal"
+          },
+          "text": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "delivery": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "room",
+          "author",
+          "text",
+          "at"
+        ]
+      },
+      "EchoPrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "EchoSayBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "room": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "EchoRoom"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "room"
+        ]
+      },
+      "EchoMessagePage": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EchoMessage"
+            }
+          },
+          "cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "messages",
+          "cursor"
+        ]
+      },
+      "EchoTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EchoTranscriptEntry"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "EchoTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/EchoPrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "edited",
+          "depth"
+        ]
+      },
+      "Capabilities": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/Capability"
+        }
+      },
+      "Capability": {
+        "type": "object",
+        "properties": {
+          "fake": {
+            "type": "boolean"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "liveRequires": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "fake",
+          "live",
+          "liveRequires"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/status": {
+      "get": {
+        "summary": "Server health, version and loaded drivers",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Channelstack",
+          "name": "status"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal"
+        ],
+        "x-channelstack-stability": "stable",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "summary": "Open a session: a scope in the shared world that owns what it creates",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Channelstack",
+          "name": "openSession"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal"
+        ],
+        "x-channelstack-stability": "stable",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}": {
+      "delete": {
+        "summary": "Close a session and remove everything it created",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Session",
+          "name": "close",
+          "dispose": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "stable",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/events": {
+      "get": {
+        "summary": "The session's event log: actions, deliveries with every attempt, and the agent's API calls",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Session",
+          "name": "events",
+          "options": [
+            "since"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "stable",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "since",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reset": {
+      "post": {
+        "summary": "Drop the whole world. Avoid in parallel suites",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Channelstack",
+          "name": "reset"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal"
+        ],
+        "x-channelstack-stability": "stable",
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/env": {
+      "get": {
+        "summary": "Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Channelstack",
+          "name": "env"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal"
+        ],
+        "x-channelstack-stability": "stable",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Env"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo": {
+      "get": {
+        "summary": "The echo fixture: the agent's app and where it reaches the fake",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "echo"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo/users": {
+      "post": {
+        "summary": "Create a person",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "EchoFixture",
+          "name": "createUser",
+          "options": [
+            "name"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EchoUserOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo/rooms": {
+      "post": {
+        "summary": "Create a room. Only the listed participants are members; include the app for it to receive events",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "EchoFixture",
+          "name": "createRoom",
+          "options": [
+            "name",
+            "participants"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EchoRoomOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoRoom"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo/users/{user}/say": {
+      "post": {
+        "summary": "Post a message in a room as this person",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "EchoUser",
+          "name": "say",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "room"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "not_in_room"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EchoSayBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo/rooms/{room}/messages": {
+      "get": {
+        "summary": "The room's messages, oldest first, with a cursor for the next read",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "EchoRoom",
+          "name": "messages",
+          "options": [
+            "since"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "room",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "since",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoMessagePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo/rooms/{room}/transcript": {
+      "get": {
+        "summary": "The room as a person would read it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "EchoRoom",
+          "name": "transcript"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "room",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EchoTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/echo/capabilities": {
+      "get": {
+        "summary": "Per action: works in the fake, works live, and what live needs",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "EchoFixture",
+          "name": "capabilities"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}
