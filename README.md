@@ -16,6 +16,8 @@ test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
 });
 ```
 
+Website: [channelstack.dev](https://channelstack.dev)
+
 **Status:** design complete, implementation not started. See [docs/phases.md](docs/phases.md).
 
 ## Documentation

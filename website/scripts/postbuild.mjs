@@ -67,7 +67,7 @@ await writeFile(
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-https://:host.workers.dev/*
+https://:version.:subdomain.workers.dev/*
   X-Robots-Tag: noindex
 `,
 );
