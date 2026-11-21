@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { waitFor } from "../../../sdks/typescript/runtime/wait.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
+import { SUMMARY_VIEW } from "./slack-fixtures.ts";
 
 /**
  * Exit check 2.2: Socket Mode. A Bolt app in Socket Mode, whose Slack base URL is the fake,
@@ -31,20 +32,7 @@ beforeAll(async () => {
     if (body.type !== "block_actions") return;
     await client.views.open({
       trigger_id: body.trigger_id,
-      view: {
-        type: "modal",
-        callback_id: "incident",
-        title: { type: "plain_text", text: "File an incident" },
-        submit: { type: "plain_text", text: "File" },
-        blocks: [
-          {
-            type: "input",
-            block_id: "summary",
-            label: { type: "plain_text", text: "Summary" },
-            element: { type: "plain_text_input", action_id: "text" },
-          },
-        ],
-      },
+      view: SUMMARY_VIEW,
     });
   });
   bolt.view("incident", async ({ ack }) => {

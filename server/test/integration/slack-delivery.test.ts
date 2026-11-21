@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { freePort } from "../../../scripts/lib/process.ts";
 import { waitFor } from "../../../sdks/typescript/runtime/wait.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
+import { SUMMARY_VIEW } from "./slack-fixtures.ts";
 
 /**
  * The fake signs like Slack. The fake's real delivery code, in the compiled binary, sends to a
@@ -207,20 +208,7 @@ describe("exit check 2.2: interactions reach Bolt's handlers, and its answers co
     const { payload } = await settled(click.id);
     const { view } = await bolt.client.views.open({
       trigger_id: payload.trigger_id,
-      view: {
-        type: "modal",
-        callback_id: "incident",
-        title: { type: "plain_text", text: "File an incident" },
-        submit: { type: "plain_text", text: "File" },
-        blocks: [
-          {
-            type: "input",
-            block_id: "summary",
-            label: { type: "plain_text", text: "Summary" },
-            element: { type: "plain_text_input", action_id: "text" },
-          },
-        ],
-      },
+      view: SUMMARY_VIEW,
     });
 
     const submitted = await act(`/modals/${view?.id}/submit`, { values: { Summary: "?" } });
