@@ -141,7 +141,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const parameters = [
       ...m.args.map((arg) => `${arg.name}: ${parameterType(arg)}`),
       ...(m.options.length > 0
-        ? [`options: { ${fields(m.options, "public").join("; ")} }${optionsOptional ? " = {}" : ""}`]
+        ? [
+            `options: { ${m.options.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,
+          ]
         : []),
     ];
     const path = pathParts(m)

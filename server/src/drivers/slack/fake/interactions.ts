@@ -1,0 +1,300 @@
+import { ProtocolError } from "../../../core/errors/index.ts";
+import type { DriverContext } from "../../../core/router/index.ts";
+import { randomToken } from "../../../core/secrets/index.ts";
+import { signSlackRequest } from "../../../core/signing/slack.ts";
+import { type Block, blockControls, findButton, findSelect, plain, selectOptions } from "../blocks.ts";
+import {
+  blockActionsPayload,
+  type InteractionContext,
+  messageActionPayload,
+  payloadForm,
+  slashCommandFields,
+} from "../interaction-payloads.ts";
+import type {
+  SlackControlScope,
+  SlackConversationRecord,
+  SlackMessageInput,
+  SlackMessageRecord,
+  SlackUserRecord,
+  SlackWorld,
+} from "../world.ts";
+import type { SlackStore } from "./store.ts";
+
+/** How long the app has to acknowledge an interaction, and to use its `trigger_id`. */
+const ACK_WINDOW_MS = 3000;
+/** A `response_url` works five times within 30 minutes. */
+const RESPONSE_URL_USES = 5;
+const RESPONSE_URL_LIFETIME_MS = 30 * 60_000;
+
+/** What the interactions need from the rest of the fake world. */
+export interface InteractionKit {
+  context: DriverContext;
+  store: SlackStore;
+  refuse(code: string, message: string, data?: Record<string, unknown>): ProtocolError;
+  /** The person, who must be in the conversation. */
+  member(session: string, userId: string, conversation: SlackConversationRecord): SlackUserRecord;
+  requireMessage(conversation: SlackConversationRecord, ts: string): SlackMessageRecord;
+  /** A message as events and `conversations.history` show it. */
+  messageObject(message: SlackMessageRecord): Record<string, unknown>;
+  postAsApp(
+    conversation: SlackConversationRecord,
+    message: SlackMessageInput,
+    options: { threadTs?: string | undefined; ephemeralFor?: string | undefined },
+  ): SlackMessageRecord;
+  edit(
+    conversation: SlackConversationRecord,
+    message: SlackMessageRecord,
+    body: { text: string; blocks: unknown[] },
+  ): void;
+  remove(conversation: SlackConversationRecord, message: SlackMessageRecord): void;
+  action(session: string, name: string, data: Record<string, unknown>): void;
+}
+
+type Interactions = Pick<SlackWorld, "clickAsUser" | "selectAsUser" | "shortcutAsUser" | "commandAsUser"> & {
+  /**
+   * The app answers an interaction through its `response_url`. False when the URL is unknown,
+   * used up or expired.
+   */
+  respond(key: string, body: Record<string, unknown>): boolean;
+};
+
+/** What a person does in the client beyond writing: buttons, menus, shortcuts and slash commands. */
+export function createInteractions(kit: InteractionKit): Interactions {
+  const { context, store, refuse, member, requireMessage } = kit;
+  const { ids, clock, delivery } = context;
+
+  /** Hand the app what it needs to answer: a `trigger_id` for a modal, a `response_url` for messages. */
+  const answerable = (
+    session: string,
+    kind: "actions" | "commands",
+    user: SlackUserRecord,
+    conversation: SlackConversationRecord,
+    source?: SlackMessageRecord,
+  ): InteractionContext => {
+    const triggerId = ids.next("slack.trigger");
+    store.triggers.set(triggerId, { session, user: user.id, expiresAt: clock() + ACK_WINDOW_MS });
+    // The URL is the credential, as with Slack's: whoever has it may answer.
+    const key = `${store.team.id}/${triggerId.split(".")[0]}/${randomToken(18)}`;
+    store.responseUrls.set(key, {
+      session,
+      conversation: conversation.id,
+      user: user.id,
+      source: source?.ts,
+      threadTs: source?.threadTs,
+      expiresAt: clock() + RESPONSE_URL_LIFETIME_MS,
+      uses: 0,
+    });
+    return {
+      user,
+      team: store.team,
+      app: store.app,
+      conversation,
+      verificationToken: context.secret("verificationToken"),
+      triggerId,
+      responseUrl: `${context.apiUrl()}/hooks/${kind}/${key}`,
+    };
+  };
+
+  /** Sign an interaction and send it. Slack doesn't retry these: the person sees an error instead. */
+  const send = (
+    session: string,
+    type: string,
+    body: string,
+    payload: Record<string, unknown>,
+    answered?: (answer: { contentType: string; body: string }) => void,
+  ): string => {
+    if (context.webhookUrl === undefined) {
+      throw refuse("dispatch_failed", "The app has no request URL, so Slack has nowhere to send this");
+    }
+    const id = ids.next("slack.event");
+    delivery.enqueue({
+      id,
+      session,
+      driver: "slack",
+      type,
+      url: context.webhookUrl,
+      body,
+      contentType: "application/x-www-form-urlencoded",
+      sign: (bytes, atMs) => signSlackRequest(context.secret("signingSecret"), bytes, atMs),
+      timeoutMs: ACK_WINDOW_MS,
+      meta: { payload },
+      ...(answered ? { answered } : {}),
+    });
+    return id;
+  };
+
+  /** The messages a person could find a control on, newest first. */
+  const inScope = (session: string, user: SlackUserRecord, where: SlackControlScope) => {
+    const reference =
+      "message" in where ? where.message : "thread" in where ? where.thread : { channel: where.channel };
+    const conversation = store.conversations.get(session, reference.channel);
+    member(session, user.id, conversation);
+    const visible = (message: SlackMessageRecord) =>
+      message.ephemeralFor === undefined || message.ephemeralFor === user.id;
+    if ("message" in where) return { conversation, messages: [requireMessage(conversation, where.message.ts)] };
+    const all = store.messagesIn(conversation.id).filter(visible);
+    if ("channel" in where) return { conversation, messages: all.toReversed() };
+    const root = requireMessage(conversation, where.thread.ts);
+    const rootTs = root.threadTs ?? root.ts;
+    return {
+      conversation,
+      messages: all.filter((message) => message.ts === rootTs || message.threadTs === rootTs).toReversed(),
+    };
+  };
+
+  /** One entry of `actions`: the control as the app wrote it, with where it sits and when it was used. */
+  const acted = (found: { block: Block; element: Block }, conversation: SlackConversationRecord, extra: object) => ({
+    ...found.element,
+    block_id: found.block.block_id,
+    action_ts: ids.slackTs(conversation.id),
+    ...extra,
+  });
+
+  const blockActions = (
+    session: string,
+    user: SlackUserRecord,
+    conversation: SlackConversationRecord,
+    message: SlackMessageRecord,
+    action: Record<string, unknown>,
+  ) => {
+    const payload = blockActionsPayload(answerable(session, "actions", user, conversation, message), {
+      message: kit.messageObject(message),
+      actions: [action],
+    });
+    return send(session, "block_actions", payloadForm(payload), payload);
+  };
+
+  return {
+    clickAsUser(session, userId, button, where) {
+      const user = store.users.get(session, userId);
+      const { conversation, messages } = inScope(session, user, where);
+      const hit = messages
+        .map((message) => ({ message, found: findButton(message.blocks, button) }))
+        .find(({ found }) => found !== undefined);
+      if (!hit?.found) {
+        const there = messages.flatMap((message) => (message.blocks as Block[]).flatMap(blockControls));
+        throw new ProtocolError(
+          "not_found",
+          `No button ${JSON.stringify(button.label ?? button.actionId)} there. Controls there: ${there.length === 0 ? "none" : there.join(", ")}`,
+        );
+      }
+      kit.action(session, "click", {
+        user: user.id,
+        channel: conversation.id,
+        ts: hit.message.ts,
+        button: plain(hit.found.element.text),
+      });
+      return blockActions(session, user, conversation, hit.message, acted(hit.found, conversation, {}));
+    },
+
+    selectAsUser(session, userId, options, menu, target) {
+      const user = store.users.get(session, userId);
+      const { conversation, messages } = inScope(session, user, { message: target });
+      const [message] = messages as [SlackMessageRecord];
+      const found = findSelect(message.blocks, menu);
+      if (!found) {
+        throw new ProtocolError("not_found", `No menu ${JSON.stringify(menu.label ?? menu.actionId)} on that message`);
+      }
+      const offered = selectOptions(found.element);
+      const chosen = options.map((wanted) => {
+        const option = offered.find((candidate) => plain(candidate.text) === wanted || candidate.value === wanted);
+        if (!option) {
+          throw new ProtocolError(
+            "not_found",
+            `The menu has no option ${JSON.stringify(wanted)}. It offers: ${offered.map((candidate) => plain(candidate.text)).join(", ")}`,
+          );
+        }
+        return option;
+      });
+      const many = String(found.element.type).startsWith("multi_");
+      kit.action(session, "select", { user: user.id, channel: conversation.id, ts: message.ts, options: [...options] });
+      return blockActions(
+        session,
+        user,
+        conversation,
+        message,
+        acted(found, conversation, many ? { selected_options: chosen } : { selected_option: chosen[0] }),
+      );
+    },
+
+    shortcutAsUser(session, userId, callbackId, target) {
+      const user = store.users.get(session, userId);
+      const { conversation, messages } = inScope(session, user, { message: target });
+      const [message] = messages as [SlackMessageRecord];
+      kit.action(session, "shortcut", { user: user.id, channel: conversation.id, ts: message.ts, callbackId });
+      // A shortcut has no message of the app's to replace: an answer through its response_url is a new message.
+      const payload = messageActionPayload(answerable(session, "actions", user, conversation), {
+        callbackId,
+        message: kit.messageObject(message),
+        actionTs: ids.slackTs(conversation.id),
+      });
+      return send(session, "message_action", payloadForm(payload), payload);
+    },
+
+    commandAsUser(session, userId, line, channel) {
+      const conversation = store.conversations.get(session, channel);
+      const user = member(session, userId, conversation);
+      const [command = "", ...rest] = line.trim().split(/\s+/);
+      if (!/^\/\S+$/.test(command)) throw new ProtocolError("invalid_argument", "A slash command starts with /");
+      kit.action(session, "command", { user: user.id, channel: conversation.id, command });
+      const fields = slashCommandFields(answerable(session, "commands", user, conversation), {
+        command,
+        text: rest.join(" "),
+      });
+      // The app may answer in the response itself: JSON with a message, or plain text.
+      return send(session, "slash_command", new URLSearchParams(fields).toString(), fields, (answer) => {
+        if (answer.body.trim() === "") return;
+        let message: Record<string, unknown> = { text: answer.body };
+        if (answer.contentType.includes("application/json")) {
+          try {
+            message = JSON.parse(answer.body) as Record<string, unknown>;
+          } catch {
+            return;
+          }
+        }
+        publish(conversation, user.id, undefined, message);
+      });
+    },
+
+    respond(key, body) {
+      const url = store.responseUrls.get(key);
+      if (!url || url.uses >= RESPONSE_URL_USES || url.expiresAt < clock()) return false;
+      url.uses += 1;
+      const conversation = store.conversations.find(url.conversation);
+      if (!conversation) return false;
+      const source = url.source === undefined ? undefined : store.findMessage(conversation.id, url.source);
+      if (body.delete_original === true) {
+        if (source) kit.remove(conversation, source);
+        return true;
+      }
+      // An answer replaces the message the control was on, unless it says otherwise or there is none.
+      if (source && body.replace_original !== false) {
+        const text = typeof body.text === "string" ? body.text : "";
+        kit.edit(conversation, source, { text, blocks: Array.isArray(body.blocks) ? body.blocks : [] });
+        return true;
+      }
+      publish(conversation, url.user, url.threadTs, body);
+      return true;
+    },
+  };
+
+  /** A new message from the app in answer to an interaction: for the person alone, unless it is `in_channel`. */
+  function publish(
+    conversation: SlackConversationRecord,
+    userId: string,
+    threadTs: string | undefined,
+    body: Record<string, unknown>,
+  ): void {
+    const text = typeof body.text === "string" ? body.text : "";
+    const blocks = Array.isArray(body.blocks) ? body.blocks : undefined;
+    if (text === "" && blocks === undefined) return;
+    kit.postAsApp(
+      conversation,
+      { text, ...(blocks ? { blocks } : {}) },
+      {
+        threadTs: typeof body.thread_ts === "string" ? body.thread_ts : threadTs,
+        ...(body.response_type === "in_channel" ? {} : { ephemeralFor: userId }),
+      },
+    );
+  }
+}

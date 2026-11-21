@@ -25,6 +25,12 @@ export interface DeliveryRequest {
   readonly meta?: Readonly<Record<string, unknown>>;
   /** How the platform retries a delivery the agent didn't acknowledge. Without it, there is one attempt. */
   readonly retry?: RetryPolicy;
+  /**
+   * Called with the agent's answer when it acknowledges an attempt of the platform's own chain.
+   * Some deliveries are answered in the response itself: a slash command's immediate reply, a
+   * modal submission's `response_action`.
+   */
+  answered?(answer: { status: number; contentType: string; body: string }): void;
 }
 
 /** A platform's own retry behaviour, asked after each attempt of the chain it started itself. */
@@ -75,6 +81,8 @@ export interface AttemptOptions {
 }
 
 const RESPONSE_BODY_LIMIT = 2048;
+/** How much of an agent's answer is handed to the driver that acts on it. */
+const ANSWER_LIMIT = 256 * 1024;
 /** A scheduled retry this close counts as work in progress; a later one doesn't. */
 const RETRY_SOON_MS = 5000;
 
@@ -113,9 +121,17 @@ export class DeliveryQueue {
    * for as long as the platform's policy asks for one. Attempts a test sends (`again`) are not part of it.
    */
   async #chain(record: DeliveryRecord, options: AttemptOptions, retries: number): Promise<void> {
-    const { attempt, responseHeaders } = await this.#send(record, options);
+    const { attempt, responseHeaders, responseText } = await this.#send(record, options);
     const cancelled = this.#sessions.get(record.request.session)?.records.get(record.request.id) !== record;
-    if (cancelled || attempt.status === "acknowledged") return;
+    if (cancelled) return;
+    if (attempt.status === "acknowledged") {
+      record.request.answered?.({
+        status: attempt.responseStatus ?? 200,
+        contentType: responseHeaders?.get("content-type") ?? "",
+        body: responseText ?? "",
+      });
+      return;
+    }
     const next = record.request.retry?.next(attempt, retries, responseHeaders);
     if (!next) return;
     const cancel = this.#timers.after(next.afterMs, () => {
@@ -193,7 +209,7 @@ export class DeliveryQueue {
   async #send(
     record: DeliveryRecord,
     options: AttemptOptions,
-  ): Promise<{ attempt: DeliveryAttempt; responseHeaders: Headers | undefined }> {
+  ): Promise<{ attempt: DeliveryAttempt; responseHeaders: Headers | undefined; responseText?: string }> {
     const { request } = record;
     const cancelled = this.#session(request.session).canceller.signal;
     const sentAt = this.#clock();
@@ -216,6 +232,7 @@ export class DeliveryQueue {
 
     let outcome: Pick<DeliveryAttempt, "status" | "responseStatus" | "responseBody">;
     let responseHeaders: Headers | undefined;
+    let responseText: string | undefined;
     try {
       const response = await fetch(request.url, {
         method: "POST",
@@ -225,7 +242,9 @@ export class DeliveryQueue {
         signal: AbortSignal.any([AbortSignal.timeout(request.timeoutMs), cancelled]),
       });
       responseHeaders = response.headers;
-      const responseBody = (await response.text()).slice(0, RESPONSE_BODY_LIMIT);
+      // The attempt keeps the start of the answer; whoever acts on the answer gets more of it, still bounded.
+      responseText = (await response.text()).slice(0, ANSWER_LIMIT);
+      const responseBody = responseText.slice(0, RESPONSE_BODY_LIMIT);
       outcome = { status: response.ok ? "acknowledged" : "failed", responseStatus: response.status, responseBody };
     } catch (error) {
       const name = error instanceof Error ? error.name : "";
@@ -233,9 +252,10 @@ export class DeliveryQueue {
     }
     const attempt: DeliveryAttempt = { ...started, ...outcome, durationMs: this.#clock() - sentAt };
     if (cancelled.aborted) return { attempt, responseHeaders };
+    const answer = responseText === undefined ? {} : { responseText };
     record.attempts[index] = attempt;
     this.#events.append(request.session, request.driver, "delivery_attempt", { id: request.id, ...attempt });
     this.#log.debug("delivery attempt", { id: request.id, driver: request.driver, type: request.type, ...outcome });
-    return { attempt, responseHeaders };
+    return { attempt, responseHeaders, ...answer };
   }
 }

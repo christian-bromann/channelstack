@@ -13,6 +13,7 @@ export class AlreadyInChannelError extends ChannelstackError {}
 export class AlreadyReactedError extends ChannelstackError {}
 export class CantDeleteMessageError extends ChannelstackError {}
 export class CantUpdateMessageError extends ChannelstackError {}
+export class DispatchFailedError extends ChannelstackError {}
 export class InternalError extends ChannelstackError {}
 export class InvalidArgumentError extends ChannelstackError {}
 export class MsgTooLongError extends ChannelstackError {}
@@ -31,6 +32,7 @@ const ERRORS: ErrorClasses = {
   already_reacted: AlreadyReactedError,
   cant_delete_message: CantDeleteMessageError,
   cant_update_message: CantUpdateMessageError,
+  dispatch_failed: DispatchFailedError,
   internal: InternalError,
   invalid_argument: InvalidArgumentError,
   msg_too_long: MsgTooLongError,
@@ -156,6 +158,17 @@ export interface SlackMessageInput {
 export interface SlackMessageMetadata {
   event_type: string;
   event_payload: Record<string, unknown>;
+}
+
+export interface SlackButtonRef {
+  label?: string;
+  actionId?: string;
+  value?: string;
+}
+
+export interface SlackMenuRef {
+  label?: string;
+  actionId?: string;
 }
 
 export type SlackMessages = SlackMessage[];
@@ -745,6 +758,34 @@ export class SlackUser {
   async delete(options: { message: SlackMessage }): Promise<void> {
     const ctx = this.#ctx;
     await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/delete`, { body: { message: { channel: options.message.channel, ts: options.message.ts } } });
+  }
+
+  /** Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental. */
+  async click(button: string | SlackButtonRef, options: { message?: SlackMessage; thread?: SlackThread | SlackMessage; channel?: SlackConversation } = {}): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental. */
+  async select(option: string | string[], options: { menu: string | SlackMenuRef; message: SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/select`, { body: { option: [option].flat(), menu: typeof options.menu === "string" ? { label: options.menu } : options.menu, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Run a message shortcut on a message. Experimental. */
+  async shortcut(callbackId: string, options: { message: SlackMessage }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/shortcut`, { body: { callbackId, message: { channel: options.message.channel, ts: options.message.ts } } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
+  }
+
+  /** Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental. */
+  async runCommand(command: string, options: { channel: SlackConversation }): Promise<SlackDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } })) as SlackDeliveryData;
+    return new SlackDelivery(ctx, data);
   }
 
   /** Add an emoji reaction to a message. Experimental. */

@@ -4,6 +4,7 @@ import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signSlackRequest } from "../../../core/signing/slack.ts";
+import { identified } from "../blocks.ts";
 import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
   appMentionEvent,
@@ -26,6 +27,7 @@ import type {
   SlackUserRecord,
   SlackWorld,
 } from "../world.ts";
+import { createInteractions } from "./interactions.ts";
 import type { SlackFault, SlackStore } from "./store.ts";
 
 /** Slack expects an acknowledgement within 3 seconds. */
@@ -79,6 +81,8 @@ export interface FakeSlackWorld extends SlackWorld {
     emoji: string,
     direction: "add" | "remove",
   ): string | undefined;
+  /** The app answers an interaction through its `response_url`. False when the URL is unknown, used up or expired. */
+  respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
   /** The user a name in a test's text refers to, in this session. */
@@ -223,7 +227,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       conversation: conversation.id,
       user: userId,
       text: body.text,
-      blocks: body.blocks,
+      blocks: identified(body.blocks, () => ids.next("slack.block")),
       threadTs: options.threadTs,
       edited: undefined,
       reactions: [],
@@ -291,7 +295,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
   const action = (session: string, name: string, data: Record<string, unknown>) =>
     events.append(session, "slack", "action", { action: name, ...data });
 
-  return {
+  const world: Omit<FakeSlackWorld, keyof ReturnType<typeof createInteractions>> = {
     team: () => store.team,
     app: () => store.app,
     emit,
@@ -411,7 +415,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
     edit(conversation, message, body) {
       const { app, team } = store;
       const previous = messageObject(message, author(message.user), team, app);
-      Object.assign(message, body);
+      Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next("slack.block")) });
       const eventTs = ids.slackTs(conversation.id);
       message.edited = eventTs;
       const current = messageObject(message, author(message.user), team, app);
@@ -613,4 +617,20 @@ export function createFakeWorld(context: DriverContext, store: SlackStore): Fake
       if (index !== -1) store.faults.splice(index, 1);
     },
   };
+
+  return Object.assign(
+    world,
+    createInteractions({
+      context,
+      store,
+      refuse,
+      member,
+      requireMessage,
+      messageObject: (message) => messageObject(message, author(message.user), store.team, store.app),
+      postAsApp: world.postAsApp,
+      edit: world.edit,
+      remove: world.remove,
+      action,
+    }),
+  );
 }

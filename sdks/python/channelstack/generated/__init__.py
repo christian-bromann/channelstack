@@ -12,7 +12,7 @@ from ..runtime.duration import Duration, parse_duration
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import describe_wait, from_matches, latest_once_quiet, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "Status", "UiLoginLink", "UnauthorizedError", "VERSION", "connect"]
 
 VERSION = "0.0.0"
 
@@ -34,6 +34,10 @@ class CantDeleteMessageError(ChannelstackError):
 
 
 class CantUpdateMessageError(ChannelstackError):
+    pass
+
+
+class DispatchFailedError(ChannelstackError):
     pass
 
 
@@ -87,6 +91,7 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "already_reacted": AlreadyReactedError,
     "cant_delete_message": CantDeleteMessageError,
     "cant_update_message": CantUpdateMessageError,
+    "dispatch_failed": DispatchFailedError,
     "internal": InternalError,
     "invalid_argument": InvalidArgumentError,
     "msg_too_long": MsgTooLongError,
@@ -345,6 +350,42 @@ class SlackMessageMetadata:
             event_type=data["event_type"],
             event_payload=data["event_payload"],
         )
+
+
+@dataclass(frozen=True)
+class SlackButtonRef:
+    label: str | None = None
+    action_id: str | None = None
+    value: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackButtonRef:
+        return cls(
+            label=data.get("label"),
+            action_id=data.get("actionId"),
+            value=data.get("value"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"label": self.label, "actionId": self.action_id, "value": self.value}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class SlackMenuRef:
+    label: str | None = None
+    action_id: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> SlackMenuRef:
+        return cls(
+            label=data.get("label"),
+            action_id=data.get("actionId"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"label": self.label, "actionId": self.action_id}
+        return {key: value for key, value in wire.items() if value is not None}
 
 
 type SlackMessages = list[SlackMessage]
@@ -759,6 +800,30 @@ class SlackUser:
         """Delete a message: this person's own, or anyone's for an admin. Experimental."""
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/delete", body={"message": {"channel": message.channel, "ts": message.ts}})
+
+    async def click(self, button: str | SlackButtonRef, *, message: SlackMessage | None = None, thread: SlackThread | SlackMessage | None = None, channel: SlackConversation | None = None) -> SlackDelivery:
+        """Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/click", body={"button": {"label": button} if isinstance(button, str) else button._to_wire(), "message": None if message is None else {"channel": message.channel, "ts": message.ts}, "thread": None if thread is None else {"channel": thread.channel, "ts": thread.ts}, "channel": None if channel is None else channel.id})
+        return SlackDelivery(ctx, data)
+
+    async def select(self, option: str | list[str], *, menu: str | SlackMenuRef, message: SlackMessage) -> SlackDelivery:
+        """Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/select", body={"option": (option if isinstance(option, list) else [option]), "menu": {"label": menu} if isinstance(menu, str) else menu._to_wire(), "message": {"channel": message.channel, "ts": message.ts}})
+        return SlackDelivery(ctx, data)
+
+    async def shortcut(self, callback_id: str, *, message: SlackMessage) -> SlackDelivery:
+        """Run a message shortcut on a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/shortcut", body={"callbackId": callback_id, "message": {"channel": message.channel, "ts": message.ts}})
+        return SlackDelivery(ctx, data)
+
+    async def run_command(self, command: str, *, channel: SlackConversation) -> SlackDelivery:
+        """Run a slash command in a conversation, e.g. `/deploy web staging`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(self.id, safe='')}/commands", body={"command": command, "channel": channel.id})
+        return SlackDelivery(ctx, data)
 
     async def react(self, emoji: str, *, message: SlackMessage) -> SlackDelivery | None:
         """Add an emoji reaction to a message. Experimental."""

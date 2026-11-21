@@ -1568,6 +1568,277 @@
           "dispose": false
         },
         {
+          "name": "click",
+          "kind": "method",
+          "summary": "Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/click",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "button",
+              "type": {
+                "kind": "named",
+                "name": "SlackButtonRef"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "label"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "thread",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackThread",
+                  "SlackMessage"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "select",
+          "kind": "method",
+          "summary": "Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/select",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "option",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "menu",
+              "type": {
+                "kind": "named",
+                "name": "SlackMenuRef"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "label"
+            },
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "shortcut",
+          "kind": "method",
+          "summary": "Run a message shortcut on a message",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/shortcut",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "callbackId",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "runCommand",
+          "kind": "method",
+          "summary": "Run a slash command in a conversation, e.g. `/deploy web staging`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/users/{user}/commands",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "command",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "SlackConversation"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "not_in_channel",
+            "dispatch_failed"
+          ],
+          "dispose": false
+        },
+        {
           "name": "react",
           "kind": "method",
           "summary": "Add an emoji reaction to a message",
@@ -3601,6 +3872,57 @@
       }
     },
     {
+      "name": "SlackButtonRef",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "label",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "actionId",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "value",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlackMenuRef",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "label",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          },
+          {
+            "name": "actionId",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
       "name": "SlackMessages",
       "type": {
         "kind": "array",
@@ -4044,6 +4366,7 @@
     "already_reacted",
     "cant_delete_message",
     "cant_update_message",
+    "dispatch_failed",
     "internal",
     "invalid_argument",
     "msg_too_long",

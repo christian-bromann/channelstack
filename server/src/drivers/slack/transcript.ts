@@ -1,4 +1,5 @@
 import { slackTsTime } from "../../core/ids/index.ts";
+import { type Block, blockControls, blockText } from "./blocks.ts";
 import { nameMentions } from "./mentions.ts";
 import type { SlackMessageRecord } from "./world.ts";
 
@@ -17,65 +18,6 @@ export interface TranscriptEntry {
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: { id: string; name: string; kind: "user" | "app" };
   depth: number;
-}
-
-type Block = {
-  type?: string;
-  text?: unknown;
-  elements?: unknown;
-  fields?: unknown;
-  label?: unknown;
-  placeholder?: unknown;
-  accessory?: unknown;
-  element?: unknown;
-};
-
-const plain = (value: unknown): string =>
-  typeof value === "string"
-    ? value
-    : typeof (value as { text?: unknown } | null)?.text === "string"
-      ? (value as { text: string }).text
-      : "";
-
-/** The text a person reads in a block: sections, headers, context, rich text. Layout is not reproduced. */
-function blockText(block: Block): string[] {
-  const nested = (items: unknown): string[] =>
-    Array.isArray(items) ? items.flatMap((item) => blockText(item as Block)) : [];
-  switch (block.type) {
-    case "section":
-      return [plain(block.text), ...(Array.isArray(block.fields) ? block.fields.map(plain) : [])];
-    case "header":
-    case "markdown":
-      return [plain(block.text)];
-    case "context":
-      return Array.isArray(block.elements) ? block.elements.map(plain) : [];
-    case "rich_text":
-    case "rich_text_section":
-    case "rich_text_list":
-    case "rich_text_quote":
-    case "rich_text_preformatted":
-      return [nested(block.elements).join("")];
-    case "text":
-      return [plain(block)];
-    case "user":
-      return [`<@${(block as { user_id?: string }).user_id ?? ""}>`];
-    case "input":
-      return [plain(block.label)];
-    default:
-      return [];
-  }
-}
-
-/** The labels of what a person can press or choose in a block: buttons, and menus by their placeholder. */
-function blockControls(block: Block): string[] {
-  const control = (element: Block): string[] => {
-    if (element.type === "button") return [plain(element.text)];
-    if (typeof element.type === "string" && element.type.endsWith("select")) return [plain(element.placeholder)];
-    return [];
-  };
-  const elements = block.type === "actions" && Array.isArray(block.elements) ? (block.elements as Block[]) : [];
-  const accessory = typeof block.accessory === "object" && block.accessory !== null ? [block.accessory as Block] : [];
-  return [...elements, ...accessory].flatMap(control).filter((label) => label !== "");
 }
 
 /**

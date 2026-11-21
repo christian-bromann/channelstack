@@ -177,7 +177,8 @@ export function emitPython(ir: Ir): Map<string, string> {
       ...m.args.map((arg) => `${snakeCase(arg.name)}: ${parameterType(arg)}`),
       ...(m.options.length > 0 ? ["*"] : []),
       ...m.options.map(
-        (option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`,
+        (option) =>
+          `${snakeCase(option.name)}: ${option.shorthand === undefined ? "" : "str | "}${annotation(option)}${option.optional ? " = None" : ""}`,
       ),
     ];
     const path = pathParts(m)

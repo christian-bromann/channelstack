@@ -116,6 +116,16 @@ export interface SlackThreadState {
   suggestedPrompts?: Array<{ title: string; message: string }>;
 }
 
+/** A control a person means: by the label they see, by its `action_id`, or both. */
+interface SlackControlRef {
+  label?: string | undefined;
+  actionId?: string | undefined;
+}
+
+/** Where a person looks for a control: on one message, or on the app's latest message that has it in a thread or a conversation. */
+export type SlackControlScope =
+  { message: { channel: string; ts: string } } | { thread: { channel: string; ts: string } } | { channel: string };
+
 /** Where a person posts: a conversation, or people to open (or reuse) a DM with. */
 type SlackDestination = { channel: string } | { to: string[] };
 
@@ -183,6 +193,26 @@ export interface SlackWorld {
     target: { channel: string; ts: string },
     action: "add" | "remove",
   ): string | undefined;
+  /** Press a button: found by its label, its `action_id`, or both. Returns the `block_actions` delivery. */
+  clickAsUser(
+    session: string,
+    user: string,
+    button: SlackControlRef & { value?: string | undefined },
+    where: SlackControlScope,
+  ): string;
+  /** Choose options in a select menu on a message, by their text or value. Returns the `block_actions` delivery. */
+  selectAsUser(
+    session: string,
+    user: string,
+    options: readonly string[],
+    menu: SlackControlRef,
+    message: { channel: string; ts: string },
+  ): string;
+  /** Run a message shortcut on a message. Returns the `message_action` delivery. */
+  shortcutAsUser(session: string, user: string, callbackId: string, message: { channel: string; ts: string }): string;
+  /** Run a slash command in a conversation: `/deploy web staging`. Returns the command's delivery. */
+  commandAsUser(session: string, user: string, command: string, channel: string): string;
+
   invite(session: string, user: string, participants: readonly string[], channel: string): void;
   kick(session: string, user: string, participant: string, channel: string): void;
 

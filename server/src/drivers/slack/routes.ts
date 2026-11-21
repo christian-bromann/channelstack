@@ -457,6 +457,99 @@ export function registerSlackRoutes(
     handler: ({ session, params, body }) => world.deleteAsUser(session.id, params.user, body.message),
   });
 
+  const controlRef = (name: string) =>
+    z
+      .object({ label: z.string().optional(), actionId: z.string().optional() })
+      .openapi(name, { "x-channelstack-shorthand": "label" });
+  /** The delivery an interaction caused, for the routes that answer with it. */
+  const interaction = (session: string, delivery: string) => deliveryWire(world.delivery(session, delivery));
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/click",
+    summary:
+      "Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation",
+    params: UserParams,
+    body: z
+      .object({
+        button: z
+          .object({ label: z.string().optional(), actionId: z.string().optional(), value: z.string().optional() })
+          .openapi("SlackButtonRef", { "x-channelstack-shorthand": "label" }),
+        message: messageRef.optional(),
+        thread: threadRef.optional(),
+        channel: conversationRef.optional(),
+      })
+      .openapi("SlackClickBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: { on: "SlackUser", name: "click", args: ["button"], options: ["message", "thread", "channel"] },
+    stability,
+    handler: ({ session, params, body }) => {
+      const scopes = [
+        body.message && { message: body.message },
+        body.thread && { thread: body.thread },
+        body.channel !== undefined && { channel: body.channel },
+      ].filter((scope) => scope !== undefined && scope !== false);
+      const [where] = scopes;
+      if (scopes.length !== 1 || !where) {
+        throw new ProtocolError("invalid_argument", "click needs exactly one of `message`, `thread` and `channel`");
+      }
+      if (body.button.label === undefined && body.button.actionId === undefined) {
+        throw new ProtocolError("invalid_argument", "Say which button: its label or its action_id");
+      }
+      return interaction(session.id, world.clickAsUser(session.id, params.user, body.button, where));
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/select",
+    summary:
+      "Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id",
+    params: UserParams,
+    body: z
+      .object({
+        option: z.array(z.string()).min(1).openapi({ "x-channelstack-one-or-many": true }),
+        menu: controlRef("SlackMenuRef"),
+        message: messageRef,
+      })
+      .openapi("SlackSelectBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: { on: "SlackUser", name: "select", args: ["option"], options: ["menu", "message"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.selectAsUser(session.id, params.user, body.option, body.menu, body.message)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/shortcut",
+    summary: "Run a message shortcut on a message",
+    params: UserParams,
+    body: z.object({ callbackId: z.string().min(1), message: messageRef }).openapi("SlackShortcutBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.shortcutAsUser(session.id, params.user, body.callbackId, body.message)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/users/{user}/commands",
+    summary: "Run a slash command in a conversation, e.g. `/deploy web staging`",
+    params: UserParams,
+    body: z.object({ command: z.string().regex(/^\/\S/), channel: conversationRef }).openapi("SlackCommandBody"),
+    response: SlackDelivery,
+    errors: ["not_found", "not_in_channel", "dispatch_failed"],
+    sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel"] },
+    stability,
+    handler: ({ session, params, body }) =>
+      interaction(session.id, world.commandAsUser(session.id, params.user, body.command, body.channel)),
+  });
+
   for (const [name, action] of [
     ["react", "add"],
     ["unreact", "remove"],

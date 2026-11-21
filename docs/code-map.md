@@ -62,6 +62,9 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `mentions.ts` (Slack) | `@name` in a test's text → the platform's mention syntax, and back (`nameMentions`, `splitAtMentions`); an emoji's name (`emojiName`) |
 | `live/` | Real API calls as the app or a person, reads, cleanup handlers *(phase 5)* |
 | `payloads.ts` | Builders for every event payload this platform sends (used by the fake's delivery) |
+| `interaction-payloads.ts` (Slack) | Builders for what Slack sends when a person acts in the client: `block_actions`, `message_action`, slash command fields; a person's handle (`handleOf`) |
+| `blocks.ts` (Slack) | Reading Block Kit: the text and controls a person sees, finding a button or a menu by label or `action_id`, filling in missing `block_id`s and `action_id`s |
+| `fake/interactions.ts` (Slack) | What a person does beyond writing: clicks, menu choices, shortcuts, slash commands, and the app's answers through `response_url`. Part of the fake world |
 | `transcript.ts` | State → what a person would see |
 | `capabilities.ts` | Per action: fake, live, what live needs |
 
@@ -116,6 +119,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Building the spec from the routes; comparing generated files | `lib/generate.ts` | Used by `spec.ts` and `sdk.ts` (write, or `--check`) |
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
+| A Slack workspace for a unit test | `server/test/slack-workspace.ts` | `slackWorkspace` (the app, a stand-in agent, a session with Ana and a channel), `refusal`, `signedBy`. New Slack test files start from it |
 | The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener, with timers the test advances itself) and `recordingAgent` (a stand-in agent endpoint). Every driver's unit tests use it |
 | Starting a server executable for a test or a smoke run | `lib/server.ts` | `startBinary`: spawn, wait for the server file, collect output, stop. The SDK launchers have their own start, because they ship |
 | The binary under test, with a control API client | `server/test/integration/harness.ts` | `BINARY`, `cli`, `startBinary` (adds `control` to `lib/server.ts`'s). Shared by the server's and the SDK's integration tests |

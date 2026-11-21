@@ -4,6 +4,7 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
+import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
 import type { SlackConversationRecord, SlackMessageRecord, SlackUserRecord } from "../world.ts";
 import type { SlackStore } from "./store.ts";
@@ -92,7 +93,7 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
   const userObject = (user: SlackUserRecord) => ({
     id: user.id,
     team_id: store.team.id,
-    name: user.name.toLowerCase().replace(/\s+/g, "."),
+    name: handleOf(user),
     deleted: false,
     real_name: user.realName,
     tz: user.timezone,
@@ -670,6 +671,22 @@ export function createSlackApi(context: DriverContext, store: SlackStore, world:
       else context.arrived(session, name);
     }
     return c.json(body, status, headers);
+  });
+
+  // A `response_url`: the app answers an interaction here. The URL is the credential, as with Slack's.
+  api.post("/hooks/:kind/*", async (c) => {
+    const key = c.req.path.split(`/hooks/${c.req.param("kind")}/`)[1] ?? "";
+    const type = c.req.header("content-type") ?? "";
+    // Slack takes JSON, or a form with the JSON in `payload`.
+    const raw = type.includes("form") ? String((await c.req.parseBody()).payload ?? "") : await c.req.text();
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return c.text("invalid_payload", 400);
+    }
+    if (typeof body !== "object" || body === null) return c.text("invalid_payload", 400);
+    return world.respond(key, body as Record<string, unknown>) ? c.text("ok") : c.text("expired_url", 404);
   });
 
   // Where `files.getUploadURLExternal` sends the app with a file's bytes.
