@@ -1,49 +1,33 @@
 import type { ReactNode } from "react";
-import { Check } from "./Icons";
 
 /**
- * What each example's test produces, drawn in the shape of the platform it runs on: a Slack
- * thread, a GitHub issue, a Linear agent session, a Notion page with comments. These are
- * channelstack's own drawings in its own colours, not copies of the products' interfaces.
+ * What each example's test produces, drawn to look like the platform it runs on: a Slack
+ * conversation, a GitHub issue, a Linear issue with an agent session, a Notion page with
+ * comments. Every part carries the playback step at which it appears, so the mock-up plays
+ * in step with the highlighted line of the test.
  */
 
-function Frame({ host, title, badge, children, checks }: { host: string; title: ReactNode; badge?: ReactNode; children: ReactNode; checks: string[] }) {
-  return (
-    <div className="mock">
-      <div className="pane-head">
-        <span className="chan">{title}</span>
-        {badge}
-        <span className="spacer" />
-        <span className="tag">{host}</span>
-      </div>
-      <div className="mock-body">{children}</div>
-      <ul className="mock-checks">
-        {checks.map((check) => (
-          <li key={check}>
-            <Check size={13} />
-            {check}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+export interface MockProps {
+  /** Current playback step. Parts with a higher step are still hidden. */
+  step: number;
 }
 
-function Avatar({ name, bot = false }: { name: string; bot?: boolean }) {
-  return (
-    <span className={bot ? "avatar bot" : `avatar person-${name.toLowerCase()}`} aria-hidden="true">
-      {name[0]!.toUpperCase()}
-    </span>
-  );
-}
+const when = (step: number, at: number, base: string) => (step >= at ? base : `${base} is-pending`);
 
-function Message({ who, bot = false, meta, children }: { who: string; bot?: boolean; meta?: string; children: ReactNode }) {
+const Mention = ({ children }: { children: string }) => <span className="mention">{children}</span>;
+
+// ---------------------------------------------------------------------------
+// Slack
+
+function SlackMessage({ who, bot = false, time, className, children }: { who: string; bot?: boolean; time: string; className: string; children: ReactNode }) {
   return (
-    <div className="msg m-item">
-      <Avatar name={who} bot={bot} />
+    <div className={className}>
+      <span className={bot ? "sl-avatar bot" : "sl-avatar"} aria-hidden="true">
+        {who[0]!.toUpperCase()}
+      </span>
       <div>
-        <p className="who">
-          {who} {bot ? <span className="tag">APP</span> : null} {meta ? <small>{meta}</small> : null}
+        <p className="sl-who">
+          <b>{who}</b> {bot ? <span className="sl-app">APP</span> : null} <small>{time}</small>
         </p>
         {children}
       </div>
@@ -51,161 +35,295 @@ function Message({ who, bot = false, meta, children }: { who: string; bot?: bool
   );
 }
 
-const Mention = ({ children }: { children: string }) => <span className="mention">{children}</span>;
-
-export function SlackMock() {
+function SlackShell({ title, composer, children }: { title: ReactNode; composer: string; children: ReactNode }) {
   return (
-    <Frame host="slack.localhost" title="# incidents" checks={["1 reply from robin, in the thread", "nothing posted to the channel"]}>
-      <Message who="Ana" meta="9:02">
-        <p>
-          <Mention>@robin</Mention> summarize yesterday’s incidents
-        </p>
-      </Message>
-      <div className="m-thread">
-        <Message who="robin" bot meta="9:02">
-          <p>Two incidents yesterday: checkout latency, resolved in 14 minutes, and a failed deploy that was rolled back.</p>
-        </Message>
-        <p className="m-meta m-item">1 reply</p>
+    <div className="app app-slack">
+      <div className="sl-head">{title}</div>
+      <div className="sl-body">{children}</div>
+      <div className="sl-composer" aria-hidden="true">
+        <span>{composer}</span>
+        <i />
       </div>
-    </Frame>
+    </div>
   );
 }
 
-export function GitHubMock() {
+/** The hero test: a DM that asks for approval before deploying. */
+export function SlackMock({ step }: MockProps) {
   return (
-    <Frame host="github.localhost" title="acme/web" checks={["robin commented once", "the redelivery started no second run"]}>
-      <div className="m-title m-item">
-        <h4>
-          Login 500s on Safari <span>#1</span>
-        </h4>
-        <span className="m-pill ok">Open</span>
-      </div>
-      <div className="m-comment m-item">
-        <p className="m-comment-head">
-          <Avatar name="mo" /> <b>mo</b> commented
-        </p>
+    <SlackShell
+      composer="Message robin"
+      title={
+        <>
+          <span className="sl-avatar bot small" aria-hidden="true">R</span>
+          <b>robin</b>
+          <span className="sl-app">APP</span>
+        </>
+      }
+    >
+      <SlackMessage who="ana" time="10:42 AM" className={when(step, 1, "sl-msg")}>
         <p>
-          <Mention>@robin</Mention> can you take a look?
+          <Mention>@robin</Mention> ship #812 to staging
         </p>
-      </div>
-      <div className="m-comment m-item">
-        <p className="m-comment-head">
-          <Avatar name="robin" bot /> <b>robin</b> <span className="tag">bot</span> commented
+      </SlackMessage>
+      <div className="slot">
+        <p className={step === 2 ? "sl-status" : "sl-status is-pending"} aria-hidden={step !== 2}>
+          <b>robin</b> is checking CI on #812…
         </p>
-        <p>Reproduced on Safari 17: the session cookie is dropped on the redirect. A fix is on the way.</p>
+        <SlackMessage who="robin" bot time="10:42 AM" className={when(step, 3, "sl-msg")}>
+          <p>Deploy #812 to staging? CI passed 4 minutes ago, 2 files changed.</p>
+          <p className="sl-actions">
+            <span className={step >= 4 ? "sl-btn primary is-clicked" : "sl-btn primary"}>Approve</span>
+            <span className="sl-btn">Cancel</span>
+          </p>
+        </SlackMessage>
       </div>
-      <p className="m-event m-item">
-        <i /> delivery redelivered with the same GUID
-      </p>
-    </Frame>
+      <SlackMessage who="robin" bot time="10:43 AM" className={when(step, 5, "sl-msg")}>
+        <p>Deployed #812 to staging in 41s. ana approved it.</p>
+      </SlackMessage>
+    </SlackShell>
   );
 }
 
-export function LinearMock() {
+/** Live mode: the same API in a real workspace, in a channel the test created. */
+export function LiveMock({ step }: MockProps) {
   return (
-    <Frame host="linear.localhost" title="ENG-1" checks={["the session showed a thought", "Stop ended it: session complete"]}>
-      <div className="m-title m-item">
-        <h4>Migrate billing cron</h4>
-      </div>
-      <p className="m-props m-item">
-        <span className="m-pill">In Progress</span>
-        <span className="m-pill">Delegated to robin</span>
-        <span className="m-pill">Kai</span>
-      </p>
-      <div className="m-session m-item">
-        <p className="m-comment-head">
-          <Avatar name="robin" bot /> <b>robin</b> <span className="tag">agent session</span>
+    <SlackShell
+      composer="Reply…"
+      title={
+        <>
+          <b>Thread</b>
+          <span className={when(step, 1, "sl-channel")}># cs-test-4f2a</span>
           <span className="spacer" />
-          <span className="m-pill ok">Complete</span>
+          <span className="sl-live">
+            <i /> live
+          </span>
+        </>
+      }
+    >
+      <SlackMessage who="Ana" time="2:10 PM" className={when(step, 2, "sl-msg")}>
+        <p>
+          <Mention>@robin</Mention> summarize #support today
         </p>
-        <ul>
-          <li>
-            <i /> Kai delegated the issue
+      </SlackMessage>
+      <p className={when(step, 3, "sl-divider")}>1 reply</p>
+      <SlackMessage who="robin" bot time="2:10 PM" className={when(step, 3, "sl-msg")}>
+        <p>Today in #support: 12 new tickets, 9 closed. Two are waiting on billing.</p>
+      </SlackMessage>
+    </SlackShell>
+  );
+}
+
+/** The pytest example: Ana rejects, and the agent leaves the keys alone. */
+export function PytestMock({ step }: MockProps) {
+  return (
+    <SlackShell
+      composer="Reply…"
+      title={
+        <>
+          <b>Thread</b>
+          <span className="sl-channel"># ops</span>
+        </>
+      }
+    >
+      <SlackMessage who="Ana" time="11:20 AM" className={when(step, 1, "sl-msg")}>
+        <p>
+          <Mention>@robin</Mention> rotate the staging keys
+        </p>
+      </SlackMessage>
+      <p className={when(step, 2, "sl-divider")}>{step >= 4 ? "2 replies" : "1 reply"}</p>
+      <SlackMessage who="robin" bot time="11:20 AM" className={when(step, 2, "sl-msg")}>
+        <p>Rotate the staging keys? This restarts three services.</p>
+        <p className="sl-actions">
+          <span className="sl-btn primary">Approve</span>
+          <span className={step >= 3 ? "sl-btn is-clicked" : "sl-btn"}>Reject</span>
+        </p>
+      </SlackMessage>
+      <SlackMessage who="robin" bot time="11:21 AM" className={when(step, 4, "sl-msg")}>
+        <p>Okay, I left the keys alone.</p>
+      </SlackMessage>
+    </SlackShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GitHub
+
+function GitHubComment({ who, bot = false, className, children }: { who: string; bot?: boolean; className: string; children: ReactNode }) {
+  return (
+    <div className={className}>
+      <span className={bot ? "gh-avatar bot" : "gh-avatar"} aria-hidden="true">
+        {who[0]!.toUpperCase()}
+      </span>
+      <div className="gh-box">
+        <p className="gh-box-head">
+          <b>{who}</b>
+          {bot ? <span className="gh-label">bot</span> : null} commented now
+        </p>
+        <div className="gh-box-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function GitHubMock({ step }: MockProps) {
+  return (
+    <div className="app app-github">
+      <div className="gh-top">
+        <span>acme</span> / <b>web</b>
+        <span className="gh-tab">Issues</span>
+      </div>
+      <div className="gh-body">
+        <div className={when(step, 1, "gh-issue")}>
+          <p className="app-title">
+            Login 500s on Safari <span>#1</span>
+          </p>
+          <p className="gh-meta">
+            <span className="gh-state">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+                <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <circle cx="8" cy="8" r="2" fill="currentColor" />
+              </svg>
+              Open
+            </span>
+            <span>
+              <b>mo</b> opened this issue now
+            </span>
+          </p>
+        </div>
+        <div className="gh-timeline">
+          <GitHubComment who="mo" className={when(step, 2, "gh-comment")}>
+            <p>
+              <Mention>@robin</Mention> can you take a look?
+            </p>
+          </GitHubComment>
+          <GitHubComment who="robin" bot className={when(step, 3, "gh-comment")}>
+            <p>Reproduced on Safari 17: the session cookie is dropped on the redirect. A fix is on the way.</p>
+          </GitHubComment>
+          <p className={when(step, 4, "gh-event")}>
+            <i aria-hidden="true" />
+            <span>
+              <b>issue_comment</b> redelivered with the same GUID
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Linear
+
+export function LinearMock({ step }: MockProps) {
+  return (
+    <div className="app app-linear">
+      <div className="ln-top">
+        <span className="ln-team" aria-hidden="true" />
+        Engineering <span className="ln-sep">›</span> <b>ENG-1</b>
+      </div>
+      <div className="ln-body">
+        <div className={when(step, 1, "ln-issue")}>
+          <p className="app-title">Migrate billing cron</p>
+          <p className="ln-props">
+            <span>
+              <i className="ln-status" aria-hidden="true" />
+              In Progress
+            </span>
+            <span>
+              <i className="ln-avatar" aria-hidden="true">K</i>
+              Kai
+            </span>
+            <span className={when(step, 2, "ln-delegate")}>
+              <i className="ln-avatar bot" aria-hidden="true">R</i>
+              robin
+            </span>
+          </p>
+        </div>
+        <p className={when(step, 1, "ln-label")}>Activity</p>
+        <ul className="ln-activity">
+          <li className={when(step, 1, "ln-row")}>
+            <i className="ln-avatar" aria-hidden="true">K</i>
+            <span>
+              <b>Kai</b> created the issue
+            </span>
           </li>
-          <li>
-            <i className="think" /> <em>Thought:</em> reading the cron definitions
+          <li className={when(step, 2, "ln-row")}>
+            <i className="ln-avatar" aria-hidden="true">K</i>
+            <span>
+              <b>Kai</b> delegated the issue to <b>robin</b>
+            </span>
           </li>
-          <li>
-            <i className="stop" /> Kai stopped the session
+          <li className={when(step, 2, "ln-session")}>
+            <p className="ln-session-head">
+              <i className="ln-avatar bot" aria-hidden="true">R</i>
+              <b>robin</b>
+              <span className="ln-agent">Agent</span>
+              <span className="spacer" />
+              <span className={step >= 5 ? "ln-state done" : "ln-state"}>{step >= 5 ? "Complete" : "Working"}</span>
+            </p>
+            <p className={when(step, 3, "ln-thought")}>Reading the cron definitions in billing/cron.ts…</p>
+            <p className={when(step, 4, "ln-stopped")}>
+              <i aria-hidden="true" />
+              Kai stopped the session
+            </p>
           </li>
         </ul>
       </div>
-    </Frame>
+    </div>
   );
 }
 
-export function NotionMock() {
+// ---------------------------------------------------------------------------
+// Notion
+
+function NotionComment({ who, bot = false, className, children }: { who: string; bot?: boolean; className: string; children: ReactNode }) {
   return (
-    <Frame host="notion.localhost" title="Roadmap" checks={["robin answered in the same discussion", "exactly one comment from robin"]}>
-      <div className="m-page">
-        <div className="m-doc m-item">
-          <h4>Roadmap</h4>
-          <p className="m-h">Q1</p>
+    <div className={className}>
+      <span className={bot ? "nt-avatar bot" : "nt-avatar"} aria-hidden="true">
+        {who[0]!.toUpperCase()}
+      </span>
+      <div>
+        <p className="nt-who">
+          <b>{who}</b> <small>Just now</small>
+        </p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function NotionMock({ step }: MockProps) {
+  return (
+    <div className="app app-notion">
+      <div className="nt-top">
+        <span className={when(step, 1, "nt-crumb")}>Roadmap</span>
+        <span className="spacer" />
+        <span>Share</span>
+        <span aria-hidden="true">···</span>
+      </div>
+      <div className="nt-body">
+        <div className={when(step, 1, "nt-doc")}>
+          <p className="app-title">Roadmap</p>
+          <p className="nt-h1">Q1</p>
           <ul>
             <li>ship search</li>
           </ul>
         </div>
-        <div className="m-discussion">
-          <Message who="Ana" meta="now">
+        <div className="nt-comments">
+          <NotionComment who="Ana" className={when(step, 2, "nt-comment")}>
             <p>
               <Mention>@robin</Mention> summarize this page
             </p>
-          </Message>
-          <Message who="robin" bot meta="now">
+          </NotionComment>
+          <NotionComment who="robin" bot className={when(step, 3, "nt-comment")}>
             <p>Q1 has one goal: ship search.</p>
-          </Message>
+          </NotionComment>
+          <p className={when(step, 2, "nt-reply")} aria-hidden="true">
+            Reply…
+          </p>
         </div>
       </div>
-    </Frame>
-  );
-}
-
-export function LiveMock() {
-  return (
-    <Frame
-      host="slack.com"
-      title="# cs-test-4f2a"
-      badge={
-        <span className="m-live">
-          <i /> live
-        </span>
-      }
-      checks={["reply from robin within 30s", "cleaned up: 1 channel, 2 messages"]}
-    >
-      <Message who="Ana" meta="14:10">
-        <p>
-          <Mention>@robin</Mention> summarize #support today
-        </p>
-      </Message>
-      <div className="m-thread">
-        <Message who="robin" bot meta="14:10">
-          <p>Today in #support: 12 new tickets, 9 closed. Two are waiting on billing.</p>
-        </Message>
-      </div>
-    </Frame>
-  );
-}
-
-export function PytestMock() {
-  return (
-    <Frame host="slack.localhost" title="# ops" checks={["“Okay, I left the keys alone.” appears once"]}>
-      <Message who="Ana" meta="11:20">
-        <p>
-          <Mention>@robin</Mention> rotate the staging keys
-        </p>
-      </Message>
-      <div className="m-thread">
-        <Message who="robin" bot meta="11:20">
-          <p>Rotate the staging keys? This restarts three services.</p>
-          <p className="buttons">
-            <span className="sbtn">Approve</span>
-            <span className="sbtn is-picked">Reject</span>
-          </p>
-        </Message>
-        <Message who="robin" bot meta="11:21">
-          <p>Okay, I left the keys alone.</p>
-        </Message>
-      </div>
-    </Frame>
+    </div>
   );
 }

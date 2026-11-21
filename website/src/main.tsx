@@ -4,6 +4,7 @@ import "@fontsource/ibm-plex-mono/latin-400.css";
 import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./styles/base.css";
 import "./styles/home.css";
+import "./styles/player.css";
 import "./styles/docs.css";
 import { ViteReactSSG } from "vite-react-ssg";
 import { routes } from "./routes";

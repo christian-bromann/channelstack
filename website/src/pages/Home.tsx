@@ -3,14 +3,13 @@ import { Link } from "react-router-dom";
 import config from "../../samples/quickstart/channelstack.config.ts?sample";
 import vitestConfig from "../../samples/quickstart/vitest.config.ts?sample";
 import { Code, CopyButton, Terminal } from "../components/Code";
-import { Examples } from "../components/Examples";
 import { Flow } from "../components/Flow";
 import { Footer } from "../components/Footer";
 import { ArrowRight, Person, Route, Shield, Transcript } from "../components/Icons";
 import { Nav } from "../components/Nav";
 import { Seo } from "../components/Seo";
 import { StackArt } from "../components/StackArt";
-import { Stage } from "../components/Stage";
+import { Player } from "../components/Player";
 import { Voice } from "../components/Voice";
 import { useReveal } from "../lib/hooks";
 import { SITE } from "../lib/site";
@@ -121,7 +120,7 @@ export default function Home() {
               </div>
             </div>
             <p className="soon">Not on npm yet. The first release is on its way.</p>
-            <Stage />
+            <Player />
           </div>
         </section>
 
@@ -192,17 +191,6 @@ export default function Home() {
             <div ref={flow}>
               <Flow />
             </div>
-          </div>
-        </section>
-
-        <section id="examples" aria-labelledby="examples-title">
-          <div className="wrap">
-            <div className="sec-head">
-              <p className="kicker">Examples</p>
-              <h2 id="examples-title">Same API on every platform.</h2>
-              <p className="sec-lede">Learn it once with Slack and the rest read the same: people act, resources are read, matchers wait for what a person would see.</p>
-            </div>
-            <Examples />
           </div>
         </section>
 

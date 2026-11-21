@@ -1,0 +1,1092 @@
+/* The example player in the hero: tabs, the test, and a mock-up of the platform it runs on.
+   Animations use transform and opacity only. */
+
+.player {
+  margin-top: clamp(40px, 6vw, 64px);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-raise);
+  box-shadow: var(--shadow);
+  scroll-margin-top: calc(var(--nav-h) + 16px);
+}
+
+/* ---------- tabs ---------- */
+
+.tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs [role="tab"] {
+  flex: none;
+  height: 48px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 150ms;
+}
+
+.tabs [role="tab"]:hover,
+.tabs [role="tab"][aria-selected="true"] {
+  color: var(--ink);
+}
+
+.tabs [role="tab"]:focus-visible {
+  outline-offset: -4px;
+}
+
+.tab-ink {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100px;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transform-origin: left;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tab-ink {
+    transition: transform 320ms var(--ease);
+  }
+}
+
+/* ---------- panels ---------- */
+
+.panels {
+  display: grid;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  min-width: 0;
+}
+
+/* with script: panels share one cell and crossfade; without: they stack and all show */
+.js .panel {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.js .panel.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.js .nojs-label {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .js .panel {
+    transition: opacity 280ms var(--ease), visibility 0s linear 280ms;
+  }
+  .js .panel.is-active {
+    transition-delay: 0s;
+  }
+}
+
+html:not(.js) .tabs,
+html:not(.js) .replay {
+  display: none;
+}
+
+html:not(.js) .panel + .panel {
+  border-top: 1px solid var(--line-strong);
+}
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--code-line);
+  background: var(--code-bg);
+  color: var(--code-dim);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dots i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--code-line);
+}
+
+.panel-code {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--code-bg);
+}
+
+.panel-code .pane-head {
+  padding-right: 6px;
+}
+
+.panel-code .code {
+  flex: 1;
+}
+
+/* the line highlight: one line tall, moved and stretched with transform */
+.hot {
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--code-lh);
+  background: color-mix(in srgb, var(--code-key) 13%, transparent);
+  box-shadow: inset 2px 0 0 var(--code-key);
+  opacity: 0;
+  transform-origin: top;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hot {
+    transition: transform 420ms var(--ease), opacity 250ms;
+  }
+}
+
+.panel-mock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid var(--code-line);
+  background: var(--code-bg);
+}
+
+/* a browser-like address above the mock-up */
+.url {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--code-raise);
+  color: var(--code-fg);
+  font-size: 12px;
+}
+
+.url i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6fd6a0;
+}
+
+.replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 78px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--code-line);
+  border-radius: 7px;
+  background: var(--code-raise);
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.replay:hover {
+  border-color: var(--code-dim);
+}
+
+.replay:focus-visible {
+  outline-color: var(--code-key);
+}
+
+.mock {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.checks {
+  display: grid;
+  gap: 4px;
+  flex: none;
+  margin: 0;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--code-line);
+  color: var(--code-fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  list-style: none;
+}
+
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checks svg {
+  flex: none;
+  color: #6fd6a0;
+}
+
+.checks .is-pending {
+  opacity: 0.3;
+}
+
+.checks .is-pending svg {
+  opacity: 0;
+}
+
+.panel-note {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px 24px;
+  align-items: start;
+  padding: 20px 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.panel-note h3 {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.panel-note h3::first-letter {
+  text-transform: uppercase;
+}
+
+.panel-note ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-note li {
+  position: relative;
+  padding-left: 22px;
+}
+
+.panel-note li::before {
+  content: "";
+  position: absolute;
+  top: 0.45em;
+  left: 2px;
+  width: 9px;
+  height: 5px;
+  border: solid var(--ok);
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+}
+
+@media (max-width: 940px) {
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    align-content: start;
+  }
+  .panel-mock {
+    border-top: 1px solid var(--code-line);
+    border-left: 0;
+  }
+  .panel-note {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel-note ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- mock-ups: shared ---------- */
+
+/* Each mock-up uses its platform's own dark colours and the system font, in both site themes. */
+.app {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.app .app-title {
+  font-family: inherit;
+  letter-spacing: -0.01em;
+}
+
+.app b {
+  font-weight: 600;
+}
+
+.slot {
+  display: grid;
+}
+
+.slot > * {
+  grid-area: 1 / 1;
+}
+
+.app .is-pending {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app :is(.sl-msg, .sl-status, .sl-divider, .sl-channel, .gh-issue, .gh-comment, .gh-event, .ln-issue, .ln-label, .ln-row, .ln-session, .ln-thought, .ln-stopped, .ln-delegate, .nt-doc, .nt-crumb, .nt-comment, .nt-reply) {
+    transition: opacity 380ms var(--ease), transform 380ms var(--ease);
+  }
+  .checks li,
+  .checks svg {
+    transition: opacity 300ms var(--ease);
+  }
+}
+
+/* a ring that expands once when a button is clicked */
+.sl-btn {
+  position: relative;
+}
+
+.sl-btn::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid #1d9bd1;
+  border-radius: 8px;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .js .sl-btn.is-clicked::after {
+    animation: press 700ms var(--ease);
+  }
+}
+
+@keyframes press {
+  0% { opacity: 1; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+
+/* ---------- Slack ---------- */
+
+.app-slack {
+  background: #1a1d21;
+  color: #d1d2d3;
+  font-size: 15px;
+}
+
+.sl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 49px;
+  padding: 0 16px;
+  border-bottom: 1px solid #35373b;
+  color: #fff;
+  font-size: 15px;
+}
+
+.sl-head b {
+  font-weight: 800;
+}
+
+.sl-channel {
+  color: #ababad;
+  font-size: 13px;
+}
+
+.sl-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff7b72;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sl-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff5449;
+}
+
+.sl-body {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  flex: 1;
+  padding: 16px;
+}
+
+.sl-msg {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.sl-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #2c7a9e;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sl-avatar.bot {
+  background: #10141b;
+  color: #f5a83c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.sl-avatar.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.sl-who b {
+  color: #fff;
+  font-weight: 800;
+}
+
+.sl-who small {
+  margin-left: 4px;
+  color: #ababad;
+  font-size: 12px;
+}
+
+.sl-app {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #35373b;
+  color: #c9c9ca;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+
+.app-slack .mention {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgba(29, 155, 209, 0.12);
+  color: #1d9bd1;
+}
+
+.sl-status {
+  align-self: start;
+  padding-left: 44px;
+  color: #ababad;
+  font-size: 13px;
+}
+
+.sl-status b {
+  color: #d1d2d3;
+}
+
+.sl-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sl-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(209, 210, 211, 0.3);
+  border-radius: 4px;
+  color: #d1d2d3;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sl-btn.primary {
+  border-color: transparent;
+  background: #007a5a;
+  color: #fff;
+}
+
+.sl-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ababad;
+  font-size: 13px;
+}
+
+.sl-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #35373b;
+}
+
+.sl-composer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 16px 16px;
+  padding: 10px 12px;
+  border: 1px solid #565856;
+  border-radius: 8px;
+  color: #9a9b9e;
+  font-size: 14px;
+}
+
+.sl-composer i {
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-left: 10px solid #565856;
+  border-right: 0;
+}
+
+/* ---------- GitHub ---------- */
+
+.app-github {
+  background: #0d1117;
+  color: #f0f6fc;
+}
+
+.gh-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 45px;
+  padding: 0 16px;
+  border-bottom: 1px solid #3d444d;
+  background: #010409;
+  color: #9198a1;
+}
+
+.gh-top b,
+.gh-top span:first-child {
+  color: #f0f6fc;
+}
+
+.gh-tab {
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 14px;
+  padding: 0 4px;
+  border-bottom: 2px solid #f78166;
+  color: #f0f6fc;
+  font-weight: 600;
+}
+
+.gh-body {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  flex: 1;
+  padding: 18px 16px;
+}
+
+.gh-issue .app-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.gh-issue .app-title span {
+  color: #9198a1;
+  font-weight: 400;
+}
+
+.gh-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #3d444d;
+  color: #9198a1;
+  font-size: 13px;
+}
+
+.gh-meta b {
+  color: #f0f6fc;
+}
+
+.gh-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #238636;
+  color: #fff;
+  font-weight: 500;
+}
+
+.gh-timeline {
+  position: relative;
+  display: grid;
+  gap: 16px;
+}
+
+/* the line that joins the comments */
+.gh-timeline::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 59px;
+  width: 2px;
+  background: #3d444d;
+}
+
+.gh-comment {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.gh-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #1f6f5c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gh-avatar.bot {
+  border-radius: 7px;
+  background: #10141b;
+  color: #f5a83c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.gh-box {
+  border: 1px solid #3d444d;
+  border-radius: 6px;
+  background: #0d1117;
+  overflow: hidden;
+}
+
+.gh-box-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #3d444d;
+  background: #151b23;
+  color: #9198a1;
+  font-size: 13px;
+}
+
+.gh-box-head b {
+  color: #f0f6fc;
+}
+
+.gh-label {
+  padding: 0 7px;
+  border: 1px solid #3d444d;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.gh-box-body {
+  padding: 14px;
+}
+
+.app-github .mention {
+  color: #4493f8;
+  font-weight: 600;
+}
+
+.gh-event {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 44px;
+  color: #9198a1;
+  font-size: 13px;
+}
+
+.gh-event i {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #0d1117;
+  border-radius: 50%;
+  background: #212830;
+  box-shadow: inset 0 0 0 9px #212830, inset 0 0 0 11px #9198a1;
+}
+
+.gh-event b {
+  color: #f0f6fc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ---------- Linear ---------- */
+
+.app-linear {
+  background: #101113;
+  color: #f7f8f8;
+  font-size: 13.5px;
+}
+
+.ln-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid #23252a;
+  color: #8a8f98;
+  font-size: 13px;
+}
+
+.ln-top b {
+  color: #f7f8f8;
+  font-weight: 500;
+}
+
+.ln-team {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #5e6ad2;
+}
+
+.ln-sep {
+  color: #62666d;
+}
+
+.ln-body {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  flex: 1;
+  padding: 20px 18px;
+}
+
+.ln-issue .app-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.ln-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.ln-props > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid #23252a;
+  border-radius: 6px;
+  background: #17181b;
+  color: #d0d6e0;
+  font-size: 12.5px;
+}
+
+.ln-status {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #f0bf00;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent 50%, #f0bf00 50%);
+  background-clip: content-box;
+  padding: 1.5px;
+}
+
+.ln-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #c2571a;
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ln-avatar.bot {
+  border-radius: 5px;
+  background: #10141b;
+  color: #f5a83c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.ln-label {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ln-activity {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ln-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8a8f98;
+  font-size: 13px;
+}
+
+.ln-row b {
+  color: #f7f8f8;
+  font-weight: 500;
+}
+
+.ln-session {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #2a2c32;
+  border-radius: 8px;
+  background: #17181b;
+}
+
+.ln-session-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ln-agent {
+  padding: 0 6px;
+  border: 1px solid #34363c;
+  border-radius: 4px;
+  color: #8a8f98;
+  font-size: 11px;
+}
+
+.ln-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #f0bf00;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.ln-state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ln-state.done {
+  color: #4cb782;
+}
+
+.ln-thought {
+  padding-left: 10px;
+  border-left: 2px solid #34363c;
+  color: #8a8f98;
+  font-style: italic;
+}
+
+.ln-stopped {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d0d6e0;
+}
+
+.ln-stopped i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #eb5757;
+}
+
+/* ---------- Notion ---------- */
+
+.app-notion {
+  background: #191919;
+  color: #d4d4d4;
+}
+
+.nt-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: #d4d4d4;
+  font-size: 14px;
+}
+
+.nt-top span:last-child {
+  color: #9b9b9b;
+  letter-spacing: 1px;
+}
+
+.nt-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 20px;
+  align-content: start;
+  flex: 1;
+  padding: 20px 20px 22px 28px;
+}
+
+.nt-doc .app-title {
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.nt-h1 {
+  margin-top: 18px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.nt-doc ul {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  font-size: 15px;
+}
+
+.nt-comments {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 12px;
+  border: 1px solid #2f2f2f;
+  border-radius: 8px;
+  background: #202020;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.nt-comment {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.nt-avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #2c7a9e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.nt-avatar.bot {
+  border-radius: 5px;
+  background: #10141b;
+  color: #f5a83c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.nt-who b {
+  color: #fff;
+}
+
+.nt-who small {
+  margin-left: 4px;
+  color: #9b9b9b;
+  font-size: 12px;
+}
+
+.app-notion .mention {
+  color: #9b9b9b;
+}
+
+.nt-reply {
+  padding-top: 10px;
+  border-top: 1px solid #2f2f2f;
+  color: #7f7f7f;
+  font-size: 13.5px;
+}
+
+@media (max-width: 520px) {
+  .nt-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+}
