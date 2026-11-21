@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 
 import { harness, type RecordingAgent, recordingAgent } from "./app-harness.ts";
 
+export { refusal } from "./app-harness.ts";
+
 /**
  * A Slack workspace for a unit test: the app in memory, a stand-in agent, one session with Ana
  * and a channel she shares with the app. `api` calls the fake Web API as the app, `post` and
@@ -28,13 +30,6 @@ export async function slackWorkspace({ reachable = true }: { reachable?: boolean
     (await h.provider("POST", `slack/api/${method}`, args, app.botToken)).body;
   return { h, agent, sessionId, app, team, ana, channel, post, get, say, api };
 }
-
-/** The error code a control API call was refused with, or "no error". */
-export const refusal = (run: Promise<unknown>) =>
-  run.then(
-    () => "no error",
-    (error: { body?: { error: string } }) => error.body?.error,
-  );
 
 /** Does a delivery carry a valid Slack signature for this signing secret, the way Bolt checks it? */
 export function signedBy(delivery: RecordingAgent["received"][number], signingSecret: string): boolean {

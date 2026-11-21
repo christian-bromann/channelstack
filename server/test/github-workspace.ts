@@ -65,6 +65,18 @@ export async function githubWorkspace({ reachable = true }: { reachable?: boolea
     }));
   /** What the webhooks so far got wrong by GitHub's schemas. */
   const webhookIssues = () => webhooks().flatMap(({ event, payload }) => webhookProblems(event, payload));
+  /** Call the REST API with any Authorization header (or none), and see the whole response. */
+  const raw = (method: string, path: string, authorization?: string, body?: unknown) =>
+    h.app.fetch(
+      new Request(`http://127.0.0.1:4500/github${path}`, {
+        method,
+        headers: {
+          ...(authorization ? { authorization } : {}),
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    );
   const name = (kind: string) => `${kind}/${repo.owner}/${repo.name}`;
 
   return {
@@ -80,6 +92,12 @@ export async function githubWorkspace({ reachable = true }: { reachable?: boolea
     jwt,
     asApp,
     api,
+    raw,
+    /** The installation token, once `api` has exchanged the App's JWT for it. */
+    token: async () => {
+      await api("GET", `/${name("repos")}`);
+      return token ?? "";
+    },
     problems,
     webhooks,
     webhookIssues,

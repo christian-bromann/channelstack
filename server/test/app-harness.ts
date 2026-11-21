@@ -159,3 +159,10 @@ export async function recordingAgent(): Promise<RecordingAgent> {
   };
   return agent;
 }
+
+/** The error code a control API call was refused with, or "no error". */
+export const refusal = (run: Promise<unknown>) =>
+  run.then(
+    () => "no error",
+    (error: { body?: { error: string } }) => error.body?.error,
+  );
