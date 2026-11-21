@@ -63,6 +63,15 @@ async function runStart(flags: {
   const port = flags.port === undefined ? (portless ? 0 : DEFAULT_PORT) : Number(flags.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) fail(`--port must be a port number, got "${flags.port}"`);
 
+  // The signals are caught before the server exists: its token file appears while it starts, and a
+  // signal that arrives right then must still end in a clean stop, not a file left behind.
+  let stopRequested = false;
+  let stop = () => {
+    stopRequested = true;
+  };
+  // SIGHUP is what a closed terminal tab sends: it must clean up like the others.
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => stop());
+
   const seed = process.env.CHANNELSTACK_SEED;
   const running = await start({
     version: pkg.version,
@@ -95,7 +104,7 @@ async function runStart(flags: {
   process.stdout.write(lines.join("\n"));
 
   let stopping = false;
-  const stop = () => {
+  stop = () => {
     if (stopping) return;
     stopping = true;
     running.stop().then(
@@ -103,8 +112,7 @@ async function runStart(flags: {
       () => process.exit(1),
     );
   };
-  // SIGHUP is what a closed terminal tab sends: it must clean up like the others.
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, stop);
+  if (stopRequested) stop();
 }
 
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */

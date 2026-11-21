@@ -7,6 +7,9 @@ import { waitFor } from "../../sdks/typescript/runtime/wait.ts";
 import { background, capture, freePort } from "./process.ts";
 import { startBinary } from "./server.ts";
 
+/** How long an agent may take to come up. Several stacks start side by side in CI, on few cores. */
+const STARTUP = { timeout: "45s" } as const;
+
 export interface StackOptions {
   /** The server executable. */
   bin: string;
@@ -82,23 +85,31 @@ export async function withStack(
       const control = (method: string, path: string) =>
         fetch(`${url}/_channelstack${path}`, { method, headers: { authorization: `Bearer ${token}` } });
       const { sessionId } = (await (await control("POST", "/sessions")).json()) as { sessionId: string };
-      await waitFor("the reference agent to connect", async () => {
-        running();
-        const fixture = (await (await control("GET", `/sessions/${sessionId}/slack`)).json()) as {
-          socketConnections: number;
-        };
-        return fixture.socketConnections > 0 ? true : undefined;
-      });
+      await waitFor(
+        "the reference agent to connect",
+        async () => {
+          running();
+          const fixture = (await (await control("GET", `/sessions/${sessionId}/slack`)).json()) as {
+            socketConnections: number;
+          };
+          return fixture.socketConnections > 0 ? true : undefined;
+        },
+        STARTUP,
+      );
       await control("DELETE", `/sessions/${sessionId}`);
     } else
-      await waitFor("the reference agent to listen", () => {
-        running();
-        return new Promise<true | undefined>((resolve) => {
-          const socket = connect({ host: "127.0.0.1", port });
-          socket.once("connect", () => resolve(socket.destroy() && true));
-          socket.once("error", () => resolve(undefined));
-        });
-      });
+      await waitFor(
+        "the reference agent to listen",
+        () => {
+          running();
+          return new Promise<true | undefined>((resolve) => {
+            const socket = connect({ host: "127.0.0.1", port });
+            socket.once("connect", () => resolve(socket.destroy() && true));
+            socket.once("error", () => resolve(undefined));
+          });
+        },
+        STARTUP,
+      );
 
     await use({ home, env });
   } finally {
