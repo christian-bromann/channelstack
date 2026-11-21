@@ -1,0 +1,44 @@
+/**
+ * `channelstack/checks`: the standard behaviour checks. Each call registers ordinary tests
+ * in the current suite of whichever framework is running (Vitest, Jest, Playwright).
+ */
+import type { Duration } from "./common";
+
+export interface ChecksOptions {
+  /** The app name from `channelstack.config.ts`. */
+  app: string;
+  /** Text that makes the agent reply, e.g. "@my-agent hello". Default: `@<app> hello`. */
+  prompt?: string;
+  /** Skip checks by id, e.g. `["slack.stream-stop"]` for an agent that doesn't stream. */
+  skip?: string[];
+  timeout?: Duration;
+}
+
+/**
+ * Registers: replies once to a DM · once to a mention · replies in the thread · survives
+ * Slack's 3s retry · handles redelivery idempotently · ignores its own and other bots'
+ * messages · rejects a bad signature · acks within 3s · handles `msg_too_long` · a stream
+ * starts and stops · honours Stop · refuses clicks from people who may not act · a double
+ * click acts once.
+ */
+export declare function slackChecks(options: ChecksOptions): void;
+
+/**
+ * Registers: ignores its own comments · one comment per trigger · review-thread replies
+ * trigger it · redelivery doesn't duplicate · check runs reach a conclusion · rejects a
+ * bad webhook signature.
+ */
+export declare function githubChecks(options: ChecksOptions): void;
+
+/**
+ * Registers: a mention opens one session · delegation opens one session · a prompt gets
+ * one response · Stop ends the session · the session never stays `active` after the work
+ * is done · redelivery doesn't duplicate activities.
+ */
+export declare function linearChecks(options: ChecksOptions): void;
+
+/**
+ * Registers: replies once to a comment mention · replies in the same discussion · ignores
+ * its own comments · stays silent on pages it isn't connected to.
+ */
+export declare function notionChecks(options: ChecksOptions): void;

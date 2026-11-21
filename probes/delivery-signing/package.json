@@ -1,0 +1,16 @@
+{
+  "name": "channelstack-probe-delivery-signing",
+  "private": true,
+  "type": "module",
+  "description": "Local probes: official platform SDK receivers accept the deliveries the fakes send (signing, timestamps, retries, Socket Mode).",
+  "scripts": {
+    "probe": "node probe.mjs && node probe-socket.mjs"
+  },
+  "dependencies": {
+    "@linear/sdk": "103.0.0",
+    "@notionhq/client": "5.31.1",
+    "@octokit/webhooks": "14.2.0",
+    "@slack/bolt": "5.1.0",
+    "ws": "8.23.0"
+  }
+}

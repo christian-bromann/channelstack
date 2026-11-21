@@ -1,0 +1,250 @@
+<title>Channelstack Competitive Landscape</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (~70ch) with wide tables allowed to scroll in their own boxes */
+:root{
+  --bg:#f6f7f5; --surface:#ffffff; --fg:#1b2420; --muted:#5b6862; --line:#d9dfdb;
+  --accent:#0f6b5c; --accent-soft:#e2f0ec; --warn:#a4570a; --warn-soft:#fbefe0; --bad:#a23a32;
+  --display:"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121715; --surface:#1a211e; --fg:#e4ebe7; --muted:#9aa8a1; --line:#2c3632;
+  --accent:#5cc4ae; --accent-soft:#183129; --warn:#e9a55a; --warn-soft:#33261a; --bad:#ec8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --surface:#1a211e; --fg:#e4ebe7; --muted:#9aa8a1; --line:#2c3632;
+  --accent:#5cc4ae; --accent-soft:#183129; --warn:#e9a55a; --warn-soft:#33261a; --bad:#ec8a80; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:17px/1.6 var(--body)}
+.wrap{max-width:860px;margin:0 auto;padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:44px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(30px,5vw,44px);font-weight:800;letter-spacing:-.01em}
+h2{font-size:24px;font-weight:700}
+h3{font-size:18px;font-weight:700}
+p{margin:0}
+section{display:grid;gap:14px}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:19px;color:var(--fg);max-width:66ch}
+.meta{color:var(--muted);font-size:14px}
+.verdict{background:var(--accent-soft);border-left:4px solid var(--accent);padding:18px 20px;border-radius:4px;display:grid;gap:10px}
+.verdict p{max-width:68ch}
+ul,ol{margin:0;padding-left:1.2em;display:grid;gap:6px}
+li{max-width:70ch}
+code{font:14px var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+a{color:var(--accent)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:720px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font:600 12px/1.3 var(--mono);letter-spacing:.04em;color:var(--muted);text-transform:uppercase;background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.c{text-align:center;font-family:var(--mono);font-size:15px;white-space:nowrap}
+.y{color:var(--accent);font-weight:600}.p{color:var(--warn)}.n{color:var(--muted)}
+tr.us td{background:var(--accent-soft)}
+.legend{font:13px var(--mono);color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:8px;align-content:start;min-width:0}
+.card .tag{font:600 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.gap{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:baseline}
+.gap .st{font:600 12px var(--mono);padding:2px 7px;border-radius:3px;white-space:nowrap}
+.st.open{background:var(--accent-soft);color:var(--accent)}
+.st.risk{background:var(--warn-soft);color:var(--warn)}
+.num{font-variant-numeric:tabular-nums}
+blockquote{margin:0;padding-left:14px;border-left:3px solid var(--line);color:var(--muted);font-style:italic}
+.src{font-size:14px;color:var(--muted)}
+.src li{max-width:none}
+hr{border:0;border-top:1px solid var(--line);margin:0}
+</style>
+
+<div class="wrap">
+
+<header style="display:grid;gap:14px">
+  <span class="eyebrow">Competitive analysis · v2 · 19 Nov 2026</span>
+  <h1>Testing agents that live in Slack, GitHub and Linear</h1>
+  <p class="lede">Who already solves end-to-end testing for channel agents, what is still open, and where channelstack fits. Built from eight research tracks:</p>
+  <ul>
+    <li>about 40 tools and vendors</li>
+    <li>emulate's 70 issues and 349 PRs</li>
+    <li>a line-by-line split of the closed MDA local-stack PR stack (#1040–#1122)</li>
+    <li>the test suites of 10 agent frameworks</li>
+    <li>a sample of 28 agent apps, plus issue searches on about 25 more</li>
+  </ul>
+  <p class="meta">Stars, downloads and counts were pulled on 2026-11-19. GitHub code-search totals are approximate. Numbers that come only from aggregators are marked "unverified". Companion notes: <code>niche.md</code>, <code>framework-testing.md</code>, <code>app-developers.md</code>, <code>devx.md</code>.</p>
+</header>
+
+<div class="verdict">
+  <span class="eyebrow">Bottom line</span>
+  <p><strong>The real competitor is "build it yourself".</strong> Every serious team has built a harness for its own channels: OpenClaw (QA Lab, Crabline), Hermes (platform stand-ins), n8n (replay and contract tests), Open SWE (a fake Slack) and MDA itself (17.9k lines, closed). None of it is packaged for anyone else. The other 85% of agent apps mock the SDK or don't test, and they keep shipping the same bugs: duplicate replies on retry, replies outside the thread, a bot that responds to itself, streams finalized twice.</p>
+  <p><strong>Don't rebuild the fakes; package the harness.</strong> Vercel Labs' <code>emulate</code> already has stateful Slack, GitHub and Linear APIs with signed events. What nobody ships is everything around them:</p>
+  <ul>
+    <li>a standing local server at stable addresses</li>
+    <li>a browser client to chat with your bot</li>
+    <li>actors and assertions on what a person sees</li>
+    <li>delivery chaos (retries, redelivery, bad signatures)</li>
+    <li>a standard set of behaviour checks, wired into Vitest, Jest, Playwright, WebdriverIO and pytest</li>
+    <li>the agent surfaces emulate rules out (Slack streams, agent sessions, Socket Mode), plus Notion, which emulate doesn't have</li>
+  </ul>
+  <p><strong>Position:</strong> channelstack is a local server, reachable through portless, built on emulate wherever emulate models state, and the shared version of what OpenClaw and Hermes each built for themselves.</p>
+</div>
+
+<section>
+  <span class="eyebrow">What changed since v1</span>
+  <h2>Four corrections</h2>
+  <ul>
+    <li><strong>emulate is further along than the 0.12.3 version the stack pinned.</strong> v0.14.0 (2026-11-18) has:
+      <ul>
+        <li>signed Slack <code>event_callback</code> deliveries and <code>block-actions</code>, <code>view-submission</code> and <code>event-retry</code> simulators;</li>
+        <li>Linear Agent Sessions (#394);</li>
+        <li>GitHub App tokens and signed webhooks.</li>
+      </ul>
+      Most of the closed stack's fake Linear (about 1.2k lines) would now be unnecessary.</li>
+    <li><strong>Upstreaming is a bet, not a plan.</strong>
+      <ul>
+        <li>Of 143 outside PRs, 12 were merged (8%), and at least 11 more were reimplemented by the maintainer (#196 → #394).</li>
+        <li>62 are still open, with a median age of 74 days.</li>
+        <li>The question "do you accept outside PRs?" (#399) has no reply, and there is no CONTRIBUTING file.</li>
+        <li>Built-in services can't be extended through <code>defineEmulator</code>.</li>
+      </ul>
+      So channelstack has to serve the missing routes itself.</li>
+    <li><strong>The HTTPS interception proxy is no longer the lead feature.</strong> Each SDK already has a base-URL option (Bolt <code>slackApiUrl</code>, <code>slack_sdk</code> <code>base_url</code>, Chat SDK <code>apiUrl</code>). With portless, one env var is enough. A transparent proxy stays as a fallback for code that can't change its base URL.</li>
+    <li><strong>The conformance suite moves down.</strong> It makes the fakes trustworthy, but it doesn't attract users. OpenClaw already proves the approach: the same scenarios run nightly against real workspaces.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="eyebrow">Capability matrix</span>
+  <h2>Who covers which piece</h2>
+  <p class="legend"><span class="y">●</span> yes &nbsp; <span class="p">◐</span> partial or claimed &nbsp; <span class="n">○</span> no &nbsp; — not applicable</p>
+  <div class="tbl">
+  <table>
+    <thead><tr>
+      <th>Tool</th><th>Stateful provider fakes</th><th>Signed inbound + retry / redelivery</th><th>Scripted actors</th><th>Asserts on what a person sees</th><th>Any language (network fake)</th><th>Local chat UI</th><th>Slack streams / Stop</th><th>Teams wire level</th><th>Packaged for others</th>
+    </tr></thead>
+    <tbody>
+      <tr><td><strong>vercel-labs/emulate</strong> 0.14</td><td class="c y">●</td><td class="c p">◐</td><td class="c p">◐</td><td class="c n">○</td><td class="c y">●</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c y">●</td></tr>
+      <tr><td>OpenClaw QA Lab · qa-channel · Crabline</td><td class="c p">◐ Discord</td><td class="c p">◐</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c n">○</td><td class="c p">◐</td><td class="c n">○</td><td class="c n">○</td></tr>
+      <tr><td>Hermes Agent platform stand-ins</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c n">○</td><td class="c y">●</td><td class="c n">○</td><td class="c n">○</td></tr>
+      <tr><td>Vercel Chat SDK integration tests</td><td class="c p">◐ via emulate</td><td class="c p">◐</td><td class="c p">◐</td><td class="c p">◐</td><td class="c n">○</td><td class="c n">○</td><td class="c p">◐ replay</td><td class="c p">◐ replay</td><td class="c p">◐</td></tr>
+      <tr><td>n8n channel contract and replay suite</td><td class="c n">○</td><td class="c y">●</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c p">◐</td><td class="c p">◐ JWT</td><td class="c n">○</td></tr>
+      <tr><td>Microsoft TestAdapter · M365 Agents Playground</td><td class="c p">◐</td><td class="c n">○</td><td class="c y">●</td><td class="c p">◐</td><td class="c n">○</td><td class="c y">● Teams</td><td class="c">—</td><td class="c p">◐</td><td class="c y">●</td></tr>
+      <tr><td><code>@chat-adapter/tests</code> · Bolt / Probot internals</td><td class="c n">○</td><td class="c p">◐</td><td class="c n">○</td><td class="c p">◐</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c p">◐</td></tr>
+      <tr><td>Hoverfly · mitmproxy · Prism · Microcks</td><td class="c p">◐</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c y">●</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c y">●</td></tr>
+      <tr><td>Arga · Hue · Drizz · StateWeave</td><td class="c y">●</td><td class="c p">◐</td><td class="c p">◐</td><td class="c n">○</td><td class="c y">●</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c p">◐ SaaS</td></tr>
+      <tr><td>LangWatch Scenario · LangSmith simulation</td><td class="c n">○</td><td class="c n">○</td><td class="c p">◐</td><td class="c p">◐</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c n">○</td><td class="c y">●</td></tr>
+      <tr class="us"><td><strong>channelstack (proposed)</strong></td><td class="c y">● on emulate</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c y">●</td><td class="c n">○ not yet</td><td class="c y">●</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="meta">"Scripted actors" means a test API for people doing things (say, click, stop) without hand-building payloads. OpenClaw's Crabline runs full flows only for Discord; Slack has a synthetic bus and a live lane. Hermes covers Slack, Telegram and Discord, and has 3 Teams tests. Chat SDK's emulate tests cover Slack and GitHub only; its other adapters are tested by replay.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Landscape</span>
+  <h2>Eight groups, two of them real competition</h2>
+  <div class="cards">
+    <div class="card"><span class="tag">Main competitor · in-house</span><h3>Harnesses teams build themselves</h3>
+      <ul>
+        <li>OpenClaw (~395k★): about 630 YAML scenarios over synthetic, Crabline and live transports, plus a mock-openai server and nightly live lanes with leased credentials.</li>
+        <li>Hermes: aiohttp stand-ins with Socket Mode and streams, and one <code>_contract.py</code> scenario suite with a driver per platform.</li>
+        <li>n8n: replays, plus Teams JWT forging.</li>
+        <li>Open SWE: a fake Slack in Playwright.</li>
+        <li>kodus: live tests across 5 git hosts.</li>
+        <li>MDA: 17.9k lines, closed.</li>
+      </ul>
+      <p>All of them are expensive, and none can be reused by anyone else.</p></div>
+    <div class="card"><span class="tag">Foundation · OSS</span><h3>vercel-labs/emulate</h3>
+      <p>Apache-2.0, about 2k stars, 15+ services. Chris Tate wrote about half of all PRs, and outside PRs are merged 8% of the time. Its README rules out Slack streaming, Socket Mode and slash commands. Testing tools are stalled: record/replay (#62), MSW (#288) and snapshots (#60, #282). Chat SDK and centaur use it. Build on it, don't fight it.</p>
+      <p class="meta num">Weekly npm: @emulators/core 299k, slack 43k, github 18k, linear 2.7k.</p></div>
+    <div class="card"><span class="tag">Commercial twins</span><h3>Arga, Hue, Drizz, StateWeave</h3>
+      <p>Funded and closed source. Arga raised a $10M seed (Aug 2026). LocalStack announced buying WonderTwin. They mostly test the agent's outbound tool calls through a base-URL or MCP swap, not channel ingress. Their fidelity claims have no published evidence.</p></div>
+    <div class="card"><span class="tag">Precedent · Microsoft</span><h3>TestFlow and Agents Playground</h3>
+      <p><code>TestAdapter</code>/<code>TestFlow</code> (<code>.send('hi').assertReply(...)</code>) is the original "simulated user, assert on reply" API, but it runs in memory and skips the channel's wire format. Agents Playground is a local Teams client, manual only. Together they prove there's demand for a local client plus a test API.</p></div>
+    <div class="card"><span class="tag">Framework kits</span><h3>Chat SDK, Bolt, Probot, Mastra, Flue, Pi</h3>
+      <p><code>@chat-adapter/tests</code> checks handler calls. Bolt has never shipped a test kit (bolt-python#380, open since 2021). Mastra and ElizaOS use mocks. Flue tested only inbound verification and has since removed it. Pi's Slack bot had no Slack tests. Pi's <code>fauxProvider</code> is the common way to fake the model.</p></div>
+    <div class="card"><span class="tag">Generic plumbing</span><h3>Proxies and spec tools</h3>
+      <p>Hoverfly, mitmproxy, MockServer, Prism, Microcks and Specmatic. None of them know Slack, GitHub or Linear semantics. Building blocks, not competitors.</p></div>
+    <div class="card"><span class="tag">Complement</span><h3>Agent eval and simulation</h3>
+      <p>LangWatch Scenario, LangSmith simulation, Braintrust and Promptfoo judge answer quality in-process. None goes through webhook ingress. channelstack tests behaviour in the channel, so they sit on top of it.</p></div>
+    <div class="card"><span class="tag">Different buyer</span><h3>RL environment vendors</h3>
+      <p>Deeptune, Halluminate, Plato and Collinear sell Slack and Jira clones to frontier labs for training. Low threat, and a possible source of scenarios.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">White space</span>
+  <h2>What is open, and how long it stays open</h2>
+  <div class="gap">
+    <span class="st open">open</span><p><strong>A packaged harness.</strong> OpenClaw and Hermes arrived at the same design on their own (fake provider servers, a scenario suite with a driver per platform, a wire-level fake model), but it stays inside their repos. Nobody offers it as a product.</p>
+    <span class="st open">open</span><p><strong>A local chat loop for development.</strong> Today, testing a Slack bot means a dev workspace, installing the app, ngrok, and switching windows. The only local client that exists is for Teams (Agents Playground). A Slack-like browser client with an inspector and chaos buttons, at <code>https://channelstack.localhost</code>, is new.</p>
+    <span class="st open">open</span><p><strong>Asserting on what a person sees, and delivery chaos.</strong> Matchers like <code>toHaveRepliesFrom</code> and <code>toHaveStatus</code>, plus retry, redelivery and forged signatures as test primitives. Only Hermes has them, internally. These catch the most common bugs across all the apps sampled.</p>
+    <span class="st open">open</span><p><strong>Teams at the wire level.</strong> No fake exists anywhere. emulate's Microsoft service is OAuth only, and Microsoft's TestFlow skips the wire format. OpenClaw has a Teams fix blocked because it "needs tenant-backed delivery proof" (#199876). n8n forges Bot Framework JWTs by hand. It's a real gap, but channelstack is starting with Slack, GitHub, Linear and Notion.</p>
+    <span class="st open">open</span><p><strong>Notion agents.</strong> emulate has no Notion service, and I found no Notion fake for comment mentions and integration webhooks. channelstack builds it as its own emulate service.</p>
+    <span class="st risk">months</span><p><strong>Slack agent surfaces</strong> (<code>chat.startStream</code>, agent sessions and Stop, Socket Mode). emulate's README rules them out today and only Hermes models them. Chat SDK users file streaming bugs (vercel/chat#1036). Vercel could close this when it needs to, so build it to be swappable.</p>
+    <span class="st open">open</span><p><strong>A standard behaviour-check suite.</strong> Things like "replies once", "survives a 3-second retry", "ignores itself", "honours Stop", "refuses unauthorised clicks". Each one maps to a bug class found in real apps. Hermes's scenario names are nearly this list.</p>
+    <span class="st open">open</span><p><strong>Linear agent tooling.</strong> Linear's own demo agents have no tests and say to try them in a real workspace.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Demand</span>
+  <h2>The same bugs, everywhere</h2>
+  <ul>
+    <li><strong>The population.</strong> There are about 5k–10k open-source agent apps in channels, and about 300–500 of them have 100+ stars, mostly active in 2026. Code-search hits: Telegram + LLM about 7.5k, Discord about 6.8k, Slack Bolt + LLM about 2.9k, Chat SDK adapters about 800, Teams about 620, Linear <code>agentSession</code> about 360.</li>
+    <li><strong>How they test (sample of 28).</strong> 71% only mock the SDK, 14% have no channel tests, 11% use a fake server (Sentry's junior on msw, Paradigm's centaur on emulate), and 4% test live (OpenClaw).</li>
+    <li><strong>The bugs that recur.</strong>
+      <ul>
+        <li>Duplicate replies: openclaw#1481, chatwoot#15450, mastra#18877, OpenHands#13358, eliza#37505.</li>
+        <li>Replies outside the thread: openclaw#1163, n8n#43054.</li>
+        <li>Bot reacting to itself: claude-code-action#794, kodus#1946, a pr-agent loop (#1528).</li>
+        <li>Missed triggers: OpenHands#12513, gemini-cli#172.</li>
+        <li>Stream finalized twice: openclaw#158103.</li>
+        <li>Check runs stuck or falsely green: claude-code-action#1679.</li>
+      </ul>
+      All of these come from platform behaviour that mocks don't model.</li>
+    <li><strong>Slack never shipped a test kit.</strong> bolt-python#380 has been open since 2021. node-slack-sdk#1031 was answered with "sign the requests yourself". About 120 GitHub repos are mock Slack servers.</li>
+    <li><strong>Explicit requests are rare, but they exist.</strong> Dry-run mode (pr-agent#1237), "how to test this tool" (claude-code-action#503), tests for the Slack client (eliza#2403), and test webhooks that work while production fails (n8n#34204, dify#41752).</li>
+  </ul>
+  <blockquote>"given the lack of test kits, I have to understand how Slack signs" (node-slack-sdk #1031)</blockquote>
+  <p class="meta">Not covered: Reddit (the archive API rate-limited every query). I found no discussion of emulate on HN or X.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Risks</span>
+  <h2>What could sink it</h2>
+  <ul>
+    <li><strong>OpenClaw packages Crabline and QA Lab.</strong> It has the reach (~395k★) to define the category. Mitigations: be framework-neutral, cover Linear and Notion, plug into every test framework, and approach them early as users rather than competitors.</li>
+    <li><strong>Vercel builds the layer into emulate.</strong> ctate reimplements good outside ideas. Mitigations: depth on agent behaviour (streams, Stop, chaos, checks), Python and Go clients, and test-framework integrations, none of which an API-emulation project has much reason to pursue.</li>
+    <li><strong>Building on emulate is fragile.</strong> Overlay routes such as streams have to write into emulate's state, and the API for that may change. Pin versions, keep the overlay small, and be ready to swap the store.</li>
+    <li><strong>The UI could grow into product clones.</strong> Keep it functional: one neutral transcript view with working buttons, forms and raw JSON, and no attempt to copy each product's look.</li>
+    <li><strong>Long-tail developers don't write e2e tests.</strong> The standard checks and the local chat UI have to deliver value before anyone writes a test.</li>
+    <li><strong>Funded twin vendors move down to developers.</strong> The answer is open, self-hosted and CI-native. Keep the core open: LocalStack closing its community edition led to a fork with about 32k stars.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="eyebrow">Recommendation</span>
+  <h2>A first milestone that proves the gap</h2>
+  <ol>
+    <li><strong>The <code>channelstack</code> server:</strong> Slack at <code>https://slack.localhost</code> through portless, with one in-memory workspace. It stores state in emulate, and serves streams, agent sessions and Stop, Socket Mode, a delivery log and redelivery itself. Config comes from <code>channelstack.config.ts</code> or the app's real manifest. GitHub, Linear and Notion (<code>github.</code>, <code>linear.</code>, <code>notion.localhost</code>) follow the same pattern.</li>
+    <li><strong>The browser UI</strong> at <code>https://channelstack.localhost</code>, plus the attach CLI (<code>channelstack slack say --as ana …</code>) and MCP: a channel view, the inspector, and chaos controls.</li>
+    <li><strong>The <code>channelstack/vitest</code> plugin and <code>slackChecks()</code>:</strong> fixtures in the test context, <code>expect</code> extended with channel matchers, and about 12 checks taken from the bug classes above. Models stay with each framework's own fakes.</li>
+    <li><strong>The proof:</strong> re-land MDA's channel tests on channelstack in about 5k lines instead of 13.8k, then show it to the teams behind junior, centaur and Open SWE, and to the OpenClaw and Hermes maintainers.</li>
+  </ol>
+</section>
+
+<hr>
+
+<section class="src">
+  <h3>Main sources</h3>
+  <ul>
+    <li><a href="https://github.com/vercel-labs/emulate">vercel-labs/emulate</a> · PRs <a href="https://github.com/vercel-labs/emulate/pull/288">#288</a>, <a href="https://github.com/vercel-labs/emulate/pull/62">#62</a>, <a href="https://github.com/vercel-labs/emulate/pull/394">#394</a> · issue <a href="https://github.com/vercel-labs/emulate/issues/399">#399</a> · <a href="https://github.com/vercel-labs/portless">vercel-labs/portless</a></li>
+    <li><a href="https://github.com/openclaw/openclaw">openclaw/openclaw</a> (<code>extensions/qa-lab</code>, <code>extensions/qa-channel</code>, <a href="https://github.com/openclaw/openclaw/issues/199876">#199876</a>) · <a href="https://github.com/NousResearch/hermes-agent">NousResearch/hermes-agent</a> (<code>tests/fakes/platforms</code>, <code>tests/e2e/core/platforms/_contract.py</code>)</li>
+    <li><a href="https://github.com/vercel/chat/blob/main/packages/integration-tests/README.md">Chat SDK integration tests</a> · <a href="https://github.com/vercel/chat/issues/1036">vercel/chat #1036</a> · <a href="https://github.com/withastro/flue">withastro/flue</a> · <a href="https://github.com/earendil-works/pi">earendil-works/pi</a> · <a href="https://github.com/n8n-io/n8n">n8n</a></li>
+    <li><a href="https://github.com/getsentry/junior">getsentry/junior</a> · <a href="https://github.com/paradigmxyz/centaur">paradigmxyz/centaur</a> · <a href="https://github.com/The-PR-Agent/pr-agent">pr-agent</a> · <a href="https://github.com/anthropics/claude-code-action">claude-code-action</a> · <a href="https://github.com/kodustech/kodus-ai">kodus</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/microsoftteams/platform/toolkit/debug-your-agents-playground">M365 Agents Playground</a> · <a href="https://www.ycombinator.com/companies/arga-labs">Arga Labs</a> · <a href="https://www.remio.ai/post/localstack-acquires-wondertwin-ai-expanding-the-local-test-boundary">LocalStack and WonderTwin</a> · <a href="https://blog.localstack.cloud/the-road-ahead-for-localstack/">LocalStack: the road ahead</a></li>
+    <li><a href="https://github.com/slackapi/bolt-python/issues/380">bolt-python #380</a> · <a href="https://github.com/slackapi/node-slack-sdk/issues/1031">node-slack-sdk #1031</a> · <a href="https://github.com/langwatch/scenario">LangWatch Scenario</a> · <a href="https://factory.strongdm.ai/techniques/dtu">StrongDM Digital Twin Universe</a></li>
+  </ul>
+</section>
+
+</div>

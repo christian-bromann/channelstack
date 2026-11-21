@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>channelstack.dev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a sound stage. Left-aligned thesis, then a split "studio monitor" (test code | rendered conversation + cue sheet), then platform roster, principles, signal-path diagram, examples, comparison. */
+:root {
+  --bg: #F5F6F8;
+  --surface: #FFFFFF;
+  --sunk: #ECEEF2;
+  --ink: #10141B;
+  --muted: #586172;
+  --line: #DCE0E7;
+  --accent: #B5650A;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #FCEFDC;
+  --ok: #18865A;
+  --rec: #D23C28;
+  --code-bg: #0E131B;
+  --code-fg: #D5DBE5;
+  --code-dim: #6E7A8C;
+  --code-key: #F2A93B;
+  --code-str: #8FD3A8;
+  --code-fn: #8DB7FF;
+  --code-line: #1D2531;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0D12; --surface: #11161E; --sunk: #161C26; --ink: #E7EBF1; --muted: #8B95A7;
+    --line: #232B37; --accent: #F2A93B; --accent-ink: #1A1206; --accent-soft: #2A1F0F;
+    --ok: #4CC38A; --rec: #F05A44; --code-bg: #0C1118; --code-line: #1B2330;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A0D12; --surface: #11161E; --sunk: #161C26; --ink: #E7EBF1; --muted: #8B95A7;
+  --line: #232B37; --accent: #F2A93B; --accent-ink: #1A1206; --accent-soft: #2A1F0F;
+  --ok: #4CC38A; --rec: #F05A44; --code-bg: #0C1118; --code-line: #1B2330;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+code, pre, .mono { font-family: var(--font-mono); }
+
+/* nav */
+header.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: -0.03em; }
+.mark { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); display: flex; align-items: center; justify-content: center; gap: 2px; padding: 0 5px; }
+.mark i { display: block; width: 2px; background: var(--accent); border-radius: 1px; }
+.navlinks { display: flex; gap: 22px; font-size: 14.5px; color: var(--muted); margin-left: 8px; }
+.navlinks a { text-decoration: none; }
+.navlinks a:hover { color: var(--ink); }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.ver { font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.gh { text-decoration: none; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+@media (max-width: 760px) { .navlinks { display: none; } .ver { display: none; } }
+
+/* hero */
+.hero { padding-block: 72px 40px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.rec { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rec) 22%, transparent); animation: blink 1.6s steps(2, start) infinite; }
+@keyframes blink { to { opacity: .25; } }
+.hero h1 { font-size: clamp(42px, 7.2vw, 88px); line-height: 0.98; font-weight: 700; margin-top: 18px; max-width: 13ch; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.lede { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 60ch; margin: 22px 0 0; }
+.lede strong { color: var(--ink); font-weight: 500; }
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 30px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 9px; font-weight: 600; font-size: 15.5px; text-decoration: none; border: 1px solid var(--line); background: var(--surface); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(1.06); }
+.install { display: inline-flex; align-items: center; gap: 12px; height: 46px; padding: 0 8px 0 16px; border-radius: 9px; background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 14.5px; max-width: 100%; }
+.install .dollar { color: var(--code-dim); }
+.install button { font: inherit; font-size: 12px; color: var(--code-fg); background: var(--code-line); border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+
+/* stage */
+.stage { margin-top: 48px; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); box-shadow: 0 24px 60px -32px rgba(16, 20, 27, .35); }
+@media (max-width: 920px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.panel-head { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; font-family: var(--font-mono); font-size: 12.5px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.panel-head .dots { display: flex; gap: 6px; }
+.panel-head .dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+.panel-head .spacer { flex: 1; }
+.codepane { background: var(--code-bg); color: var(--code-fg); min-width: 0; }
+.codepane .panel-head { border-color: var(--code-line); color: var(--code-dim); }
+.codepane .panel-head .dots i { background: var(--code-line); }
+pre.code { margin: 0; padding: 18px 0; overflow-x: auto; font-size: 13.5px; line-height: 1.7; counter-reset: ln; }
+pre.code .l { display: block; padding: 0 18px 0 0; white-space: pre; }
+pre.code .l::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 40px; padding-right: 14px; text-align: right; color: var(--code-dim); opacity: .55; }
+pre.code .l.hot { background: color-mix(in srgb, var(--code-key) 10%, transparent); box-shadow: inset 2px 0 0 var(--code-key); }
+.k { color: var(--code-key); } .s { color: var(--code-str); } .f { color: var(--code-fn); } .c { color: var(--code-dim); font-style: italic; }
+.monitor { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--line); }
+@media (max-width: 920px) { .monitor { border-left: 0; border-top: 1px solid var(--line); } }
+.replay { font: inherit; font-size: 12px; color: var(--ink); background: var(--sunk); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.thread { padding: 18px; display: flex; flex-direction: column; gap: 14px; background: var(--surface); }
+.msg { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; transition: opacity .35s ease, transform .35s ease; }
+.msg.pending { opacity: .18; transform: translateY(4px); }
+.av { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 14px; color: #fff; }
+.av.ana { background: #5B6CF0; }
+.av.bot { background: var(--ink); color: var(--accent); }
+.who { font-weight: 600; font-size: 14.5px; }
+.who small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
+.tag { font-family: var(--font-mono); font-size: 10.5px; padding: 1px 5px; border-radius: 4px; background: var(--sunk); color: var(--muted); margin-left: 6px; vertical-align: 1px; }
+.body { font-size: 14.5px; }
+.status { font-size: 13.5px; color: var(--muted); font-style: italic; }
+.btns { display: flex; gap: 8px; margin-top: 8px; }
+.sbtn { font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.sbtn.go { background: var(--ok); color: #fff; border-color: transparent; }
+.sbtn.clicked { box-shadow: 0 0 0 2px var(--accent); }
+.mention { color: var(--accent); font-weight: 500; }
+.cues { border-top: 1px solid var(--line); background: var(--sunk); padding: 12px 0 6px; font-family: var(--font-mono); font-size: 12px; overflow-x: auto; }
+.cues h4 { margin: 0 16px 6px; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; }
+.cue { display: grid; grid-template-columns: 74px 64px minmax(0, 1fr) auto; gap: 10px; padding: 3px 16px; white-space: nowrap; transition: opacity .3s ease; font-variant-numeric: tabular-nums; }
+.cue.pending { opacity: .2; }
+.cue .tc { color: var(--muted); }
+.cue .dir { color: var(--accent); }
+.cue .chk { color: var(--ok); }
+.result { display: flex; align-items: center; gap: 10px; padding: 10px 16px 12px; font-family: var(--font-mono); font-size: 12.5px; border-top: 1px dashed var(--line); margin-top: 6px; }
+.result .pass { background: var(--ok); color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+
+/* sections */
+section { padding-block: 84px; }
+section + section { border-top: 1px solid var(--line); }
+.sec-head { display: grid; gap: 14px; max-width: 760px; margin-bottom: 44px; }
+.kicker { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.sec-head h2 { font-size: clamp(30px, 4.2vw, 48px); line-height: 1.05; font-weight: 700; }
+.sec-head p { margin: 0; color: var(--muted); font-size: 18px; max-width: 62ch; }
+
+/* platforms */
+.platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+@media (max-width: 860px) { .platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .platforms { grid-template-columns: minmax(0, 1fr); } }
+.pf { background: var(--surface); padding: 22px 22px 24px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.pf-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.pf h3 { font-size: 21px; font-weight: 600; }
+.pf .pkg { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.pf ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.pf li { font-family: var(--font-mono); font-size: 11.5px; padding: 3px 7px; border-radius: 5px; background: var(--sunk); color: var(--ink); }
+.pf p { margin: 0; font-size: 14.5px; color: var(--muted); }
+
+/* principles */
+.principles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 40px; }
+@media (max-width: 760px) { .principles { grid-template-columns: minmax(0, 1fr); } }
+.pr { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; }
+.pr .ico { width: 44px; height: 44px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.pr h3 { font-size: 21px; font-weight: 600; margin-bottom: 6px; }
+.pr p { margin: 0; color: var(--muted); }
+.pr code { font-size: 13.5px; color: var(--ink); background: var(--sunk); padding: 1px 5px; border-radius: 4px; }
+
+/* diagram */
+.diagram { margin-top: 56px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 22px; overflow-x: auto; }
+.diagram svg { display: block; min-width: 760px; width: 100%; height: auto; }
+.diagram text { font-family: var(--font-mono); font-size: 12.5px; fill: var(--ink); }
+.diagram .lbl { fill: var(--muted); font-size: 11.5px; }
+.diagram .ttl { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
+.diagram .box { fill: var(--sunk); stroke: var(--line); }
+.diagram .boxa { fill: var(--accent-soft); stroke: var(--accent); }
+.diagram .wire { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.diagram .wirea { stroke: var(--accent); stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+.diagram .head { fill: var(--muted); }
+.diagram .heada { fill: var(--accent); }
+.caption { font-size: 14px; color: var(--muted); margin: 14px 0 0; }
+
+/* examples */
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0; border-bottom: 1px solid var(--line); }
+.tab { font: inherit; font-size: 14.5px; font-weight: 500; padding: 10px 14px; border: 0; background: none; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--ink); border-color: var(--accent); }
+.example { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 12px 12px; overflow: hidden; }
+@media (max-width: 860px) { .example { grid-template-columns: minmax(0, 1fr); } }
+.example[hidden] { display: none; }
+.example .codepane { border-radius: 0; }
+.ex-note { padding: 22px; background: var(--surface); display: grid; gap: 12px; align-content: start; font-size: 14.5px; color: var(--muted); }
+.ex-note h3 { font-size: 18px; color: var(--ink); font-weight: 600; }
+.ex-note ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+
+/* compare */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14.5px; }
+th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+thead th { font-family: var(--font-display); font-size: 15px; font-weight: 600; background: var(--sunk); }
+thead th.us { background: var(--accent-soft); color: var(--ink); }
+td.us { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); font-weight: 500; }
+.y { color: var(--ok); font-weight: 600; } .n { color: var(--muted); } .p { color: var(--accent); }
+
+/* quick start */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.step { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.step .n2 { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.step h3 { font-size: 19px; font-weight: 600; }
+.step p { margin: 0; color: var(--muted); font-size: 15px; }
+.mini { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 13px; padding: 14px 16px; border-radius: 9px; overflow-x: auto; white-space: pre; line-height: 1.65; }
+
+/* closing */
+.closing { padding-block: 96px; text-align: left; }
+.closing .wrap { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: end; }
+@media (max-width: 860px) { .closing .wrap { grid-template-columns: minmax(0, 1fr); } }
+.closing h2 { font-size: clamp(34px, 5vw, 60px); line-height: 1; font-weight: 700; }
+.why-name { font-size: 15px; color: var(--muted); border-left: 2px solid var(--accent); padding-left: 16px; margin: 0; }
+.why-name strong { color: var(--ink); font-weight: 600; }
+canvas.wave { display: block; width: 100%; height: 64px; margin-top: 36px; }
+footer { border-top: 1px solid var(--line); padding-block: 36px 48px; font-size: 14px; color: var(--muted); }
+footer .wrap { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 28px; }
+@media (max-width: 760px) { footer .wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+footer h4 { margin: 0 0 10px; font-size: 13px; color: var(--ink); font-weight: 600; }
+footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .rec { animation: none; } .msg, .cue { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="channelstack home"><span class="mark" aria-hidden="true"><i style="height:8px"></i><i style="height:14px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:6px"></i></span>channelstack</a>
+    <nav class="navlinks" aria-label="Main">
+      <a href="#guide">Guide</a><a href="#platforms">Platforms</a><a href="#api">API</a><a href="#examples">Examples</a><a href="#blog">Blog</a>
+    </nav>
+    <div class="nav-right">
+      <span class="ver">v0.1 preview</span>
+      <a class="gh" href="#github">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <span class="eyebrow"><span class="rec" aria-hidden="true"></span>Test harness for agents that live in chat</span>
+    <h1>Your agent’s whole world, <em>on localhost.</em></h1>
+    <p class="lede">channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine. Script the people, let your agent answer through its real code path, and assert on the conversation a person would see. Signed webhooks, real payload shapes and real ids, with no changes to how your agent works.</p>
+    <div class="cta">
+      <a class="btn primary" href="#guide">Get started</a>
+      <a class="btn" href="#why">Why channelstack?</a>
+      <span class="install"><span><span class="dollar">$ </span><span id="cmd">npm i -D channelstack</span></span><button type="button" id="copy">Copy</button></span>
+    </div>
+
+    <div class="stage" aria-label="Example test and the conversation it produces">
+      <div class="codepane">
+        <div class="panel-head"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>deploy.test.ts</span><span class="spacer"></span><span>vitest</span></div>
+<pre class="code" id="heroCode"><span class="l"><span class="k">import</span> { <span class="k">test</span>, expect } <span class="k">from</span> <span class="s">&quot;vitest&quot;</span></span><span class="l"></span><span class="l"><span class="k">test</span>(<span class="s">&quot;ships a PR from a Slack DM&quot;</span>, <span class="k">async</span> ({ slack }) =&gt; {</span><span class="l">  <span class="k">const</span> ana = <span class="k">await</span> slack.<span class="f">createUser</span>({ name: <span class="s">&quot;ana&quot;</span> })</span><span class="l" data-step="1">  <span class="k">const</span> msg = <span class="k">await</span> ana.<span class="f">say</span>(<span class="s">&quot;@robin ship #812 to staging&quot;</span>,</span><span class="l" data-step="1">    { to: slack.app })</span><span class="l"></span><span class="l" data-step="2">  <span class="k">await</span> <span class="f">expect</span>(msg.thread).<span class="f">toHaveStatusText</span>(<span class="s">/checking CI/</span>)</span><span class="l" data-step="3">  <span class="k">const</span> ask = <span class="k">await</span> msg.thread.<span class="f">waitForReply</span>({ <span class="k">from</span>: <span class="s">&quot;robin&quot;</span> })</span><span class="l" data-step="3">  <span class="k">await</span> <span class="f">expect</span>(ask).<span class="f">toHaveButton</span>(<span class="s">&quot;Approve&quot;</span>)</span><span class="l"></span><span class="l" data-step="4">  <span class="k">await</span> ana.<span class="f">click</span>(<span class="s">&quot;Approve&quot;</span>, { message: ask })</span><span class="l" data-step="5">  <span class="k">await</span> <span class="f">expect</span>(msg.thread).<span class="f">toContainText</span>(<span class="s">/Deployed/</span>, { count: 1 })</span><span class="l" data-step="5">  <span class="k">await</span> <span class="f">expect</span>(msg.thread).not.<span class="f">toContainText</span>(<span class="s">&quot;Thinking…&quot;</span>)</span><span class="l">})</span></pre>
+      </div>
+
+      <div class="monitor">
+        <div class="panel-head"><span>#ana ↔ robin</span><span class="tag">slack · channelstack</span><span class="spacer"></span><button class="replay" type="button" id="replay"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg>Replay</button></div>
+        <div class="thread" id="thread">
+          <div class="msg" data-step="1"><div class="av ana" aria-hidden="true">A</div><div><div class="who">ana <small>10:42</small></div><div class="body"><span class="mention">@robin</span> ship #812 to staging</div></div></div>
+          <div class="msg" data-step="2"><div class="av bot" aria-hidden="true">R</div><div><div class="who">robin<span class="tag">APP</span></div><div class="status">is checking CI on #812…</div></div></div>
+          <div class="msg" data-step="3"><div class="av bot" aria-hidden="true">R</div><div><div class="who">robin<span class="tag">APP</span> <small>10:42</small></div><div class="body">Deploy #812 to staging? CI passed 4 minutes ago, 2 files changed.</div><div class="btns"><span class="sbtn go" id="approve">Approve</span><span class="sbtn">Cancel</span></div></div></div>
+          <div class="msg" data-step="5"><div class="av bot" aria-hidden="true">R</div><div><div class="who">robin<span class="tag">APP</span> <small>10:43</small></div><div class="body">Deployed #812 to staging in 41s. ana approved it.</div></div></div>
+        </div>
+        <div class="cues" aria-label="Cue sheet: every request recorded during the test">
+          <h4><span>Cue sheet</span><span>schema-checked</span></h4>
+          <div class="cue" data-step="1"><span class="tc">00:00.000</span><span class="dir">→ agent</span><span>message.im · v0 signature · retry 0</span><span class="chk">200</span></div>
+          <div class="cue" data-step="2"><span class="tc">00:00.391</span><span class="dir">← agent</span><span>assistant.threads.setStatus</span><span class="chk">✓</span></div>
+          <div class="cue" data-step="3"><span class="tc">00:01.204</span><span class="dir">← agent</span><span>chat.postMessage · 2 blocks</span><span class="chk">✓</span></div>
+          <div class="cue" data-step="4"><span class="tc">00:01.950</span><span class="dir">→ agent</span><span>block_actions · approve</span><span class="chk">200</span></div>
+          <div class="cue" data-step="5"><span class="tc">00:02.733</span><span class="dir">← agent</span><span>chat.postMessage</span><span class="chk">✓</span></div>
+          <div class="result"><span class="pass">PASS</span><span>5 assertions · 2.7s · 0 unknown requests</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="platforms">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Four platforms, one API</span>
+        <h2>Everywhere your agent gets a message.</h2>
+        <p>One package fakes all four, with the people, events and API calls agents actually use. Use one in a test, or several when your agent spans them. Discord, Stripe and email come next.</p>
+      </div>
+      <div class="platforms">
+        <div class="pf"><div class="pf-top"><h3>Slack</h3><span class="pkg">{ slack }</span></div><p>DMs, mentions, threads and the agent view, with progress streams rendered the way people see them.</p><ul><li>Events API</li><li>block_actions</li><li>chat.startStream</li><li>assistant.threads</li><li>agent_session_stopped</li></ul></div>
+        <div class="pf"><div class="pf-top"><h3>GitHub</h3><span class="pkg">{ github }</span></div><p>Apps with installations, signed deliveries with real GUIDs, and redelivery for dedupe tests.</p><ul><li>App manifests</li><li>issue_comment</li><li>pull_request</li><li>check_run</li><li>redeliver</li></ul></div>
+        <div class="pf"><div class="pf-top"><h3>Linear</h3><span class="pkg">{ linear }</span></div><p>Agent sessions end to end: delegation, prompts, questions, activities and the Stop signal.</p><ul><li>delegation</li><li>AgentSessionEvent</li><li>agentActivityCreate</li><li>stop signal</li></ul></div>
+        <div class="pf"><div class="pf-top"><h3>Notion</h3><span class="pkg">{ notion }</span></div><p>Pages, databases and comments, with webhooks when someone mentions your integration.</p><ul><li>page webhooks</li><li>comments</li><li>database queries</li><li>blocks</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Why channelstack</span>
+        <h2>Mocks test your mock. channelstack tests your agent.</h2>
+        <p>Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on. channelstack closes those gaps.</p>
+      </div>
+      <div class="principles">
+        <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M14 6l6 6-6 6"/></svg></div><div><h3>Your agent’s real code path</h3><p><code>channelstack env</code> points your agent’s own SDKs at <code>slack.localhost</code>, <code>github.localhost</code> and friends. Agents with hard-coded hosts use proxy mode instead: set <code>HTTPS_PROXY</code> and trust a CA that only that agent sees.</p></div></div>
+        <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12l4 4L19 6"/></svg></div><div><h3>Shapes that can’t drift</h3><p>Every response and webhook is checked against the providers’ own schemas: OpenAPI descriptions, GraphQL introspection and recorded traffic. When a platform changes, your build goes red instead of quietly wrong.</p></div></div>
+        <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 4-5 7-5s5.8 1.4 7 5"/></svg></div><div><h3>People, not payloads</h3><p>Write <code>ana.click("Approve", { message })</code> instead of hand-building a <code>block_actions</code> body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery IDs.</p></div></div>
+        <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg></div><div><h3>Assert what people see</h3><p>Streams, status lines, edits and ephemeral messages render into one transcript. <code>toHaveRepliesFrom(…, { count: 1 })</code> catches the double post. <code>not.toContainText</code> catches the leftover “Thinking…” reply.</p></div></div>
+      </div>
+
+      <div class="diagram" role="img" aria-label="Signal path: channelstack sends signed webhooks to your agent, and your agent's API calls to platform hosts go through channelstack's proxy back into the same fake workspace.">
+        <svg viewBox="0 0 1000 250" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+            <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="heada"/></marker>
+          </defs>
+          <rect x="20" y="40" width="210" height="170" rx="10" class="box"/>
+          <text x="40" y="72" class="ttl">Your test</text>
+          <text x="40" y="104">ana.say(…)</text>
+          <text x="40" y="128">ana.click("Approve", …)</text>
+          <text x="40" y="152">expect(thread)</text>
+          <text x="40" y="190" class="lbl">vitest · jest · pytest</text>
+
+          <rect x="395" y="20" width="230" height="210" rx="10" class="boxa"/>
+          <text x="415" y="52" class="ttl">channelstack</text>
+          <text x="415" y="84">fake workspaces</text>
+          <text x="415" y="108">people + delivery</text>
+          <text x="415" y="132">fake platform APIs</text>
+          <text x="415" y="156">schema checks</text>
+          <text x="415" y="196" class="lbl">slack.localhost · github.localhost</text>
+          <text x="415" y="214" class="lbl">linear.localhost · notion.localhost</text>
+
+          <rect x="770" y="40" width="210" height="170" rx="10" class="box"/>
+          <text x="790" y="72" class="ttl">Your agent</text>
+          <text x="790" y="104">unchanged code</text>
+          <text x="790" y="128">real SDKs</text>
+          <text x="790" y="152">its own config</text>
+          <text x="790" y="190" class="lbl">channelstack env</text>
+
+          <path d="M230 125 H390" class="wire" marker-end="url(#ah)"/>
+          <text x="252" y="115" class="lbl">script + assert</text>
+          <path d="M625 90 H765" class="wire" marker-end="url(#ah)"/>
+          <text x="640" y="80" class="lbl">signed webhooks</text>
+          <path d="M770 165 H630" class="wirea" marker-end="url(#aha)"/>
+          <text x="642" y="186" class="lbl">API calls</text>
+        </svg>
+      </div>
+      <p class="caption">In proxy mode, requests to hosts channelstack doesn’t emulate pass through untouched.</p>
+    </div>
+  </section>
+
+  <section id="examples">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Examples</span>
+        <h2>Same API on every platform.</h2>
+        <p>Learn it once with Slack and the rest read the same: people act, resources are read, matchers wait for what a person would see.</p>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Platform examples">
+        <button class="tab" role="tab" type="button" id="t-github" aria-controls="p-github" aria-selected="true">GitHub</button>
+        <button class="tab" role="tab" type="button" id="t-linear" aria-controls="p-linear" aria-selected="false">Linear</button>
+        <button class="tab" role="tab" type="button" id="t-notion" aria-controls="p-notion" aria-selected="false">Notion</button>
+        <button class="tab" role="tab" type="button" id="t-live" aria-controls="p-live" aria-selected="false">Live mode</button>
+        <button class="tab" role="tab" type="button" id="t-py" aria-controls="p-py" aria-selected="false">pytest</button>
+      </div>
+
+      <div class="example" role="tabpanel" id="p-github" aria-labelledby="t-github">
+        <div class="codepane"><pre class="code"><span class="l"><span class="k">test</span>(<span class="s">&quot;answers on the issue and ignores itself&quot;</span>, <span class="k">async</span> ({ github }) =&gt; {</span><span class="l">  <span class="k">const</span> mo = <span class="k">await</span> github.<span class="f">createUser</span>({ login: <span class="s">&quot;mo&quot;</span> })</span><span class="l">  <span class="k">const</span> repo = <span class="k">await</span> github.<span class="f">createRepo</span>({ collaborators: [mo], apps: [github.app] })</span><span class="l">  <span class="k">const</span> issue = <span class="k">await</span> mo.<span class="f">openIssue</span>({ title: <span class="s">&quot;Login 500s on Safari&quot;</span> }, { repo })</span><span class="l"></span><span class="l">  <span class="k">const</span> comment = <span class="k">await</span> mo.<span class="f">comment</span>(<span class="s">&quot;@robin can you take a look?&quot;</span>, { issue })</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(issue).<span class="f">toHaveCommentFrom</span>(<span class="s">&quot;robin&quot;</span>, { text: <span class="s">/Safari/</span> })</span><span class="l"></span><span class="l">  <span class="c">// the same delivery again must not start a second run</span></span><span class="l">  <span class="k">await</span> comment.delivery!.<span class="f">redeliver</span>()</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(issue).<span class="f">toHaveCommentsFrom</span>(<span class="s">&quot;robin&quot;</span>, { count: 1 })</span><span class="l">})</span></pre></div>
+        <div class="ex-note"><h3>What channelstack handles</h3><ul><li>Installs the App only on repos you list in <code>apps</code></li><li>Signs each delivery with <code>X-Hub-Signature-256</code></li><li>Redelivers with the same GUID, the way GitHub does</li></ul></div>
+      </div>
+      <div class="example" role="tabpanel" id="p-linear" aria-labelledby="t-linear" hidden>
+        <div class="codepane"><pre class="code"><span class="l"><span class="k">test</span>(<span class="s">&quot;Stop ends a working session&quot;</span>, <span class="k">async</span> ({ linear }) =&gt; {</span><span class="l">  <span class="k">const</span> kai = <span class="k">await</span> linear.<span class="f">createUser</span>({ name: <span class="s">&quot;Kai&quot;</span> })</span><span class="l">  <span class="k">const</span> team = <span class="k">await</span> linear.<span class="f">createTeam</span>({ key: <span class="s">&quot;ENG&quot;</span>, members: [kai] })</span><span class="l">  <span class="k">const</span> issue = <span class="k">await</span> kai.<span class="f">createIssue</span>({ title: <span class="s">&quot;Migrate billing cron&quot;</span> }, { team })</span><span class="l"></span><span class="l">  <span class="k">const</span> session = <span class="k">await</span> kai.<span class="f">delegate</span>(linear.app, { issue })</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(session).<span class="f">toHaveActivity</span>({ type: <span class="s">&quot;thought&quot;</span> })</span><span class="l"></span><span class="l">  <span class="k">await</span> kai.<span class="f">stop</span>({ session })</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(session).<span class="f">toHaveSessionState</span>(<span class="s">&quot;complete&quot;</span>)</span><span class="l">})</span></pre></div>
+        <div class="ex-note"><h3>What channelstack handles</h3><ul><li><code>AgentSessionEvent</code> in Linear’s current shape</li><li>The <code>prompted</code> event carrying the stop signal</li><li>Every GraphQL response checked against Linear’s schema</li></ul></div>
+      </div>
+      <div class="example" role="tabpanel" id="p-notion" aria-labelledby="t-notion" hidden>
+        <div class="codepane"><pre class="code"><span class="l"><span class="k">test</span>(<span class="s">&quot;answers a comment mention in the same discussion&quot;</span>, <span class="k">async</span> ({ notion }) =&gt; {</span><span class="l">  <span class="k">const</span> ana = <span class="k">await</span> notion.<span class="f">createUser</span>({ name: <span class="s">&quot;Ana&quot;</span> })</span><span class="l">  <span class="k">const</span> page = <span class="k">await</span> notion.<span class="f">createPage</span>({</span><span class="l">    title: <span class="s">&quot;Roadmap&quot;</span>, content: <span class="s">&quot;# Q1\n- ship search&quot;</span>, connections: [notion.app],</span><span class="l">  })</span><span class="l"></span><span class="l">  <span class="k">const</span> comment = <span class="k">await</span> ana.<span class="f">comment</span>(<span class="s">&quot;@robin summarize this page&quot;</span>, { page })</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(comment.discussion).<span class="f">toHaveCommentFrom</span>(<span class="s">&quot;robin&quot;</span>, { text: <span class="s">/search/</span> })</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(comment.discussion).<span class="f">toHaveCommentsFrom</span>(<span class="s">&quot;robin&quot;</span>, { count: 1 })</span><span class="l">})</span></pre></div>
+        <div class="ex-note"><h3>What channelstack handles</h3><ul><li>Connections and their inheritance, like Notion</li><li>Webhooks signed with <code>X-Notion-Signature</code></li><li><code>page.content_updated</code> batched the way Notion does</li></ul></div>
+      </div>
+      <div class="example" role="tabpanel" id="p-live" aria-labelledby="t-live" hidden>
+        <div class="codepane"><pre class="code"><span class="l"><span class="c">// with CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_USER_ANA_TOKEN set, Ana is real</span></span><span class="l"><span class="k">test</span>(<span class="s">&quot;a real person asks the real agent&quot;</span>, <span class="k">async</span> ({ slack }) =&gt; {</span><span class="l">  <span class="k">const</span> ana = <span class="k">await</span> slack.<span class="f">createUser</span>({ name: <span class="s">&quot;Ana&quot;</span> })</span><span class="l">  <span class="k">const</span> channel = <span class="k">await</span> slack.<span class="f">createChannel</span>({ participants: [ana, slack.app] })</span><span class="l"></span><span class="l">  <span class="k">const</span> msg = <span class="k">await</span> ana.<span class="f">say</span>(<span class="s">&quot;@robin summarize #support today&quot;</span>, { channel })</span><span class="l">  <span class="k">await</span> <span class="f">expect</span>(msg.thread).<span class="f">toHaveReplyFrom</span>(<span class="s">&quot;robin&quot;</span>, { timeout: <span class="s">&quot;30s&quot;</span> })</span><span class="l">})</span></pre></div>
+        <div class="ex-note"><h3>What channelstack handles</h3><ul><li>The same test runs against a real sandbox workspace</li><li>Acts as real people and reads the result back</li><li>Removes everything the test created</li></ul></div>
+      </div>
+      <div class="example" role="tabpanel" id="p-py" aria-labelledby="t-py" hidden>
+        <div class="codepane"><pre class="code"><span class="l"><span class="k">async</span> <span class="k">def</span> <span class="f">test_reject_leaves_the_keys_alone</span>(slack):</span><span class="l">    ana = <span class="k">await</span> slack.<span class="f">create_user</span>(name=<span class="s">&quot;Ana&quot;</span>)</span><span class="l">    channel = <span class="k">await</span> slack.<span class="f">create_channel</span>(participants=[ana, slack.app])</span><span class="l"></span><span class="l">    msg = <span class="k">await</span> ana.<span class="f">say</span>(<span class="s">&quot;@robin rotate the staging keys&quot;</span>, channel=channel)</span><span class="l">    ask = <span class="k">await</span> msg.thread.<span class="f">wait_for_reply</span>(from_=<span class="s">&quot;robin&quot;</span>)</span><span class="l">    <span class="k">await</span> ana.<span class="f">click</span>(<span class="s">&quot;Reject&quot;</span>, message=ask)</span><span class="l"></span><span class="l">    <span class="k">await</span> <span class="f">expect</span>(msg.thread).<span class="f">to_contain_text</span>(<span class="s">&quot;Okay, I left the keys alone.&quot;</span>, count=1)</span></pre></div>
+        <div class="ex-note"><h3>What channelstack handles</h3><ul><li>The same fakes from Python through <code>pytest-channelstack</code></li><li>One channelstack server shared by JS and Python suites</li><li>Fixtures named after each platform</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Compared</span>
+        <h2>Between mocks and a real workspace.</h2>
+        <p>Real sandbox workspaces are slow, shared and flaky in CI. Mocks are fast but only prove your code matches your own guess. channelstack keeps the speed and drops the guessing.</p>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th scope="col"></th><th scope="col">Hand-written mocks</th><th scope="col">API emulators</th><th scope="col">Real sandbox workspace</th><th scope="col" class="us">channelstack</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Agent code unchanged</th><td class="n">No</td><td class="p">Base URL overrides</td><td class="y">Yes</td><td class="us y">Yes: a base URL, or a proxy</td></tr>
+            <tr><th scope="row">Platform calls your agent</th><td class="n">No</td><td class="p">Some webhooks</td><td class="y">Yes</td><td class="us y">Signed, retried, replayable</td></tr>
+            <tr><th scope="row">Scripted people</th><td class="n">No</td><td class="n">No</td><td class="p">Manual or second bot</td><td class="us y">Built in</td></tr>
+            <tr><th scope="row">Payload shapes checked</th><td class="n">No</td><td class="n">No</td><td class="y">They’re real</td><td class="us y">Against provider schemas</td></tr>
+            <tr><th scope="row">Assert on what people see</th><td class="n">No</td><td class="n">Raw state</td><td class="p">Screenshots</td><td class="us y">Rendered transcript</td></tr>
+            <tr><th scope="row">Offline, parallel CI</th><td class="y">Yes</td><td class="y">Yes</td><td class="n">No</td><td class="us y">Yes</td></tr>
+            <tr><th scope="row">Same test against the real platform</th><td class="n">No</td><td class="n">No</td><td class="y">Yes</td><td class="us y">Live mode</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="guide">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">Quick start</span>
+        <h2>First passing test in three steps.</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><span class="n2">STEP 1</span><h3>Install</h3><p>One package: the server, the CLI, the UI and the test integrations.</p><div class="mini">npm i -D channelstack</div></div>
+        <div class="step"><span class="n2">STEP 2</span><h3>Point your agent at it</h3><p>Describe your agent’s app, then start the agent the way you always do, with channelstack’s environment.</p><div class="mini">// channelstack.config.ts
+slack: { app: { name: &quot;robin&quot; } }
+
+$ npx channelstack env &gt;&gt; .env.local
+$ portless run robin pnpm dev</div></div>
+        <div class="step"><span class="n2">STEP 3</span><h3>Run</h3><p>Add the plugin and run your tests as usual. Every failure links to its transcript in the UI.</p><div class="mini">// vitest.config.ts
+plugins: [channelstack()]
+
+$ npx vitest
+✓ deploy.test.ts (1) 2.7s</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="closing">
+    <div class="wrap">
+      <div>
+        <h2>Test the conversation before your users have it.</h2>
+        <div class="cta"><a class="btn primary" href="#guide">Read the guide</a><a class="btn" href="#github">Star on GitHub</a></div>
+      </div>
+      <p class="why-name"><strong>Why “channelstack”?</strong> Your agent lives in a stack of channels: Slack, GitHub, Linear, Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the conversation end to end before your users have it.</p>
+    </div>
+    <div class="wrap"><canvas class="wave" id="wave" aria-hidden="true"></canvas></div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><a class="brand" href="#top"><span class="mark" aria-hidden="true"><i style="height:8px"></i><i style="height:14px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:6px"></i></span>channelstack</a><p style="margin:12px 0 0">MIT licensed. Not affiliated with the platforms it emulates.</p></div>
+    <div><h4>Docs</h4><ul><li><a href="#guide">Guide</a></li><li><a href="#api">API reference</a></li><li><a href="#platforms">Platforms</a></li><li><a href="#ci">CI recipes</a></li></ul></div>
+    <div><h4>Community</h4><ul><li><a href="#github">GitHub</a></li><li><a href="#discord">Discord</a></li><li><a href="#blog">Blog</a></li></ul></div>
+    <div><h4>More</h4><ul><li><a href="#changelog">Changelog</a></li><li><a href="#roadmap">Roadmap</a></li><li><a href="#brand">Brand</a></li></ul></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // copy install command
+  var copyBtn = document.getElementById("copy");
+  copyBtn.addEventListener("click", function () {
+    var text = document.getElementById("cmd").textContent;
+    var done = function () { copyBtn.textContent = "Copied"; setTimeout(function () { copyBtn.textContent = "Copy"; }, 1400); };
+    try {
+      navigator.clipboard.writeText(text).then(done, function () { selectCmd(); });
+    } catch (e) { selectCmd(); }
+  });
+  function selectCmd() {
+    var r = document.createRange(); r.selectNodeContents(document.getElementById("cmd"));
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+
+  // tabs
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  tabs.forEach(function (tab, i) {
+    tab.addEventListener("click", function () { select(i); });
+    tab.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        var n = (i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length;
+        select(n); tabs[n].focus();
+      }
+    });
+  });
+  function select(n) {
+    tabs.forEach(function (t, j) {
+      t.setAttribute("aria-selected", j === n ? "true" : "false");
+      t.tabIndex = j === n ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = j !== n;
+    });
+  }
+  select(0);
+
+  // replay of the hero test; at rest everything is visible
+  var stepped = Array.prototype.slice.call(document.querySelectorAll("#thread .msg, .cue"));
+  var lines = Array.prototype.slice.call(document.querySelectorAll("#heroCode .l[data-step]"));
+  var approve = document.getElementById("approve");
+  var timers = [];
+  function setStep(n) {
+    stepped.forEach(function (el) { el.classList.toggle("pending", Number(el.dataset.step) > n); });
+    lines.forEach(function (el) { el.classList.toggle("hot", Number(el.dataset.step) === n); });
+    approve.classList.toggle("clicked", n >= 4);
+  }
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    if (reduce) { setStep(5); lines.forEach(function (el) { el.classList.remove("hot"); }); return; }
+    setStep(0);
+    [1, 2, 3, 4, 5].forEach(function (n, i) { timers.push(setTimeout(function () { setStep(n); }, 500 + i * 900)); });
+    timers.push(setTimeout(function () { lines.forEach(function (el) { el.classList.remove("hot"); }); }, 500 + 5 * 900 + 600));
+  }
+  document.getElementById("replay").addEventListener("click", play);
+  setStep(5); approve.classList.add("clicked");
+
+  // waveform
+  var cv = document.getElementById("wave");
+  function draw() {
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (!w) return;
+    cv.width = w * dpr; cv.height = h * dpr;
+    var ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
+    var accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#B5650A";
+    var line = getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "#DCE0E7";
+    var bars = Math.floor(w / 5), seed = 7;
+    function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+    for (var i = 0; i < bars; i++) {
+      var t = i / bars;
+      var env = Math.pow(Math.sin(Math.PI * t), 0.6) * (0.55 + 0.45 * Math.sin(t * 19) * Math.sin(t * 7.3));
+      var bh = Math.max(2, Math.abs(env) * h * (0.35 + 0.65 * rnd()));
+      ctx.fillStyle = (i % 23 < 6) ? accent : line;
+      ctx.fillRect(i * 5, (h - bh) / 2, 3, bh);
+    }
+  }
+  draw();
+  window.addEventListener("resize", draw);
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", draw);
+  }
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+</body>
+</html>
