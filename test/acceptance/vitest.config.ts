@@ -6,7 +6,8 @@ import channelstack from "../../integrations/vitest/index.ts";
 
 /**
  * The acceptance suite: `api/examples` run unchanged against a reference agent and the compiled
- * binary. `scripts/accept.ts` starts both and names the `describe` blocks this phase has enabled.
+ * binary, and the tests in `stack/` that need the same pair. `scripts/accept.ts` starts both and
+ * names the `describe` blocks of the examples this phase has enabled.
  */
 export default defineConfig({
   plugins: [channelstack({ mode: "attach" })],
@@ -18,7 +19,7 @@ export default defineConfig({
   },
   test: {
     root: fileURLToPath(new URL("../..", import.meta.url)),
-    include: ["api/examples/slack.test.ts"],
+    include: ["api/examples/slack.test.ts", "test/acceptance/stack/**/*.test.ts"],
     testTimeout: 30_000,
   },
 });

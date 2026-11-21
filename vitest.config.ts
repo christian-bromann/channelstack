@@ -18,6 +18,8 @@ export default defineConfig({
           testTimeout: 30_000,
         },
       },
+      // Needs the compiled binary: `pnpm test:accept` runs it after the examples.
+      { test: { name: "acceptance", include: ["test/acceptance/*.test.ts"], testTimeout: 60_000 } },
       { test: { name: "redaction", include: ["server/test/integration/redaction.test.ts"], testTimeout: 30_000 } },
     ],
   },

@@ -40,10 +40,10 @@ export async function runExamples(
   for (const name of options.agents ?? (Object.keys(AGENTS) as Array<keyof typeof AGENTS>)) {
     console.log(`\napi/examples against ${name}`);
     await withStack({ bin, agent: AGENTS[name], webhook: { driver: "slack", path: "/slack/events" } }, ({ env }) => {
-      run("pnpm", ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", "-t", pattern], {
-        cwd: ROOT,
-        env,
-      });
+      const vitest = ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts"];
+      run("pnpm", [...vitest, "api/examples", "-t", pattern], { cwd: ROOT, env });
+      // The tests that need a server and an agent but aren't examples (quiet, parallel sessions).
+      run("pnpm", [...vitest, "test/acceptance/stack"], { cwd: ROOT, env });
     });
   }
 }

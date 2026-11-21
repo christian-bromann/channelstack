@@ -4,22 +4,10 @@
  * configuration from the environment (`channelstack env` prints it) and talks to whatever
  * `SLACK_API_URL` points at: the fake in tests, Slack itself when the variable is unset.
  */
-import { App, LogLevel } from "@slack/bolt";
 import { streamText } from "ai";
 
+import { app, listen } from "../shared/bolt.ts";
 import { answer, wantsWriting, writer } from "../shared/scripted-model.ts";
-
-const { SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, SLACK_API_URL, PORT } = process.env;
-if (!SLACK_BOT_TOKEN || !SLACK_SIGNING_SECRET || !PORT) {
-  throw new Error("The agent needs SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET and PORT");
-}
-
-const app = new App({
-  token: SLACK_BOT_TOKEN,
-  signingSecret: SLACK_SIGNING_SECRET,
-  ...(SLACK_API_URL ? { clientOptions: { slackApiUrl: SLACK_API_URL } } : {}),
-  logLevel: LogLevel.ERROR,
-});
 
 /** Events Slack delivers more than once (a retry after a slow ack) are handled once. */
 const handled = new Set<string>();
@@ -75,4 +63,4 @@ app.event("reaction_added", async ({ event, body, client }) => {
   });
 });
 
-await app.start(Number(PORT));
+await listen();
