@@ -2,6 +2,7 @@ import { type Context, Hono } from "hono";
 
 import { bearerFrom } from "../../../../core/auth/index.ts";
 import { ProtocolError } from "../../../../core/errors/index.ts";
+import { WORLD_SCOPE } from "../../../../core/events/index.ts";
 import type { DriverContext } from "../../../../core/router/index.ts";
 import { verifyGitHubAppJwt } from "../../../../core/signing/github.ts";
 import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
@@ -21,7 +22,14 @@ const TOKEN_LIFETIME_MS = 60 * 60 * 1000;
 /** How much of a request or response body the event log keeps. */
 const RECORD_LIMIT = 64 * 1024;
 
-type Variables = { repo?: GitHubRepoRecord; requestBody?: unknown };
+type Variables = {
+  repo?: GitHubRepoRecord;
+  requestBody?: unknown;
+  /** The request showed the App's JWT or its installation's token. Only such calls are on record. */
+  authenticated?: boolean;
+  /** A call about no repository that still belongs to one session: reading one of its deliveries. */
+  session?: string;
+};
 
 /**
  * GitHub's REST API, as the agent's App sees it. It authenticates as GitHub does (the App's JWT
@@ -47,6 +55,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     if (token === undefined || !(await verifyGitHubAppJwt(token, app, clock()))) {
       throw unauthorized("A JSON web token could not be decoded");
     }
+    c.set("authenticated", true);
   };
 
   /** The App's installation, by the token `POST /app/installations/{id}/access_tokens` handed out. */
@@ -54,6 +63,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     const token = credential(c);
     if (token === undefined) throw unauthorized("Requires authentication");
     if (!constantTimeEqual(token, context.secret("installationToken"))) throw unauthorized();
+    c.set("authenticated", true);
   };
 
   // --- The App's own endpoints -------------------------------------------------------------
@@ -146,6 +156,8 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   const hookEntry = (c: Context) => {
     const entry = store.hookDeliveries.find((candidate) => String(candidate.id) === c.req.param("delivery"));
     if (!entry) throw notFound();
+    // One delivery belongs to one session: reading it, or sending it again, is on that session's record.
+    c.set("session", entry.session);
     return entry;
   };
 
@@ -219,6 +231,15 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   registerPulls(register);
   registerChecks(register);
 
+  // Anything else isn't served: GitHub's 404, through the same error handling and recording as every route.
+  routes.all("*", (c) => {
+    // Whoever asks gets the 404; it is on record when the App's installation asked.
+    const token = credential(c);
+    if (token !== undefined && constantTimeEqual(token, context.secret("installationToken")))
+      c.set("authenticated", true);
+    throw notFound();
+  });
+
   // --- What wraps every request ------------------------------------------------------------
 
   const api = new Hono<{ Variables: Variables }>();
@@ -259,10 +280,13 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
         : {}),
       durationMs: clock() - startedAt,
     };
-    // A call about a repository is on record for the session that owns it. The App's calls about
-    // no repository (its own endpoints) belong to no session and are kept for all of them.
-    if (repo) context.events.append(store.sessionOf(repo), "github", "api_call", call);
-    else store.recordAppCall({ ...call, at: new Date(clock()).toISOString() });
+    // Only what authenticated as the App or its installation is on record. A call about a
+    // repository belongs to the session that owns it; one about a delivery, to the delivery's
+    // session; the rest (the App's own endpoints, the token exchange) to no session, and the
+    // core event log keeps those in the scope every session reads.
+    if (!c.get("authenticated")) return;
+    const scope = repo ? store.sessionOf(repo) : (c.get("session") ?? WORLD_SCOPE);
+    context.events.append(scope, "github", "api_call", call);
   });
 
   api.onError((error, c) => {
@@ -285,8 +309,6 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     context.log.error("github api", { error: error instanceof Error ? error.message : String(error) });
     return c.json({ message: "Server Error", documentation_url: DOCS }, 500);
   });
-
-  api.notFound((c) => c.json({ message: "Not Found", documentation_url: DOCS, status: "404" }, 404));
 
   // GitHub Enterprise serves the same API under `/api/v3`; SDKs that are given a host assume that layout.
   api.route("/api/v3", routes);

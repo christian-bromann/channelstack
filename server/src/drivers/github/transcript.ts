@@ -62,20 +62,23 @@ export function renderTranscript(
       entries: [entry(comment.id, comment.author, comment.createdAt, text, comment.updatedAt > comment.createdAt, 0)],
     });
   }
-  const inThread = (root: GitHubReviewCommentRecord) =>
-    thread.reviewComments
-      .filter((comment) => comment.id === root.id || comment.inReplyTo === root.id)
-      .map((comment) =>
-        entry(
-          comment.id,
-          comment.author,
-          comment.createdAt,
-          comment.id === root.id ? `${comment.path}:${comment.line}: ${comment.body}` : comment.body,
-          comment.updatedAt > comment.createdAt,
-          comment.id === root.id ? 0 : 1,
-        ),
-      );
-  const roots = thread.reviewComments.filter((comment) => comment.inReplyTo === undefined);
+  // A thread reads as its first comment (with where it is), then the rest indented under it. When
+  // the comment that started it was deleted, the oldest one left takes its place.
+  const threads = new Map<number, GitHubReviewCommentRecord[]>();
+  for (const comment of thread.reviewComments)
+    threads.set(comment.thread, [...(threads.get(comment.thread) ?? []), comment]);
+  const heads = [...threads.values()].flatMap(([head]) => head ?? []);
+  const inThread = (head: GitHubReviewCommentRecord) =>
+    (threads.get(head.thread) ?? []).map((comment) =>
+      entry(
+        comment.id,
+        comment.author,
+        comment.createdAt,
+        comment === head ? `${comment.path}:${comment.line}: ${comment.body}` : comment.body,
+        comment.updatedAt > comment.createdAt,
+        comment === head ? 0 : 1,
+      ),
+    );
   for (const review of thread.reviews) {
     if (review.state === "PENDING") continue;
     const at = review.submittedAt ?? 0;
@@ -93,11 +96,11 @@ export function renderTranscript(
             ),
           ]
         : [];
-    timed.push({ at, entries: [...headline, ...roots.filter((root) => root.review === review.id).flatMap(inThread)] });
+    timed.push({ at, entries: [...headline, ...heads.filter((head) => head.review === review.id).flatMap(inThread)] });
   }
   // A thread whose review isn't listed (the transcript of one thread) still shows.
   const listed = new Set(thread.reviews.map((review) => review.id));
-  for (const root of roots) if (!listed.has(root.review)) timed.push({ at: root.createdAt, entries: inThread(root) });
+  for (const head of heads) if (!listed.has(head.review)) timed.push({ at: head.createdAt, entries: inThread(head) });
   const entries = timed.sort((a, b) => a.at - b.at).flatMap((group) => group.entries);
   const text = entries
     .map((line) => `${"  ".repeat(line.depth)}${line.author.name}: ${line.text}${line.edited ? " (edited)" : ""}`)

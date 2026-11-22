@@ -28,7 +28,10 @@ export function registerChecks(register: Register): void {
 
   const time = (body: Json, name: string): number | undefined => {
     const value = text(body, name);
-    return value === undefined ? undefined : Date.parse(value);
+    if (value === undefined) return undefined;
+    const at = Date.parse(value);
+    if (Number.isNaN(at)) throw invalid("CheckRun", name, "invalid");
+    return at;
   };
   const input = (body: Json): GitHubCheckRunInput => {
     const status = text(body, "status");

@@ -47,7 +47,14 @@ const NODE_ID_PREFIX = {
 function msgpack(value: number | string): Buffer {
   if (typeof value === "string") {
     const text = Buffer.from(value, "utf8");
-    const head = text.length < 32 ? [0xa0 | text.length] : [0xd9, text.length];
+    // msgpack's three string headers: up to 31 bytes, up to 255, up to 65,535.
+    if (text.length > 0xffff) throw new Error("A node id can't hold a string that long");
+    const head =
+      text.length < 32
+        ? [0xa0 | text.length]
+        : text.length < 256
+          ? [0xd9, text.length]
+          : [0xda, text.length >> 8, text.length & 0xff];
     return Buffer.concat([Buffer.from(head), text]);
   }
   const wide = value > 0xffff_ffff;

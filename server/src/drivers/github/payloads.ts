@@ -15,7 +15,7 @@ import type {
   GitHubStatusRecord,
   GitHubUserRecord,
 } from "./world.ts";
-import { REACTIONS } from "./world.ts";
+import { type GitHubPermission, PERMISSIONS, REACTIONS } from "./world.ts";
 
 type Json = Record<string, unknown>;
 
@@ -110,14 +110,17 @@ export function githubObjects(lookups: GitHubLookups) {
   });
 
   /** Someone as a repository's collaborator: the user, with what they may do there. */
-  const collaborator = (
-    record: GitHubUserRecord,
-    role: "admin" | "maintain" | "write" | "triage" | "read" | "none",
-  ): Json => {
-    const rank = ["none", "read", "triage", "write", "maintain", "admin"].indexOf(role);
+  const collaborator = (record: GitHubUserRecord, role: GitHubPermission | "none"): Json => {
+    const has = (level: GitHubPermission) => role !== "none" && PERMISSIONS.indexOf(role) >= PERMISSIONS.indexOf(level);
     return {
       ...user(record),
-      permissions: { admin: rank >= 5, maintain: rank >= 4, push: rank >= 3, triage: rank >= 2, pull: rank >= 1 },
+      permissions: {
+        admin: has("admin"),
+        maintain: has("maintain"),
+        push: has("write"),
+        triage: has("triage"),
+        pull: has("read"),
+      },
       role_name: role,
     };
   };

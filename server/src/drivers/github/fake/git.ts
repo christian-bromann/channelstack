@@ -39,6 +39,10 @@ function text(bytes: Uint8Array): string | undefined {
   }
 }
 
+/** One side of a hunk header as git writes it: an empty side starts one line lower, and a count of 1 is left out. */
+const range = (start: number, count: number): string =>
+  count === 0 ? `${start - 1},0` : count === 1 ? String(start) : `${start},${count}`;
+
 const signature = (who: Signature) => ({
   name: who.name,
   email: who.email,
@@ -303,7 +307,7 @@ export class GitStore {
         const { hunks } = structuredPatch(path, path, oldText, newText, "", "", { context: 3 });
         const lines: string[] = [];
         for (const hunk of hunks) {
-          lines.push(`@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`);
+          lines.push(`@@ -${range(hunk.oldStart, hunk.oldLines)} +${range(hunk.newStart, hunk.newLines)} @@`);
           let [left, right] = [hunk.oldStart, hunk.newStart];
           for (const line of hunk.lines) {
             lines.push(line);

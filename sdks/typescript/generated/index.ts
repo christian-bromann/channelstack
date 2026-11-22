@@ -1570,10 +1570,10 @@ export class GitHubFixture {
     return decodeGitHubDeliveries(ctx, data);
   }
 
-  /** The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500). Experimental. */
-  async appCalls(): Promise<GitHubAppCalls> {
+  /** The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental. */
+  async appCalls(options: { operation?: string; error?: true | string } = {}): Promise<GitHubAppCalls> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/app-calls`)) as GitHubAppCalls;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/app-calls`, { query: { operation: options.operation, error: options.error } })) as GitHubAppCalls;
     return data;
   }
 

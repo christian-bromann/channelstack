@@ -4129,7 +4129,7 @@
         {
           "name": "appCalls",
           "kind": "method",
-          "summary": "The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500)",
+          "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -4142,7 +4142,33 @@
             ]
           },
           "args": [],
-          "options": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
           "returns": {
             "kind": "named",
             "name": "GitHubAppCalls"

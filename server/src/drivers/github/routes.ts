@@ -2,7 +2,7 @@ import { z } from "@hono/zod-openapi";
 
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
-import type { EventLog } from "../../core/events/index.ts";
+import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
 import { apiCallSchema, CallsQuery, DeliveryAttempt, DeliveryStatus, readCalls } from "../../core/router/inspect.ts";
 import type { FakeGitHubWorld } from "./fake/world.ts";
@@ -1110,7 +1110,7 @@ export function registerGitHubRoutes(
         const pull = kit.requirePull(store.repo(comment.repo), comment.pull);
         const actor = person(session.id, params.user);
         // Whoever opened the pull request or started the thread may resolve it; anyone else needs write access.
-        const own = pull.author === actor || pulls.rootOf(comment).author === actor;
+        const own = pull.author === actor || pulls.threadOf(comment)[0]?.author === actor;
         kit.allow(store.repo(comment.repo), actor, own ? "read" : "write");
         kit.action(store.repo(comment.repo), name, { user: actor, comment: comment.id });
         return caused(session.id, pulls.setResolved(pull, actor, comment, name === "resolve"));
@@ -1407,11 +1407,11 @@ export function registerGitHubRoutes(
     },
   });
 
-  /** The thread a comment on the diff is in: the comment that started it, then the replies. */
+  /** The thread a comment on the diff is in: its first comment, then the replies. */
   const threadOf = (session: string, id: number) => {
-    const root = pulls.rootOf(reviewCommentOf(session, id));
-    const all = store.reviewCommentsOf(store.repo(root.repo), root.pull);
-    return { root, replies: all.filter((comment) => comment.inReplyTo === root.id) };
+    const [head, ...replies] = pulls.threadOf(reviewCommentOf(session, id));
+    if (!head) throw new ProtocolError("not_found", "That thread has no comments left");
+    return { head, replies };
   };
 
   router.route({
@@ -1436,7 +1436,7 @@ export function registerGitHubRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "GitHubReviewComment", name: "resolved" },
     stability,
-    handler: ({ session, params }) => threadOf(session.id, params.comment).root.resolved,
+    handler: ({ session, params }) => pulls.isResolved(threadOf(session.id, params.comment).head),
   });
 
   router.route({
@@ -1449,8 +1449,8 @@ export function registerGitHubRoutes(
     sdkMethod: { on: "GitHubReviewComment", name: "transcript" },
     stability,
     handler: ({ session, params }) => {
-      const { root, replies } = threadOf(session.id, params.comment);
-      return renderTranscript({ comments: [], reviews: [], reviewComments: [root, ...replies] }, principal);
+      const { head, replies } = threadOf(session.id, params.comment);
+      return renderTranscript({ comments: [], reviews: [], reviewComments: [head, ...replies] }, principal);
     },
   });
 
@@ -1529,16 +1529,12 @@ export function registerGitHubRoutes(
     method: "get",
     path: "/app-calls",
     summary:
-      "The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500)",
+      "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
+    query: CallsQuery,
     response: z.array(GitHubApiCall).openapi("GitHubAppCalls"),
-    sdkMethod: { on: "GitHubFixture", name: "appCalls" },
+    sdkMethod: { on: "GitHubFixture", name: "appCalls", options: ["operation", "error"] },
     stability,
-    handler: () =>
-      store.appCalls.map((call, index) => ({
-        ...(call as Omit<z.infer<typeof GitHubApiCall>, "id" | "channel">),
-        id: `appcall_${index + 1}`,
-        channel: "github" as const,
-      })),
+    handler: ({ query }) => readCalls(deps.events, WORLD_SCOPE, "github", query),
   });
 
   router.route({

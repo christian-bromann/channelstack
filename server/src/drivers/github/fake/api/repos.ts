@@ -1,5 +1,5 @@
 import { githubNodeId } from "../../../../core/ids/index.ts";
-import type { GitHubCommitInfo } from "../../world.ts";
+import { type GitHubCommitInfo, PERMISSIONS } from "../../world.ts";
 import { FILE_MODE, type GitTreeEntry, TREE_MODE } from "../git.ts";
 import { GitHubRefusal } from "../kit.ts";
 import { type Call, invalid, type Json, notFound, page, type Register, text } from "./shared.ts";
@@ -30,17 +30,22 @@ export function registerRepos(register: Register): void {
    * `/repos/{owner}/{repo}` and the route's own segment, so a path that names that segment again
    * (`contents/docs/contents/x.md`) is taken whole.
    */
-  const rest = ({ c }: Call, after: string): string =>
-    decodeURIComponent(c.req.path.replace(/^.*?\/repos\/[^/]+\/[^/]+/, "").slice(after.length));
+  const rest = ({ c }: Call, after: string): string => {
+    const tail = c.req.path.replace(/^.*?\/repos\/[^/]+\/[^/]+/, "").slice(after.length);
+    try {
+      return decodeURIComponent(tail);
+    } catch {
+      // A percent escape that isn't one names nothing.
+      throw notFound();
+    }
+  };
 
   register("get", "", ["metadata", "read"], ({ c, world, repo }) => c.json(world.kit.objects.fullRepository(repo)));
 
   register("get", "/collaborators/:user/permission", ["metadata", "read"], ({ c, world, repo }) => {
     const user = world.kit.store.byLogin(world.kit.store.sessionOf(repo), c.req.param("user") ?? "");
     if (!user) throw notFound();
-    const level = (["admin", "maintain", "write", "triage", "read"] as const).find((candidate) =>
-      world.kit.can(repo, user.id, candidate),
-    );
+    const level = PERMISSIONS.toReversed().find((candidate) => world.kit.can(repo, user.id, candidate));
     // The API's older names: write is still "write", but triage and maintain show as read and write.
     const permission =
       level === "admin" ? "admin" : level === "write" || level === "maintain" ? "write" : level ? "read" : "none";
@@ -455,7 +460,7 @@ export function registerRepos(register: Register): void {
   );
 
   register("get", "/labels/:name", ["issues", "read"], ({ c, world, repo }) => {
-    const label = repo.labels.get(decodeURIComponent(c.req.param("name") ?? "").toLowerCase());
+    const label = repo.labels.get((c.req.param("name") ?? "").toLowerCase());
     if (!label) throw notFound();
     return c.json(world.kit.objects.label(repo, label));
   });

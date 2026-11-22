@@ -172,7 +172,7 @@ export function registerIssues(register: Register): void {
 
   register("delete", "/issues/:number{[0-9]+}/labels/:name", write, (call) => {
     const issue = issueOf(call);
-    call.world.issues.removeLabels(issue, call.bot, [decodeURIComponent(call.c.req.param("name") ?? "")]);
+    call.world.issues.removeLabels(issue, call.bot, [call.c.req.param("name") ?? ""]);
     return call.c.json(labelsJson(call, issue));
   });
 

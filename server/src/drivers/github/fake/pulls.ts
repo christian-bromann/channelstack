@@ -151,8 +151,9 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     }
     if (input.body.trim() === "") throw refused("PullRequestReviewComment", "body", "body can't be blank");
     const now = clock();
+    const id = Number(ids.next("github.comment"));
     return store.add(store.reviewComments, store.sessionOf(repo), {
-      id: Number(ids.next("github.comment")),
+      id,
       repo: repo.id,
       pull: pull.number,
       review: review.id,
@@ -164,8 +165,8 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       body: input.body,
       commitSha: pull.pull.headSha,
       diffHunk: hunkUpTo(change, input.line, side),
+      thread: id,
       inReplyTo: undefined,
-      resolved: false,
       reactions: [],
       createdAt: now,
       updatedAt: now,
@@ -181,12 +182,18 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       pull_request: objects.pullRequest(pull),
     });
 
-  /** The comment that started the thread a comment is in. */
-  const rootOf = (comment: GitHubReviewCommentRecord): GitHubReviewCommentRecord =>
-    comment.inReplyTo === undefined ? comment : (store.reviewComments.find(String(comment.inReplyTo)) ?? comment);
+  /**
+   * The thread a comment on the diff is in, oldest comment first. The first one left is the
+   * thread's head: when the comment that started a thread is deleted, the rest stay one thread.
+   */
+  const threadOf = (comment: GitHubReviewCommentRecord): GitHubReviewCommentRecord[] =>
+    store
+      .reviewCommentsOf(store.repo(comment.repo), comment.pull)
+      .filter((candidate) => candidate.thread === comment.thread);
 
   return {
-    rootOf,
+    threadOf,
+    isResolved: (comment: GitHubReviewCommentRecord) => store.resolvedThreads.has(comment.thread),
 
     async openPull(
       repo: GitHubRepoRecord,
@@ -321,20 +328,19 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       return comment;
     },
 
-    /** Reply in a thread on the diff. A reply always hangs on the comment that started the thread. */
+    /** Reply in a thread on the diff. A reply hangs on the thread's first comment, whichever comment was answered. */
     reply(pull: Pull, actor: number, to: GitHubReviewCommentRecord, body: string): GitHubReviewCommentRecord {
       if (body.trim() === "") throw refused("PullRequestReviewComment", "body", "body can't be blank");
-      const root = rootOf(to);
+      const [head = to] = threadOf(to);
       const review = newReview(pull, actor, "COMMENTED", "");
       const now = clock();
       const comment = store.add(store.reviewComments, store.sessionOf(store.repo(pull.repo)), {
-        ...root,
+        ...head,
         id: Number(ids.next("github.comment")),
         review: review.id,
         author: actor,
         body,
-        inReplyTo: root.id,
-        resolved: false,
+        inReplyTo: head.id,
         reactions: [],
         createdAt: now,
         updatedAt: now,
@@ -361,15 +367,13 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     /** Resolve or reopen a thread on the diff. Sends `pull_request_review_thread`. */
     setResolved(pull: Pull, actor: number, comment: GitHubReviewCommentRecord, resolved: boolean): string | undefined {
       const repo = store.repo(pull.repo);
-      const root = rootOf(comment);
-      root.resolved = resolved;
-      const thread = store
-        .reviewCommentsOf(repo, pull.number)
-        .filter((candidate) => candidate.id === root.id || candidate.inReplyTo === root.id);
+      if (resolved) store.resolvedThreads.add(comment.thread);
+      else store.resolvedThreads.delete(comment.thread);
+      const thread = threadOf(comment);
       return kit.emit(repo, "pull_request_review_thread", actor, {
         action: resolved ? "resolved" : "unresolved",
         thread: {
-          node_id: githubNodeId("PullRequestReviewThread", [repo.id, root.id]),
+          node_id: githubNodeId("PullRequestReviewThread", [repo.id, comment.thread]),
           comments: thread.map((candidate) => objects.reviewComment(candidate, pull)),
         },
         pull_request: objects.pullRequest(pull),

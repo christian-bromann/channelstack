@@ -16,10 +16,11 @@ export interface GitHubFixture extends Inspectable<GitHubDelivery> {
   readonly org: string;
 
   /**
-   * The app's REST calls about no repository: its own endpoints (`GET /app`) and the token
-   * exchange. They belong to no session, so every session sees the same list. `calls()` has the rest.
+   * The app's REST calls about no repository of any session: its own endpoints (`GET /app`) and
+   * the token exchange. They belong to no session, so every session reads the same list; only
+   * calls that authenticated as the app are on it. `calls()` has the calls about repositories.
    */
-  appCalls(): Promise<ApiCall[]>;
+  appCalls(filter?: { operation?: string; error?: true | string }): Promise<ApiCall[]>;
 
   createUser(options: GitHubUserOptions): Promise<GitHubUser>;
 

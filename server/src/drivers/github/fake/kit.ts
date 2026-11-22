@@ -2,7 +2,13 @@ import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { signGitHubWebhook } from "../../../core/signing/github.ts";
 import { type GitHubObjects, githubObjects } from "../payloads.ts";
-import type { GitHubIssueRecord, GitHubPermission, GitHubRepoRecord, GitHubUserRecord } from "../world.ts";
+import {
+  type GitHubIssueRecord,
+  type GitHubPermission,
+  type GitHubRepoRecord,
+  type GitHubUserRecord,
+  PERMISSIONS,
+} from "../world.ts";
 import type { GitStore } from "./git.ts";
 import type { GitHubStore } from "./store.ts";
 
@@ -52,7 +58,6 @@ export const invalid = (
 
 /** GitHub waits ten seconds for a webhook to be answered. */
 const ACK_WINDOW_MS = 10_000;
-const PERMISSION_RANK: readonly GitHubPermission[] = ["read", "triage", "write", "maintain", "admin"];
 
 /** What every part of the fake world builds on: the state, git, the object builders and the way to the agent. */
 export interface GitHubKit {
@@ -185,7 +190,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     headers,
     can: (repo, user, level) => {
       const has = permission(repo, user);
-      return has !== undefined && PERMISSION_RANK.indexOf(has) >= PERMISSION_RANK.indexOf(level);
+      return has !== undefined && PERMISSIONS.indexOf(has) >= PERMISSIONS.indexOf(level);
     },
     allow(repo, user, level) {
       // GitHub answers 404 for a repository you can't see at all, and 403 for one you can't change.

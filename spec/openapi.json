@@ -12762,7 +12762,7 @@
     },
     "/sessions/{session}/github/app-calls": {
       "get": {
-        "summary": "The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500)",
+        "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
         "security": [
           {
             "bearer": []
@@ -12770,7 +12770,11 @@
         ],
         "x-channelstack-method": {
           "on": "GitHubFixture",
-          "name": "appCalls"
+          "name": "appCalls",
+          "options": [
+            "operation",
+            "error"
+          ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
@@ -12788,6 +12792,34 @@
             "required": true,
             "name": "session",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
           }
         ],
         "responses": {

@@ -14,8 +14,6 @@ import type {
   GitHubUserRecord,
 } from "../world.ts";
 
-const APP_CALL_LIMIT = 500;
-
 /** The GitHub fake's in-memory state. Objects live in the core registry; the store adds GitHub's own indexes. */
 export class GitHubStore {
   readonly users: Collection<GitHubUserRecord>;
@@ -32,8 +30,8 @@ export class GitHubStore {
   readonly hookDeliveries: GitHubHookDeliveryRecord[] = [];
   /** Who made a commit here (`<repo id>:<sha>` → user id): GitHub attributes it to them. */
   readonly commitActors = new Map<string, number>();
-  /** The App's calls about no repository, newest last: its own endpoints, the token exchange. */
-  readonly appCalls: Array<Record<string, unknown> & { at: string }> = [];
+  /** The threads on the diff that are resolved, by thread id. */
+  readonly resolvedThreads = new Set<number>();
   /** A check suite per repo and commit: check runs of one commit share it. */
   readonly suites = new Map<string, number>();
   #org: GitHubOrgRecord | undefined;
@@ -82,24 +80,9 @@ export class GitHubStore {
     };
     this.#created.clear();
     this.hookDeliveries.length = 0;
-    this.appCalls.length = 0;
     this.suites.clear();
     this.commitActors.clear();
-  }
-
-  /**
-   * Keep a call the App made about no repository. A token in the answer is not kept: the log is
-   * read through the control API, and tokens stay where `channelstack env` hands them out.
-   */
-  recordAppCall(call: Record<string, unknown> & { at: string }): void {
-    const { response } = call;
-    const scrubbed =
-      typeof response === "object" && response !== null && "token" in response
-        ? { ...response, token: "[redacted]" }
-        : response;
-    this.appCalls.push({ ...call, response: scrubbed });
-    // A long-running server doesn't keep every call forever.
-    if (this.appCalls.length > APP_CALL_LIMIT) this.appCalls.splice(0, this.appCalls.length - APP_CALL_LIMIT);
+    this.resolvedThreads.clear();
   }
 
   /** Keep a new object for its session. */
@@ -226,6 +209,7 @@ export class GitHubStore {
   /** Forget a closed session's indexes. Answers with what the caller still has to clean up. */
   release(session: string): { users: GitHubUserRecord[]; repos: GitHubRepoRecord[] } {
     const released = { users: this.list(this.users, session), repos: this.list(this.repos, session) };
+    for (const comment of this.list(this.reviewComments, session)) this.resolvedThreads.delete(comment.thread);
     this.#created.delete(session);
     for (let index = this.hookDeliveries.length - 1; index >= 0; index--) {
       if (this.hookDeliveries[index]?.session === session) this.hookDeliveries.splice(index, 1);

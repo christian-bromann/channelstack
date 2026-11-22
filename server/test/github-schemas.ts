@@ -86,8 +86,16 @@ const UNLISTED: ReadonlyArray<readonly [method: string, template: string, status
   ["POST", "/repos/{owner}/{repo}/statuses/{sha}", 422],
   ["GET", "/app/hook/deliveries/{delivery_id}", 404],
   ["POST", "/app/hook/deliveries/{delivery_id}/attempts", 404],
-  ["POST", "/app/installations/{installation_id}/access_tokens", 404],
 ];
+
+// An exception for an answer the description does list would skip that answer's schema: refused
+// when the module loads, so an entry can't outlive a newer description.
+for (const [method, template, status] of UNLISTED) {
+  const listed = (rest.paths as Json)[template] as Record<string, { responses?: Json }> | undefined;
+  if (listed?.[method.toLowerCase()]?.responses?.[String(status)] !== undefined) {
+    throw new Error(`GitHub's description lists ${method} ${template} ${status}: take it out of UNLISTED`);
+  }
+}
 
 const restSchema = validators("rest", withNull(asGitHubAnswers(rest)));
 const webhookSchema = validators("webhooks", withNull(webhooks));

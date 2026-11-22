@@ -426,6 +426,81 @@ describe("code", () => {
     expect(calls.at(-1)).toMatchObject({ method: "DELETE", request: { assignees: ["ana"] }, responseStatus: 200 });
   });
 
+  test("a path the fake doesn't serve is GitHub's 404, under both roots", async () => {
+    const { raw, path, token, get } = await workspace();
+    const auth = `token ${await token()}`;
+    for (const unknown of [`${path}/milestones`, `/api/v3${path}/milestones`, "/rate_limit", "/api/v3/nothing/here"]) {
+      const response = await raw("GET", unknown, auth);
+      expect([response.status, await response.json()]).toEqual([
+        404,
+        { message: "Not Found", documentation_url: "https://docs.github.com/rest", status: "404" },
+      ]);
+    }
+    expect((await raw("POST", "/graphql", auth, { query: "{ viewer { login } }" })).status).toBe(404);
+    // What didn't authenticate is on no record; what did and names no repository is on the App's.
+    await raw("GET", "/nothing/at/all");
+    await raw("GET", "/app", "Bearer made-up");
+    const about = (await get("/app-calls")).map((call: { operation: string }) => call.operation);
+    expect(about).toContain("GET /rate_limit");
+    expect(about).not.toContain("GET /nothing/at/all");
+    expect(about).not.toContain("GET /app");
+  });
+
+  test("patches have the headers git writes: an empty side, a single line, a range", async () => {
+    const { ana, repo, post, api, path } = await workspace();
+    const pr = await post(`/users/${ana.id}/pulls`, {
+      pr: {
+        from: "feat",
+        title: "Headers",
+        changes: [
+          { path: "added.txt", content: b64("one\n") },
+          { path: "two.txt", content: b64("one\ntwo\n") },
+          { path: "README.md", content: null },
+        ],
+      },
+      repo: repo.id,
+    });
+    const files = (await api("GET", `${path}/pulls/${pr.number}/files`)).body as Array<{
+      filename: string;
+      patch: string;
+    }>;
+    const header = (name: string) => files.find((file) => file.filename === name)?.patch.split("\n")[0];
+    expect(header("added.txt")).toBe("@@ -0,0 +1 @@");
+    expect(header("two.txt")).toBe("@@ -0,0 +1,2 @@");
+    expect(header("README.md")).toBe("@@ -1 +0,0 @@");
+    // A comment on the first added line carries that header, and the line is where git says it is.
+    const comment = await post(`/users/${ana.id}/review-comment`, {
+      body: "here",
+      pr: { repoId: repo.id, number: pr.number },
+      path: "two.txt",
+      line: 2,
+    });
+    expect((await api("GET", `${path}/pulls/comments/${comment.id}`)).body.diff_hunk).toBe(
+      "@@ -0,0 +1,2 @@\n+one\n+two",
+    );
+  });
+
+  test("what can't be read is refused, not a server error: a bad escape, a date that isn't one, a label with a %", async () => {
+    const { api, path, issue, pull, raw, token } = await workspace();
+    const auth = `token ${await token()}`;
+    for (const bad of ["/contents/%E0%A4%A", "/branches/%", "/git/ref/heads/%zz"]) {
+      expect((await raw("GET", `${path}${bad}`, auth)).status).toBe(404);
+    }
+    const pr = await pull();
+    const sha = (await api("GET", `${path}/pulls/${pr.number}`)).body.head.sha;
+    const run = await api("POST", `${path}/check-runs`, { name: "lint", head_sha: sha, started_at: "yesterday" });
+    expect([run.status, run.body.errors]).toEqual([
+      422,
+      [{ resource: "CheckRun", field: "started_at", code: "invalid" }],
+    ]);
+
+    const { number } = await issue();
+    await api("POST", `${path}/labels`, { name: "50% done" });
+    await api("POST", `${path}/issues/${number}/labels`, { labels: ["50% done"] });
+    expect((await api("GET", `${path}/labels/50%25%20done`)).body.name).toBe("50% done");
+    expect((await api("DELETE", `${path}/issues/${number}/labels/50%25%20done`)).body).toEqual([]);
+  });
+
   test("lists are paged the way GitHub pages them", async () => {
     const { raw, path, token, issue } = await workspace();
     for (const title of ["one", "two", "three"]) await issue(title);
@@ -546,6 +621,44 @@ describe("pull requests", () => {
     expect(said.body).toMatchObject({ state: "COMMENTED", body: "Done thinking" });
   });
 
+  test("a thread stays one thread when the comment that started it is deleted", async () => {
+    const { h, ana, pull, post, get, api, path, webhooks } = await workspace();
+    const pr = await pull();
+    const root = await post(`/users/${ana.id}/review-comment`, {
+      body: "root",
+      pr: pr.ref,
+      path: "src/app.ts",
+      line: 1,
+    });
+    const replies = `${path}/pulls/${pr.number}/comments/${root.id}/replies`;
+    const one = (await api("POST", replies, { body: "reply one" })).body;
+    const two = (await api("POST", replies, { body: "reply two" })).body;
+    await post(`/users/${ana.id}/delete`, { comment: root.id });
+
+    const transcript = async () => (await get(`/repos/${pr.repoId}/issues/${pr.number}/transcript`)).text;
+    // The oldest comment left reads as the thread's first, with where it is.
+    expect(await transcript()).toBe(
+      ["ana: Add app", "my-agent: src/app.ts:1: reply one", "  my-agent: reply two"].join("\n"),
+    );
+    expect((await get(`/review-comments/${one.id}/replies`)).map((reply: { body: string }) => reply.body)).toEqual([
+      "reply two",
+    ]);
+    expect((await get(`/review-comments/${two.id}/transcript`)).text).toBe(
+      "my-agent: src/app.ts:1: reply one\n  my-agent: reply two",
+    );
+
+    // A new reply joins the same thread, and resolving it names all that is left of it.
+    const three = await post(`/users/${ana.id}/reply`, { body: "reply three", comment: two.id });
+    await post(`/users/${ana.id}/resolve`, { comment: three.id });
+    await h.app.settled();
+    expect(
+      webhooks()
+        .at(-1)
+        ?.payload.thread.comments.map((comment: { body: string }) => comment.body),
+    ).toEqual(["reply one", "reply two", "reply three"]);
+    expect(await get(`/review-comments/${one.id}/resolved`)).toBe(true);
+  });
+
   test("a thread on the diff: reply, resolve, and how a person reads it", async () => {
     const { h, ana, pull, post, get, api, path, webhooks } = await workspace();
     const pr = await pull();
@@ -661,6 +774,19 @@ describe("check runs", () => {
       check_run: { id: run.id },
       sender: { login: "ana" },
     });
+  });
+
+  test("a name or a context that reports again is the newest", async () => {
+    const { pull, api, path } = await workspace();
+    const pr = await pull();
+    const sha = (await api("GET", `${path}/pulls/${pr.number}`)).body.head.sha;
+    for (const context of ["a", "b", "a"]) await api("POST", `${path}/statuses/${sha}`, { state: "success", context });
+    const combined = (await api("GET", `${path}/commits/${sha}/status`)).body;
+    expect(combined.statuses.map((status: { context: string }) => status.context)).toEqual(["a", "b"]);
+    for (const name of ["lint", "test", "lint"])
+      await api("POST", `${path}/check-runs`, { name, head_sha: sha, conclusion: "success" });
+    const runs = (await api("GET", `${path}/commits/${sha}/check-runs`)).body.check_runs;
+    expect(runs.map((run: { name: string }) => run.name)).toEqual(["test", "lint"]);
   });
 
   test("a check run that never completes is the agent's open work", async () => {

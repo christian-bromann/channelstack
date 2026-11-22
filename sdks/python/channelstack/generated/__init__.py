@@ -1361,10 +1361,10 @@ class GitHubFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
         return [GitHubDelivery(ctx, item) for item in data]
 
-    async def app_calls(self) -> GitHubAppCalls:
-        """The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500). Experimental."""
+    async def app_calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubAppCalls:
+        """The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/app-calls")
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/app-calls", query={"operation": operation, "error": error})
         return [GitHubApiCall._from_wire(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubApiCalls:

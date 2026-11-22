@@ -142,6 +142,7 @@ Every feature runs in the fake server (in memory). The question this document an
 | `pr.checkRuns()`, `commit.statuses()`, `toHaveCheckRun` | Done | Yes | User token | |
 | `issue.comments()`, `pr.reviews()`, `reviewComments()`, `toHaveCommentsFrom`, `toHaveReviewComment`, `toBeMerged` | Done | Yes | User token | |
 | `repo.readFile(path, { ref })` | Done | Yes | User token | |
+| `github.appCalls()` | Done | Yes, with proxy | Proxy (sees the App's calls) | The App's calls about no repository: its own endpoints and the token exchange. Fake: the same list for every session |
 | `delivery.redeliver()` | Done | Yes | App credentials (`POST /app/hook/deliveries/{id}/attempts`, App JWT) | Confirmed. GitHub redelivers to the agent's own webhook URL |
 | `delivery.attempts`, `status` for the agent's webhook | Done | Yes | App credentials (`GET /app/hook/deliveries`, App JWT) | Read-only: GitHub's delivery log shows each delivery to the agent, its status code and duration. channelstack stays out of the path |
 

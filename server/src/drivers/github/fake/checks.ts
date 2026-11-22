@@ -143,14 +143,21 @@ export function createChecks(kit: GitHubKit) {
     /** The newest check run of each name for a commit: what GitHub shows, and what its API lists by default. */
     latest(repo: GitHubRepoRecord, sha: string): GitHubCheckRunRecord[] {
       const byName = new Map<string, GitHubCheckRunRecord>();
-      for (const run of store.checkRunsOf(repo, sha)) byName.set(run.name, run);
+      // Taken out before it is put in again, so a name that reports again moves to the end.
+      for (const run of store.checkRunsOf(repo, sha)) {
+        byName.delete(run.name);
+        byName.set(run.name, run);
+      }
       return [...byName.values()];
     },
 
     /** The newest status of each context for a commit, newest first: what GitHub shows next to it. */
     latestStatuses(repo: GitHubRepoRecord, sha: string): GitHubStatusRecord[] {
       const byContext = new Map<string, GitHubStatusRecord>();
-      for (const status of store.statusesOf(repo, sha)) byContext.set(status.context, status);
+      for (const status of store.statusesOf(repo, sha)) {
+        byContext.delete(status.context);
+        byContext.set(status.context, status);
+      }
       return [...byContext.values()].reverse();
     },
 

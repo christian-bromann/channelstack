@@ -25,7 +25,9 @@ export interface GitHubAppRecord {
 }
 
 export type GitHubOrgRole = "member" | "admin" | "outside_collaborator";
-export type GitHubPermission = "read" | "triage" | "write" | "maintain" | "admin";
+/** What someone may do on a repository, from least to most. */
+export const PERMISSIONS = ["read", "triage", "write", "maintain", "admin"] as const;
+export type GitHubPermission = (typeof PERMISSIONS)[number];
 
 export interface GitHubUserRecord {
   id: number;
@@ -155,10 +157,10 @@ export interface GitHubReviewCommentRecord {
   body: string;
   commitSha: string;
   diffHunk: string;
+  /** The thread this comment is in: the id of the comment that started it, which stays the thread's name when that comment is deleted. */
+  thread: number;
   /** The comment that started the thread this one replies in. */
   inReplyTo: number | undefined;
-  /** On the comment that starts a thread: is the thread resolved? */
-  resolved: boolean;
   reactions: GitHubReactionRecord[];
   createdAt: number;
   updatedAt: number;

@@ -1,4 +1,4 @@
-import { afterEach, expect } from "vitest";
+import { afterEach, beforeEach, expect } from "vitest";
 
 import { restProblems, webhookProblems } from "../../server/test/github-schemas.ts";
 
@@ -7,16 +7,24 @@ import { restProblems, webhookProblems } from "../../server/test/github-schemas.
  * agent made in the test's session and each webhook the fake sent it are held to GitHub's own
  * descriptions. A test that passes with a response GitHub wouldn't give still fails here.
  */
-afterEach(async ({ github }) => {
+/** How many of the App's session-less calls were on record when each test began. */
+const before = new WeakMap<object, number>();
+
+beforeEach(async (context) => {
+  if (context.github) before.set(context, (await context.github.appCalls()).length);
+});
+
+afterEach(async (context) => {
+  const { github } = context;
   // A test that never got its fixtures has nothing to check.
   if (!github) return;
-  // The App's own endpoints belong to no session: whatever the agent called there so far is checked too.
+  // The App's own endpoints belong to no session: what was called there since this test began is checked too.
   const [inSession, aboutNoRepo, deliveries] = await Promise.all([
     github.calls(),
     github.appCalls(),
     github.deliveries(),
   ]);
-  const calls = [...inSession, ...aboutNoRepo];
+  const calls = [...inSession, ...aboutNoRepo.slice(before.get(context) ?? 0)];
   const problems = [
     ...calls.flatMap((call) => restProblems(call.method, call.path, call.responseStatus, call.response)),
     ...deliveries.flatMap((delivery) => webhookProblems(delivery.type, delivery.payload)),
