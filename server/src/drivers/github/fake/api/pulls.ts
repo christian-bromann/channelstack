@@ -1,6 +1,18 @@
 import { GitHubRefusal } from "../kit.ts";
 import type { GitHubInlineComment, GitHubReviewEvent } from "../pulls.ts";
-import { type Call, invalid, type Json, list, notFound, numberParam, page, people, pullOf, type Register, text } from "./shared.ts";
+import {
+  type Call,
+  invalid,
+  type Json,
+  list,
+  notFound,
+  numberParam,
+  page,
+  people,
+  pullOf,
+  type Register,
+  text,
+} from "./shared.ts";
 
 const EVENTS: readonly string[] = ["COMMENT", "APPROVE", "REQUEST_CHANGES"];
 
@@ -35,7 +47,9 @@ export function registerPulls(register: Register): void {
     };
   };
   const reviewCommentOf = ({ c, world, repo }: Call) => {
-    const comment = world.kit.store.reviewCommentsOf(repo).find((candidate) => candidate.id === numberParam(c, "comment"));
+    const comment = world.kit.store
+      .reviewCommentsOf(repo)
+      .find((candidate) => candidate.id === numberParam(c, "comment"));
     if (!comment) throw notFound();
     return { comment, pull: world.kit.requirePull(repo, comment.pull) };
   };
@@ -55,7 +69,10 @@ export function registerPulls(register: Register): void {
     const pulls = world.kit.store
       .issuesOf(repo)
       .filter((issue) => issue.pull !== undefined && (state === "all" || issue.state === state))
-      .filter((issue) => (head === undefined || issue.pull?.head === head) && (base === undefined || issue.pull?.base === base))
+      .filter(
+        (issue) =>
+          (head === undefined || issue.pull?.head === head) && (base === undefined || issue.pull?.base === base),
+      )
       .reverse();
     return c.json(page(c, pulls).map((issue) => world.kit.objects.pullRequest(issue)));
   });
@@ -76,14 +93,20 @@ export function registerPulls(register: Register): void {
     return c.json(world.kit.objects.pullRequest(issue), 201);
   });
 
-  register("get", "/pulls/:number{[0-9]+}", read, (call) => call.c.json(call.world.kit.objects.pullRequest(pullOf(call))));
+  register("get", "/pulls/:number{[0-9]+}", read, (call) =>
+    call.c.json(call.world.kit.objects.pullRequest(pullOf(call))),
+  );
 
   register("patch", "/pulls/:number{[0-9]+}", write, (call) => {
     const { c, world, body, bot } = call;
     const pull = pullOf(call);
     const state = text(body, "state");
     if (state !== undefined && state !== "open" && state !== "closed") throw invalid("PullRequest", "state", "invalid");
-    world.issues.updateIssue(pull, bot, { title: text(body, "title"), body: body.body === null ? null : text(body, "body"), state });
+    world.issues.updateIssue(pull, bot, {
+      title: text(body, "title"),
+      body: body.body === null ? null : text(body, "body"),
+      state,
+    });
     return c.json(world.kit.objects.pullRequest(pull));
   });
 
@@ -116,7 +139,8 @@ export function registerPulls(register: Register): void {
   register("put", "/pulls/:number{[0-9]+}/merge", ["contents", "write"], async (call) => {
     const { c, world, body, bot } = call;
     const method = text(body, "merge_method") ?? "merge";
-    if (method !== "merge" && method !== "squash" && method !== "rebase") throw invalid("PullRequest", "merge_method", "invalid");
+    if (method !== "merge" && method !== "squash" && method !== "rebase")
+      throw invalid("PullRequest", "merge_method", "invalid");
     const { sha } = await world.pulls.merge(pullOf(call), bot, {
       method,
       title: text(body, "commit_title"),
@@ -128,14 +152,20 @@ export function registerPulls(register: Register): void {
   // --- Review requests ------------------------------------------------------------------------
 
   register("get", "/pulls/:number{[0-9]+}/requested_reviewers", read, (call) =>
-    call.c.json({ users: pullOf(call).pull.requestedReviewers.map((id) => call.world.kit.objects.actor(id)), teams: [] }),
+    call.c.json({
+      users: pullOf(call).pull.requestedReviewers.map((id) => call.world.kit.objects.actor(id)),
+      teams: [],
+    }),
   );
 
   register("post", "/pulls/:number{[0-9]+}/requested_reviewers", write, (call) => {
     const pull = pullOf(call);
     const reviewers = people(call, list(call.body, "reviewers") ?? []);
     if (reviewers.includes(call.bot)) {
-      throw new GitHubRefusal(422, "Reviews may only be requested from collaborators. One or more of the users or teams you specified is not a collaborator of the repository.");
+      throw new GitHubRefusal(
+        422,
+        "Reviews may only be requested from collaborators. One or more of the users or teams you specified is not a collaborator of the repository.",
+      );
     }
     call.world.pulls.requestReviewers(pull, call.bot, reviewers);
     return call.c.json(call.world.kit.objects.pullRequest(pull), 201);
@@ -146,25 +176,35 @@ export function registerPulls(register: Register): void {
   register("get", "/pulls/:number{[0-9]+}/reviews", read, (call) => {
     const { c, world, repo } = call;
     const pull = pullOf(call);
-    return c.json(page(c, world.kit.store.reviewsOf(repo, pull.number)).map((review) => world.kit.objects.review(review, pull)));
+    return c.json(
+      page(c, world.kit.store.reviewsOf(repo, pull.number)).map((review) => world.kit.objects.review(review, pull)),
+    );
   });
 
-  register("post", "/pulls/:number{[0-9]+}/reviews", write, async (call) => {
+  /** The review endpoints say what was wrong in plain sentences, not as error objects. */
+  const inSentences = async <T>(run: () => T | Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch (error) {
+      if (!(error instanceof GitHubRefusal) || error.githubStatus !== 422) throw error;
+      const sentences = (error.errors ?? []).map((entry) =>
+        typeof entry === "string" ? entry : String(entry.message ?? entry.code),
+      );
+      throw new GitHubRefusal(422, "Unprocessable Entity", sentences);
+    }
+  };
+
+  register("post", "/pulls/:number{[0-9]+}/reviews", write, (call) => {
     const { c, world, body, bot } = call;
     const pull = pullOf(call);
-    try {
+    return inSentences(async () => {
       const { review } = await world.pulls.review(pull, bot, {
         event: reviewEvent(body),
         body: text(body, "body"),
         comments: (list(body, "comments") ?? []).map((comment) => inlineOf(comment as Json)),
       });
       return c.json(world.kit.objects.review(review, pull));
-    } catch (error) {
-      // This endpoint says what was wrong in plain sentences, not as error objects.
-      if (!(error instanceof GitHubRefusal) || error.githubStatus !== 422) throw error;
-      const sentences = (error.errors ?? []).map((entry) => (typeof entry === "string" ? entry : String(entry.message ?? entry.code)));
-      throw new GitHubRefusal(422, "Unprocessable Entity", sentences);
-    }
+    });
   });
 
   register("get", "/pulls/:number{[0-9]+}/reviews/:review{[0-9]+}", read, (call) => {
@@ -174,16 +214,20 @@ export function registerPulls(register: Register): void {
 
   register("post", "/pulls/:number{[0-9]+}/reviews/:review{[0-9]+}/events", write, (call) => {
     const { pull, review } = reviewOf(call);
-    const event = reviewEvent(call.body);
-    if (event === undefined) throw invalid("PullRequestReview", "event");
-    call.world.pulls.submitReview(pull, review, event, text(call.body, "body"));
-    return call.c.json(call.world.kit.objects.review(review, pull));
+    return inSentences(() => {
+      const event = reviewEvent(call.body);
+      if (event === undefined) throw invalid("PullRequestReview", "event");
+      call.world.pulls.submitReview(pull, review, event, text(call.body, "body"));
+      return call.c.json(call.world.kit.objects.review(review, pull));
+    });
   });
 
   register("get", "/pulls/:number{[0-9]+}/reviews/:review{[0-9]+}/comments", read, (call) => {
     const { c, world, repo } = call;
     const { pull, review } = reviewOf(call);
-    const comments = world.kit.store.reviewCommentsOf(repo, pull.number).filter((comment) => comment.review === review.id);
+    const comments = world.kit.store
+      .reviewCommentsOf(repo, pull.number)
+      .filter((comment) => comment.review === review.id);
     return c.json(page(c, comments).map((comment) => world.kit.objects.reviewComment(comment, pull)));
   });
 
@@ -193,7 +237,9 @@ export function registerPulls(register: Register): void {
     const { c, world, repo } = call;
     const pull = pullOf(call);
     return c.json(
-      page(c, world.kit.store.reviewCommentsOf(repo, pull.number)).map((comment) => world.kit.objects.reviewComment(comment, pull)),
+      page(c, world.kit.store.reviewCommentsOf(repo, pull.number)).map((comment) =>
+        world.kit.objects.reviewComment(comment, pull),
+      ),
     );
   });
 
@@ -204,7 +250,10 @@ export function registerPulls(register: Register): void {
     if (typeof body.in_reply_to === "number") {
       const to = world.kit.store.reviewCommentsOf(repo, pull.number).find((comment) => comment.id === body.in_reply_to);
       if (!to) throw notFound();
-      return c.json(world.kit.objects.reviewComment(world.pulls.reply(pull, bot, to, text(body, "body") ?? ""), pull), 201);
+      return c.json(
+        world.kit.objects.reviewComment(world.pulls.reply(pull, bot, to, text(body, "body") ?? ""), pull),
+        201,
+      );
     }
     const comment = await world.pulls.reviewComment(pull, bot, inlineOf(body));
     return c.json(world.kit.objects.reviewComment(comment, pull), 201);
@@ -214,7 +263,10 @@ export function registerPulls(register: Register): void {
     const { c, world, body, bot } = call;
     const { comment, pull } = reviewCommentOf(call);
     if (pull.number !== numberParam(c, "number")) throw notFound();
-    return c.json(world.kit.objects.reviewComment(world.pulls.reply(pull, bot, comment, text(body, "body") ?? ""), pull), 201);
+    return c.json(
+      world.kit.objects.reviewComment(world.pulls.reply(pull, bot, comment, text(body, "body") ?? ""), pull),
+      201,
+    );
   });
 
   register("get", "/pulls/comments/:comment{[0-9]+}", read, (call) => {

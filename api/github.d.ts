@@ -1,5 +1,5 @@
 import type {
-  App, Delivery, DeliveryAttempt, FileInput, HasTranscript, Inspectable, QuietOptions,
+  ApiCall, App, Delivery, DeliveryAttempt, FileInput, HasTranscript, Inspectable, QuietOptions,
   Resource, RichText, Timestamp, User, WaitOptions,
 } from "./common";
 
@@ -14,6 +14,12 @@ export interface GitHubFixture extends Inspectable<GitHubDelivery> {
   /** Base URL to give the agent (Octokit `baseUrl`), e.g. `https://github.localhost`. */
   readonly apiUrl: string;
   readonly org: string;
+
+  /**
+   * The app's REST calls about no repository: its own endpoints (`GET /app`) and the token
+   * exchange. They belong to no session, so every session sees the same list. `calls()` has the rest.
+   */
+  appCalls(): Promise<ApiCall[]>;
 
   createUser(options: GitHubUserOptions): Promise<GitHubUser>;
 

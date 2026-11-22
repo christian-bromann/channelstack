@@ -216,6 +216,7 @@ export function createRepos(kit: GitHubKit) {
         type: "User",
         role: input.role ?? "member",
         fixedId: input.id !== undefined,
+        createdAt: clock(),
       });
     },
 

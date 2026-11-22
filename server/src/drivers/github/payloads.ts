@@ -1,4 +1,4 @@
-import { githubNodeId } from "../../core/ids/index.ts";
+import { githubLegacyNodeId, githubNodeId } from "../../core/ids/index.ts";
 import type {
   GitHubAppRecord,
   GitHubCheckRunRecord,
@@ -83,9 +83,42 @@ export function githubObjects(lookups: GitHubLookups) {
         type: "User",
         role: "member",
         fixedId: false,
+        createdAt: 0,
       }),
       node_id: githubNodeId("Organization", [org.id]),
       type: "Organization",
+    };
+  };
+
+  /** `GET /users/{username}`: a person's public profile. */
+  const publicUser = (record: GitHubUserRecord): Json => ({
+    ...user(record),
+    name: record.name ?? null,
+    company: null,
+    blog: "",
+    location: null,
+    email: record.email ?? null,
+    hireable: null,
+    bio: null,
+    twitter_username: null,
+    public_repos: 0,
+    public_gists: 0,
+    followers: 0,
+    following: 0,
+    created_at: githubTime(record.createdAt),
+    updated_at: githubTime(record.createdAt),
+  });
+
+  /** Someone as a repository's collaborator: the user, with what they may do there. */
+  const collaborator = (
+    record: GitHubUserRecord,
+    role: "admin" | "maintain" | "write" | "triage" | "read" | "none",
+  ): Json => {
+    const rank = ["none", "read", "triage", "write", "maintain", "admin"].indexOf(role);
+    return {
+      ...user(record),
+      permissions: { admin: rank >= 5, maintain: rank >= 4, push: rank >= 3, triage: rank >= 2, pull: rank >= 1 },
+      role_name: role,
     };
   };
 
@@ -239,7 +272,7 @@ export function githubObjects(lookups: GitHubLookups) {
 
   const reaction = (record: GitHubReactionRecord): Json => ({
     id: record.id,
-    node_id: `REA_${Buffer.from(String(record.id)).toString("base64url")}`,
+    node_id: githubNodeId("Reaction", [record.id]),
     user: actor(record.user),
     content: record.content,
     created_at: githubTime(record.createdAt),
@@ -457,7 +490,7 @@ export function githubObjects(lookups: GitHubLookups) {
       id: app.id,
       client_id: app.clientId,
       slug: app.slug,
-      node_id: `A_${Buffer.from(String(app.id)).toString("base64url")}`,
+      node_id: githubNodeId("App", [app.id]),
       owner: orgOwner(),
       name: app.name,
       description: "",
@@ -500,7 +533,7 @@ export function githubObjects(lookups: GitHubLookups) {
   /** The installation as every webhook of an App carries it. */
   const installationLite = (): Json => {
     const { installationId } = lookups.app();
-    return { id: installationId, node_id: `MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9u${installationId}` };
+    return { id: installationId, node_id: githubLegacyNodeId("IntegrationInstallation", installationId) };
   };
 
   const suite = (repo: GitHubRepoRecord, id: number, sha: string): Json => ({
@@ -554,7 +587,7 @@ export function githubObjects(lookups: GitHubLookups) {
       url: `${repoApi(repo)}/statuses/${record.sha}`,
       avatar_url: `${web()}/avatars/u/${record.creator}?v=4`,
       id: record.id,
-      node_id: `SC_${Buffer.from(String(record.id)).toString("base64url")}`,
+      node_id: githubNodeId("StatusContext", [repo.id, record.id]),
       state: record.state,
       description: record.description,
       target_url: record.targetUrl,
@@ -575,7 +608,7 @@ export function githubObjects(lookups: GitHubLookups) {
   /** `GET /repos/{owner}/{repo}/git/commits/{sha}`: the commit as git has it. */
   const gitCommit = (repo: GitHubRepoRecord, info: GitHubCommitInfo): Json => ({
     sha: info.sha,
-    node_id: `C_${Buffer.from(info.sha).toString("base64url").slice(0, 24)}`,
+    node_id: githubNodeId("Commit", [repo.id, info.sha]),
     url: `${repoApi(repo)}/git/commits/${info.sha}`,
     html_url: `${repoWeb(repo)}/commit/${info.sha}`,
     author: gitPerson(info.author),
@@ -611,7 +644,7 @@ export function githubObjects(lookups: GitHubLookups) {
     changes?: readonly GitHubFileChange[],
   ): Json => ({
     sha: info.sha,
-    node_id: `C_${Buffer.from(info.sha).toString("base64url").slice(0, 24)}`,
+    node_id: githubNodeId("Commit", [repo.id, info.sha]),
     commit: {
       author: gitPerson(info.author),
       committer: gitPerson(info.committer),
@@ -674,6 +707,8 @@ export function githubObjects(lookups: GitHubLookups) {
 
   return {
     user,
+    publicUser,
+    collaborator,
     actor,
     orgOwner,
     organization,

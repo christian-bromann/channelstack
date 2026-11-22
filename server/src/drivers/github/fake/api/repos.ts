@@ -1,11 +1,10 @@
 import { githubNodeId } from "../../../../core/ids/index.ts";
 import type { GitHubCommitInfo } from "../../world.ts";
-import type { GitTreeEntry } from "../git.ts";
+import { FILE_MODE, type GitTreeEntry, TREE_MODE } from "../git.ts";
 import { GitHubRefusal } from "../kit.ts";
 import { type Call, invalid, type Json, notFound, page, type Register, text } from "./shared.ts";
 
 const base64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
-const TREE_MODE = "040000";
 
 /** Repositories, their contents and the Git Data API. */
 export function registerRepos(register: Register): void {
@@ -26,8 +25,13 @@ export function registerRepos(register: Register): void {
     const changes = detailed ? await world.kit.git.changes(dirOf(call), info.parents[0], info.sha) : undefined;
     return world.kit.objects.commit(repo, info, { author: who, committer: who }, changes);
   };
-  /** The API path of the rest of a route: a ref or a file path with slashes in it. */
-  const rest = ({ c }: Call, after: string): string => decodeURIComponent(c.req.path.split(after)[1] ?? "");
+  /**
+   * The rest of a route's path: a ref or a file path with slashes in it. It starts right after
+   * `/repos/{owner}/{repo}` and the route's own segment, so a path that names that segment again
+   * (`contents/docs/contents/x.md`) is taken whole.
+   */
+  const rest = ({ c }: Call, after: string): string =>
+    decodeURIComponent(c.req.path.replace(/^.*?\/repos\/[^/]+\/[^/]+/, "").slice(after.length));
 
   register("get", "", ["metadata", "read"], ({ c, world, repo }) => c.json(world.kit.objects.fullRepository(repo)));
 
@@ -38,8 +42,13 @@ export function registerRepos(register: Register): void {
       world.kit.can(repo, user.id, candidate),
     );
     // The API's older names: write is still "write", but triage and maintain show as read and write.
-    const permission = level === "admin" ? "admin" : level === "write" || level === "maintain" ? "write" : level ? "read" : "none";
-    return c.json({ permission, role_name: level ?? "none", user: world.kit.objects.user(user) });
+    const permission =
+      level === "admin" ? "admin" : level === "write" || level === "maintain" ? "write" : level ? "read" : "none";
+    return c.json({
+      permission,
+      role_name: level ?? "none",
+      user: world.kit.objects.collaborator(user, level ?? "none"),
+    });
   });
 
   // --- Branches and commits ------------------------------------------------------------------
@@ -106,7 +115,14 @@ export function registerRepos(register: Register): void {
       patch_url: `${web}/compare/${from}...${to}.patch`,
       base_commit: await commitJson(call, base, false),
       merge_base_commit: await commitJson(call, merge, false),
-      status: ahead.length > 0 && behind.length > 0 ? "diverged" : ahead.length > 0 ? "ahead" : behind.length > 0 ? "behind" : "identical",
+      status:
+        ahead.length > 0 && behind.length > 0
+          ? "diverged"
+          : ahead.length > 0
+            ? "ahead"
+            : behind.length > 0
+              ? "behind"
+              : "identical",
       ahead_by: ahead.length,
       behind_by: behind.length,
       total_commits: ahead.length,
@@ -213,18 +229,17 @@ export function registerRepos(register: Register): void {
     const blob = removing ? undefined : (await world.kit.git.files(dir, sha)).get(path);
     return c.json(
       {
-        content: blob && bytes ? { ...fileJson(call, path, blob.sha, branchName, bytes), content: undefined, encoding: undefined } : null,
+        content:
+          blob && bytes
+            ? { ...fileJson(call, path, blob.sha, branchName, bytes), content: undefined, encoding: undefined }
+            : null,
         commit: world.kit.objects.gitCommit(repo, info),
       },
       removing || existing ? 200 : 201,
     );
   };
   register("put", "/contents/*", write, (call) => change(call, false));
-  register("delete", "/contents/*", write, async (call) => {
-    // DELETE carries its fields in the body too.
-    const raw = await call.c.req.text();
-    return change({ ...call, body: raw === "" ? {} : (JSON.parse(raw) as Json) }, true);
-  });
+  register("delete", "/contents/*", write, (call) => change(call, true));
 
   // --- Git data -----------------------------------------------------------------------------
 
@@ -244,7 +259,7 @@ export function registerRepos(register: Register): void {
     if (!bytes) throw notFound();
     return c.json({
       sha,
-      node_id: `B_${Buffer.from(sha).toString("base64url").slice(0, 24)}`,
+      node_id: githubNodeId("Blob", [repo.id, sha]),
       size: bytes.length,
       url: `${world.kit.objects.repoApi(repo)}/git/blobs/${sha}`,
       content: `${base64(bytes)}\n`,
@@ -277,7 +292,13 @@ export function registerRepos(register: Register): void {
     if (!Array.isArray(entries)) throw invalid("Tree", "tree");
     const baseTree = text(body, "base_tree");
     const files = baseTree ? await git.files(dir, baseTree) : new Map<string, { sha: string; mode: string }>();
-    for (const entry of entries as Array<{ path?: string; mode?: string; type?: string; sha?: string | null; content?: string }>) {
+    for (const entry of entries as Array<{
+      path?: string;
+      mode?: string;
+      type?: string;
+      sha?: string | null;
+      content?: string;
+    }>) {
       if (typeof entry.path !== "string") throw invalid("Tree", "path");
       if (entry.type === "tree" || entry.mode === TREE_MODE) continue;
       // `sha: null` deletes the file; `content` writes a blob for it.
@@ -285,7 +306,7 @@ export function registerRepos(register: Register): void {
       else {
         const sha = entry.sha ?? (await git.writeBlob(dir, entry.content ?? ""));
         if (!(await git.readBlob(dir, sha))) throw new GitHubRefusal(422, "tree.sha is not a valid blob");
-        files.set(entry.path, { sha, mode: entry.mode ?? "100644" });
+        files.set(entry.path, { sha, mode: entry.mode ?? FILE_MODE });
       }
     }
     const sha = await git.treeOf(dir, files);
@@ -323,17 +344,28 @@ export function registerRepos(register: Register): void {
     if (tree === undefined || !(await git.readTree(dir, tree))) throw new GitHubRefusal(422, "Tree SHA does not exist");
     const parents = Array.isArray(body.parents) ? (body.parents as string[]) : [];
     for (const parent of parents) {
-      if (!(await git.readCommit(dir, parent))) throw new GitHubRefusal(422, "Parent SHA does not exist or is not a commit object");
+      if (!(await git.readCommit(dir, parent)))
+        throw new GitHubRefusal(422, "Parent SHA does not exist or is not a commit object");
     }
     const given = (who: unknown) => {
       const person = who as { name?: string; email?: string; date?: string } | undefined;
       if (!person?.name || !person.email) return undefined;
-      return { name: person.name, email: person.email, date: person.date ? Date.parse(person.date) : world.kit.context.clock() };
+      return {
+        name: person.name,
+        email: person.email,
+        date: person.date ? Date.parse(person.date) : world.kit.context.clock(),
+      };
     };
     // Without an author, the commit is the App's own.
     const own = { ...world.kit.identity(store.bot), date: world.kit.context.clock() };
     const author = given(body.author) ?? own;
-    const sha = await git.writeCommit(dir, { message, tree, parents, author, committer: given(body.committer) ?? author });
+    const sha = await git.writeCommit(dir, {
+      message,
+      tree,
+      parents,
+      author,
+      committer: given(body.committer) ?? author,
+    });
     store.commitActors.set(`${repo.id}:${sha}`, bot);
     const info = await git.readCommit(dir, sha);
     if (!info) throw notFound();
@@ -350,7 +382,7 @@ export function registerRepos(register: Register): void {
     const api = call.world.kit.objects.repoApi(call.repo);
     return {
       ref: `refs/heads/${branchName}`,
-      node_id: `REF_${Buffer.from(`${githubNodeId("Repository", [call.repo.id])}:${branchName}`).toString("base64url").slice(0, 40)}`,
+      node_id: githubNodeId("Ref", [call.repo.id, `refs/heads/${branchName}`]),
       url: `${api}/git/refs/heads/${branchName}`,
       object: { sha, type: "commit", url: `${api}/git/commits/${sha}` },
     };
@@ -369,7 +401,9 @@ export function registerRepos(register: Register): void {
     const prefix = branchNamed(rest(call, "/git/matching-refs/")) ?? "";
     const { git } = call.world.kit;
     const names = (await git.branches(dirOf(call))).filter((name) => name.startsWith(prefix));
-    const refs = await Promise.all(names.map(async (name) => refJson(call, name, (await git.branch(dirOf(call), name)) ?? "")));
+    const refs = await Promise.all(
+      names.map(async (name) => refJson(call, name, (await git.branch(dirOf(call), name)) ?? "")),
+    );
     return call.c.json(page(call.c, refs));
   });
 
@@ -378,7 +412,8 @@ export function registerRepos(register: Register): void {
     const { git } = world.kit;
     const name = branchNamed(text(body, "ref") ?? "");
     const sha = text(body, "sha");
-    if (!name || !(text(body, "ref") ?? "").startsWith("refs/")) throw new GitHubRefusal(422, "Reference name must start with refs/heads/");
+    if (!name || !(text(body, "ref") ?? "").startsWith("refs/"))
+      throw new GitHubRefusal(422, "Reference name must start with refs/heads/");
     if (!sha || !(await git.readCommit(dirOf(call), sha))) throw new GitHubRefusal(422, "Object does not exist");
     if (await git.branch(dirOf(call), name)) throw new GitHubRefusal(422, "Reference already exists");
     await git.setBranch(dirOf(call), name, sha);
@@ -429,7 +464,11 @@ export function registerRepos(register: Register): void {
     const name = text(body, "name");
     if (!name) throw invalid("Label", "name");
     if (repo.labels.has(name.toLowerCase())) throw invalid("Label", "name", "already_exists");
-    const label = world.repos.addLabel(repo, { name, color: text(body, "color"), description: text(body, "description") });
+    const label = world.repos.addLabel(repo, {
+      name,
+      color: text(body, "color"),
+      description: text(body, "description"),
+    });
     return c.json(world.kit.objects.label(repo, label), 201);
   });
 }

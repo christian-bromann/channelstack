@@ -36,7 +36,15 @@ Recorded here and in the reality matrix, to be settled by the first live run:
 
 ## Held to GitHub's own schemas
 
-Every REST response and every webhook is validated in tests against `@octokit/openapi` (GitHub's REST description) and `@octokit/openapi-webhooks`: once for every route in a unit scenario, and after every acceptance test for whatever the reference agent called. Three things are read loosely, each because GitHub's own traffic needs it: `nullable` is translated to JSON Schema, a nullable reference written as `allOf` plus `type: ["null"]` is read as "this or null", and `format: email` accepts GitHub's bot addresses (`…+my-agent[bot]@users.noreply.github.com`).
+Every REST response and every webhook is validated in tests against `@octokit/openapi` (GitHub's REST description) and `@octokit/openapi-webhooks`: once for every route in a unit scenario, and after every acceptance test for whatever the reference agent called. Where GitHub's own answers don't satisfy GitHub's own description, the validator (`server/test/github-schemas.ts`) reads the description the way GitHub answers. Each case is named there, and here:
+
+- `nullable` (OpenAPI 3.0) is translated to JSON Schema, and a nullable reference written as `allOf` plus `type: ["null"]` (in the webhook schemas) is read as "this or null".
+- `format: email` accepts GitHub's bot addresses (`…+my-agent[bot]@users.noreply.github.com`).
+- An installation's `account` is described as a user and an enterprise at once (`allOf`); it is read as one or the other.
+- A 409 from the contents API is described as exactly one of two errors, and a plain error fits both; it is read as either.
+- Status codes the description doesn't list for a route, where GitHub answers with its usual error object: 422 from creating a check run or a status, 404 from the App's delivery log and from the token exchange for an installation that isn't the App's.
+
+The App's own endpoints are about no repository and so belong to no session. The fake keeps the last 500 such calls for every session to read (`github.appCalls()`, with the token of a token exchange taken out), which is how the acceptance run checks them too.
 
 ## Dependencies
 

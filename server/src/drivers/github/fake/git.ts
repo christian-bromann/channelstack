@@ -24,8 +24,9 @@ interface Signature {
   date: number;
 }
 
-const FILE_MODE = "100644";
-const TREE_MODE = "040000";
+/** The mode git gives an ordinary file, and a directory. */
+export const FILE_MODE = "100644";
+export const TREE_MODE = "040000";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 

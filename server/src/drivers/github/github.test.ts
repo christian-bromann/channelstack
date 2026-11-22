@@ -12,7 +12,12 @@ afterEach(() => {
 
 async function workspace(options?: Parameters<typeof githubWorkspace>[0]) {
   const space = await githubWorkspace(options);
-  closers.push(space.agent.close);
+  closers.push(() => {
+    space.agent.close();
+    // Whatever a test is about, every answer and every webhook in it is what GitHub's schemas describe.
+    expect(space.problems.join("\n")).toBe("");
+    expect(space.webhookIssues().join("\n")).toBe("");
+  });
   /** Open an issue as Ana, and the handle fields a later call names it by. */
   const issue = async (title = "Something") => {
     const opened = await space.post(`/users/${space.ana.id}/issues`, { issue: { title }, repo: space.repo.id });
@@ -249,6 +254,42 @@ describe("what people may do", () => {
     expect(await refusal(post(`/users/${ana.id}/react`, { content: "heart" }))).toBe("invalid_argument");
   });
 
+  test("a deleted comment is gone: it can't be edited, deleted again, reacted to or read", async () => {
+    const { h, ana, issue, pull, post, get, webhooks } = await workspace();
+    const { ref } = await issue();
+    const comment = await post(`/users/${ana.id}/comment`, { body: "oops", issue: ref });
+    await post(`/users/${ana.id}/delete`, { comment: comment.id });
+    await h.app.settled();
+    const sent = webhooks().length;
+    expect(await refusal(post(`/users/${ana.id}/delete`, { comment: comment.id }))).toBe("not_found");
+    expect(await refusal(post(`/users/${ana.id}/edit`, { body: "again", comment: comment.id }))).toBe("not_found");
+    expect(await refusal(post(`/users/${ana.id}/react`, { content: "heart", comment: comment.id }))).toBe("not_found");
+    expect(await refusal(post(`/users/${ana.id}/minimize`, { comment: comment.id }))).toBe("not_found");
+    expect(await refusal(get(`/comments/${comment.id}`))).toBe("not_found");
+
+    // The same for a comment on the diff.
+    const pr = await pull();
+    const inline = await post(`/users/${ana.id}/review-comment`, {
+      body: "hm",
+      pr: pr.ref,
+      path: "src/app.ts",
+      line: 1,
+    });
+    await post(`/users/${ana.id}/delete`, { comment: inline.id });
+    await h.app.settled();
+    const after = webhooks().length;
+    expect(await refusal(post(`/users/${ana.id}/reply`, { body: "?", comment: inline.id }))).toBe("not_found");
+    expect(await refusal(post(`/users/${ana.id}/resolve`, { comment: inline.id }))).toBe("not_found");
+    await h.app.settled();
+    // Nothing more was sent about either of them.
+    expect(
+      webhooks()
+        .slice(sent)
+        .map((hook) => `${hook.event}.${hook.payload.action}`),
+    ).not.toContain("issue_comment.deleted");
+    expect(webhooks()).toHaveLength(after);
+  });
+
   test("the App needs the permission an endpoint asks for", async () => {
     const { api, path, issue } = await workspace();
     const { number } = await issue();
@@ -350,6 +391,41 @@ describe("code", () => {
     expect((await api("GET", `${path}/git/ref/heads/nope`)).status).toBe(404);
   });
 
+  test("a path or a ref that names the route's own segment again is taken whole", async () => {
+    const { api, path } = await workspace();
+    const put = await api("PUT", `${path}/contents/docs/contents/x.md`, { message: "Add", content: b64("x\n") });
+    expect(put.body.content).toMatchObject({ name: "x.md", path: "docs/contents/x.md" });
+    expect((await api("GET", `${path}/contents/docs/contents/x.md`)).body.path).toBe("docs/contents/x.md");
+    const main = (await api("GET", `${path}/git/ref/heads/main`)).body.object.sha;
+    await api("POST", `${path}/git/refs`, { ref: "refs/heads/feat/branches/x", sha: main });
+    expect((await api("GET", `${path}/branches/feat/branches/x`)).body.name).toBe("feat/branches/x");
+    expect((await api("GET", `${path}/git/ref/heads/feat/branches/x`)).body.ref).toBe("refs/heads/feat/branches/x");
+  });
+
+  test("a body is parsed in one place: bad JSON is GitHub's 400, and a DELETE's body is on record", async () => {
+    const { h, api, path, issue, get, token, raw } = await workspace();
+    const { number } = await issue();
+    const send = async (method: string, body: string) =>
+      h.app.fetch(
+        new Request(`http://127.0.0.1:4500/github${path}/issues/${number}/assignees`, {
+          method,
+          headers: { authorization: `token ${await token()}`, "content-type": "application/json" },
+          body,
+        }),
+      );
+    for (const method of ["POST", "DELETE"]) {
+      const bad = await send(method, "{not json");
+      expect([bad.status, ((await bad.json()) as { message: string }).message]).toEqual([400, "Problems parsing JSON"]);
+    }
+    expect((await send("POST", "null")).status).toBe(400);
+    expect((await raw("GET", `${path}/issues/${number}`, `token ${await token()}`)).status).toBe(200);
+
+    await api("POST", `${path}/issues/${number}/assignees`, { assignees: ["ana"] });
+    await api("DELETE", `${path}/issues/${number}/assignees`, { assignees: ["ana"] });
+    const calls = await get("/calls");
+    expect(calls.at(-1)).toMatchObject({ method: "DELETE", request: { assignees: ["ana"] }, responseStatus: 200 });
+  });
+
   test("lists are paged the way GitHub pages them", async () => {
     const { raw, path, token, issue } = await workspace();
     for (const title of ["one", "two", "three"]) await issue(title);
@@ -435,6 +511,39 @@ describe("pull requests", () => {
     await h.app.settled();
     expect(approved).toMatchObject({ state: "APPROVED", body: "Ship it", author: { login: "ben" } });
     expect(webhooks().at(-1)?.payload).toMatchObject({ action: "submitted", review: { state: "approved" } });
+  });
+
+  test("a pending review is held to the same rules when it is submitted", async () => {
+    const { h, ana, repo, post, api, path, webhooks } = await workspace();
+    await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "a.txt", content: b64("a\n") }],
+      repo: repo.id,
+      branch: "bot",
+    });
+    const own = (await api("POST", `${path}/pulls`, { head: "bot", base: "main", title: "From the App" })).body;
+    await h.app.settled();
+    const before = webhooks().length;
+    const reviews = `${path}/pulls/${own.number}/reviews`;
+
+    // Its own pull request: not directly, and not through a pending review either.
+    expect((await api("POST", reviews, { event: "APPROVE" })).status).toBe(422);
+    const pending = (await api("POST", reviews, {})).body;
+    expect(pending.state).toBe("PENDING");
+    expect((await api("POST", `${reviews}/${pending.id}/events`, { event: "APPROVE" })).status).toBe(422);
+    expect((await api("POST", `${reviews}/${pending.id}/events`, { event: "REQUEST_CHANGES" })).status).toBe(422);
+    const blank = await api("POST", `${reviews}/${pending.id}/events`, { event: "COMMENT" });
+    expect([blank.status, blank.body.errors]).toEqual([422, ["Body can't be blank"]]);
+    await h.app.settled();
+    expect(webhooks()).toHaveLength(before);
+
+    // Someone who was asked for a review isn't any more once they have given it.
+    const ben = await post("/users", { login: "ben" });
+    const ref = { repoId: repo.id, number: own.number };
+    await api("POST", `${path}/pulls/${own.number}/requested_reviewers`, { reviewers: ["ben"] });
+    await post(`/users/${ben.id}/review`, { review: { pr: ref, event: "COMMENT", body: "Fine" } });
+    expect((await api("GET", `${path}/pulls/${own.number}/requested_reviewers`)).body.users).toEqual([]);
+    const said = await api("POST", `${reviews}/${pending.id}/events`, { event: "COMMENT", body: "Done thinking" });
+    expect(said.body).toMatchObject({ state: "COMMENTED", body: "Done thinking" });
   });
 
   test("a thread on the diff: reply, resolve, and how a person reads it", async () => {
@@ -621,6 +730,11 @@ describe("sessions in one org", () => {
       request: { body: "On it" },
     });
     expect(await get("/calls?error=true")).toMatchObject([{ responseStatus: 404, error: "Not Found" }]);
+    // The App's own endpoints are about no repository: they are in no session's calls, and in `app-calls` for all.
+    const about = (await get("/app-calls")).map((call: { operation: string }) => call.operation);
+    expect(about).toContain("GET /app/installations");
+    const exchange = (await get("/app-calls")).find((call: { path: string }) => call.path.endsWith("/access_tokens"));
+    expect(exchange).toMatchObject({ method: "POST", responseStatus: 201, response: { token: "[redacted]" } });
     // Nothing a session's log holds shows the installation token.
     const other = (await h.call("POST", "/sessions")).body.sessionId;
     expect((await h.call("GET", `/sessions/${other}/github/calls`)).body).toEqual([]);

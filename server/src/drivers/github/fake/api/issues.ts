@@ -1,6 +1,17 @@
 import { type GitHubReactionContent, REACTIONS } from "../../world.ts";
 import { GitHubRefusal } from "../kit.ts";
-import { type Call, invalid, issueOf, list, notFound, numberParam, page, people, type Register, text } from "./shared.ts";
+import {
+  type Call,
+  invalid,
+  issueOf,
+  list,
+  notFound,
+  numberParam,
+  page,
+  people,
+  type Register,
+  text,
+} from "./shared.ts";
 
 /** Issues, their comments, labels, assignees and reactions. */
 export function registerIssues(register: Register): void {
@@ -17,7 +28,11 @@ export function registerIssues(register: Register): void {
   const assignable = (call: Call, logins: readonly unknown[]) => people(call, logins).filter((id) => id !== call.bot);
   const labelNames = (body: Call["body"]): string[] =>
     (Array.isArray(body) ? body : (list(body, "labels") ?? [])).flatMap((label) =>
-      typeof label === "string" ? [label] : typeof (label as { name?: unknown })?.name === "string" ? [(label as { name: string }).name] : [],
+      typeof label === "string"
+        ? [label]
+        : typeof (label as { name?: unknown })?.name === "string"
+          ? [(label as { name: string }).name]
+          : [],
     );
 
   register("get", "/issues", read, ({ c, world, repo }) => {
@@ -62,12 +77,20 @@ export function registerIssues(register: Register): void {
     if (body.labels !== undefined) {
       const wanted = labelNames(body);
       const lower = wanted.map((name) => name.toLowerCase());
-      world.issues.removeLabels(issue, bot, issue.labels.filter((has) => !lower.includes(has.toLowerCase())));
+      world.issues.removeLabels(
+        issue,
+        bot,
+        issue.labels.filter((has) => !lower.includes(has.toLowerCase())),
+      );
       world.issues.addLabels(issue, bot, wanted);
     }
     if (body.assignees !== undefined) {
       const wanted = assignable(call, list(body, "assignees") ?? []);
-      world.issues.unassign(issue, bot, issue.assignees.filter((has) => !wanted.includes(has)));
+      world.issues.unassign(
+        issue,
+        bot,
+        issue.assignees.filter((has) => !wanted.includes(has)),
+      );
       world.issues.assign(issue, bot, wanted);
     }
     return c.json(world.kit.objects.issue(issue));
@@ -78,7 +101,11 @@ export function registerIssues(register: Register): void {
   register("get", "/issues/:number{[0-9]+}/comments", read, (call) => {
     const { c, world, repo } = call;
     const issue = issueOf(call);
-    return c.json(page(c, world.kit.store.commentsOn(repo, issue.number)).map((comment) => world.kit.objects.comment(comment, issue)));
+    return c.json(
+      page(c, world.kit.store.commentsOn(repo, issue.number)).map((comment) =>
+        world.kit.objects.comment(comment, issue),
+      ),
+    );
   });
 
   register("post", "/issues/:number{[0-9]+}/comments", write, (call) => {
@@ -128,7 +155,11 @@ export function registerIssues(register: Register): void {
     const issue = issueOf(call);
     const wanted = labelNames(call.body);
     const lower = wanted.map((name) => name.toLowerCase());
-    call.world.issues.removeLabels(issue, call.bot, issue.labels.filter((has) => !lower.includes(has.toLowerCase())));
+    call.world.issues.removeLabels(
+      issue,
+      call.bot,
+      issue.labels.filter((has) => !lower.includes(has.toLowerCase())),
+    );
     call.world.issues.addLabels(issue, call.bot, wanted);
     return call.c.json(labelsJson(call, issue));
   });
@@ -151,11 +182,9 @@ export function registerIssues(register: Register): void {
     return call.c.json(call.world.kit.objects.issue(issue), 201);
   });
 
-  register("delete", "/issues/:number{[0-9]+}/assignees", write, async (call) => {
+  register("delete", "/issues/:number{[0-9]+}/assignees", write, (call) => {
     const issue = issueOf(call);
-    const raw = await call.c.req.text();
-    const body = raw === "" ? {} : (JSON.parse(raw) as Call["body"]);
-    call.world.issues.unassign(issue, call.bot, people(call, list(body, "assignees") ?? []));
+    call.world.issues.unassign(issue, call.bot, people(call, list(call.body, "assignees") ?? []));
     return call.c.json(call.world.kit.objects.issue(issue));
   });
 
@@ -169,7 +198,9 @@ export function registerIssues(register: Register): void {
     register("post", `${path}/reactions`, write, (call) => {
       const content = text(call.body, "content") as GitHubReactionContent | undefined;
       if (content === undefined || !REACTIONS.includes(content)) {
-        throw new GitHubRefusal(422, "Validation Failed", [{ resource: "Reaction", code: "invalid", field: "content" }]);
+        throw new GitHubRefusal(422, "Validation Failed", [
+          { resource: "Reaction", code: "invalid", field: "content" },
+        ]);
       }
       const { reaction, created } = call.world.issues.react(target(call), call.bot, content);
       return call.c.json(call.world.kit.objects.reaction(reaction), created ? 201 : 200);
@@ -182,7 +213,9 @@ export function registerIssues(register: Register): void {
   reactions("/issues/:number{[0-9]+}", issueOf);
   reactions("/issues/comments/:comment{[0-9]+}", commentOf);
   reactions("/pulls/comments/:comment{[0-9]+}", ({ c, world, repo }) => {
-    const comment = world.kit.store.reviewCommentsOf(repo).find((candidate) => candidate.id === numberParam(c, "comment"));
+    const comment = world.kit.store
+      .reviewCommentsOf(repo)
+      .find((candidate) => candidate.id === numberParam(c, "comment"));
     if (!comment) throw notFound();
     return comment;
   });

@@ -59,7 +59,7 @@ webhooks.on("pull_request_review_comment.created", async ({ payload }) => {
 webhooks.on("pull_request.opened", async ({ payload }) => {
   const { head } = payload.pull_request;
   // Bug: starts a check run and never finishes it.
-  const state = broken("github.check-conclusion")
+  const state = broken("github.check-run")
     ? ({ status: "in_progress" } as const)
     : ({ status: "completed", conclusion: "success" } as const);
   await rest(payload).checks.create({ ...at(payload), name: agent.words.check, head_sha: head.sha, ...state });

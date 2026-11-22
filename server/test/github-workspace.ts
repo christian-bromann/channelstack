@@ -39,18 +39,21 @@ export async function githubWorkspace({ reachable = true }: { reachable?: boolea
       .setExpirationTime(now + (claims.expiresIn ?? 540))
       .sign(createPrivateKey(app.privateKey));
   };
-  /** Call the REST API with the App's JWT. */
-  const asApp = async (method: string, path: string, body?: unknown) =>
-    h.provider(method, `github${path}`, body, await jwt());
-  let token: string | undefined;
-  /** What the REST answers so far got wrong by GitHub's description. A test ends by expecting none. */
+  /** What the REST answers so far got wrong by GitHub's description. Every test ends by expecting none. */
   const problems: string[] = [];
-  /** Call the REST API as the App's installation, the way Octokit does after exchanging its JWT for a token. */
-  const api = async (method: string, path: string, body?: unknown) => {
-    token ??= (await asApp("POST", `/app/installations/${await installationId()}/access_tokens`)).body.token;
+  /** Hold an answer to GitHub's description of that route. */
+  const checked = async (method: string, path: string, token: string | undefined, body?: unknown) => {
     const response = await h.provider(method, `github${path}`, body, token);
     problems.push(...restProblems(method, path.split("?")[0] ?? path, response.status, response.body));
     return response;
+  };
+  /** Call the REST API with the App's JWT. */
+  const asApp = async (method: string, path: string, body?: unknown) => checked(method, path, await jwt(), body);
+  let token: string | undefined;
+  /** Call the REST API as the App's installation, the way Octokit does after exchanging its JWT for a token. */
+  const api = async (method: string, path: string, body?: unknown) => {
+    token ??= (await asApp("POST", `/app/installations/${await installationId()}/access_tokens`)).body.token;
+    return checked(method, path, token, body);
   };
   const installationId = async (): Promise<number> => (await asApp("GET", "/app/installations")).body[0].id;
 

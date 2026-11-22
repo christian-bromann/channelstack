@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 
 import type { GitHubIssueRecord, GitHubRepoRecord } from "../../world.ts";
-import { GitHubRefusal } from "../kit.ts";
+import { GitHubRefusal, invalid as validation } from "../kit.ts";
 import type { FakeGitHubWorld } from "../world.ts";
 
 export type Json = Record<string, unknown>;
@@ -29,8 +29,9 @@ export type Register = (
 
 export const notFound = () => new GitHubRefusal(404, "Not Found");
 
+/** GitHub's 422 for one field, by error code: `missing_field` unless said otherwise. */
 export const invalid = (resource: string, field: string, code = "missing_field") =>
-  new GitHubRefusal(422, "Validation Failed", [{ resource, field, code }]);
+  validation(resource, field, { code });
 
 /** A path parameter that is a number: an issue number, a comment id. */
 export function numberParam(c: Context, name: string): number {

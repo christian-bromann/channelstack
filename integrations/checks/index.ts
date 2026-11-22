@@ -51,27 +51,32 @@ export const SLACK_CHECKS = [
   "slack.double-click",
 ] as const;
 
-type SlackCheck = (typeof SLACK_CHECKS)[number];
-
 /** The ids of the GitHub checks, in the order they are registered. */
 export const GITHUB_CHECKS = [
   "github.ignores-own-comments",
   "github.one-comment",
   "github.review-thread",
   "github.redelivery",
-  "github.check-conclusion",
+  "github.check-run",
   "github.bad-signature",
 ] as const;
 
-type GitHubCheck = (typeof GITHUB_CHECKS)[number];
-
-/** Registers one check as a test, with its id in the name. A check that was skipped, or whose prompt wasn't given, is left out. */
-const registrar =
-  <Id extends string>(options: ChecksOptions) =>
-  (id: Id, title: string, run: (context: TestContext) => Promise<void>, needs: unknown = true): void => {
+/**
+ * Registers one check as a test, with its id in the name. A check that was skipped, or whose
+ * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
+ */
+const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]) => {
+  const unknown = (options.skip ?? []).filter((id) => !(ids as readonly string[]).includes(id));
+  if (unknown.length > 0) {
+    throw new Error(
+      `No check is called ${unknown.map((id) => `"${id}"`).join(", ")}. The checks are: ${ids.join(", ")}`,
+    );
+  }
+  return (id: Id, title: string, run: (context: TestContext) => Promise<void>, needs: unknown = true): void => {
     if (options.skip?.includes(id) || needs === undefined) return;
     test(`${title} [${id}]`, run);
   };
+};
 
 /**
  * Registers: replies once to a DM · once to a mention · replies in the thread · survives Slack's
@@ -83,7 +88,7 @@ export function slackChecks(options: ChecksOptions): void {
   const { app } = options;
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
-  const check = registrar<SlackCheck>(options);
+  const check = registrar(options, SLACK_CHECKS);
 
   describe(`slack checks: ${app}`, () => {
     check("slack.dm-once", "replies once to a DM", async ({ slack }) => {
@@ -251,7 +256,7 @@ export function githubChecks(options: ChecksOptions): void {
   const { app } = options;
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
-  const check = registrar<GitHubCheck>(options);
+  const check = registrar(options, GITHUB_CHECKS);
   /** A repository the App is installed on, with Ana as a collaborator and an issue to talk in. */
   const setup = async ({ github }: TestContext) => {
     const ana = await github.createUser({ login: "ana" });
@@ -304,7 +309,7 @@ export function githubChecks(options: ChecksOptions): void {
       await expect(issue).toHaveCommentsFrom(app, { count: 1, ...wait });
     });
 
-    check("github.check-conclusion", "every check run it starts reaches a conclusion", async (context) => {
+    check("github.check-run", "every check run it starts reaches a conclusion", async (context) => {
       const { pr } = await pullRequest(context);
       // Quiet means nothing is left open; a check run that never completes is, and the wait says so.
       await context.channelstack.quiet(wait);

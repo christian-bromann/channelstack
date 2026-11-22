@@ -1,11 +1,24 @@
 import { githubTime } from "../../payloads.ts";
-import type { GitHubAnnotationRecord, GitHubCheckConclusion, GitHubCheckRunRecord, GitHubStatusRecord } from "../../world.ts";
+import type {
+  GitHubAnnotationRecord,
+  GitHubCheckConclusion,
+  GitHubCheckRunRecord,
+  GitHubStatusRecord,
+} from "../../world.ts";
 import type { GitHubCheckRunInput } from "../checks.ts";
 import { GitHubRefusal } from "../kit.ts";
 import { type Call, invalid, type Json, notFound, numberParam, page, type Register, text } from "./shared.ts";
 
 const STATUSES: readonly string[] = ["queued", "in_progress", "completed"];
-const CONCLUSIONS: readonly string[] = ["success", "failure", "neutral", "cancelled", "skipped", "timed_out", "action_required"];
+const CONCLUSIONS: readonly string[] = [
+  "success",
+  "failure",
+  "neutral",
+  "cancelled",
+  "skipped",
+  "timed_out",
+  "action_required",
+];
 const STATES: readonly string[] = ["pending", "success", "failure", "error"];
 
 /** Check runs and commit statuses. */
@@ -21,7 +34,8 @@ export function registerChecks(register: Register): void {
     const status = text(body, "status");
     const conclusion = text(body, "conclusion");
     if (status !== undefined && !STATUSES.includes(status)) throw invalid("CheckRun", "status", "invalid");
-    if (conclusion !== undefined && !CONCLUSIONS.includes(conclusion)) throw invalid("CheckRun", "conclusion", "invalid");
+    if (conclusion !== undefined && !CONCLUSIONS.includes(conclusion))
+      throw invalid("CheckRun", "conclusion", "invalid");
     const output = body.output as Json | undefined;
     return {
       name: text(body, "name"),
@@ -37,7 +51,9 @@ export function registerChecks(register: Register): void {
             title: text(output, "title"),
             summary: text(output, "summary"),
             text: text(output, "text"),
-            annotations: Array.isArray(output.annotations) ? (output.annotations as GitHubAnnotationRecord[]) : undefined,
+            annotations: Array.isArray(output.annotations)
+              ? (output.annotations as GitHubAnnotationRecord[])
+              : undefined,
           }
         : undefined,
       actions: Array.isArray(body.actions) ? (body.actions as GitHubCheckRunInput["actions"]) : undefined,
@@ -66,7 +82,9 @@ export function registerChecks(register: Register): void {
     return c.json(world.kit.objects.checkRun(run), 201);
   });
 
-  register("get", "/check-runs/:run{[0-9]+}", read, (call) => call.c.json(call.world.kit.objects.checkRun(runOf(call))));
+  register("get", "/check-runs/:run{[0-9]+}", read, (call) =>
+    call.c.json(call.world.kit.objects.checkRun(runOf(call))),
+  );
 
   register("patch", "/check-runs/:run{[0-9]+}", write, (call) =>
     call.c.json(call.world.kit.objects.checkRun(call.world.checks.update(runOf(call), input(call.body)))),
@@ -95,12 +113,17 @@ export function registerChecks(register: Register): void {
     const { c, world, repo } = call;
     const sha = await shaOf(call);
     // By default GitHub lists the newest run of each name; `filter=all` lists every one.
-    const runs = (c.req.query("filter") === "all" ? world.kit.store.checkRunsOf(repo, sha) : world.checks.latest(repo, sha)).filter(
+    const runs = (
+      c.req.query("filter") === "all" ? world.kit.store.checkRunsOf(repo, sha) : world.checks.latest(repo, sha)
+    ).filter(
       (run) =>
         (c.req.query("check_name") === undefined || run.name === c.req.query("check_name")) &&
         (c.req.query("status") === undefined || run.status === c.req.query("status")),
     );
-    return c.json({ total_count: runs.length, check_runs: page(c, runs).map((run) => world.kit.objects.checkRun(run)) });
+    return c.json({
+      total_count: runs.length,
+      check_runs: page(c, runs).map((run) => world.kit.objects.checkRun(run)),
+    });
   });
 
   // --- Commit statuses ------------------------------------------------------------------------
@@ -110,7 +133,8 @@ export function registerChecks(register: Register): void {
     const sha = c.req.param("sha") ?? "";
     const state = text(body, "state");
     if (state === undefined || !STATES.includes(state)) throw invalid("Status", "state", "invalid");
-    if (!(await world.kit.git.readCommit(world.kit.dir(repo), sha))) throw new GitHubRefusal(422, `No commit found for SHA: ${sha}`);
+    if (!(await world.kit.git.readCommit(world.kit.dir(repo), sha)))
+      throw new GitHubRefusal(422, `No commit found for SHA: ${sha}`);
     const status = world.checks.createStatus(repo, bot, sha, {
       state: state as GitHubStatusRecord["state"],
       context: text(body, "context"),
@@ -120,13 +144,6 @@ export function registerChecks(register: Register): void {
     return c.json(world.kit.objects.status(status), 201);
   });
 
-  /** The newest status of each context for a commit, newest first. */
-  const current = (call: Call, sha: string): GitHubStatusRecord[] => {
-    const byContext = new Map<string, GitHubStatusRecord>();
-    for (const status of call.world.kit.store.statusesOf(call.repo, sha)) byContext.set(status.context, status);
-    return [...byContext.values()].reverse();
-  };
-
   register("get", "/commits/:ref/statuses", ["statuses", "read"], async (call) => {
     const statuses = [...call.world.kit.store.statusesOf(call.repo, await shaOf(call))].reverse();
     return call.c.json(page(call.c, statuses).map((status) => call.world.kit.objects.status(status)));
@@ -135,12 +152,16 @@ export function registerChecks(register: Register): void {
   register("get", "/commits/:ref/status", ["statuses", "read"], async (call) => {
     const { c, world, repo } = call;
     const sha = await shaOf(call);
-    const statuses = current(call, sha);
+    const statuses = world.checks.latestStatuses(repo, sha);
     const states = statuses.map((status) => status.state);
     const api = world.kit.objects.repoApi(repo);
     return c.json({
       // Failure wins over pending, pending over success; a commit without statuses is pending.
-      state: states.some((state) => state === "failure" || state === "error") ? "failure" : states.length > 0 && states.every((state) => state === "success") ? "success" : "pending",
+      state: states.some((state) => state === "failure" || state === "error")
+        ? "failure"
+        : states.length > 0 && states.every((state) => state === "success")
+          ? "success"
+          : "pending",
       statuses: statuses.map((status) => {
         const { creator: _creator, ...simple } = world.kit.objects.status(status);
         return { ...simple, required: null };

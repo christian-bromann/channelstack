@@ -1,3 +1,4 @@
+import { githubNodeId } from "../../../core/ids/index.ts";
 import type {
   GitHubFileChange,
   GitHubIssueRecord,
@@ -7,7 +8,7 @@ import type {
   GitHubReviewState,
 } from "../world.ts";
 import type { GitHubIssues } from "./issues.ts";
-import { type GitHubKit, GitHubRefusal } from "./kit.ts";
+import { type GitHubKit, GitHubRefusal, invalid } from "./kit.ts";
 import type { GitHubRepos } from "./repos.ts";
 
 type Pull = GitHubIssueRecord & { pull: NonNullable<GitHubIssueRecord["pull"]> };
@@ -35,8 +36,8 @@ const STATE_FOR: Readonly<Record<GitHubReviewEvent, GitHubReviewState>> = {
   REQUEST_CHANGES: "CHANGES_REQUESTED",
 };
 
-const invalid = (resource: string, field: string, message: string) =>
-  new GitHubRefusal(422, "Validation Failed", [{ resource, code: "custom", field, message }]);
+/** A refusal with GitHub's own sentence about one field. */
+const refused = (resource: string, field: string, message: string) => invalid(resource, field, { message });
 
 /** The part of a file's patch a comment on `line` shows: its hunk, down to that line. */
 function hunkUpTo(change: GitHubFileChange, line: number, side: "LEFT" | "RIGHT"): string {
@@ -51,6 +52,8 @@ function hunkUpTo(change: GitHubFileChange, line: number, side: "LEFT" | "RIGHT"
       continue;
     }
     out.push(text);
+    // "\ No newline at end of file" belongs to the line before it, on neither side.
+    if (text.startsWith("\\")) continue;
     const [onLeft, onRight] = [!text.startsWith("+"), !text.startsWith("-")];
     if ((side === "LEFT" && onLeft && left === line) || (side === "RIGHT" && onRight && right === line)) break;
     if (onLeft) left++;
@@ -64,9 +67,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
   const { context, store, git, objects } = kit;
   const { ids, clock } = context;
 
-  const touch = (issue: GitHubIssueRecord) => {
-    issue.updatedAt = clock();
-  };
+  const { touch } = kit;
 
   const newReview = (pull: Pull, author: number, state: GitHubReviewState, body: string): GitHubReviewRecord =>
     store.add(store.reviews, store.sessionOf(store.repo(pull.repo)), {
@@ -91,6 +92,37 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     });
   };
 
+  /**
+   * May this person submit a review with this verdict? Not an approval or a change request on
+   * their own pull request, and not one that says nothing. Asked for a new review and for a
+   * pending one alike.
+   */
+  const maySubmit = (
+    pull: Pull,
+    author: number,
+    event: GitHubReviewEvent,
+    body: string,
+    hasComments: boolean,
+  ): void => {
+    if (event !== "COMMENT" && author === pull.author) {
+      const what = event === "APPROVE" ? "approve" : "request changes on";
+      throw refused("PullRequestReview", "event", `Can not ${what} your own pull request`);
+    }
+    if (body.trim() !== "" || hasComments) return;
+    if (event === "REQUEST_CHANGES") {
+      throw refused("PullRequestReview", "body", "You need to leave a comment indicating the requested changes.");
+    }
+    if (event === "COMMENT") throw refused("PullRequestReview", "body", "Body can't be blank");
+  };
+
+  /** A review was submitted: its author is no longer asked for one, and the App hears about its comments and the review. */
+  const announce = (pull: Pull, review: GitHubReviewRecord, comments: readonly GitHubReviewCommentRecord[]): void => {
+    pull.pull.requestedReviewers = pull.pull.requestedReviewers.filter((reviewer) => reviewer !== review.author);
+    touch(pull);
+    for (const comment of comments) comment.delivery = commentEvent(pull, comment, "created");
+    submitted(pull, review);
+  };
+
   /** A comment on the diff. GitHub refuses a line that isn't part of it. */
   const inline = async (
     pull: Pull,
@@ -102,7 +134,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     const side = input.side ?? "RIGHT";
     const change = (await repos.pullChanges(repo, pull)).find((candidate) => candidate.path === input.path);
     if (!change) {
-      throw invalid(
+      throw refused(
         "PullRequestReviewComment",
         "pull_request_review_thread.path",
         "pull_request_review_thread.path could not be resolved",
@@ -110,14 +142,14 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     }
     for (const line of input.startLine === undefined ? [input.line] : [input.startLine, input.line]) {
       if (!(side === "RIGHT" ? change.rightLines : change.leftLines).includes(line)) {
-        throw invalid(
+        throw refused(
           "PullRequestReviewComment",
           "pull_request_review_thread.line",
           "pull_request_review_thread.line must be part of the diff",
         );
       }
     }
-    if (input.body.trim() === "") throw invalid("PullRequestReviewComment", "body", "body can't be blank");
+    if (input.body.trim() === "") throw refused("PullRequestReviewComment", "body", "body can't be blank");
     const now = clock();
     return store.add(store.reviewComments, store.sessionOf(repo), {
       id: Number(ids.next("github.comment")),
@@ -164,8 +196,8 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       const dir = kit.dir(repo);
       const base = input.base ?? repo.defaultBranch;
       const [headSha, baseSha] = await Promise.all([git.branch(dir, input.head), git.branch(dir, base)]);
-      if (!headSha) throw invalid("PullRequest", "head", "head is invalid");
-      if (!baseSha) throw invalid("PullRequest", "base", "base is invalid");
+      if (!headSha) throw refused("PullRequest", "head", "head is invalid");
+      if (!baseSha) throw refused("PullRequest", "base", "base is invalid");
       const commits = await git.ahead(dir, baseSha, headSha);
       if (commits.length === 0) {
         throw new GitHubRefusal(422, "Validation Failed", [
@@ -209,7 +241,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       const deliveries: Array<string | undefined> = [];
       for (const reviewer of reviewers) {
         if (reviewer === pull.author)
-          throw invalid("PullRequest", "reviewers", "Review cannot be requested from pull request author.");
+          throw refused("PullRequest", "reviewers", "Review cannot be requested from pull request author.");
         if (pull.pull.requestedReviewers.includes(reviewer)) continue;
         pull.pull.requestedReviewers.push(reviewer);
         touch(pull);
@@ -221,7 +253,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     },
 
     markReady(pull: Pull, actor: number): string | undefined {
-      if (!pull.pull.draft) throw invalid("PullRequest", "draft", "The pull request is not a draft");
+      if (!pull.pull.draft) throw refused("PullRequest", "draft", "The pull request is not a draft");
       pull.pull.draft = false;
       touch(pull);
       return kit.issueEvent(pull, actor, "ready_for_review");
@@ -242,19 +274,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     ): Promise<{ review: GitHubReviewRecord; comments: GitHubReviewCommentRecord[] }> {
       const body = input.body ?? "";
       const comments = input.comments ?? [];
-      if (input.event !== undefined && input.event !== "COMMENT" && actor === pull.author) {
-        throw invalid(
-          "PullRequestReview",
-          "event",
-          `Can not ${input.event === "APPROVE" ? "approve" : "request changes on"} your own pull request`,
-        );
-      }
-      if (input.event === "REQUEST_CHANGES" && body.trim() === "" && comments.length === 0) {
-        throw invalid("PullRequestReview", "body", "You need to leave a comment indicating the requested changes.");
-      }
-      if (input.event === "COMMENT" && body.trim() === "" && comments.length === 0) {
-        throw invalid("PullRequestReview", "body", "Body can't be blank");
-      }
+      if (input.event !== undefined) maySubmit(pull, actor, input.event, body, comments.length > 0);
       const review = newReview(pull, actor, input.event === undefined ? "PENDING" : STATE_FOR[input.event], body);
       const made: GitHubReviewCommentRecord[] = [];
       try {
@@ -266,27 +286,23 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
         store.forget(store.reviews, session, review.id);
         throw error;
       }
-      if (review.state !== "PENDING") {
-        pull.pull.requestedReviewers = pull.pull.requestedReviewers.filter((reviewer) => reviewer !== actor);
-        touch(pull);
-        for (const comment of made) comment.delivery = commentEvent(pull, comment, "created");
-        submitted(pull, review);
-      }
+      if (review.state !== "PENDING") announce(pull, review, made);
       return { review, comments: made };
     },
 
     /** Submit a pending review. */
     submitReview(pull: Pull, review: GitHubReviewRecord, event: GitHubReviewEvent, body: string | undefined): void {
-      if (review.state !== "PENDING")
-        throw invalid("PullRequestReview", "event", "Can not submit a review that was already submitted");
+      if (review.state !== "PENDING") {
+        throw refused("PullRequestReview", "event", "Can not submit a review that was already submitted");
+      }
+      const comments = store
+        .reviewCommentsOf(store.repo(pull.repo), pull.number)
+        .filter((comment) => comment.review === review.id);
+      maySubmit(pull, review.author, event, body ?? review.body, comments.length > 0);
       review.state = STATE_FOR[event];
       review.body = body ?? review.body;
       review.submittedAt = clock();
-      touch(pull);
-      for (const comment of store.reviewCommentsOf(store.repo(pull.repo), pull.number)) {
-        if (comment.review === review.id) comment.delivery = commentEvent(pull, comment, "created");
-      }
-      submitted(pull, review);
+      announce(pull, review, comments);
     },
 
     /** One comment on the diff, outside a review. GitHub wraps it in a review of its own. */
@@ -307,7 +323,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
 
     /** Reply in a thread on the diff. A reply always hangs on the comment that started the thread. */
     reply(pull: Pull, actor: number, to: GitHubReviewCommentRecord, body: string): GitHubReviewCommentRecord {
-      if (body.trim() === "") throw invalid("PullRequestReviewComment", "body", "body can't be blank");
+      if (body.trim() === "") throw refused("PullRequestReviewComment", "body", "body can't be blank");
       const root = rootOf(to);
       const review = newReview(pull, actor, "COMMENTED", "");
       const now = clock();
@@ -353,7 +369,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       return kit.emit(repo, "pull_request_review_thread", actor, {
         action: resolved ? "resolved" : "unresolved",
         thread: {
-          node_id: `PRRT_${Buffer.from(String(root.id)).toString("base64url")}`,
+          node_id: githubNodeId("PullRequestReviewThread", [repo.id, root.id]),
           comments: thread.map((candidate) => objects.reviewComment(candidate, pull)),
         },
         pull_request: objects.pullRequest(pull),

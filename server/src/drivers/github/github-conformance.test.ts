@@ -9,7 +9,12 @@ afterEach(() => {
 
 async function workspace() {
   const space = await githubWorkspace();
-  closers.push(space.agent.close);
+  closers.push(() => {
+    space.agent.close();
+    // Whatever a test is about, every answer and every webhook in it is what GitHub's schemas describe.
+    expect(space.problems.join("\n")).toBe("");
+    expect(space.webhookIssues().join("\n")).toBe("");
+  });
   return space;
 }
 
@@ -200,6 +205,84 @@ describe("GitHub's own schemas", () => {
     await api("GET", `${path}/pulls/${pr.number}/merge`);
     await api("PUT", `${path}/pulls/${pr.number}/merge`, { merge_method: "squash" });
     await api("GET", `${path}/pulls/${pr.number}/merge`);
+    await h.app.settled();
+
+    expect(problems.join("\n")).toBe("");
+    expect(webhookIssues().join("\n")).toBe("");
+  });
+
+  test("the App's own endpoints, people, and the routes the scenarios above leave out", async () => {
+    const { h, ana, repo, post, api, asApp, path, problems, webhookIssues } = await workspace();
+    const ben = await post("/users", { login: "ben" });
+    await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "src/app.ts", content: b64("export {}\n") }],
+      repo: repo.id,
+      branch: "feat",
+    });
+    const issue = await post(`/users/${ana.id}/issues`, { issue: { title: "Labels" }, repo: repo.id });
+    const comment = await post(`/users/${ana.id}/comment`, {
+      body: "@my-agent hi",
+      issue: { repoId: repo.id, number: issue.number },
+    });
+    await h.app.settled();
+
+    await asApp("GET", "/app");
+    const [installation] = (await asApp("GET", "/app/installations")).body;
+    await asApp("GET", `/app/installations/${installation.id}`);
+    await asApp("GET", "/app/installations/1");
+    await asApp("POST", `/app/installations/${installation.id}/access_tokens`);
+    await asApp("POST", "/app/installations/1/access_tokens");
+    await asApp("GET", `${path}/installation`);
+    await asApp("GET", "/orgs/acme/installation");
+    const [delivery] = (await asApp("GET", "/app/hook/deliveries")).body;
+    await asApp("GET", `/app/hook/deliveries/${delivery.id}`);
+    await asApp("GET", "/app/hook/deliveries/1");
+    await asApp("POST", `/app/hook/deliveries/${delivery.id}/attempts`);
+    await asApp("POST", "/app/hook/deliveries/1/attempts");
+    await api("GET", "/installation/repositories");
+    await api("GET", "/users/ana");
+    await api("GET", "/users/my-agent%5Bbot%5D");
+    await api("GET", "/users/nobody");
+    await api("GET", "/user");
+    await api("GET", `${path}/collaborators/ana/permission`);
+    await api("GET", `${path}/collaborators/ben/permission`);
+    await api("GET", `${path}/collaborators/nobody/permission`);
+
+    await api("GET", `${path}/labels/bug`);
+    await api("PUT", `${path}/issues/${issue.number}/labels`, { labels: ["bug", "question"] });
+    await api("DELETE", `${path}/issues/${issue.number}/labels`);
+    await api("POST", `${path}/issues/${issue.number}/assignees`, { assignees: ["ana", "ben"] });
+    await api("DELETE", `${path}/issues/${issue.number}/assignees`, { assignees: ["ben"] });
+    const reaction = (await api("POST", `${path}/issues/comments/${comment.id}/reactions`, { content: "eyes" })).body;
+    await api("DELETE", `${path}/issues/comments/${comment.id}/reactions/${reaction.id}`);
+    const onIssue = (await api("POST", `${path}/issues/${issue.number}/reactions`, { content: "heart" })).body;
+    await api("GET", `${path}/issues/${issue.number}/reactions`);
+    await api("DELETE", `${path}/issues/${issue.number}/reactions/${onIssue.id}`);
+
+    const pull = (await api("POST", `${path}/pulls`, { head: "feat", base: "main", title: "From the App" })).body;
+    await api("POST", `${path}/pulls/${pull.number}/requested_reviewers`, { reviewers: ["ben"] });
+    await api("POST", `${path}/pulls/${pull.number}/requested_reviewers`, { reviewers: ["my-agent[bot]"] });
+    const pending = (await api("POST", `${path}/pulls/${pull.number}/reviews`, { body: "Thinking" })).body;
+    await api("POST", `${path}/pulls/${pull.number}/reviews/${pending.id}/events`, { event: "COMMENT" });
+    await api("POST", `${path}/pulls/${pull.number}/reviews/${pending.id}/events`, { event: "COMMENT" });
+    const inline = (
+      await api("POST", `${path}/pulls/${pull.number}/comments`, {
+        body: "Here",
+        path: "src/app.ts",
+        line: 1,
+        commit_id: pull.head.sha,
+      })
+    ).body;
+    await api("PATCH", `${path}/pulls/comments/${inline.id}`, { body: "Here, exactly" });
+    const onDiff = (await api("POST", `${path}/pulls/comments/${inline.id}/reactions`, { content: "+1" })).body;
+    await api("GET", `${path}/pulls/comments/${inline.id}/reactions`);
+    await api("DELETE", `${path}/pulls/comments/${inline.id}/reactions/${onDiff.id}`);
+    await api("DELETE", `${path}/pulls/comments/${inline.id}`);
+    await api("PATCH", `${path}/pulls/${pull.number}`, { state: "closed" });
+
+    const file = (await api("GET", `${path}/contents/src/app.ts?ref=feat`)).body;
+    await api("DELETE", `${path}/contents/src/app.ts`, { message: "Remove it", sha: file.sha, branch: "feat" });
+    await api("DELETE", `${path}/contents/src/app.ts`, { message: "Again", sha: file.sha, branch: "feat" });
     await h.app.settled();
 
     expect(problems.join("\n")).toBe("");

@@ -54,7 +54,42 @@ function withNull(node: unknown): unknown {
   };
 }
 
-const restSchema = validators("rest", withNull(rest));
+/**
+ * Where GitHub's REST description says something GitHub's own answers don't satisfy. Each entry
+ * is read the way GitHub answers; decision 0013 lists them.
+ */
+function asGitHubAnswers(description: typeof rest): typeof rest {
+  const fixed = structuredClone(description) as unknown as {
+    components: { schemas: Record<string, { properties: Record<string, Json> }> };
+    paths: Record<string, Record<string, { responses: Record<string, Json> }>>;
+  };
+  // An installation's account is a user or an enterprise. The description writes "both at once" (`allOf`).
+  const account = fixed.components.schemas.installation?.properties.account;
+  if (account) Object.assign(account, { anyOf: account.allOf, allOf: undefined });
+  // A 409 from the contents API is a plain error, which also fits the rule-violation error (it has
+  // no required fields), so "exactly one of the two" can never hold.
+  for (const method of ["put", "delete"]) {
+    const conflict = fixed.paths["/repos/{owner}/{repo}/contents/{path}"]?.[method]?.responses["409"] as
+      { content?: Record<string, { schema: Json }> } | undefined;
+    const schema = conflict?.content?.["application/json"]?.schema;
+    if (schema) Object.assign(schema, { anyOf: schema.oneOf, oneOf: undefined });
+  }
+  return fixed as unknown as typeof rest;
+}
+
+/**
+ * Answers GitHub gives that its description doesn't list for the route: the usual error object
+ * for a validation failure or for something that isn't there.
+ */
+const UNLISTED: ReadonlyArray<readonly [method: string, template: string, status: number]> = [
+  ["POST", "/repos/{owner}/{repo}/check-runs", 422],
+  ["POST", "/repos/{owner}/{repo}/statuses/{sha}", 422],
+  ["GET", "/app/hook/deliveries/{delivery_id}", 404],
+  ["POST", "/app/hook/deliveries/{delivery_id}/attempts", 404],
+  ["POST", "/app/installations/{installation_id}/access_tokens", 404],
+];
+
+const restSchema = validators("rest", withNull(asGitHubAnswers(rest)));
 const webhookSchema = validators("webhooks", withNull(webhooks));
 
 const problems = (validate: ValidateFunction, value: unknown): string[] =>
@@ -75,7 +110,8 @@ const templates = Object.keys(rest.paths).map((template) => {
 
 /** The path template of GitHub's description that a request path matches: the one with the most literal segments. */
 function restTemplate(path: string): string | undefined {
-  const segments = path.split("/");
+  // GitHub Enterprise serves the same API under `/api/v3`.
+  const segments = path.replace(/^\/api\/v3(?=\/)/, "").split("/");
   return (
     templates
       .filter(
@@ -99,6 +135,10 @@ export function restProblems(method: string, path: string, status: number, body:
   const operation = (rest.paths as Json)[template] as Record<string, { responses?: Record<string, Json> }>;
   const responses = operation[method.toLowerCase()]?.responses;
   if (!responses) return [`GitHub's REST description has no ${method} ${template}`];
+  if (UNLISTED.some(([verb, route, code]) => verb === method && route === template && code === status)) {
+    const { message } = (body ?? {}) as { message?: unknown };
+    return typeof message === "string" ? [] : [`${method} ${template} ${status}: an error needs a message`];
+  }
   const described = responses[String(status)];
   if (!described)
     return [`${method} ${template} doesn't answer ${status} (it answers ${Object.keys(responses).join(", ")})`];

@@ -242,3 +242,153 @@ describe("emitters", () => {
     expect(code).toContain("class NotFoundError(ChannelstackError):");
   });
 });
+
+describe("what the GitHub surface needed", () => {
+  /** A gadget that is a widget, with a numbered part, files, and people given by a handle or in full. */
+  const schemas = {
+    Gadget: {
+      type: "object",
+      required: ["id", "owner", "kind", "serial"],
+      properties: {
+        id: { type: "string" },
+        owner: ref("Person"),
+        kind: { type: "string", enum: ["widget"] },
+        size: { type: "integer" },
+        serial: { type: "integer" },
+      },
+      "x-channelstack-resource": { id: "id", extends: "Widget" },
+    },
+    Part: {
+      type: "object",
+      required: ["widgetId", "number"],
+      properties: { widgetId: { type: "string" }, number: { type: "integer" } },
+      "x-channelstack-resource": { id: ["widgetId", "number"] },
+    },
+    WidgetBody: {
+      type: "object",
+      required: ["label"],
+      properties: {
+        label: { type: "string" },
+        parent: { type: "string", "x-channelstack-ref": ["Widget"] },
+        mode: { type: "string", enum: ["a", "b"], default: "a" },
+        part: {
+          type: "object",
+          required: ["widgetId", "number"],
+          properties: { widgetId: { type: "string" }, number: { type: "integer" } },
+          "x-channelstack-ref": ["Part"],
+        },
+        files: { type: "array", items: { type: "object" }, "x-channelstack-files": "tree" },
+        changes: { type: "array", items: { type: "object" }, "x-channelstack-files": "changes" },
+        helpers: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["who"],
+            properties: { who: { type: "string", "x-channelstack-ref": ["Widget"] }, role: { type: "string" } },
+            "x-channelstack-shorthand": "who",
+          },
+        },
+        note: { type: ["string", "null"] },
+      },
+    },
+  };
+  const operation = {
+    "x-channelstack-method": {
+      on: "Widget",
+      name: "update",
+      args: ["label", "since"],
+      options: ["parent", "mode", "part", "files", "changes", "helpers", "note"],
+    },
+  };
+  const ir = buildIr(spec({ schemas, operation }));
+  const update = ir.resources.find((resource) => resource.name === "Widget")?.methods[0];
+  const option = (name: string) => update?.options.find((candidate) => candidate.name === name)?.type;
+
+  test("the IR: a resource that extends another comes after it, and the new kinds of value are named", () => {
+    const names = ir.resources.map((resource) => resource.name);
+    expect(names.indexOf("Gadget")).toBeGreaterThan(names.indexOf("Widget"));
+    expect(ir.resources.find((resource) => resource.name === "Gadget")).toMatchObject({ extends: "Widget" });
+    expect(option("files")).toEqual({ kind: "files", mode: "tree" });
+    expect(option("changes")).toEqual({ kind: "files", mode: "changes" });
+    expect(option("helpers")).toMatchObject({ kind: "array", items: { kind: "object", shorthand: "who" } });
+    expect(option("note")).toEqual({ kind: "nullable", type: { kind: "string" } });
+    // A query parameter can be a positional argument, after the body's.
+    expect(update?.args.map((arg) => [arg.name, arg.in])).toEqual([
+      ["label", "body"],
+      ["since", "query"],
+    ]);
+  });
+
+  test.for([
+    [
+      "a resource that extends one that isn't there",
+      {
+        Bad: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+          "x-channelstack-resource": { id: "id", extends: "Nope" },
+        },
+      },
+      /extends unknown resource "Nope"/,
+    ],
+    [
+      "a resource that extends another without having its fields",
+      {
+        Bad: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+          "x-channelstack-resource": { id: "id", extends: "Widget" },
+        },
+      },
+      /needs the same id and every field of it \(missing: owner, kind, size\)/,
+    ],
+    [
+      "a shorthand that names a field the object doesn't have",
+      {
+        Bad: {
+          type: "object",
+          properties: { x: { type: "object", properties: { a: { type: "string" } }, "x-channelstack-shorthand": "b" } },
+        },
+      },
+      /x-channelstack-shorthand names "b"/,
+    ],
+  ] as const)("%s is refused", ([, extra, message]) => {
+    expect(() => buildIr(spec({ schemas: extra }))).toThrow(message);
+  });
+
+  test("TypeScript: a subclass, typed ids, files read on the test's side, a handle in place of an object", () => {
+    const [[, code] = ["", ""]] = [...emitTypeScript(ir)];
+    expect(code).toContain("export interface GadgetData extends WidgetData {\n  serial: number;\n}");
+    expect(code).toContain("export class Gadget extends Widget {");
+    expect(code).toContain("    super(ctx, data);");
+    expect(code).toContain('import { type FileInput, readChanges, readTree } from "../runtime/files.ts";');
+    expect(code).toContain("files?: string | FileInput[]");
+    expect(code).toContain("changes?: FileInput[] | Record<string, string | null>");
+    expect(code).toContain("helpers?: Array<Widget | { who: Widget; role?: string }>");
+    expect(code).toContain("note?: string | undefined");
+    // A handle with a number in its id is sent as that number, not as text.
+    expect(code).toContain(
+      "part: options.part === undefined ? undefined : { widgetId: options.part.widgetId, number: options.part.number }",
+    );
+    expect(code).toContain("files: options.files === undefined ? undefined : readTree(options.files)");
+    expect(code).toContain("changes: options.changes === undefined ? undefined : readChanges(options.changes)");
+    expect(code).toContain("(item instanceof Widget ? { who: item.id } : { ...item, who: item.who.id })");
+    expect(code).toContain("query: { since }");
+  });
+
+  test("Python: the same, in Python's terms", () => {
+    const [[, code] = ["", ""]] = [...emitPython(ir)];
+    expect(code).toContain("class Gadget(Widget):");
+    expect(code).toContain('        super().__init__(ctx, data)\n        self.serial: int = data["serial"]');
+    expect(code).toContain("from ..runtime.files import ChangesInput, TreeInput, read_changes, read_tree");
+    expect(code).toContain("files: TreeInput | None = None");
+    expect(code).toContain("helpers: list[Widget | dict[str, Any]] | None = None");
+    expect(code).toContain('"files": None if files is None else read_tree(files)');
+    expect(code).toContain('"changes": None if changes is None else read_changes(changes)');
+    expect(code).toContain('"part": None if part is None else {"widgetId": part.widget_id, "number": part.number}');
+    expect(code).toContain('({"who": item.id} if isinstance(item, (Widget,)) else');
+    expect(code).toContain('query={"since": since}');
+  });
+});

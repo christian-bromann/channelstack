@@ -35,6 +35,21 @@ const REFUSALS: Readonly<Record<number, string>> = {
   422: "validation_failed",
 };
 
+/**
+ * GitHub's 422 "Validation Failed" for one field: with a `message` it is GitHub's `custom` error,
+ * without one the error `code` says what is wrong (`missing_field`, `invalid`, `already_exists`).
+ */
+export const invalid = (
+  resource: string,
+  field: string,
+  problem: { message: string } | { code: string } = { code: "missing_field" },
+) =>
+  new GitHubRefusal(422, "Validation Failed", [
+    "message" in problem
+      ? { resource, code: "custom", field, message: problem.message }
+      : { resource, field, code: problem.code },
+  ]);
+
 /** GitHub waits ten seconds for a webhook to be answered. */
 const ACK_WINDOW_MS = 10_000;
 const PERMISSION_RANK: readonly GitHubPermission[] = ["read", "triage", "write", "maintain", "admin"];
@@ -68,6 +83,8 @@ export interface GitHubKit {
   ): GitHubIssueRecord & { pull: NonNullable<GitHubIssueRecord["pull"]> };
   /** The git identity GitHub commits under for someone. */
   identity(user: GitHubUserRecord): { name: string; email: string };
+  /** Something about an issue or a pull request changed: GitHub moves its `updated_at`. */
+  touch(issue: GitHubIssueRecord): void;
   /** `issues` for an issue, `pull_request` for a pull request, with the object under the matching key. */
   issueEvent(issue: GitHubIssueRecord, sender: number, action: string, extra?: Json): string | undefined;
 }
@@ -187,6 +204,9 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
       name: user.name ?? user.login,
       email: user.email ?? `${user.id}+${user.login}@users.noreply.github.com`,
     }),
+    touch(issue) {
+      issue.updatedAt = clock();
+    },
     issueEvent(issue, sender, action, extra = {}) {
       const repo = store.repo(issue.repo);
       return issue.pull

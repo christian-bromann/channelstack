@@ -32,9 +32,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
   const { context, store, objects } = kit;
   const { ids, clock } = context;
 
-  const touch = (issue: GitHubIssueRecord) => {
-    issue.updatedAt = clock();
-  };
+  const { touch } = kit;
 
   /** A new issue record with the next number of its repository. Issues and pull requests share the numbers. */
   const newIssue = (

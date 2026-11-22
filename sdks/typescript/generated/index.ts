@@ -506,7 +506,7 @@ function decodeGitHubDeliveries(ctx: HandleContext, data: GitHubDeliveriesWire):
   return data.map((item) => new GitHubDelivery(ctx, item));
 }
 
-export type GitHubApiCalls = GitHubApiCall[];
+export type GitHubAppCalls = GitHubApiCall[];
 
 export interface GitHubApiCall {
   id: string;
@@ -521,6 +521,8 @@ export interface GitHubApiCall {
   response?: unknown;
   error?: string;
 }
+
+export type GitHubApiCalls = GitHubApiCall[];
 
 export interface UiLoginLink {
   url: string;
@@ -1566,6 +1568,13 @@ export class GitHubFixture {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as GitHubDeliveriesWire;
     return decodeGitHubDeliveries(ctx, data);
+  }
+
+  /** The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500). Experimental. */
+  async appCalls(): Promise<GitHubAppCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/app-calls`)) as GitHubAppCalls;
+    return data;
   }
 
   /** The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session. Experimental. */

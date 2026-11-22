@@ -14,6 +14,8 @@ import type {
   GitHubUserRecord,
 } from "../world.ts";
 
+const APP_CALL_LIMIT = 500;
+
 /** The GitHub fake's in-memory state. Objects live in the core registry; the store adds GitHub's own indexes. */
 export class GitHubStore {
   readonly users: Collection<GitHubUserRecord>;
@@ -30,6 +32,8 @@ export class GitHubStore {
   readonly hookDeliveries: GitHubHookDeliveryRecord[] = [];
   /** Who made a commit here (`<repo id>:<sha>` → user id): GitHub attributes it to them. */
   readonly commitActors = new Map<string, number>();
+  /** The App's calls about no repository, newest last: its own endpoints, the token exchange. */
+  readonly appCalls: Array<Record<string, unknown> & { at: string }> = [];
   /** A check suite per repo and commit: check runs of one commit share it. */
   readonly suites = new Map<string, number>();
   #org: GitHubOrgRecord | undefined;
@@ -74,11 +78,28 @@ export class GitHubStore {
       type: "Bot",
       role: "member",
       fixedId: false,
+      createdAt: app.createdAt,
     };
     this.#created.clear();
     this.hookDeliveries.length = 0;
+    this.appCalls.length = 0;
     this.suites.clear();
     this.commitActors.clear();
+  }
+
+  /**
+   * Keep a call the App made about no repository. A token in the answer is not kept: the log is
+   * read through the control API, and tokens stay where `channelstack env` hands them out.
+   */
+  recordAppCall(call: Record<string, unknown> & { at: string }): void {
+    const { response } = call;
+    const scrubbed =
+      typeof response === "object" && response !== null && "token" in response
+        ? { ...response, token: "[redacted]" }
+        : response;
+    this.appCalls.push({ ...call, response: scrubbed });
+    // A long-running server doesn't keep every call forever.
+    if (this.appCalls.length > APP_CALL_LIMIT) this.appCalls.splice(0, this.appCalls.length - APP_CALL_LIMIT);
   }
 
   /** Keep a new object for its session. */
@@ -100,10 +121,11 @@ export class GitHubStore {
     return ids.map((id) => collection.find(String(id))).filter((record): record is T => record !== undefined);
   }
 
-  /** Take an object out of its session's listing: a deleted comment. The registry entry goes with the session. */
+  /** Delete an object: it leaves its session's listing and the registry, so nothing reaches it any more. */
   forget<T extends { id: number }>(collection: Collection<T>, session: string, id: number): void {
     const ids = this.#created.get(session)?.get(collection as Collection<{ id: number }>);
-    if (ids) ids.splice(ids.indexOf(id), 1);
+    if (ids?.includes(id)) ids.splice(ids.indexOf(id), 1);
+    collection.remove(String(id));
   }
 
   /** Whoever acts under this id: a person, or the App's bot. */

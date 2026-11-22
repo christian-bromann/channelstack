@@ -10,7 +10,13 @@ import { restProblems, webhookProblems } from "../../server/test/github-schemas.
 afterEach(async ({ github }) => {
   // A test that never got its fixtures has nothing to check.
   if (!github) return;
-  const [calls, deliveries] = await Promise.all([github.calls(), github.deliveries()]);
+  // The App's own endpoints belong to no session: whatever the agent called there so far is checked too.
+  const [inSession, aboutNoRepo, deliveries] = await Promise.all([
+    github.calls(),
+    github.appCalls(),
+    github.deliveries(),
+  ]);
+  const calls = [...inSession, ...aboutNoRepo];
   const problems = [
     ...calls.flatMap((call) => restProblems(call.method, call.path, call.responseStatus, call.response)),
     ...deliveries.flatMap((delivery) => webhookProblems(delivery.type, delivery.payload)),

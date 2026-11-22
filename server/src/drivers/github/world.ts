@@ -36,6 +36,7 @@ export interface GitHubUserRecord {
   role: GitHubOrgRole;
   /** The test fixed this id itself, so it is given back when the session closes. */
   fixedId: boolean;
+  createdAt: number;
 }
 
 export interface GitHubLabelRecord {

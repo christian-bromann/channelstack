@@ -4127,6 +4127,35 @@
           "dispose": false
         },
         {
+          "name": "appCalls",
+          "kind": "method",
+          "summary": "The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500)",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/app-calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubAppCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "calls",
           "kind": "method",
           "summary": "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
@@ -9385,7 +9414,7 @@
       }
     },
     {
-      "name": "GitHubApiCalls",
+      "name": "GitHubAppCalls",
       "type": {
         "kind": "array",
         "items": {
@@ -9478,6 +9507,16 @@
             "optional": true
           }
         ]
+      }
+    },
+    {
+      "name": "GitHubApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GitHubApiCall"
+        }
       }
     },
     {

@@ -96,6 +96,8 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     await asApp(c);
     const repo = store.repoNamed(c.req.param("owner"), c.req.param("repo"));
     if (!repo?.installed) throw notFound();
+    // About a repository, so on record for its session, like the calls made with the token.
+    c.set("repo", repo);
     return c.json(objects.installation());
   });
 
@@ -118,7 +120,8 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
       delivered_at: githubTime(entry.deliveredAt),
       redelivery: number > 0,
       duration: (attempt?.durationMs ?? 0) / 1000,
-      status: attempt?.status === "acknowledged" ? "OK" : code === 0 ? "failed to connect to host" : "Invalid HTTP Response",
+      status:
+        attempt?.status === "acknowledged" ? "OK" : code === 0 ? "failed to connect to host" : "Invalid HTTP Response",
       status_code: code,
       event: entry.event,
       action: entry.action,
@@ -171,7 +174,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     asInstallation(c);
     const user = store.anyByLogin(c.req.param("login"));
     if (!user) throw notFound();
-    return c.json({ ...objects.user(user), name: user.name ?? null, email: user.email ?? null });
+    return c.json(objects.publicUser(user));
   });
 
   routes.get("/user", (c) => {
@@ -190,16 +193,22 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
       if (granted === undefined || (level === "write" && granted !== "write")) {
         throw new GitHubRefusal(403, "Resource not accessible by integration");
       }
+      // Any method may carry a body (GitHub's DELETE for assignees and files does). It is parsed
+      // and put on record here, once, for every route.
       let body: Json = {};
-      if (method !== "get" && method !== "delete") {
-        const raw = await c.req.text();
-        if (raw !== "") {
-          try {
-            body = JSON.parse(raw) as Json;
-          } catch {
-            throw new GitHubRefusal(400, "Problems parsing JSON");
-          }
+      const raw = method === "get" ? "" : await c.req.text();
+      if (raw !== "") {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          throw new GitHubRefusal(400, "Problems parsing JSON");
         }
+        // An object, or a list where an endpoint takes one (labels); anything else is no request body.
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new GitHubRefusal(400, "Invalid request.\n\nThe request body must be a JSON object or array.");
+        }
+        body = parsed as Json;
         c.set("requestBody", body);
       }
       return handler({ c, world, repo, body, bot: store.bot.id });
@@ -219,15 +228,15 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     await next();
     c.header("x-github-media-type", "github.v3; format=json");
     c.header("x-github-api-version-selected", "2022-11-28");
-    c.header("x-github-request-id", world.kit.context.ids.next("github.delivery").toUpperCase().replaceAll("-", ":").slice(0, 34));
+    c.header(
+      "x-github-request-id",
+      world.kit.context.ids.next("github.delivery").toUpperCase().replaceAll("-", ":").slice(0, 34),
+    );
     c.header("x-ratelimit-limit", "5000");
     c.header("x-ratelimit-remaining", "4999");
     c.header("x-ratelimit-used", "1");
     c.header("x-ratelimit-reset", String(Math.floor(clock() / 1000) + 3600));
     c.header("x-ratelimit-resource", "core");
-    const repo = c.get("repo");
-    if (!repo) return;
-    // A call about a repository is on record for the session that owns it.
     const raw = c.res.status === 204 ? "" : await c.res.clone().text();
     let response: unknown = raw;
     try {
@@ -235,24 +244,37 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     } catch {
       response = raw.slice(0, RECORD_LIMIT);
     }
-    const path = new URL(c.req.url).pathname.replace(/^.*?(?=\/repos\/)/, "");
-    context.events.append(store.sessionOf(repo), "github", "api_call", {
+    const repo = c.get("repo");
+    // The path as GitHub has it: without the fake's own prefix, and without `/api/v3`.
+    const path = new URL(c.req.url).pathname.replace(/^\/github(?=\/)/, "").replace(/^\/api\/v3(?=\/)/, "");
+    const call = {
       operation: `${c.req.method} ${path}`,
       method: c.req.method,
       path,
       request: c.get("requestBody"),
       responseStatus: c.res.status,
       response: raw.length > RECORD_LIMIT ? undefined : response,
-      ...(c.res.status >= 400 ? { error: (response as { message?: string } | undefined)?.message ?? String(c.res.status) } : {}),
+      ...(c.res.status >= 400
+        ? { error: (response as { message?: string } | undefined)?.message ?? String(c.res.status) }
+        : {}),
       durationMs: clock() - startedAt,
-    });
+    };
+    // A call about a repository is on record for the session that owns it. The App's calls about
+    // no repository (its own endpoints) belong to no session and are kept for all of them.
+    if (repo) context.events.append(store.sessionOf(repo), "github", "api_call", call);
+    else store.recordAppCall({ ...call, at: new Date(clock()).toISOString() });
   });
 
   api.onError((error, c) => {
     if (error instanceof GitHubRefusal) {
       const status = error.githubStatus;
       return c.json(
-        { message: error.message, ...(error.errors ? { errors: error.errors } : {}), documentation_url: DOCS, status: String(status) },
+        {
+          message: error.message,
+          ...(error.errors ? { errors: error.errors } : {}),
+          documentation_url: DOCS,
+          status: String(status),
+        },
         status as 400,
       );
     }

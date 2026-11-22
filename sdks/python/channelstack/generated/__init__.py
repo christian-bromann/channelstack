@@ -13,7 +13,7 @@ from ..runtime.files import ChangesInput, TreeInput, read_changes, read_tree
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.0.0"
 
@@ -698,7 +698,7 @@ type GitHubReviewCommentReplies = list[GitHubReviewComment]
 type GitHubDeliveries = list[GitHubDelivery]
 
 
-type GitHubApiCalls = list[GitHubApiCall]
+type GitHubAppCalls = list[GitHubApiCall]
 
 
 @dataclass(frozen=True)
@@ -730,6 +730,9 @@ class GitHubApiCall:
             response=data.get("response"),
             error=data.get("error"),
         )
+
+
+type GitHubApiCalls = list[GitHubApiCall]
 
 
 @dataclass(frozen=True)
@@ -1357,6 +1360,12 @@ class GitHubFixture:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
         return [GitHubDelivery(ctx, item) for item in data]
+
+    async def app_calls(self) -> GitHubAppCalls:
+        """The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/app-calls")
+        return [GitHubApiCall._from_wire(ctx, item) for item in data]
 
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubApiCalls:
         """The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session. Experimental."""

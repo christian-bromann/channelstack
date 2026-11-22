@@ -147,6 +147,13 @@ export function createChecks(kit: GitHubKit) {
       return [...byName.values()];
     },
 
+    /** The newest status of each context for a commit, newest first: what GitHub shows next to it. */
+    latestStatuses(repo: GitHubRepoRecord, sha: string): GitHubStatusRecord[] {
+      const byContext = new Map<string, GitHubStatusRecord>();
+      for (const status of store.statusesOf(repo, sha)) byContext.set(status.context, status);
+      return [...byContext.values()].reverse();
+    },
+
     createStatus(
       repo: GitHubRepoRecord,
       actor: number,

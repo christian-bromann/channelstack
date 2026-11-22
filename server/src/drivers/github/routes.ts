@@ -398,6 +398,10 @@ export function registerGitHubRoutes(
   const changeMap = (list: ReadonlyArray<{ path: string; content: string | null }>) =>
     new Map(list.map(({ path, content }) => [path.replace(/^\.?\//, ""), content === null ? null : bytes(content)]));
 
+  /** The commit message GitHub's web editor suggests when none is given. */
+  const defaultMessage = (list: ReadonlyArray<{ path: string }>) =>
+    `Update ${list.length === 1 ? list[0]?.path : `${list.length} files`}`;
+
   // --- The fixture ----------------------------------------------------------------------------
 
   router.route({
@@ -641,10 +645,7 @@ export function registerGitHubRoutes(
     sdkMethod: { on: "GitHubCommit", name: "statuses", bind: commitBinding },
     stability,
     handler: ({ session, params }) => {
-      const byContext = new Map(
-        store.statusesOf(repoOf(session.id, params.repo), params.sha).map((status) => [status.context, status]),
-      );
-      return [...byContext.values()].map((status) => ({
+      return checks.latestStatuses(repoOf(session.id, params.repo), params.sha).map((status) => ({
         context: status.context,
         state: status.state,
         author: authorWire(status.creator),
@@ -672,8 +673,7 @@ export function registerGitHubRoutes(
       const actor = person(session.id, params.user);
       kit.allow(repo, actor, "write");
       kit.action(repo, "push", { user: actor, branch: body.branch });
-      const paths = body.changes.map((change) => change.path);
-      const message = body.message ?? `Update ${paths.length === 1 ? paths[0] : `${paths.length} files`}`;
+      const message = body.message ?? defaultMessage(body.changes);
       const { sha } = await repos.commitTo(repo, actor, body.branch, changeMap(body.changes), message);
       const info = await git.readCommit(kit.dir(repo), sha);
       if (!info) throw new ProtocolError("internal", "The commit that was just made is gone");
@@ -751,8 +751,7 @@ export function registerGitHubRoutes(
       kit.allow(repo, actor, pr.changes ? "write" : "read");
       kit.action(repo, "openPullRequest", { user: actor, from: pr.from });
       if (pr.changes) {
-        const paths = pr.changes.map((change) => change.path);
-        const message = pr.title ?? `Update ${paths.length === 1 ? paths[0] : `${paths.length} files`}`;
+        const message = pr.title ?? defaultMessage(pr.changes);
         await repos.commitTo(repo, actor, pr.from, changeMap(pr.changes), message);
       }
       const { issue } = await pulls.openPull(repo, actor, {
@@ -1524,6 +1523,22 @@ export function registerGitHubRoutes(
     sdkMethod: { on: "GitHubDelivery", name: "resend", options: ["badSignature"] },
     stability,
     handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+  });
+
+  router.route({
+    method: "get",
+    path: "/app-calls",
+    summary:
+      "The App's REST calls about no repository: its own endpoints and the token exchange. They belong to no session, so every session sees the same list (the last 500)",
+    response: z.array(GitHubApiCall).openapi("GitHubAppCalls"),
+    sdkMethod: { on: "GitHubFixture", name: "appCalls" },
+    stability,
+    handler: () =>
+      store.appCalls.map((call, index) => ({
+        ...(call as Omit<z.infer<typeof GitHubApiCall>, "id" | "channel">),
+        id: `appcall_${index + 1}`,
+        channel: "github" as const,
+      })),
   });
 
   router.route({
