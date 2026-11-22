@@ -8,7 +8,7 @@
   "files": {
     "includes": [
       "**",
-      "!/api",
+      "!api",
       "!docs",
       "!index.html",
       "!spec",
