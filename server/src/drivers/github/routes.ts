@@ -367,8 +367,13 @@ export function registerGitHubRoutes(
   // --- Handles → records ------------------------------------------------------------------------
 
   const person = (session: string, id: string) => store.users.get(session, id).id;
-  /** A person of this session, or the App's bot. */
-  const author = (session: string, id: string) => (id === String(store.app.id) ? store.bot.id : person(session, id));
+  /**
+   * The people, or the App's bot, an issue is assigned to or a review is requested from. The
+   * contract (`api/github.d.ts`) takes the App here; whether GitHub itself accepts an App's bot is
+   * not verified (docs/reality-matrix.md).
+   */
+  const people = (session: string, ids: readonly string[]) =>
+    ids.map((id) => (id === String(store.app.id) ? store.bot.id : person(session, id)));
   const repoOf = (session: string, id: string) => store.repos.get(session, id);
   const issueOf = (session: string, ref: { repoId: string; number: number }) => {
     const issue = store.issue(repoOf(session, ref.repoId), ref.number);
@@ -709,7 +714,7 @@ export function registerGitHubRoutes(
         title: body.issue.title,
         body: body.issue.body,
         labels: triage ? body.issue.labels : [],
-        assignees: triage ? body.issue.assignees?.map((id) => author(session.id, id)) : [],
+        assignees: triage ? people(session.id, body.issue.assignees ?? []) : [],
       });
       return issueWire(issue);
     },
@@ -758,11 +763,7 @@ export function registerGitHubRoutes(
         draft: pr.draft,
       });
       if (pr.reviewers?.length) {
-        pulls.requestReviewers(
-          issue,
-          actor,
-          pr.reviewers.map((id) => author(session.id, id)),
-        );
+        pulls.requestReviewers(issue, actor, people(session.id, pr.reviewers));
       }
       return pullWire(issue);
     },
@@ -871,7 +872,7 @@ export function registerGitHubRoutes(
     params: UserParams,
     body: z.object({ assignees: authors(), issue: issueRef }).openapi("GitHubAssignBody"),
     response: z.array(GitHubDelivery).openapi("GitHubAssignDeliveries"),
-    errors: ["not_found", "forbidden"],
+    errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "assign", args: ["assignees"], options: ["issue"] },
     stability,
     handler: ({ session, params, body }) => {
@@ -879,14 +880,7 @@ export function registerGitHubRoutes(
       const actor = person(session.id, params.user);
       kit.allow(store.repo(issue.repo), actor, "triage");
       kit.action(store.repo(issue.repo), "assign", { user: actor, number: issue.number });
-      return delivered(
-        session.id,
-        issues.assign(
-          issue,
-          actor,
-          body.assignees.map((id) => author(session.id, id)),
-        ),
-      );
+      return delivered(session.id, issues.assign(issue, actor, people(session.id, body.assignees)));
     },
   });
 
@@ -1141,11 +1135,7 @@ export function registerGitHubRoutes(
       const actor = person(session.id, params.user);
       mayChange(pull, actor);
       kit.action(store.repo(pull.repo), "requestReview", { user: actor, number: pull.number });
-      const sent = pulls.requestReviewers(
-        pull,
-        actor,
-        body.reviewers.map((id) => author(session.id, id)),
-      );
+      const sent = pulls.requestReviewers(pull, actor, people(session.id, body.reviewers));
       return caused(
         session.id,
         sent.find((guid) => guid !== undefined),

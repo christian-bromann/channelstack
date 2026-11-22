@@ -52,6 +52,8 @@ Goal: the GitHub fake. Every fake GitHub example passes against Probot and the C
 | `jose` (server) | 6.2.17 | Verifying the App's RS256 JWT. No native code, WebCrypto only | MIT | Released 2026-11 |
 | `diff` (server) | 9.0.0 | Unified patches for PR files, and the lines a review comment may sit on | BSD-3-Clause | Released 2026-04 |
 | `probot` (dev) | 14.3.7 | Reference agent | ISC | Released 2026-11 |
+| `@octokit/rest` (dev) | 22.0.1 | Octokit in the Chat SDK agent and the broken agent, and the type the shared workflows are written against | MIT | Released 2026-07 |
+| `@octokit/auth-app` (dev) | 8.3.1 | App authentication for that Octokit | MIT | Maintained by GitHub's Octokit team |
 | `@chat-adapter/github` (dev) | 4.45.0 | Reference agent; same version as `chat` | MIT | Released 2026-11 |
 | `@octokit/webhooks` (dev) | 14.2.0 | The receiver in delivery cases G1 to G3 | MIT | Released 2026-07 |
 | `@octokit/openapi` (dev) | 24.0.0 | GitHub's REST description (`github/rest-api-description`), for exit check 3.2 | MIT | Released 2026-10 |

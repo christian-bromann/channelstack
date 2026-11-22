@@ -133,7 +133,11 @@ export function registerPulls(register: Register): void {
 
   register("post", "/pulls/:number{[0-9]+}/requested_reviewers", write, (call) => {
     const pull = pullOf(call);
-    call.world.pulls.requestReviewers(pull, call.bot, people(call, list(call.body, "reviewers") ?? []));
+    const reviewers = people(call, list(call.body, "reviewers") ?? []);
+    if (reviewers.includes(call.bot)) {
+      throw new GitHubRefusal(422, "Reviews may only be requested from collaborators. One or more of the users or teams you specified is not a collaborator of the repository.");
+    }
+    call.world.pulls.requestReviewers(pull, call.bot, reviewers);
     return call.c.json(call.world.kit.objects.pullRequest(pull), 201);
   });
 

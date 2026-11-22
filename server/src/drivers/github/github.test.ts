@@ -206,7 +206,7 @@ describe("webhooks", () => {
 
 describe("what people may do", () => {
   test("permissions follow the org role and the repository's collaborators", async () => {
-    const { ana, repo, issue, post } = await workspace();
+    const { ana, app, repo, issue, post } = await workspace();
     const { ref } = await issue();
     const member = await post("/users", { login: "mel" });
     const outsider = await post("/users", { login: "olaf", role: "outside_collaborator" });
@@ -223,6 +223,11 @@ describe("what people may do", () => {
     // An org admin may do everything; the author may close their own issue.
     expect((await post(`/users/${admin.id}/push`, change)).message).toBe("Update a.txt");
     expect((await post(`/users/${ana.id}/close`, { issue: ref })).action).toBe("closed");
+    // The App's bot can be assigned, as the contract has it.
+    const assigned = await post(`/users/${ana.id}/assign`, { assignees: [app.id, member.id], issue: ref });
+    expect(
+      assigned.map((delivery: { payload: { assignee: { login: string } } }) => delivery.payload.assignee.login),
+    ).toEqual(["my-agent[bot]", "mel"]);
     // A label a person picks has to exist.
     expect(await refusal(post(`/users/${ana.id}/label`, { labels: ["nope"], issue: ref }))).toBe("not_found");
   });

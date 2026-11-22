@@ -5024,7 +5024,8 @@
             "internal",
             "session_not_found",
             "not_found",
-            "forbidden"
+            "forbidden",
+            "validation_failed"
           ],
           "dispose": false
         },

@@ -49,6 +49,13 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // agent with one fault per check), and the Socket Mode half of 2.2 (`socket-mode.test.ts`).
   // Delivery cases S2 to S5 and K1 to K4 against Bolt are in `test:integration`.
   2: [],
+  // Phase 3 as well. The acceptance run covers 3.1 (every fake GitHub example against Probot and
+  // the Chat SDK agent), 3.2 and 3.3 for that whole run (`test/acceptance/github-schemas.setup.ts`
+  // holds every call and webhook of each test to GitHub's schemas) and 3.4 (`test/acceptance/checks`
+  // against both agents, `checks-broken.test.ts` against the agent with one fault per check). The
+  // unit tests cover 3.2 and 3.3 for every route of the fake (`github-conformance.test.ts`), and
+  // delivery cases G1 to G3 with `@octokit/webhooks` (3.5) are in `test:integration`.
+  3: [],
 };
 
 const phase = Number(process.argv[2]);

@@ -30,5 +30,6 @@
       "project": ["**/*.ts"]
     }
   },
-  "ignoreBinaries": ["uv", "portless"]
+  "ignoreBinaries": ["uv", "portless"],
+  "ignore": ["api/examples/fixtures/**"]
 }

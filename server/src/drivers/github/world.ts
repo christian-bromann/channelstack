@@ -72,7 +72,7 @@ export interface GitHubReactionRecord {
 }
 
 /** The pull request half of an issue that is one. */
-export interface GitHubPullRecord {
+interface GitHubPullRecord {
   id: number;
   /** Branch names in the same repo. */
   head: string;

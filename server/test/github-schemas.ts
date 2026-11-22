@@ -74,7 +74,7 @@ const templates = Object.keys(rest.paths).map((template) => {
 });
 
 /** The path template of GitHub's description that a request path matches: the one with the most literal segments. */
-export function restTemplate(path: string): string | undefined {
+function restTemplate(path: string): string | undefined {
   const segments = path.split("/");
   return (
     templates

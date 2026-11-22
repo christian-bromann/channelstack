@@ -422,5 +422,3 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     },
   };
 }
-
-export type GitHubPulls = ReturnType<typeof createPulls>;

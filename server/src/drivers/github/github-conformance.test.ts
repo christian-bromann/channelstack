@@ -107,7 +107,7 @@ describe("GitHub's own schemas", () => {
   });
 
   test("pull requests, reviews and checks", async () => {
-    const { h, ana, app, repo, post, api, path, problems, webhookIssues } = await workspace();
+    const { h, ana, repo, post, api, path, problems, webhookIssues } = await workspace();
     const ben = await post("/users", { login: "ben" });
     const pr = await post(`/users/${ana.id}/pulls`, {
       pr: {
@@ -120,7 +120,7 @@ describe("GitHub's own schemas", () => {
     });
     const ref = { repoId: repo.id, number: pr.number };
     await post(`/users/${ana.id}/mark-ready`, { pr: ref });
-    await post(`/users/${ana.id}/request-review`, { reviewers: [app.id], pr: ref });
+    await post(`/users/${ana.id}/request-review`, { reviewers: [ben.id], pr: ref });
     const review = await post(`/users/${ben.id}/review`, {
       review: {
         pr: ref,

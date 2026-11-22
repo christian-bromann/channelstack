@@ -17,7 +17,7 @@ export interface Call {
   bot: number;
 }
 
-export type Handler = (call: Call) => Response | Promise<Response>;
+type Handler = (call: Call) => Response | Promise<Response>;
 
 /** Registers the routes of one area of the API. `permission` is what the App's installation needs for it. */
 export type Register = (
@@ -73,7 +73,7 @@ export const issueOf = ({ c, world, repo }: Call, name = "number"): GitHubIssueR
 
 export const pullOf = ({ c, world, repo }: Call, name = "number") => world.kit.requirePull(repo, numberParam(c, name));
 
-/** People named in a request body by login. GitHub ignores a login it doesn't know. */
+/** People named in a request body by login. GitHub ignores a login it doesn't know. The bot's own login is kept, for the caller to refuse or drop. */
 export function people({ world, repo }: Call, logins: readonly unknown[]): number[] {
   const session = world.kit.store.sessionOf(repo);
   return logins.flatMap((login) => {

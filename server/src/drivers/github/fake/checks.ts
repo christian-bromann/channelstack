@@ -172,5 +172,3 @@ export function createChecks(kit: GitHubKit) {
     },
   };
 }
-
-export type GitHubChecks = ReturnType<typeof createChecks>;

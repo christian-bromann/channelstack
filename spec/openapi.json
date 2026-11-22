@@ -9898,7 +9898,8 @@
           "internal",
           "session_not_found",
           "not_found",
-          "forbidden"
+          "forbidden",
+          "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [

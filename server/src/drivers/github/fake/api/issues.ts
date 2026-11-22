@@ -13,6 +13,8 @@ export function registerIssues(register: Register): void {
     if (!comment || !world.kit.store.commentsOn(repo, comment.issue).includes(comment)) throw notFound();
     return comment;
   };
+  /** Who an issue can be assigned to. GitHub drops, without a word, anyone who can't be: an App's bot among them. */
+  const assignable = (call: Call, logins: readonly unknown[]) => people(call, logins).filter((id) => id !== call.bot);
   const labelNames = (body: Call["body"]): string[] =>
     (Array.isArray(body) ? body : (list(body, "labels") ?? [])).flatMap((label) =>
       typeof label === "string" ? [label] : typeof (label as { name?: unknown })?.name === "string" ? [(label as { name: string }).name] : [],
@@ -38,7 +40,7 @@ export function registerIssues(register: Register): void {
       title,
       body: text(body, "body"),
       labels: labelNames(body),
-      assignees: people(call, list(body, "assignees") ?? []),
+      assignees: assignable(call, list(body, "assignees") ?? []),
     });
     return c.json(world.kit.objects.issue(issue), 201);
   });
@@ -64,7 +66,7 @@ export function registerIssues(register: Register): void {
       world.issues.addLabels(issue, bot, wanted);
     }
     if (body.assignees !== undefined) {
-      const wanted = people(call, list(body, "assignees") ?? []);
+      const wanted = assignable(call, list(body, "assignees") ?? []);
       world.issues.unassign(issue, bot, issue.assignees.filter((has) => !wanted.includes(has)));
       world.issues.assign(issue, bot, wanted);
     }
@@ -145,7 +147,7 @@ export function registerIssues(register: Register): void {
 
   register("post", "/issues/:number{[0-9]+}/assignees", write, (call) => {
     const issue = issueOf(call);
-    call.world.issues.assign(issue, call.bot, people(call, list(call.body, "assignees") ?? []));
+    call.world.issues.assign(issue, call.bot, assignable(call, list(call.body, "assignees") ?? []));
     return call.c.json(call.world.kit.objects.issue(issue), 201);
   });
 

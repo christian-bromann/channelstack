@@ -33,7 +33,7 @@
 | Object registry and handles | `registry/` | Typed collections per driver and type; resolving handle ids for a session (`get`), from the platform's side (`find`), and their owner | Keep a private `Map` of objects in a route |
 | Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`); reading the time out of a Slack `ts` (`slackTsTime`) | Call `crypto.randomUUID()` or format ids by hand |
 | Secrets | `secrets/` | Fake tokens and signing secrets (the CSPRNG helpers, the token formats, `~/.channelstack/secrets.json`, 0600, rotation); live credentials in memory *(planned, phase 5)* | Generate or store a secret anywhere else |
-| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`). `X-Hub-Signature-256`, `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
+| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`); GitHub's `X-Hub-Signature-256` and checking an App's JWT (`github.ts`). `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
 | Access to the control API | `auth/` | Creating the bearer token, parsing `Authorization: Bearer`, the middleware (`requireAccess`); browser access for the UI (`ui.ts`): one-time login codes, the session cookie, and the short list of reads it allows | Compare tokens with `===`; let a cookie authorize anything but those reads |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
 | Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); another way to the agent than HTTP (`DeliveryTransport`: a connection the agent opened); handing the agent's answer to the driver (`answered`); cancelling a closed session's deliveries. | Call `fetch` to the agent from a driver |
@@ -43,6 +43,7 @@
 | Errors | `errors/` | The protocol's error codes and their HTTP status (`ProtocolError`), including a platform's own refusal surfaced through the control API (`{ platform, status }`) | Throw ad-hoc error shapes from routes |
 | Redaction | `redact/` | Scrubbing tokens, secrets and emails from logs and errors (`text`), and tokens from recorded payloads (`tokens`) | Log request bodies or headers without it |
 | Logging | `log/` | The one logger: JSON lines, redacted | Write to stdout or stderr from core or a driver |
+| What every fixture lets a test inspect | `router/inspect.ts` | The schemas and reads every channel shares: `DeliveryAttempt`, `DeliveryStatus`, a channel's API call schema and the `calls()` filter (`apiCallSchema`, `CallsQuery`, `readCalls`), `duration` | Declare a delivery attempt or an API call schema in a driver |
 | Routing helpers | `router/` | `registerRoute`, `DriverRouter`, zod-openapi registration, `x-channelstack-*` extensions; the `Driver`, `DriverContext` and `FakeBackend` contracts | Register Hono routes on the control API without the extensions |
 | State directory | `home/` | `CHANNELSTACK_HOME`, writing 0600 files atomically, reading JSON state | Write a file with a secret any other way |
 | Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency | Call `Date.now()` or `setTimeout` in core or a driver |
@@ -68,6 +69,10 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `fake/views.ts` (Slack) | Modals: `views.open` / `update` / `push`, and a person submitting or closing one. Part of the fake world |
 | `fake/socket.ts` (Slack) | Socket Mode: tickets from `apps.connections.open`, the app's connections, envelopes and acks. It is the delivery queue's transport once the app connects |
 | `fake/interactions.ts` (Slack) | What a person does beyond writing: clicks, menu choices, shortcuts, slash commands, Stop, the agent split view, and the app's answers through `response_url`. Part of the fake world |
+| `fake/kit.ts` (GitHub) | What the parts of the GitHub world build on: permissions (`can`, `allow`), sending a webhook (`emit`, with GitHub's headers), `GitHubRefusal`, the git identity of a person |
+| `fake/git.ts` (GitHub) | Git in memory with real SHAs (isomorphic-git on memfs): blobs, trees, commits, branches, history, merges, and what changed between two commits with patches |
+| `fake/repos.ts`, `issues.ts`, `pulls.ts`, `checks.ts` (GitHub) | The GitHub world, one file per area: people, repositories and pushes; issues, comments, labels, reactions; pull requests, reviews, threads, merging; check runs and statuses. `fake/world.ts` puts them together and owns deliveries |
+| `fake/api/` (GitHub) | The REST API the App calls, one file per area (`repos.ts`, `issues.ts`, `pulls.ts`, `checks.ts`), with authentication, the App's own endpoints and call recording in `index.ts`, and request helpers in `shared.ts` |
 | `transcript.ts` | State → what a person would see |
 | `capabilities.ts` | Per action: fake, live, what live needs |
 
@@ -91,6 +96,7 @@ The same modules with the same names in every language.
 | Credentials | `credentials` *(planned, phase 5)* | `CHANNELSTACK_<CHANNEL>_*` lookup |
 | Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, repeating a call a person would wait for (`retryWhile`), text matching for waits, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it |
 | Durations | `duration` | Parsing `"3s"`, `"750ms"` |
+| Files | `files` | Reading fixture files and directories a test hands over (`readTree`, `readChanges`), and where relative paths start (`setFilesRoot`) |
 
 The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary.
 
@@ -113,6 +119,11 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The Bolt app the Bolt agents start from | `shared/bolt.ts` | Configuration from the environment, `listen` |
 | Bolt + AI SDK | `bolt-ai-sdk/agent.ts` | Mentions, DMs, reactions, native streaming |
 | Chat SDK | `chat-sdk-slack/agent.ts` | The same behaviour on Vercel's Chat SDK and its Slack adapter |
+| What the GitHub agents do | `shared/github.ts` | Triage, duplicates, the typo fix, reviews, thread answers, checks and the autofix, written once against Octokit's REST methods |
+| The HTTP server around a web-standard handler | `shared/serve.ts` | For agents on frameworks that speak Request and Response (the Chat SDK) |
+| Probot | `probot/agent.ts` | A GitHub App as Probot's docs show |
+| Chat SDK on GitHub | `chat-sdk-github/agent.ts` | Conversations through the Chat SDK's GitHub adapter, the rest with `@octokit/webhooks` |
+| A GitHub agent with one fault per standard check | `broken-github/agent.ts` | `BROKEN=<check id>`; exit check 3.4 proves each check fails against it |
 | An agent with one fault per standard check | `broken-slack/agent.ts` | `BROKEN=<check id>` switches on the bug that check exists to catch; exit check 2.3 proves each check fails against it |
 | A deliberately broken agent | `mdac-220/agent.ts` | Leaves a lone "Thinking…" stream behind; exit check 1.4 proves the suite catches it |
 
@@ -125,8 +136,10 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
 | What the Bolt delivery tests share | `server/test/integration/slack-fixtures.ts` | `slackSession` (a session with Ana and a channel on a running server) and `SUMMARY_VIEW` (a one-input modal) |
-| A Slack workspace for a unit test | `server/test/slack-workspace.ts` | `slackWorkspace` (the app, a stand-in agent, a session with Ana and a channel), `refusal`, `signedBy`. New Slack test files start from it |
-| The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener, with timers the test advances itself) and `recordingAgent` (a stand-in agent endpoint). Every driver's unit tests use it |
+| A GitHub org for a unit test | `server/test/github-workspace.ts` | `githubWorkspace` (the App, a stand-in agent, a session with Ana and a repository; `api` calls the REST API as the installation and checks every answer against GitHub's description). New GitHub test files start from it |
+| GitHub's schemas as validators | `server/test/github-schemas.ts` | `restProblems`, `webhookProblems`: what a response or a webhook gets wrong by `@octokit/openapi` and `@octokit/openapi-webhooks`. The unit tests and `test/acceptance/github-schemas.setup.ts` use it |
+| A Slack workspace for a unit test | `server/test/slack-workspace.ts` | `slackWorkspace` (the app, a stand-in agent, a session with Ana and a channel), `signedBy`. New Slack test files start from it |
+| The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener, with timers the test advances itself), `recordingAgent` (a stand-in agent endpoint) and `refusal` (the error code a control call was refused with). Every driver's unit tests use it |
 | Starting a server executable for a test or a smoke run | `lib/server.ts` | `startBinary`: spawn, wait for the server file, collect output, stop. The SDK launchers have their own start, because they ship |
 | The binary under test, with a control API client | `server/test/integration/harness.ts` | `BINARY`, `cli`, `startBinary` (adds `control` to `lib/server.ts`'s). Shared by the server's and the SDK's integration tests |
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |
@@ -146,7 +159,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
 | Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test and the `expect.extend` adapter (`setup.ts`) |
 | Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
-| Checks | `integrations/checks/` | `slackChecks()` (and later the other channels'): the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS` lists their ids |
+| Checks | `integrations/checks/` | `slackChecks()`, `githubChecks()` (and later the other channels'): the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS` and `GITHUB_CHECKS` list their ids |
 | pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |
 
 ## Generated code (never edit by hand)

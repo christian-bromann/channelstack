@@ -98,7 +98,7 @@ describe("pull requests and reviews", () => {
     });
 
     const fix = await pr.headCommit();
-    expect(fix.author.name).toBe(github.app.name);
+    expect(fix.author?.name).toBe(github.app.name);
     await ben.review({ pr, event: "APPROVE" });
     await ana.merge({ pr, method: "squash" });
     await expect(pr).toBeMerged();

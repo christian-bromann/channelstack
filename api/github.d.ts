@@ -65,14 +65,20 @@ export type GitHubReaction = "+1" | "-1" | "laugh" | "confused" | "heart" | "hoo
  */
 export interface GitHubUser extends User {
   readonly channel: "github";
+  /** The login. `name` is the same, so an author is matched by it. */
   readonly login: string;
   readonly numericId: number;
+  /** The profile name, when one was given. */
+  readonly displayName: string | undefined;
+  readonly role: "member" | "admin" | "outside_collaborator";
 
   // ------------------------------------------------------------ code
   /** Push a commit to a branch (created from the default branch if missing). Sends `push`, and `pull_request` `synchronize` for open PRs on it. */
   push(changes: GitHubChanges, where: { repo: GitHubRepo; branch: string; message?: string }): Promise<GitHubCommit>;
 
   // ------------------------------------------------------------ issues and PRs
+  // An action that sends one webhook answers with that delivery. There is none where the app isn't
+  // installed or has no webhook URL: GitHub tells an App only about repositories it is installed on.
   openIssue(issue: { title: string; body?: RichText; labels?: string[]; assignees?: GitHubAuthor[] }, where: { repo: GitHubRepo }): Promise<GitHubIssue>;
   /** Open a pull request. Pass `changes` to push them to `from` first, or point `from` at an existing branch. */
   openPullRequest(pr: {
@@ -84,9 +90,9 @@ export interface GitHubUser extends User {
     draft?: boolean;
     reviewers?: GitHubAuthor[];
   }, where: { repo: GitHubRepo }): Promise<GitHubPullRequest>;
-  editIssue(changes: { title?: string; body?: RichText }, target: { issue: GitHubIssue }): Promise<GitHubDelivery>;
-  close(target: { issue: GitHubIssue }): Promise<GitHubDelivery>;
-  reopen(target: { issue: GitHubIssue }): Promise<GitHubDelivery>;
+  editIssue(changes: { title?: string; body?: RichText }, target: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined>;
+  close(target: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined>;
+  reopen(target: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined>;
   label(labels: string | string[], target: { issue: GitHubIssue }): Promise<GitHubDelivery[]>;
   unlabel(labels: string | string[], target: { issue: GitHubIssue }): Promise<GitHubDelivery[]>;
   /** Assign people or the app's bot. Sends `issues`/`pull_request` (action `assigned`). */
@@ -96,8 +102,8 @@ export interface GitHubUser extends User {
   /** Comment on an issue or PR conversation. Sends `issue_comment` (action `created`). */
   comment(body: RichText, where: { issue: GitHubIssue }): Promise<GitHubComment>;
   /** Edit a conversation comment or review comment. */
-  edit(body: RichText, target: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery>;
-  delete(target: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery>;
+  edit(body: RichText, target: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined>;
+  delete(target: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined>;
   react(content: GitHubReaction, target: { issue: GitHubIssue } | { comment: GitHubComment | GitHubReviewComment }): Promise<void>;
   /** Hide a comment as outdated, spam, off-topic and so on. */
   minimize(target: { comment: GitHubComment; reason?: "OUTDATED" | "SPAM" | "OFF_TOPIC" | "RESOLVED" }): Promise<void>;
@@ -114,18 +120,18 @@ export interface GitHubUser extends User {
   reviewComment(body: RichText, where: { pr: GitHubPullRequest; path: string; line: number; side?: "LEFT" | "RIGHT" }): Promise<GitHubReviewComment>;
   /** Reply in a review thread. Sends `pull_request_review_comment`. */
   reply(body: RichText, where: { comment: GitHubReviewComment }): Promise<GitHubReviewComment>;
-  resolve(target: { comment: GitHubReviewComment }): Promise<GitHubDelivery>;
-  unresolve(target: { comment: GitHubReviewComment }): Promise<GitHubDelivery>;
+  resolve(target: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined>;
+  unresolve(target: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined>;
   /** Request a review from people or the app's bot. Sends `pull_request` (action `review_requested`). */
-  requestReview(reviewers: GitHubAuthor | GitHubAuthor[], where: { pr: GitHubPullRequest }): Promise<GitHubDelivery>;
-  markReady(target: { pr: GitHubPullRequest }): Promise<GitHubDelivery>;
-  merge(target: { pr: GitHubPullRequest; method?: "merge" | "squash" | "rebase" }): Promise<GitHubDelivery>;
+  requestReview(reviewers: GitHubAuthor | GitHubAuthor[], where: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined>;
+  markReady(target: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined>;
+  merge(target: { pr: GitHubPullRequest; method?: "merge" | "squash" | "rebase" }): Promise<GitHubDelivery | undefined>;
 
   // ------------------------------------------------------------ checks
   /** Click "Re-run" on a check run. Sends `check_run` (action `rerequested`). */
-  rerun(target: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery>;
+  rerun(target: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery | undefined>;
   /** Click one of the check run's requested actions. Sends `check_run` (action `requested_action`). */
-  requestAction(identifier: string, where: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery>;
+  requestAction(identifier: string, where: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery | undefined>;
 }
 
 export interface GitHubApp extends App {
@@ -154,10 +160,11 @@ export interface GitHubRepo extends Resource {
   /** `owner/name`. */
   readonly fullName: string;
   readonly defaultBranch: string;
+  readonly private: boolean;
 
   /** Install the app on this repo later. Sends `installation_repositories`. */
-  installApp(app: GitHubApp): Promise<GitHubDelivery>;
-  uninstallApp(app: GitHubApp): Promise<GitHubDelivery>;
+  installApp(app: GitHubApp): Promise<GitHubDelivery | undefined>;
+  uninstallApp(app: GitHubApp): Promise<GitHubDelivery | undefined>;
 
   issue(number: number): Promise<GitHubIssue>;
   pullRequest(number: number): Promise<GitHubPullRequest>;
@@ -169,7 +176,8 @@ export interface GitHubRepo extends Resource {
 export interface GitHubCommit {
   readonly sha: string;
   readonly message: string;
-  readonly author: GitHubAuthor;
+  /** Who GitHub attributes the commit to. Absent when its author is nobody on GitHub (a repository's first commit). */
+  readonly author: GitHubAuthor | undefined;
   readonly branch: string;
   readonly committedAt: Timestamp;
   checkRuns(): Promise<GitHubCheckRun[]>;
@@ -178,6 +186,8 @@ export interface GitHubCommit {
 
 export interface GitHubIssue extends HasTranscript {
   readonly repo: GitHubRepo;
+  /** The repository's id: with `number`, what identifies the issue. */
+  readonly repoId: string;
   readonly number: number;
   readonly url: string;
   readonly author: GitHubAuthor;
@@ -249,6 +259,8 @@ export interface GitHubCheckRun {
   readonly title?: string;
   readonly summary?: string;
   readonly annotations: ReadonlyArray<{ path: string; startLine: number; endLine: number; level: "notice" | "warning" | "failure"; message: string }>;
+  /** The identifiers of the buttons the app put on the run, for `requestAction`. */
+  readonly actions: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
