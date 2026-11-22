@@ -366,6 +366,29 @@ describe("code", () => {
 });
 
 describe("pull requests", () => {
+  test("`synchronize` is sent even when a read brought the pull request up to date first", async () => {
+    const { h, ana, repo, pull, post, get, webhooks } = await workspace();
+    const pr = await pull();
+    await h.app.settled();
+    // Reads of the pull request's head keep coming while the push is made: none of them may swallow the event.
+    let pushing = true;
+    const reading = (async () => {
+      while (pushing) await get(`/repos/${repo.id}/pulls/${pr.number}/check-runs`);
+    })();
+    const commit = await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "src/app.ts", content: b64("export const z = 3\n") }],
+      repo: repo.id,
+      branch: "feat",
+    });
+    pushing = false;
+    await reading;
+    await h.app.settled();
+    expect(webhooks().at(-1)).toMatchObject({
+      event: "pull_request",
+      payload: { action: "synchronize", after: commit.sha },
+    });
+  });
+
   test("GitHub's refusals when opening one", async () => {
     const { ana, repo, pull, post, api, path } = await workspace();
     const open = (pr: object) => refusal(post(`/users/${ana.id}/pulls`, { pr, repo: repo.id }));

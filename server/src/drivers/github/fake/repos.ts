@@ -120,11 +120,12 @@ export function createRepos(kit: GitHubKit) {
     });
     for (const issue of store.issuesOf(repo)) {
       if (!issue.pull || issue.state !== "open") continue;
-      const was = issue.pull.headSha;
       await refreshPull(repo, issue);
-      if (issue.pull.head === branch && after !== undefined && was !== after) {
+      // Whether the head moved is what the push says, not what the record held: a read that came
+      // in between may have brought the record up to date already.
+      if (issue.pull.head === branch && after !== undefined && before !== undefined && before !== after) {
         issue.updatedAt = clock();
-        kit.issueEvent(issue, actor, "synchronize", { before: was, after });
+        kit.issueEvent(issue, actor, "synchronize", { before, after });
       }
     }
     return pushed;
