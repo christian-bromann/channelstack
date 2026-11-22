@@ -74,6 +74,7 @@ const server = new Server({
     logLevel: "error",
   }),
   port: Number(PORT),
+  host: "127.0.0.1",
   webhookPath: "/api/github/webhooks",
 });
 await server.load(app);
