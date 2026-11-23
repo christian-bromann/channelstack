@@ -179,6 +179,15 @@ export function linearModels(world: FakeLinearWorld) {
       previousIdentifiers: [],
       reactionData: [],
       customerTicketCount: 0,
+      // Issues aren't shared outside their team in the fake.
+      sharedAccess: {
+        __typename: "IssueSharedAccess",
+        isShared: false,
+        sharedWithCount: 0,
+        sharedWithUsers: [],
+        viewerHasOnlySharedAccess: false,
+        disallowedIssueFields: [],
+      },
       team: () => teamModel(teamRecord),
       state: () => state(teamRecord, stateRecord),
       assignee: optionalUser(record.assignee),
@@ -235,7 +244,7 @@ export function linearModels(world: FakeLinearWorld) {
             .map(comment),
         )(args),
       agentSession: () => {
-        const owned = store.sessionsOn(issueRecord).find((entry) => entry.comment === world.rootOf(record).id);
+        const owned = store.sessionsOn(issueRecord).find((entry) => entry.thread === world.rootOf(record).id);
         return owned ? session(owned) : null;
       },
       reactions: () =>

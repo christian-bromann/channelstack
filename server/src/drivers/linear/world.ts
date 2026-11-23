@@ -129,8 +129,13 @@ export interface LinearSessionRecord {
   appUser: string;
   /** The person responsible for the session: whoever delegated or mentioned the app. */
   creator: string;
-  /** The root comment of the session's thread, when it has one. */
+  /** The comment that opened the session (a mention), as `AgentSession.comment`. */
   comment: string | null;
+  /**
+   * The root comment of the thread the session's comments are in: the mention, or for a
+   * delegation the first comment Linear wrote for the session. A reply there prompts the session.
+   */
+  thread: string | null;
   status: LinearSessionStatus;
   plan: { entries: LinearPlanEntry[]; updatedAt: number } | null;
   externalUrls: Array<{ label: string; url: string }>;

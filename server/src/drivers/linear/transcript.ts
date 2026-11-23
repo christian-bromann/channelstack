@@ -61,45 +61,55 @@ export function renderTranscript(
       (activity, index) => !(activity.ephemeral && index < all.length - 1) && activity.sourceComment === null,
     );
   };
-  const sessionLines = (session: LinearSessionRecord, depth: number) => {
-    for (const activity of activitiesOf(session))
-      push(activity.id, activity.user, activity.createdAt, activityText(activity), false, depth);
+  const activityLine = (activity: LinearActivityRecord, depth: number) => ({
+    at: activity.createdAt,
+    line: () => push(activity.id, activity.user, activity.createdAt, activityText(activity), false, depth),
+  });
+  const commentLine = (comment: LinearCommentRecord, depth: number) => ({
+    at: comment.createdAt,
+    line: () =>
+      push(
+        comment.id,
+        comment.user,
+        comment.createdAt,
+        options.readable(comment.body),
+        comment.editedAt !== null,
+        depth,
+      ),
+  });
+  const inOrder = (lines: Array<{ at: number; line: () => void }>) => {
+    for (const { line } of lines.sort((a, b) => a.at - b.at)) line();
   };
 
-  const roots = input.comments.filter((comment) => comment.parent === null);
-  const shown = new Set<string>();
-  for (const root of roots) {
-    push(root.id, root.user, root.createdAt, options.readable(root.body), root.editedAt !== null, 0);
-    // Replies and the activities of a session on this thread, in the order they happened.
-    const session = input.sessions.find((candidate) => candidate.comment === root.id);
-    if (session) shown.add(session.id);
+  // The page reads in time order: top-level comments, and the activities of sessions without a
+  // thread. Under each comment: its replies, and the activities of the session on it. A delegated
+  // session gets its thread from its first answer, so what it did before reads just above that.
+  const top: Array<{ at: number; line: () => void }> = [];
+  const threaded = new Set<string>();
+  for (const root of input.comments.filter((comment) => comment.parent === null)) {
+    const session = input.sessions.find((candidate) => candidate.thread === root.id);
+    const all = session ? input.activities(session) : [];
+    const opened = all.findIndex((activity) => activity.sourceComment === root.id);
+    const shown = session ? activitiesOf(session) : [];
+    const before = shown.filter((activity) => all.indexOf(activity) < opened);
+    const after = shown.filter((activity) => all.indexOf(activity) > opened);
+    if (session) threaded.add(session.id);
     const replies = input.comments
       .filter((comment) => comment.parent === root.id)
-      .map((comment) => ({
-        at: comment.createdAt,
-        line: () =>
-          push(
-            comment.id,
-            comment.user,
-            comment.createdAt,
-            options.readable(comment.body),
-            comment.editedAt !== null,
-            1,
-          ),
-      }));
-    const lines = [
-      ...replies,
-      ...(session
-        ? activitiesOf(session).map((activity) => ({
-            at: activity.createdAt,
-            line: () => push(activity.id, activity.user, activity.createdAt, activityText(activity), false, 1),
-          }))
-        : []),
-    ];
-    for (const { line } of lines.sort((a, b) => a.at - b.at)) line();
+      .map((reply) => commentLine(reply, 1));
+    const thread = [...replies, ...after.map((activity) => activityLine(activity, 1))];
+    top.push({
+      at: root.createdAt,
+      line: () => {
+        for (const activity of before) activityLine(activity, 0).line();
+        commentLine(root, 0).line();
+        inOrder(thread);
+      },
+    });
   }
-  // Sessions without a thread (a delegation) read after the comments.
-  for (const session of input.sessions) if (!shown.has(session.id)) sessionLines(session, 0);
+  for (const session of input.sessions)
+    if (!threaded.has(session.id)) for (const activity of activitiesOf(session)) top.push(activityLine(activity, 0));
+  inOrder(top);
 
   const text = entries
     .map((entry) => `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${entry.edited ? " (edited)" : ""}`)

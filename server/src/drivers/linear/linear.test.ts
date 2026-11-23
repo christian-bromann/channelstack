@@ -128,6 +128,42 @@ describe("agent sessions", () => {
     );
   });
 
+  test("what the person has to read is also a comment of the app, in the session's thread", async () => {
+    const { h, ana, app, post, get, gql, issue } = await workspace();
+    const created = await issue();
+    const session = await post(`/users/${ana.id}/delegate`, { app: app.id, issue: created.id });
+    const answer = await gql(
+      `mutation ($input: AgentActivityCreateInput!) { agentActivityCreate(input: $input) { agentActivity { sourceComment { id body user { name } } } } }`,
+      { input: { agentSessionId: session.id, content: { type: "thought", body: "Reading the code" } } },
+    );
+    expect(answer.body.data.agentActivityCreate.agentActivity.sourceComment).toBeNull();
+    const asked = await gql(
+      `mutation ($input: AgentActivityCreateInput!) { agentActivityCreate(input: $input) { agentActivity { sourceComment { id body user { name } } } } }`,
+      { input: { agentSessionId: session.id, content: { type: "elicitation", body: "Which browser?" } } },
+    );
+    const question = asked.body.data.agentActivityCreate.agentActivity.sourceComment;
+    expect(question).toMatchObject({ body: "Which browser?", user: { name: "my-agent" } });
+    // A reply to the agent's comment is a prompt in its session.
+    await post(`/users/${ana.id}/reply`, { body: "Safari 18", comment: question.id });
+    await h.app.settled();
+    expect((await get(`/agent-sessions/${session.id}/activities`)).at(-1)).toMatchObject({
+      type: "prompt",
+      body: "Safari 18",
+    });
+    await gql(ACTIVITY, {
+      input: { agentSessionId: session.id, content: { type: "response", body: "Fixed for Safari 18" } },
+    });
+    expect((await get(`/issues/${created.id}/transcript`)).text).toBe(
+      [
+        "Ana: Checkout fails on Safari",
+        "my-agent: (thought) Reading the code",
+        "my-agent: Which browser?",
+        "  Ana: Safari 18",
+        "  my-agent: Fixed for Safari 18",
+      ].join("\n"),
+    );
+  });
+
   test("Stop: the session is stopping until the agent ends its turn", async () => {
     const { h, ana, app, post, get, gql, webhooks, issue } = await workspace();
     const session = await post(`/users/${ana.id}/delegate`, { app: app.id, issue: (await issue()).id });

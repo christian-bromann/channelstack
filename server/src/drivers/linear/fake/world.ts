@@ -227,6 +227,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       appUser: store.appUser.id,
       creator,
       comment: comment ? rootOf(comment).id : null,
+      thread: comment ? rootOf(comment).id : null,
       status: "pending",
       plan: null,
       externalUrls: [],
@@ -420,7 +421,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       links.comment(issue, record.id),
     );
     if (user === store.appUser.id) return record;
-    const thread = root ? store.sessionsOn(issue).find((candidate) => candidate.comment === root.id) : undefined;
+    const thread = root ? store.sessionsOn(issue).find((candidate) => candidate.thread === root.id) : undefined;
     if (thread) {
       record.session = thread.id;
       promptSession(thread, user, body, { comment: record });
@@ -500,6 +501,16 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     // Stopping, a thought doesn't undo the Stop: only the turn's end (a response or an error) does.
     const status = next[type] ?? "active";
     if (!(record.status === "stopping" && status === "active")) moveTo(record, status);
+    // What the person has to read (an answer, a question, a failure) Linear also writes as a
+    // comment of the app in the session's thread; the activity's source comment is that comment.
+    if (type === "response" || type === "elicitation" || type === "error") {
+      const issue = store.issue(record.issue);
+      const parent = record.thread === null ? undefined : store.commentsOn(issue).find((c) => c.id === record.thread);
+      const written = comment(issue, store.appUser.id, activity.content.body ?? "", parent);
+      written.session = record.id;
+      record.thread ??= written.id;
+      activity.sourceComment = written.id;
+    }
     return activity;
   };
 

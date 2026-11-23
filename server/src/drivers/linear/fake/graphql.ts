@@ -4,7 +4,6 @@ import {
   execute,
   type ExecutionResult,
   type FragmentDefinitionNode,
-  getNamedType,
   GraphQLError,
   type GraphQLFieldResolver,
   type GraphQLOutputType,

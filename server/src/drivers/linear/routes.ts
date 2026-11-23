@@ -866,7 +866,7 @@ export function registerLinearRoutes(
       return renderTranscript(
         {
           comments: thread,
-          sessions: store.sessionsOn(issue).filter((record) => record.comment === root.id),
+          sessions: store.sessionsOn(issue).filter((record) => record.thread === root.id),
           activities: (record) => store.activitiesOf(record),
         },
         { principal, readable: world.readable },
@@ -904,7 +904,18 @@ export function registerLinearRoutes(
     "The session's activities, oldest first: the agent's, and the prompts of people",
     z.array(LinearAgentActivity).openapi("LinearAgentActivities"),
     (record, session) => store.activitiesOf(record).map((activity) => activityWire(session, activity)),
-    { waits: [{ name: "waitForActivity", mode: "next", text: "type", what: "an activity" }] },
+    {
+      waits: [
+        // What the agent says after a person's prompt answers that prompt, not an earlier one.
+        {
+          name: "waitForActivity",
+          mode: "next",
+          text: "type",
+          turn: { field: "type", value: "prompt" },
+          what: "an activity",
+        },
+      ],
+    },
   );
   sessionRead(
     "/external-urls",
