@@ -61,6 +61,24 @@ export const GITHUB_CHECKS = [
   "github.bad-signature",
 ] as const;
 
+/** The ids of the Linear checks, in the order they are registered. */
+export const LINEAR_CHECKS = [
+  "linear.first-activity",
+  "linear.ends-turn",
+  "linear.stop",
+  "linear.redelivery",
+  "linear.stale",
+  "linear.bad-signature",
+] as const;
+
+/** The ids of the Notion checks, in the order they are registered. */
+export const NOTION_CHECKS = [
+  "notion.reply-in-discussion",
+  "notion.ignores-own-comments",
+  "notion.redelivery",
+  "notion.bad-signature",
+] as const;
+
 /**
  * Registers one check as a test, with its id in the name. A check that was skipped, or whose
  * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
@@ -72,9 +90,38 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
       `No check is called ${unknown.map((id) => `"${id}"`).join(", ")}. The checks are: ${ids.join(", ")}`,
     );
   }
-  return (id: Id, title: string, run: (context: TestContext) => Promise<void>, needs: unknown = true): void => {
-    if (options.skip?.includes(id) || needs === undefined) return;
-    test(`${title} [${id}]`, run);
+  // `needs` is a rest argument: a default value would turn the `undefined` of a missing option into a value.
+  return (id: Id, title: string, run: (context: TestContext) => Promise<void>, ...needs: unknown[]): void => {
+    if (options.skip?.includes(id) || (needs.length > 0 && needs[0] === undefined)) return;
+    // Vitest reads which fixtures a test uses from how it destructures its context: name them all.
+    test(`${title} [${id}]`, ({
+      channelstack,
+      slack,
+      github,
+      linear,
+      notion,
+      task,
+      expect,
+      skip,
+      signal,
+      onTestFailed,
+      onTestFinished,
+      annotate,
+    }) =>
+      run({
+        channelstack,
+        slack,
+        github,
+        linear,
+        notion,
+        task,
+        expect,
+        skip,
+        signal,
+        onTestFailed,
+        onTestFinished,
+        annotate,
+      } as TestContext));
   };
 };
 
@@ -321,6 +368,118 @@ export function githubChecks(options: ChecksOptions): void {
       const { ana, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Signed by someone else" }, { repo });
       const comment = await ana.comment(prompt, { issue });
+      const delivery = comment.delivery;
+      if (!delivery) throw new Error("The comment caused no delivery: is the agent's webhook URL set?");
+      await delivery.resend({ badSignature: true });
+      await expect(delivery).toBeRejected(wait);
+    });
+  });
+}
+
+/**
+ * The Linear checks: an agent delegated an issue. `prompt` is the issue's title (default "Look
+ * into this"); the agent should take the issue, work on it and end its turn.
+ */
+export function linearChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const title = options.prompt ?? "Look into this";
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar(options, LINEAR_CHECKS);
+  /** Ana in a team, an issue, and a session from delegating it to the app. */
+  const delegated = async ({ linear }: TestContext) => {
+    const ana = await linear.createUser({ name: "Ana" });
+    const team = await linear.createTeam({ members: [ana] });
+    const issue = await ana.createIssue({ title }, { team });
+    const session = await ana.delegate(linear.app, { issue });
+    return { ana, issue, session };
+  };
+  const ended = ["complete", "awaitingInput", "error"] as const;
+
+  describe(`linear checks: ${app}`, () => {
+    check("linear.first-activity", "acknowledges a new session within 10 seconds", async (context) => {
+      const { session } = await delegated(context);
+      // Linear shows a session as unresponsive when nothing arrives in that time.
+      await expect(session).toHaveActivity({}, { timeout: "10s" });
+    });
+
+    check("linear.ends-turn", "ends its turn: the session doesn't stay active", async (context) => {
+      const { session } = await delegated(context);
+      await session.waitForState([...ended], wait);
+    });
+
+    check("linear.stop", "Stop ends the session", async (context) => {
+      const { ana, session } = await delegated(context);
+      await expect(session).toHaveActivity({}, wait);
+      await ana.stop({ session });
+      // The agent answers Stop with a response or an error; until then the session is stopping.
+      await session.waitForState(["complete", "error"], wait);
+    });
+
+    check("linear.redelivery", "a redelivered webhook doesn't start the work again", async (context) => {
+      const { session } = await delegated(context);
+      await session.waitForState([...ended], wait);
+      await session.delivery.redeliver();
+      await context.channelstack.quiet(wait);
+      const responses = (await session.activities()).filter((activity) => activity.type === "response");
+      expect(responses.length).toBeLessThanOrEqual(1);
+    });
+
+    check("linear.stale", "rejects a webhook whose timestamp is more than a minute old", async (context) => {
+      const { session } = await delegated(context);
+      await session.delivery.resend({ stale: true });
+      await expect(session.delivery).toBeRejected(wait);
+    });
+
+    check("linear.bad-signature", "rejects a webhook with a bad signature", async (context) => {
+      const { session } = await delegated(context);
+      await session.delivery.resend({ badSignature: true });
+      await expect(session.delivery).toBeRejected(wait);
+    });
+  });
+}
+
+/**
+ * The Notion checks: an integration mentioned in a page comment. `prompt` is the comment (default
+ * `@<app> hello`); the agent should answer once, in that discussion.
+ */
+export function notionChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const prompt = options.prompt ?? `@${app} hello`;
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar(options, NOTION_CHECKS);
+  /** Ana, and her comment on a page the integration is connected to. */
+  const commented = async ({ notion }: TestContext) => {
+    const ana = await notion.createUser({ name: "Ana" });
+    const page = await notion.createPage({ title: "Notes", content: "- a first note", connections: [notion.app] });
+    const comment = await ana.comment(prompt, { page });
+    return { ana, page, comment };
+  };
+
+  describe(`notion checks: ${app}`, () => {
+    check("notion.reply-in-discussion", "answers a comment in its discussion", async (context) => {
+      const { page, comment } = await commented(context);
+      await expect(comment.discussion).toHaveCommentFrom(app, wait);
+      // An answer in a discussion of its own is one the person doesn't see where they asked.
+      const elsewhere = (await page.discussions()).filter((discussion) => discussion.id !== comment.discussion.id);
+      expect(elsewhere).toEqual([]);
+    });
+
+    check("notion.ignores-own-comments", "its own comment doesn't set it off again", async (context) => {
+      const { comment } = await commented(context);
+      await expect(comment.discussion).toHaveCommentFrom(app, wait);
+      await expect(comment.discussion).toHaveCommentsFrom(app, { count: 1, ...wait });
+    });
+
+    check("notion.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
+      const { comment } = await commented(context);
+      await expect(comment.discussion).toHaveCommentFrom(app, wait);
+      // Notion retries with the same event id.
+      await comment.delivery?.redeliver();
+      await expect(comment.discussion).toHaveCommentsFrom(app, { count: 1, ...wait });
+    });
+
+    check("notion.bad-signature", "rejects a webhook with a bad signature", async (context) => {
+      const { comment } = await commented(context);
       const delivery = comment.delivery;
       if (!delivery) throw new Error("The comment caused no delivery: is the agent's webhook URL set?");
       await delivery.resend({ badSignature: true });
