@@ -387,16 +387,27 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
   /** Find an option by name, or (as Notion does for `select` and `multi_select`) add it. */
   const optionNamed = (property: NotionPropertyRecord, name: string): string => {
-    const found = property.options.find((option) => option.name === name);
-    if (found) return found.name;
-    if (property.type === "status")
+    if (property.type === "status" && !property.options.some((option) => option.name === name))
       throw invalid(`body failed validation: "${name}" is not an option of the status property ${property.name}`);
-    property.options.push({
-      id: ids.next("notion.uuid"),
-      name,
-      color: OPTION_COLORS[property.options.length % 10] ?? "default",
-    });
     return name;
+  };
+
+  /**
+   * A select's or multi-select's new option names become options of the schema: only once every
+   * value of the change was checked, so a refused change adds none.
+   */
+  const addOptions = (schema: readonly NotionPropertyRecord[], values: Record<string, NotionValue>) => {
+    for (const property of schema) {
+      const value = values[property.name];
+      const names = value?.type === "select" ? [value.option] : value?.type === "multi_select" ? value.options : [];
+      for (const name of names)
+        if (name !== null && !property.options.some((option) => option.name === name))
+          property.options.push({
+            id: ids.next("notion.uuid"),
+            name,
+            color: OPTION_COLORS[property.options.length % 10] ?? "default",
+          });
+    }
   };
 
   /** A test's value (`"Done"`, `3`, `["a", "b"]`) as the value of a property of this type. */
@@ -512,6 +523,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     actor: string,
   ) => {
     const changed = Object.keys(values).map((name) => propertyNamed(page, name));
+    addOptions(changed, values);
     for (const property of changed) page.properties[property.name] = values[property.name] as NotionValue;
     touch(page, actor);
     return emit(session, page, "page.properties_updated", (id) =>
@@ -666,6 +678,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         );
       properties[name] = fromPlain(property, value);
     }
+    addOptions(database.properties, properties);
     const page = makePage(session, parent, properties, actor);
     return { page, delivery: options.announce ? announcePage(session, page, actor) : undefined };
   };
@@ -939,6 +952,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         values[property.name] = fromRequest(property, raw);
       }
       const drafts = children.map(draftFromRequest);
+      addOptions(schemaFor(parent), values);
       const draft = makePage(session, parent, values, actor);
       draft.children = insertBlocks(session, draft, { type: "page_id", id: draft.id }, drafts, actor);
       announcePage(session, draft, actor);

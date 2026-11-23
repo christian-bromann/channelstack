@@ -15,7 +15,7 @@ import {
   transcriptSchema,
 } from "../../core/router/inspect.ts";
 import { NotionApiError } from "./errors.ts";
-import { type FakeNotionWorld, type PlainValue } from "./fake/world.ts";
+import type { FakeNotionWorld, PlainValue } from "./fake/world.ts";
 import { plainText } from "./rich-text.ts";
 import { renderDiscussion, renderPage } from "./transcript.ts";
 import type {

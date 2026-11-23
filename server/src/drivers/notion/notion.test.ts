@@ -222,6 +222,21 @@ describe("the REST API", () => {
     expect(await names({ filter: { property: "Estimate", number: { greater_than: 9 } } })).toEqual(["Ten"]);
     expect(await names({ filter: { property: "Estimate", number: { is_empty: true } } })).toEqual(["None"]);
     expect(await names({ filter: { property: "Estimate", number: { sounds_like: 9 } } })).toBe("validation_error");
+    // A new multi-select name becomes an option, but only with a change Notion takes.
+    const tagsOf = async () =>
+      (await api("GET", `data_sources/${source.id}`)).body.properties.Tags.multi_select.options.map(
+        (option: { name: string }) => option.name,
+      );
+    const [ten] = (
+      await api("POST", `data_sources/${source.id}/query`, { filter: { property: "Name", title: { equals: "Ten" } } })
+    ).body.results;
+    const refused = await api("PATCH", `pages/${ten.id}`, {
+      properties: { Tags: { multi_select: [{ name: "new" }] }, Nope: { number: 1 } },
+    });
+    expect(refused.status).toBe(400);
+    expect(await tagsOf()).toEqual(["api", "ui"]);
+    await api("PATCH", `pages/${ten.id}`, { properties: { Tags: { multi_select: [{ name: "new" }] } } });
+    expect(await tagsOf()).toEqual(["api", "ui", "new"]);
   });
 });
 

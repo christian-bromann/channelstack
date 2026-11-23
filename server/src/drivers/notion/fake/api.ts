@@ -7,7 +7,7 @@ import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { NotionApiError, pagingOf } from "../errors.ts";
 import { NOTION_API_VERSION } from "../payloads.ts";
 import type { NotionBlockRecord, NotionCapability, NotionDatabaseRecord, NotionPageRecord } from "../world.ts";
-import { type FakeNotionWorld, type PlainValue } from "./world.ts";
+import type { FakeNotionWorld, PlainValue } from "./world.ts";
 
 /** The versions the API takes; the client libraries send one in `Notion-Version`. */
 const VERSIONS = ["2022-06-28", NOTION_API_VERSION, "2026-03-11"];
