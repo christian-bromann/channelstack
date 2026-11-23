@@ -431,6 +431,19 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
   // --- Activities -------------------------------------------------------------------------------
 
   /**
+   * An id the app chose for what it creates (`agentActivityCreate`'s `id`, so a retry can't make a
+   * second one): a UUID nothing has yet. One that is taken is refused, never overwritten.
+   */
+  const claimId = (id: string): string => {
+    try {
+      return ids.reserve("linear.uuid", id);
+    } catch (error) {
+      if (!(error instanceof ProtocolError)) throw error;
+      throw new LinearError(/already in use/.test(error.message) ? "Entity already exists" : "id must be a UUID");
+    }
+  };
+
+  /**
    * The app publishes an activity, as `agentActivityCreate` does: checked first, then the session
    * moves on. A thought or an action makes it active, an elicitation waits for input, a response
    * completes the turn (unless it has the `continue` signal), an error is the error state.
@@ -473,7 +486,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     const session = store.sessions.owner(record.id);
     if (session === undefined) throw new Error("A session belongs to a test session");
     const activity = store.add(store.activities, session, {
-      id: input.id ?? ids.next("linear.uuid"),
+      id: input.id ? claimId(input.id) : ids.next("linear.uuid"),
       session: record.id,
       user: store.appUser.id,
       content:

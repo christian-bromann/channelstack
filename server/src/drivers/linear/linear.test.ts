@@ -92,6 +92,16 @@ describe("agent sessions", () => {
     );
     expect(await get(`/agent-sessions/${session.id}/activities`)).toEqual([]);
     expect(await get(`/agent-sessions/${session.id}/state`)).toBe("pending");
+    // An id the app chose is the activity's; a retry with it is refused instead of making or replacing one.
+    const id = "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f";
+    expect(await publish({ type: "response", body: "Done" }, { id })).toBeUndefined();
+    expect(await publish({ type: "response", body: "Done again" }, { id })).toBe("Entity already exists");
+    expect(await publish({ type: "thought", body: "x" }, { id: session.id })).toBe("Entity already exists");
+    expect(await publish({ type: "thought", body: "x" }, { id: "not-a-uuid" })).toBe("id must be a UUID");
+    const activities = await get(`/agent-sessions/${session.id}/activities`);
+    expect(activities.map((activity: { id: string; body: string }) => [activity.id, activity.body])).toEqual([
+      [id, "Done"],
+    ]);
   });
 
   test("a mention in a comment opens a session on its thread; a reply there prompts it", async () => {
