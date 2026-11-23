@@ -105,10 +105,18 @@ try {
     failed = true;
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   }
-  // A channel whose credentials are set must have run live: a run that skipped all of it proves nothing.
-  const results = JSON.parse(readFileSync(report, "utf8")) as {
-    testResults: Array<{ name: string; assertionResults: Array<{ status: string }> }>;
+  // A channel whose credentials are set must have run live: a run that skipped all of it proves
+  // nothing. That includes a channel whose live backend isn't built yet: exit check 5.1 isn't met
+  // for it, and the job says so. Without a report (Vitest died), the run has failed already.
+  let results: { testResults: Array<{ name: string; assertionResults: Array<{ status: string }> }> } = {
+    testResults: [],
   };
+  try {
+    results = JSON.parse(readFileSync(report, "utf8"));
+  } catch {
+    failed = true;
+    process.stderr.write("Vitest wrote no report: the live tests didn't run\n");
+  }
   for (const driver of DRIVERS) {
     const credentials = driver.live?.credentials ?? [];
     if (credentials.length === 0 || credentials.some((name) => !env[name])) continue;

@@ -79,7 +79,7 @@ Every feature runs in the fake server (in memory). The question this document an
 | `slack.createChannel({ participants, private })` | Done | Built | User token of the first real person in it (`conversations.create`, `conversations.invite`) | Including `slack.app` invites the bot. The app's bot can't create channels, so a person does; no separate seeding token is needed |
 | `slack.createChannel({ shared: true })` (Slack Connect) | Yes | No | — | Needs a second organization and manual approval |
 | `slack.uninstallApp()` | Done | Not yet | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run. Live runs report `unsupported_in_live` until that job exists |
-| `ana.say(text, { channel })` | Done | Built | User token (`chat.postMessage` as the user) | The platform sends real `message` and `app_mention` events. The person's token must come from a separate Slack app, not the agent's: Slack shows a message posted with a user token of the agent's own app as the app's, and the agent ignores it (found in the first live run; channelstack refuses such a token with `action_requires`) |
+| `ana.say(text, { channel })` | Done | Built | User token (`chat.postMessage` as the user) | The platform sends real `message` and `app_mention` events. The person's token must come from a separate Slack app, not the agent's: Slack shows a message posted with a user token of the agent's own app as the app's, and the agent ignores it (found in the first live run; channelstack refuses such a token with `live_misconfigured`, and the test fails) |
 | `ana.say(text, { to: slack.app })` (DM) | Done | Built | User token (`conversations.open`, then `chat.postMessage`) | Fires `message.im` |
 | `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Built | User token | |
 | `ana.say({ files })` | Yes | Yes | User token (files upload v2) | |
@@ -116,7 +116,7 @@ Every feature runs in the fake server (in memory). The question this document an
 
 ## GitHub
 
-The live backend isn't built yet. With the App's credentials set (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`), every GitHub operation reports `unsupported_in_live` and its test is skipped, until the test org exists.
+The live backend isn't built yet. With the App's credentials set (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`), every GitHub operation reports `unsupported_in_live` and its test is skipped (the nightly job then fails for it, since its live block passed nothing), until the test org exists.
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
@@ -153,7 +153,7 @@ The live backend isn't built yet. With the App's credentials set (`CHANNELSTACK_
 
 ## Linear
 
-The live backend isn't built yet. With the app's token set (`CHANNELSTACK_LINEAR_APP_TOKEN`), every Linear operation reports `unsupported_in_live` and its test is skipped, until the test workspace exists.
+The live backend isn't built yet. With the app's token set (`CHANNELSTACK_LINEAR_APP_TOKEN`), every Linear operation reports `unsupported_in_live` and its test is skipped (the nightly job then fails for it, since its live block passed nothing), until the test workspace exists.
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
@@ -178,7 +178,7 @@ The live backend isn't built yet. With the app's token set (`CHANNELSTACK_LINEAR
 
 ## Notion
 
-The live backend isn't built yet. With the integration's token set (`CHANNELSTACK_NOTION_TOKEN`), every Notion operation reports `unsupported_in_live` and its test is skipped, until the test workspace exists.
+The live backend isn't built yet. With the integration's token set (`CHANNELSTACK_NOTION_TOKEN`), every Notion operation reports `unsupported_in_live` and its test is skipped (the nightly job then fails for it, since its live block passed nothing), until the test workspace exists.
 
 Notion now has **personal access tokens** that act as the person who created them, with that person's permissions and no page sharing. That's the "User token" for Notion, and it makes most person actions possible live. The integration's own token (internal or public OAuth) always acts as a bot.
 
@@ -240,7 +240,7 @@ The browser actor runs in CI, so nobody signs in by hand. Each sandbox person is
 
 Answered so far (2026-11-23, Slack sandbox):
 
-- **V1, Slack A2: not yet confirmed end to end.** channelstack's side works against real Slack: the tagged channel, the invite, Ana's message with a real mention of the bot, reading the thread back, and cleanup (the sweep check found nothing left). But the sandbox's person token was issued by the agent's own app, so Slack showed Ana's message as the app's and the agent ignored it. The fix is a separate Slack app for the sandbox's people, whose user token Ana uses; channelstack now refuses the other kind with `action_requires`. V1 is answered once that token exists and the nightly job passes.
+- **V1, Slack A2: not yet confirmed end to end.** channelstack's side works against real Slack: the tagged channel, the invite, Ana's message with a real mention of the bot, reading the thread back, and cleanup (the sweep check found nothing left). But the sandbox's person token was issued by the agent's own app, so Slack showed Ana's message as the app's and the agent ignored it. The fix is a separate Slack app for the sandbox's people, whose user token Ana uses; channelstack now refuses the other kind with `live_misconfigured`, so the nightly job fails until the token is replaced. V1 is answered once that token exists and the nightly job passes.
 - **Slack's read methods ignore a JSON body.** `users.info` answers `user_not_found` to one; the live client sends parameters form-encoded, as Slack's SDK does.
 
 Still open:
