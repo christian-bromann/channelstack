@@ -44,6 +44,11 @@ export function linearResolvers(world: FakeLinearWorld) {
   const statesOf = () => store.all(store.teams).flatMap((team) => team.states.map((state) => ({ team, state })));
   const labelsOf = () => store.all(store.teams).flatMap((team) => team.labels.map((label) => ({ team, label })));
 
+  /** A mutation is on record for the session of what it is about, even when it is refused. */
+  const mark = (context: LinearCallContext, owner: string | undefined) => {
+    if (owner !== undefined) context.sessions.add(owner);
+  };
+
   const Query = {
     viewer: () => models.user(store.appUser),
     organization: () => models.organization(),
@@ -53,21 +58,16 @@ export function linearResolvers(world: FakeLinearWorld) {
       return models.user(user);
     },
     users: (args: Args) => models.listOf([store.appUser, ...store.all(store.users)].map(models.user))(args),
-    team: ({ id }: Args, context: LinearCallContext) => models.team(teamBy(id), context),
+    team: ({ id }: Args) => models.team(teamBy(id)),
     teams: (args: Args) => models.listOf(store.all(store.teams).map((team) => models.team(team)))(args),
-    issue: ({ id }: Args, context: LinearCallContext) => models.issue(issueBy(id), context),
-    issues: (args: Args, context: LinearCallContext) =>
-      models.listOf(store.all(store.issues).map((issue) => models.issue(issue, context)))(args),
-    comment: ({ id }: Args, context: LinearCallContext) => {
-      const comment = commentBy(id);
-      models.issue(store.issue(comment.issue), context);
-      return models.comment(comment);
-    },
+    issue: ({ id }: Args) => models.issue(issueBy(id)),
+    issues: (args: Args) => models.listOf(store.all(store.issues).map((issue) => models.issue(issue)))(args),
+    comment: ({ id }: Args) => models.comment(commentBy(id)),
     comments: (args: Args) => models.listOf(store.all(store.comments).map(models.comment))(args),
-    agentSession: ({ id }: Args, context: LinearCallContext) => {
+    agentSession: ({ id }: Args) => {
       const session = store.sessions.find(id);
       if (!session) throw notFound("AgentSession");
-      return models.session(session, context);
+      return models.session(session);
     },
     agentSessions: (args: Args) =>
       models.listOf(
@@ -99,19 +99,19 @@ export function linearResolvers(world: FakeLinearWorld) {
   const Mutation = {
     agentActivityCreate: ({ input }: Args, context: LinearCallContext) => {
       const session = sessionBy(input.agentSessionId);
-      models.session(session, context);
+      mark(context, store.sessions.owner(session.id));
       const activity = world.publish(session, input);
       return { lastSyncId: sync(), success: true, agentActivity: () => models.activity(activity) };
     },
     agentSessionUpdate: ({ id, input }: Args, context: LinearCallContext) => {
       const session = sessionBy(id);
-      models.session(session, context);
+      mark(context, store.sessions.owner(session.id));
       world.updateSession(session, input);
       return { lastSyncId: sync(), success: true, agentSession: () => models.session(session) };
     },
     issueUpdate: ({ id, input }: Args, context: LinearCallContext) => {
       const issue = issueBy(id);
-      models.issue(issue, context);
+      mark(context, store.issues.owner(issue.id));
       const labelIds =
         input.labelIds ??
         (input.addedLabelIds || input.removedLabelIds
@@ -128,13 +128,13 @@ export function linearResolvers(world: FakeLinearWorld) {
     },
     issueAddLabel: ({ id, labelId }: Args, context: LinearCallContext) => {
       const issue = issueBy(id);
-      models.issue(issue, context);
+      mark(context, store.issues.owner(issue.id));
       world.updateIssue(issue, app(), { labelIds: [...new Set([...issue.labels, labelId as string])] });
       return { lastSyncId: sync(), success: true, issue: () => models.issue(issue) };
     },
     issueRemoveLabel: ({ id, labelId }: Args, context: LinearCallContext) => {
       const issue = issueBy(id);
-      models.issue(issue, context);
+      mark(context, store.issues.owner(issue.id));
       world.updateIssue(issue, app(), { labelIds: issue.labels.filter((label) => label !== labelId) });
       return { lastSyncId: sync(), success: true, issue: () => models.issue(issue) };
     },
@@ -143,13 +143,13 @@ export function linearResolvers(world: FakeLinearWorld) {
       const parent = input.parentId ? commentBy(input.parentId) : undefined;
       const issue = input.issueId ? issueBy(input.issueId) : parent ? store.issue(parent.issue) : undefined;
       if (!issue) throw new LinearError("A comment needs an issueId or a parentId");
-      models.issue(issue, context);
+      mark(context, store.issues.owner(issue.id));
       const comment = world.comment(issue, app(), input.body, parent);
       return { lastSyncId: sync(), success: true, comment: () => models.comment(comment) };
     },
     commentUpdate: ({ id, input }: Args, context: LinearCallContext) => {
       const comment = commentBy(id);
-      models.issue(store.issue(comment.issue), context);
+      mark(context, store.comments.owner(comment.id));
       if (comment.user !== app())
         throw new LinearError("You can only edit your own comments", "FORBIDDEN", "forbidden");
       if (typeof input.body === "string") world.editComment(comment, app(), input.body);
@@ -157,7 +157,7 @@ export function linearResolvers(world: FakeLinearWorld) {
     },
     commentDelete: ({ id }: Args, context: LinearCallContext) => {
       const comment = commentBy(id);
-      models.issue(store.issue(comment.issue), context);
+      mark(context, store.comments.owner(comment.id));
       if (comment.user !== app())
         throw new LinearError("You can only delete your own comments", "FORBIDDEN", "forbidden");
       world.deleteComment(comment, app());
@@ -166,7 +166,7 @@ export function linearResolvers(world: FakeLinearWorld) {
     reactionCreate: ({ input }: Args, context: LinearCallContext) => {
       const comment = input.commentId ? commentBy(input.commentId) : undefined;
       if (!comment) throw new LinearError("The fake takes reactions on comments only");
-      models.issue(store.issue(comment.issue), context);
+      mark(context, store.comments.owner(comment.id));
       world.react(comment, app(), input.emoji);
       const reaction = comment.reactions.find((entry) => entry.user === app() && entry.emoji === input.emoji);
       return {

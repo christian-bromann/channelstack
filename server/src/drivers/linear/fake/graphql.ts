@@ -120,7 +120,15 @@ function emptyValue(type: GraphQLOutputType, where: string): unknown {
  * Fields are read from the source objects the models build: a value as it is, a function called
  * with the field's arguments. A field the model leaves out gets Linear's empty value for it.
  */
+/**
+ * The test session an object of the answer belongs to. An object that is part of the answer puts
+ * its session on the call's record; one that was only looked at (filtered out of a list) doesn't.
+ */
+export const OWNER = Symbol("owner");
+
 const fieldResolver: GraphQLFieldResolver<Record<string, unknown>, unknown> = (source, args, context, info) => {
+  const owner = (source as { [OWNER]?: string | undefined } | undefined)?.[OWNER];
+  if (owner !== undefined) (context as { sessions?: Set<string> }).sessions?.add(owner);
   const value = source?.[info.fieldName];
   if (typeof value === "function") return (value as (args: unknown, context: unknown) => unknown)(args, context);
   if (value !== undefined) return value;

@@ -273,6 +273,27 @@ describe("the GraphQL API", () => {
     expect(calls.map((call: { operation: string }) => call.operation)).toContain("issueUpdate");
   });
 
+  test("a call is on record for the sessions of what it answered with, not of what a filter left out", async () => {
+    const { h, gql, team, issue, get } = await workspace();
+    await issue();
+    // A second test, at the same time, with an issue of its own.
+    const { sessionId: other } = (await h.call("POST", "/sessions")).body;
+    const base = `/sessions/${other}/linear`;
+    const ben = (await h.call("POST", `${base}/users`, { name: "Ben" })).body;
+    const theirs = (await h.call("POST", `${base}/teams`, { members: [ben.id] })).body;
+    await h.call("POST", `${base}/users/${ben.id}/issues`, { issue: { title: "Theirs" }, team: theirs.id });
+    const mine = await gql(
+      `query ($team: ID) { issues(filter: { team: { id: { eq: $team } } }) { nodes { title } } }`,
+      {
+        team: team.id,
+      },
+    );
+    expect(mine.body.data.issues.nodes).toEqual([{ title: "Checkout fails on Safari" }]);
+    expect((await get("/calls")).map((call: { operation: string }) => call.operation)).toContain("issues");
+    const theirCalls = (await h.call("GET", `${base}/calls`)).body as Array<{ operation: string }>;
+    expect(theirCalls.map((call) => call.operation)).not.toContain("issues");
+  });
+
   test("a comment the app writes, and an Issue event with what changed", async () => {
     const { h, gql, webhooks, issue, get } = await workspace();
     const created = await issue();

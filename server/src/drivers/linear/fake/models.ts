@@ -9,10 +9,10 @@ import {
   type LinearUserRecord,
   reactionData,
 } from "../world.ts";
-import { connection, matchesFilter } from "./graphql.ts";
+import { connection, matchesFilter, OWNER } from "./graphql.ts";
 import type { FakeLinearWorld } from "./world.ts";
 
-type Model = Record<string, unknown> & { id: string };
+type Model = Record<string, unknown> & { id: string; [OWNER]?: string | undefined };
 type Args = {
   filter?: Record<string, unknown> | null;
   first?: number | null;
@@ -33,13 +33,10 @@ export interface LinearCallContext {
 /**
  * Records → the objects GraphQL reads, one builder per Linear type. A relation is a function, so
  * it is only built when an operation asks for it; a field left out gets Linear's empty value.
- * Reading an object puts its test session on the call's record.
+ * An object carries its test session (`OWNER`): resolving it puts that session on the call's record.
  */
 export function linearModels(world: FakeLinearWorld) {
   const { store, links } = world;
-  const touch = (context: LinearCallContext | undefined, session: string | undefined) => {
-    if (context && session !== undefined) context.sessions.add(session);
-  };
   /** A list as a filtered, paged connection. */
   const listOf =
     <T extends Model>(models: readonly T[]) =>
@@ -50,6 +47,7 @@ export function linearModels(world: FakeLinearWorld) {
       );
 
   const user = (record: LinearUserRecord): Model => ({
+    [OWNER]: store.users.owner(record.id),
     __typename: "User",
     id: record.id,
     name: record.name,
@@ -127,9 +125,9 @@ export function linearModels(world: FakeLinearWorld) {
     team: () => teamModel(team),
   });
 
-  const teamModel = (record: LinearTeamRecord, context?: LinearCallContext): Model => {
-    touch(context, store.teams.owner(record.id));
+  const teamModel = (record: LinearTeamRecord): Model => {
     return {
+      [OWNER]: store.teams.owner(record.id),
       __typename: "Team",
       id: record.id,
       key: record.key,
@@ -147,13 +145,13 @@ export function linearModels(world: FakeLinearWorld) {
   };
   const team = (record: LinearTeamRecord) => teamModel(record);
 
-  const issue = (record: LinearIssueRecord, context?: LinearCallContext): Model => {
-    touch(context, store.issues.owner(record.id));
+  const issue = (record: LinearIssueRecord): Model => {
     const teamRecord = store.team(record.team);
     const stateRecord = world.stateOf(record);
     const priorityLabel = ["No priority", "Urgent", "High", "Medium", "Low"][record.priority] ?? "No priority";
     const optionalUser = (id: string | null) => (id === null ? null : () => user(store.user(id) as LinearUserRecord));
     return {
+      [OWNER]: store.issues.owner(record.id),
       __typename: "Issue",
       id: record.id,
       identifier: record.identifier,
@@ -216,6 +214,7 @@ export function linearModels(world: FakeLinearWorld) {
     const issueRecord = store.issue(record.issue);
     const author = store.user(record.user) as LinearUserRecord;
     return {
+      [OWNER]: store.comments.owner(record.id),
       __typename: "Comment",
       id: record.id,
       body: record.body,
@@ -259,10 +258,10 @@ export function linearModels(world: FakeLinearWorld) {
     };
   };
 
-  const session = (record: LinearSessionRecord, context?: LinearCallContext): Model => {
-    touch(context, store.sessions.owner(record.id));
+  const session = (record: LinearSessionRecord): Model => {
     const issueRecord = store.issue(record.issue);
     return {
+      [OWNER]: store.sessions.owner(record.id),
       __typename: "AgentSession",
       id: record.id,
       status: record.status,
@@ -298,6 +297,7 @@ export function linearModels(world: FakeLinearWorld) {
     const sessionRecord = store.sessions.find(record.session) as LinearSessionRecord;
     const typename = `AgentActivity${record.content.type.charAt(0).toUpperCase()}${record.content.type.slice(1)}Content`;
     return {
+      [OWNER]: store.activities.owner(record.id),
       __typename: "AgentActivity",
       id: record.id,
       createdAt: iso(record.createdAt),
