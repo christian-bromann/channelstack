@@ -54,7 +54,7 @@ export function createLinearApi(context: DriverContext, world: FakeLinearWorld):
     if (typeof request?.query !== "string")
       return c.json({ errors: [{ message: "A query is required", extensions: { code: "BAD_REQUEST" } }] }, 400);
 
-    const callContext: LinearCallContext & { viewer: string } = { sessions: new Set(), viewer: world.store.appUser.id };
+    const callContext: LinearCallContext = { sessions: new Set() };
     const { document, result } = await runGraphQL(request, root, callContext);
     // A query GraphQL can't run (it doesn't parse, or asks for what the schema doesn't have) is a 400; the rest is a 200.
     const status = result.data === undefined && result.errors ? 400 : 200;

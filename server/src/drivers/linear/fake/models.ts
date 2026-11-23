@@ -56,7 +56,8 @@ export function linearModels(world: FakeLinearWorld) {
     admin: record.admin,
     guest: record.guest,
     app: record.app,
-    isMe: (_: unknown, context: { viewer?: string } | undefined) => context?.viewer === record.id,
+    // The fake takes the app's token only, so "me" is always the app's user, in answers and filters alike.
+    isMe: record.id === store.appUser.id,
     active: true,
     url: links.profile(record),
     createdAt: iso(record.createdAt),

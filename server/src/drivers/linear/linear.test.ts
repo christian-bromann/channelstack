@@ -290,6 +290,16 @@ describe("the GraphQL API", () => {
     expect(await get(`/issues/${created.id}/state`)).toEqual({ name: "In Review", type: "started" });
     expect((await gql("{ nope }")).status).toBe(400);
     expect((await gql(`{ issue(id: "ENG-99") { id } }`)).body.errors[0].message).toBe("Entity not found: Issue");
+    // Filters that name the app as "me", as agents ask for their own work.
+    await gql(
+      `mutation ($id: String!, $me: String!) { issueUpdate(id: $id, input: { delegateId: $me }) { success } }`,
+      {
+        id: created.id,
+        me: (await gql("{ viewer { id } }")).body.data.viewer.id,
+      },
+    );
+    const mine = await gql(`{ issues(filter: { delegate: { isMe: { eq: true } } }) { nodes { identifier } } }`);
+    expect(mine.body.data.issues.nodes).toEqual([{ identifier: "ENG-1" }]);
     const calls = await get("/calls");
     expect(calls.map((call: { operation: string }) => call.operation)).toContain("issueUpdate");
   });
@@ -328,6 +338,11 @@ describe("the GraphQL API", () => {
     );
     await h.app.settled();
     const update = webhooks().find((hook) => hook.event === "Issue" && hook.payload.action === "update");
+    // A test asks for the deliveries about one issue: its own Issue webhooks are among them.
+    const about = await get(`/deliveries?resource=${created.id}`);
+    expect(about.map((delivery: { type: string; action: string }) => `${delivery.type}.${delivery.action}`)).toEqual(
+      expect.arrayContaining(["Issue.create", "Issue.update", "Comment.create"]),
+    );
     expect(update?.payload).toMatchObject({
       data: { title: "Checkout fails", priority: 2 },
       updatedFrom: { title: "Checkout fails on Safari", priority: 0 },
