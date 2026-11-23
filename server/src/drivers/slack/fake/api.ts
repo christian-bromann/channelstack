@@ -558,7 +558,7 @@ export function createSlackApi(
           user: bot(),
           conversation,
           team: store.team,
-          eventTs: ids.slackTs(conversation.id),
+          eventTs: ids.slackTs(),
         }),
       );
       return { channel: conversationObject(conversation) };

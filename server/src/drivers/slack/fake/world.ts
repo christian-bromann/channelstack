@@ -244,7 +244,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     },
   ): SlackMessageRecord => {
     const message: SlackMessageRecord = {
-      ts: ids.slackTs(conversation.id),
+      ts: ids.slackTs(),
       conversation: conversation.id,
       user: userId,
       text: body.text,
@@ -440,7 +440,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       const { app, team } = store;
       const previous = messageObject(message, author(message.user), team, app);
       Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next("slack.block")) });
-      const eventTs = ids.slackTs(conversation.id);
+      const eventTs = ids.slackTs();
       message.edited = eventTs;
       const current = messageObject(message, author(message.user), team, app);
       const id = emit(
@@ -455,11 +455,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     remove(conversation, message) {
       const previous = messageObject(message, author(message.user), store.team, store.app);
       store.removeMessage(conversation.id, message.ts);
-      emit(
-        conversation,
-        messageSubscription(conversation),
-        messageDeletedEvent(previous, conversation, ids.slackTs(conversation.id)),
-      );
+      emit(conversation, messageSubscription(conversation), messageDeletedEvent(previous, conversation, ids.slackTs()));
     },
 
     react(conversation, message, userId, emoji, direction) {
@@ -479,7 +475,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       return emit(
         conversation,
         direction === "add" ? "reaction_added" : "reaction_removed",
-        reactionEvent(direction, { user: userId, reaction: name, message, eventTs: ids.slackTs(conversation.id) }),
+        reactionEvent(direction, { user: userId, reaction: name, message, eventTs: ids.slackTs() }),
       );
     },
 
@@ -533,7 +529,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
             conversation,
             team: store.team,
             inviter: inviter.id,
-            eventTs: ids.slackTs(conversation.id),
+            eventTs: ids.slackTs(),
           }),
         );
       }
@@ -550,7 +546,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         user: id,
         conversation,
         team: store.team,
-        eventTs: ids.slackTs(conversation.id),
+        eventTs: ids.slackTs(),
       });
       if (id !== store.app.botUserId) conversation.members.delete(id);
       emit(conversation, "member_left_channel", event);

@@ -92,7 +92,7 @@ export class IdGenerator {
   readonly #clock: Clock;
   readonly #used = new Map<IdKind, Set<string>>();
   readonly #sequences = new Map<string, number>();
-  readonly #lastTs = new Map<string, number>();
+  #lastTs = 0;
   readonly #draw: Draw;
 
   constructor(options: { seed: number; clock: Clock }) {
@@ -150,19 +150,22 @@ export class IdGenerator {
     return `${teamKey}-${this.sequence(`linear.identifier:${teamKey}`)}`;
   }
 
-  /** A Slack message `ts`: epoch seconds and microseconds, strictly increasing per conversation. */
-  slackTs(conversation: string): string {
+  /**
+   * A Slack message `ts`: epoch seconds and microseconds. Strictly increasing across the world, so
+   * a `ts` is unique in its conversation and orders messages the way they were written.
+   */
+  slackTs(): string {
     const now = this.#clock();
     const candidate = Math.floor(now / 1000) * 1_000_000 + (now % 1000) * 1000 + this.#draw.int(0, 999);
-    const micros = Math.max(candidate, (this.#lastTs.get(conversation) ?? 0) + 1);
-    this.#lastTs.set(conversation, micros);
+    const micros = Math.max(candidate, this.#lastTs + 1);
+    this.#lastTs = micros;
     return `${Math.floor(micros / 1_000_000)}.${String(micros % 1_000_000).padStart(6, "0")}`;
   }
 
   /** Start sequences and `ts` over for a new world (`POST /reset`). Ids already handed out stay taken, so none repeats. */
   reset(): void {
     this.#sequences.clear();
-    this.#lastTs.clear();
+    this.#lastTs = 0;
   }
 
   #usedSet(kind: IdKind): Set<string> {
