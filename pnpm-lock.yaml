@@ -175,9 +175,6 @@ importers:
       '@chat-adapter/linear':
         specifier: 4.45.0
         version: 4.45.0(ai@7.0.177(zod@4.6.7))(graphql@17.1.0)(supports-color@7.2.0)(zod@4.6.7)
-      '@chat-adapter/notion':
-        specifier: 4.45.0
-        version: 4.45.0(ai@7.0.177(zod@4.6.7))(supports-color@7.2.0)(zod@4.6.7)
       '@chat-adapter/slack':
         specifier: 4.45.0
         version: 4.45.0(ai@7.0.177(zod@4.6.7))(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)(zod@4.6.7)
@@ -309,6 +306,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@notionhq/client':
+        specifier: 5.31.1
+        version: 5.31.1
 
 packages:
 
@@ -420,10 +421,6 @@ packages:
 
   '@chat-adapter/linear@4.45.0':
     resolution: {integrity: sha512-DTC6XfBp39/Jgy8BnyiAaAwFBczDuzfh5+vy1GVTvy6ozd6oC2pDq01FometAx1jdifb26zIm0cQjWc7dB+z3A==}
-    engines: {node: '>=20'}
-
-  '@chat-adapter/notion@4.45.0':
-    resolution: {integrity: sha512-9359dJV4CJRNUFUQSf7l4gnaO3dkyAHx0VUPksLMGBJ08xDA/3/A8xZ0fefmvzHpOoJ6/xXuDzwJAlTkslbR3Q==}
     engines: {node: '>=20'}
 
   '@chat-adapter/shared@4.45.0':
@@ -3660,16 +3657,6 @@ snapshots:
     transitivePeerDependencies:
       - ai
       - graphql
-      - supports-color
-      - workflow
-      - zod
-
-  '@chat-adapter/notion@4.45.0(ai@7.0.177(zod@4.6.7))(supports-color@7.2.0)(zod@4.6.7)':
-    dependencies:
-      '@chat-adapter/shared': 4.45.0(ai@7.0.177(zod@4.6.7))(supports-color@7.2.0)(zod@4.6.7)
-      chat: 4.45.0(ai@7.0.177(zod@4.6.7))(supports-color@7.2.0)(zod@4.6.7)
-    transitivePeerDependencies:
-      - ai
       - supports-color
       - workflow
       - zod

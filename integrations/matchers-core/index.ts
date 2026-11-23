@@ -28,6 +28,8 @@ export interface MatcherResult {
 export interface MatcherState {
   /** True under `.not`. */
   isNot: boolean;
+  /** The test framework's own equality, which understands asymmetric matchers (`expect.any(Number)`). */
+  equals?: (actual: unknown, expected: unknown) => boolean;
   /** Defaults from the integration's options. */
   timeout: Duration;
   quietFor: Duration;
@@ -173,10 +175,23 @@ async function sessionOf(subject: unknown): Promise<AgentSession | undefined> {
   throw new TypeError("This matcher needs an agent session or an issue");
 }
 
+/** A comment: GitHub and Linear call its text `body`, Notion calls it `text`. */
 interface Comment {
   readonly author: Author;
-  readonly body: string;
+  readonly body?: string;
+  readonly text?: string;
 }
+const commentText = (comment: Comment) => comment.body ?? comment.text ?? "";
+
+/** The text of each block of a Notion page, nested ones included: its rich text, or a child page's title. */
+const blockTexts = (blocks: readonly unknown[]): string[] =>
+  blocks.flatMap((raw) => {
+    const block = raw as { type?: string; children?: unknown[] } & Record<string, unknown>;
+    const data = (block.type ? block[block.type] : undefined) as
+      { rich_text?: Array<{ plain_text?: string }>; title?: string } | undefined;
+    const text = data?.rich_text ? data.rich_text.map((item) => item.plain_text ?? "").join("") : (data?.title ?? "");
+    return [text, ...blockTexts(block.children ?? [])];
+  });
 
 interface ReviewComment extends Comment {
   readonly path: string;
@@ -190,9 +205,9 @@ const commentsOf = (subject: unknown): Promise<readonly Comment[]> => {
   return handle.comments();
 };
 const commentFrom = (author: AuthorRef, text?: string | RegExp) => (comment: Comment) =>
-  fromMatches(comment.author, author) && textMatches(comment.body, text);
+  fromMatches(comment.author, author) && textMatches(commentText(comment), text);
 const written = (comments: readonly Comment[]) =>
-  listing(comments.map((comment) => `${comment.author.name}: ${comment.body}`));
+  listing(comments.map((comment) => `${comment.author.name}: ${commentText(comment)}`));
 
 export const matchers = {
   /** The thread (or DM) has at least one reply from this author. */
@@ -405,7 +420,7 @@ export const matchers = {
             (expected.path === undefined || comment.path === expected.path) &&
             (expected.line === undefined || comment.line === expected.line) &&
             (expected.from === undefined || fromMatches(comment.author, expected.from)) &&
-            textMatches(comment.body, expected.text),
+            textMatches(commentText(comment), expected.text),
         ),
       describe: (comments) =>
         `Expected ${state.isNot ? "no" : "a"} comment on the diff${wanted}. The diff has:\n${listing(comments.map((comment) => `${comment.author.name} on ${comment.path}:${comment.line}: ${comment.body}`))}`,
@@ -535,6 +550,31 @@ export const matchers = {
       holds: (assignee) => (user === undefined ? assignee === undefined : assignee?.id === user.id),
       describe: (assignee) =>
         `Expected the issue ${state.isNot ? "not " : ""}to be assigned to ${user?.name ?? "no one"}, it is assigned to ${assignee?.name ?? "no one"}`,
+    });
+  },
+
+  /** Subject: a Notion page. A block (at any depth) whose text matches. */
+  toHaveBlock(state: MatcherState, subject: unknown, text: string | RegExp, options?: Timing) {
+    const page = subject as { blocks(): Promise<unknown[]> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => blockTexts(await page.blocks()),
+      holds: (texts) => texts.some((line) => textMatches(line, text)),
+      describe: (texts) =>
+        `Expected the page ${state.isNot ? "not " : ""}to have a block matching ${show(text)}. Its blocks:\n${listing(texts)}`,
+    });
+  },
+
+  /** Subject: a Notion page. A property has this value; asymmetric matchers (`expect.any(Number)`) work. */
+  toHavePropertyValue(state: MatcherState, subject: unknown, name: string, expected: unknown, options?: Timing) {
+    const page = subject as { property(name: string): Promise<unknown> };
+    const equals = state.equals ?? ((a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b));
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => page.property(name),
+      holds: (value) => equals(value, expected),
+      describe: (value) =>
+        `Expected ${name} ${state.isNot ? "not " : ""}to be ${String(expected)}, it is ${JSON.stringify(value)}`,
     });
   },
 

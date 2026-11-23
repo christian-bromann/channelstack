@@ -31,10 +31,11 @@ beforeEach(async (context) => {
   };
   // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
   setFilesRoot(dirname(context.task.file.filepath));
-  [context.slack, context.github, context.linear] = await Promise.all([
+  [context.slack, context.github, context.linear, context.notion] = await Promise.all([
     session.slack(),
     session.github(),
     session.linear(),
+    session.notion(),
   ]);
 });
 
@@ -48,8 +49,13 @@ expect.extend(
   Object.fromEntries(
     (Object.keys(matchers) as MatcherName[]).map((name) => [
       name,
-      function (this: { isNot?: boolean }, subject: unknown, ...args: unknown[]) {
-        const state: MatcherState = { isNot: this.isNot === true, timeout: server.timeout, quietFor: server.quietFor };
+      function (this: { isNot?: boolean; equals?: MatcherState["equals"] }, subject: unknown, ...args: unknown[]) {
+        const state: MatcherState = {
+          isNot: this.isNot === true,
+          timeout: server.timeout,
+          quietFor: server.quietFor,
+          ...(this.equals ? { equals: this.equals } : {}),
+        };
         return (matchers[name] as (state: MatcherState, subject: unknown, ...rest: unknown[]) => unknown)(
           state,
           subject,

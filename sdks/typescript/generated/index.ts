@@ -620,6 +620,113 @@ export interface LinearApiCall {
   error?: string;
 }
 
+export type NotionPropertySchema = "title" | "rich_text" | "number" | "checkbox" | "date" | "people" | "url" | "email" | { select: string[] } | { multi_select: string[] } | { status: string[] } | { relation: NotionDatabase };
+
+export type NotionPropertyValue = string | number | boolean | string[] | { start: string; end?: string } | undefined;
+
+export type NotionPropertyValueWire = string | number | boolean | string[] | { start: string; end?: string } | null;
+
+function decodeNotionPropertyValue(ctx: HandleContext, data: NotionPropertyValueWire): NotionPropertyValue {
+  return (data === null ? undefined : data);
+}
+
+export type NotionDiscussions = NotionDiscussion[];
+
+export type NotionDiscussionsWire = NotionDiscussionData[];
+
+function decodeNotionDiscussions(ctx: HandleContext, data: NotionDiscussionsWire): NotionDiscussions {
+  return data.map((item) => new NotionDiscussion(ctx, item));
+}
+
+export type NotionBlocks = unknown[];
+
+export type NotionChildPages = NotionPage[];
+
+export type NotionChildPagesWire = NotionPageData[];
+
+function decodeNotionChildPages(ctx: HandleContext, data: NotionChildPagesWire): NotionChildPages {
+  return data.map((item) => new NotionPage(ctx, item));
+}
+
+export type NotionConnections = NotionIntegration[];
+
+export type NotionConnectionsWire = NotionIntegrationData[];
+
+function decodeNotionConnections(ctx: HandleContext, data: NotionConnectionsWire): NotionConnections {
+  return data.map((item) => new NotionIntegration(ctx, item));
+}
+
+export interface NotionTranscript {
+  entries: NotionTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface NotionTranscriptWire {
+  entries: NotionTranscriptEntry[];
+  text: string;
+}
+
+function decodeNotionTranscript(_ctx: HandleContext, data: NotionTranscriptWire): NotionTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface NotionTranscriptEntry {
+  id: string;
+  author: NotionPrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+}
+
+export interface NotionPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+export type NotionRows = NotionPage[];
+
+export type NotionRowsWire = NotionPageData[];
+
+function decodeNotionRows(ctx: HandleContext, data: NotionRowsWire): NotionRows {
+  return data.map((item) => new NotionPage(ctx, item));
+}
+
+export type NotionComments = NotionComment[];
+
+export type NotionCommentsWire = NotionCommentData[];
+
+function decodeNotionComments(ctx: HandleContext, data: NotionCommentsWire): NotionComments {
+  return data.map((item) => new NotionComment(ctx, item));
+}
+
+export type NotionDeliveries = NotionDelivery[];
+
+export type NotionDeliveriesWire = NotionDeliveryData[];
+
+function decodeNotionDeliveries(ctx: HandleContext, data: NotionDeliveriesWire): NotionDeliveries {
+  return data.map((item) => new NotionDelivery(ctx, item));
+}
+
+export type NotionApiCalls = NotionApiCall[];
+
+export interface NotionApiCall {
+  id: string;
+  channel: "notion";
+  operation: string;
+  method: string;
+  path: string;
+  at: string;
+  durationMs: number;
+  request?: unknown;
+  responseStatus: number;
+  response?: unknown;
+  error?: string;
+}
+
 export interface UiLoginLink {
   url: string;
 }
@@ -736,6 +843,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear`)) as LinearFixtureData;
     return new LinearFixture(ctx, data);
+  }
+
+  /** The Notion fixture: the agent's integration, and where the agent reaches the fake. Experimental. */
+  async notion(): Promise<NotionFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion`)) as NotionFixtureData;
+    return new NotionFixture(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3053,6 +3167,532 @@ export class LinearAgentActivity {
     this.action = data.action;
     this.ephemeral = data.ephemeral;
     this.createdAt = data.createdAt;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionFixture}. */
+export interface NotionFixtureData {
+  app: NotionIntegrationData;
+  apiUrl: string;
+}
+
+export class NotionFixture {
+  readonly app: NotionIntegration;
+  readonly apiUrl: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionFixtureData) {
+    this.#ctx = ctx;
+    this.app = new NotionIntegration(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+  }
+
+  /** Create a person in the workspace. Experimental. */
+  async createUser(options: { name: string; id?: string; email?: string; avatarUrl?: string }): Promise<NotionUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users`, { body: { name: options.name, id: options.id, email: options.email, avatarUrl: options.avatarUrl } })) as NotionUserData;
+    return new NotionUser(ctx, data);
+  }
+
+  /** Create a page as seed data: it sends no event. The integration sees it only through `connections`, its own or a parent's. Experimental. */
+  async createPage(options: { title: string; parent?: NotionPage; content?: string | unknown[]; icon?: string; connections?: NotionIntegration[]; createdBy?: NotionUser }): Promise<NotionPage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/pages`, { body: { title: options.title, parent: options.parent === undefined ? undefined : options.parent.id, content: options.content, icon: options.icon, connections: options.connections === undefined ? undefined : options.connections.map((item) => item.id), createdBy: options.createdBy === undefined ? undefined : options.createdBy.id } })) as NotionPageData;
+    return new NotionPage(ctx, data);
+  }
+
+  /** Create a database with its property schema and rows, as seed data. Experimental. */
+  async createDatabase(options: { title: string; parent?: NotionPage; properties: Record<string, NotionPropertySchema>; rows?: Array<Record<string, NotionPropertyValue>>; connections?: NotionIntegration[] }): Promise<NotionDatabase> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/databases`, { body: { title: options.title, parent: options.parent === undefined ? undefined : options.parent.id, properties: options.properties, rows: options.rows, connections: options.connections === undefined ? undefined : options.connections.map((item) => item.id) } })) as NotionDatabaseData;
+    return new NotionDatabase(ctx, data);
+  }
+
+  /** How long Notion holds `page.content_updated` to batch edits, for this session (fake only). Default one second. Experimental. */
+  async setContentUpdateDelay(delay: Duration): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/content-delay`, { body: { delay: parseDuration(delay) } });
+  }
+
+  /** Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created. Experimental. */
+  async sendVerification(): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/verification`)) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: NotionPage } = {}): Promise<NotionDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as NotionDeliveriesWire;
+    return decodeNotionDeliveries(ctx, data);
+  }
+
+  /** The REST calls the agent made about this session's pages, by the client's method name (`comments.create`). Experimental. */
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<NotionApiCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/calls`, { query: { operation: options.operation, error: options.error } })) as NotionApiCalls;
+    return data;
+  }
+
+  /** Wait for the next new API call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<NotionApiCall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionIntegration}. */
+export interface NotionIntegrationData {
+  id: string;
+  name: string;
+  kind: "app";
+  channel: "notion";
+  botUserId: string;
+  token: string;
+  webhookSecret: string;
+}
+
+export class NotionIntegration {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "app";
+  readonly channel: "notion";
+  readonly botUserId: string;
+  readonly token: string;
+  readonly webhookSecret: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionIntegrationData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.botUserId = data.botUserId;
+    this.token = data.token;
+    this.webhookSecret = data.webhookSecret;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionUser}. */
+export interface NotionUserData {
+  id: string;
+  name: string;
+  kind: "user";
+  channel: "notion";
+  email?: string;
+}
+
+export class NotionUser {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "user";
+  readonly channel: "notion";
+  readonly email: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.email = data.email;
+  }
+
+  /** Start a discussion on a page, or anchored to the block with `anchor` in its text. Sends `comment.created` if the integration can see the page. Experimental. */
+  async comment(text: string, options: { page: NotionPage; anchor?: string }): Promise<NotionComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/comment`, { body: { text, page: options.page.id, anchor: options.anchor } })) as NotionCommentData;
+    return new NotionComment(ctx, data);
+  }
+
+  /** Reply in a discussion. Sends `comment.created`. Experimental. */
+  async reply(text: string, options: { discussion: NotionDiscussion }): Promise<NotionComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/reply`, { body: { text, discussion: options.discussion.id } })) as NotionCommentData;
+    return new NotionComment(ctx, data);
+  }
+
+  /** Edit one of this person's comments. Sends `comment.updated`. Experimental. */
+  async editComment(text: string, options: { comment: NotionComment }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/edit-comment`, { body: { text, comment: options.comment.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Delete one of this person's comments. Sends `comment.deleted`. Experimental. */
+  async deleteComment(options: { comment: NotionComment }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/delete-comment`, { body: { comment: options.comment.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Resolve a discussion. Notion sends no event for it, and the API no longer lists its comments. Experimental. */
+  async resolve(options: { discussion: NotionDiscussion }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/resolve`, { body: { discussion: options.discussion.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Reopen a resolved discussion. Experimental. */
+  async reopen(options: { discussion: NotionDiscussion }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/reopen`, { body: { discussion: options.discussion.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Create a page as this person. Sends `page.created` if the integration can see it. Experimental. */
+  async createPage(page: { title: string; parent?: NotionPage; content?: string | unknown[]; icon?: string; connections?: NotionIntegration[] }): Promise<NotionPage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/pages`, { body: { page: { ...page, parent: page.parent === undefined ? undefined : page.parent.id, connections: page.connections === undefined ? undefined : page.connections.map((item) => item.id) } } })) as NotionPageData;
+    return new NotionPage(ctx, data);
+  }
+
+  /** Edit a page's body: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental. */
+  async edit(change: { append?: string | unknown[]; replace?: string | unknown[] }, options: { page: NotionPage }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/edit`, { body: { change, page: options.page.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Change a page's title. Sends `page.properties_updated`. Experimental. */
+  async rename(title: string, options: { page: NotionPage }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/rename`, { body: { title, page: options.page.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Mention the integration in the page body: in the block with `inBlock` in its text, or in a new paragraph. Sends `page.content_updated` after the batching delay. Experimental. */
+  async mention(integration: NotionIntegration, options: { page: NotionPage; inBlock?: string }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/mention`, { body: { integration: integration.id, page: options.page.id, inBlock: options.inBlock } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Set a property of a database row. Sends `page.properties_updated`. Experimental. */
+  async setProperty(name: string, value: NotionPropertyValue, options: { page: NotionPage }): Promise<NotionDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/set-property`, { body: { name, value, page: options.page.id } })) as NotionDeliveryData | null;
+    return (data === null ? undefined : new NotionDelivery(ctx, data));
+  }
+
+  /** Add a row to a database. Sends `page.created` if the integration can see the database. Experimental. */
+  async addRow(values: Record<string, NotionPropertyValue>, options: { database: NotionDatabase }): Promise<NotionPage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/rows`, { body: { values, database: options.database.id } })) as NotionPageData;
+    return new NotionPage(ctx, data);
+  }
+
+  /** Connect the integration to a page (Share → Connections): it sees the page and everything under it. Experimental. */
+  async connect(integration: NotionIntegration, options: { page: NotionPage }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/connect`, { body: { integration: integration.id, page: options.page.id } });
+  }
+
+  /** Remove the integration's connection from a page. Experimental. */
+  async disconnect(integration: NotionIntegration, options: { page: NotionPage }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users/${segment(this.id)}/disconnect`, { body: { integration: integration.id, page: options.page.id } });
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionPage}. */
+export interface NotionPageData {
+  id: string;
+  channel: "notion";
+  title: string;
+  url: string;
+}
+
+export class NotionPage {
+  readonly id: string;
+  readonly channel: "notion";
+  readonly title: string;
+  readonly url: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionPageData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.title = data.title;
+    this.url = data.url;
+  }
+
+  /** The page's discussions: on the page itself, and on its blocks. Experimental. */
+  async discussions(): Promise<NotionDiscussions> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/discussions`)) as NotionDiscussionsWire;
+    return decodeNotionDiscussions(ctx, data);
+  }
+
+  /** The page body as Markdown, once the agent is quiet. Experimental. */
+  async markdown(): Promise<string> {
+    const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/markdown`)) as string;
+    return data;
+  }
+
+  /** The page's blocks as the API has them, with nested blocks under `children`. Experimental. */
+  async blocks(): Promise<NotionBlocks> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/blocks`)) as NotionBlocks;
+    return data;
+  }
+
+  /** A property's value as a person reads it: text, a number, option names, ids. Experimental. */
+  async property(name: string): Promise<NotionPropertyValue> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/property`, { query: { name } })) as NotionPropertyValueWire;
+    return decodeNotionPropertyValue(ctx, data);
+  }
+
+  /** The pages directly under this page. Experimental. */
+  async children(): Promise<NotionChildPages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/children`)) as NotionChildPagesWire;
+    return decodeNotionChildPages(ctx, data);
+  }
+
+  /** The integrations that can see the page: connected to it or to a page above it. Experimental. */
+  async connections(): Promise<NotionConnections> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/connections`)) as NotionConnectionsWire;
+    return decodeNotionConnections(ctx, data);
+  }
+
+  /** The page and its discussions as a person reads them. Experimental. */
+  async transcript(): Promise<NotionTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages/${segment(this.id)}/transcript`)) as NotionTranscriptWire;
+    return decodeNotionTranscript(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionDatabase}. */
+export interface NotionDatabaseData {
+  id: string;
+  channel: "notion";
+  title: string;
+  url: string;
+}
+
+export class NotionDatabase {
+  readonly id: string;
+  readonly channel: "notion";
+  readonly title: string;
+  readonly url: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionDatabaseData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.title = data.title;
+    this.url = data.url;
+  }
+
+  /** The rows of a database, optionally only those whose properties have these values. Experimental. */
+  async rows(filter?: Record<string, NotionPropertyValue>): Promise<NotionRows> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/databases/${segment(this.id)}/rows`, { body: { filter } })) as NotionRowsWire;
+    return decodeNotionRows(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionDelivery}. */
+export interface NotionDeliveryData {
+  id: string;
+  channel: "notion";
+  type: string;
+  entity: { type: string; id: string };
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class NotionDelivery {
+  readonly id: string;
+  readonly channel: "notion";
+  readonly type: string;
+  readonly entity: { type: string; id: string };
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.type = data.type;
+    this.entity = data.entity;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<NotionDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries/${segment(this.id)}`)) as NotionDeliveryData;
+    return new NotionDelivery(ctx, data);
+  }
+
+  /** Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send the delivery again, signed with a token that isn't the subscription's. Experimental. */
+  async resend(options: { badSignature?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<NotionDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionComment}. */
+export interface NotionCommentData {
+  id: string;
+  discussion: NotionDiscussionData;
+  author: NotionUserData | NotionIntegrationData;
+  text: string;
+  createdAt: string;
+  delivery?: NotionDeliveryData;
+}
+
+export class NotionComment {
+  readonly id: string;
+  readonly discussion: NotionDiscussion;
+  readonly author: NotionUser | NotionIntegration;
+  readonly text: string;
+  readonly createdAt: string;
+  readonly delivery: NotionDelivery | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionCommentData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.discussion = new NotionDiscussion(ctx, data.discussion);
+    this.author = data.author.kind === "user" ? new NotionUser(ctx, data.author) : new NotionIntegration(ctx, data.author);
+    this.text = data.text;
+    this.createdAt = data.createdAt;
+    this.delivery = data.delivery === undefined ? undefined : new NotionDelivery(ctx, data.delivery);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link NotionDiscussion}. */
+export interface NotionDiscussionData {
+  id: string;
+  page: NotionPageData;
+  anchor?: string;
+}
+
+export class NotionDiscussion {
+  readonly id: string;
+  readonly page: NotionPage;
+  readonly anchor: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: NotionDiscussionData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.page = new NotionPage(ctx, data.page);
+    this.anchor = data.anchor;
+  }
+
+  /** The discussion's comments, oldest first. Experimental. */
+  async comments(): Promise<NotionComments> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/comments`)) as NotionCommentsWire;
+    return decodeNotionComments(ctx, data);
+  }
+
+  /** Whether the discussion is resolved. Experimental. */
+  async resolved(): Promise<boolean> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/resolved`)) as boolean;
+    return data;
+  }
+
+  /** The discussion as a person reads it. Experimental. */
+  async transcript(): Promise<NotionTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/discussions/${segment(this.id)}/transcript`)) as NotionTranscriptWire;
+    return decodeNotionTranscript(ctx, data);
+  }
+
+  /** Wait for the next new comment matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForComment(options: { from?: NotionUser | NotionIntegration | string } & WaitOptions = {}): Promise<NotionComment> {
+    return waitForNext(this.#seen, "waitForComment", () => this.comments(), (item) => fromMatches(item.author, options.from), describeWait("a comment", options.from), options);
+  }
+
+  /** The latest comment matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestComment(options: { from?: NotionUser | NotionIntegration | string } & QuietOptions = {}): Promise<NotionComment> {
+    return latestOnceQuiet(() => this.comments(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a comment", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

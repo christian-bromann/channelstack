@@ -37,7 +37,6 @@
     "@biomejs/biome": "2.6.8",
     "@chat-adapter/github": "4.45.0",
     "@chat-adapter/linear": "4.45.0",
-    "@chat-adapter/notion": "4.45.0",
     "@chat-adapter/slack": "4.45.0",
     "@chat-adapter/state-memory": "4.45.0",
     "@linear/sdk": "103.0.0",
