@@ -1,5 +1,6 @@
 import type { RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
+import { ID_FORMATS } from "../../../core/ids/index.ts";
 import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
@@ -50,7 +51,6 @@ const STATE_COLOR: Readonly<Record<LinearStateType, string>> = {
   completed: "#5e6ad2",
   canceled: "#95a2b3",
 };
-const TEAM_KEY = /^[A-Z][A-Z0-9]{0,6}$/;
 
 export interface LinearIssueInput {
   title: string;
@@ -649,7 +649,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     ) {
       // A generated key is unique in the world, so parallel tests never share an `ENG-1`.
       const key = input.key ?? ids.next("linear.teamKey");
-      if (!TEAM_KEY.test(key))
+      if (!ID_FORMATS["linear.teamKey"].accepts.test(key))
         throw new ProtocolError(
           "invalid_argument",
           `"${key}" is not a team key: 1 to 7 capital letters or digits, starting with a letter`,
