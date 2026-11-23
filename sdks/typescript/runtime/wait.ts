@@ -100,6 +100,11 @@ export function textMatches(text: string, expected: string | RegExp | undefined)
   return expected.test(text);
 }
 
+/** Text to find as it goes to the server: a string as it is, a `RegExp` as its source and flags. */
+export function patternOnWire(pattern: string | RegExp): string | { source: string; flags: string } {
+  return typeof pattern === "string" ? pattern : { source: pattern.source, flags: pattern.flags };
+}
+
 /** "a reply" → "a reply from my-agent", for timeout messages. */
 export function describeWait(what: string, from: Author | string | undefined): string {
   return from === undefined ? what : `${what} from ${typeof from === "string" ? from : from.name}`;

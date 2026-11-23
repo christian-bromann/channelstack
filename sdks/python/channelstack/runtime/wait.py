@@ -103,6 +103,14 @@ def from_matches(author: Author, from_: Author | str | None) -> bool:
     return author.id == from_.id
 
 
+def pattern_on_wire(pattern: str | re.Pattern[str]) -> str | dict[str, str]:
+    """Text to find as it goes to the server: a string as it is, a pattern as its source and flags."""
+    if isinstance(pattern, str):
+        return pattern
+    marks = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL}
+    return {"source": pattern.pattern, "flags": "".join(flag for flag, bit in marks.items() if pattern.flags & bit)}
+
+
 def describe_wait(what: str, from_: Author | str | None) -> str:
     """ "a reply" -> "a reply from my-agent", for timeout messages."""
     if from_ is None:

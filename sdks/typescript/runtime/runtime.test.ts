@@ -8,10 +8,10 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { connectWith, sessionOf } from "./client.ts";
 import { parseDuration } from "./duration.ts";
-import { readChanges, readTree, setFilesRoot } from "./files.ts";
+import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, segment, Transport } from "./transport.ts";
-import { untilQuiet, waitFor, waitForNext, WaitTimeoutError } from "./wait.ts";
+import { patternOnWire, untilQuiet, waitFor, waitForNext, WaitTimeoutError } from "./wait.ts";
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -120,6 +120,11 @@ describe("waiting", () => {
     expect((await waitForNext(seen, "w", read, response, "a response")).n).toBe(3);
     const prompt = (item: { type: string }) => item.type === "prompt";
     expect((await waitForNext(new Map(), "w", read, response, "a response", {}, prompt)).n).toBe(3);
+  });
+
+  test("a pattern goes to the server as its source and flags; a string as it is", () => {
+    expect(patternOnWire("Rate limits")).toBe("Rate limits");
+    expect(patternOnWire(/rate\s+limits/i)).toEqual({ source: "rate\\s+limits", flags: "i" });
   });
 
   test("an error from the read is not swallowed", async () => {
@@ -284,6 +289,15 @@ describe("files a test hands over", () => {
   };
   const text = (content: string | null) => (content === null ? null : Buffer.from(content, "base64").toString("utf8"));
   afterEach(() => setFilesRoot(undefined));
+
+  test("a document is its text: inline, or a fixture file's contents from the test's directory", () => {
+    const root = fixture();
+    setFilesRoot(root);
+    expect(readDocument("# inline")).toBe("# inline");
+    expect(readDocument({ path: "./web/README.md" })).toBe("# web\n");
+    const blocks = [{ type: "divider", divider: {} }];
+    expect(readDocument(blocks)).toBe(blocks);
+  });
 
   test("a directory is every file under it, by its path inside it", () => {
     const root = fixture();

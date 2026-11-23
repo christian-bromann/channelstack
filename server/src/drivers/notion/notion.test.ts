@@ -88,6 +88,16 @@ describe("the REST API", () => {
     expect(await get(`/pages/${page.id}/markdown`)).toBe("- one\n- [ ] ship it");
     const comment = await post(`/users/${ana.id}/comment`, { text: "@my-agent hi", page: page.id });
     expect(comment.text).toBe("@my-agent hi");
+    // Anchored by a pattern, as the SDKs send a RegExp.
+    const anchored = await post(`/users/${ana.id}/comment`, {
+      text: "this one",
+      page: page.id,
+      anchor: { source: "^-?\\s*ONE$", flags: "i" },
+    });
+    expect(anchored.discussion.anchor).toBe("one");
+    expect(
+      await refusal(post(`/users/${ana.id}/comment`, { text: "x", page: page.id, anchor: { source: "(", flags: "" } })),
+    ).toBe("invalid_argument");
     const created = await api("POST", "comments", {
       discussion_id: comment.discussion.id,
       rich_text: [{ type: "text", text: { content: "Hello Ana" } }],

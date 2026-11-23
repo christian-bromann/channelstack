@@ -140,8 +140,13 @@ const databaseRef = z.string().openapi(refTo("NotionDatabase"));
 const discussionRef = z.string().openapi(refTo("NotionDiscussion"));
 const commentRef = z.string().openapi(refTo("NotionComment"));
 const Content = z.union([z.string(), z.array(z.unknown())]).openapi({
-  description: "Markdown, or Notion block objects as the API takes them.",
+  description: "Markdown, or Notion block objects as the API takes them. SDKs also take a fixture file (`{ path }`).",
+  "x-channelstack-files": "document",
 });
+/** Text to find in a page: a string, or a pattern (SDKs send a `RegExp` as its source and flags). */
+const TextPattern = z
+  .union([z.string().min(1), z.object({ source: z.string().min(1), flags: z.string().regex(/^[imsu]*$/) })])
+  .openapi({ "x-channelstack-pattern": true });
 
 const UserParams = z.object({ user: pathParam("user") });
 const PageParams = z.object({ page: pathParam("page") });
@@ -372,7 +377,7 @@ export function registerNotionRoutes(
       "Start a discussion on a page, or anchored to the block with `anchor` in its text. Sends `comment.created` if the integration can see the page",
     params: UserParams,
     body: z
-      .object({ text: z.string().min(1), page: pageRef, anchor: z.string().min(1).optional() })
+      .object({ text: z.string().min(1), page: pageRef, anchor: TextPattern.optional() })
       .openapi("NotionCommentBody"),
     response: NotionComment,
     errors: ["not_found"],
@@ -546,7 +551,7 @@ export function registerNotionRoutes(
       "Mention the integration in the page body: in the block with `inBlock` in its text, or in a new paragraph. Sends `page.content_updated` after the batching delay",
     params: UserParams,
     body: z
-      .object({ integration: integrationRef, page: pageRef, inBlock: z.string().min(1).optional() })
+      .object({ integration: integrationRef, page: pageRef, inBlock: TextPattern.optional() })
       .openapi("NotionMentionBody"),
     response: NotionDelivery.nullable(),
     errors: ["not_found"],

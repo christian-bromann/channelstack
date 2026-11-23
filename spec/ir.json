@@ -10462,18 +10462,8 @@
             {
               "name": "content",
               "type": {
-                "kind": "union",
-                "types": [
-                  {
-                    "kind": "string"
-                  },
-                  {
-                    "kind": "array",
-                    "items": {
-                      "kind": "unknown"
-                    }
-                  }
-                ]
+                "kind": "files",
+                "mode": "document"
               },
               "optional": true,
               "in": "body"
@@ -10952,7 +10942,7 @@
             {
               "name": "anchor",
               "type": {
-                "kind": "string"
+                "kind": "pattern"
               },
               "optional": true,
               "in": "body"
@@ -11284,18 +11274,8 @@
                   {
                     "name": "content",
                     "type": {
-                      "kind": "union",
-                      "types": [
-                        {
-                          "kind": "string"
-                        },
-                        {
-                          "kind": "array",
-                          "items": {
-                            "kind": "unknown"
-                          }
-                        }
-                      ]
+                      "kind": "files",
+                      "mode": "document"
                     },
                     "optional": true
                   },
@@ -11368,36 +11348,16 @@
                   {
                     "name": "append",
                     "type": {
-                      "kind": "union",
-                      "types": [
-                        {
-                          "kind": "string"
-                        },
-                        {
-                          "kind": "array",
-                          "items": {
-                            "kind": "unknown"
-                          }
-                        }
-                      ]
+                      "kind": "files",
+                      "mode": "document"
                     },
                     "optional": true
                   },
                   {
                     "name": "replace",
                     "type": {
-                      "kind": "union",
-                      "types": [
-                        {
-                          "kind": "string"
-                        },
-                        {
-                          "kind": "array",
-                          "items": {
-                            "kind": "unknown"
-                          }
-                        }
-                      ]
+                      "kind": "files",
+                      "mode": "document"
                     },
                     "optional": true
                   }
@@ -11543,7 +11503,7 @@
             {
               "name": "inBlock",
               "type": {
-                "kind": "string"
+                "kind": "pattern"
               },
               "optional": true,
               "in": "body"

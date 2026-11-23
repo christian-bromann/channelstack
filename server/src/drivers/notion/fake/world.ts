@@ -60,6 +60,9 @@ const unseen = (kind: string, id: string) =>
 /** A property's value as a test gives it (`NotionPropertyValue`): plain values, option names, ids. */
 export type PlainValue = string | number | boolean | null | string[] | { start: string; end?: string | undefined };
 
+/** Text to find in a page: a string it contains, or a pattern. */
+type TextPattern = string | { source: string; flags: string };
+
 export interface PageInput {
   title: string;
   parent?: string | undefined;
@@ -777,9 +780,21 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   };
 
   /** The block of a page whose text has this in it: where a comment is anchored, or a mention goes. */
-  const blockWith = (page: NotionPageRecord, text: string): NotionBlockRecord => {
-    const found = allBlocks(page).find((block) => blockText(block).includes(text));
-    if (!found) throw new ProtocolError("not_found", `"${titleOf(page)}" has no block with "${text}" in it`);
+  const blockWith = (page: NotionPageRecord, text: TextPattern): NotionBlockRecord => {
+    let has: (block: string) => boolean;
+    if (typeof text === "string") has = (block) => block.includes(text);
+    else {
+      let pattern: RegExp;
+      try {
+        pattern = new RegExp(text.source, text.flags);
+      } catch {
+        throw new ProtocolError("invalid_argument", `/${text.source}/${text.flags} is not a pattern`);
+      }
+      has = (block) => pattern.test(block);
+    }
+    const found = allBlocks(page).find((block) => has(blockText(block)));
+    const named = typeof text === "string" ? `"${text}"` : `/${text.source}/${text.flags}`;
+    if (!found) throw new ProtocolError("not_found", `"${titleOf(page)}" has no block with ${named} in it`);
     return found;
   };
 
@@ -866,7 +881,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       return setProperties(session, page, { [property.name]: { type: "title", rich: [textItem(title)] } }, actor);
     },
     /** A person mentions the integration in the page body: in the block with this text, or a new paragraph. */
-    mention(session: string, page: NotionPageRecord, inBlock: string | undefined, actor: string) {
+    mention(session: string, page: NotionPageRecord, inBlock: TextPattern | undefined, actor: string) {
       const mention = userMention(store.bot.id, store.bot.name);
       if (inBlock === undefined) {
         append(session, { page }, [{ type: "paragraph", paragraph: { rich_text: [] } }], actor);
@@ -940,7 +955,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     },
 
     // Comments
-    comment(session: string, page: NotionPageRecord, rich: RichTextItem[], actor: string, anchor?: string) {
+    comment(session: string, page: NotionPageRecord, rich: RichTextItem[], actor: string, anchor?: TextPattern) {
       return startDiscussion(session, page, anchor === undefined ? undefined : blockWith(page, anchor), rich, actor);
     },
     /** `comments.create` for the integration: on a page, a block, or in a discussion. */

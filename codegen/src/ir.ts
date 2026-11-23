@@ -89,8 +89,12 @@ export type IrType =
   /**
    * Files a test hands over. SDKs take a directory, files on disk or inline contents and send
    * paths with base64 contents: a whole tree (`tree`), or changes where `null` deletes (`changes`).
+   * `document` is one text: inline, or a fixture file's contents (`{ path }`), sent as the text;
+   * anything else (structured content) is sent as it is.
    */
-  | { kind: "files"; mode: "tree" | "changes" }
+  | { kind: "files"; mode: "tree" | "changes" | "document" }
+  /** Text to find: a string, or a pattern (a `RegExp`), sent as `{ source, flags }`. */
+  | { kind: "pattern" }
   /** A named data type from `types`. */
   | { kind: "named"; name: string }
   /** In a response: the wire data of a handle, which SDKs wrap into the handle again. */
@@ -187,6 +191,9 @@ export function buildIr(openapi: Json): Ir {
         return { kind: "nullable", type: typeOf(target ?? {}, where) };
       }
     }
+    // Kinds the SDKs build from more than one shape: before the alternatives are read as a union.
+    if (schema["x-channelstack-pattern"] === true) return { kind: "pattern" };
+    if (schema["x-channelstack-files"] === "document") return { kind: "files", mode: "document" };
     const alternatives: Json[] | undefined = schema.oneOf ?? schema.anyOf;
     if (Array.isArray(alternatives)) {
       // "One of these, or null": the alternatives that aren't null, marked as nullable.

@@ -5142,7 +5142,8 @@
                 "items": {}
               }
             ],
-            "description": "Markdown, or Notion block objects as the API takes them."
+            "description": "Markdown, or Notion block objects as the API takes them. SDKs also take a fixture file (`{ path }`).",
+            "x-channelstack-files": "document"
           },
           "icon": {
             "type": "string"
@@ -5507,8 +5508,30 @@
             ]
           },
           "anchor": {
-            "type": "string",
-            "minLength": 1
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "flags": {
+                    "type": "string",
+                    "pattern": "^[imsu]*$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "flags"
+                ]
+              }
+            ],
+            "x-channelstack-pattern": true
           }
         },
         "required": [
@@ -5622,7 +5645,8 @@
                     "items": {}
                   }
                 ],
-                "description": "Markdown, or Notion block objects as the API takes them."
+                "description": "Markdown, or Notion block objects as the API takes them. SDKs also take a fixture file (`{ path }`).",
+                "x-channelstack-files": "document"
               },
               "icon": {
                 "type": "string"
@@ -5662,7 +5686,8 @@
                     "items": {}
                   }
                 ],
-                "description": "Markdown, or Notion block objects as the API takes them."
+                "description": "Markdown, or Notion block objects as the API takes them. SDKs also take a fixture file (`{ path }`).",
+                "x-channelstack-files": "document"
               },
               "replace": {
                 "anyOf": [
@@ -5674,7 +5699,8 @@
                     "items": {}
                   }
                 ],
-                "description": "Markdown, or Notion block objects as the API takes them."
+                "description": "Markdown, or Notion block objects as the API takes them. SDKs also take a fixture file (`{ path }`).",
+                "x-channelstack-files": "document"
               }
             }
           },
@@ -5725,8 +5751,30 @@
             ]
           },
           "inBlock": {
-            "type": "string",
-            "minLength": 1
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "flags": {
+                    "type": "string",
+                    "pattern": "^[imsu]*$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "flags"
+                ]
+              }
+            ],
+            "x-channelstack-pattern": true
           }
         },
         "required": [

@@ -41,6 +41,10 @@ Events are sparse, as Notion's are: the entity, its parent, who did it (`authors
 - **The integration's own changes come back as events,** with the bot in `authors`. Notion's documentation doesn't say either way; an agent has to ignore its own comments regardless, and the checks hold it to that. Unverified.
 - **The verification request is sent on demand** (`notion.sendVerification()`), not at start: Notion sends it once, when a subscription is created, and the agent then holds the token (`NOTION_VERIFICATION_TOKEN` from `channelstack env`).
 
+## Notion: content from a file, anchors by pattern
+
+`createPage({ content: { path } })` and `comment({ anchor: /…/ })`, `mention({ inBlock: /…/ })` are what the contract had from the start, so the generator gained two kinds for them instead of the contract losing them: `x-channelstack-files: "document"` (the SDK reads the fixture file, relative to the test, and sends its text; Markdown or block objects pass as they are) and `x-channelstack-pattern` (a `RegExp` goes as `{ source, flags }`, a string as it is). The server compiles the pattern and refuses one that isn't valid.
+
 ## Reference agents
 
 - Linear: `@linear/sdk` (`LinearWebhookClient`, `LinearClient`) and the Chat SDK's Linear adapter in agent-session mode, sharing their behaviour in `examples/agents/shared/linear.ts`.

@@ -49,8 +49,8 @@ export interface NotionUserOptions {
 export interface NotionPageOptions {
   title: string;
   parent?: NotionPage;
-  /** Initial content: Markdown, or Notion block objects as the API takes them. */
-  content?: string | unknown[];
+  /** Initial content: Markdown, a path to a `.md` fixture, or raw Notion block objects. */
+  content?: string | { path: string } | unknown[];
   icon?: string;
   connections?: NotionIntegration[];
   /** Shown as the page's creator. Defaults to a generated workspace owner. */
@@ -92,7 +92,7 @@ export interface NotionUser extends User {
    * Start a discussion: page-level, or anchored to the block containing `anchor`.
    * Sends `comment.created`.
    */
-  comment(text: RichText, where: { page: NotionPage; anchor?: string }): Promise<NotionComment>;
+  comment(text: RichText, where: { page: NotionPage; anchor?: string | RegExp }): Promise<NotionComment>;
   reply(text: RichText, where: { discussion: NotionDiscussion }): Promise<NotionComment>;
   editComment(text: RichText, target: { comment: NotionComment }): Promise<NotionDelivery | undefined>;
   deleteComment(target: { comment: NotionComment }): Promise<NotionDelivery | undefined>;
@@ -106,7 +106,7 @@ export interface NotionUser extends User {
   edit(change: { append?: string | unknown[]; replace?: string | unknown[] }, target: { page: NotionPage }): Promise<NotionDelivery | undefined>;
   rename(title: string, target: { page: NotionPage }): Promise<NotionDelivery | undefined>;
   /** Mention the integration inside the page body (not in a comment). */
-  mention(integration: NotionIntegration, where: { page: NotionPage; inBlock?: string }): Promise<NotionDelivery | undefined>;
+  mention(integration: NotionIntegration, where: { page: NotionPage; inBlock?: string | RegExp }): Promise<NotionDelivery | undefined>;
   setProperty(name: string, value: NotionPropertyValue, target: { page: NotionPage }): Promise<NotionDelivery | undefined>;
   addRow(values: Record<string, NotionPropertyValue>, where: { database: NotionDatabase }): Promise<NotionPage>;
   /** Connect an integration to a page (Share → Connections). */

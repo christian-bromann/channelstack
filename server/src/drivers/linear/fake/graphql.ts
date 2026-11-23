@@ -8,7 +8,6 @@ import {
   type GraphQLFieldResolver,
   type GraphQLOutputType,
   type GraphQLSchema,
-  isEnumType,
   isListType,
   isNonNullType,
   isObjectType,

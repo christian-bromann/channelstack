@@ -59,7 +59,9 @@ export function emitPython(ir: Ir): Map<string, string> {
         return short ? `${typeOf(short.type)} | dict[str, Any]` : "dict[str, Any]";
       }
       case "files":
-        return type.mode === "tree" ? "TreeInput" : "ChangesInput";
+        return { tree: "TreeInput", changes: "ChangesInput", document: "DocumentInput" }[type.mode];
+      case "pattern":
+        return "str | re.Pattern[str]";
       case "named":
       case "resource":
         return type.name;
@@ -146,6 +148,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     type.kind === "ref" ||
     type.kind === "duration" ||
     type.kind === "files" ||
+    type.kind === "pattern" ||
     (type.kind === "named" && isDataclass(type.name)) ||
     (type.kind === "array" && (type.oneOrMany === true || holdsRefs(type.items))) ||
     (type.kind === "object" && (type.shorthand !== undefined || type.fields.some((field) => holdsRefs(field.type))));
@@ -161,7 +164,9 @@ export function emitPython(ir: Ir): Map<string, string> {
         : `{${idFields.map((id) => `${JSON.stringify(id)}: ${expr}.${snakeCase(id)}`).join(", ")}}`;
     }
     if (type.kind === "duration") return `parse_duration(${expr})`;
-    if (type.kind === "files") return `${type.mode === "tree" ? "read_tree" : "read_changes"}(${expr})`;
+    if (type.kind === "files")
+      return `${{ tree: "read_tree", changes: "read_changes", document: "read_document" }[type.mode]}(${expr})`;
+    if (type.kind === "pattern") return `pattern_on_wire(${expr})`;
     if (type.kind === "array") {
       const list = type.oneOrMany ? `(${expr} if isinstance(${expr}, list) else [${expr}])` : expr;
       const item = encodeValue(type.items, "item");
@@ -419,12 +424,15 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...(usesText ? ["text_matches"] : []),
     ...(allMethods.some((m) => m.onceQuiet) ? ["until_quiet"] : []),
     ...(allWaits.length > 0 ? ["wait_for", "wait_for_next"] : []),
+    ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["pattern_on_wire"] : []),
   ];
+  const spec = JSON.stringify(ir);
   const lines = [
     `# ${BANNER}`,
     "# ruff: noqa",
     "from __future__ import annotations",
     "",
+    ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["import re"] : []),
     "from collections.abc import Awaitable, Callable",
     "from dataclasses import dataclass",
     "from typing import Any, Literal, Self",
@@ -434,7 +442,18 @@ export function emitPython(ir: Ir): Map<string, string> {
     ...(usesDurations || allWaits.length > 0
       ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
       : []),
-    ...(usesFiles ? ["from ..runtime.files import ChangesInput, TreeInput, read_changes, read_tree"] : []),
+    ...(usesFiles
+      ? [
+          `from ..runtime.files import ${[
+            ...(spec.includes('"mode":"changes"') ? ["ChangesInput"] : []),
+            ...(spec.includes('"mode":"document"') ? ["DocumentInput"] : []),
+            ...(spec.includes('"mode":"tree"') ? ["TreeInput"] : []),
+            ...(spec.includes('"mode":"changes"') ? ["read_changes"] : []),
+            ...(spec.includes('"mode":"document"') ? ["read_document"] : []),
+            ...(spec.includes('"mode":"tree"') ? ["read_tree"] : []),
+          ].join(", ")}`,
+        ]
+      : []),
     "from ..runtime.transport import ChannelstackError, Transport",
     ...(waitImports.length > 0 ? [`from ..runtime.wait import ${waitImports.join(", ")}`] : []),
     "",

@@ -2,6 +2,7 @@
 # ruff: noqa
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal, Self
@@ -9,9 +10,9 @@ from urllib.parse import quote
 
 from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
 from ..runtime.duration import Duration, parse_duration
-from ..runtime.files import ChangesInput, TreeInput, read_changes, read_tree
+from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes, read_document, read_tree
 from ..runtime.transport import ChannelstackError, Transport
-from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next
+from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
 __all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "ValidationFailedError", "connect"]
 
@@ -2436,10 +2437,10 @@ class NotionFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users", body={"name": name, "id": id, "email": email, "avatarUrl": avatar_url})
         return NotionUser(ctx, data)
 
-    async def create_page(self, *, title: str, parent: NotionPage | None = None, content: str | list[Any] | None = None, icon: str | None = None, connections: list[NotionIntegration] | None = None, created_by: NotionUser | None = None) -> NotionPage:
+    async def create_page(self, *, title: str, parent: NotionPage | None = None, content: DocumentInput | None = None, icon: str | None = None, connections: list[NotionIntegration] | None = None, created_by: NotionUser | None = None) -> NotionPage:
         """Create a page as seed data: it sends no event. The integration sees it only through `connections`, its own or a parent's. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/pages", body={"title": title, "parent": None if parent is None else parent.id, "content": content, "icon": icon, "connections": None if connections is None else [item.id for item in connections], "createdBy": None if created_by is None else created_by.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/pages", body={"title": title, "parent": None if parent is None else parent.id, "content": None if content is None else read_document(content), "icon": icon, "connections": None if connections is None else [item.id for item in connections], "createdBy": None if created_by is None else created_by.id})
         return NotionPage(ctx, data)
 
     async def create_database(self, *, title: str, parent: NotionPage | None = None, properties: dict[str, NotionPropertySchema], rows: list[dict[str, NotionPropertyValue]] | None = None, connections: list[NotionIntegration] | None = None) -> NotionDatabase:
@@ -2497,10 +2498,10 @@ class NotionUser:
         self.channel: Literal["notion"] = data["channel"]
         self.email: str | None = data.get("email")
 
-    async def comment(self, text: str, *, page: NotionPage, anchor: str | None = None) -> NotionComment:
+    async def comment(self, text: str, *, page: NotionPage, anchor: str | re.Pattern[str] | None = None) -> NotionComment:
         """Start a discussion on a page, or anchored to the block with `anchor` in its text. Sends `comment.created` if the integration can see the page. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/comment", body={"text": text, "page": page.id, "anchor": anchor})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/comment", body={"text": text, "page": page.id, "anchor": None if anchor is None else pattern_on_wire(anchor)})
         return NotionComment(ctx, data)
 
     async def reply(self, text: str, *, discussion: NotionDiscussion) -> NotionComment:
@@ -2536,13 +2537,13 @@ class NotionUser:
     async def create_page(self, page: dict[str, Any]) -> NotionPage:
         """Create a page as this person. Sends `page.created` if the integration can see it. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/pages", body={"page": {key: value for key, value in {**page, "parent": None if page.get("parent") is None else page["parent"].id, "connections": None if page.get("connections") is None else [item.id for item in page["connections"]]}.items() if value is not None}})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/pages", body={"page": {key: value for key, value in {**page, "parent": None if page.get("parent") is None else page["parent"].id, "content": None if page.get("content") is None else read_document(page["content"]), "connections": None if page.get("connections") is None else [item.id for item in page["connections"]]}.items() if value is not None}})
         return NotionPage(ctx, data)
 
     async def edit(self, change: dict[str, Any], *, page: NotionPage) -> NotionDelivery | None:
         """Edit a page's body: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/edit", body={"change": change, "page": page.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/edit", body={"change": {key: value for key, value in {**change, "append": None if change.get("append") is None else read_document(change["append"]), "replace": None if change.get("replace") is None else read_document(change["replace"])}.items() if value is not None}, "page": page.id})
         return (None if data is None else NotionDelivery(ctx, data))
 
     async def rename(self, title: str, *, page: NotionPage) -> NotionDelivery | None:
@@ -2551,10 +2552,10 @@ class NotionUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/rename", body={"title": title, "page": page.id})
         return (None if data is None else NotionDelivery(ctx, data))
 
-    async def mention(self, integration: NotionIntegration, *, page: NotionPage, in_block: str | None = None) -> NotionDelivery | None:
+    async def mention(self, integration: NotionIntegration, *, page: NotionPage, in_block: str | re.Pattern[str] | None = None) -> NotionDelivery | None:
         """Mention the integration in the page body: in the block with `inBlock` in its text, or in a new paragraph. Sends `page.content_updated` after the batching delay. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/mention", body={"integration": integration.id, "page": page.id, "inBlock": in_block})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/mention", body={"integration": integration.id, "page": page.id, "inBlock": None if in_block is None else pattern_on_wire(in_block)})
         return (None if data is None else NotionDelivery(ctx, data))
 
     async def set_property(self, name: str, value: NotionPropertyValue, *, page: NotionPage) -> NotionDelivery | None:

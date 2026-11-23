@@ -36,9 +36,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return short ? `${typeOf(short.type, side)} | ${whole}` : whole;
       }
       case "files":
+        if (type.mode === "document")
+          return side === "public" ? "string | { path: string } | unknown[]" : "string | unknown[]";
         if (side === "public")
           return type.mode === "tree" ? "string | FileInput[]" : "FileInput[] | Record<string, string | null>";
         return `Array<{ path: string; content: string${type.mode === "changes" ? " | null" : ""} }>`;
+      case "pattern":
+        return side === "public" ? "string | RegExp" : "string | { source: string; flags: string }";
       case "named":
         return side === "wire" && index.holdsResources(type) ? `${type.name}Wire` : type.name;
       case "resource":
@@ -120,6 +124,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     type.kind === "ref" ||
     type.kind === "duration" ||
     type.kind === "files" ||
+    type.kind === "pattern" ||
     (type.kind === "object" && type.shorthand !== undefined) ||
     (type.kind === "array" && type.oneOrMany === true) ||
     (type.kind === "array" && holdsRefs(type.items)) ||
@@ -133,7 +138,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
     }
     if (type.kind === "duration") return `parseDuration(${expr})`;
-    if (type.kind === "files") return `${type.mode === "tree" ? "readTree" : "readChanges"}(${expr})`;
+    if (type.kind === "files")
+      return `${{ tree: "readTree", changes: "readChanges", document: "readDocument" }[type.mode]}(${expr})`;
+    if (type.kind === "pattern") return `patternOnWire(${expr})`;
     if (type.kind === "array") {
       const list = type.oneOrMany ? `[${expr}].flat()` : expr;
       const item = encodeValue(type.items, "item");
@@ -402,15 +409,26 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ...(allWaits.some((w) => w.mode !== "latest") ? ["type WaitOptions"] : []),
     ...(allMethods.some((m) => m.retryWhile) ? ["retryWhile"] : []),
     ...(allMethods.some((m) => m.onceQuiet) ? ["untilQuiet"] : []),
+    ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["patternOnWire"] : []),
   ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
+  const spec = JSON.stringify(ir);
   const lines = [
     `// ${BANNER}`,
     `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
-    ...(usesFiles ? ['import { type FileInput, readChanges, readTree } from "../runtime/files.ts";'] : []),
+    ...(usesFiles
+      ? [
+          `import { ${[
+            ...(spec.includes('"mode":"tree"') || spec.includes('"mode":"changes"') ? ["type FileInput"] : []),
+            ...(spec.includes('"mode":"changes"') ? ["readChanges"] : []),
+            ...(spec.includes('"mode":"document"') ? ["readDocument"] : []),
+            ...(spec.includes('"mode":"tree"') ? ["readTree"] : []),
+          ].join(", ")} } from "../runtime/files.ts";`,
+        ]
+      : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
     `import { ${[...waitImports, "type QuietState"].join(", ")} } from "../runtime/wait.ts";`,
