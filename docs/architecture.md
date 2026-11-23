@@ -62,7 +62,7 @@ GET  /sessions/{sid}/slack/conversations/C08E1F2G3H4/threads/1732101234.567899/r
      → { replies, cursor }
 ```
 
-Objects the platform identifies by more than one value get nested paths: a Slack message is channel + `ts`, a GitHub issue is `repos/acme/web/issues/12`.
+Objects the platform identifies by more than one value get nested paths: a Slack message is channel + `ts`, a GitHub issue is a repository and a number, `repos/1034567890/issues/12` (the repository by its id: decision 0013).
 
 | Platform | Object | Fake id (same shape as the real one) |
 |---|---|---|

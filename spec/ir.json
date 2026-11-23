@@ -306,6 +306,35 @@
             "session_not_found"
           ],
           "dispose": false
+        },
+        {
+          "name": "github",
+          "kind": "factory",
+          "summary": "The GitHub fixture: the agent's App, the org, and where the agent reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -3795,6 +3824,4077 @@
           "dispose": true
         }
       ]
+    },
+    {
+      "name": "GitHubFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "org",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person in the org",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "login",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "id",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "email",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "role",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "member",
+                  "admin",
+                  "outside_collaborator"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createRepo",
+          "kind": "factory",
+          "summary": "Create a repository in the org. The App hears about it only when it is listed in `apps`: an App must be installed on a repository",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/repos",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "private",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "defaultBranch",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "files",
+              "type": {
+                "kind": "files",
+                "mode": "tree"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "collaborators",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "object",
+                  "fields": [
+                    {
+                      "name": "user",
+                      "type": {
+                        "kind": "ref",
+                        "resources": [
+                          "GitHubUser"
+                        ]
+                      },
+                      "optional": false
+                    },
+                    {
+                      "name": "permission",
+                      "type": {
+                        "kind": "enum",
+                        "values": [
+                          "read",
+                          "triage",
+                          "write",
+                          "maintain",
+                          "admin"
+                        ]
+                      },
+                      "optional": true
+                    }
+                  ],
+                  "shorthand": "user"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "apps",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GitHubApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "object",
+                  "fields": [
+                    {
+                      "name": "name",
+                      "type": {
+                        "kind": "string"
+                      },
+                      "optional": false
+                    },
+                    {
+                      "name": "color",
+                      "type": {
+                        "kind": "string"
+                      },
+                      "optional": true
+                    },
+                    {
+                      "name": "description",
+                      "type": {
+                        "kind": "string"
+                      },
+                      "optional": true
+                    }
+                  ],
+                  "shorthand": "name"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubRepo"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deliveries",
+          "kind": "method",
+          "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "type",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "resource",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "appCalls",
+          "kind": "method",
+          "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/app-calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubAppCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "named",
+            "name": "GitHubApiCall"
+          },
+          "filter": true,
+          "what": "an API call from the agent"
+        }
+      ]
+    },
+    {
+      "name": "GitHubApp",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        },
+        {
+          "name": "slug",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "botLogin",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "botUserId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "appId",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "privateKey",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "webhookSecret",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "installationId",
+          "kind": "method",
+          "summary": "The id of the App's installation, for a repository it is installed on",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/installation-id",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "integer"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GitHubUser",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "login",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "numericId",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "displayName",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "email",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "role",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "member",
+              "admin",
+              "outside_collaborator"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "push",
+          "kind": "method",
+          "summary": "Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/push",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "changes",
+              "type": {
+                "kind": "files",
+                "mode": "changes"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "branch",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "message",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubCommit"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "openIssue",
+          "kind": "method",
+          "summary": "Open an issue. Sends `issues` (action `opened`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/issues",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "labels",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "string"
+                      }
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "assignees",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "ref",
+                        "resources": [
+                          "GitHubUser",
+                          "GitHubApp"
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "openPullRequest",
+          "kind": "method",
+          "summary": "Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/pulls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "from",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "to",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "changes",
+                    "type": {
+                      "kind": "files",
+                      "mode": "changes"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "draft",
+                    "type": {
+                      "kind": "boolean"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "reviewers",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "ref",
+                        "resources": [
+                          "GitHubUser",
+                          "GitHubApp"
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubPullRequest"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "editIssue",
+          "kind": "method",
+          "summary": "Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/edit-issue",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "changes",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "close",
+          "kind": "method",
+          "summary": "Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/close",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reopen",
+          "kind": "method",
+          "summary": "Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/reopen",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "label",
+          "kind": "method",
+          "summary": "Put labels on an issue or a pull request. Sends one `labeled` event per label",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/label",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubLabelDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "unlabel",
+          "kind": "method",
+          "summary": "Take labels off an issue or a pull request. Sends one `unlabeled` event per label",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/unlabel",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubUnlabelDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "assign",
+          "kind": "method",
+          "summary": "Assign people or the App's bot. Sends one `assigned` event per assignee",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/assign",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "assignees",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GitHubUser",
+                    "GitHubApp"
+                  ]
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubAssignDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "comment",
+          "kind": "method",
+          "summary": "Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "summary": "Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/edit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment",
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "delete",
+          "kind": "method",
+          "summary": "Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/delete",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment",
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "react",
+          "kind": "method",
+          "summary": "React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/react",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "content",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "+1",
+                  "-1",
+                  "laugh",
+                  "confused",
+                  "heart",
+                  "hooray",
+                  "rocket",
+                  "eyes"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment",
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "minimize",
+          "kind": "method",
+          "summary": "Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/minimize",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "reason",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "OUTDATED",
+                  "SPAM",
+                  "OFF_TOPIC",
+                  "RESOLVED"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "review",
+          "kind": "method",
+          "summary": "Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/review",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "review",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "pr",
+                    "type": {
+                      "kind": "ref",
+                      "resources": [
+                        "GitHubPullRequest"
+                      ]
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "event",
+                    "type": {
+                      "kind": "enum",
+                      "values": [
+                        "COMMENT",
+                        "APPROVE",
+                        "REQUEST_CHANGES"
+                      ]
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "comments",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "object",
+                        "fields": [
+                          {
+                            "name": "path",
+                            "type": {
+                              "kind": "string"
+                            },
+                            "optional": false
+                          },
+                          {
+                            "name": "line",
+                            "type": {
+                              "kind": "integer"
+                            },
+                            "optional": false
+                          },
+                          {
+                            "name": "side",
+                            "type": {
+                              "kind": "enum",
+                              "values": [
+                                "LEFT",
+                                "RIGHT"
+                              ]
+                            },
+                            "optional": true
+                          },
+                          {
+                            "name": "startLine",
+                            "type": {
+                              "kind": "integer"
+                            },
+                            "optional": true
+                          },
+                          {
+                            "name": "body",
+                            "type": {
+                              "kind": "string"
+                            },
+                            "optional": false
+                          }
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubReview"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reviewComment",
+          "kind": "method",
+          "summary": "One comment on the diff, outside a review. Sends `pull_request_review_comment`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/review-comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "path",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "line",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "side",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "LEFT",
+                  "RIGHT"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubReviewComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "Reply in a thread on the diff. Sends `pull_request_review_comment`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubReviewComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resolve",
+          "kind": "method",
+          "summary": "Resolve a thread on the diff. Sends `pull_request_review_thread`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/resolve",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "unresolve",
+          "kind": "method",
+          "summary": "Reopen a thread on the diff. Sends `pull_request_review_thread`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/unresolve",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "requestReview",
+          "kind": "method",
+          "summary": "Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/request-review",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "reviewers",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GitHubUser",
+                    "GitHubApp"
+                  ]
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "markReady",
+          "kind": "method",
+          "summary": "Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/mark-ready",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "merge",
+          "kind": "method",
+          "summary": "Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/merge",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "method",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "merge",
+                  "squash",
+                  "rebase"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden",
+            "not_allowed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "rerun",
+          "kind": "method",
+          "summary": "Click \"Re-run\" on a check run. Sends `check_run` (action `rerequested`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/rerun",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "checkRun",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubCheckRun"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "requestAction",
+          "kind": "method",
+          "summary": "Click one of the buttons the App put on a check run. Sends `check_run` (action `requested_action`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/users/{user}/request-action",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "identifier",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "checkRun",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubCheckRun"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GitHubRepo",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "owner",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "fullName",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "defaultBranch",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "private",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "installApp",
+          "kind": "method",
+          "summary": "Install the App on this repository. Sends `installation_repositories`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/repos/{repo}/install",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubApp"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "uninstallApp",
+          "kind": "method",
+          "summary": "Take the App off this repository. Sends `installation_repositories`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/repos/{repo}/uninstall",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubApp"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "validation_failed"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "issue",
+          "kind": "method",
+          "summary": "An issue of this repository by its number",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issue",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "number",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "pullRequest",
+          "kind": "method",
+          "summary": "A pull request of this repository by its number",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pull",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "number",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubPullRequest"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "readFile",
+          "kind": "method",
+          "summary": "A file's text as it is on a branch (the default branch without `ref`), or nothing when it isn't there",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/file",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "path",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [
+            {
+              "name": "ref",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "string"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
+          "name": "commits",
+          "kind": "method",
+          "summary": "The commits of a branch (the default branch without `branch`), newest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/commits",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "branch",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubCommits"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GitHubDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "github"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "action",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "guid",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the delivery again, unchanged or signed with a secret that isn't the App's",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
+        }
+      ]
+    },
+    {
+      "name": "GitHubIssue",
+      "idFields": [
+        "repoId",
+        "number"
+      ],
+      "fields": [
+        {
+          "name": "repoId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "number",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "repo",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubRepo"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "GitHubUser"
+              },
+              {
+                "kind": "resource",
+                "name": "GitHubApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Read the issue again",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "title",
+          "kind": "method",
+          "summary": "The issue's title as it is now",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}/title",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "string"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "state",
+          "kind": "method",
+          "summary": "Open or closed, once the agent is quiet",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}/state",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "enum",
+            "values": [
+              "open",
+              "closed"
+            ]
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
+          "name": "labels",
+          "kind": "method",
+          "summary": "The names of the labels on it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}/labels",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "assignees",
+          "kind": "method",
+          "summary": "Who it is assigned to",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}/assignees",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "array",
+            "items": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "resource",
+                  "name": "GitHubUser"
+                },
+                {
+                  "kind": "resource",
+                  "name": "GitHubApp"
+                }
+              ],
+              "discriminator": "kind"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "comments",
+          "kind": "method",
+          "summary": "The comments of the conversation, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}/comments",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubComments"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The issue or pull request as a person reads it: description, comments, reviews and threads",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/issues/{number}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForComment",
+          "mode": "next",
+          "read": "comments",
+          "item": {
+            "kind": "resource",
+            "name": "GitHubComment"
+          },
+          "from": "author",
+          "text": "body",
+          "what": "a comment"
+        },
+        {
+          "name": "latestComment",
+          "mode": "latest",
+          "read": "comments",
+          "item": {
+            "kind": "resource",
+            "name": "GitHubComment"
+          },
+          "from": "author",
+          "what": "a comment"
+        }
+      ]
+    },
+    {
+      "name": "GitHubCommit",
+      "idFields": [
+        "repoId",
+        "sha"
+      ],
+      "fields": [
+        {
+          "name": "repoId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "sha",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "message",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "GitHubUser"
+              },
+              {
+                "kind": "resource",
+                "name": "GitHubApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": true
+        },
+        {
+          "name": "branch",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "committedAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "checkRuns",
+          "kind": "method",
+          "summary": "The check runs on this commit: the newest of each name",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/commits/{sha}/check-runs",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "sha",
+                "from": "self",
+                "field": "sha"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubCheckRuns"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "statuses",
+          "kind": "method",
+          "summary": "The commit statuses on this commit: the newest of each context",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/commits/{sha}/statuses",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "sha",
+                "from": "self",
+                "field": "sha"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubStatuses"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GitHubCheckRun",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "slug",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": false
+              }
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "headSha",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "queued",
+              "in_progress",
+              "completed"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "conclusion",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "success",
+              "failure",
+              "neutral",
+              "cancelled",
+              "skipped",
+              "timed_out",
+              "action_required"
+            ]
+          },
+          "optional": true
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "summary",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "annotations",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "path",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "startLine",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "endLine",
+                  "type": {
+                    "kind": "integer"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "level",
+                  "type": {
+                    "kind": "enum",
+                    "values": [
+                      "notice",
+                      "warning",
+                      "failure"
+                    ]
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "message",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                }
+              ]
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "actions",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "GitHubComment",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "issue",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubIssue"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "GitHubUser"
+              },
+              {
+                "kind": "resource",
+                "name": "GitHubApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "body",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Read a conversation comment again",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/comments/{comment}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reactions",
+          "kind": "method",
+          "summary": "The reactions on a conversation comment, by content",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/comments/{comment}/reactions",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubReactions"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GitHubReviewComment",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "pr",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubPullRequest"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "GitHubUser"
+              },
+              {
+                "kind": "resource",
+                "name": "GitHubApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "path",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "line",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "side",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "LEFT",
+              "RIGHT"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "body",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "The replies in this comment's thread, once the agent is quiet",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/review-comments/{comment}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubReviewCommentReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
+          "name": "resolved",
+          "kind": "method",
+          "summary": "Is this comment's thread resolved?",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/review-comments/{comment}/resolved",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "boolean"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "This comment's thread as a person reads it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/review-comments/{comment}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GitHubPullRequest",
+      "idFields": [
+        "repoId",
+        "number"
+      ],
+      "extends": "GitHubIssue",
+      "fields": [
+        {
+          "name": "repoId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "number",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "repo",
+          "type": {
+            "kind": "resource",
+            "name": "GitHubRepo"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "GitHubUser"
+              },
+              {
+                "kind": "resource",
+                "name": "GitHubApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "head",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "base",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Read the pull request again",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pulls/{number}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubPullRequest"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "headCommit",
+          "kind": "method",
+          "summary": "The newest commit of the pull request's branch, once the agent is quiet",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pulls/{number}/head-commit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubCommit"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
+          "name": "reviews",
+          "kind": "method",
+          "summary": "The submitted reviews, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pulls/{number}/reviews",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubReviews"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reviewComments",
+          "kind": "method",
+          "summary": "The comments on the diff, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pulls/{number}/review-comments",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubReviewComments"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "checkRuns",
+          "kind": "method",
+          "summary": "The check runs on the pull request's newest commit: the newest of each name",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pulls/{number}/check-runs",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubPullCheckRuns"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "merged",
+          "kind": "method",
+          "summary": "Has the pull request been merged?",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos/{repo}/pulls/{number}/merged",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "repo",
+                "from": "self",
+                "field": "repoId"
+              },
+              {
+                "name": "number",
+                "from": "self",
+                "field": "number"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "boolean"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
     }
   ],
   "types": [
@@ -4368,7 +8468,8 @@
             },
             "optional": true
           }
-        ]
+        ],
+        "shorthand": "text"
       }
     },
     {
@@ -4422,7 +8523,8 @@
             },
             "optional": true
           }
-        ]
+        ],
+        "shorthand": "label"
       }
     },
     {
@@ -4444,7 +8546,8 @@
             },
             "optional": true
           }
-        ]
+        ],
+        "shorthand": "label"
       }
     },
     {
@@ -4928,6 +9031,521 @@
       }
     },
     {
+      "name": "GitHubCommits",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubCommit"
+        }
+      }
+    },
+    {
+      "name": "GitHubCheckRuns",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubCheckRun"
+        }
+      }
+    },
+    {
+      "name": "GitHubStatuses",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "object",
+          "fields": [
+            {
+              "name": "context",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            },
+            {
+              "name": "state",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "pending",
+                  "success",
+                  "failure",
+                  "error"
+                ]
+              },
+              "optional": false
+            },
+            {
+              "name": "author",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "resource",
+                    "name": "GitHubUser"
+                  },
+                  {
+                    "kind": "resource",
+                    "name": "GitHubApp"
+                  }
+                ],
+                "discriminator": "kind"
+              },
+              "optional": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "GitHubLabelDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubDelivery"
+        }
+      }
+    },
+    {
+      "name": "GitHubUnlabelDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubDelivery"
+        }
+      }
+    },
+    {
+      "name": "GitHubAssignDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubDelivery"
+        }
+      }
+    },
+    {
+      "name": "GitHubReview",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "resource",
+                  "name": "GitHubUser"
+                },
+                {
+                  "kind": "resource",
+                  "name": "GitHubApp"
+                }
+              ],
+              "discriminator": "kind"
+            },
+            "optional": false
+          },
+          {
+            "name": "state",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "COMMENTED",
+                "APPROVED",
+                "CHANGES_REQUESTED",
+                "DISMISSED",
+                "PENDING"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "body",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "comments",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "resource",
+                "name": "GitHubReviewComment"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "delivery",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "GitHubComments",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubComment"
+        }
+      }
+    },
+    {
+      "name": "GitHubTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "GitHubTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "GitHubTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "GitHubPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "GitHubPrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "GitHubReviews",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GitHubReview"
+        }
+      }
+    },
+    {
+      "name": "GitHubReviewComments",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubReviewComment"
+        }
+      }
+    },
+    {
+      "name": "GitHubPullCheckRuns",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubCheckRun"
+        }
+      }
+    },
+    {
+      "name": "GitHubReactions",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GitHubReaction"
+        }
+      }
+    },
+    {
+      "name": "GitHubReaction",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "content",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "+1",
+                "-1",
+                "laugh",
+                "confused",
+                "heart",
+                "hooray",
+                "rocket",
+                "eyes"
+              ]
+            },
+            "optional": false
+          },
+          {
+            "name": "by",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "resource",
+                    "name": "GitHubUser"
+                  },
+                  {
+                    "kind": "resource",
+                    "name": "GitHubApp"
+                  }
+                ],
+                "discriminator": "kind"
+              }
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "GitHubReviewCommentReplies",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubReviewComment"
+        }
+      }
+    },
+    {
+      "name": "GitHubDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubDelivery"
+        }
+      }
+    },
+    {
+      "name": "GitHubAppCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GitHubApiCall"
+        }
+      }
+    },
+    {
+      "name": "GitHubApiCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "literal",
+              "value": "github"
+            },
+            "optional": false
+          },
+          {
+            "name": "operation",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "GitHubApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GitHubApiCall"
+        }
+      }
+    },
+    {
       "name": "UiLoginLink",
       "type": {
         "kind": "object",
@@ -4950,18 +9568,21 @@
     "cant_delete_message",
     "cant_update_message",
     "dispatch_failed",
+    "forbidden",
     "internal",
     "invalid_argument",
     "msg_too_long",
     "name_taken",
     "no_reaction",
     "no_text",
+    "not_allowed",
     "not_found",
     "not_in_channel",
     "not_in_room",
     "session_not_found",
     "split_view_unavailable",
     "stop_unavailable",
-    "unauthorized"
+    "unauthorized",
+    "validation_failed"
   ]
 }

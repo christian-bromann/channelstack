@@ -8,7 +8,7 @@ import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { type Clock, systemClock, systemTimers, type Timers } from "./core/clock/index.ts";
 import { DeliveryQueue } from "./core/delivery/index.ts";
 import { ProtocolError } from "./core/errors/index.ts";
-import { EventLog } from "./core/events/index.ts";
+import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
 import type { Logger } from "./core/log/index.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
@@ -260,6 +260,7 @@ export function createApp(options: AppOptions): App {
     stability: "stable",
     handler: () => {
       sessions.closeAll();
+      events.drop(WORLD_SCOPE);
       registry.clear();
       ids.reset();
       for (const driver of drivers) driver.fake.seed();

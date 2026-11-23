@@ -5,8 +5,6 @@
  * reads its configuration from the environment (`channelstack env` prints it): the Slack adapter
  * picks up `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and `SLACK_API_URL` by itself.
  */
-import { createServer, type IncomingHttpHeaders } from "node:http";
-
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { isValidSlackRequest } from "@slack/bolt";
@@ -26,6 +24,7 @@ import {
 } from "chat";
 
 import { answer, sendOrShorten, wantsWriting, writer } from "../shared/scripted-model.ts";
+import { serve } from "../shared/serve.ts";
 import { deployRequest, SUGGESTED_PROMPTS, texts } from "../shared/workflows.ts";
 
 const { SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, PORT } = process.env;
@@ -192,13 +191,13 @@ bot.onReaction(async (event) => {
 });
 
 /** Slack's request signature, checked with Slack's own verifier: an HMAC over the timestamp and the exact body. */
-const signedBySlack = (headers: IncomingHttpHeaders, body: string): boolean =>
+const signedBySlack = (headers: Headers, body: string): boolean =>
   isValidSlackRequest({
     signingSecret: SLACK_SIGNING_SECRET ?? "",
     body,
     headers: {
-      "x-slack-signature": String(headers["x-slack-signature"] ?? ""),
-      "x-slack-request-timestamp": Number(headers["x-slack-request-timestamp"] ?? 0),
+      "x-slack-signature": headers.get("x-slack-signature") ?? "",
+      "x-slack-request-timestamp": Number(headers.get("x-slack-request-timestamp") ?? 0),
     },
   });
 
@@ -206,8 +205,8 @@ const signedBySlack = (headers: IncomingHttpHeaders, body: string): boolean =>
  * Message shortcuts aren't something the Chat SDK handles, so this one is answered next to it:
  * "Create ticket" on a message files a ticket and says so in that message's thread.
  */
-async function shortcut(headers: IncomingHttpHeaders, body: string): Promise<Response | undefined> {
-  if (!String(headers["content-type"]).includes("form")) return undefined;
+async function shortcut(headers: Headers, body: string): Promise<Response | undefined> {
+  if (!(headers.get("content-type") ?? "").includes("form")) return undefined;
   const payload = new URLSearchParams(body).get("payload");
   if (!payload?.includes('"message_action"')) return undefined;
   if (!signedBySlack(headers, body)) return new Response("bad signature", { status: 401 });
@@ -226,19 +225,8 @@ async function shortcut(headers: IncomingHttpHeaders, body: string): Promise<Res
   return new Response("", { status: 200 });
 }
 
-// The Chat SDK speaks web-standard Request and Response; this is the smallest server around it.
-createServer(async (incoming, outgoing) => {
-  let body = "";
-  for await (const chunk of incoming) body += chunk;
-  const request = new Request(`http://${incoming.headers.host}${incoming.url}`, {
-    method: incoming.method ?? "GET",
-    headers: incoming.headers as Record<string, string>,
-    ...(incoming.method === "POST" ? { body } : {}),
-  });
-  const response =
-    incoming.url === "/slack/events"
-      ? ((await shortcut(incoming.headers, body)) ?? (await bot.webhooks.slack(request)))
-      : new Response("not found", { status: 404 });
-  outgoing.writeHead(response.status, Object.fromEntries(response.headers));
-  outgoing.end(Buffer.from(await response.arrayBuffer()));
-}).listen(Number(PORT), "127.0.0.1");
+serve(
+  Number(PORT),
+  "/slack/events",
+  async (request, body) => (await shortcut(request.headers, body)) ?? (await bot.webhooks.slack(request)),
+);

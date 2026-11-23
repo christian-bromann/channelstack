@@ -1,6 +1,8 @@
+import { dirname } from "node:path";
+
 import { afterEach, beforeEach, expect, inject } from "vitest";
 
-import { type Channelstack, connect, type Session, untilQuiet } from "../../sdks/typescript/client.ts";
+import { type Channelstack, connect, type Session, setFilesRoot, untilQuiet } from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
 
 /** Runs in every test worker: one client per worker, one session per test, and the matchers. */
@@ -27,7 +29,9 @@ beforeEach(async (context) => {
       untilQuiet(() => session.quiet(), { quietFor: server.quietFor, timeout: server.timeout, ...options }),
     reset: () => channelstack.reset(),
   };
-  context.slack = await session.slack();
+  // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
+  setFilesRoot(dirname(context.task.file.filepath));
+  [context.slack, context.github] = await Promise.all([session.slack(), session.github()]);
 });
 
 afterEach(async (context) => {

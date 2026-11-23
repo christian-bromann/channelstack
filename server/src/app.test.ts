@@ -35,7 +35,7 @@ describe("control API", () => {
     expect((await h.call("GET", "/status")).body).toEqual({
       ready: true,
       version: "0.0.0-test",
-      drivers: ["echo", "slack"],
+      drivers: ["echo", "slack", "github"],
     });
     for (const token of [null, "wrong-token-0123456789", `${TOKEN}x`]) {
       const refused = await h.call("GET", "/status", undefined, token);
@@ -289,7 +289,7 @@ describe("the echo pipeline", () => {
       new Request("http://127.0.0.1:4500/api/nope", { headers: { "x-forwarded-host": "echo.localhost" } }),
     );
     expect(await forwarded.json()).toEqual({ ok: false, error: "unknown_method" });
-    expect(h.app.hosts()).toEqual(["channelstack", "echo", "slack"]);
+    expect(h.app.hosts()).toEqual(["channelstack", "echo", "slack", "github"]);
     expect((await h.app.fetch(new Request("http://127.0.0.1:4500/elsewhere"))).status).toBe(404);
   });
 });

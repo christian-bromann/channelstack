@@ -154,6 +154,27 @@ async function stillOpen(subject: unknown): Promise<string[]> {
 const from = (author: AuthorRef, text?: string | RegExp) => (message: Message) =>
   fromMatches(message.author, author) && textMatches(message.text, text);
 
+interface Comment {
+  readonly author: Author;
+  readonly body: string;
+}
+
+interface ReviewComment extends Comment {
+  readonly path: string;
+  readonly line: number;
+}
+
+/** The comments of a subject that has a conversation: an issue, a pull request. */
+const commentsOf = (subject: unknown): Promise<readonly Comment[]> => {
+  const handle = subject as { comments?: () => Promise<Comment[]> };
+  if (typeof handle.comments !== "function") throw new TypeError("This matcher needs something with comments");
+  return handle.comments();
+};
+const commentFrom = (author: AuthorRef, text?: string | RegExp) => (comment: Comment) =>
+  fromMatches(comment.author, author) && textMatches(comment.body, text);
+const written = (comments: readonly Comment[]) =>
+  listing(comments.map((comment) => `${comment.author.name}: ${comment.body}`));
+
 export const matchers = {
   /** The thread (or DM) has at least one reply from this author. */
   toHaveReplyFrom(
@@ -310,6 +331,130 @@ export const matchers = {
       holds: (modals) => modals.some((modal) => textMatches(modal.title, title)),
       describe: (modals) =>
         `Expected ${state.isNot ? "no" : "a"} modal${title === undefined ? "" : ` titled ${show(title)}`} to have been opened. Opened: ${modals.length === 0 ? "none" : modals.map((modal) => JSON.stringify(modal.title)).join(", ")}`,
+    });
+  },
+
+  /** Subject: an issue or a pull request. At least one comment from this author in its conversation. */
+  toHaveCommentFrom(
+    state: MatcherState,
+    subject: unknown,
+    author: AuthorRef,
+    options?: Timing & { text?: string | RegExp },
+  ) {
+    const wanted = `a comment from ${nameOf(author)}${options?.text === undefined ? "" : ` matching ${show(options.text)}`}`;
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => commentsOf(subject),
+      holds: (comments) => comments.some(commentFrom(author, options?.text)),
+      describe: (comments) =>
+        `Expected ${state.isNot ? wanted.replace(/^a /, "no ") : wanted}. The conversation has:\n${written(comments)}`,
+    });
+  },
+
+  /** Exactly `count` comments from this author, checked once the agent is quiet. */
+  toHaveCommentsFrom(state: MatcherState, subject: unknown, author: AuthorRef, options: Timing & { count: number }) {
+    return settle(subject, state, options, {
+      onceQuiet: true,
+      read: () => commentsOf(subject),
+      holds: (comments) => comments.filter(commentFrom(author)).length === options.count,
+      describe: (comments) =>
+        `Expected ${state.isNot ? "not " : ""}exactly ${options.count} comments from ${nameOf(author)}, found ${comments.filter(commentFrom(author)).length}:\n${written(comments)}`,
+    });
+  },
+
+  /** Subject: a pull request. A comment on the diff, matched by every field that is given. */
+  toHaveReviewComment(
+    state: MatcherState,
+    subject: unknown,
+    expected: { path?: string; line?: number; from?: AuthorRef; text?: string | RegExp },
+    options?: Timing,
+  ) {
+    const pull = subject as { reviewComments(): Promise<ReviewComment[]> };
+    const wanted = [
+      expected.path === undefined
+        ? ""
+        : ` on ${expected.path}${expected.line === undefined ? "" : `:${expected.line}`}`,
+      expected.from === undefined ? "" : ` from ${nameOf(expected.from)}`,
+      expected.text === undefined ? "" : ` matching ${show(expected.text)}`,
+    ].join("");
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => pull.reviewComments(),
+      holds: (comments) =>
+        comments.some(
+          (comment) =>
+            (expected.path === undefined || comment.path === expected.path) &&
+            (expected.line === undefined || comment.line === expected.line) &&
+            (expected.from === undefined || fromMatches(comment.author, expected.from)) &&
+            textMatches(comment.body, expected.text),
+        ),
+      describe: (comments) =>
+        `Expected ${state.isNot ? "no" : "a"} comment on the diff${wanted}. The diff has:\n${listing(comments.map((comment) => `${comment.author.name} on ${comment.path}:${comment.line}: ${comment.body}`))}`,
+    });
+  },
+
+  /** Subject: a pull request. A review from this author, with this verdict if one is given. */
+  toHaveReviewFrom(state: MatcherState, subject: unknown, author: AuthorRef, options?: Timing & { state?: string }) {
+    const pull = subject as { reviews(): Promise<Array<{ author: Author; state: string; body: string }>> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => pull.reviews(),
+      holds: (reviews) =>
+        reviews.some(
+          (review) =>
+            fromMatches(review.author, author) && (options?.state === undefined || review.state === options.state),
+        ),
+      describe: (reviews) =>
+        `Expected ${state.isNot ? "no" : "a"} review from ${nameOf(author)}${options?.state === undefined ? "" : ` with state ${options.state}`}. Reviews there:\n${listing(reviews.map((review) => `${review.author.name}: ${review.state}${review.body === "" ? "" : ` ${JSON.stringify(review.body)}`}`))}`,
+    });
+  },
+
+  /** Subject: a pull request or a commit. A check run of this name, in this state if one is given. */
+  toHaveCheckRun(
+    state: MatcherState,
+    subject: unknown,
+    name: string | RegExp,
+    options?: Timing & { status?: string; conclusion?: string },
+  ) {
+    const target = subject as {
+      checkRuns(): Promise<Array<{ name: string; status: string; conclusion?: string | undefined }>>;
+    };
+    const wanted = [options?.status, options?.conclusion].filter((part) => part !== undefined).join(", ");
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => target.checkRuns(),
+      holds: (runs) =>
+        runs.some(
+          (run) =>
+            (typeof name === "string" ? run.name === name : textMatches(run.name, name)) &&
+            (options?.status === undefined || run.status === options.status) &&
+            (options?.conclusion === undefined || run.conclusion === options.conclusion),
+        ),
+      describe: (runs) =>
+        `Expected ${state.isNot ? "no" : "a"} check run ${show(name)}${wanted === "" ? "" : ` (${wanted})`}. Check runs there:\n${listing(runs.map((run) => `${run.name}: ${run.status}${run.conclusion === undefined ? "" : `, ${run.conclusion}`}`))}`,
+    });
+  },
+
+  /** Subject: an issue or a pull request. It has this label. */
+  toHaveLabel(state: MatcherState, subject: unknown, name: string, options?: Timing) {
+    const issue = subject as { labels(): Promise<string[]> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => issue.labels(),
+      holds: (labels) => labels.some((label) => label.toLowerCase() === name.toLowerCase()),
+      describe: (labels) =>
+        `Expected ${state.isNot ? "no" : "the"} label ${JSON.stringify(name)}. Labels there: ${labels.length === 0 ? "none" : labels.join(", ")}`,
+    });
+  },
+
+  /** Subject: a pull request. It has been merged. */
+  toBeMerged(state: MatcherState, subject: unknown, options?: Timing) {
+    const pull = subject as { merged(): Promise<boolean> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => pull.merged(),
+      holds: (merged) => merged,
+      describe: () => `Expected the pull request ${state.isNot ? "not " : ""}to be merged`,
     });
   },
 

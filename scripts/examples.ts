@@ -10,30 +10,55 @@ import { binaryPath } from "./lib/packages.ts";
 import { run } from "./lib/process.ts";
 import { withStack } from "./lib/stack.ts";
 
-/** The reference agents the examples run against, by name. */
-const AGENTS = {
-  "bolt-ai-sdk": join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts"),
-  "chat-sdk-slack": join(ROOT, "examples", "agents", "chat-sdk-slack", "agent.ts"),
+/** What each channel's reference agents run: its examples, and the tests that need a server and such an agent. */
+const CHANNELS = {
+  slack: {
+    examples: "api/examples/slack.test.ts",
+    /**
+     * What is enabled of the examples (docs/phases.md), as patterns on Vitest's full test names
+     * ("describe > test"): whole `describe` blocks, and single tests of blocks a later phase completes.
+     */
+    enabled: [
+      "mentions and threads > ",
+      "direct messages > ",
+      "buttons, menus, modals and commands > ",
+      "streaming, status and Stop > ",
+      "reactions, edits and deletes > ",
+      "inspecting what the agent did > ",
+      // Everything but the Socket Mode test, which needs an agent started in Socket Mode (exit check 2.2).
+      "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
+    ],
+    // Quiet and parallel sessions (not examples), and the standard checks as a developer adds them (exit check 2.3).
+    suites: ["test/acceptance/stack", "test/acceptance/checks/slack-checks.test.ts"],
+  },
+  github: {
+    examples: "api/examples/github.test.ts",
+    enabled: [
+      "issues > ",
+      "pull requests and reviews > ",
+      "pushes and check runs > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+    ],
+    // The standard checks as a developer adds them (exit check 3.4).
+    suites: ["test/acceptance/checks/github-checks.test.ts"],
+  },
 } as const;
 
-/**
- * What this phase has enabled of `api/examples/slack.test.ts` (docs/phases.md), as patterns on
- * Vitest's full test names ("describe > test"): whole `describe` blocks, and single tests of
- * blocks that later phases complete.
- */
-const ENABLED = [
-  "mentions and threads > ",
-  "direct messages > ",
-  "buttons, menus, modals and commands > ",
-  "streaming, status and Stop > ",
-  "reactions, edits and deletes > ",
-  "inspecting what the agent did > ",
-  // Everything but the Socket Mode test, which needs an agent started in Socket Mode (exit check 2.2).
-  "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
-];
+/** The reference agents the examples run against, by name: the channel they live in, and where they take webhooks. */
+const AGENTS = {
+  "bolt-ai-sdk": { channel: "slack", path: "/slack/events" },
+  "chat-sdk-slack": { channel: "slack", path: "/slack/events" },
+  probot: { channel: "github", path: "/api/github/webhooks" },
+  "chat-sdk-github": { channel: "github", path: "/api/webhooks/github" },
+} as const;
 
-/** Matches the full name ("describe > test") of every example test this phase has enabled. */
-export const ENABLED_TESTS = new RegExp(`^(${ENABLED.join("|")})`);
+/** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */
+export const ENABLED_TESTS = new RegExp(
+  `^(${Object.values(CHANNELS)
+    .flatMap((channel) => channel.enabled)
+    .join("|")})`,
+);
 
 export async function runExamples(
   options: { agents?: ReadonlyArray<keyof typeof AGENTS>; bin?: string } = {},
@@ -41,14 +66,14 @@ export async function runExamples(
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
   for (const name of options.agents ?? (Object.keys(AGENTS) as Array<keyof typeof AGENTS>)) {
+    const { channel, path } = AGENTS[name];
+    const { examples, enabled, suites } = CHANNELS[channel];
     console.log(`\napi/examples against ${name}`);
-    await withStack({ bin, agent: AGENTS[name], webhook: { driver: "slack", path: "/slack/events" } }, ({ env }) => {
+    const agent = join(ROOT, "examples", "agents", name, "agent.ts");
+    await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
       const vitest = ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts"];
-      run("pnpm", [...vitest, "api/examples", "-t", ENABLED_TESTS.source], { cwd: ROOT, env });
-      // The tests that need a server and an agent but aren't examples (quiet, parallel sessions).
-      run("pnpm", [...vitest, "test/acceptance/stack"], { cwd: ROOT, env });
-      // The standard checks, as a developer adds them to a suite (exit check 2.3).
-      run("pnpm", [...vitest, "test/acceptance/checks"], { cwd: ROOT, env });
+      run("pnpm", [...vitest, examples, "-t", `^(${enabled.join("|")})`], { cwd: ROOT, env });
+      for (const suite of suites) run("pnpm", [...vitest, suite], { cwd: ROOT, env });
     });
   }
 }

@@ -27,7 +27,7 @@ export interface TransportOptions {
 
 export interface RequestOptions {
   body?: unknown;
-  query?: Readonly<Record<string, string | boolean | undefined>>;
+  query?: Readonly<Record<string, string | number | boolean | undefined>>;
 }
 
 /** How long to keep retrying a connection that is refused, while the server starts. */
@@ -41,7 +41,7 @@ function isConnectionRefused(error: unknown): boolean {
 }
 
 /** One path segment, escaped. */
-export function segment(value: string): string {
+export function segment(value: string | number): string {
   return encodeURIComponent(value);
 }
 

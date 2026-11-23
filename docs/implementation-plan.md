@@ -143,7 +143,7 @@ POST /sessions/{sid}/slack/users/{user}/reply         { text, thread: { channel,
 POST /sessions/{sid}/slack/users/{user}/click         { button: label | { actionId }, message | thread } → { delivery: "Ev08G3H4J5K6" }
 POST /sessions/{sid}/slack/users/{user}/stop          { thread: { channel, ts } }                       → { delivery }
 GET  /sessions/{sid}/slack/conversations/{channel}/threads/{ts}/transcript?since=<cursor>              → { messages, cursor }
-GET  /sessions/{sid}/github/repos/{owner}/{repo}/issues/{number}/comments?since=<cursor>               → { comments, cursor }
+GET  /sessions/{sid}/github/repos/{repo}/issues/{number}/comments?since=<cursor>                       → { comments, cursor }
 GET  /sessions/{sid}/linear/issues/{identifier}/sessions                                               → { sessions }
 GET  /sessions/{sid}/events?since=<cursor>                                                             → { events, cursor }
 GET  /sessions/{sid}/slack/capabilities                                                                → per-action { fake, live, liveRequires }

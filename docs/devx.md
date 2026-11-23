@@ -71,7 +71,7 @@ Point the agent at it, using only options the SDKs already have. When the variab
 |---|---|---|
 | Slack (Bolt JS) | `clientOptions: { slackApiUrl }` | `SLACK_API_URL=https://slack.localhost/api/` |
 | Slack (Python) | `WebClient(base_url=...)` | the same |
-| GitHub (Octokit, Probot) | `baseUrl` | `GITHUB_API_URL=https://github.localhost` |
+| GitHub (Octokit, Probot) | `baseUrl` | `GITHUB_API_URL=https://github.localhost`, with `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY` (a PEM in one line), `GITHUB_WEBHOOK_SECRET`, `GITHUB_INSTALLATION_ID` |
 | Linear (`@linear/sdk`) | `apiUrl` | `LINEAR_API_URL=https://linear.localhost/graphql` |
 | Notion (`@notionhq/client`) | `baseUrl` | `NOTION_BASE_URL=https://notion.localhost` |
 | Chat SDK, Mastra, Flue | the adapter's API URL option | the same variables |

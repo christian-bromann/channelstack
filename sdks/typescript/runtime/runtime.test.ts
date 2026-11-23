@@ -1,10 +1,14 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
 
 import { connectWith, sessionOf } from "./client.ts";
 import { parseDuration } from "./duration.ts";
+import { readChanges, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, segment, Transport } from "./transport.ts";
 import { untilQuiet, waitFor, WaitTimeoutError } from "./wait.ts";
@@ -252,5 +256,65 @@ describe("the server binary", () => {
     expect(() => resolveServerBinary({})).toThrow(
       /optional dependency @channelstack\/server-.* isn't installed.*CHANNELSTACK_SERVER_BIN/,
     );
+  });
+});
+
+describe("files a test hands over", () => {
+  const fixture = () => {
+    const root = mkdtempSync(join(tmpdir(), "cs-files-"));
+    mkdirSync(join(root, "web", "src"), { recursive: true });
+    writeFileSync(join(root, "web", "README.md"), "# web\n");
+    writeFileSync(join(root, "web", "src", "app.ts"), "export {}\n");
+    return root;
+  };
+  const text = (content: string | null) => (content === null ? null : Buffer.from(content, "base64").toString("utf8"));
+  afterEach(() => setFilesRoot(undefined));
+
+  test("a directory is every file under it, by its path inside it", () => {
+    const root = fixture();
+    expect(readTree(join(root, "web")).map((file) => [file.path, text(file.content)])).toEqual([
+      ["README.md", "# web\n"],
+      ["src/app.ts", "export {}\n"],
+    ]);
+  });
+
+  test("a relative path starts from the root an integration set, or from the working directory", () => {
+    const root = fixture();
+    setFilesRoot(root);
+    expect(readTree("./web").map((file) => file.path)).toEqual(["README.md", "src/app.ts"]);
+    setFilesRoot(undefined);
+    expect(() => readTree("./web-that-is-not-in-the-working-directory")).toThrow(/ENOENT/);
+  });
+
+  test("a list takes inline contents, a file on disk under a name, and a directory under a prefix", () => {
+    const root = fixture();
+    const files = readTree([
+      { name: "notes.txt", content: "hi" },
+      { name: "bin/data", content: new Uint8Array([0, 255]) },
+      { path: join(root, "web", "README.md") },
+      { path: join(root, "web", "README.md"), name: "docs/README.md" },
+      { path: join(root, "web", "src"), name: "lib" },
+    ]);
+    expect(files.map((file) => file.path)).toEqual([
+      "notes.txt",
+      "bin/data",
+      "README.md",
+      "docs/README.md",
+      "lib/app.ts",
+    ]);
+    expect(Buffer.from(files[1]?.content ?? "", "base64")).toEqual(Buffer.from([0, 255]));
+  });
+
+  test("changes are a list of files, or a map of path to contents where null deletes", () => {
+    expect(
+      readChanges({ "src/app.ts": "export const x = 1\n", "old.ts": null }).map((file) => [
+        file.path,
+        text(file.content),
+      ]),
+    ).toEqual([
+      ["src/app.ts", "export const x = 1\n"],
+      ["old.ts", null],
+    ]);
+    expect(readChanges([{ name: "a.txt", content: "a" }])).toEqual([{ path: "a.txt", content: "YQ==" }]);
   });
 });

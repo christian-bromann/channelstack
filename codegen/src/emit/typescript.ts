@@ -30,16 +30,24 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       }
       case "record":
         return `Record<string, ${typeOf(type.values, side)}>`;
-      case "object":
-        return `{ ${fields(type.fields, side).join("; ")} }`;
+      case "object": {
+        const whole = `{ ${fields(type.fields, side).join("; ")} }`;
+        const short = side === "public" ? type.fields.find((field) => field.name === type.shorthand) : undefined;
+        return short ? `${typeOf(short.type, side)} | ${whole}` : whole;
+      }
+      case "files":
+        if (side === "public")
+          return type.mode === "tree" ? "string | FileInput[]" : "FileInput[] | Record<string, string | null>";
+        return `Array<{ path: string; content: string${type.mode === "changes" ? " | null" : ""} }>`;
       case "named":
         return side === "wire" && index.holdsResources(type) ? `${type.name}Wire` : type.name;
       case "resource":
         return side === "wire" ? `${type.name}Data` : type.name;
       case "ref": {
         if (side === "public") return type.resources.join(" | ");
-        const ids = index.refIdFields(type.resources);
-        return ids.length === 1 ? "string" : `{ ${ids.map((id) => `${id}: string`).join("; ")} }`;
+        const ids = index.refIds(type.resources);
+        const [only] = ids;
+        return ids.length === 1 && only ? typeOf(only.type, side) : `{ ${fields(ids, side).join("; ")} }`;
       }
       case "nullable":
         return `${typeOf(type.type, side)} | ${side === "wire" ? "null" : "undefined"}`;
@@ -50,6 +58,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
 
   const fields = (list: readonly IrField[], side: "public" | "wire") =>
     list.map((field) => `${field.name}${field.optional ? "?" : ""}: ${typeOf(field.type, side)}`);
+
+  /** An expression as the body of an arrow function: an object literal needs parentheses there. */
+  const returned = (expr: string): string => (expr.startsWith("{") ? `(${expr})` : expr);
 
   /** An expression that turns wire data into what SDK users see. */
   const decode = (type: IrType, expr: string): string => {
@@ -64,18 +75,28 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return `new ${type.name}(${context}, ${expr})`;
       }
       case "array":
-        return `${expr}.map((item) => ${decode(type.items, "item")})`;
+        return `${expr}.map((item) => ${returned(decode(type.items, "item"))})`;
       case "named":
         return `decode${type.name}(ctx, ${expr})`;
       case "nullable":
         return `(${expr} === null ? undefined : ${decode(type.type, expr)})`;
       case "record":
         return `Object.fromEntries(Object.entries(${expr}).map(([key, value]) => [key, ${decode(type.values, "value")}]))`;
-      case "object":
-        return `{ ...${expr}, ${type.fields
-          .filter((field) => index.holdsResources(field.type))
-          .map((field) => `${field.name}: ${decode(field.type, `${expr}.${field.name}`)}`)
-          .join(", ")} }`;
+      case "object": {
+        const converted = type.fields.filter((field) => index.holdsResources(field.type));
+        const optional = converted.filter((field) => field.optional);
+        // An optional field is taken out first, so one the server left out stays left out (and keeps its type).
+        const source = optional.length > 0 ? "rest" : expr;
+        const entries = converted.map((field) =>
+          field.optional
+            ? `...(${field.name} === undefined ? {} : { ${field.name}: ${decode(field.type, field.name)} })`
+            : `${field.name}: ${decode(field.type, `${source}.${field.name}`)}`,
+        );
+        const built = `{ ...${source}, ${entries.join(", ")} }`;
+        return optional.length > 0
+          ? `(({ ${optional.map((field) => field.name).join(", ")}, ...rest }: typeof ${expr}) => (${built}))(${expr})`
+          : built;
+      }
       case "union": {
         // Handle data in a union is told apart by its discriminator field, e.g. `kind: "user" | "app"`.
         const members = index.discriminated(type);
@@ -98,6 +119,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const holdsRefs = (type: IrType): boolean =>
     type.kind === "ref" ||
     type.kind === "duration" ||
+    type.kind === "files" ||
+    (type.kind === "object" && type.shorthand !== undefined) ||
     (type.kind === "array" && type.oneOrMany === true) ||
     (type.kind === "array" && holdsRefs(type.items)) ||
     (type.kind === "object" && type.fields.some((field) => holdsRefs(field.type)));
@@ -110,16 +133,25 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
     }
     if (type.kind === "duration") return `parseDuration(${expr})`;
+    if (type.kind === "files") return `${type.mode === "tree" ? "readTree" : "readChanges"}(${expr})`;
     if (type.kind === "array") {
       const list = type.oneOrMany ? `[${expr}].flat()` : expr;
       const item = encodeValue(type.items, "item");
-      return item === "item" ? list : `${list}.map((item) => ${item})`;
+      return item === "item" ? list : `${list}.map((item) => ${returned(item)})`;
     }
     if (type.kind === "object") {
       const converted = type.fields
         .filter((field) => holdsRefs(field.type))
         .map((field) => `${field.name}: ${encodeField(field, `${expr}.${field.name}`)}`);
-      return `{ ...${expr}, ${converted.join(", ")} }`;
+      const whole = converted.length > 0 ? `{ ...${expr}, ${converted.join(", ")} }` : expr;
+      const short = type.fields.find((field) => field.name === type.shorthand);
+      if (!short) return whole;
+      // The value of one field stands for the whole object: a handle, or a plain string.
+      const given =
+        short.type.kind === "ref"
+          ? short.type.resources.map((name) => `${expr} instanceof ${name}`).join(" || ")
+          : `typeof ${expr} === "string"`;
+      return `(${given} ? { ${short.name}: ${encodeValue(short.type, expr)} } : ${whole})`;
     }
     return expr;
   };
@@ -169,7 +201,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     return [
       "",
       `  /** ${m.summary}.${m.stability === "experimental" ? " Experimental." : ""} */`,
-      `  async ${m.name}(${parameters.join(", ")}): Promise<${returns}> {`,
+      `  ${index.inherits(resource, m.name) ? "override " : ""}async ${m.name}(${parameters.join(", ")}): Promise<${returns}> {`,
       "    const ctx = this.#ctx;",
       ...(m.onceQuiet ? ["    await untilQuiet(() => quietOf(ctx));"] : []),
       ...(m.returns
@@ -241,15 +273,18 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const disposable = !isRoot && index.disposer(resource) !== undefined;
     const waits = resource.waits ?? [];
     const seen = waits.some((w) => w.mode === "next") ? ["  readonly #seen = new Map<string, number>();"] : [];
-    const quiet = isRoot
-      ? []
-      : [
-          "",
-          "  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */",
-          "  [QUIET](): Promise<QuietState> {",
-          "    return quietOf(this.#ctx);",
-          "  }",
-        ];
+    const parent = resource.extends;
+    const own = index.ownFields(resource);
+    const quiet =
+      isRoot || parent !== undefined
+        ? []
+        : [
+            "",
+            "  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */",
+            "  [QUIET](): Promise<QuietState> {",
+            "    return quietOf(this.#ctx);",
+            "  }",
+          ];
     const tail = [
       ...resource.methods.flatMap((m) => method(resource, m)),
       ...waits.flatMap((w) => wait(resource, w)),
@@ -262,14 +297,14 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         ? []
         : [
             `/** Wire data of a {@link ${resource.name}}. */`,
-            `export interface ${resource.name}Data {`,
-            ...fields(resource.fields, "wire").map((f) => `  ${f};`),
+            `export interface ${resource.name}Data${parent === undefined ? "" : ` extends ${parent}Data`} {`,
+            ...fields(own, "wire").map((f) => `  ${f};`),
             "}",
             "",
           ]),
-      `export class ${resource.name}${isRoot ? " extends ClientBase" : disposable ? " implements AsyncDisposable" : ""} {`,
+      `export class ${resource.name}${isRoot ? " extends ClientBase" : parent !== undefined ? ` extends ${parent}` : disposable ? " implements AsyncDisposable" : ""} {`,
       // An optional field is always present on a handle, as undefined when the server didn't send it.
-      ...resource.fields.map(
+      ...own.map(
         (field) => `  readonly ${field.name}: ${typeOf(field.type, "public")}${field.optional ? " | undefined" : ""};`,
       ),
       "  readonly #ctx: HandleContext;",
@@ -284,8 +319,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
           ]
         : [
             `  constructor(ctx: HandleContext, data: ${resource.name}Data) {`,
+            ...(parent === undefined ? [] : ["    super(ctx, data);"]),
             "    this.#ctx = ctx;",
-            ...resource.fields.map((field) => {
+            ...own.map((field) => {
               const value = decode(field.type, `data.${field.name}`);
               const guarded =
                 field.optional && value !== `data.${field.name}`
@@ -326,6 +362,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
 
   const disposes = ir.resources.some((resource) => resource.name !== ir.root && index.disposer(resource) !== undefined);
   const usesDurations = JSON.stringify(ir).includes('"kind":"duration"');
+  const usesFiles = JSON.stringify(ir).includes('"kind":"files"');
   const allWaits = ir.resources.flatMap((resource) => resource.waits ?? []);
   const allMethods = ir.resources.flatMap((resource) => resource.methods);
   const waitImports = [
@@ -345,6 +382,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     `// ${BANNER}`,
     `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
+    ...(usesFiles ? ['import { type FileInput, readChanges, readTree } from "../runtime/files.ts";'] : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
     `import { ${[...waitImports, "type QuietState"].join(", ")} } from "../runtime/wait.ts";`,

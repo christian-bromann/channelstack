@@ -25,6 +25,12 @@ export class CursorList<T> {
   }
 }
 
+/**
+ * The scope of what belongs to no session: an app's calls about nothing a session owns (a GitHub
+ * App's own endpoints). It is a log like a session's, read the same way, and lives until the world is reset.
+ */
+export const WORLD_SCOPE = "world";
+
 export type EventKind = "action" | "delivery" | "delivery_attempt" | "api_call";
 
 /** An event in one line, for `channelstack tail` and the UI's inspector. */

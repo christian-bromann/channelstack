@@ -2016,6 +2016,1922 @@
           "type"
         ]
       },
+      "GitHubFixture": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/GitHubApp"
+          },
+          "apiUrl": {
+            "type": "string"
+          },
+          "org": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "app",
+          "apiUrl",
+          "org"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "GitHubApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ]
+          },
+          "slug": {
+            "type": "string"
+          },
+          "botLogin": {
+            "type": "string"
+          },
+          "botUserId": {
+            "type": "string"
+          },
+          "appId": {
+            "type": "integer"
+          },
+          "privateKey": {
+            "type": "string"
+          },
+          "webhookSecret": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "slug",
+          "botLogin",
+          "botUserId",
+          "appId",
+          "privateKey",
+          "webhookSecret"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The login: what an author is matched by."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "login": {
+            "type": "string"
+          },
+          "numericId": {
+            "type": "integer"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "admin",
+              "outside_collaborator"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "login",
+          "numericId",
+          "role"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubUserOptions": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "member",
+              "admin",
+              "outside_collaborator"
+            ]
+          }
+        },
+        "required": [
+          "login"
+        ]
+      },
+      "GitHubRepo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "defaultBranch": {
+            "type": "string"
+          },
+          "private": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "owner",
+          "name",
+          "fullName",
+          "defaultBranch",
+          "private"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubRepoOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "private": {
+            "type": "boolean"
+          },
+          "defaultBranch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ]
+            },
+            "x-channelstack-files": "tree"
+          },
+          "collaborators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "type": "string",
+                  "x-channelstack-ref": [
+                    "GitHubUser"
+                  ]
+                },
+                "permission": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "triage",
+                    "write",
+                    "maintain",
+                    "admin"
+                  ],
+                  "default": "write"
+                }
+              },
+              "required": [
+                "user"
+              ],
+              "x-channelstack-shorthand": "user"
+            }
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GitHubApp"
+              ]
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "color": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "x-channelstack-shorthand": "name"
+            }
+          }
+        }
+      },
+      "GitHubInstallationIdBody": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GitHubRepo"
+            ]
+          }
+        },
+        "required": [
+          "repo"
+        ]
+      },
+      "GitHubDelivery": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "github"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "`X-GitHub-Event`, e.g. `issue_comment`."
+          },
+          "action": {
+            "type": "string"
+          },
+          "guid": {
+            "type": "string",
+            "description": "`X-GitHub-Delivery`."
+          },
+          "payload": {},
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttempt"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "type",
+          "guid",
+          "attempts",
+          "status"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubInstallBody": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GitHubApp"
+            ]
+          }
+        },
+        "required": [
+          "app"
+        ]
+      },
+      "GitHubUninstallBody": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GitHubApp"
+            ]
+          }
+        },
+        "required": [
+          "app"
+        ]
+      },
+      "GitHubIssue": {
+        "type": "object",
+        "properties": {
+          "repoId": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "repo": {
+            "$ref": "#/components/schemas/GitHubRepo"
+          },
+          "url": {
+            "type": "string"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            }
+          }
+        },
+        "required": [
+          "repoId",
+          "number",
+          "repo",
+          "url",
+          "author"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "repoId",
+            "number"
+          ]
+        }
+      },
+      "GitHubPullRequest": {
+        "type": "object",
+        "properties": {
+          "repoId": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "repo": {
+            "$ref": "#/components/schemas/GitHubRepo"
+          },
+          "url": {
+            "type": "string"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            }
+          },
+          "head": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repoId",
+          "number",
+          "repo",
+          "url",
+          "author",
+          "head",
+          "base"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "repoId",
+            "number"
+          ],
+          "extends": "GitHubIssue"
+        }
+      },
+      "GitHubCommits": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubCommit"
+        }
+      },
+      "GitHubCommit": {
+        "type": "object",
+        "properties": {
+          "repoId": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            },
+            "description": "Absent when the commit's author is nobody on GitHub."
+          },
+          "branch": {
+            "type": "string"
+          },
+          "committedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "repoId",
+          "sha",
+          "message",
+          "branch",
+          "committedAt"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "repoId",
+            "sha"
+          ]
+        }
+      },
+      "GitHubCheckRuns": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubCheckRun"
+        }
+      },
+      "GitHubCheckRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "app": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "slug"
+            ]
+          },
+          "headSha": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "completed"
+            ]
+          },
+          "conclusion": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failure",
+              "neutral",
+              "cancelled",
+              "skipped",
+              "timed_out",
+              "action_required"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "startLine": {
+                  "type": "integer"
+                },
+                "endLine": {
+                  "type": "integer"
+                },
+                "level": {
+                  "type": "string",
+                  "enum": [
+                    "notice",
+                    "warning",
+                    "failure"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "startLine",
+                "endLine",
+                "level",
+                "message"
+              ]
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The identifiers of the buttons the App put on the run."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "app",
+          "headSha",
+          "status",
+          "annotations",
+          "actions"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubStatuses": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "success",
+                "failure",
+                "error"
+              ]
+            },
+            "author": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/GitHubUser"
+                },
+                {
+                  "$ref": "#/components/schemas/GitHubApp"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "user": "#/components/schemas/GitHubUser",
+                  "app": "#/components/schemas/GitHubApp"
+                }
+              }
+            }
+          },
+          "required": [
+            "context",
+            "state",
+            "author"
+          ]
+        }
+      },
+      "GitHubPushBody": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "content": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ]
+            },
+            "x-channelstack-files": "changes"
+          },
+          "repo": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GitHubRepo"
+            ]
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "changes",
+          "repo",
+          "branch"
+        ]
+      },
+      "GitHubOpenIssueBody": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "body": {
+                "type": "string"
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "assignees": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "x-channelstack-ref": [
+                    "GitHubUser",
+                    "GitHubApp"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "title"
+            ]
+          },
+          "repo": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GitHubRepo"
+            ]
+          }
+        },
+        "required": [
+          "issue",
+          "repo"
+        ]
+      },
+      "GitHubOpenPullRequestBody": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "content": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ]
+                },
+                "x-channelstack-files": "changes"
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "reviewers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "x-channelstack-ref": [
+                    "GitHubUser",
+                    "GitHubApp"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "from"
+            ]
+          },
+          "repo": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GitHubRepo"
+            ]
+          }
+        },
+        "required": [
+          "pr",
+          "repo"
+        ]
+      },
+      "GitHubEditIssueBody": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "body": {
+                "type": "string"
+              }
+            }
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "changes",
+          "issue"
+        ]
+      },
+      "GitHubCloseBody": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "issue"
+        ]
+      },
+      "GitHubReopenBody": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "issue"
+        ]
+      },
+      "GitHubLabelDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubDelivery"
+        }
+      },
+      "GitHubLabelBody": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "labels",
+          "issue"
+        ]
+      },
+      "GitHubUnlabelDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubDelivery"
+        }
+      },
+      "GitHubUnlabelBody": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "labels",
+          "issue"
+        ]
+      },
+      "GitHubAssignDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubDelivery"
+        }
+      },
+      "GitHubAssignBody": {
+        "type": "object",
+        "properties": {
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GitHubUser",
+                "GitHubApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "assignees",
+          "issue"
+        ]
+      },
+      "GitHubComment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          },
+          "issue": {
+            "$ref": "#/components/schemas/GitHubIssue"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            }
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/GitHubDelivery"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "issue",
+          "author",
+          "body",
+          "createdAt"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubCommentBody": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          }
+        },
+        "required": [
+          "body",
+          "issue"
+        ]
+      },
+      "GitHubEditBody": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubComment",
+              "GitHubReviewComment"
+            ]
+          }
+        },
+        "required": [
+          "body",
+          "comment"
+        ]
+      },
+      "GitHubDeleteBody": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubComment",
+              "GitHubReviewComment"
+            ]
+          }
+        },
+        "required": [
+          "comment"
+        ]
+      },
+      "GitHubReactBody": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "enum": [
+              "+1",
+              "-1",
+              "laugh",
+              "confused",
+              "heart",
+              "hooray",
+              "rocket",
+              "eyes"
+            ]
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubIssue"
+            ]
+          },
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubComment",
+              "GitHubReviewComment"
+            ]
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "GitHubMinimizeBody": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubComment"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "OUTDATED",
+              "SPAM",
+              "OFF_TOPIC",
+              "RESOLVED"
+            ],
+            "default": "OUTDATED"
+          }
+        },
+        "required": [
+          "comment"
+        ]
+      },
+      "GitHubReview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            }
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "COMMENTED",
+              "APPROVED",
+              "CHANGES_REQUESTED",
+              "DISMISSED",
+              "PENDING"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubReviewComment"
+            }
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/GitHubDelivery"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "state",
+          "body",
+          "comments"
+        ]
+      },
+      "GitHubReviewComment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "pr": {
+            "$ref": "#/components/schemas/GitHubPullRequest"
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GitHubUser"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubApp"
+              }
+            ],
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "user": "#/components/schemas/GitHubUser",
+                "app": "#/components/schemas/GitHubApp"
+              }
+            }
+          },
+          "path": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "LEFT",
+              "RIGHT"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/GitHubDelivery"
+          }
+        },
+        "required": [
+          "id",
+          "pr",
+          "author",
+          "path",
+          "line",
+          "side",
+          "body"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GitHubReviewBody": {
+        "type": "object",
+        "properties": {
+          "review": {
+            "type": "object",
+            "properties": {
+              "pr": {
+                "type": "object",
+                "properties": {
+                  "repoId": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "repoId",
+                  "number"
+                ],
+                "x-channelstack-ref": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "event": {
+                "type": "string",
+                "enum": [
+                  "COMMENT",
+                  "APPROVE",
+                  "REQUEST_CHANGES"
+                ]
+              },
+              "body": {
+                "type": "string"
+              },
+              "comments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "line": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": [
+                        "LEFT",
+                        "RIGHT"
+                      ]
+                    },
+                    "startLine": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "body": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "line",
+                    "body"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "pr",
+              "event"
+            ]
+          }
+        },
+        "required": [
+          "review"
+        ]
+      },
+      "GitHubReviewCommentBody": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pr": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubPullRequest"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "LEFT",
+              "RIGHT"
+            ]
+          }
+        },
+        "required": [
+          "body",
+          "pr",
+          "path",
+          "line"
+        ]
+      },
+      "GitHubReplyBody": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubReviewComment"
+            ]
+          }
+        },
+        "required": [
+          "body",
+          "comment"
+        ]
+      },
+      "GitHubResolveBody": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubReviewComment"
+            ]
+          }
+        },
+        "required": [
+          "comment"
+        ]
+      },
+      "GitHubUnresolveBody": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubReviewComment"
+            ]
+          }
+        },
+        "required": [
+          "comment"
+        ]
+      },
+      "GitHubRequestReviewBody": {
+        "type": "object",
+        "properties": {
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GitHubUser",
+                "GitHubApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          },
+          "pr": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubPullRequest"
+            ]
+          }
+        },
+        "required": [
+          "reviewers",
+          "pr"
+        ]
+      },
+      "GitHubMarkReadyBody": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubPullRequest"
+            ]
+          }
+        },
+        "required": [
+          "pr"
+        ]
+      },
+      "GitHubMergeBody": {
+        "type": "object",
+        "properties": {
+          "pr": {
+            "type": "object",
+            "properties": {
+              "repoId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "repoId",
+              "number"
+            ],
+            "x-channelstack-ref": [
+              "GitHubPullRequest"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "squash",
+              "rebase"
+            ],
+            "default": "merge"
+          }
+        },
+        "required": [
+          "pr"
+        ]
+      },
+      "GitHubRerunBody": {
+        "type": "object",
+        "properties": {
+          "checkRun": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubCheckRun"
+            ]
+          }
+        },
+        "required": [
+          "checkRun"
+        ]
+      },
+      "GitHubRequestActionBody": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checkRun": {
+            "type": "integer",
+            "x-channelstack-ref": [
+              "GitHubCheckRun"
+            ]
+          }
+        },
+        "required": [
+          "identifier",
+          "checkRun"
+        ]
+      },
+      "GitHubComments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubComment"
+        }
+      },
+      "GitHubTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubTranscriptEntry"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcript as plain text, one entry per line."
+          }
+        },
+        "required": [
+          "entries",
+          "text"
+        ],
+        "x-channelstack-string": "text"
+      },
+      "GitHubTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/GitHubPrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "edited",
+          "depth"
+        ]
+      },
+      "GitHubPrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "GitHubReviews": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubReview"
+        }
+      },
+      "GitHubReviewComments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubReviewComment"
+        }
+      },
+      "GitHubPullCheckRuns": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubCheckRun"
+        }
+      },
+      "GitHubReactions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubReaction"
+        }
+      },
+      "GitHubReaction": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "enum": [
+              "+1",
+              "-1",
+              "laugh",
+              "confused",
+              "heart",
+              "hooray",
+              "rocket",
+              "eyes"
+            ]
+          },
+          "by": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/GitHubUser"
+                },
+                {
+                  "$ref": "#/components/schemas/GitHubApp"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "user": "#/components/schemas/GitHubUser",
+                  "app": "#/components/schemas/GitHubApp"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "content",
+          "by"
+        ]
+      },
+      "GitHubReviewCommentReplies": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubReviewComment"
+        }
+      },
+      "GitHubDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubDelivery"
+        }
+      },
+      "GitHubResendBody": {
+        "type": "object",
+        "properties": {
+          "badSignature": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "GitHubAppCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubApiCall"
+        }
+      },
+      "GitHubApiCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "github"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "request": {},
+          "responseStatus": {
+            "type": "integer"
+          },
+          "response": {},
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "operation",
+          "method",
+          "path",
+          "at",
+          "durationMs",
+          "responseStatus"
+        ]
+      },
+      "GitHubApiCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GitHubApiCall"
+        }
+      },
       "UiLoginLink": {
         "type": "object",
         "properties": {
@@ -6429,6 +8345,4587 @@
         "responses": {
           "204": {
             "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github": {
+      "get": {
+        "summary": "The GitHub fixture: the agent's App, the org, and where the agent reaches the fake",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "github"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users": {
+      "post": {
+        "summary": "Create a person in the org",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "GitHubFixture",
+          "name": "createUser",
+          "options": [
+            "login",
+            "id",
+            "name",
+            "email",
+            "role"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubUserOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos": {
+      "post": {
+        "summary": "Create a repository in the org. The App hears about it only when it is listed in `apps`: an App must be installed on a repository",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "GitHubFixture",
+          "name": "createRepo",
+          "options": [
+            "name",
+            "private",
+            "defaultBranch",
+            "files",
+            "collaborators",
+            "apps",
+            "labels"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubRepoOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubRepo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/installation-id": {
+      "post": {
+        "summary": "The id of the App's installation, for a repository it is installed on",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubApp",
+          "name": "installationId",
+          "args": [
+            "repo"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubInstallationIdBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/install": {
+      "post": {
+        "summary": "Install the App on this repository. Sends `installation_repositories`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubRepo",
+          "name": "installApp",
+          "args": [
+            "app"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubInstallBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/uninstall": {
+      "post": {
+        "summary": "Take the App off this repository. Sends `installation_repositories`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubRepo",
+          "name": "uninstallApp",
+          "args": [
+            "app"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubUninstallBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issue": {
+      "get": {
+        "summary": "An issue of this repository by its number",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubRepo",
+          "name": "issue",
+          "args": [
+            "number"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": true,
+            "name": "number",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubIssue"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pull": {
+      "get": {
+        "summary": "A pull request of this repository by its number",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubRepo",
+          "name": "pullRequest",
+          "args": [
+            "number"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": true,
+            "name": "number",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubPullRequest"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/file": {
+      "get": {
+        "summary": "A file's text as it is on a branch (the default branch without `ref`), or nothing when it isn't there",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubRepo",
+          "name": "readFile",
+          "args": [
+            "path"
+          ],
+          "options": [
+            "ref"
+          ],
+          "onceQuiet": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "path",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "ref",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/commits": {
+      "get": {
+        "summary": "The commits of a branch (the default branch without `branch`), newest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubRepo",
+          "name": "commits",
+          "options": [
+            "branch"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "branch",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubCommits"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/commits/{sha}/check-runs": {
+      "get": {
+        "summary": "The check runs on this commit: the newest of each name",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubCommit",
+          "name": "checkRuns",
+          "bind": {
+            "repo": "repoId",
+            "sha": "sha"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "sha",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubCheckRuns"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/commits/{sha}/statuses": {
+      "get": {
+        "summary": "The commit statuses on this commit: the newest of each context",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubCommit",
+          "name": "statuses",
+          "bind": {
+            "repo": "repoId",
+            "sha": "sha"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "sha",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubStatuses"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/push": {
+      "post": {
+        "summary": "Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "push",
+          "args": [
+            "changes"
+          ],
+          "options": [
+            "repo",
+            "branch",
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubPushBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubCommit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/issues": {
+      "post": {
+        "summary": "Open an issue. Sends `issues` (action `opened`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "openIssue",
+          "args": [
+            "issue"
+          ],
+          "options": [
+            "repo"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubOpenIssueBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubIssue"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/pulls": {
+      "post": {
+        "summary": "Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "openPullRequest",
+          "args": [
+            "pr"
+          ],
+          "options": [
+            "repo"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubOpenPullRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubPullRequest"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/edit-issue": {
+      "post": {
+        "summary": "Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "editIssue",
+          "args": [
+            "changes"
+          ],
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubEditIssueBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/close": {
+      "post": {
+        "summary": "Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "close",
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubCloseBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/reopen": {
+      "post": {
+        "summary": "Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "reopen",
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubReopenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/label": {
+      "post": {
+        "summary": "Put labels on an issue or a pull request. Sends one `labeled` event per label",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "label",
+          "args": [
+            "labels"
+          ],
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubLabelBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubLabelDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/unlabel": {
+      "post": {
+        "summary": "Take labels off an issue or a pull request. Sends one `unlabeled` event per label",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "unlabel",
+          "args": [
+            "labels"
+          ],
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubUnlabelBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubUnlabelDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/assign": {
+      "post": {
+        "summary": "Assign people or the App's bot. Sends one `assigned` event per assignee",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "assign",
+          "args": [
+            "assignees"
+          ],
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubAssignBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubAssignDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/comment": {
+      "post": {
+        "summary": "Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "comment",
+          "args": [
+            "body"
+          ],
+          "options": [
+            "issue"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubCommentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubComment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/edit": {
+      "post": {
+        "summary": "Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "edit",
+          "args": [
+            "body"
+          ],
+          "options": [
+            "comment"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubEditBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/delete": {
+      "post": {
+        "summary": "Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "delete",
+          "options": [
+            "comment"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubDeleteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/react": {
+      "post": {
+        "summary": "React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "react",
+          "args": [
+            "content"
+          ],
+          "options": [
+            "issue",
+            "comment"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubReactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/minimize": {
+      "post": {
+        "summary": "Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "minimize",
+          "options": [
+            "comment",
+            "reason"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubMinimizeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/review": {
+      "post": {
+        "summary": "Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "review",
+          "args": [
+            "review"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubReviewBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/review-comment": {
+      "post": {
+        "summary": "One comment on the diff, outside a review. Sends `pull_request_review_comment`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "reviewComment",
+          "args": [
+            "body"
+          ],
+          "options": [
+            "pr",
+            "path",
+            "line",
+            "side"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubReviewCommentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReviewComment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/reply": {
+      "post": {
+        "summary": "Reply in a thread on the diff. Sends `pull_request_review_comment`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "reply",
+          "args": [
+            "body"
+          ],
+          "options": [
+            "comment"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReviewComment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/resolve": {
+      "post": {
+        "summary": "Resolve a thread on the diff. Sends `pull_request_review_thread`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "resolve",
+          "options": [
+            "comment"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubResolveBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/unresolve": {
+      "post": {
+        "summary": "Reopen a thread on the diff. Sends `pull_request_review_thread`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "unresolve",
+          "options": [
+            "comment"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubUnresolveBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/request-review": {
+      "post": {
+        "summary": "Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "requestReview",
+          "args": [
+            "reviewers"
+          ],
+          "options": [
+            "pr"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubRequestReviewBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/mark-ready": {
+      "post": {
+        "summary": "Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "markReady",
+          "options": [
+            "pr"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "validation_failed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubMarkReadyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/merge": {
+      "post": {
+        "summary": "Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "merge",
+          "options": [
+            "pr",
+            "method"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden",
+          "not_allowed"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubMergeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/rerun": {
+      "post": {
+        "summary": "Click \"Re-run\" on a check run. Sends `check_run` (action `rerequested`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "rerun",
+          "options": [
+            "checkRun"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubRerunBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/users/{user}/request-action": {
+      "post": {
+        "summary": "Click one of the buttons the App put on a check run. Sends `check_run` (action `requested_action`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubUser",
+          "name": "requestAction",
+          "args": [
+            "identifier"
+          ],
+          "options": [
+            "checkRun"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found",
+          "forbidden"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubRequestActionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}": {
+      "get": {
+        "summary": "Read the issue again",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "refresh",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubIssue"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}/title": {
+      "get": {
+        "summary": "The issue's title as it is now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "title",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}/state": {
+      "get": {
+        "summary": "Open or closed, once the agent is quiet",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "state",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          },
+          "onceQuiet": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "closed"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}/labels": {
+      "get": {
+        "summary": "The names of the labels on it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "labels",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}/assignees": {
+      "get": {
+        "summary": "Who it is assigned to",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "assignees",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/GitHubUser"
+                      },
+                      {
+                        "$ref": "#/components/schemas/GitHubApp"
+                      }
+                    ],
+                    "discriminator": {
+                      "propertyName": "kind",
+                      "mapping": {
+                        "user": "#/components/schemas/GitHubUser",
+                        "app": "#/components/schemas/GitHubApp"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}/comments": {
+      "get": {
+        "summary": "The comments of the conversation, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "comments",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForComment",
+            "mode": "next",
+            "from": "author",
+            "text": "body",
+            "what": "a comment"
+          },
+          {
+            "name": "latestComment",
+            "mode": "latest",
+            "from": "author",
+            "what": "a comment"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubComments"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/issues/{number}/transcript": {
+      "get": {
+        "summary": "The issue or pull request as a person reads it: description, comments, reviews and threads",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubIssue",
+          "name": "transcript",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pulls/{number}": {
+      "get": {
+        "summary": "Read the pull request again",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubPullRequest",
+          "name": "refresh",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubPullRequest"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pulls/{number}/head-commit": {
+      "get": {
+        "summary": "The newest commit of the pull request's branch, once the agent is quiet",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubPullRequest",
+          "name": "headCommit",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          },
+          "onceQuiet": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubCommit"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pulls/{number}/reviews": {
+      "get": {
+        "summary": "The submitted reviews, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubPullRequest",
+          "name": "reviews",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReviews"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pulls/{number}/review-comments": {
+      "get": {
+        "summary": "The comments on the diff, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubPullRequest",
+          "name": "reviewComments",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReviewComments"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pulls/{number}/check-runs": {
+      "get": {
+        "summary": "The check runs on the pull request's newest commit: the newest of each name",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubPullRequest",
+          "name": "checkRuns",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubPullCheckRuns"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/repos/{repo}/pulls/{number}/merged": {
+      "get": {
+        "summary": "Has the pull request been merged?",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubPullRequest",
+          "name": "merged",
+          "bind": {
+            "repo": "repoId",
+            "number": "number"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "repo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "number",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/comments/{comment}": {
+      "get": {
+        "summary": "Read a conversation comment again",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubComment",
+          "name": "refresh"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "comment",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubComment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/comments/{comment}/reactions": {
+      "get": {
+        "summary": "The reactions on a conversation comment, by content",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubComment",
+          "name": "reactions"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "comment",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReactions"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/review-comments/{comment}/replies": {
+      "get": {
+        "summary": "The replies in this comment's thread, once the agent is quiet",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubReviewComment",
+          "name": "replies",
+          "onceQuiet": true
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "comment",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubReviewCommentReplies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/review-comments/{comment}/resolved": {
+      "get": {
+        "summary": "Is this comment's thread resolved?",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubReviewComment",
+          "name": "resolved"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "comment",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/review-comments/{comment}/transcript": {
+      "get": {
+        "summary": "This comment's thread as a person reads it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubReviewComment",
+          "name": "transcript"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "required": false,
+            "name": "comment",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/deliveries": {
+      "get": {
+        "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "deliveries",
+          "options": [
+            "type",
+            "resource"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only this event, e.g. `issue_comment`."
+            },
+            "required": false,
+            "description": "Only this event, e.g. `issue_comment`.",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only deliveries about this repository.",
+              "x-channelstack-ref": [
+                "GitHubRepo"
+              ]
+            },
+            "required": false,
+            "description": "Only deliveries about this repository.",
+            "name": "resource",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/deliveries/{delivery}": {
+      "get": {
+        "summary": "Re-read a delivery: its attempts and status",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubDelivery",
+          "name": "refresh"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "settled",
+            "mode": "until",
+            "field": "status",
+            "not": [
+              "pending"
+            ],
+            "what": "the delivery to settle"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/deliveries/{delivery}/redeliver": {
+      "post": {
+        "summary": "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubDelivery",
+          "name": "redeliver"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/deliveries/{delivery}/resend": {
+      "post": {
+        "summary": "Send the delivery again, unchanged or signed with a secret that isn't the App's",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubDelivery",
+          "name": "resend",
+          "options": [
+            "badSignature"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubResendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/app-calls": {
+      "get": {
+        "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "appCalls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubAppCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/calls": {
+      "get": {
+        "summary": "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "calls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "filter": true,
+            "what": "an API call from the agent"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubApiCalls"
+                }
+              }
+            }
           },
           "default": {
             "description": "A protocol error",

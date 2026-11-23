@@ -1,4 +1,4 @@
-import { randomString } from "./csprng.ts";
+import { randomRsaPrivateKey, randomString } from "./csprng.ts";
 
 const DIGITS = "0123456789";
 const HEX = "0123456789abcdef";
@@ -37,6 +37,11 @@ export const SECRET_FORMATS = {
   // The deprecated verification token Slack still puts in every payload as `token`.
   "slack.verificationToken": { pattern: /^[A-Za-z0-9]{24}$/, generate: () => alnum(24) },
   "github.webhookSecret": { pattern: /^[a-f0-9]{40}$/, generate: () => hex(40) },
+  // The App's private key: the agent signs its JWTs with it, and the fake checks them against its public half.
+  "github.privateKey": {
+    pattern: /^-----BEGIN RSA PRIVATE KEY-----\n[A-Za-z0-9+/=\n]+-----END RSA PRIVATE KEY-----\n$/,
+    generate: randomRsaPrivateKey,
+  },
   "github.installationToken": { pattern: /^ghs_[A-Za-z0-9]{36}$/, generate: () => `ghs_${alnum(36)}` },
   "linear.oauthToken": { pattern: /^lin_oauth_[a-f0-9]{64}$/, generate: () => `lin_oauth_${hex(64)}` },
   "linear.apiKey": { pattern: /^lin_api_[A-Za-z0-9]{40}$/, generate: () => `lin_api_${alnum(40)}` },

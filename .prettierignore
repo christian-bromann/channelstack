@@ -2,9 +2,9 @@
 
 # Design documents and the public contract are written by hand; their tables stay as they are.
 *.md
-docs/
-api/
-phase-log/
+/docs/
+/api/
+/phase-log/
 index.html
 .claude/
 

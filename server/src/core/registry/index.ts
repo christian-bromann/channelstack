@@ -39,6 +39,11 @@ export class Collection<T> {
     return this.#entries.get(id)?.owner;
   }
 
+  /** Take one object out: it was deleted on the platform, so no handle resolves to it any more. */
+  remove(id: string): void {
+    this.#entries.delete(id);
+  }
+
   release(session: string): T[] {
     const released: T[] = [];
     for (const [id, entry] of this.#entries) {
