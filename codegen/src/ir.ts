@@ -47,6 +47,8 @@ export interface IrWait {
   item: IrType;
   field?: string;
   not?: string[];
+  /** For `until`: the wait takes the value, or the values, to wait for as its first argument. */
+  in?: true;
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
   /** A text field of the item; an option of the same name narrows the wait by a string or a pattern. */
@@ -375,11 +377,11 @@ export function buildIr(openapi: Json): Ir {
         const returned = responseSchema ? typeOf(responseSchema, `${where} → 200`) : null;
         if (
           wait.mode === "until" &&
-          (returned === null || typeof wait.field !== "string" || !Array.isArray(wait.not))
+          (returned === null || (wait.in !== true && (typeof wait.field !== "string" || !Array.isArray(wait.not))))
         ) {
           throw new SpecError(
             where,
-            "an `until` wait needs a response, a `field` and the values it must leave (`not`)",
+            "an `until` wait needs a response, and either a `field` and the values it must leave (`not`), or `in`",
           );
         }
         const item = wait.mode === "until" && returned ? returned : itemOf(returned, where);
@@ -393,7 +395,10 @@ export function buildIr(openapi: Json): Ir {
             ...(wait.from ? { from: wait.from } : {}),
             ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
-            ...(wait.mode === "until" ? { field: wait.field, not: wait.not } : {}),
+            ...(wait.mode === "until" && wait.in !== true ? { field: wait.field, not: wait.not } : {}),
+            ...(wait.mode === "until" && wait.in === true
+              ? { in: true as const, ...(wait.field ? { field: wait.field } : {}) }
+              : {}),
             what: wait.what,
           },
         ];

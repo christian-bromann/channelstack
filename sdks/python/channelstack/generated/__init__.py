@@ -13,7 +13,7 @@ from ..runtime.files import ChangesInput, TreeInput, read_changes, read_tree
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.0.0"
 
@@ -736,6 +736,128 @@ type GitHubApiCalls = list[GitHubApiCall]
 
 
 @dataclass(frozen=True)
+class LinearIssueState:
+    name: str
+    type: Literal["backlog", "unstarted", "started", "completed", "canceled", "triage"]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearIssueState:
+        return cls(
+            name=data["name"],
+            type=data["type"],
+        )
+
+
+type LinearComments = list[LinearComment]
+
+
+type LinearAgentSessions = list[LinearAgentSession]
+
+
+@dataclass(frozen=True)
+class LinearTranscript:
+    entries: list[LinearTranscriptEntry]
+    text: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearTranscript:
+        return cls(
+            entries=[LinearTranscriptEntry._from_wire(ctx, item) for item in data["entries"]],
+            text=data["text"],
+        )
+
+    def __str__(self) -> str:
+        return self.text
+
+
+@dataclass(frozen=True)
+class LinearTranscriptEntry:
+    id: str
+    author: LinearPrincipal
+    at: str
+    text: str
+    controls: list[str]
+    edited: bool
+    depth: int
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearTranscriptEntry:
+        return cls(
+            id=data["id"],
+            author=LinearPrincipal._from_wire(ctx, data["author"]),
+            at=data["at"],
+            text=data["text"],
+            controls=data["controls"],
+            edited=data["edited"],
+            depth=data["depth"],
+        )
+
+
+@dataclass(frozen=True)
+class LinearPrincipal:
+    id: str
+    name: str
+    kind: Literal["user", "app"]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearPrincipal:
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            kind=data["kind"],
+        )
+
+
+type LinearCommentReplies = list[LinearComment]
+
+
+type LinearAgentActivities = list[LinearAgentActivity]
+
+
+type LinearExternalUrls = list[dict[str, Any]]
+
+
+type LinearPlan = list[dict[str, Any]]
+
+
+type LinearDeliveries = list[LinearDelivery]
+
+
+type LinearApiCalls = list[LinearApiCall]
+
+
+@dataclass(frozen=True)
+class LinearApiCall:
+    id: str
+    channel: Literal["linear"]
+    operation: str
+    method: str
+    path: str
+    at: str
+    duration_ms: float
+    response_status: int
+    request: Any | None = None
+    response: Any | None = None
+    error: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearApiCall:
+        return cls(
+            id=data["id"],
+            channel=data["channel"],
+            operation=data["operation"],
+            method=data["method"],
+            path=data["path"],
+            at=data["at"],
+            duration_ms=data["durationMs"],
+            response_status=data["responseStatus"],
+            request=data.get("request"),
+            response=data.get("response"),
+            error=data.get("error"),
+        )
+
+
+@dataclass(frozen=True)
 class UiLoginLink:
     url: str
 
@@ -821,6 +943,12 @@ class Session:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github")
         return GitHubFixture(ctx, data)
+
+    async def linear(self) -> LinearFixture:
+        """The Linear fixture: the agent's app, and where the agent reaches the fake. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear")
+        return LinearFixture(ctx, data)
 
     async def __aenter__(self) -> Self:
         return self
@@ -1428,23 +1556,23 @@ class GitHubUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/pulls", body={"pr": {key: value for key, value in {**pr, "changes": None if pr.get("changes") is None else read_changes(pr["changes"]), "reviewers": None if pr.get("reviewers") is None else [item.id for item in pr["reviewers"]]}.items() if value is not None}, "repo": repo.id})
         return GitHubPullRequest(ctx, data)
 
-    async def edit_issue(self, changes: dict[str, Any], *, issue: GitHubIssue) -> GitHubDelivery:
+    async def edit_issue(self, changes: dict[str, Any], *, issue: GitHubIssue) -> GitHubDelivery | None:
         """Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/edit-issue", body={"changes": changes, "issue": {"repoId": issue.repo_id, "number": issue.number}})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def close(self, *, issue: GitHubIssue) -> GitHubDelivery:
+    async def close(self, *, issue: GitHubIssue) -> GitHubDelivery | None:
         """Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/close", body={"issue": {"repoId": issue.repo_id, "number": issue.number}})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def reopen(self, *, issue: GitHubIssue) -> GitHubDelivery:
+    async def reopen(self, *, issue: GitHubIssue) -> GitHubDelivery | None:
         """Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/reopen", body={"issue": {"repoId": issue.repo_id, "number": issue.number}})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
     async def label(self, labels: str | list[str], *, issue: GitHubIssue) -> GitHubLabelDeliveries:
         """Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental."""
@@ -1470,17 +1598,17 @@ class GitHubUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/comment", body={"body": body, "issue": {"repoId": issue.repo_id, "number": issue.number}})
         return GitHubComment(ctx, data)
 
-    async def edit(self, body: str, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery:
+    async def edit(self, body: str, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery | None:
         """Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/edit", body={"body": body, "comment": comment.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def delete(self, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery:
+    async def delete(self, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery | None:
         """Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/delete", body={"comment": comment.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
     async def react(self, content: Literal["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"], *, issue: GitHubIssue | None = None, comment: GitHubComment | GitHubReviewComment | None = None) -> None:
         """React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental."""
@@ -1510,47 +1638,47 @@ class GitHubUser:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/reply", body={"body": body, "comment": comment.id})
         return GitHubReviewComment(ctx, data)
 
-    async def resolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery:
+    async def resolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery | None:
         """Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/resolve", body={"comment": comment.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def unresolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery:
+    async def unresolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery | None:
         """Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/unresolve", body={"comment": comment.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def request_review(self, reviewers: GitHubUser | GitHubApp | list[GitHubUser | GitHubApp], *, pr: GitHubPullRequest) -> GitHubDelivery:
+    async def request_review(self, reviewers: GitHubUser | GitHubApp | list[GitHubUser | GitHubApp], *, pr: GitHubPullRequest) -> GitHubDelivery | None:
         """Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/request-review", body={"reviewers": [item.id for item in (reviewers if isinstance(reviewers, list) else [reviewers])], "pr": {"repoId": pr.repo_id, "number": pr.number}})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def mark_ready(self, *, pr: GitHubPullRequest) -> GitHubDelivery:
+    async def mark_ready(self, *, pr: GitHubPullRequest) -> GitHubDelivery | None:
         """Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/mark-ready", body={"pr": {"repoId": pr.repo_id, "number": pr.number}})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def merge(self, *, pr: GitHubPullRequest, method: Literal["merge", "squash", "rebase"] | None = None) -> GitHubDelivery:
+    async def merge(self, *, pr: GitHubPullRequest, method: Literal["merge", "squash", "rebase"] | None = None) -> GitHubDelivery | None:
         """Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/merge", body={"pr": {"repoId": pr.repo_id, "number": pr.number}, "method": method})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def rerun(self, *, check_run: GitHubCheckRun) -> GitHubDelivery:
+    async def rerun(self, *, check_run: GitHubCheckRun) -> GitHubDelivery | None:
         """Click "Re-run" on a check run. Sends `check_run` (action `rerequested`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/rerun", body={"checkRun": check_run.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def request_action(self, identifier: str, *, check_run: GitHubCheckRun) -> GitHubDelivery:
+    async def request_action(self, identifier: str, *, check_run: GitHubCheckRun) -> GitHubDelivery | None:
         """Click one of the buttons the App put on a check run. Sends `check_run` (action `requested_action`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users/{quote(str(self.id), safe='')}/request-action", body={"identifier": identifier, "checkRun": check_run.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
 
 class GitHubRepo:
@@ -1563,17 +1691,17 @@ class GitHubRepo:
         self.default_branch: str = data["defaultBranch"]
         self.private: bool = data["private"]
 
-    async def install_app(self, app: GitHubApp) -> GitHubDelivery:
+    async def install_app(self, app: GitHubApp) -> GitHubDelivery | None:
         """Install the App on this repository. Sends `installation_repositories`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.id), safe='')}/install", body={"app": app.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
-    async def uninstall_app(self, app: GitHubApp) -> GitHubDelivery:
+    async def uninstall_app(self, app: GitHubApp) -> GitHubDelivery | None:
         """Take the App off this repository. Sends `installation_repositories`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.id), safe='')}/uninstall", body={"app": app.id})
-        return GitHubDelivery(ctx, data)
+        return (None if data is None else GitHubDelivery(ctx, data))
 
     async def issue(self, number: int) -> GitHubIssue:
         """An issue of this repository by its number. Experimental."""
@@ -1795,6 +1923,383 @@ class GitHubReviewComment:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/review-comments/{quote(str(self.id), safe='')}/transcript")
         return GitHubTranscript._from_wire(ctx, data)
+
+
+class LinearFixture:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.app: LinearApp = LinearApp(ctx, data["app"])
+        self.api_url: str = data["apiUrl"]
+
+    async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, email: str | None = None, admin: bool | None = None, guest: bool | None = None) -> LinearUser:
+        """Create a person in the workspace. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users", body={"name": name, "id": id, "displayName": display_name, "email": email, "admin": admin, "guest": guest})
+        return LinearUser(ctx, data)
+
+    async def create_team(self, *, key: str | None = None, name: str | None = None, members: list[LinearUser] | None = None, states: list[dict[str, Any]] | None = None, labels: list[str] | None = None) -> LinearTeam:
+        """Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/teams", body={"key": key, "name": name, "members": None if members is None else [item.id for item in members], "states": states, "labels": labels})
+        return LinearTeam(ctx, data)
+
+    async def deliveries(self, *, type: str | None = None, resource: LinearIssue | None = None) -> LinearDeliveries:
+        """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        return [LinearDelivery(ctx, item) for item in data]
+
+    async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> LinearApiCalls:
+        """The GraphQL operations the agent sent about this session's issues and sessions, by root field (`agentActivityCreate`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/calls", query={"operation": operation, "error": error})
+        return [LinearApiCall._from_wire(ctx, item) for item in data]
+
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> LinearApiCall:
+        """Wait for the next new API call from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
+
+
+class LinearApp:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.name: str = data["name"]
+        self.kind: Literal["app"] = data["kind"]
+        self.bot_user_id: str = data["botUserId"]
+        self.access_token: str = data["accessToken"]
+        self.webhook_secret: str = data["webhookSecret"]
+        self.client_id: str = data["clientId"]
+        self.client_secret: str = data["clientSecret"]
+
+
+class LinearUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.name: str = data["name"]
+        self.kind: Literal["user"] = data["kind"]
+        self.display_name: str = data["displayName"]
+        self.email: str | None = data.get("email")
+        self.admin: bool = data["admin"]
+        self.guest: bool = data["guest"]
+
+    async def create_issue(self, issue: dict[str, Any], *, team: LinearTeam) -> LinearIssue:
+        """Create an issue. Sends `Issue` (`create`); with `delegate`, it opens an agent session and sends `AgentSessionEvent` (`created`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/issues", body={"issue": {key: value for key, value in {**issue, "assignee": None if issue.get("assignee") is None else issue["assignee"].id, "delegate": None if issue.get("delegate") is None else issue["delegate"].id, "parent": None if issue.get("parent") is None else issue["parent"].id}.items() if value is not None}, "team": team.id})
+        return LinearIssue(ctx, data)
+
+    async def edit_issue(self, changes: dict[str, Any], *, issue: LinearIssue) -> LinearDelivery | None:
+        """Edit an issue's title, description or priority. Sends `Issue` (`update`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/edit-issue", body={"changes": changes, "issue": issue.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def undelegate(self, *, issue: LinearIssue) -> LinearDelivery | None:
+        """Take an issue back from the app. Sends `Issue` (`update`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/undelegate", body={"issue": issue.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def assign(self, assignee: LinearUser | None = None, *, issue: LinearIssue) -> LinearDelivery | None:
+        """Assign an issue to a person, or (with no one) unassign it. Sends `Issue` (`update`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/assign", body={"assignee": None if assignee is None else assignee.id, "issue": issue.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def set_state(self, state: str, *, issue: LinearIssue) -> LinearDelivery | None:
+        """Move an issue to a workflow state, by name. Sends `Issue` (`update`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/set-state", body={"state": state, "issue": issue.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def label(self, labels: str | list[str], *, issue: LinearIssue) -> LinearDelivery | None:
+        """Put labels on an issue, by name. Sends `Issue` (`update`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/label", body={"labels": (labels if isinstance(labels, list) else [labels]), "issue": issue.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def delegate(self, app: LinearApp, *, issue: LinearIssue) -> LinearAgentSession:
+        """Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/delegate", body={"app": app.id, "issue": issue.id})
+        return LinearAgentSession(ctx, data)
+
+    async def comment(self, body: str, *, issue: LinearIssue) -> LinearComment:
+        """Comment on an issue. A mention of the app opens an agent session and sends `AgentSessionEvent` (`created`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/comment", body={"body": body, "issue": issue.id})
+        return LinearComment(ctx, data)
+
+    async def reply(self, body: str, *, comment: LinearComment) -> LinearComment:
+        """Reply in a comment's thread. In an agent session's thread, it prompts the session (`AgentSessionEvent` `prompted`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/reply", body={"body": body, "comment": comment.id})
+        return LinearComment(ctx, data)
+
+    async def edit(self, body: str, *, comment: LinearComment) -> LinearDelivery | None:
+        """Edit a comment. Sends `Comment` (`update`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/edit", body={"body": body, "comment": comment.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def delete(self, *, comment: LinearComment) -> LinearDelivery | None:
+        """Delete a comment. Sends `Comment` (`remove`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/delete", body={"comment": comment.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def react(self, emoji: str, *, comment: LinearComment) -> None:
+        """React to a comment with an emoji. Linear sends no webhook for it. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "comment": comment.id})
+
+    async def prompt(self, body: str, *, session: LinearAgentSession) -> LinearDelivery:
+        """Send a follow-up in an agent session. Sends `AgentSessionEvent` (`prompted`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/prompt", body={"body": body, "session": session.id})
+        return LinearDelivery(ctx, data)
+
+    async def answer(self, body: str, *, elicitation: LinearAgentActivity) -> LinearDelivery:
+        """Answer a question the agent asked (an `elicitation` activity). Sends `AgentSessionEvent` (`prompted`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/answer", body={"body": body, "elicitation": elicitation.id})
+        return LinearDelivery(ctx, data)
+
+    async def stop(self, *, session: LinearAgentSession) -> LinearDelivery:
+        """Press Stop on an agent session. Sends `AgentSessionEvent` (`prompted`) with the `stop` signal. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/stop", body={"session": session.id})
+        return LinearDelivery(ctx, data)
+
+
+class LinearTeam:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.key: str = data["key"]
+        self.name: str = data["name"]
+
+    async def issue(self, identifier: str) -> LinearIssue:
+        """An issue of this team by its identifier (`ENG-12`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/teams/{quote(str(self.id), safe='')}/issue", query={"identifier": identifier})
+        return LinearIssue(ctx, data)
+
+
+class LinearIssue:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.identifier: str = data["identifier"]
+        self.url: str = data["url"]
+        self.team: LinearTeam = LinearTeam(ctx, data["team"])
+        self.creator: LinearUser | LinearApp = LinearUser(ctx, data["creator"]) if data["creator"]["kind"] == "user" else LinearApp(ctx, data["creator"])
+
+    async def refresh(self) -> LinearIssue:
+        """Read the issue again. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}")
+        return LinearIssue(ctx, data)
+
+    async def title(self) -> str:
+        """The issue's title as it is now. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/title")
+        return data
+
+    async def state(self) -> LinearIssueState:
+        """The issue's workflow state. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/state")
+        return LinearIssueState._from_wire(ctx, data)
+
+    async def assignee(self) -> LinearUser | None:
+        """Who the issue is assigned to, if anyone. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/assignee")
+        return (None if data is None else LinearUser(ctx, data))
+
+    async def delegated_to(self) -> LinearApp | None:
+        """The app the issue is delegated to, if any. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/delegate")
+        return (None if data is None else LinearApp(ctx, data))
+
+    async def labels(self) -> list[str]:
+        """The names of the labels on the issue. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/labels")
+        return data
+
+    async def comments(self) -> LinearComments:
+        """The comments on the issue, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/comments")
+        return [LinearComment(ctx, item) for item in data]
+
+    async def sessions(self) -> LinearAgentSessions:
+        """The agent sessions on the issue, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/sessions")
+        return [LinearAgentSession(ctx, item) for item in data]
+
+    async def session(self) -> LinearAgentSession:
+        """The issue's latest agent session, waiting for one to be opened. Experimental."""
+        ctx = self._ctx
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/session"))
+        return LinearAgentSession(ctx, data)
+
+    async def transcript(self) -> LinearTranscript:
+        """The issue as a person reads it: description, comments and the agent's sessions. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/transcript")
+        return LinearTranscript._from_wire(ctx, data)
+
+    async def wait_for_comment(self, *, from_: LinearUser | LinearApp | str | None = None, body: Text | None = None, timeout: Duration = "10s") -> LinearComment:
+        """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_) and text_matches(item.body, body), describe_wait("a comment", from_), timeout=timeout)
+
+    async def latest_comment(self, *, from_: LinearUser | LinearApp | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> LinearComment:
+        """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
+
+
+class LinearDelivery:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.channel: Literal["linear"] = data["channel"]
+        self.type: str = data["type"]
+        self.action: str = data["action"]
+        self.webhook_id: str = data["webhookId"]
+        self.payload: Any | None = data.get("payload")
+        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
+        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
+
+    async def refresh(self) -> LinearDelivery:
+        """Re-read a delivery: its attempts and status. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}")
+        return LinearDelivery(ctx, data)
+
+    async def redeliver(self) -> DeliveryAttempt:
+        """Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/redeliver")
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None) -> DeliveryAttempt:
+        """Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration = "10s") -> LinearDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> LinearDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
+
+
+class LinearAgentSession:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
+        self.app: LinearApp = LinearApp(ctx, data["app"])
+        self.started_by: LinearUser = LinearUser(ctx, data["startedBy"])
+        self.delivery: LinearDelivery = LinearDelivery(ctx, data["delivery"])
+
+    async def state(self) -> Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]:
+        """The session's status. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/agent-sessions/{quote(str(self.id), safe='')}/state")
+        return data
+
+    async def activities(self) -> LinearAgentActivities:
+        """The session's activities, oldest first: the agent's, and the prompts of people. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/agent-sessions/{quote(str(self.id), safe='')}/activities")
+        return [LinearAgentActivity(ctx, item) for item in data]
+
+    async def external_urls(self) -> LinearExternalUrls:
+        """The links the agent attached to the session. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/agent-sessions/{quote(str(self.id), safe='')}/external-urls")
+        return data
+
+    async def plan(self) -> LinearPlan:
+        """The agent's plan: each step and its status. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/agent-sessions/{quote(str(self.id), safe='')}/plan")
+        return data
+
+    async def transcript(self) -> LinearTranscript:
+        """The session as a person reads it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/agent-sessions/{quote(str(self.id), safe='')}/transcript")
+        return LinearTranscript._from_wire(ctx, data)
+
+    async def wait_for_state(self, wanted: Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"] | list[Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]], *, timeout: Duration = "10s") -> Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]:
+        """Wait for the agent session to reach that state: one of the values given. Resolves with the value as it is then."""
+        values = wanted if isinstance(wanted, list) else [wanted]
+
+        async def reached() -> Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"] | None:
+            value = await self.state()
+            return value if value in values else None
+
+        return await wait_for("the agent session to reach that state", reached, timeout=timeout)
+
+    async def wait_for_activity(self, *, type: Text | None = None, timeout: Duration = "10s") -> LinearAgentActivity:
+        """Wait for the next new activity, after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForActivity", self.activities, lambda item: text_matches(item.type, type), "an activity", timeout=timeout)
+
+
+class LinearComment:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
+        self.author: LinearUser | LinearApp = LinearUser(ctx, data["author"]) if data["author"]["kind"] == "user" else LinearApp(ctx, data["author"])
+        self.body: str = data["body"]
+        self.created_at: str = data["createdAt"]
+        self.url: str = data["url"]
+        self.session: LinearAgentSession | None = None if data.get("session") is None else LinearAgentSession(ctx, data["session"])
+        self.delivery: LinearDelivery | None = None if data.get("delivery") is None else LinearDelivery(ctx, data["delivery"])
+
+    async def replies(self) -> LinearCommentReplies:
+        """The replies in a comment's thread, once the agent is quiet. Experimental."""
+        ctx = self._ctx
+        await until_quiet(lambda: quiet_of(ctx))
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/replies")
+        return [LinearComment(ctx, item) for item in data]
+
+    async def transcript(self) -> LinearTranscript:
+        """A comment's thread as a person reads it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/transcript")
+        return LinearTranscript._from_wire(ctx, data)
+
+
+class LinearAgentActivity:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.session: LinearAgentSession = LinearAgentSession(ctx, data["session"])
+        self.type: Literal["thought", "action", "elicitation", "response", "error", "prompt"] = data["type"]
+        self.author: LinearUser | LinearApp = LinearUser(ctx, data["author"]) if data["author"]["kind"] == "user" else LinearApp(ctx, data["author"])
+        self.body: str | None = data.get("body")
+        self.action: dict[str, Any] | None = data.get("action")
+        self.ephemeral: bool = data["ephemeral"]
+        self.created_at: str = data["createdAt"]
 
 
 class GitHubPullRequest(GitHubIssue):

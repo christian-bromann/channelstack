@@ -19,6 +19,11 @@ export interface DeliveryRequest {
   readonly contentType?: string;
   /** The platform's signature headers for this body, signed when the attempt is sent. */
   sign(body: string, atMs: number): Record<string, string>;
+  /**
+   * The body as one attempt sends it, for a platform that puts the time of each attempt into the
+   * signed body (Linear's `webhookTimestamp`). Without it every attempt sends `body` as it is.
+   */
+  stamp?(body: string, atMs: number): string;
   /** The platform's ack window. */
   readonly timeoutMs: number;
   /** What the driver wants to find again on the delivery: the inner event type, the object that caused it. */
@@ -98,6 +103,11 @@ export interface AttemptOptions {
   sign?: (body: string, atMs: number) => Record<string, string>;
   /** Marks the attempt as deliberately forged. */
   forged?: boolean;
+  /**
+   * Send as if at this time: the body is stamped and signed with it. A time long past makes a
+   * stale delivery the agent should refuse.
+   */
+  atMs?: number;
 }
 
 const RESPONSE_BODY_LIMIT = 2048;
@@ -246,13 +256,15 @@ export class DeliveryQueue {
     const cancelled = this.#session(request.session).canceller.signal;
     const sentAt = this.#clock();
     const transport = request.transport?.();
+    const at = options.atMs ?? sentAt;
+    const body = request.stamp ? request.stamp(request.body, at) : request.body;
     const requestHeaders = transport
       ? // A connection the agent opened needs no signature: only what the platform adds to a retry.
         { ...options.headers }
       : {
           "content-type": request.contentType ?? "application/json",
           "user-agent": "channelstack",
-          ...(options.sign ?? request.sign)(request.body, sentAt),
+          ...(options.sign ?? request.sign)(body, at),
           ...options.headers,
         };
     const index = record.attempts.length;
@@ -284,7 +296,7 @@ export class DeliveryQueue {
         const response = await fetch(request.url, {
           method: "POST",
           headers: requestHeaders,
-          body: request.body,
+          body,
           redirect: "manual",
           signal,
         });

@@ -524,6 +524,102 @@ export interface GitHubApiCall {
 
 export type GitHubApiCalls = GitHubApiCall[];
 
+export interface LinearIssueState {
+  name: string;
+  type: "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage";
+}
+
+export type LinearComments = LinearComment[];
+
+export type LinearCommentsWire = LinearCommentData[];
+
+function decodeLinearComments(ctx: HandleContext, data: LinearCommentsWire): LinearComments {
+  return data.map((item) => new LinearComment(ctx, item));
+}
+
+export type LinearAgentSessions = LinearAgentSession[];
+
+export type LinearAgentSessionsWire = LinearAgentSessionData[];
+
+function decodeLinearAgentSessions(ctx: HandleContext, data: LinearAgentSessionsWire): LinearAgentSessions {
+  return data.map((item) => new LinearAgentSession(ctx, item));
+}
+
+export interface LinearTranscript {
+  entries: LinearTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface LinearTranscriptWire {
+  entries: LinearTranscriptEntry[];
+  text: string;
+}
+
+function decodeLinearTranscript(_ctx: HandleContext, data: LinearTranscriptWire): LinearTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface LinearTranscriptEntry {
+  id: string;
+  author: LinearPrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+}
+
+export interface LinearPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+export type LinearCommentReplies = LinearComment[];
+
+export type LinearCommentRepliesWire = LinearCommentData[];
+
+function decodeLinearCommentReplies(ctx: HandleContext, data: LinearCommentRepliesWire): LinearCommentReplies {
+  return data.map((item) => new LinearComment(ctx, item));
+}
+
+export type LinearAgentActivities = LinearAgentActivity[];
+
+export type LinearAgentActivitiesWire = LinearAgentActivityData[];
+
+function decodeLinearAgentActivities(ctx: HandleContext, data: LinearAgentActivitiesWire): LinearAgentActivities {
+  return data.map((item) => new LinearAgentActivity(ctx, item));
+}
+
+export type LinearExternalUrls = Array<{ label: string; url: string }>;
+
+export type LinearPlan = Array<{ content: string; status: "pending" | "inProgress" | "completed" | "canceled" }>;
+
+export type LinearDeliveries = LinearDelivery[];
+
+export type LinearDeliveriesWire = LinearDeliveryData[];
+
+function decodeLinearDeliveries(ctx: HandleContext, data: LinearDeliveriesWire): LinearDeliveries {
+  return data.map((item) => new LinearDelivery(ctx, item));
+}
+
+export type LinearApiCalls = LinearApiCall[];
+
+export interface LinearApiCall {
+  id: string;
+  channel: "linear";
+  operation: string;
+  method: string;
+  path: string;
+  at: string;
+  durationMs: number;
+  request?: unknown;
+  responseStatus: number;
+  response?: unknown;
+  error?: string;
+}
+
 export interface UiLoginLink {
   url: string;
 }
@@ -633,6 +729,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github`)) as GitHubFixtureData;
     return new GitHubFixture(ctx, data);
+  }
+
+  /** The Linear fixture: the agent's app, and where the agent reaches the fake. Experimental. */
+  async linear(): Promise<LinearFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear`)) as LinearFixtureData;
+    return new LinearFixture(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1705,24 +1808,24 @@ export class GitHubUser {
   }
 
   /** Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental. */
-  async editIssue(changes: { title?: string; body?: string }, options: { issue: GitHubIssue }): Promise<GitHubDelivery> {
+  async editIssue(changes: { title?: string; body?: string }, options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/edit-issue`, { body: { changes, issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/edit-issue`, { body: { changes, issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental. */
-  async close(options: { issue: GitHubIssue }): Promise<GitHubDelivery> {
+  async close(options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/close`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/close`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental. */
-  async reopen(options: { issue: GitHubIssue }): Promise<GitHubDelivery> {
+  async reopen(options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/reopen`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/reopen`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental. */
@@ -1754,17 +1857,17 @@ export class GitHubUser {
   }
 
   /** Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental. */
-  async edit(body: string, options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery> {
+  async edit(body: string, options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/edit`, { body: { body, comment: options.comment.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/edit`, { body: { body, comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental. */
-  async delete(options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery> {
+  async delete(options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/delete`, { body: { comment: options.comment.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/delete`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental. */
@@ -1801,52 +1904,52 @@ export class GitHubUser {
   }
 
   /** Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental. */
-  async resolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery> {
+  async resolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/resolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/resolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental. */
-  async unresolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery> {
+  async unresolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/unresolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/unresolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental. */
-  async requestReview(reviewers: GitHubUser | GitHubApp | Array<GitHubUser | GitHubApp>, options: { pr: GitHubPullRequest }): Promise<GitHubDelivery> {
+  async requestReview(reviewers: GitHubUser | GitHubApp | Array<GitHubUser | GitHubApp>, options: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/request-review`, { body: { reviewers: [reviewers].flat().map((item) => item.id), pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/request-review`, { body: { reviewers: [reviewers].flat().map((item) => item.id), pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental. */
-  async markReady(options: { pr: GitHubPullRequest }): Promise<GitHubDelivery> {
+  async markReady(options: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/mark-ready`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/mark-ready`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental. */
-  async merge(options: { pr: GitHubPullRequest; method?: "merge" | "squash" | "rebase" }): Promise<GitHubDelivery> {
+  async merge(options: { pr: GitHubPullRequest; method?: "merge" | "squash" | "rebase" }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/merge`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number }, method: options.method } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/merge`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number }, method: options.method } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Click "Re-run" on a check run. Sends `check_run` (action `rerequested`). Experimental. */
-  async rerun(options: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery> {
+  async rerun(options: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/rerun`, { body: { checkRun: options.checkRun.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/rerun`, { body: { checkRun: options.checkRun.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Click one of the buttons the App put on a check run. Sends `check_run` (action `requested_action`). Experimental. */
-  async requestAction(identifier: string, options: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery> {
+  async requestAction(identifier: string, options: { checkRun: GitHubCheckRun }): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/request-action`, { body: { identifier, checkRun: options.checkRun.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users/${segment(this.id)}/request-action`, { body: { identifier, checkRun: options.checkRun.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -1886,17 +1989,17 @@ export class GitHubRepo {
   }
 
   /** Install the App on this repository. Sends `installation_repositories`. Experimental. */
-  async installApp(app: GitHubApp): Promise<GitHubDelivery> {
+  async installApp(app: GitHubApp): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/install`, { body: { app: app.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/install`, { body: { app: app.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** Take the App off this repository. Sends `installation_repositories`. Experimental. */
-  async uninstallApp(app: GitHubApp): Promise<GitHubDelivery> {
+  async uninstallApp(app: GitHubApp): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/uninstall`, { body: { app: app.id } })) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/uninstall`, { body: { app: app.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** An issue of this repository by its number. Experimental. */
@@ -2306,6 +2409,650 @@ export class GitHubReviewComment {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/review-comments/${segment(this.id)}/transcript`)) as GitHubTranscriptWire;
     return decodeGitHubTranscript(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearFixture}. */
+export interface LinearFixtureData {
+  app: LinearAppData;
+  apiUrl: string;
+}
+
+export class LinearFixture {
+  readonly app: LinearApp;
+  readonly apiUrl: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearFixtureData) {
+    this.#ctx = ctx;
+    this.app = new LinearApp(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+  }
+
+  /** Create a person in the workspace. Experimental. */
+  async createUser(options: { name: string; id?: string; displayName?: string; email?: string; admin?: boolean; guest?: boolean }): Promise<LinearUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users`, { body: { name: options.name, id: options.id, displayName: options.displayName, email: options.email, admin: options.admin, guest: options.guest } })) as LinearUserData;
+    return new LinearUser(ctx, data);
+  }
+
+  /** Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one. Experimental. */
+  async createTeam(options: { key?: string; name?: string; members?: LinearUser[]; states?: Array<{ name: string; type: "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage" }>; labels?: string[] } = {}): Promise<LinearTeam> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/teams`, { body: { key: options.key, name: options.name, members: options.members === undefined ? undefined : options.members.map((item) => item.id), states: options.states, labels: options.labels } })) as LinearTeamData;
+    return new LinearTeam(ctx, data);
+  }
+
+  /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: LinearIssue } = {}): Promise<LinearDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as LinearDeliveriesWire;
+    return decodeLinearDeliveries(ctx, data);
+  }
+
+  /** The GraphQL operations the agent sent about this session's issues and sessions, by root field (`agentActivityCreate`). Experimental. */
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<LinearApiCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/calls`, { query: { operation: options.operation, error: options.error } })) as LinearApiCalls;
+    return data;
+  }
+
+  /** Wait for the next new API call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<LinearApiCall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearApp}. */
+export interface LinearAppData {
+  id: string;
+  name: string;
+  kind: "app";
+  botUserId: string;
+  accessToken: string;
+  webhookSecret: string;
+  clientId: string;
+  clientSecret: string;
+}
+
+export class LinearApp {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "app";
+  readonly botUserId: string;
+  readonly accessToken: string;
+  readonly webhookSecret: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearAppData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.botUserId = data.botUserId;
+    this.accessToken = data.accessToken;
+    this.webhookSecret = data.webhookSecret;
+    this.clientId = data.clientId;
+    this.clientSecret = data.clientSecret;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearUser}. */
+export interface LinearUserData {
+  id: string;
+  name: string;
+  kind: "user";
+  displayName: string;
+  email?: string;
+  admin: boolean;
+  guest: boolean;
+}
+
+export class LinearUser {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "user";
+  readonly displayName: string;
+  readonly email: string | undefined;
+  readonly admin: boolean;
+  readonly guest: boolean;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.name = data.name;
+    this.kind = data.kind;
+    this.displayName = data.displayName;
+    this.email = data.email;
+    this.admin = data.admin;
+    this.guest = data.guest;
+  }
+
+  /** Create an issue. Sends `Issue` (`create`); with `delegate`, it opens an agent session and sends `AgentSessionEvent` (`created`). Experimental. */
+  async createIssue(issue: { title: string; description?: string; priority?: number; state?: string; labels?: string[]; assignee?: LinearUser; delegate?: LinearApp; parent?: LinearIssue }, options: { team: LinearTeam }): Promise<LinearIssue> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/issues`, { body: { issue: { ...issue, assignee: issue.assignee === undefined ? undefined : issue.assignee.id, delegate: issue.delegate === undefined ? undefined : issue.delegate.id, parent: issue.parent === undefined ? undefined : issue.parent.id }, team: options.team.id } })) as LinearIssueData;
+    return new LinearIssue(ctx, data);
+  }
+
+  /** Edit an issue's title, description or priority. Sends `Issue` (`update`). Experimental. */
+  async editIssue(changes: { title?: string; description?: string; priority?: number }, options: { issue: LinearIssue }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/edit-issue`, { body: { changes, issue: options.issue.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** Take an issue back from the app. Sends `Issue` (`update`). Experimental. */
+  async undelegate(options: { issue: LinearIssue }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/undelegate`, { body: { issue: options.issue.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** Assign an issue to a person, or (with no one) unassign it. Sends `Issue` (`update`). Experimental. */
+  async assign(assignee: LinearUser | undefined, options: { issue: LinearIssue }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/assign`, { body: { assignee: assignee === undefined ? undefined : assignee.id, issue: options.issue.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** Move an issue to a workflow state, by name. Sends `Issue` (`update`). Experimental. */
+  async setState(state: string, options: { issue: LinearIssue }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/set-state`, { body: { state, issue: options.issue.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** Put labels on an issue, by name. Sends `Issue` (`update`). Experimental. */
+  async label(labels: string | string[], options: { issue: LinearIssue }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/label`, { body: { labels: [labels].flat(), issue: options.issue.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental. */
+  async delegate(app: LinearApp, options: { issue: LinearIssue }): Promise<LinearAgentSession> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/delegate`, { body: { app: app.id, issue: options.issue.id } })) as LinearAgentSessionData;
+    return new LinearAgentSession(ctx, data);
+  }
+
+  /** Comment on an issue. A mention of the app opens an agent session and sends `AgentSessionEvent` (`created`). Experimental. */
+  async comment(body: string, options: { issue: LinearIssue }): Promise<LinearComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/comment`, { body: { body, issue: options.issue.id } })) as LinearCommentData;
+    return new LinearComment(ctx, data);
+  }
+
+  /** Reply in a comment's thread. In an agent session's thread, it prompts the session (`AgentSessionEvent` `prompted`). Experimental. */
+  async reply(body: string, options: { comment: LinearComment }): Promise<LinearComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/reply`, { body: { body, comment: options.comment.id } })) as LinearCommentData;
+    return new LinearComment(ctx, data);
+  }
+
+  /** Edit a comment. Sends `Comment` (`update`). Experimental. */
+  async edit(body: string, options: { comment: LinearComment }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/edit`, { body: { body, comment: options.comment.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** Delete a comment. Sends `Comment` (`remove`). Experimental. */
+  async delete(options: { comment: LinearComment }): Promise<LinearDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/delete`, { body: { comment: options.comment.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
+  }
+
+  /** React to a comment with an emoji. Linear sends no webhook for it. Experimental. */
+  async react(emoji: string, options: { comment: LinearComment }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/react`, { body: { emoji, comment: options.comment.id } });
+  }
+
+  /** Send a follow-up in an agent session. Sends `AgentSessionEvent` (`prompted`). Experimental. */
+  async prompt(body: string, options: { session: LinearAgentSession }): Promise<LinearDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/prompt`, { body: { body, session: options.session.id } })) as LinearDeliveryData;
+    return new LinearDelivery(ctx, data);
+  }
+
+  /** Answer a question the agent asked (an `elicitation` activity). Sends `AgentSessionEvent` (`prompted`). Experimental. */
+  async answer(body: string, options: { elicitation: LinearAgentActivity }): Promise<LinearDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/answer`, { body: { body, elicitation: options.elicitation.id } })) as LinearDeliveryData;
+    return new LinearDelivery(ctx, data);
+  }
+
+  /** Press Stop on an agent session. Sends `AgentSessionEvent` (`prompted`) with the `stop` signal. Experimental. */
+  async stop(options: { session: LinearAgentSession }): Promise<LinearDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/stop`, { body: { session: options.session.id } })) as LinearDeliveryData;
+    return new LinearDelivery(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearTeam}. */
+export interface LinearTeamData {
+  id: string;
+  key: string;
+  name: string;
+}
+
+export class LinearTeam {
+  readonly id: string;
+  readonly key: string;
+  readonly name: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearTeamData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.key = data.key;
+    this.name = data.name;
+  }
+
+  /** An issue of this team by its identifier (`ENG-12`). Experimental. */
+  async issue(identifier: string): Promise<LinearIssue> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/teams/${segment(this.id)}/issue`, { query: { identifier } })) as LinearIssueData;
+    return new LinearIssue(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearIssue}. */
+export interface LinearIssueData {
+  id: string;
+  identifier: string;
+  url: string;
+  team: LinearTeamData;
+  creator: LinearUserData | LinearAppData;
+}
+
+export class LinearIssue {
+  readonly id: string;
+  readonly identifier: string;
+  readonly url: string;
+  readonly team: LinearTeam;
+  readonly creator: LinearUser | LinearApp;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearIssueData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.identifier = data.identifier;
+    this.url = data.url;
+    this.team = new LinearTeam(ctx, data.team);
+    this.creator = data.creator.kind === "user" ? new LinearUser(ctx, data.creator) : new LinearApp(ctx, data.creator);
+  }
+
+  /** Read the issue again. Experimental. */
+  async refresh(): Promise<LinearIssue> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}`)) as LinearIssueData;
+    return new LinearIssue(ctx, data);
+  }
+
+  /** The issue's title as it is now. Experimental. */
+  async title(): Promise<string> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/title`)) as string;
+    return data;
+  }
+
+  /** The issue's workflow state. Experimental. */
+  async state(): Promise<LinearIssueState> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/state`)) as LinearIssueState;
+    return data;
+  }
+
+  /** Who the issue is assigned to, if anyone. Experimental. */
+  async assignee(): Promise<LinearUser | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/assignee`)) as LinearUserData | null;
+    return (data === null ? undefined : new LinearUser(ctx, data));
+  }
+
+  /** The app the issue is delegated to, if any. Experimental. */
+  async delegatedTo(): Promise<LinearApp | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/delegate`)) as LinearAppData | null;
+    return (data === null ? undefined : new LinearApp(ctx, data));
+  }
+
+  /** The names of the labels on the issue. Experimental. */
+  async labels(): Promise<string[]> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/labels`)) as string[];
+    return data;
+  }
+
+  /** The comments on the issue, oldest first. Experimental. */
+  async comments(): Promise<LinearComments> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/comments`)) as LinearCommentsWire;
+    return decodeLinearComments(ctx, data);
+  }
+
+  /** The agent sessions on the issue, oldest first. Experimental. */
+  async sessions(): Promise<LinearAgentSessions> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/sessions`)) as LinearAgentSessionsWire;
+    return decodeLinearAgentSessions(ctx, data);
+  }
+
+  /** The issue's latest agent session, waiting for one to be opened. Experimental. */
+  async session(): Promise<LinearAgentSession> {
+    const ctx = this.#ctx;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/session`))) as LinearAgentSessionData;
+    return new LinearAgentSession(ctx, data);
+  }
+
+  /** The issue as a person reads it: description, comments and the agent's sessions. Experimental. */
+  async transcript(): Promise<LinearTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/transcript`)) as LinearTranscriptWire;
+    return decodeLinearTranscript(ctx, data);
+  }
+
+  /** Wait for the next new comment matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForComment(options: { from?: LinearUser | LinearApp | string; body?: string | RegExp } & WaitOptions = {}): Promise<LinearComment> {
+    return waitForNext(this.#seen, "waitForComment", () => this.comments(), (item) => fromMatches(item.author, options.from) && textMatches(item.body, options.body), describeWait("a comment", options.from), options);
+  }
+
+  /** The latest comment matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestComment(options: { from?: LinearUser | LinearApp | string } & QuietOptions = {}): Promise<LinearComment> {
+    return latestOnceQuiet(() => this.comments(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a comment", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearDelivery}. */
+export interface LinearDeliveryData {
+  id: string;
+  channel: "linear";
+  type: string;
+  action: string;
+  webhookId: string;
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class LinearDelivery {
+  readonly id: string;
+  readonly channel: "linear";
+  readonly type: string;
+  readonly action: string;
+  readonly webhookId: string;
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.type = data.type;
+    this.action = data.action;
+    this.webhookId = data.webhookId;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<LinearDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}`)) as LinearDeliveryData;
+    return new LinearDelivery(ctx, data);
+  }
+
+  /** Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental. */
+  async resend(options: { badSignature?: boolean; stale?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<LinearDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearAgentSession}. */
+export interface LinearAgentSessionData {
+  id: string;
+  issue: LinearIssueData;
+  app: LinearAppData;
+  startedBy: LinearUserData;
+  delivery: LinearDeliveryData;
+}
+
+export class LinearAgentSession {
+  readonly id: string;
+  readonly issue: LinearIssue;
+  readonly app: LinearApp;
+  readonly startedBy: LinearUser;
+  readonly delivery: LinearDelivery;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearAgentSessionData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.issue = new LinearIssue(ctx, data.issue);
+    this.app = new LinearApp(ctx, data.app);
+    this.startedBy = new LinearUser(ctx, data.startedBy);
+    this.delivery = new LinearDelivery(ctx, data.delivery);
+  }
+
+  /** The session's status. Experimental. */
+  async state(): Promise<"pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale"> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/agent-sessions/${segment(this.id)}/state`)) as "pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale";
+    return data;
+  }
+
+  /** The session's activities, oldest first: the agent's, and the prompts of people. Experimental. */
+  async activities(): Promise<LinearAgentActivities> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/agent-sessions/${segment(this.id)}/activities`)) as LinearAgentActivitiesWire;
+    return decodeLinearAgentActivities(ctx, data);
+  }
+
+  /** The links the agent attached to the session. Experimental. */
+  async externalUrls(): Promise<LinearExternalUrls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/agent-sessions/${segment(this.id)}/external-urls`)) as LinearExternalUrls;
+    return data;
+  }
+
+  /** The agent's plan: each step and its status. Experimental. */
+  async plan(): Promise<LinearPlan> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/agent-sessions/${segment(this.id)}/plan`)) as LinearPlan;
+    return data;
+  }
+
+  /** The session as a person reads it. Experimental. */
+  async transcript(): Promise<LinearTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/agent-sessions/${segment(this.id)}/transcript`)) as LinearTranscriptWire;
+    return decodeLinearTranscript(ctx, data);
+  }
+
+  /** Wait for the agent session to reach that state: one of the values given. Resolves with the value as it is then. */
+  async waitForState(wanted: "pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale" | Array<"pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale">, options: WaitOptions = {}): Promise<"pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale"> {
+    const values: unknown[] = [wanted].flat();
+    return waitFor("the agent session to reach that state", async () => {
+      const value = await this.state();
+      return values.includes(value) ? value : undefined;
+    }, options);
+  }
+
+  /** Wait for the next new activity, after the last one this handle saw. */
+  async waitForActivity(options: { type?: string | RegExp } & WaitOptions = {}): Promise<LinearAgentActivity> {
+    return waitForNext(this.#seen, "waitForActivity", () => this.activities(), (item) => textMatches(item.type, options.type), "an activity", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearComment}. */
+export interface LinearCommentData {
+  id: string;
+  issue: LinearIssueData;
+  author: LinearUserData | LinearAppData;
+  body: string;
+  createdAt: string;
+  url: string;
+  session?: LinearAgentSessionData;
+  delivery?: LinearDeliveryData;
+}
+
+export class LinearComment {
+  readonly id: string;
+  readonly issue: LinearIssue;
+  readonly author: LinearUser | LinearApp;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly url: string;
+  readonly session: LinearAgentSession | undefined;
+  readonly delivery: LinearDelivery | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearCommentData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.issue = new LinearIssue(ctx, data.issue);
+    this.author = data.author.kind === "user" ? new LinearUser(ctx, data.author) : new LinearApp(ctx, data.author);
+    this.body = data.body;
+    this.createdAt = data.createdAt;
+    this.url = data.url;
+    this.session = data.session === undefined ? undefined : new LinearAgentSession(ctx, data.session);
+    this.delivery = data.delivery === undefined ? undefined : new LinearDelivery(ctx, data.delivery);
+  }
+
+  /** The replies in a comment's thread, once the agent is quiet. Experimental. */
+  async replies(): Promise<LinearCommentReplies> {
+    const ctx = this.#ctx;
+    await untilQuiet(() => quietOf(ctx));
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/replies`)) as LinearCommentRepliesWire;
+    return decodeLinearCommentReplies(ctx, data);
+  }
+
+  /** A comment's thread as a person reads it. Experimental. */
+  async transcript(): Promise<LinearTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/comments/${segment(this.id)}/transcript`)) as LinearTranscriptWire;
+    return decodeLinearTranscript(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link LinearAgentActivity}. */
+export interface LinearAgentActivityData {
+  id: string;
+  session: LinearAgentSessionData;
+  type: "thought" | "action" | "elicitation" | "response" | "error" | "prompt";
+  author: LinearUserData | LinearAppData;
+  body?: string;
+  action?: { action: string; parameter?: string; result?: string };
+  ephemeral: boolean;
+  createdAt: string;
+}
+
+export class LinearAgentActivity {
+  readonly id: string;
+  readonly session: LinearAgentSession;
+  readonly type: "thought" | "action" | "elicitation" | "response" | "error" | "prompt";
+  readonly author: LinearUser | LinearApp;
+  readonly body: string | undefined;
+  readonly action: { action: string; parameter?: string; result?: string } | undefined;
+  readonly ephemeral: boolean;
+  readonly createdAt: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: LinearAgentActivityData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.session = new LinearAgentSession(ctx, data.session);
+    this.type = data.type;
+    this.author = data.author.kind === "user" ? new LinearUser(ctx, data.author) : new LinearApp(ctx, data.author);
+    this.body = data.body;
+    this.action = data.action;
+    this.ephemeral = data.ephemeral;
+    this.createdAt = data.createdAt;
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

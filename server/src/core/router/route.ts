@@ -35,9 +35,11 @@ interface SdkBinding {
 interface WaitBinding {
   name: string;
   mode: "next" | "latest" | "until";
-  /** For `until`: the field to watch, and the values that mean "not yet". */
+  /** For `until`: the field to watch (the value itself without one), and the values that mean "not yet". */
   field?: string;
   not?: readonly string[];
+  /** For `until`: the wait's first argument is the value, or the values, to wait for (`waitForState("complete")`). */
+  in?: true;
   /** The item field holding who authored it; the wait's `from` option filters on it. */
   from?: string;
   /** A text field of the item the wait can be narrowed by: an option of that name takes a string or a pattern. */
@@ -109,6 +111,10 @@ export function registerRoute<
   B extends z.ZodType = z.ZodUndefined,
   R extends z.ZodType = z.ZodUndefined,
 >(app: OpenAPIHono, spec: RouteSpec<P, Q, B, R>): void {
+  // A response that may be null keeps that in the OpenAPI document: as a top-level `nullable()`
+  // of a named schema it would be written as the bare reference, and SDKs would decode a null.
+  const response =
+    spec.response instanceof z.ZodNullable ? z.union([spec.response.unwrap() as z.ZodType, z.null()]) : spec.response;
   const route = createRoute({
     method: spec.method,
     path: spec.path,
@@ -120,8 +126,8 @@ export function registerRoute<
       ...(spec.body ? { body: { required: true, content: { "application/json": { schema: spec.body } } } } : {}),
     },
     responses: {
-      ...(spec.response
-        ? { 200: { description: "OK", content: { "application/json": { schema: spec.response } } } }
+      ...(response
+        ? { 200: { description: "OK", content: { "application/json": { schema: response } } } }
         : { 204: { description: "Done" } }),
       default: { description: "A protocol error", content: { "application/json": { schema: ErrorBody } } },
     },

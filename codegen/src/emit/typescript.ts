@@ -172,8 +172,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
 
   const method = (resource: IrResource, m: IrMethod): string[] => {
     const optionsOptional = m.options.every((option) => option.optional);
+    // An optional argument before options that must be given is one that may be `undefined`.
+    const optionalArg = (arg: IrParam) => (!arg.optional ? "" : m.options.length > 0 && !optionsOptional ? "" : "?");
     const parameters = [
-      ...m.args.map((arg) => `${arg.name}${arg.optional ? "?" : ""}: ${parameterType(arg)}`),
+      ...m.args.map(
+        (arg) =>
+          `${arg.name}${optionalArg(arg)}: ${parameterType(arg)}${arg.optional && optionalArg(arg) === "" ? " | undefined" : ""}`,
+      ),
       ...(m.options.length > 0
         ? [
             `options: { ${m.options.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,
@@ -241,6 +246,29 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }, ` : "";
     const call = `() => this.${w.read}(${filter === "" ? "" : "filter"})`;
     const noun = w.what.replace(/^an? /, "");
+    if (w.mode === "until" && w.in) {
+      const fieldType =
+        w.field === undefined
+          ? item
+          : typeOf(
+              index.resource((w.item as { name: string }).name).fields.find((f) => f.name === w.field)?.type ?? {
+                kind: "unknown",
+              },
+              "public",
+            );
+      const value = w.field === undefined ? "value" : `value.${w.field}`;
+      return [
+        "",
+        `  /** Wait for ${w.what}: one of the values given. Resolves with the value as it is then. */`,
+        `  async ${w.name}(wanted: ${fieldType} | Array<${fieldType}>, options: WaitOptions = {}): Promise<${item}> {`,
+        "    const values: unknown[] = [wanted].flat();",
+        `    return waitFor(${JSON.stringify(w.what)}, async () => {`,
+        `      const value = await this.${w.read}();`,
+        `      return values.includes(${value}) ? value : undefined;`,
+        "    }, options);",
+        "  }",
+      ];
+    }
     if (w.mode === "until") {
       const pending = (w.not ?? []).map((value) => `value.${w.field} === ${JSON.stringify(value)}`).join(" || ");
       return [

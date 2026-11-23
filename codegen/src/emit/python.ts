@@ -270,6 +270,21 @@ export function emitPython(ir: Ir): Map<string, string> {
     const matches = `lambda item: ${conditions.length > 0 ? conditions.join(" and ") : "True"}`;
     const what = fromField ? `describe_wait(${JSON.stringify(w.what)}, from_)` : JSON.stringify(w.what);
     const noun = w.what.replace(/^an? /, "");
+    if (w.mode === "until" && w.in) {
+      const value = w.field === undefined ? "value" : `value.${snakeCase(w.field)}`;
+      return [
+        "",
+        `    async def ${snakeCase(w.name)}(self, wanted: ${typeOf(w.item)} | list[${typeOf(w.item)}], *, timeout: Duration = "10s") -> ${typeOf(w.item)}:`,
+        `        """Wait for ${w.what}: one of the values given. Resolves with the value as it is then."""`,
+        "        values = wanted if isinstance(wanted, list) else [wanted]",
+        "",
+        `        async def reached() -> ${typeOf(w.item)} | None:`,
+        `            value = await self.${snakeCase(w.read)}()`,
+        `            return value if ${value} in values else None`,
+        "",
+        `        return await wait_for(${JSON.stringify(w.what)}, reached, timeout=timeout)`,
+      ];
+    }
     if (w.mode === "until") {
       const pending = `value.${snakeCase(w.field ?? "")} in (${(w.not ?? []).map((value) => JSON.stringify(value)).join(", ")},)`;
       return [
