@@ -55,7 +55,11 @@ A driver declares its live credentials (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTA
 
 ## New dependencies
 
-None. The Slack Web API is called with `fetch`: the server needs a dozen methods, and `@slack/web-api` would bring axios and its own retry logic into the binary.
+| Package | Version | Why a library and not our code | License | Maintained |
+|---|---|---|---|---|
+| `pytest` (Python SDK, dev only) | 8.4.2 | The Python runtime's own tests (`sdks/python/tests`), the counterpart of the TypeScript runtime's Vitest tests (review finding R1.10) | MIT | Yes |
+
+No runtime dependency. The Slack Web API is called with `fetch`: the server needs a dozen methods, and `@slack/web-api` would bring axios and its own retry logic into the binary.
 
 ## Docs to update
 
