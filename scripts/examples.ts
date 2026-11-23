@@ -43,6 +43,17 @@ const CHANNELS = {
     // The standard checks as a developer adds them (exit check 3.4).
     suites: ["test/acceptance/checks/github-checks.test.ts"],
   },
+  linear: {
+    examples: "api/examples/linear.test.ts",
+    enabled: [
+      "delegation and agent sessions > ",
+      "conversation inside a session > ",
+      "issue workflow > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+    ],
+    suites: [],
+  },
 } as const;
 
 /** The reference agents the examples run against, by name: the channel they live in, and where they take webhooks. */
@@ -51,6 +62,8 @@ const AGENTS = {
   "chat-sdk-slack": { channel: "slack", path: "/slack/events" },
   probot: { channel: "github", path: "/api/github/webhooks" },
   "chat-sdk-github": { channel: "github", path: "/api/webhooks/github" },
+  "linear-sdk": { channel: "linear", path: "/webhooks/linear" },
+  "chat-sdk-linear": { channel: "linear", path: "/api/webhooks/linear" },
 } as const;
 
 /** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */

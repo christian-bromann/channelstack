@@ -23,11 +23,15 @@ export default defineConfig({
     include: [
       "api/examples/slack.test.ts",
       "api/examples/github.test.ts",
+      "api/examples/linear.test.ts",
       "test/acceptance/stack/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],
     // Runs after each test, while its session is still open (the plugin closes it last).
-    setupFiles: [fileURLToPath(new URL("./github-schemas.setup.ts", import.meta.url))],
+    setupFiles: [
+      fileURLToPath(new URL("./github-schemas.setup.ts", import.meta.url)),
+      fileURLToPath(new URL("./linear-schemas.setup.ts", import.meta.url)),
+    ],
     testTimeout: 30_000,
     // Exit check 1.7 runs 20 tests at the same moment; Vitest's default is 5 at a time.
     maxConcurrency: 20,
