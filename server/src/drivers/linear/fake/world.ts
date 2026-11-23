@@ -140,15 +140,15 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
         eventType: typeof payload.action === "string" ? `${type}.${payload.action}` : type,
         action: payload.action,
         payload: full,
-        issue: issueOfPayload(payload),
+        issue: issueOfPayload(type, payload),
       },
     });
     return id;
   };
   /** The issue a webhook is about, so a test can ask for the deliveries of one. */
-  const issueOfPayload = (payload: Record<string, unknown>): string | undefined => {
+  const issueOfPayload = (type: string, payload: Record<string, unknown>): string | undefined => {
     const data = (payload.data ?? payload.agentSession) as { issueId?: string; id?: string } | undefined;
-    return data?.issueId ?? (payload.type === "Issue" ? data?.id : undefined);
+    return data?.issueId ?? (type === "Issue" ? data?.id : undefined);
   };
 
   const entityEvent = (
