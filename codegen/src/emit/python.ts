@@ -307,7 +307,7 @@ export function emitPython(ir: Ir): Map<string, string> {
         : `        """The latest ${noun}${fromField ? " matching `from_`" : ""}, once the agent is quiet. Waits for at least one."""`,
       w.mode === "next"
         ? // A filtered read is its own list, so each filter keeps its own place in it.
-          `        return await wait_for_next(self._seen, ${filters.length > 0 ? `f"${w.name}:${filters.map((option) => `{${snakeCase(option.name)}!r}`).join(":")}"` : JSON.stringify(w.name)}, ${reader}, ${matches}, ${what}, timeout=timeout)`
+          `        return await wait_for_next(self._seen, ${filters.length > 0 ? `f"${w.name}:${filters.map((option) => `{${snakeCase(option.name)}!r}`).join(":")}"` : JSON.stringify(w.name)}, ${reader}, ${matches}, ${what}, timeout=timeout${w.turn ? `, starts_turn=lambda item: item.${snakeCase(w.turn.field)} == ${JSON.stringify(w.turn.value)}` : ""})`
         : `        return await latest_once_quiet(${reader}, ${matches}, lambda: quiet_of(self._ctx), ${what}, timeout=timeout, quiet_for=quiet_for)`,
     ];
   };

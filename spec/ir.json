@@ -10045,6 +10045,10 @@
             "name": "LinearAgentActivity"
           },
           "text": "type",
+          "turn": {
+            "field": "type",
+            "value": "prompt"
+          },
           "what": "an activity"
         }
       ]

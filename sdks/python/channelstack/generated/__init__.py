@@ -2260,7 +2260,7 @@ class LinearAgentSession:
 
     async def wait_for_activity(self, *, type: Text | None = None, timeout: Duration = "10s") -> LinearAgentActivity:
         """Wait for the next new activity, after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForActivity", self.activities, lambda item: text_matches(item.type, type), "an activity", timeout=timeout)
+        return await wait_for_next(self._seen, "waitForActivity", self.activities, lambda item: text_matches(item.type, type), "an activity", timeout=timeout, starts_turn=lambda item: item.type == "prompt")
 
 
 class LinearComment:

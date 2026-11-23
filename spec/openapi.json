@@ -16467,6 +16467,10 @@
             "name": "waitForActivity",
             "mode": "next",
             "text": "type",
+            "turn": {
+              "field": "type",
+              "value": "prompt"
+            },
             "what": "an activity"
           }
         ],

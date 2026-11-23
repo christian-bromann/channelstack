@@ -2953,7 +2953,7 @@ export class LinearAgentSession {
 
   /** Wait for the next new activity, after the last one this handle saw. */
   async waitForActivity(options: { type?: string | RegExp } & WaitOptions = {}): Promise<LinearAgentActivity> {
-    return waitForNext(this.#seen, "waitForActivity", () => this.activities(), (item) => textMatches(item.type, options.type), "an activity", options);
+    return waitForNext(this.#seen, "waitForActivity", () => this.activities(), (item) => textMatches(item.type, options.type), "an activity", options, (item) => item.type === "prompt");
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

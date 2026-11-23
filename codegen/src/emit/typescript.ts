@@ -290,7 +290,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       `  async ${w.name}(${filter}options: ${options} = {}): Promise<${item}> {`,
       w.mode === "next"
         ? // A filtered read is its own list, so each filter keeps its own place in it.
-          `    return waitForNext(this.#seen, ${filter ? `\`${w.name}:\${JSON.stringify(filter)}\`` : JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options);`
+          `    return waitForNext(this.#seen, ${filter ? `\`${w.name}:\${JSON.stringify(filter)}\`` : JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options${w.turn ? `, (item) => item.${w.turn.field} === ${JSON.stringify(w.turn.value)}` : ""});`
         : `    return latestOnceQuiet(${call}, ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
       "  }",
     ];

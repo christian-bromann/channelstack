@@ -11,7 +11,7 @@ import { parseDuration } from "./duration.ts";
 import { readChanges, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, segment, Transport } from "./transport.ts";
-import { untilQuiet, waitFor, WaitTimeoutError } from "./wait.ts";
+import { untilQuiet, waitFor, waitForNext, WaitTimeoutError } from "./wait.ts";
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -105,6 +105,21 @@ describe("waiting", () => {
     started = Date.now();
     await untilQuiet(longQuiet, { quietFor: "80ms", interval: "5ms", watching: true });
     expect(Date.now() - started).toBeGreaterThanOrEqual(80);
+  });
+
+  test("a next-wait returns each match once; with turns, only what came after the newest prompt", async () => {
+    const items = [
+      { type: "response", n: 1 },
+      { type: "prompt", n: 2 },
+      { type: "response", n: 3 },
+    ];
+    const read = async () => items;
+    const response = (item: { type: string }) => item.type === "response";
+    const seen = new Map<string, number>();
+    expect((await waitForNext(seen, "w", read, response, "a response")).n).toBe(1);
+    expect((await waitForNext(seen, "w", read, response, "a response")).n).toBe(3);
+    const prompt = (item: { type: string }) => item.type === "prompt";
+    expect((await waitForNext(new Map(), "w", read, response, "a response", {}, prompt)).n).toBe(3);
   });
 
   test("an error from the read is not swallowed", async () => {

@@ -118,15 +118,20 @@ async def wait_for_next[T](
     what: str,
     *,
     timeout: Duration = "10s",
+    starts_turn: Callable[[T], bool] | None = None,
 ) -> T:
     """Wait for the next new item of a list that matches, after the last one this handle returned.
 
-    `seen` belongs to the handle and remembers, per wait, how far it has looked.
+    `seen` belongs to the handle and remembers, per wait, how far it has looked. With `starts_turn`,
+    the wait also looks only after the newest item that starts a turn (a person's prompt).
     """
 
     async def look() -> T | None:
         items = await read()
-        for position in range(seen.get(key, 0), len(items)):
+        turn = 0
+        if starts_turn is not None:
+            turn = next((position + 1 for position in reversed(range(len(items))) if starts_turn(items[position])), 0)
+        for position in range(max(seen.get(key, 0), turn), len(items)):
             if matches(items[position]):
                 seen[key] = position + 1
                 return items[position]

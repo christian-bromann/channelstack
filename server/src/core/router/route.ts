@@ -40,6 +40,11 @@ interface WaitBinding {
   not?: readonly string[];
   /** For `until`: the wait's first argument is the value, or the values, to wait for (`waitForState("complete")`). */
   in?: true;
+  /**
+   * For `next`: items where `field` is `value` start a new turn, and the wait looks only after the
+   * newest of them. A person's prompt in an agent session is one: what the agent says next answers it.
+   */
+  turn?: { field: string; value: string };
   /** The item field holding who authored it; the wait's `from` option filters on it. */
   from?: string;
   /** A text field of the item the wait can be narrowed by: an option of that name takes a string or a pattern. */

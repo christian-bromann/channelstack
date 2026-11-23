@@ -49,6 +49,8 @@ export interface IrWait {
   not?: string[];
   /** For `until`: the wait takes the value, or the values, to wait for as its first argument. */
   in?: true;
+  /** For `next`: an item whose `field` is `value` starts a new turn; the wait looks only after the newest one. */
+  turn?: { field: string; value: string };
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
   /** A text field of the item; an option of the same name narrows the wait by a string or a pattern. */
@@ -395,6 +397,7 @@ export function buildIr(openapi: Json): Ir {
             ...(wait.from ? { from: wait.from } : {}),
             ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
+            ...(wait.mode === "next" && wait.turn ? { turn: { field: wait.turn.field, value: wait.turn.value } } : {}),
             ...(wait.mode === "until" && wait.in !== true ? { field: wait.field, not: wait.not } : {}),
             ...(wait.mode === "until" && wait.in === true
               ? { in: true as const, ...(wait.field ? { field: wait.field } : {}) }
