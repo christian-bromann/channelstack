@@ -336,10 +336,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     const parent = target.block
       ? { type: "block_id" as const, id: target.block.id }
       : { type: "page_id" as const, id: target.page.id };
-    const added = insertBlocks(session, target.page, parent, draftsOf(content), actor);
+    // Everything is checked before a block is made, so a refused append leaves nothing behind.
     const list = target.block ? target.block.children : target.page.children;
     const at = after === undefined ? list.length : list.indexOf(after) + 1;
     if (after !== undefined && at === 0) throw invalid(`body failed validation: ${after} is not a child of this block`);
+    const drafts = draftsOf(content);
+    const added = insertBlocks(session, target.page, parent, drafts, actor);
     list.splice(at, 0, ...added);
     touch(target.page, actor);
     contentUpdated(session, target.page, added, actor);
@@ -377,13 +379,15 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
   // --- Properties -----------------------------------------------------------------------------
 
-  const schemaOf = (page: NotionPageRecord): NotionPropertyRecord[] =>
-    page.parent.type === "database_id"
-      ? store.database(page.parent.id).properties
+  /** The properties a page has where it is: its database's, or just a title. */
+  const schemaFor = (parent: NotionParent): NotionPropertyRecord[] =>
+    parent.type === "database_id"
+      ? store.database(parent.id).properties
       : [{ id: "title", name: "title", type: "title", options: [] }];
+  const schemaOf = (page: NotionPageRecord): NotionPropertyRecord[] => schemaFor(page.parent);
 
-  const propertyNamed = (page: NotionPageRecord, name: string): NotionPropertyRecord => {
-    const schema = schemaOf(page);
+  const propertyNamed = (page: { parent: NotionParent }, name: string): NotionPropertyRecord => {
+    const schema = schemaFor(page.parent);
     const found = schema.find((property) => property.name === name || property.id === name);
     if (!found)
       throw invalid(
@@ -938,18 +942,15 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       children: unknown[],
       actor: string,
     ) {
-      const draft = makePage(session, parent, {}, actor);
+      // Properties and children are checked before the page exists, so a refused create leaves nothing behind.
+      const values: Record<string, NotionValue> = {};
       for (const [name, raw] of Object.entries(properties)) {
-        const property = propertyNamed(draft, name);
-        draft.properties[property.name] = fromRequest(property, raw);
+        const property = propertyNamed({ parent }, name);
+        values[property.name] = fromRequest(property, raw);
       }
-      draft.children = insertBlocks(
-        session,
-        draft,
-        { type: "page_id", id: draft.id },
-        children.map(draftFromRequest),
-        actor,
-      );
+      const drafts = children.map(draftFromRequest);
+      const draft = makePage(session, parent, values, actor);
+      draft.children = insertBlocks(session, draft, { type: "page_id", id: draft.id }, drafts, actor);
       announcePage(session, draft, actor);
       return draft;
     },

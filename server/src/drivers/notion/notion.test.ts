@@ -117,6 +117,22 @@ describe("the REST API", () => {
     expect((await api("GET", `comments?block_id=${page.id}`)).body.results).toEqual([]);
     expect(await get(`/discussions/${comment.discussion.id}/resolved`)).toBe(true);
     expect((await api("POST", "comments", { rich_text: [] })).body.code).toBe("validation_error");
+    // A refused create or append leaves nothing behind: no page, no child page block, no blocks.
+    const before = (await api("GET", `blocks/${page.id}/children`)).body.results.length;
+    const refused = await api("POST", "pages", {
+      parent: { page_id: page.id },
+      properties: { title: { title: [{ text: { content: "Half made" } }] }, Nope: { number: 1 } },
+    });
+    expect(refused.body.code).toBe("validation_error");
+    const badChild = await api("POST", "pages", { parent: { page_id: page.id }, children: [{ nonsense: true }] });
+    expect(badChild.body.code).toBe("validation_error");
+    const badAfter = await api("PATCH", `blocks/${page.id}/children`, {
+      children: [{ type: "paragraph", paragraph: { rich_text: [{ text: { content: "x" } }] } }],
+      after: "00000000-0000-4000-8000-000000000000",
+    });
+    expect(badAfter.body.code).toBe("validation_error");
+    expect((await api("GET", `blocks/${page.id}/children`)).body.results).toHaveLength(before);
+    expect((await api("POST", "search", { query: "Half made" })).body.results).toEqual([]);
   });
 
   test("databases: a data source to query, rows to update, Notion's refusals", async () => {
