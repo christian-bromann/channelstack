@@ -73,6 +73,7 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `fake/kit.ts` (GitHub) | What the parts of the GitHub world build on: permissions (`can`, `allow`), sending a webhook (`emit`, with GitHub's headers), `GitHubRefusal`, the git identity of a person |
 | `fake/git.ts` (GitHub) | Git in memory with real SHAs (isomorphic-git on memfs): blobs, trees, commits, branches, history, merges, and what changed between two commits with patches |
 | `fake/repos.ts`, `issues.ts`, `pulls.ts`, `checks.ts` (GitHub) | The GitHub world, one file per area: people, repositories and pushes; issues, comments, labels, reactions; pull requests, reviews, threads, merging; check runs and statuses. `fake/world.ts` puts them together and owns deliveries |
+| `schema/` (Linear) | Linear's GraphQL schema: `schema.graphql` from `linear/linear` at a pinned commit, and `schema.ts`, the module the binary embeds (generated) |
 | `fake/graphql.ts` (Linear) | Running GraphQL against Linear's committed schema (`schema/`, from `scripts/linear-schema.ts`): the field resolver over model objects, the depth limit, Linear's errors (`LinearError`, `notFound`), connections and filters |
 | `fake/models.ts`, `fake/resolvers.ts` (Linear) | Records → the objects GraphQL resolves (issues, comments, sessions, activities, teams, states), and the root queries and mutations the app calls |
 | `links.ts` (Linear, Notion) | Where a person would open something: issue, comment, profile and session URLs (Linear); page and database URLs (Notion) |
@@ -184,3 +185,4 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 |---|---|
 | `spec/openapi.json`, `spec/ir.json` | The routes (`pnpm spec`) |
 | `sdks/typescript/generated/`, `sdks/python/channelstack/generated/` | `spec/ir.json` (`pnpm sdk`) |
+| `server/src/drivers/linear/schema/schema.ts` | `server/src/drivers/linear/schema/schema.graphql`, Linear's schema at a pinned commit (`pnpm linear:schema`) |
