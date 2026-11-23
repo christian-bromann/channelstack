@@ -11,7 +11,6 @@ import { type Author, type EventParent, notionPayloads, stampAttempt } from "../
 import { plainText, type RichTextItem, textItem, userMention } from "../rich-text.ts";
 import type {
   NotionBlockRecord,
-  NotionBotRecord,
   NotionCommentRecord,
   NotionDatabaseRecord,
   NotionDiscussionRecord,

@@ -152,21 +152,22 @@ Every feature runs in the fake server (in memory). The question this document an
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `linear.createTeam({ key, members, states, labels })` | Yes | Yes | Seeding credentials (admin API key, `teamCreate`) | Generated keys avoid collisions. Deleted (or archived) at the end of the session |
-| `ana.createIssue({ … }, { team })` | Yes | Yes | User token (`issueCreate`) | |
-| `ana.createIssue({ delegate: linear.app })` | Yes | Yes | User token (`issueCreate` with `delegateId`) | Confirmed |
-| `ana.editIssue`, `assign`, `setState`, `label` | Yes | Yes | User token (`issueUpdate`) | |
-| `ana.delegate(linear.app, { issue })` | Yes | Yes | User token (`issueUpdate` with `delegateId`) | Confirmed: changing the delegate can start an agent session |
-| `ana.undelegate({ issue })` | Yes | Yes | User token (`issueUpdate` with `delegateId: null`) | Confirmed |
-| `ana.comment("@my-agent …", { issue })` | Yes | Yes | User token (`commentCreate`) | Confirmed for people: channelstack writes the profile URL (`https://linear.app/<workspace>/profiles/<user>`) into the Markdown body, and Linear turns it into a mention. **unverified** whether an app's profile URL opens a session the same way |
-| `ana.reply` / `edit` / `delete` / `react` (comments) | Yes | Yes | User token | |
-| `ana.prompt(text, { session })` | Yes | Yes | User token (`commentCreate` with `parentId` set to the session's root comment) | **unverified**: the docs say a person's new message in a session sends `prompted`, but don't say an API reply counts. First live spike |
-| `ana.answer(text, { elicitation })` | Yes | Yes | User token (same as prompt) | |
-| `ana.stop({ session })` | Yes | Yes, with browser | Browser | Confirmed: the `stop` signal is only generated when a person presses Stop in Linear, and it can't be published through `agentActivityCreate` |
-| `session.state()`, `activities()`, `plan()`, `externalUrls()`, `toHaveSessionState`, `toHaveActivity` | Yes | Yes | User token (GraphQL reads) | |
-| `issue.comments()`, `toHaveCommentFrom`, `toBeDelegatedTo`, `toHaveState` | Yes | Yes | User token | |
-| `delivery.redeliver()` | Yes | No | — | Fake-only. Linear has no redelivery mutation |
-| Webhook deliveries to the agent | Yes | Agent's concern | — | Linear delivers to the agent's own webhook URL |
+| `linear.createTeam({ key, members, states, labels })` | Done | Yes | Seeding credentials (admin API key, `teamCreate`) | Generated keys avoid collisions. Deleted (or archived) at the end of the session |
+| `ana.createIssue({ … }, { team })` | Done | Yes | User token (`issueCreate`) | |
+| `ana.createIssue({ delegate: linear.app })` | Done | Yes | User token (`issueCreate` with `delegateId`) | Confirmed |
+| `ana.editIssue`, `assign`, `setState`, `label` | Done | Yes | User token (`issueUpdate`) | |
+| `ana.delegate(linear.app, { issue })` | Done | Yes | User token (`issueUpdate` with `delegateId`) | Confirmed: changing the delegate can start an agent session |
+| `ana.undelegate({ issue })` | Done | Yes | User token (`issueUpdate` with `delegateId: null`) | Confirmed |
+| `ana.comment("@my-agent …", { issue })` | Done | Yes | User token (`commentCreate`) | Confirmed for people: channelstack writes the profile URL (`https://linear.app/<workspace>/profiles/<user>`) into the Markdown body, and Linear turns it into a mention. **unverified** whether an app's profile URL opens a session the same way |
+| `ana.reply` / `edit` / `delete` / `react` (comments) | Done | Yes | User token | |
+| `ana.prompt(text, { session })` | Done | Yes | User token (`commentCreate` with `parentId` set to the session's root comment) | **unverified**: the docs say a person's new message in a session sends `prompted`, but don't say an API reply counts. First live spike |
+| `ana.answer(text, { elicitation })` | Done | Yes | User token (same as prompt) | |
+| `ana.stop({ session })` | Done | Yes, with browser | Browser | Confirmed: the `stop` signal is only generated when a person presses Stop in Linear, and it can't be published through `agentActivityCreate` |
+| `session.state()`, `activities()`, `plan()`, `externalUrls()`, `toHaveSessionState`, `toHaveActivity` | Done | Yes | User token (GraphQL reads) | |
+| `issue.comments()`, `toHaveCommentFrom`, `toBeDelegatedTo`, `toHaveState` | Done | Yes | User token | |
+| `delivery.redeliver()` | Done | No | — | Fake-only. Linear has no redelivery mutation. The fake stamps a new `webhookTimestamp` into the body and signs it again, as Linear's own retries do |
+| An agent's `response`, `elicitation` and `error` as comments | Done | Yes | — | **unverified**: the fake writes them as the app's comments in the session's thread (the mention, or for a delegation a thread of their own), with the activity's `sourceComment` on that comment. The Chat SDK's Linear adapter relies on a response having one. First live spike |
+| Webhook deliveries to the agent | Done | Agent's concern | — | Linear delivers to the agent's own webhook URL |
 
 ---
 
@@ -176,21 +177,24 @@ Notion now has **personal access tokens** that act as the person who created the
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `notion.createPage({ content, connections })` (seed) | Yes | Yes | Seeding credentials (a seeding PAT), under a parent page the agent's integration is connected to once, by hand | Confirmed: sharing a parent gives access to all child pages, which is how `connections: [notion.app]` works live |
-| `notion.createPage({ connections: [] })` (agent not connected) | Yes | Yes | Seeding credentials, under a parent the agent can't see | |
-| `notion.createDatabase({ properties, rows })` | Yes | Yes | Seeding credentials | |
-| `ana.createPage(...)` (as a person) | Yes | Yes | User token (PAT) | |
-| `ana.comment(text, { page, anchor })` | Yes | Yes | User token (PAT) | **unverified**: whether `created_by` on a PAT-made comment is the person or a bot. The docs only confirm that the display name is the person's |
-| `ana.reply(text, { discussion })` | Yes | Yes | User token (PAT, comment with `discussion_id`) | |
-| `ana.editComment` / `deleteComment` | Yes | Yes | User token (PAT) | Content only |
-| `ana.resolve` / `reopen` (discussion) | Yes | Not yet | — | Not in the first release. Confirmed: the REST API has no resolve action, so a person's resolve is a UI click (browser actor later) |
-| `ana.edit({ append }, { page })`, `rename`, `setProperty`, `addRow` | Yes | Yes | User token (PAT) | |
-| `ana.mention(notion.app, { page })` | Yes | Yes | User token (PAT) | **unverified**: whether an in-body mention of an integration reaches the agent as an event |
-| `ana.connect` / `disconnect(notion.app, { page })` | Yes | Yes, with browser | Browser ("Add connections" in the page menu) | Confirmed: no API adds or removes a connection |
-| `page.markdown()`, `blocks()`, `property()`, `discussions()`, `toHaveBlock`, `toHaveCommentFrom`, `toHavePropertyValue` | Yes | Yes | User token or seeding credentials (read APIs) | |
-| `discussion.resolved()` | Yes | Not yet | — | No resolved field in the REST API. Follows `resolve` |
-| Webhook deliveries (`comment.created`, `page.content_updated`) | Yes | Agent's concern | — | Notion delivers to the agent's own URL. The fake signs `X-Notion-Signature: sha256=<HMAC-SHA256 of the body, keyed with the verification token>`, batches `page.content_updated` the way Notion does, and retries like Notion (up to 8 times over about 24 hours) |
-| `delivery.resend()` / redelivery | Yes | No | — | Fake-only. Notion has no redelivery API |
+| `notion.createPage({ content, connections })` (seed) | Done | Yes | Seeding credentials (a seeding PAT), under a parent page the agent's integration is connected to once, by hand | Confirmed: sharing a parent gives access to all child pages, which is how `connections: [notion.app]` works live |
+| `notion.createPage({ connections: [] })` (agent not connected) | Done | Yes | Seeding credentials, under a parent the agent can't see | |
+| `notion.createDatabase({ properties, rows })` | Done | Yes | Seeding credentials | |
+| `ana.createPage(...)` (as a person) | Done | Yes | User token (PAT) | |
+| `ana.comment(text, { page, anchor })` | Done | Yes | User token (PAT) | **unverified**: whether `created_by` on a PAT-made comment is the person or a bot. The docs only confirm that the display name is the person's |
+| `ana.reply(text, { discussion })` | Done | Yes | User token (PAT, comment with `discussion_id`) | |
+| `ana.editComment` / `deleteComment` | Done | Yes | User token (PAT) | Content only |
+| `ana.resolve` / `reopen` (discussion) | Done | Not yet | — | Not in the first release. Confirmed: the REST API has no resolve action, so a person's resolve is a UI click (browser actor later) |
+| `ana.edit({ append }, { page })`, `rename`, `setProperty`, `addRow` | Done | Yes | User token (PAT) | |
+| `ana.mention(notion.app, { page })` | Done | Yes | User token (PAT) | **unverified**: whether an in-body mention of an integration reaches the agent as an event |
+| `ana.connect` / `disconnect(notion.app, { page })` | Done | Yes, with browser | Browser ("Add connections" in the page menu) | Confirmed: no API adds or removes a connection |
+| `page.markdown()`, `blocks()`, `property()`, `discussions()`, `toHaveBlock`, `toHaveCommentFrom`, `toHavePropertyValue` | Done | Yes | User token or seeding credentials (read APIs) | |
+| `discussion.resolved()` | Done | Not yet | — | No resolved field in the REST API. Follows `resolve` |
+| Webhook deliveries (`comment.created`, `page.*`) | Done | Agent's concern | — | Notion delivers to the agent's own URL. The fake signs `X-Notion-Signature: sha256=<HMAC-SHA256 of the body, keyed with the verification token>`, batches `page.content_updated` the way Notion does, and retries like Notion (up to 8 times over about 24 hours) |
+| `delivery.resend()` / redelivery | Done | No | — | Fake-only. Notion has no redelivery API. A redelivery is the same event with the next `attempt_number`, signed again |
+| `notion.setContentUpdateDelay(delay)` | Done | No | — | Fake-only: how long `page.content_updated` is held to batch edits (default one second). Notion doesn't document its window |
+| `notion.sendVerification()` | Done | No | — | Fake-only: the `{ verification_token }` request Notion sends once when a subscription is created |
+| Events the integration caused itself | Done | Yes | — | **unverified**: the fake sends them (its own comments, edits and property changes), with the bot in `authors`, so an agent must ignore its own. The checks assume that |
 
 ---
 

@@ -361,8 +361,8 @@ Every matcher reads the **transcript**: each channel's state reduced to what a p
 |---|---|
 | Slack | `toContainText(text \| RegExp)`, `toHaveReplyFrom(app)`, `toHaveRepliesFrom(app, { count: 1 })`, `toHaveChannelMessageFrom(app)`, `toHaveStreamingReplyFrom(app)`, `toHaveStatus("working" \| "streaming" \| "stopped" \| "idle")`, `toHaveStatusText(text)`, `toHaveButton(label)`, `toHaveReaction(emoji, { by })`, `toHaveOpenedModal(title)`, `toBeEphemeralFor(user)` |
 | GitHub | `toHaveCommentFrom(app)`, `toHaveCommentsFrom(app, { count })`, `toHaveReviewComment({ path, line, from })`, `toHaveCheckRun(name, { status, conclusion })`, `toHaveLabel(name)`, `toBeMerged()` |
-| Linear | `toHaveSessionState("active" \| "awaitingInput" \| "complete" \| "error")`, `toHaveActivity({ type, from })`, `toHaveCommentFrom(app)`, `toBeAssignedTo(user)` |
-| Notion | `toHaveCommentFrom(app, { inDiscussion })`, `toHaveBlock(text \| RegExp)`, `toHavePropertyValue(name, value)` |
+| Linear | `toHaveSessionState("pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error")`, `toHaveActivity({ type, from, text })`, `toHaveCommentFrom(app)`, `toBeDelegatedTo(app)`, `toBeAssignedTo(user)`, `toHaveState(name)` |
+| Notion | `toHaveCommentFrom(app)` and `toHaveCommentsFrom(app, { count })` on a discussion, `toHaveBlock(text \| RegExp)`, `toHavePropertyValue(name, value)` (asymmetric matchers such as `expect.any(Number)` work) |
 | Any delivery | `toBeAccepted({ within: "3s" })`, `toBeRejected()` (bad signature), `toBeRetried({ times })` |
 
 The matchers assert on **behaviour** (once, in the thread, stopped, acknowledged in time, on the right line), not on exact wording. So they hold whether the agent uses a real model or a fake one.
@@ -372,7 +372,7 @@ The matchers assert on **behaviour** (once, in the thread, stopped, acknowledged
 The standard checks are a helper that registers ordinary tests in your suite:
 
 ```ts
-import { slackChecks, githubChecks } from "channelstack/checks";
+import { slackChecks, githubChecks, linearChecks, notionChecks } from "channelstack/checks";
 
 slackChecks({ app: "my-agent" });    // ~12 tests: replies once to a DM and to a mention, stays in thread,
                                     // survives the 3s retry, idempotent on redelivery, ignores itself
@@ -381,6 +381,11 @@ slackChecks({ app: "my-agent" });    // ~12 tests: replies once to a DM and to a
                                     // clicks, a double click acts once
 githubChecks({ app: "my-agent" });   // ignores its own comments, one comment per trigger, review-thread
                                     // replies trigger, check run reaches a conclusion
+linearChecks({ app: "my-agent" });   // a first activity within 10s, ends its turn, Stop ends the session,
+                                    // a redelivery doesn't start the work again, rejects stale and
+                                    // badly signed webhooks
+notionChecks({ app: "my-agent" });   // answers in the discussion it was asked in, ignores its own comments,
+                                    // a webhook sent again doesn't answer twice, rejects a bad signature
 ```
 
 Each check is named after a bug class found in real apps (`app-developers.md`). The UI's **Checks** panel runs the same set.
