@@ -20,10 +20,11 @@ export interface DeliveryRequest {
   /** The platform's signature headers for this body, signed when the attempt is sent. */
   sign(body: string, atMs: number): Record<string, string>;
   /**
-   * The body as one attempt sends it, for a platform that puts the time of each attempt into the
-   * signed body (Linear's `webhookTimestamp`). Without it every attempt sends `body` as it is.
+   * The body as one attempt sends it, for a platform that puts the attempt into the signed body:
+   * its time (Linear's `webhookTimestamp`) or its number, from 1 (Notion's `attempt_number`).
+   * Without it every attempt sends `body` as it is.
    */
-  stamp?(body: string, atMs: number): string;
+  stamp?(body: string, atMs: number, attempt: number): string;
   /** The platform's ack window. */
   readonly timeoutMs: number;
   /** What the driver wants to find again on the delivery: the inner event type, the object that caused it. */
@@ -257,7 +258,7 @@ export class DeliveryQueue {
     const sentAt = this.#clock();
     const transport = request.transport?.();
     const at = options.atMs ?? sentAt;
-    const body = request.stamp ? request.stamp(request.body, at) : request.body;
+    const body = request.stamp ? request.stamp(request.body, at, record.attempts.length + 1) : request.body;
     const requestHeaders = transport
       ? // A connection the agent opened needs no signature: only what the platform adds to a retry.
         { ...options.headers }
