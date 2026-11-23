@@ -652,13 +652,10 @@ export function registerLinearRoutes(
     const issue = store.issue(record.issue);
     const user = actor(session, userId, issue);
     const body = world.markdown(session, text);
-    const root = record.comment ? store.comments.find(record.comment) : undefined;
-    if (root) {
-      const reply = world.comment(issue, user.id, body, root);
-      const prompted = world.deliveries(session).at(-1);
-      void reply;
-      return prompted ? deliveryWire(prompted) : undefined;
-    }
+    // In a session with a thread (its mention, or the comments Linear wrote for it), the prompt is a
+    // reply there; a session without one yet takes it directly.
+    const root = record.thread === null ? undefined : store.comments.find(record.thread);
+    if (root) return caused(session, world.comment(issue, user.id, body, root).prompted);
     return caused(session, world.promptSession(record, user.id, body));
   };
 

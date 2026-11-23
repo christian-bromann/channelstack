@@ -407,6 +407,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       editedAt: null,
       session: undefined,
       delivery: undefined,
+      prompted: undefined,
     } satisfies LinearCommentRecord);
     issue.updatedAt = now;
     record.delivery = entityEvent(
@@ -421,7 +422,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     const thread = root ? store.sessionsOn(issue).find((candidate) => candidate.thread === root.id) : undefined;
     if (thread) {
       record.session = thread.id;
-      promptSession(thread, user, body, { comment: record });
+      record.prompted = promptSession(thread, user, body, { comment: record });
     } else if (mentioned(body).includes(store.appUser.id)) {
       startSession(issue, user, record);
     }

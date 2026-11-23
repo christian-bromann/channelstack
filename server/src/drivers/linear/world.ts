@@ -115,6 +115,8 @@ export interface LinearCommentRecord {
   session: string | undefined;
   /** The `Comment` delivery this comment caused. */
   delivery: string | undefined;
+  /** For a reply in a session's thread: the `AgentSessionEvent` (`prompted`) delivery it caused. */
+  prompted: string | undefined;
 }
 
 /** A session's status, as Linear's `AgentSessionStatus` has it. */

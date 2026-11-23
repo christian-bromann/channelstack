@@ -174,6 +174,27 @@ describe("agent sessions", () => {
     );
   });
 
+  test("in a delegated session, a person's answer is a reply in the thread the agent's question opened", async () => {
+    const { ana, app, post, get, gql, issue } = await workspace();
+    const created = await issue();
+    const session = await post(`/users/${ana.id}/delegate`, { app: app.id, issue: created.id });
+    // Before the agent has written anything there is no thread: the prompt goes to the session itself.
+    const early = await post(`/users/${ana.id}/prompt`, { body: "it's urgent", session: session.id });
+    expect(early).toMatchObject({ action: "prompted" });
+    await gql(ACTIVITY, {
+      input: { agentSessionId: session.id, content: { type: "elicitation", body: "Which browser?" } },
+    });
+    const [question] = (await get(`/agent-sessions/${session.id}/activities`)).filter(
+      (activity: { type: string }) => activity.type === "elicitation",
+    );
+    const sent = await post(`/users/${ana.id}/answer`, { body: "Safari 18", elicitation: question.id });
+    expect(sent).toMatchObject({ action: "prompted", payload: { agentActivity: { content: { body: "Safari 18" } } } });
+    expect(sent.payload.agentActivity.sourceCommentId).toBeDefined();
+    expect((await get(`/issues/${created.id}/transcript`)).text).toBe(
+      ["Ana: Checkout fails on Safari", "Ana: it's urgent", "my-agent: Which browser?", "  Ana: Safari 18"].join("\n"),
+    );
+  });
+
   test("Stop: the session is stopping until the agent ends its turn", async () => {
     const { h, ana, app, post, get, gql, webhooks, issue } = await workspace();
     const session = await post(`/users/${ana.id}/delegate`, { app: app.id, issue: (await issue()).id });
