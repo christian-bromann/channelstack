@@ -45,6 +45,15 @@ export const text = (body: Json, name: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
+/** A time in a request body, in milliseconds. GitHub refuses one it can't read. */
+export const time = (body: Json, name: string, resource: string): number | undefined => {
+  const value = text(body, name);
+  if (value === undefined) return undefined;
+  const at = Date.parse(value);
+  if (Number.isNaN(at)) throw invalid(resource, name, "invalid");
+  return at;
+};
+
 export const list = (body: Json, name: string): unknown[] | undefined => {
   const value = body[name];
   return Array.isArray(value) ? value : undefined;

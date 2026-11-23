@@ -213,7 +213,7 @@ describe("GitHub's own schemas", () => {
 
   test("the App's own endpoints, people, and the routes the scenarios above leave out", async () => {
     const { h, ana, repo, post, api, asApp, path, problems, webhookIssues } = await workspace();
-    const ben = await post("/users", { login: "ben" });
+    await post("/users", { login: "ben" });
     await post(`/users/${ana.id}/push`, {
       changes: [{ path: "src/app.ts", content: b64("export {}\n") }],
       repo: repo.id,

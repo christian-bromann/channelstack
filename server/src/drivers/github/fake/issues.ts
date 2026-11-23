@@ -7,7 +7,7 @@ import type {
   GitHubRepoRecord,
   GitHubReviewCommentRecord,
 } from "../world.ts";
-import { type GitHubKit, GitHubRefusal } from "./kit.ts";
+import { type GitHubKit, GitHubRefusal, invalid } from "./kit.ts";
 import type { GitHubRepos } from "./repos.ts";
 
 export interface GitHubIssueInput {
@@ -138,10 +138,13 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
         ]);
       const issue = newIssue(repo, actor, input.title, input.body);
       // Labels and assignees given with the issue are on it when `opened` is sent; each still gets its own event after.
-      const labels = (input.labels ?? []).map(
-        (name) => repo.labels.get(name.toLowerCase()) ?? repos.addLabel(repo, { name }),
-      );
-      issue.labels.push(...new Set(labels.map((label) => label.name)));
+      // One label per name, however often and in whatever case it was given.
+      const labels = [
+        ...new Set(
+          (input.labels ?? []).map((name) => repo.labels.get(name.toLowerCase()) ?? repos.addLabel(repo, { name })),
+        ),
+      ];
+      issue.labels.push(...labels.map((label) => label.name));
       issue.assignees.push(...new Set(input.assignees ?? []));
       const delivery = kit.issueEvent(issue, actor, "opened");
       for (const label of labels) kit.issueEvent(issue, actor, "labeled", { label: objects.label(repo, label) });
@@ -155,31 +158,29 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
      * the text was before, `closed` or `reopened`. Answers with the last delivery it caused.
      */
     updateIssue(issue: GitHubIssueRecord, actor: number, changes: GitHubIssueChanges): string | undefined {
+      // Refused before anything changes.
+      if (changes.state === "open" && issue.state !== "open" && issue.pull?.merged) {
+        throw invalid("PullRequest", "state", {
+          message: "state cannot be changed. The pull request has been merged.",
+        });
+      }
       let delivery: string | undefined;
       const from: Record<string, { from: string }> = {};
+      // No body and an empty body are the same thing.
+      const body = changes.body === "" ? null : changes.body;
       if (changes.title !== undefined && changes.title !== issue.title) {
         from.title = { from: issue.title };
         issue.title = changes.title;
       }
-      if (changes.body !== undefined && (changes.body ?? null) !== issue.body) {
+      if (body !== undefined && body !== issue.body) {
         from.body = { from: issue.body ?? "" };
-        issue.body = changes.body === "" ? null : changes.body;
+        issue.body = body;
       }
       if (Object.keys(from).length > 0) {
         touch(issue);
         delivery = kit.issueEvent(issue, actor, "edited", { changes: from });
       }
       if (changes.state !== undefined && changes.state !== issue.state) {
-        if (changes.state === "open" && issue.pull?.merged) {
-          throw new GitHubRefusal(422, "Validation Failed", [
-            {
-              resource: "PullRequest",
-              code: "custom",
-              field: "state",
-              message: "state cannot be changed. The pull request has been merged.",
-            },
-          ]);
-        }
         issue.state = changes.state;
         issue.closedAt = changes.state === "closed" ? clock() : undefined;
         issue.closedBy = changes.state === "closed" ? actor : undefined;

@@ -442,6 +442,11 @@ describe("code", () => {
     await raw("GET", "/app", "Bearer made-up");
     const about = (await get("/app-calls")).map((call: { operation: string }) => call.operation);
     expect(about).toContain("GET /rate_limit");
+    // One about a repository is on its session's record, where `calls({ error: true })` finds it, and not on everyone's.
+    expect((await get("/calls?error=true")).map((call: { operation: string }) => call.operation)).toContain(
+      `GET ${path}/milestones`,
+    );
+    expect(about).not.toContain(`GET ${path}/milestones`);
     expect(about).not.toContain("GET /nothing/at/all");
     expect(about).not.toContain("GET /app");
   });
@@ -494,11 +499,78 @@ describe("code", () => {
       [{ resource: "CheckRun", field: "started_at", code: "invalid" }],
     ]);
 
+    const tree = (await api("GET", `${path}/git/ref/heads/main`)).body.object.sha;
+    const author = { name: "Ana", email: "ana@example.com", date: "yesterday" };
+    const dated = await api("POST", `${path}/git/commits`, {
+      message: "m",
+      tree: (await api("GET", `${path}/git/commits/${tree}`)).body.tree.sha,
+      author,
+    });
+    expect([dated.status, dated.body.errors]).toEqual([422, [{ resource: "Commit", field: "date", code: "invalid" }]]);
+    expect((await api("POST", `${path}/git/trees`, { tree: [null] })).status).toBe(422);
+
     const { number } = await issue();
     await api("POST", `${path}/labels`, { name: "50% done" });
     await api("POST", `${path}/issues/${number}/labels`, { labels: ["50% done"] });
     expect((await api("GET", `${path}/labels/50%25%20done`)).body.name).toBe("50% done");
     expect((await api("DELETE", `${path}/issues/${number}/labels/50%25%20done`)).body).toEqual([]);
+  });
+
+  test("a directory is its tree: in a contents listing, and as an entry of a new tree", async () => {
+    const { ana, repo, post, api, path } = await workspace();
+    await post(`/users/${ana.id}/push`, {
+      changes: [
+        { path: "src/a.ts", content: b64("a\n") },
+        { path: "src/b.ts", content: b64("b\n") },
+      ],
+      repo: repo.id,
+      branch: "main",
+    });
+    const listed = (await api("GET", `${path}/contents/`)).body.find((entry: { name: string }) => entry.name === "src");
+    const tree = (await api("GET", `${path}/git/trees/${listed.sha}`)).body;
+    expect(tree.tree.map((entry: { path: string }) => entry.path)).toEqual(["a.ts", "b.ts"]);
+    expect(listed.git_url).toMatch(new RegExp(`/git/trees/${listed.sha}$`));
+
+    // The same directory under another name: everything in it comes along.
+    const copy = await api("POST", `${path}/git/trees`, {
+      tree: [{ path: "lib", mode: "040000", type: "tree", sha: listed.sha }],
+    });
+    expect(copy.status).toBe(201);
+    const all = (await api("GET", `${path}/git/trees/${copy.body.sha}?recursive=1`)).body.tree;
+    expect(all.map((entry: { path: string }) => entry.path)).toEqual(["lib", "lib/a.ts", "lib/b.ts"]);
+    const blob = (await api("POST", `${path}/git/blobs`, { content: "x" })).body.sha;
+    const notATree = await api("POST", `${path}/git/trees`, {
+      tree: [{ path: "lib", mode: "040000", type: "tree", sha: blob }],
+    });
+    expect([notATree.status, notATree.body.message]).toEqual([422, "tree.sha is not a valid tree"]);
+  });
+
+  test("history: a forced update says so, and the merge base is the newest commit both sides share", async () => {
+    const { h, api, path, webhooks } = await workspace();
+    const commit = async (message: string, parents: string[]) => {
+      const tree = (
+        await api("POST", `${path}/git/trees`, { tree: [{ path: `${message}.txt`, mode: "100644", content: message }] })
+      ).body.sha;
+      return (await api("POST", `${path}/git/commits`, { message, tree, parents })).body.sha as string;
+    };
+    const a = (await api("GET", `${path}/git/ref/heads/main`)).body.object.sha;
+    const b1 = await commit("base", [a]);
+    await api("PATCH", `${path}/git/refs/heads/main`, { sha: b1 });
+    // `feat` merged `main` in, with the older commit as the merge's first parent.
+    const h1 = await commit("merge", [a, b1]);
+    const h2 = await commit("head", [h1]);
+    await api("POST", `${path}/git/refs`, { ref: "refs/heads/feat", sha: h2 });
+    expect((await api("GET", `${path}/compare/main...feat`)).body.merge_base_commit.sha).toBe(b1);
+
+    const other = await commit("elsewhere", [a]);
+    await api("PATCH", `${path}/git/refs/heads/feat`, { sha: other, force: true });
+    await h.app.settled();
+    expect(webhooks().at(-1)?.payload).toMatchObject({
+      ref: "refs/heads/feat",
+      before: h2,
+      after: other,
+      forced: true,
+    });
   });
 
   test("lists are paged the way GitHub pages them", async () => {
@@ -619,6 +691,56 @@ describe("pull requests", () => {
     expect((await api("GET", `${path}/pulls/${own.number}/requested_reviewers`)).body.users).toEqual([]);
     const said = await api("POST", `${reviews}/${pending.id}/events`, { event: "COMMENT", body: "Done thinking" });
     expect(said.body).toMatchObject({ state: "COMMENTED", body: "Done thinking" });
+  });
+
+  test("a pending review's comments are nobody's to see until it is submitted", async () => {
+    const { ana, pull, post, get, api, path } = await workspace();
+    const pr = await pull();
+    const reviews = `${path}/pulls/${pr.number}/reviews`;
+    const pending = (await api("POST", reviews, { comments: [{ path: "src/app.ts", line: 1, body: "draft" }] })).body;
+    const [comment] = (await api("GET", `${reviews}/${pending.id}/comments`)).body;
+    const seen = async () =>
+      (await get(`/repos/${pr.repoId}/pulls/${pr.number}/review-comments`)).map((c: { body: string }) => c.body);
+
+    expect(await seen()).toEqual([]);
+    expect((await api("GET", `${path}/pulls/${pr.number}`)).body.review_comments).toBe(0);
+    expect(await refusal(post(`/users/${ana.id}/reply`, { body: "?", comment: comment.id }))).toBe("not_found");
+    expect(await refusal(post(`/users/${ana.id}/resolve`, { comment: comment.id }))).toBe("not_found");
+
+    await api("POST", `${reviews}/${pending.id}/events`, { event: "COMMENT" });
+    expect(await seen()).toEqual(["draft"]);
+    expect((await api("GET", `${path}/pulls/${pr.number}`)).body.review_comments).toBe(1);
+    expect((await post(`/users/${ana.id}/reply`, { body: "ok", comment: comment.id })).body).toBe("ok");
+  });
+
+  test("a refused request leaves nothing behind and sends nothing", async () => {
+    const { h, ana, repo, pull, post, get, api, path, webhooks } = await workspace();
+    const ben = await post("/users", { login: "ben" });
+    const pr = await pull();
+    await h.app.settled();
+    const sent = webhooks().length;
+
+    // Ben could be asked, Ana (the author) can't: nobody is.
+    expect(
+      (await api("POST", `${path}/pulls/${pr.number}/requested_reviewers`, { reviewers: ["ben", "ana"] })).status,
+    ).toBe(422);
+    expect((await api("GET", `${path}/pulls/${pr.number}/requested_reviewers`)).body.users).toEqual([]);
+    // The same through a person's `openPullRequest`: no branch is pushed and no pull request opened.
+    const again = post(`/users/${ana.id}/pulls`, {
+      pr: { from: "other", changes: [{ path: "x.txt", content: b64("x") }], reviewers: [ben.id, ana.id] },
+      repo: repo.id,
+    });
+    expect(await refusal(again)).toBe("validation_failed");
+    expect(await refusal(get(`/repos/${repo.id}/commits?branch=other`))).toBe("not_found");
+
+    // A merged pull request can't be reopened, and the title that came with the request isn't taken either.
+    await post(`/users/${ana.id}/merge`, { pr: pr.ref });
+    await h.app.settled();
+    const merged = webhooks().length;
+    expect((await api("PATCH", `${path}/pulls/${pr.number}`, { title: "Renamed", state: "open" })).status).toBe(422);
+    expect((await api("GET", `${path}/pulls/${pr.number}`)).body.title).toBe("Add app");
+    await h.app.settled();
+    expect([sent, webhooks().length]).toEqual([sent, merged]);
   });
 
   test("a thread stays one thread when the comment that started it is deleted", async () => {
@@ -803,6 +925,37 @@ describe("check runs", () => {
     });
     await h.app.settled();
     expect((await quiet()).open).toEqual([]);
+  });
+});
+
+describe("nothing is sent for what didn't happen", () => {
+  test("a label named twice is one label, and an empty body on an issue without one is no edit", async () => {
+    const { h, api, path, webhooks } = await workspace();
+    const issue = (await api("POST", `${path}/issues`, { title: "Twice", labels: ["bug", "Bug"] })).body;
+    await h.app.settled();
+    expect(issue.labels.map((label: { name: string }) => label.name)).toEqual(["bug"]);
+    expect(webhooks().filter((hook) => hook.payload.action === "labeled")).toHaveLength(1);
+    const sent = webhooks().length;
+    const same = (await api("PATCH", `${path}/issues/${issue.number}`, { body: "" })).body;
+    await h.app.settled();
+    expect([same.body, same.updated_at, webhooks().length]).toEqual([null, issue.updated_at, sent]);
+  });
+});
+
+describe("a reset", () => {
+  test("the App is the same App in the new world: what `channelstack env` printed still holds", async () => {
+    const { h, asApp, jwt } = await workspace();
+    const env = async () => {
+      const all = (await h.call("GET", "/env")).body as Record<string, string>;
+      return Object.fromEntries(Object.entries(all).filter(([name]) => name.startsWith("GITHUB_")));
+    };
+    const before = await env();
+    const signed = await jwt();
+    await h.call("POST", "/reset");
+    expect(await env()).toEqual(before);
+    expect((await h.provider("GET", "github/app", undefined, signed)).status).toBe(200);
+    const installation = Number(before.GITHUB_INSTALLATION_ID);
+    expect((await asApp("POST", `/app/installations/${installation}/access_tokens`)).status).toBe(201);
   });
 });
 

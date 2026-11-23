@@ -194,6 +194,13 @@ export class GitHubStore {
     );
   }
 
+  /** The comments on the diff a person can see: not those of a review its author hasn't submitted yet. */
+  postedReviewComments(repo: GitHubRepoRecord, pull?: number): GitHubReviewCommentRecord[] {
+    return this.reviewCommentsOf(repo, pull).filter(
+      (comment) => this.reviews.find(String(comment.review))?.state !== "PENDING",
+    );
+  }
+
   checkRunsOf(repo: GitHubRepoRecord, sha?: string): GitHubCheckRunRecord[] {
     return this.list(this.checkRuns, this.sessionOf(repo)).filter(
       (run) => run.repo === repo.id && (sha === undefined || run.headSha === sha),

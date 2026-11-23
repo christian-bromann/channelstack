@@ -93,6 +93,7 @@ export function createRepos(kit: GitHubKit) {
     branch: string,
     before: string | undefined,
     after: string | undefined,
+    forced = false,
   ): Promise<string | undefined> => {
     const dir = kit.dir(repo);
     repo.pushedAt = clock();
@@ -111,7 +112,7 @@ export function createRepos(kit: GitHubKit) {
       after: after ?? ZERO_SHA,
       created: before === undefined,
       deleted: after === undefined,
-      forced: false,
+      forced,
       base_ref: null,
       compare: `${objects.repoWeb(repo)}/compare/${(before ?? ZERO_SHA).slice(0, 12)}...${(after ?? ZERO_SHA).slice(0, 12)}`,
       commits: listed,

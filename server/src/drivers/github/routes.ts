@@ -385,7 +385,14 @@ export function registerGitHubRoutes(
     if (!issue.pull) throw new ProtocolError("not_found", `#${ref.number} is an issue, not a pull request`);
     return issue as GitHubIssueRecord & { pull: NonNullable<GitHubIssueRecord["pull"]> };
   };
-  const reviewCommentOf = (session: string, id: number) => store.reviewComments.get(session, String(id));
+  /** A comment on the diff a person has a handle to: one they can see, so not one of a review that is still pending. */
+  const reviewCommentOf = (session: string, id: number) => {
+    const comment = store.reviewComments.get(session, String(id));
+    if (store.reviews.find(String(comment.review))?.state === "PENDING") {
+      throw new ProtocolError("not_found", `No comment ${id} on the diff: its review hasn't been submitted`);
+    }
+    return comment;
+  };
   /** A conversation comment or a comment on the diff, whichever the id is. */
   const anyComment = (session: string, id: number) => {
     const review = store.reviewComments.find(String(id));
@@ -749,6 +756,9 @@ export function registerGitHubRoutes(
       const actor = person(session.id, params.user);
       const { pr } = body;
       kit.allow(repo, actor, pr.changes ? "write" : "read");
+      // Refused before anything is pushed or opened.
+      const reviewers = people(session.id, pr.reviewers ?? []);
+      pulls.mayRequest(actor, reviewers);
       kit.action(repo, "openPullRequest", { user: actor, from: pr.from });
       if (pr.changes) {
         const message = pr.title ?? defaultMessage(pr.changes);
@@ -761,9 +771,7 @@ export function registerGitHubRoutes(
         body: pr.body,
         draft: pr.draft,
       });
-      if (pr.reviewers?.length) {
-        pulls.requestReviewers(issue, actor, people(session.id, pr.reviewers));
-      }
+      if (reviewers.length > 0) pulls.requestReviewers(issue, actor, reviewers);
       return pullWire(issue);
     },
   });
@@ -1292,7 +1300,7 @@ export function registerGitHubRoutes(
           issue,
           comments: store.commentsOn(repo, issue.number),
           reviews: store.reviewsOf(repo, issue.number),
-          reviewComments: store.reviewCommentsOf(repo, issue.number),
+          reviewComments: store.postedReviewComments(repo, issue.number),
         },
         principal,
       );
@@ -1354,7 +1362,9 @@ export function registerGitHubRoutes(
     "The comments on the diff, oldest first",
     z.array(GitHubReviewComment).openapi("GitHubReviewComments"),
     (pull, session) =>
-      store.reviewCommentsOf(store.repo(pull.repo), pull.number).map((comment) => reviewCommentWire(session, comment)),
+      store
+        .postedReviewComments(store.repo(pull.repo), pull.number)
+        .map((comment) => reviewCommentWire(session, comment)),
   );
   pullRead(
     "/check-runs",

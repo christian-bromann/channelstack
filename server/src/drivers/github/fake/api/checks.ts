@@ -7,7 +7,7 @@ import type {
 } from "../../world.ts";
 import type { GitHubCheckRunInput } from "../checks.ts";
 import { GitHubRefusal } from "../kit.ts";
-import { type Call, invalid, type Json, notFound, numberParam, page, type Register, text } from "./shared.ts";
+import { type Call, invalid, type Json, notFound, numberParam, page, type Register, text, time } from "./shared.ts";
 
 const STATUSES: readonly string[] = ["queued", "in_progress", "completed"];
 const CONCLUSIONS: readonly string[] = [
@@ -26,13 +26,6 @@ export function registerChecks(register: Register): void {
   const read = ["checks", "read"] as const;
   const write = ["checks", "write"] as const;
 
-  const time = (body: Json, name: string): number | undefined => {
-    const value = text(body, name);
-    if (value === undefined) return undefined;
-    const at = Date.parse(value);
-    if (Number.isNaN(at)) throw invalid("CheckRun", name, "invalid");
-    return at;
-  };
   const input = (body: Json): GitHubCheckRunInput => {
     const status = text(body, "status");
     const conclusion = text(body, "conclusion");
@@ -47,8 +40,8 @@ export function registerChecks(register: Register): void {
       conclusion: conclusion as GitHubCheckConclusion | undefined,
       externalId: text(body, "external_id"),
       detailsUrl: text(body, "details_url"),
-      startedAt: time(body, "started_at"),
-      completedAt: time(body, "completed_at"),
+      startedAt: time(body, "started_at", "CheckRun"),
+      completedAt: time(body, "completed_at", "CheckRun"),
       output: output
         ? {
             title: text(output, "title"),

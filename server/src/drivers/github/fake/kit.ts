@@ -114,7 +114,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     actor: (id) => store.actor(id),
     repo: (id) => store.repo(id),
     commentCount: (issue) => store.commentsOn(store.repo(issue.repo), issue.number).length,
-    reviewCommentCount: (issue) => store.reviewCommentsOf(store.repo(issue.repo), issue.number).length,
+    reviewCommentCount: (issue) => store.postedReviewComments(store.repo(issue.repo), issue.number).length,
     openIssueCount: (repo) => store.issuesOf(repo).filter((issue) => issue.state === "open").length,
     association: (repo, user) => {
       if (user === store.bot.id) return "NONE";

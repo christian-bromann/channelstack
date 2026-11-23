@@ -232,11 +232,20 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   registerChecks(register);
 
   // Anything else isn't served: GitHub's 404, through the same error handling and recording as every route.
-  routes.all("*", (c) => {
-    // Whoever asks gets the 404; it is on record when the App's installation asked.
-    const token = credential(c);
-    if (token !== undefined && constantTimeEqual(token, context.secret("installationToken")))
+  routes.all("*", async (c) => {
+    // Whoever asks gets the 404. It is on record when the App or its installation asked: for the
+    // session that owns the repository the path names, or for no session when it names none.
+    const token = credential(c) ?? "";
+    const app = { privateKey: context.secret("privateKey"), issuers: [String(store.app.id), store.app.clientId] };
+    if (
+      constantTimeEqual(token, context.secret("installationToken")) ||
+      (await verifyGitHubAppJwt(token, app, clock()))
+    ) {
       c.set("authenticated", true);
+      const [, owner = "", name = ""] = /\/repos\/([^/]+)\/([^/]+)/.exec(c.req.path) ?? [];
+      const repo = store.repoNamed(owner, name);
+      if (repo?.installed) c.set("repo", repo);
+    }
     throw notFound();
   });
 

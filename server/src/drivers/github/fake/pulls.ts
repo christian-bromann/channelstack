@@ -188,8 +188,15 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
    */
   const threadOf = (comment: GitHubReviewCommentRecord): GitHubReviewCommentRecord[] =>
     store
-      .reviewCommentsOf(store.repo(comment.repo), comment.pull)
+      .postedReviewComments(store.repo(comment.repo), comment.pull)
       .filter((candidate) => candidate.thread === comment.thread);
+
+  /** A review can be asked of anyone but the pull request's author. */
+  const mayRequest = (author: number, reviewers: readonly number[]): void => {
+    if (reviewers.includes(author)) {
+      throw refused("PullRequest", "reviewers", "Review cannot be requested from pull request author.");
+    }
+  };
 
   return {
     threadOf,
@@ -244,11 +251,13 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       return { issue: issue as Pull, delivery: kit.issueEvent(issue, actor, "opened") };
     },
 
+    mayRequest,
+
     requestReviewers(pull: Pull, actor: number, reviewers: readonly number[]): Array<string | undefined> {
+      // Everyone is checked before anyone is asked.
+      mayRequest(pull.author, reviewers);
       const deliveries: Array<string | undefined> = [];
       for (const reviewer of reviewers) {
-        if (reviewer === pull.author)
-          throw refused("PullRequest", "reviewers", "Review cannot be requested from pull request author.");
         if (pull.pull.requestedReviewers.includes(reviewer)) continue;
         pull.pull.requestedReviewers.push(reviewer);
         touch(pull);

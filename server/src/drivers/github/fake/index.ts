@@ -34,26 +34,28 @@ export function createGitHubFake(context: DriverContext): GitHubFake {
   const store = new GitHubStore(context.registry);
   const git = new GitStore();
   const world = createFakeWorld(context, store, git);
+  // Who the org and the App are is drawn once. The agent holds the App's ids from `channelstack env`
+  // and isn't restarted by a reset, so a new world has the same App in it.
+  const identity = {
+    org: Number(context.ids.next("github.user")),
+    app: {
+      id: Number(context.ids.next("github.app")),
+      slug: DEFAULT_APP.slug,
+      name: DEFAULT_APP.slug,
+      clientId: context.ids.next("github.clientId"),
+      botId: Number(context.ids.next("github.user")),
+      installationId: Number(context.ids.next("github.installation")),
+      events: DEFAULT_APP.events,
+      permissions: DEFAULT_APP.permissions,
+    },
+  };
   const fake = {
     api: createGitHubApi(context, world),
     world,
     store,
     seed() {
       git.clear();
-      store.seed(
-        { id: Number(context.ids.next("github.user")), login: "acme" },
-        {
-          id: Number(context.ids.next("github.app")),
-          slug: DEFAULT_APP.slug,
-          name: DEFAULT_APP.slug,
-          clientId: context.ids.next("github.clientId"),
-          botId: Number(context.ids.next("github.user")),
-          installationId: Number(context.ids.next("github.installation")),
-          events: DEFAULT_APP.events,
-          permissions: DEFAULT_APP.permissions,
-          createdAt: context.clock(),
-        },
-      );
+      store.seed({ id: identity.org, login: "acme" }, { ...identity.app, createdAt: context.clock() });
     },
     release(session: string) {
       const released = store.release(session);

@@ -2,7 +2,7 @@ import { githubNodeId } from "../../../../core/ids/index.ts";
 import { type GitHubCommitInfo, PERMISSIONS } from "../../world.ts";
 import { FILE_MODE, type GitTreeEntry, TREE_MODE } from "../git.ts";
 import { GitHubRefusal } from "../kit.ts";
-import { type Call, invalid, type Json, notFound, page, type Register, text } from "./shared.ts";
+import { type Call, invalid, type Json, notFound, page, type Register, text, time } from "./shared.ts";
 
 const base64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 
@@ -182,17 +182,18 @@ export function registerRepos(register: Register): void {
       else if (!children.has(child)) {
         const api = world.kit.objects.repoApi(repo);
         const html = `${world.kit.objects.repoWeb(repo)}/tree/${ref}/${childPath}`;
+        const tree = (await world.kit.git.treeAt(dirOf(call), sha, childPath)) ?? "";
         children.set(child, {
           name: child,
           path: childPath,
-          sha: entry.sha,
+          sha: tree,
           size: 0,
           url: `${api}/contents/${childPath}?ref=${ref}`,
           html_url: html,
-          git_url: `${api}/git/trees/${entry.sha}`,
+          git_url: `${api}/git/trees/${tree}`,
           download_url: null,
           type: "dir",
-          _links: { self: `${api}/contents/${childPath}?ref=${ref}`, git: `${api}/git/trees/${entry.sha}`, html },
+          _links: { self: `${api}/contents/${childPath}?ref=${ref}`, git: `${api}/git/trees/${tree}`, html },
         });
       }
     }
@@ -297,22 +298,21 @@ export function registerRepos(register: Register): void {
     if (!Array.isArray(entries)) throw invalid("Tree", "tree");
     const baseTree = text(body, "base_tree");
     const files = baseTree ? await git.files(dir, baseTree) : new Map<string, { sha: string; mode: string }>();
-    for (const entry of entries as Array<{
-      path?: string;
-      mode?: string;
-      type?: string;
-      sha?: string | null;
-      content?: string;
-    }>) {
-      if (typeof entry.path !== "string") throw invalid("Tree", "path");
-      if (entry.type === "tree" || entry.mode === TREE_MODE) continue;
-      // `sha: null` deletes the file; `content` writes a blob for it.
-      if (entry.sha === null) files.delete(entry.path);
-      else {
-        const sha = entry.sha ?? (await git.writeBlob(dir, entry.content ?? ""));
-        if (!(await git.readBlob(dir, sha))) throw new GitHubRefusal(422, "tree.sha is not a valid blob");
-        files.set(entry.path, { sha, mode: entry.mode ?? FILE_MODE });
+    for (const entry of entries as Array<Json | null>) {
+      if (typeof entry !== "object" || entry === null || typeof entry.path !== "string") throw invalid("Tree", "path");
+      const { path, mode, sha: given } = entry as { path: string; mode?: string; sha?: string | null };
+      // Whatever was at the path goes: a file, or everything under a directory of that name.
+      for (const known of [...files.keys()]) if (known === path || known.startsWith(`${path}/`)) files.delete(known);
+      // `sha: null` deletes; a tree puts everything under it at the path; `content` writes a blob.
+      if (given === null) continue;
+      if (entry.type === "tree" || mode === TREE_MODE) {
+        if (!given || !(await git.readTree(dir, given))) throw new GitHubRefusal(422, "tree.sha is not a valid tree");
+        for (const [name, file] of await git.files(dir, given)) files.set(`${path}/${name}`, file);
+        continue;
       }
+      const sha = given ?? (await git.writeBlob(dir, text(entry, "content") ?? ""));
+      if (!(await git.readBlob(dir, sha))) throw new GitHubRefusal(422, "tree.sha is not a valid blob");
+      files.set(path, { sha, mode: mode ?? FILE_MODE });
     }
     const sha = await git.treeOf(dir, files);
     return c.json(treeJson(call, sha, (await git.readTree(dir, sha)) ?? []), 201);
@@ -358,7 +358,7 @@ export function registerRepos(register: Register): void {
       return {
         name: person.name,
         email: person.email,
-        date: person.date ? Date.parse(person.date) : world.kit.context.clock(),
+        date: time(person, "date", "Commit") ?? world.kit.context.clock(),
       };
     };
     // Without an author, the commit is the App's own.
@@ -439,7 +439,7 @@ export function registerRepos(register: Register): void {
     const forward = (await git.log(dir, sha)).some((commit) => commit.sha === before);
     if (!forward && body.force !== true) throw new GitHubRefusal(422, "Update is not a fast forward");
     await git.setBranch(dir, name, sha);
-    if (sha !== before) await world.repos.afterPush(repo, bot, name, before, sha);
+    if (sha !== before) await world.repos.afterPush(repo, bot, name, before, sha, !forward);
     return c.json(refJson(call, name, sha));
   });
 

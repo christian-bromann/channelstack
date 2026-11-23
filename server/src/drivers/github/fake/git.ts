@@ -195,10 +195,26 @@ export class GitStore {
     return (await this.log(dir, head)).filter((commit) => !behind.has(commit.sha)).reverse();
   }
 
-  /** The newest commit both histories share. */
+  /** The merge base: a commit both histories share that isn't behind another one they share. */
   async mergeBase(dir: string, a: string, b: string): Promise<string | undefined> {
     const mine = new Set((await this.log(dir, a)).map((commit) => commit.sha));
-    return (await this.log(dir, b)).find((commit) => mine.has(commit.sha))?.sha;
+    const shared = (await this.log(dir, b)).filter((commit) => mine.has(commit.sha));
+    // What lies behind a shared commit isn't the base: the base is the one nothing shared leads to.
+    const behind = new Set<string>();
+    for (const commit of shared) {
+      for (const older of (await this.log(dir, commit.sha)).slice(1)) behind.add(older.sha);
+    }
+    return shared.find((commit) => !behind.has(commit.sha))?.sha;
+  }
+
+  /** The tree of a directory in a commit, by its path. */
+  async treeAt(dir: string, commit: string, path: string): Promise<string | undefined> {
+    let tree = (await this.readCommit(dir, commit))?.tree;
+    for (const name of path.split("/").filter(Boolean)) {
+      const entry = tree ? (await this.readTree(dir, tree))?.find((candidate) => candidate.path === name) : undefined;
+      tree = entry?.type === "tree" ? entry.sha : undefined;
+    }
+    return tree;
   }
 
   /** Every file of a commit (or of a tree), by path. */
