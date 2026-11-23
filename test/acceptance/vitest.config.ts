@@ -24,6 +24,7 @@ export default defineConfig({
       "api/examples/slack.test.ts",
       "api/examples/github.test.ts",
       "api/examples/linear.test.ts",
+      "api/examples/notion.test.ts",
       "test/acceptance/stack/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],

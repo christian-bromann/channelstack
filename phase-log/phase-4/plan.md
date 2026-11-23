@@ -45,6 +45,9 @@ Goal: the Linear and Notion fakes. Every fake Linear and Notion example passes, 
 | `marked` (server) | 18.2.0 | Its lexer reads Markdown for page content; nothing is rendered to HTML | MIT | Released 2026-11 |
 | `@linear/sdk` (dev) | 103.0.0 | Reference agent; `LinearWebhookClient` is the receiver in L1 to L3 | MIT | Released 2026-11 |
 | `@notionhq/client` (dev) | 5.31.1 | Reference agent; `verifyWebhookSignature` is the receiver in N1 to N3; its response types check the fake's builders | MIT | Released 2026-11 |
+| `@chat-adapter/linear` (dev) | 4.45.0 | The second Linear reference agent, on the Chat SDK in agent-session mode | MIT | Released 2026-11 |
+
+`@notionhq/client` is also a dev dependency of `server`: the fake's builders are typed by its response and webhook types (type imports only). `@chat-adapter/notion` was dropped: it calls `https://api.notion.com/v1` with no base URL option, so it can't reach the fake in base-URL mode (it can in proxy mode, phase 5).
 
 Linear's schema is a data file, not a dependency: `server/src/drivers/linear/schema/schema.graphql`, from `linear/linear` at a pinned commit (`scripts/linear-schema.ts` fetches it and writes the module the binary embeds).
 

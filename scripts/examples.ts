@@ -54,6 +54,16 @@ const CHANNELS = {
     ],
     suites: [],
   },
+  notion: {
+    examples: "api/examples/notion.test.ts",
+    enabled: [
+      "comments and discussions > ",
+      "connections > ",
+      "pages and databases > ",
+      "delivery and failures \\(fake only\\) > ",
+    ],
+    suites: [],
+  },
 } as const;
 
 /** The reference agents the examples run against, by name: the channel they live in, and where they take webhooks. */
@@ -64,6 +74,7 @@ const AGENTS = {
   "chat-sdk-github": { channel: "github", path: "/api/webhooks/github" },
   "linear-sdk": { channel: "linear", path: "/webhooks/linear" },
   "chat-sdk-linear": { channel: "linear", path: "/api/webhooks/linear" },
+  "notion-sdk": { channel: "notion", path: "/webhooks/notion" },
 } as const;
 
 /** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */
