@@ -24,6 +24,8 @@ export interface StackOptions {
   socketMode?: boolean;
   /** Extra environment for the agent, on top of what `channelstack env` prints. */
   agentEnv?: Readonly<Record<string, string>>;
+  /** More agents next to it, one per channel, all against the same server (every channel in one run). */
+  others?: ReadonlyArray<{ agent: string; webhook: { driver: string; path: string } }>;
 }
 
 export interface RunningStack {
@@ -50,11 +52,20 @@ export async function withStack(
   const stops: Array<() => Promise<unknown>> = [];
   try {
     const port = await freePort();
-    const webhookVariable = `CHANNELSTACK_${options.webhook.driver.toUpperCase()}_WEBHOOK_URL`;
+    const others = await Promise.all(
+      (options.others ?? []).map(async (other) => ({ ...other, port: await freePort() })),
+    );
+    const webhookUrl = (webhook: { driver: string; path: string }, at: number) => ({
+      [`CHANNELSTACK_${webhook.driver.toUpperCase()}_WEBHOOK_URL`]: `http://127.0.0.1:${at}${webhook.path}`,
+    });
     const server = await startBinary({
       bin: options.bin,
       home,
-      env: options.socketMode ? env : { ...env, [webhookVariable]: `http://127.0.0.1:${port}${options.webhook.path}` },
+      env: {
+        ...env,
+        ...(options.socketMode ? {} : webhookUrl(options.webhook, port)),
+        ...Object.assign({}, ...others.map((other) => webhookUrl(other.webhook, other.port))),
+      },
     });
     stops.push(server.stop);
 
@@ -72,10 +83,29 @@ export async function withStack(
       ...options.agentEnv,
     });
     stops.push(agent.stop);
+    const companions = others.map((other) => {
+      const started = background(process.execPath, [other.agent], {
+        ...process.env,
+        ...agentEnv,
+        PORT: String(other.port),
+      });
+      stops.push(started.stop);
+      return { ...other, started };
+    });
     const running = () => {
       if (agent.child.exitCode !== null)
         throw new Error(`The agent ${options.agent} exited with ${agent.child.exitCode}`);
+      for (const other of companions)
+        if (other.started.child.exitCode !== null)
+          throw new Error(`The agent ${other.agent} exited with ${other.started.child.exitCode}`);
     };
+    /** Something answers on this port. */
+    const listening = (at: number) =>
+      new Promise<true | undefined>((resolve) => {
+        const socket = connect({ host: "127.0.0.1", port: at });
+        socket.once("connect", () => resolve(socket.destroy() && true));
+        socket.once("error", () => resolve(undefined));
+      });
     if (options.socketMode) {
       // In Socket Mode the agent listens nowhere: it is ready once the fake sees its connection.
       const { url, token } = server;
@@ -99,11 +129,16 @@ export async function withStack(
         "the reference agent to listen",
         () => {
           running();
-          return new Promise<true | undefined>((resolve) => {
-            const socket = connect({ host: "127.0.0.1", port });
-            socket.once("connect", () => resolve(socket.destroy() && true));
-            socket.once("error", () => resolve(undefined));
-          });
+          return listening(port);
+        },
+        STARTUP,
+      );
+    for (const other of companions)
+      await waitFor(
+        `the reference agent ${other.agent} to listen`,
+        () => {
+          running();
+          return listening(other.port);
         },
         STARTUP,
       );

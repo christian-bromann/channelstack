@@ -52,7 +52,8 @@ const CHANNELS = {
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
     ],
-    suites: [],
+    // The standard checks as a developer adds them (exit check 4.5).
+    suites: ["test/acceptance/checks/linear-checks.test.ts"],
   },
   notion: {
     examples: "api/examples/notion.test.ts",
@@ -62,7 +63,7 @@ const CHANNELS = {
       "pages and databases > ",
       "delivery and failures \\(fake only\\) > ",
     ],
-    suites: [],
+    suites: ["test/acceptance/checks/notion-checks.test.ts"],
   },
 } as const;
 
@@ -77,11 +78,19 @@ const AGENTS = {
   "notion-sdk": { channel: "notion", path: "/webhooks/notion" },
 } as const;
 
+/**
+ * Every channel in one run (exit check 4.6): `api/examples/shared.test.ts` against one server with
+ * one reference agent per channel, each with its own endpoint.
+ */
+const SHARED = {
+  examples: "api/examples/shared.test.ts",
+  agents: ["bolt-ai-sdk", "probot", "linear-sdk", "notion-sdk"],
+  enabled: ["answers in #support", "an admin and a regular member", "(slack|github|linear|notion) checks: "],
+} as const;
+
 /** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */
 export const ENABLED_TESTS = new RegExp(
-  `^(${Object.values(CHANNELS)
-    .flatMap((channel) => channel.enabled)
-    .join("|")})`,
+  `^(${[...Object.values(CHANNELS).flatMap((channel) => channel.enabled), ...SHARED.enabled].join("|")})`,
 );
 
 export async function runExamples(
@@ -100,4 +109,17 @@ export async function runExamples(
       for (const suite of suites) run("pnpm", [...vitest, suite], { cwd: ROOT, env });
     });
   }
+  if (options.agents !== undefined) return;
+  console.log(`\n${SHARED.examples} against ${SHARED.agents.join(", ")}`);
+  const [first, ...rest] = SHARED.agents.map((name) => ({
+    agent: join(ROOT, "examples", "agents", name, "agent.ts"),
+    webhook: { driver: AGENTS[name].channel, path: AGENTS[name].path },
+  }));
+  if (!first) return;
+  await withStack({ bin, ...first, others: rest }, ({ env }) => {
+    run("pnpm", ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", SHARED.examples], {
+      cwd: ROOT,
+      env,
+    });
+  });
 }

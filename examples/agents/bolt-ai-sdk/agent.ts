@@ -24,14 +24,17 @@ const app = createApp();
 const handled = new Set<string>();
 const firstTime = (eventId: string) => !handled.has(eventId) && handled.add(eventId).size > 0;
 
-/** Threads the agent has answered in: it keeps answering follow-ups there without a new mention. */
-const joined = new Set<string>();
+/**
+ * Threads the agent has answered in, and whom it is helping there: it keeps answering that
+ * person's follow-ups without a new mention. Someone else chiming in ("+1") isn't asking it.
+ */
+const joined = new Map<string, string | undefined>();
 
 app.event("app_mention", async ({ event, body, client, say }) => {
   // Other bots don't get answers, and a retried event was already answered.
   if ("bot_id" in event || !firstTime(body.event_id)) return;
   const thread = event.thread_ts ?? event.ts;
-  joined.add(`${event.channel}:${thread}`);
+  joined.set(`${event.channel}:${thread}`, event.user);
   if (/look at/i.test(event.text))
     await client.reactions.add({ channel: event.channel, timestamp: event.ts, name: "eyes" });
   // Workflows first: a deploy needs an approval or an environment, an incident needs its form.
@@ -153,11 +156,14 @@ app.message(async ({ message, body, client, say }) => {
   if (message.subtype !== undefined || "bot_id" in message || !firstTime(body.event_id)) return;
   const thread = message.thread_ts ?? message.ts;
   const direct = message.channel_type === "im";
-  const followUp = message.thread_ts !== undefined && joined.has(`${message.channel}:${thread}`);
+  const followUp =
+    message.thread_ts !== undefined &&
+    joined.has(`${message.channel}:${thread}`) &&
+    joined.get(`${message.channel}:${thread}`) === message.user;
   // A mention is answered by the app_mention handler; here: DMs, and follow-ups in a thread it is part of.
   if (!direct && !followUp) return;
   if ((message.text ?? "").includes("<@") && !direct) return;
-  joined.add(`${message.channel}:${thread}`);
+  if (!joined.has(`${message.channel}:${thread}`)) joined.set(`${message.channel}:${thread}`, message.user);
   const prompt = message.text ?? "";
   // In the split view, "this channel" is the one the person is looking at.
   const looking = lookingAt.get(`${message.channel}:${thread}`);

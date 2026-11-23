@@ -25,6 +25,7 @@ export default defineConfig({
       "api/examples/github.test.ts",
       "api/examples/linear.test.ts",
       "api/examples/notion.test.ts",
+      "api/examples/shared.test.ts",
       "test/acceptance/stack/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],

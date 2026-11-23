@@ -7,8 +7,7 @@ import { linearResponseProblems, linearWebhookProblems } from "../../server/test
  * got in the test's session and each webhook the fake sent it are held to Linear's own schema. A
  * test that passes with an answer Linear wouldn't give still fails here.
  */
-afterEach(async (context) => {
-  const { linear } = context;
+afterEach(async ({ linear }) => {
   // A test that never got its fixtures has nothing to check.
   if (!linear) return;
   const [calls, deliveries] = await Promise.all([linear.calls(), linear.deliveries()]);

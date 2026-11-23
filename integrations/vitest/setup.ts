@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 
-import { afterEach, beforeEach, expect, inject } from "vitest";
+import { expect, inject, test, type TestContext } from "vitest";
 
 import { type Channelstack, connect, type Session, setFilesRoot, untilQuiet } from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
@@ -16,32 +16,64 @@ const connected = () => {
   return client;
 };
 
-const sessions = new WeakMap<object, Session>();
+/**
+ * The fixtures, registered on Vitest's own `test` so that a suite's `test.extend` can build on
+ * them (`ana: async ({ slack }, use) => …`). They are automatic: every test has its session,
+ * opened before its hooks run and closed after them, whether it names a fixture or not.
+ */
+type Fixtures = Pick<TestContext, "channelstack" | "slack" | "github" | "linear" | "notion"> & {
+  channelstackSession: Session;
+};
+const auto = { auto: true } as const;
 
-beforeEach(async (context) => {
-  const channelstack = await connected();
-  const session = await channelstack.openSession();
-  sessions.set(context, session);
-  context.channelstack = {
-    url: server.url,
-    env: () => channelstack.env(),
-    quiet: (options = {}) =>
-      untilQuiet(() => session.quiet(), { quietFor: server.quietFor, timeout: server.timeout, ...options }),
-    reset: () => channelstack.reset(),
-  };
-  // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
-  setFilesRoot(dirname(context.task.file.filepath));
-  [context.slack, context.github, context.linear, context.notion] = await Promise.all([
-    session.slack(),
-    session.github(),
-    session.linear(),
-    session.notion(),
-  ]);
-});
-
-afterEach(async (context) => {
-  // Closing the session removes everything the test created. Disposing never fails a test.
-  await sessions.get(context)?.[Symbol.asyncDispose]();
+(test as unknown as { override(fixtures: Record<string, unknown>): void }).override({
+  channelstackSession: [
+    async ({ task }: { task: { file: { filepath: string } } }, use: (session: Session) => Promise<void>) => {
+      const session = await (await connected()).openSession();
+      // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
+      setFilesRoot(dirname(task.file.filepath));
+      try {
+        await use(session);
+      } finally {
+        // Closing the session removes everything the test created. Disposing never fails a test.
+        await session[Symbol.asyncDispose]();
+      }
+    },
+    auto,
+  ],
+  channelstack: [
+    async ({ channelstackSession: session }: Fixtures, use: (value: Fixtures["channelstack"]) => Promise<void>) => {
+      const channelstack = await connected();
+      await use({
+        url: server.url,
+        env: () => channelstack.env(),
+        quiet: (options = {}) =>
+          untilQuiet(() => session.quiet(), { quietFor: server.quietFor, timeout: server.timeout, ...options }),
+        reset: () => channelstack.reset(),
+      });
+    },
+    auto,
+  ],
+  slack: [
+    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
+      use(await channelstackSession.slack()),
+    auto,
+  ],
+  github: [
+    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
+      use(await channelstackSession.github()),
+    auto,
+  ],
+  linear: [
+    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
+      use(await channelstackSession.linear()),
+    auto,
+  ],
+  notion: [
+    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
+      use(await channelstackSession.notion()),
+    auto,
+  ],
 });
 
 expect.extend(
