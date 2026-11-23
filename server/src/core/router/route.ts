@@ -177,6 +177,7 @@ export const SessionParams = z.object({
 const LIVE_ERRORS = [
   "unsupported_in_live",
   "action_requires",
+  "live_misconfigured",
   "live_not_allowlisted",
   "fake_actor_in_live_world",
   "cross_workspace_credential",

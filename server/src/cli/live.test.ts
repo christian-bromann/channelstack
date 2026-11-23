@@ -46,7 +46,7 @@ describe("exit check 5.6: channelstack doctor", () => {
     });
     expect(ok).toBe(false);
     expect(text).toMatch(
-      /FAIL {2}CHANNELSTACK_SLACK_BOT_TOKEN \(xoxb-…\): workspace T0STUB0001 isn't in CHANNELSTACK_LIVE_SLACK_TEAMS/,
+      /FAIL {2}CHANNELSTACK_SLACK_BOT_TOKEN \(xoxb-…\): Slack workspace T0STUB0001 isn't in CHANNELSTACK_LIVE_SLACK_TEAMS/,
     );
     expect(text).toContain("FAIL  CHANNELSTACK_LIVE_LINEAR_WORKSPACES is empty");
     expect(text).toContain("FAIL  live linear isn't built yet");

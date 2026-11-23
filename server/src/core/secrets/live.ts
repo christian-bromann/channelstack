@@ -64,6 +64,11 @@ export class LiveVault {
     return new LiveCredential(owner, value);
   }
 
+  /** A setting from the environment that isn't a secret (an app's id): its value, unregistered. */
+  setting(variable: string): string | undefined {
+    return this.#env[variable] || undefined;
+  }
+
   /** A person's credential a test handed over. */
   person(name: string, value: string): LiveCredential {
     this.#register(value);

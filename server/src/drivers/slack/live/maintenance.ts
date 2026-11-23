@@ -4,18 +4,14 @@ import { type LiveCredential, LiveVault } from "../../../core/secrets/index.ts";
 import { SlackRefusal } from "../world.ts";
 import { archiveTagged, removeSlackEntry, taggedChannels } from "./cleanup.ts";
 import { SlackWebClient } from "./client.ts";
+import { checkSlackCredential, identify, type SlackIdentity } from "./identity.ts";
 
 const PERSON = /^CHANNELSTACK_SLACK_USER_([A-Z0-9_]+)_TOKEN$/;
 
-/** The app's and every person's credentials in the environment, with who each is in Slack. */
+/** The app's and every person's credentials in the environment, with who each is in Slack (or why Slack refused it). */
 async function identities(client: SlackWebClient, env: Readonly<Record<string, string | undefined>>) {
   const vault = new LiveVault(env, () => {});
-  const found: Array<{
-    variable: string;
-    credential: LiveCredential;
-    who?: { user: string; team: string; bot: boolean };
-    problem?: string;
-  }> = [];
+  const found: Array<{ variable: string; credential: LiveCredential; who?: SlackIdentity; problem?: string }> = [];
   const variables = [
     "CHANNELSTACK_SLACK_BOT_TOKEN",
     ...Object.keys(env)
@@ -27,12 +23,7 @@ async function identities(client: SlackWebClient, env: Readonly<Record<string, s
     const credential = vault.fromEnv(variable, owner);
     if (!credential) continue;
     try {
-      const answer = await client.call("auth.test", credential);
-      found.push({
-        variable,
-        credential,
-        who: { user: String(answer.user_id), team: String(answer.team_id), bot: typeof answer.bot_id === "string" },
-      });
+      found.push({ variable, credential, who: await identify(client, credential) });
     } catch (error) {
       found.push({ variable, credential, problem: error instanceof SlackRefusal ? error.code : String(error) });
     }
@@ -47,32 +38,24 @@ export const slackMaintenance: LiveMaintenance = {
     const allowlist = new Allowlist("CHANNELSTACK_LIVE_SLACK_TEAMS", env);
     const checks: LiveCheck[] = [];
     const found = await identities(client, env);
-    const app = found.find((entry) => entry.variable === "CHANNELSTACK_SLACK_BOT_TOKEN");
+    const app = found.find((entry) => entry.credential.owner === "app")?.who;
     for (const entry of found) {
       const shown = `${entry.variable} (${entry.credential.prefix()}…)`;
-      if (entry.problem) {
+      if (!entry.who) {
         checks.push({ ok: false, text: `${shown}: Slack refused it (${entry.problem})` });
         continue;
       }
-      const who = entry.who;
-      if (!who) continue;
-      const isApp = entry === app;
-      if (isApp !== who.bot) {
+      const role = entry.credential.owner === "app" ? "app" : "person";
+      // The same check the live world makes, so doctor and a live run never disagree.
+      try {
+        checkSlackCredential(entry.who, { role, who: entry.variable, allowlist, appTeam: app?.team });
         checks.push({
-          ok: false,
-          text: `${shown}: ${isApp ? "not a bot token (xoxb-)" : "a bot token, not a person's (xoxp-)"}`,
+          ok: true,
+          text: `${shown}: ${role === "app" ? "the app's bot" : "a person"} in workspace ${entry.who.team}`,
         });
-        continue;
+      } catch (error) {
+        checks.push({ ok: false, text: `${shown}: ${error instanceof Error ? error.message : String(error)}` });
       }
-      if (!allowlist.allows(who.team)) {
-        checks.push({ ok: false, text: `${shown}: workspace ${who.team} isn't in CHANNELSTACK_LIVE_SLACK_TEAMS` });
-        continue;
-      }
-      if (!isApp && app?.who && app.who.team !== who.team) {
-        checks.push({ ok: false, text: `${shown}: workspace ${who.team}, and the app is in ${app.who.team}` });
-        continue;
-      }
-      checks.push({ ok: true, text: `${shown}: ${isApp ? "the app's bot" : "a person"} in workspace ${who.team}` });
     }
     return checks;
   },

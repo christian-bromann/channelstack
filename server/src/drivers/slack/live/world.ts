@@ -1,7 +1,12 @@
 import type { Clock } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
-import { actionRequires, fakeActorInLiveWorld, unsupportedInLive } from "../../../core/reality/index.ts";
+import {
+  actionRequires,
+  fakeActorInLiveWorld,
+  liveMisconfigured,
+  unsupportedInLive,
+} from "../../../core/reality/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { mentionedUsers, resolveMentions } from "../mentions.ts";
@@ -18,6 +23,7 @@ import {
 } from "../world.ts";
 import type { SlackCredentials } from "./cleanup.ts";
 import type { SlackAnswer, SlackWebClient } from "./client.ts";
+import { checkSlackCredential, identify } from "./identity.ts";
 
 /** How long a read of real Slack is reused: matchers poll every 50ms, and Slack's read methods allow about one call a second. */
 const READ_TTL_MS = 1000;
@@ -92,7 +98,8 @@ export function createLiveWorld(deps: {
 }): LiveSlackWorld {
   const { client, live, ids, clock } = deps;
   const bot = live.vault.fromEnv("CHANNELSTACK_SLACK_BOT_TOKEN");
-  const appId = live.vault.fromEnv("CHANNELSTACK_SLACK_APP_ID")?.reveal() ?? "";
+  // An id, not a secret: read as it is, not held as a credential.
+  const appId = live.vault.setting("CHANNELSTACK_SLACK_APP_ID") ?? "";
 
   let identity: { team: SlackTeam; app: SlackAppRecord } | undefined;
   let checked: Promise<void> | undefined;
@@ -108,7 +115,7 @@ export function createLiveWorld(deps: {
     return identity;
   };
   const botCredential = (): LiveCredential => {
-    if (!bot) throw actionRequires("Slack", "CHANNELSTACK_SLACK_BOT_TOKEN", "the app's bot token isn't set");
+    if (!bot) throw liveMisconfigured("CHANNELSTACK_SLACK_BOT_TOKEN isn't set", "set the app's bot token (xoxb-)");
     return bot;
   };
   const peopleOf = (session: string) => people.get(session) ?? new Map<string, LivePerson>();
@@ -330,10 +337,9 @@ export function createLiveWorld(deps: {
     // app's bot, and the agent ignores it as its own (found in the first live run, live-mode.md V1).
     const { app } = known();
     if (message.bot_id === app.botId || (app.id !== "" && message.app_id === app.id)) {
-      throw actionRequires(
-        "SlackUser.say",
-        "a person's token from another Slack app",
-        `${person(session, userId).alias}'s token was issued by the agent's own app, so Slack shows the message as the app's and the agent ignores it. Install a separate Slack app for the sandbox's people and use the user token it issues`,
+      throw liveMisconfigured(
+        `${person(session, userId).alias}'s token was issued by the agent's own app, so Slack shows the message as the app's and the agent ignores it`,
+        "install a separate Slack app for the sandbox's people and use the user token it issues",
       );
     }
     const [record] = await records(session, target.id, [{ ...message, ts: (answer.ts as string) ?? message.ts }]);
@@ -347,32 +353,29 @@ export function createLiveWorld(deps: {
   return {
     async ready() {
       checked ??= (async () => {
-        const credential = botCredential();
-        const answer = await client.call("auth.test", credential);
-        if (typeof answer.bot_id !== "string" || typeof answer.user_id !== "string") {
-          throw actionRequires(
-            "Slack",
-            "a bot token",
-            "CHANNELSTACK_SLACK_BOT_TOKEN isn't a bot token (xoxb-): a person's token can't act as the app",
-          );
-        }
-        const teamId = String(answer.team_id);
-        live.allowlist.assert(teamId, `Slack workspace ${teamId}`);
-        const domain = /^https:\/\/([^.]+)\./.exec(String(answer.url ?? ""))?.[1] ?? "";
+        const who = await identify(client, botCredential());
+        checkSlackCredential(who, { role: "app", who: "CHANNELSTACK_SLACK_BOT_TOKEN", allowlist: live.allowlist });
+        const domain = /^https:\/\/([^.]+)\./.exec(who.url)?.[1] ?? "";
         identity = {
-          team: { id: teamId, name: String(answer.team ?? ""), domain },
+          team: { id: who.team, name: who.teamName, domain },
           app: {
             id: appId,
             name: deps.appName,
-            botId: answer.bot_id,
-            botUserId: answer.user_id,
-            scopes: typeof answer.scopes === "string" ? answer.scopes.split(",") : [],
+            botId: who.botId ?? "",
+            botUserId: who.user,
+            scopes: who.scopes,
             botEvents: [],
             installed: true,
           },
         };
-      })();
-      // A failed check is kept: the next action is refused the same way, without asking Slack again.
+      })().catch((error: unknown) => {
+        // A definitive answer is kept, so the next action is refused the same way without asking
+        // Slack again. A network error or a rate limit isn't: the next action asks again.
+        if (!(error instanceof ProtocolError) || error.code === "ratelimited" || error.code === "unexpected") {
+          checked = undefined;
+        }
+        throw error;
+      });
       return checked;
     },
 
@@ -414,10 +417,9 @@ export function createLiveWorld(deps: {
       people.set(session, map);
       if (options.token === undefined) {
         if (live.strict) {
-          throw actionRequires(
-            "SlackFixture.createUser",
-            "a token",
-            `CHANNELSTACK_REALITY is live and ${options.name} has none (CHANNELSTACK_SLACK_USER_<NAME>_TOKEN)`,
+          throw liveMisconfigured(
+            `CHANNELSTACK_REALITY is live and ${options.name} has no token`,
+            "set CHANNELSTACK_SLACK_USER_<NAME>_TOKEN for them, or run without CHANNELSTACK_REALITY=live",
           );
         }
         // A fake person can exist next to a live workspace, but can't act in it.
@@ -440,23 +442,14 @@ export function createLiveWorld(deps: {
         return record;
       }
       const credential = live.vault.person(options.name, options.token);
-      const who = await client.call("auth.test", credential);
-      const teamId = String(who.team_id);
-      if (teamId !== known().team.id) {
-        throw new ProtocolError(
-          "cross_workspace_credential",
-          `${options.name}'s token is for workspace ${teamId}, and the app is in ${known().team.id}`,
-          { team: teamId },
-        );
-      }
-      if (typeof who.bot_id === "string") {
-        throw actionRequires(
-          "SlackFixture.createUser",
-          "a user token",
-          `${options.name}'s token is a bot token, not a person's (xoxp-)`,
-        );
-      }
-      const info = await client.call("users.info", botCredential(), { user: String(who.user_id) });
+      const who = await identify(client, credential);
+      checkSlackCredential(who, {
+        role: "person",
+        who: `${options.name}'s token`,
+        allowlist: live.allowlist,
+        appTeam: known().team.id,
+      });
+      const info = await client.call("users.info", botCredential(), { user: who.user });
       const record = userRecord(info.user as WireUser);
       map.set(record.id, { record, alias: options.name, credential });
       return record;

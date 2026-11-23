@@ -70,6 +70,11 @@ export function actionRequires(operation: string, requires: string, reason: stri
   });
 }
 
+/** Live mode is set up wrong. Unlike `action_requires`, a test fails for it: a broken setup must not pass as skipped. */
+export function liveMisconfigured(what: string, fix: string): ProtocolError {
+  return new ProtocolError("live_misconfigured", `${what}: ${fix}`, { what, fix });
+}
+
 /** Refuse an operation the way its declaration says, on a driver of this reality. Nothing happens in the fake. */
 export async function admitLive(
   reality: DriverReality,
@@ -79,10 +84,9 @@ export async function admitLive(
 ): Promise<void> {
   if (reality.mode === "fake") return;
   if (reality.mode === "missing") {
-    throw actionRequires(
-      operation,
-      "credentials",
-      `${reality.missing.join(", ")} ${reality.missing.length === 1 ? "isn't" : "aren't"} set, so ${channel} can't run live`,
+    throw liveMisconfigured(
+      `${channel} has some of its live credentials and not all`,
+      `set ${reality.missing.join(" and ")}, or unset the others to run it fake`,
     );
   }
   if (support && "unsupported" in support) throw unsupportedInLive(operation, support.unsupported);

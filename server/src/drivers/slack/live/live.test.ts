@@ -156,10 +156,10 @@ describe("live Slack: acting and reading back", () => {
       message: { text: "hi" },
       to: [stub.bot.userId],
     });
-    expect(said.body).toMatchObject({
-      error: "action_requires",
-      data: { requires: "a person's token from another Slack app" },
-    });
+    // A setup that can't work fails the test (it isn't skipped), with the fix in the message.
+    expect(said.status).toBe(412);
+    expect(said.body.error).toBe("live_misconfigured");
+    expect(said.body.message).toContain("install a separate Slack app for the sandbox's people");
     // What was posted is still removed with the session.
     await server.call("DELETE", `/sessions/${session.id}`);
     expect(stub.channels().flatMap((channel) => channel.messages)).toEqual([]);
@@ -169,7 +169,45 @@ describe("live Slack: acting and reading back", () => {
     const stub = slackStub();
     const session = await liveSlack(stub, stub.team, { CHANNELSTACK_REALITY: "live" }).open();
     const ben = await session.slack("POST", "/users", { name: "Ben" });
-    expect(ben.body).toMatchObject({ error: "action_requires", data: { requires: "a token" } });
+    expect(ben.body.error).toBe("live_misconfigured");
+    expect(ben.body.message).toContain("CHANNELSTACK_REALITY is live and Ben has no token");
+  });
+
+  test("a network error on the first check doesn't stick: the next action asks Slack again", async () => {
+    const stub = slackStub();
+    let failNext = true;
+    const flaky = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (failNext) {
+        failNext = false;
+        throw new TypeError("fetch failed");
+      }
+      return stub.fetch(input, init);
+    }) as typeof fetch;
+    const server = harness(
+      {},
+      {
+        live: {
+          env: {
+            CHANNELSTACK_SLACK_APP_ID: "A0STUBAPP1",
+            CHANNELSTACK_SLACK_BOT_TOKEN: stub.bot.token,
+            CHANNELSTACK_LIVE_SLACK_TEAMS: stub.team,
+          },
+          fetch: flaky,
+          apiBase: { slack: stub.apiBase },
+        },
+      },
+    );
+    const { body } = await server.call("POST", "/sessions", {});
+    expect((await server.call("GET", `/sessions/${body.sessionId}/slack`)).status).toBe(500);
+    expect((await server.call("GET", `/sessions/${body.sessionId}/slack`)).status).toBe(200);
+  });
+
+  test("a definitive refusal is kept: Slack isn't asked again", async () => {
+    const stub = slackStub();
+    const session = await liveSlack(stub, "T0SOMEWHERE").open();
+    await session.slack("GET", "");
+    await session.slack("GET", "");
+    expect(stub.calls.map((call) => call.method)).toEqual(["auth.test"]);
   });
 
   test("a fixed id is refused live: real ids are Slack's", async () => {

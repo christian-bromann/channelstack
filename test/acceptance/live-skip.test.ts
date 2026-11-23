@@ -52,3 +52,41 @@ test("a GitHub example on a live server is skipped with the reason", async () =>
     await server.stop();
   }
 }, 60_000);
+
+// The other side of it: a setup that can't work fails the test instead. With only some of Slack's
+// credentials set (here the app id, not the bot token), a Slack example must fail with
+// live_misconfigured, so a nightly run with a typo in a variable name goes red.
+test("a Slack example on a server with Slack's credentials set in part fails", async () => {
+  const server = await startBinary({
+    bin: process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath(),
+    env: { CHANNELSTACK_SLACK_APP_ID: "A0000000001", CHANNELSTACK_LOG_LEVEL: "warn" },
+  });
+  try {
+    const run = spawnSync(
+      "pnpm",
+      [
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/acceptance/vitest.config.ts",
+        "api/examples/slack.test.ts",
+        "-t",
+        "a mention gets exactly one reply, in the thread",
+        "--reporter",
+        "verbose",
+      ],
+      {
+        cwd: ROOT,
+        env: { ...process.env, CHANNELSTACK_HOME: server.home, NO_COLOR: "1" },
+        encoding: "utf8",
+      },
+    );
+    const output = `${run.stdout}\n${run.stderr}`;
+    expect(run.status, output).toBe(1);
+    expect(output).toMatch(/1 failed/);
+    expect(output).toContain("slack has some of its live credentials and not all: set CHANNELSTACK_SLACK_BOT_TOKEN");
+  } finally {
+    await server.stop();
+  }
+}, 60_000);
