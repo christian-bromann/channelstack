@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { bearerFrom } from "../../../core/auth/index.ts";
 import { delay } from "../../../core/clock/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
+import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { identified } from "../blocks.ts";
 import { handleOf } from "../interaction-payloads.ts";
@@ -558,7 +559,7 @@ export function createSlackApi(
           user: bot(),
           conversation,
           team: store.team,
-          eventTs: ids.slackTs(conversation.id),
+          eventTs: ids.slackTs(),
         }),
       );
       return { channel: conversationObject(conversation) };
@@ -687,18 +688,22 @@ export function createSlackApi(
         about === undefined ? undefined : (store.conversations.owner(about) ?? store.users.owner(about)),
       )
       .find((owner) => owner !== undefined);
-    if (session !== undefined) {
-      context.events.append(session, "slack", "api_call", {
+    recordCall(
+      context.events,
+      "slack",
+      [session],
+      {
         operation: name,
         method: c.req.method,
         path: new URL(c.req.url).pathname,
         request: args,
         responseStatus: status,
         response: body,
-        ...(body.ok === false ? { error: body.error } : {}),
+        error: body.ok === false ? String(body.error) : undefined,
         durationMs: clock() - startedAt,
-      });
-    }
+      },
+      { unattributed: "drop" },
+    );
     // A rate-limited agent backs off and retries: until the retry arrives, its session isn't quiet.
     if (session !== undefined) {
       if (status === 429) context.expectMore(session, name, Number(headers["retry-after"]) * 1000 + RETRY_GRACE_MS);

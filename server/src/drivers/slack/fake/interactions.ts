@@ -199,10 +199,10 @@ export function createInteractions(kit: InteractionKit): Interactions {
   };
 
   /** One entry of `actions`: the control as the app wrote it, with where it sits and when it was used. */
-  const acted = (found: { block: Block; element: Block }, conversation: SlackConversationRecord, extra: object) => ({
+  const acted = (found: { block: Block; element: Block }, extra: object) => ({
     ...found.element,
     block_id: found.block.block_id,
-    action_ts: ids.slackTs(conversation.id),
+    action_ts: ids.slackTs(),
     ...extra,
   });
 
@@ -244,7 +244,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
         ts: hit.message.ts,
         button: plain(hit.found.element.text),
       });
-      return blockActions(session, user, conversation, hit.message, acted(hit.found, conversation, {}));
+      return blockActions(session, user, conversation, hit.message, acted(hit.found, {}));
     },
 
     selectAsUser(session, userId, options, menu, target) {
@@ -277,7 +277,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
         user,
         conversation,
         message,
-        acted(found, conversation, many ? { selected_options: chosen } : { selected_option: chosen[0] }),
+        acted(found, many ? { selected_options: chosen } : { selected_option: chosen[0] }),
       );
     },
 
@@ -291,7 +291,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const payload = messageActionPayload(answerable(session, "actions", user, conversation), {
         callbackId,
         message: kit.messageObject(message),
-        actionTs: ids.slackTs(conversation.id),
+        actionTs: ids.slackTs(),
       });
       return send(session, "message_action", payloadForm(payload), payload);
     },
@@ -354,7 +354,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
           thread_ts: rootTs,
           user: user.id,
           streaming_message_ts: streaming.map((message) => message.ts),
-          event_ts: ids.slackTs(conversation.id),
+          event_ts: ids.slackTs(),
         }) ?? ""
       );
     },
@@ -458,7 +458,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
         channel_id: dm.id,
         thread_ts: threadTs,
       },
-      event_ts: ids.slackTs(dm.id),
+      event_ts: ids.slackTs(),
     };
   }
 

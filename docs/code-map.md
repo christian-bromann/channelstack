@@ -30,20 +30,21 @@
 | Concern | Module | Use it for | Don't |
 |---|---|---|---|
 | Sessions and ownership | `sessions/` | Opening and closing scopes, `onClose` cleanup; sessions shared by name (`dev`, for the CLI, the UI and MCP) | Track ownership inside a driver |
-| Object registry and handles | `registry/` | Typed collections per driver and type; resolving handle ids for a session (`get`), from the platform's side (`find`), and their owner | Keep a private `Map` of objects in a route |
+| Object registry and handles | `registry/` | Typed collections per driver and type; resolving handle ids for a session (`get`), from the platform's side (`find`), and their owner; a session's objects, or all of them, in the order they were made (`list`, `values`) | Keep a private `Map` of objects in a route |
 | Ids in each platform's format | `ids/` | Every generated id (`U…`, `C…`, `ts`, GitHub numbers and node ids, UUIDs), seeded by `CHANNELSTACK_SEED`; validating fixed ids (`reserve`); reading the time out of a Slack `ts` (`slackTsTime`) | Call `crypto.randomUUID()` or format ids by hand |
 | Secrets | `secrets/` | Fake tokens and signing secrets (the CSPRNG helpers, the token formats, `~/.channelstack/secrets.json`, 0600, rotation); live credentials in memory *(planned, phase 5)* | Generate or store a secret anywhere else |
-| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`); GitHub's `X-Hub-Signature-256` and checking an App's JWT (`github.ts`). `Linear-Signature` + `webhookTimestamp`, `X-Notion-Signature` *(planned, with each platform)* | Compute an HMAC or compare a secret in a driver |
+| Signing and verification | `signing/`, one file per platform, `hmac.ts` shared | HMAC-SHA256 over the sent bytes, constant-time compare (`constantTimeEqual`); the echo signer; Slack v0 (`slack.ts`); GitHub's `X-Hub-Signature-256` and checking an App's JWT (`github.ts`); `Linear-Signature` and the `webhookTimestamp` stamped into the body (`linear.ts`); `X-Notion-Signature` with the verification token (`notion.ts`) | Compute an HMAC or compare a secret in a driver |
 | Access to the control API | `auth/` | Creating the bearer token, parsing `Authorization: Bearer`, the middleware (`requireAccess`); browser access for the UI (`ui.ts`): one-time login codes, the session cookie, and the short list of reads it allows | Compare tokens with `===`; let a cookie authorize anything but those reads |
 | Event log and cursors | `events/` | Appending deliveries, API calls and actions (`EventLog`); what belongs to no session, in a scope every session reads (`WORLD_SCOPE`); cursor-based reads of any list (`CursorList`) | Keep per-driver logs or invent another cursor format |
-| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); another way to the agent than HTTP (`DeliveryTransport`: a connection the agent opened); handing the agent's answer to the driver (`answered`); cancelling a closed session's deliveries. | Call `fetch` to the agent from a driver |
+| Delivery queue | `delivery/` | Sending events to the agent over HTTP with the platform's signer and ack window; keeping every delivery with its attempts; sending one again (`again`: a platform's retry headers, a forged signature); a platform's own retries (`RetryPolicy`, on the injected timers); another way to the agent than HTTP (`DeliveryTransport`: a connection the agent opened); handing the agent's answer to the driver (`answered`); putting the attempt into the signed body (`stamp`: its time, its number); cancelling a closed session's deliveries. | Call `fetch` to the agent from a driver |
 | Quiet detector | `quiet/` | "Is the agent idle, and for how long?" (`GET /sessions/{sid}/quiet`): busy while a provider call is in flight, a delivery is in flight or about to be retried, a driver reports open work (named, so a failure can say what was left open), or the agent was told to retry later (`expectMore` until it `arrived`); negative and exact-count matchers wait for it | Add sleeps or ad-hoc settle timers |
 | Reality rules | `reality/` *(planned, phase 5)* | Fake or live per object, `unsupported_in_live`, `fake_actor_in_live_world` | Branch on `process.env` credentials in a driver |
 | Safety and cleanup ledger | `safety/`, `ledger/` *(planned, phase 5)* | Live allowlists, tagging, cleanup, `channelstack sweep` | Delete live objects from a driver directly |
+| `RichText` | `rich-text/` | Splitting a test's text at its `@name` mentions (`richTextPieces`); each driver turns the pieces into its own mention | Parse `@name` in a driver |
 | Errors | `errors/` | The protocol's error codes and their HTTP status (`ProtocolError`), including a platform's own refusal surfaced through the control API (`{ platform, status }`) | Throw ad-hoc error shapes from routes |
 | Redaction | `redact/` | Scrubbing tokens, secrets and emails from logs and errors (`text`), and tokens from recorded payloads (`tokens`) | Log request bodies or headers without it |
 | Logging | `log/` | The one logger: JSON lines, redacted | Write to stdout or stderr from core or a driver |
-| What every fixture lets a test inspect | `router/inspect.ts` | The schemas and reads every channel shares: `DeliveryAttempt`, `DeliveryStatus`, a channel's API call schema and the `calls()` filter (`apiCallSchema`, `CallsQuery`, `readCalls`), `duration` | Declare a delivery attempt or an API call schema in a driver |
+| What every fixture lets a test inspect | `router/inspect.ts` | The schemas and reads every channel shares: `DeliveryAttempt`, `DeliveryStatus`, a channel's API call schema and the `calls()` filter (`apiCallSchema`, `CallsQuery`, `readCalls`); putting a call on record for its sessions, or for none (`recordCall`, the one writer); a transcript's entry type, schema and text (`TranscriptEntry`, `principalSchema`, `transcriptSchema` with a channel's extra fields, `transcriptText`); `duration` | Declare a delivery attempt, an API call schema, a transcript entry or its schema in a driver; append an `api_call` event yourself; join a transcript's lines yourself |
 | Routing helpers | `router/` | `registerRoute`, `DriverRouter`, zod-openapi registration, `x-channelstack-*` extensions; the `Driver`, `DriverContext` and `FakeBackend` contracts | Register Hono routes on the control API without the extensions |
 | State directory | `home/` | `CHANNELSTACK_HOME`, writing 0600 files atomically, reading JSON state | Write a file with a secret any other way |
 | Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency | Call `Date.now()` or `setTimeout` in core or a driver |
@@ -72,6 +73,14 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 | `fake/kit.ts` (GitHub) | What the parts of the GitHub world build on: permissions (`can`, `allow`), sending a webhook (`emit`, with GitHub's headers), `GitHubRefusal`, the git identity of a person |
 | `fake/git.ts` (GitHub) | Git in memory with real SHAs (isomorphic-git on memfs): blobs, trees, commits, branches, history, merges, and what changed between two commits with patches |
 | `fake/repos.ts`, `issues.ts`, `pulls.ts`, `checks.ts` (GitHub) | The GitHub world, one file per area: people, repositories and pushes; issues, comments, labels, reactions; pull requests, reviews, threads, merging; check runs and statuses. `fake/world.ts` puts them together and owns deliveries |
+| `schema/` (Linear) | Linear's GraphQL schema: `schema.graphql` from `linear/linear` at a pinned commit, and `schema.ts`, the module the binary embeds (generated) |
+| `fake/graphql.ts` (Linear) | Running GraphQL against Linear's committed schema (`schema/`, from `scripts/linear-schema.ts`): the field resolver over model objects, the depth limit, Linear's errors (`LinearError`, `notFound`), connections and filters |
+| `fake/models.ts`, `fake/resolvers.ts` (Linear) | Records → the objects GraphQL resolves (issues, comments, sessions, activities, teams, states), and the root queries and mutations the app calls |
+| `links.ts` (Linear, Notion) | Where a person would open something: issue, comment, profile and session URLs (Linear); page and database URLs (Notion) |
+| `markdown.ts` (Notion) | Markdown → Notion blocks (with `marked`'s lexer) and blocks → Markdown |
+| `errors.ts` (Notion) | Notion's API refusals (`NotionApiError`: status, `code`, message) and a list's paging as a request gives it (`pagingOf`) |
+| `rich-text.ts` (Notion) | Notion's rich text items: text runs, mentions, plain text |
+| `objects.ts` (Notion) | Records → the API objects Notion answers with (users, pages, blocks, databases, data sources, comments, property values, lists), typed by `@notionhq/client`'s response types |
 | `fake/api/` (GitHub) | The REST API the App calls, one file per area (`repos.ts`, `issues.ts`, `pulls.ts`, `checks.ts`), with authentication, the App's own endpoints and call recording in `index.ts`, and request helpers in `shared.ts` |
 | `transcript.ts` | State → what a person would see |
 | `capabilities.ts` | Per action: fake, live, what live needs |
@@ -124,6 +133,12 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Probot | `probot/agent.ts` | A GitHub App as Probot's docs show |
 | Chat SDK on GitHub | `chat-sdk-github/agent.ts` | Conversations through the Chat SDK's GitHub adapter, the rest with `@octokit/webhooks` |
 | A GitHub agent with one fault per standard check | `broken-github/agent.ts` | `BROKEN=<check id>`; exit check 3.4 proves each check fails against it |
+| What the Linear agents do | `shared/linear.ts` | Acknowledge, start the issue, work, answer, review; a question first, a plan and a link, a long job that only Stop ends; written once against `LinearClient` |
+| `@linear/sdk` | `linear-sdk/agent.ts` | `LinearWebhookClient` and `LinearClient`, as Linear's agent guide shows |
+| Chat SDK on Linear | `chat-sdk-linear/agent.ts` | The Chat SDK's Linear adapter in agent-session mode; the rest with `LinearClient` |
+| What the Notion agents do | `shared/notion.ts` | Answers in the discussion, action items, estimates, a mention in the body, a summary for a new page, a row set to "Ready for agent"; written once against `@notionhq/client` |
+| `@notionhq/client` | `notion-sdk/agent.ts` | The verification request, `verifyWebhookSignature`, `Client` |
+| Linear and Notion agents with one fault per standard check | `broken-linear/agent.ts`, `broken-notion/agent.ts` | `BROKEN=<check id>`; exit check 4.5 proves each check fails against them |
 | An agent with one fault per standard check | `broken-slack/agent.ts` | `BROKEN=<check id>` switches on the bug that check exists to catch; exit check 2.3 proves each check fails against it |
 | A deliberately broken agent | `mdac-220/agent.ts` | Leaves a lone "Thinking…" stream behind; exit check 1.4 proves the suite catches it |
 
@@ -137,6 +152,9 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
 | What the Bolt delivery tests share | `server/test/integration/slack-fixtures.ts` | `slackSession` (a session with Ana and a channel on a running server) and `SUMMARY_VIEW` (a one-input modal) |
 | A GitHub org for a unit test | `server/test/github-workspace.ts` | `githubWorkspace` (the App, a stand-in agent, a session with Ana and a repository; `api` calls the REST API as the installation and checks every answer against GitHub's description). New GitHub test files start from it |
+| A Linear workspace for a unit test | `server/test/linear-workspace.ts` | `linearWorkspace` (the app, a stand-in agent, a session with Ana in a team; `gql` calls GraphQL as the app and holds every answer to Linear's schema) |
+| Linear's schema as a validator | `server/test/linear-schema.ts` | `linearResponseProblems`, `linearWebhookProblems`: what a GraphQL answer or a webhook gets wrong by the committed schema. The unit tests and `test/acceptance/linear-schemas.setup.ts` use it |
+| Linear's schema in the binary | `scripts/linear-schema.ts` | Writes `server/src/drivers/linear/schema/schema.ts` from the pinned `schema.graphql`; `--check` in the gate, `--fetch` for a new commit |
 | GitHub's schemas as validators | `server/test/github-schemas.ts` | `restProblems`, `webhookProblems`: what a response or a webhook gets wrong by `@octokit/openapi` and `@octokit/openapi-webhooks`. The unit tests and `test/acceptance/github-schemas.setup.ts` use it |
 | A Slack workspace for a unit test | `server/test/slack-workspace.ts` | `slackWorkspace` (the app, a stand-in agent, a session with Ana and a channel), `signedBy`. New Slack test files start from it |
 | The app in memory, for unit tests | `server/test/app-harness.ts` | `harness` (the app called through `fetch`, no listener, with timers the test advances itself), `recordingAgent` (a stand-in agent endpoint) and `refusal` (the error code a control call was refused with). Every driver's unit tests use it |
@@ -145,8 +163,8 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |
 | Running the server from source | `dev-server.sh` | Stands in for the binary (`CHANNELSTACK_SERVER_BIN`) on machines that block freshly compiled executables. CI never uses it |
 | Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check |
-| A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints. Everything that needs both uses it |
-| `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack` |
+| A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints; `others` adds one agent per channel (every channel in one run). Everything that needs both uses it |
+| `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack`, each channel's checks, and `shared.test.ts` with one agent per channel |
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |
 | Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) |
 | Packaging check | `pack-test.ts` | `npm pack` into an empty project |
@@ -157,9 +175,9 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Concern | Module | Notes |
 |---|---|---|
 | Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
-| Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test and the `expect.extend` adapter (`setup.ts`) |
+| Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test, registered with `test.override` so a suite's `test.extend` builds on them, and the `expect.extend` adapter (`setup.ts`) |
 | Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
-| Checks | `integrations/checks/` | `slackChecks()`, `githubChecks()` (and later the other channels'): the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS` and `GITHUB_CHECKS` list their ids |
+| Checks | `integrations/checks/` | `slackChecks()`, `githubChecks()`, `linearChecks()`, `notionChecks()`: the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS` and `NOTION_CHECKS` list their ids |
 | pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |
 
 ## Generated code (never edit by hand)
@@ -168,3 +186,4 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 |---|---|
 | `spec/openapi.json`, `spec/ir.json` | The routes (`pnpm spec`) |
 | `sdks/typescript/generated/`, `sdks/python/channelstack/generated/` | `spec/ir.json` (`pnpm sdk`) |
+| `server/src/drivers/linear/schema/schema.ts` | `server/src/drivers/linear/schema/schema.graphql`, Linear's schema at a pinned commit (`pnpm linear:schema`) |

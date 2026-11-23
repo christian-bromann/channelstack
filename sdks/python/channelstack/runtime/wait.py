@@ -103,6 +103,14 @@ def from_matches(author: Author, from_: Author | str | None) -> bool:
     return author.id == from_.id
 
 
+def pattern_on_wire(pattern: str | re.Pattern[str]) -> str | dict[str, str]:
+    """Text to find as it goes to the server: a string as it is, a pattern as its source and flags."""
+    if isinstance(pattern, str):
+        return pattern
+    marks = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL}
+    return {"source": pattern.pattern, "flags": "".join(flag for flag, bit in marks.items() if pattern.flags & bit)}
+
+
 def describe_wait(what: str, from_: Author | str | None) -> str:
     """ "a reply" -> "a reply from my-agent", for timeout messages."""
     if from_ is None:
@@ -118,15 +126,20 @@ async def wait_for_next[T](
     what: str,
     *,
     timeout: Duration = "10s",
+    starts_turn: Callable[[T], bool] | None = None,
 ) -> T:
     """Wait for the next new item of a list that matches, after the last one this handle returned.
 
-    `seen` belongs to the handle and remembers, per wait, how far it has looked.
+    `seen` belongs to the handle and remembers, per wait, how far it has looked. With `starts_turn`,
+    the wait also looks only after the newest item that starts a turn (a person's prompt).
     """
 
     async def look() -> T | None:
         items = await read()
-        for position in range(seen.get(key, 0), len(items)):
+        turn = 0
+        if starts_turn is not None:
+            turn = next((position + 1 for position in reversed(range(len(items))) if starts_turn(items[position])), 0)
+        for position in range(max(seen.get(key, 0), turn), len(items)):
             if matches(items[position]):
                 seen[key] = position + 1
                 return items[position]

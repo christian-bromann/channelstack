@@ -34,6 +34,16 @@ export class Collection<T> {
     return this.#entries.get(id)?.value;
   }
 
+  /** A session's objects, oldest first. */
+  list(session: string): T[] {
+    return [...this.#entries.values()].filter((entry) => entry.owner === session).map((entry) => entry.value);
+  }
+
+  /** Every object, oldest first: the workspace as the platform's side sees it. */
+  values(): T[] {
+    return [...this.#entries.values()].map((entry) => entry.value);
+  }
+
   /** The session an object belongs to, for attributing events. */
   owner(id: string): string | undefined {
     return this.#entries.get(id)?.owner;

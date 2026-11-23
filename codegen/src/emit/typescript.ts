@@ -36,9 +36,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return short ? `${typeOf(short.type, side)} | ${whole}` : whole;
       }
       case "files":
+        if (type.mode === "document")
+          return side === "public" ? "string | { path: string } | unknown[]" : "string | unknown[]";
         if (side === "public")
           return type.mode === "tree" ? "string | FileInput[]" : "FileInput[] | Record<string, string | null>";
         return `Array<{ path: string; content: string${type.mode === "changes" ? " | null" : ""} }>`;
+      case "pattern":
+        return side === "public" ? "string | RegExp" : "string | { source: string; flags: string }";
       case "named":
         return side === "wire" && index.holdsResources(type) ? `${type.name}Wire` : type.name;
       case "resource":
@@ -120,6 +124,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     type.kind === "ref" ||
     type.kind === "duration" ||
     type.kind === "files" ||
+    type.kind === "pattern" ||
     (type.kind === "object" && type.shorthand !== undefined) ||
     (type.kind === "array" && type.oneOrMany === true) ||
     (type.kind === "array" && holdsRefs(type.items)) ||
@@ -133,7 +138,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       return ids.length === 1 ? `${expr}.${ids[0]}` : `{ ${ids.map((id) => `${id}: ${expr}.${id}`).join(", ")} }`;
     }
     if (type.kind === "duration") return `parseDuration(${expr})`;
-    if (type.kind === "files") return `${type.mode === "tree" ? "readTree" : "readChanges"}(${expr})`;
+    if (type.kind === "files")
+      return `${{ tree: "readTree", changes: "readChanges", document: "readDocument" }[type.mode]}(${expr})`;
+    if (type.kind === "pattern") return `patternOnWire(${expr})`;
     if (type.kind === "array") {
       const list = type.oneOrMany ? `[${expr}].flat()` : expr;
       const item = encodeValue(type.items, "item");
@@ -172,8 +179,13 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
 
   const method = (resource: IrResource, m: IrMethod): string[] => {
     const optionsOptional = m.options.every((option) => option.optional);
+    // An optional argument before options that must be given is one that may be `undefined`.
+    const optionalArg = (arg: IrParam) => (!arg.optional ? "" : m.options.length > 0 && !optionsOptional ? "" : "?");
     const parameters = [
-      ...m.args.map((arg) => `${arg.name}${arg.optional ? "?" : ""}: ${parameterType(arg)}`),
+      ...m.args.map(
+        (arg) =>
+          `${arg.name}${optionalArg(arg)}: ${parameterType(arg)}${arg.optional && optionalArg(arg) === "" ? " | undefined" : ""}`,
+      ),
       ...(m.options.length > 0
         ? [
             `options: { ${m.options.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,
@@ -241,6 +253,29 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }, ` : "";
     const call = `() => this.${w.read}(${filter === "" ? "" : "filter"})`;
     const noun = w.what.replace(/^an? /, "");
+    if (w.mode === "until" && w.in) {
+      const fieldType =
+        w.field === undefined
+          ? item
+          : typeOf(
+              index.resource((w.item as { name: string }).name).fields.find((f) => f.name === w.field)?.type ?? {
+                kind: "unknown",
+              },
+              "public",
+            );
+      const value = w.field === undefined ? "value" : `value.${w.field}`;
+      return [
+        "",
+        `  /** Wait for ${w.what}: one of the values given. Resolves with the value as it is then. */`,
+        `  async ${w.name}(wanted: ${fieldType} | Array<${fieldType}>, options: WaitOptions = {}): Promise<${item}> {`,
+        "    const values: unknown[] = [wanted].flat();",
+        `    return waitFor(${JSON.stringify(w.what)}, async () => {`,
+        `      const value = await this.${w.read}();`,
+        `      return values.includes(${value}) ? value : undefined;`,
+        "    }, options);",
+        "  }",
+      ];
+    }
     if (w.mode === "until") {
       const pending = (w.not ?? []).map((value) => `value.${w.field} === ${JSON.stringify(value)}`).join(" || ");
       return [
@@ -262,7 +297,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       `  async ${w.name}(${filter}options: ${options} = {}): Promise<${item}> {`,
       w.mode === "next"
         ? // A filtered read is its own list, so each filter keeps its own place in it.
-          `    return waitForNext(this.#seen, ${filter ? `\`${w.name}:\${JSON.stringify(filter)}\`` : JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options);`
+          `    return waitForNext(this.#seen, ${filter ? `\`${w.name}:\${JSON.stringify(filter)}\`` : JSON.stringify(w.name)}, ${call}, ${matches}, ${what}, options${w.turn ? `, (item) => item.${w.turn.field} === ${JSON.stringify(w.turn.value)}` : ""});`
         : `    return latestOnceQuiet(${call}, ${matches}, () => quietOf(this.#ctx), ${what}, options);`,
       "  }",
     ];
@@ -374,15 +409,26 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ...(allWaits.some((w) => w.mode !== "latest") ? ["type WaitOptions"] : []),
     ...(allMethods.some((m) => m.retryWhile) ? ["retryWhile"] : []),
     ...(allMethods.some((m) => m.onceQuiet) ? ["untilQuiet"] : []),
+    ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["patternOnWire"] : []),
   ];
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
+  const spec = JSON.stringify(ir);
   const lines = [
     `// ${BANNER}`,
     `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
-    ...(usesFiles ? ['import { type FileInput, readChanges, readTree } from "../runtime/files.ts";'] : []),
+    ...(usesFiles
+      ? [
+          `import { ${[
+            ...(spec.includes('"mode":"tree"') || spec.includes('"mode":"changes"') ? ["type FileInput"] : []),
+            ...(spec.includes('"mode":"changes"') ? ["readChanges"] : []),
+            ...(spec.includes('"mode":"document"') ? ["readDocument"] : []),
+            ...(spec.includes('"mode":"tree"') ? ["readTree"] : []),
+          ].join(", ")} } from "../runtime/files.ts";`,
+        ]
+      : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
     `import { ${[...waitImports, "type QuietState"].join(", ")} } from "../runtime/wait.ts";`,

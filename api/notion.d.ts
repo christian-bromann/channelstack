@@ -1,5 +1,5 @@
 import type {
-  App, Delivery, DeliveryAttempt, HasTranscript, Inspectable, QuietOptions,
+  App, Delivery, DeliveryAttempt, Duration, HasTranscript, Inspectable, QuietOptions,
   Resource, RichText, Timestamp, User, WaitOptions,
 } from "./common";
 
@@ -24,6 +24,11 @@ export interface NotionFixture extends Inspectable<NotionDelivery> {
    */
   createPage(options: NotionPageOptions): Promise<NotionPage>;
   createDatabase(options: NotionDatabaseOptions): Promise<NotionDatabase>;
+
+  /** Fake only: how long `page.content_updated` waits to batch edits, for this test. Default "1s". */
+  setContentUpdateDelay(delay: Duration): Promise<void>;
+  /** Fake only: send the subscription's verification request (`{ verification_token }`), as Notion does once. */
+  sendVerification(): Promise<NotionDelivery | undefined>;
 }
 
 export interface NotionUserOptions {

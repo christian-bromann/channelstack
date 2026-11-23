@@ -1,23 +1,17 @@
 import { slackTsTime } from "../../core/ids/index.ts";
+import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
 import { type Block, blockControls, blockText } from "./blocks.ts";
 import { nameMentions } from "./mentions.ts";
 import type { SlackMessageRecord } from "./world.ts";
 
-/** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
-export interface TranscriptEntry {
-  id: string;
-  author: { id: string; name: string; kind: "user" | "app" };
-  at: string;
-  text: string;
-  controls: string[];
+/** One line of a Slack transcript: every channel's fields, and what Slack shows besides. */
+export interface SlackTranscriptEntry extends TranscriptEntry {
   /** The names of the files shared with the message. */
   files: string[];
   /** A reply that was also sent to the channel. */
   alsoInChannel?: true;
-  edited: boolean;
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: { id: string; name: string; kind: "user" | "app" };
-  depth: number;
 }
 
 /**
@@ -34,11 +28,11 @@ export function renderTranscript(
     /** The name of a mentioned user, or nothing when the id is nobody the reader's session knows. */
     mentionName(userId: string): string | undefined;
   },
-): { entries: TranscriptEntry[]; text: string } {
+): { entries: SlackTranscriptEntry[]; text: string } {
   const named = (text: string) => nameMentions(text, options.mentionName);
   const entries = messages
     .filter((message) => message.ephemeralFor === undefined || message.ephemeralFor === options.viewer)
-    .map((message): TranscriptEntry => {
+    .map((message): SlackTranscriptEntry => {
       const blocks = message.blocks as Block[];
       const fromBlocks = blocks.flatMap(blockText).filter((line) => line !== "");
       return {
@@ -57,21 +51,15 @@ export function renderTranscript(
       };
     });
   // One line per entry, replies indented under their thread: what `toString()` prints and snapshots keep.
-  const text = entries
-    .map((entry) => {
-      const marks = [
-        entry.edited ? "edited" : "",
-        entry.alsoInChannel ? "also sent to the channel" : "",
-        entry.streaming === "open" ? "streaming" : "",
-        entry.visibleTo ? `only ${entry.visibleTo.name} sees this` : "",
-      ]
-        .filter((mark) => mark !== "")
-        .join(", ");
-      const controls = [...entry.controls, ...entry.files.map((file) => `file: ${file}`)]
-        .map((control) => ` [${control}]`)
-        .join("");
-      return `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${controls}${marks === "" ? "" : ` (${marks})`}`;
-    })
-    .join("\n");
+  const text = transcriptText(entries, {
+    marks: (entry) => [
+      entry.edited ? "edited" : "",
+      entry.alsoInChannel ? "also sent to the channel" : "",
+      entry.streaming === "open" ? "streaming" : "",
+      entry.visibleTo ? `only ${entry.visibleTo.name} sees this` : "",
+    ],
+    after: (entry) =>
+      [...entry.controls, ...entry.files.map((file) => `file: ${file}`)].map((control) => ` [${control}]`).join(""),
+  });
   return { entries, text };
 }

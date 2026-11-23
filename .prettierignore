@@ -13,3 +13,6 @@ spec/
 sdks/typescript/generated/
 sdks/python/
 pnpm-lock.yaml
+
+# Generated from Linear's schema by scripts/linear-schema.ts.
+/server/src/drivers/linear/schema/schema.ts

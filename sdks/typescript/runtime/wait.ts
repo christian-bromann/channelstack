@@ -100,6 +100,11 @@ export function textMatches(text: string, expected: string | RegExp | undefined)
   return expected.test(text);
 }
 
+/** Text to find as it goes to the server: a string as it is, a `RegExp` as its source and flags. */
+export function patternOnWire(pattern: string | RegExp): string | { source: string; flags: string } {
+  return typeof pattern === "string" ? pattern : { source: pattern.source, flags: pattern.flags };
+}
+
 /** "a reply" → "a reply from my-agent", for timeout messages. */
 export function describeWait(what: string, from: Author | string | undefined): string {
   return from === undefined ? what : `${what} from ${typeof from === "string" ? from : from.name}`;
@@ -107,7 +112,8 @@ export function describeWait(what: string, from: Author | string | undefined): s
 
 /**
  * Wait for the next new item of a list that matches, after the last one this handle returned.
- * `seen` belongs to the handle and remembers, per wait, how far it has looked.
+ * `seen` belongs to the handle and remembers, per wait, how far it has looked. With `startsTurn`,
+ * the wait also looks only after the newest item that starts a turn (a person's prompt).
  */
 export function waitForNext<T>(
   seen: Map<string, number>,
@@ -116,12 +122,15 @@ export function waitForNext<T>(
   matches: (item: T) => boolean,
   what: string,
   options: WaitOptions = {},
+  startsTurn?: (item: T) => boolean,
 ): Promise<T> {
   return waitFor(
     what,
     async () => {
       const items = await read();
-      const index = items.findIndex((item, position) => position >= (seen.get(key) ?? 0) && matches(item));
+      const turn = startsTurn ? items.findLastIndex(startsTurn) + 1 : 0;
+      const from = Math.max(seen.get(key) ?? 0, turn);
+      const index = items.findIndex((item, position) => position >= from && matches(item));
       if (index === -1) return undefined;
       seen.set(key, index + 1);
       return items[index];

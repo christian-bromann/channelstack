@@ -98,7 +98,21 @@ export const ID_FORMATS = {
   "github.status": numeric(30_000_000_000, 39_999_999_999, /^3\d{10}$/),
   "github.pull": numeric(2_000_000_000, 2_999_999_999, /^2\d{9}$/),
   "linear.uuid": uuid,
+  // The short id in an agent session's URL (`/agent-session/<slugId>`).
+  "linear.slugId": { pattern: /^[0-9a-f]{12}$/, generate: (draw) => draw.chars(12, HEX) },
+  // A team key a test didn't choose: a letter, then capitals and digits, like the keys people pick.
+  "linear.teamKey": {
+    pattern: /^T[0-9A-Z]{5}$/,
+    accepts: /^[A-Z][A-Z0-9]{0,6}$/,
+    generate: (draw) => `T${draw.chars(5, UPPER_ALNUM)}`,
+  },
   "notion.uuid": uuid,
+  // A database property's id: four characters, URL-encoded as the API hands them out (`%3DkLq`).
+  "notion.propertyId": {
+    pattern: /^(?:%[0-9A-F]{2}|[A-Za-z0-9]){4}$/,
+    accepts: /^(?:%[0-9A-F]{2}|[A-Za-z0-9_.~-])+$/,
+    generate: (draw) => encodeURIComponent(draw.chars(4, `${UPPER_ALNUM}${LOWER_ALNUM.slice(10)}:;<=>?@[]^`)),
+  },
   "echo.app": echo("EA"),
   "echo.user": echo("EU"),
   "echo.room": echo("ER"),

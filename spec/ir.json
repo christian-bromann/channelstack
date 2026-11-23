@@ -335,6 +335,64 @@
             "session_not_found"
           ],
           "dispose": false
+        },
+        {
+          "name": "linear",
+          "kind": "factory",
+          "summary": "The Linear fixture: the agent's app, and where the agent reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "notion",
+          "kind": "factory",
+          "summary": "The Notion fixture: the agent's integration, and where the agent reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -4785,8 +4843,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -4833,8 +4894,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -4882,8 +4946,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5186,8 +5253,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5235,8 +5305,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5689,8 +5762,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5737,8 +5813,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5802,8 +5881,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5851,8 +5933,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5913,8 +5998,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -5962,8 +6050,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -6019,8 +6110,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -6119,8 +6213,11 @@
           ],
           "options": [],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -6167,8 +6264,11 @@
           ],
           "options": [],
           "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -7584,6 +7684,4911 @@
       ]
     },
     {
+      "name": "LinearFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "LinearApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person in the workspace",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "id",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "displayName",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "email",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "admin",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "guest",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createTeam",
+          "kind": "factory",
+          "summary": "Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/teams",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "key",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "members",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "LinearUser"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "states",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "object",
+                  "fields": [
+                    {
+                      "name": "name",
+                      "type": {
+                        "kind": "string"
+                      },
+                      "optional": false
+                    },
+                    {
+                      "name": "type",
+                      "type": {
+                        "kind": "enum",
+                        "values": [
+                          "backlog",
+                          "unstarted",
+                          "started",
+                          "completed",
+                          "canceled",
+                          "triage"
+                        ]
+                      },
+                      "optional": false
+                    }
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearTeam"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deliveries",
+          "kind": "method",
+          "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "type",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "resource",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "LinearDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The GraphQL operations the agent sent about this session's issues and sessions, by root field (`agentActivityCreate`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "LinearApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "named",
+            "name": "LinearApiCall"
+          },
+          "filter": true,
+          "what": "an API call from the agent"
+        }
+      ]
+    },
+    {
+      "name": "LinearApp",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        },
+        {
+          "name": "botUserId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "accessToken",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "webhookSecret",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "clientId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "clientSecret",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "LinearUser",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "displayName",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "email",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "admin",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "guest",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createIssue",
+          "kind": "method",
+          "summary": "Create an issue. Sends `Issue` (`create`); with `delegate`, it opens an agent session and sends `AgentSessionEvent` (`created`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/issues",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "description",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "priority",
+                    "type": {
+                      "kind": "integer"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "state",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "labels",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "string"
+                      }
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "assignee",
+                    "type": {
+                      "kind": "ref",
+                      "resources": [
+                        "LinearUser"
+                      ]
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "delegate",
+                    "type": {
+                      "kind": "ref",
+                      "resources": [
+                        "LinearApp"
+                      ]
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "parent",
+                    "type": {
+                      "kind": "ref",
+                      "resources": [
+                        "LinearIssue"
+                      ]
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "team",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearTeam"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "editIssue",
+          "kind": "method",
+          "summary": "Edit an issue's title, description or priority. Sends `Issue` (`update`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/edit-issue",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "changes",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "description",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "priority",
+                    "type": {
+                      "kind": "integer"
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "undelegate",
+          "kind": "method",
+          "summary": "Take an issue back from the app. Sends `Issue` (`update`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/undelegate",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "assign",
+          "kind": "method",
+          "summary": "Assign an issue to a person, or (with no one) unassign it. Sends `Issue` (`update`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/assign",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "assignee",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearUser"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "setState",
+          "kind": "method",
+          "summary": "Move an issue to a workflow state, by name. Sends `Issue` (`update`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/set-state",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "state",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "label",
+          "kind": "method",
+          "summary": "Put labels on an issue, by name. Sends `Issue` (`update`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/label",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "delegate",
+          "kind": "method",
+          "summary": "Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/delegate",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearApp"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearAgentSession"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "comment",
+          "kind": "method",
+          "summary": "Comment on an issue. A mention of the app opens an agent session and sends `AgentSessionEvent` (`created`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "Reply in a comment's thread. In an agent session's thread, it prompts the session (`AgentSessionEvent` `prompted`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "summary": "Edit a comment. Sends `Comment` (`update`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/edit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "delete",
+          "kind": "method",
+          "summary": "Delete a comment. Sends `Comment` (`remove`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/delete",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "react",
+          "kind": "method",
+          "summary": "React to a comment with an emoji. Linear sends no webhook for it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/react",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "prompt",
+          "kind": "method",
+          "summary": "Send a follow-up in an agent session. Sends `AgentSessionEvent` (`prompted`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/prompt",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "session",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearAgentSession"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "answer",
+          "kind": "method",
+          "summary": "Answer a question the agent asked (an `elicitation` activity). Sends `AgentSessionEvent` (`prompted`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/answer",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "elicitation",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearAgentActivity"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "stop",
+          "kind": "method",
+          "summary": "Press Stop on an agent session. Sends `AgentSessionEvent` (`prompted`) with the `stop` signal",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/users/{user}/stop",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "session",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "LinearAgentSession"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "LinearTeam",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "key",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "issue",
+          "kind": "method",
+          "summary": "An issue of this team by its identifier (`ENG-12`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/teams/{team}/issue",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "team",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "identifier",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "LinearIssue",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "identifier",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "team",
+          "type": {
+            "kind": "resource",
+            "name": "LinearTeam"
+          },
+          "optional": false
+        },
+        {
+          "name": "creator",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "LinearUser"
+              },
+              {
+                "kind": "resource",
+                "name": "LinearApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Read the issue again",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "title",
+          "kind": "method",
+          "summary": "The issue's title as it is now",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/title",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "string"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "state",
+          "kind": "method",
+          "summary": "The issue's workflow state",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/state",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearIssueState"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "assignee",
+          "kind": "method",
+          "summary": "Who the issue is assigned to, if anyone",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/assignee",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearUser"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "delegatedTo",
+          "kind": "method",
+          "summary": "The app the issue is delegated to, if any",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/delegate",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearApp"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "labels",
+          "kind": "method",
+          "summary": "The names of the labels on the issue",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/labels",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "comments",
+          "kind": "method",
+          "summary": "The comments on the issue, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/comments",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearComments"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "sessions",
+          "kind": "method",
+          "summary": "The agent sessions on the issue, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/sessions",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearAgentSessions"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "session",
+          "kind": "method",
+          "summary": "The issue's latest agent session, waiting for one to be opened",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/session",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearAgentSession"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "retryWhile": [
+            "not_found"
+          ]
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The issue as a person reads it: description, comments and the agent's sessions",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues/{issue}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "issue",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForComment",
+          "mode": "next",
+          "read": "comments",
+          "item": {
+            "kind": "resource",
+            "name": "LinearComment"
+          },
+          "from": "author",
+          "text": "body",
+          "what": "a comment"
+        },
+        {
+          "name": "latestComment",
+          "mode": "latest",
+          "read": "comments",
+          "item": {
+            "kind": "resource",
+            "name": "LinearComment"
+          },
+          "from": "author",
+          "what": "a comment"
+        }
+      ]
+    },
+    {
+      "name": "LinearDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "linear"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "action",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "webhookId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/linear/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "stale",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
+        }
+      ]
+    },
+    {
+      "name": "LinearAgentSession",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "issue",
+          "type": {
+            "kind": "resource",
+            "name": "LinearIssue"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "LinearApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "startedBy",
+          "type": {
+            "kind": "resource",
+            "name": "LinearUser"
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "state",
+          "kind": "method",
+          "summary": "The session's status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/agent-sessions/{agentSession}/state",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "agentSession",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "active",
+              "stopping",
+              "awaitingInput",
+              "complete",
+              "error",
+              "stale"
+            ]
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "activities",
+          "kind": "method",
+          "summary": "The session's activities, oldest first: the agent's, and the prompts of people",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/agent-sessions/{agentSession}/activities",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "agentSession",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearAgentActivities"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "externalUrls",
+          "kind": "method",
+          "summary": "The links the agent attached to the session",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/agent-sessions/{agentSession}/external-urls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "agentSession",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearExternalUrls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "plan",
+          "kind": "method",
+          "summary": "The agent's plan: each step and its status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/agent-sessions/{agentSession}/plan",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "agentSession",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearPlan"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The session as a person reads it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/agent-sessions/{agentSession}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "agentSession",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForState",
+          "mode": "until",
+          "read": "state",
+          "item": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "active",
+              "stopping",
+              "awaitingInput",
+              "complete",
+              "error",
+              "stale"
+            ]
+          },
+          "in": true,
+          "what": "the agent session to reach that state"
+        },
+        {
+          "name": "waitForActivity",
+          "mode": "next",
+          "read": "activities",
+          "item": {
+            "kind": "resource",
+            "name": "LinearAgentActivity"
+          },
+          "text": "type",
+          "turn": {
+            "field": "type",
+            "value": "prompt"
+          },
+          "what": "an activity"
+        }
+      ]
+    },
+    {
+      "name": "LinearComment",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "issue",
+          "type": {
+            "kind": "resource",
+            "name": "LinearIssue"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "LinearUser"
+              },
+              {
+                "kind": "resource",
+                "name": "LinearApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "body",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "session",
+          "type": {
+            "kind": "resource",
+            "name": "LinearAgentSession"
+          },
+          "optional": true
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "LinearDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "The replies in a comment's thread, once the agent is quiet",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/comments/{comment}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearCommentReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "A comment's thread as a person reads it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/comments/{comment}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "comment",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "LinearAgentActivity",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "session",
+          "type": {
+            "kind": "resource",
+            "name": "LinearAgentSession"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "thought",
+              "action",
+              "elicitation",
+              "response",
+              "error",
+              "prompt"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "LinearUser"
+              },
+              {
+                "kind": "resource",
+                "name": "LinearApp"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "body",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "action",
+          "type": {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "action",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": false
+              },
+              {
+                "name": "parameter",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": true
+              },
+              {
+                "name": "result",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": true
+              }
+            ]
+          },
+          "optional": true
+        },
+        {
+          "name": "ephemeral",
+          "type": {
+            "kind": "boolean"
+          },
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "NotionFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "NotionIntegration"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person in the workspace",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "id",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "email",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "avatarUrl",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createPage",
+          "kind": "factory",
+          "summary": "Create a page as seed data: it sends no event. The integration sees it only through `connections`, its own or a parent's",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/pages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "parent",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "content",
+              "type": {
+                "kind": "files",
+                "mode": "document"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "icon",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "connections",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "NotionIntegration"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "createdBy",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionUser"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionPage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createDatabase",
+          "kind": "factory",
+          "summary": "Create a database with its property schema and rows, as seed data",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/databases",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "parent",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "properties",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "named",
+                  "name": "NotionPropertySchema"
+                }
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "rows",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "record",
+                  "values": {
+                    "kind": "named",
+                    "name": "NotionPropertyValue"
+                  }
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "connections",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "NotionIntegration"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionDatabase"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "setContentUpdateDelay",
+          "kind": "method",
+          "summary": "How long Notion holds `page.content_updated` to batch edits, for this session (fake only). Default one second",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/content-delay",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "delay",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "sendVerification",
+          "kind": "method",
+          "summary": "Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/verification",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deliveries",
+          "kind": "method",
+          "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "type",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "resource",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "NotionDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The REST calls the agent made about this session's pages, by the client's method name (`comments.create`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "NotionApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "named",
+            "name": "NotionApiCall"
+          },
+          "filter": true,
+          "what": "an API call from the agent"
+        }
+      ]
+    },
+    {
+      "name": "NotionIntegration",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "notion"
+          },
+          "optional": false
+        },
+        {
+          "name": "botUserId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "token",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "webhookSecret",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "NotionUser",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "notion"
+          },
+          "optional": false
+        },
+        {
+          "name": "email",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "comment",
+          "kind": "method",
+          "summary": "Start a discussion on a page, or anchored to the block with `anchor` in its text. Sends `comment.created` if the integration can see the page",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "anchor",
+              "type": {
+                "kind": "pattern"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "Reply in a discussion. Sends `comment.created`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "discussion",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionDiscussion"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "editComment",
+          "kind": "method",
+          "summary": "Edit one of this person's comments. Sends `comment.updated`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/edit-comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deleteComment",
+          "kind": "method",
+          "summary": "Delete one of this person's comments. Sends `comment.deleted`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/delete-comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resolve",
+          "kind": "method",
+          "summary": "Resolve a discussion. Notion sends no event for it, and the API no longer lists its comments",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/resolve",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "discussion",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionDiscussion"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reopen",
+          "kind": "method",
+          "summary": "Reopen a resolved discussion",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/reopen",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "discussion",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionDiscussion"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createPage",
+          "kind": "method",
+          "summary": "Create a page as this person. Sends `page.created` if the integration can see it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/pages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "parent",
+                    "type": {
+                      "kind": "ref",
+                      "resources": [
+                        "NotionPage"
+                      ]
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "content",
+                    "type": {
+                      "kind": "files",
+                      "mode": "document"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "icon",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "connections",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "ref",
+                        "resources": [
+                          "NotionIntegration"
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionPage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "summary": "Edit a page's body: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/edit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "change",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "append",
+                    "type": {
+                      "kind": "files",
+                      "mode": "document"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "replace",
+                    "type": {
+                      "kind": "files",
+                      "mode": "document"
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "rename",
+          "kind": "method",
+          "summary": "Change a page's title. Sends `page.properties_updated`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/rename",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "title",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "mention",
+          "kind": "method",
+          "summary": "Mention the integration in the page body: in the block with `inBlock` in its text, or in a new paragraph. Sends `page.content_updated` after the batching delay",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/mention",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "integration",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionIntegration"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "inBlock",
+              "type": {
+                "kind": "pattern"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "setProperty",
+          "kind": "method",
+          "summary": "Set a property of a database row. Sends `page.properties_updated`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/set-property",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "value",
+              "type": {
+                "kind": "named",
+                "name": "NotionPropertyValue"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "NotionDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "addRow",
+          "kind": "method",
+          "summary": "Add a row to a database. Sends `page.created` if the integration can see the database",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/rows",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "values",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "named",
+                  "name": "NotionPropertyValue"
+                }
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "database",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionDatabase"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionPage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "connect",
+          "kind": "method",
+          "summary": "Connect the integration to a page (Share → Connections): it sees the page and everything under it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/connect",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "integration",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionIntegration"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "disconnect",
+          "kind": "method",
+          "summary": "Remove the integration's connection from a page",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/users/{user}/disconnect",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "integration",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionIntegration"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "page",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "NotionPage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "NotionPage",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "notion"
+          },
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "discussions",
+          "kind": "method",
+          "summary": "The page's discussions: on the page itself, and on its blocks",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/discussions",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionDiscussions"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "markdown",
+          "kind": "method",
+          "summary": "The page body as Markdown, once the agent is quiet",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/markdown",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "string"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "onceQuiet": true
+        },
+        {
+          "name": "blocks",
+          "kind": "method",
+          "summary": "The page's blocks as the API has them, with nested blocks under `children`",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/blocks",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionBlocks"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "property",
+          "kind": "method",
+          "summary": "A property's value as a person reads it: text, a number, option names, ids",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/property",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionPropertyValue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "children",
+          "kind": "method",
+          "summary": "The pages directly under this page",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/children",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionChildPages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "connections",
+          "kind": "method",
+          "summary": "The integrations that can see the page: connected to it or to a page above it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/connections",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionConnections"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The page and its discussions as a person reads them",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages/{page}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "page",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "NotionDatabase",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "notion"
+          },
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "url",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "rows",
+          "kind": "method",
+          "summary": "The rows of a database, optionally only those whose properties have these values",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/databases/{database}/rows",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "database",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "filter",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "named",
+                  "name": "NotionPropertyValue"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionRows"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "NotionDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "notion"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "entity",
+          "type": {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "type",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": {
+                  "kind": "string"
+                },
+                "optional": false
+              }
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "NotionDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the delivery again, signed with a token that isn't the subscription's",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/notion/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "NotionDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
+        }
+      ]
+    },
+    {
+      "name": "NotionComment",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "discussion",
+          "type": {
+            "kind": "resource",
+            "name": "NotionDiscussion"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "union",
+            "types": [
+              {
+                "kind": "resource",
+                "name": "NotionUser"
+              },
+              {
+                "kind": "resource",
+                "name": "NotionIntegration"
+              }
+            ],
+            "discriminator": "kind"
+          },
+          "optional": false
+        },
+        {
+          "name": "text",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "NotionDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "NotionDiscussion",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "page",
+          "type": {
+            "kind": "resource",
+            "name": "NotionPage"
+          },
+          "optional": false
+        },
+        {
+          "name": "anchor",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "comments",
+          "kind": "method",
+          "summary": "The discussion's comments, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/discussions/{discussion}/comments",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "discussion",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionComments"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resolved",
+          "kind": "method",
+          "summary": "Whether the discussion is resolved",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/discussions/{discussion}/resolved",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "discussion",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "boolean"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The discussion as a person reads it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/discussions/{discussion}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "discussion",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForComment",
+          "mode": "next",
+          "read": "comments",
+          "item": {
+            "kind": "resource",
+            "name": "NotionComment"
+          },
+          "from": "author",
+          "what": "a comment"
+        },
+        {
+          "name": "latestComment",
+          "mode": "latest",
+          "read": "comments",
+          "item": {
+            "kind": "resource",
+            "name": "NotionComment"
+          },
+          "from": "author",
+          "what": "a comment"
+        }
+      ]
+    },
+    {
       "name": "GitHubPullRequest",
       "idFields": [
         "repoId",
@@ -8807,6 +13812,20 @@
             "optional": false
           },
           {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
             "name": "files",
             "type": {
               "kind": "array",
@@ -8823,13 +13842,6 @@
               "value": true
             },
             "optional": true
-          },
-          {
-            "name": "edited",
-            "type": {
-              "kind": "boolean"
-            },
-            "optional": false
           },
           {
             "name": "streaming",
@@ -8850,13 +13862,6 @@
               "name": "SlackPrincipal"
             },
             "optional": true
-          },
-          {
-            "name": "depth",
-            "type": {
-              "kind": "integer"
-            },
-            "optional": false
           }
         ]
       }
@@ -9543,6 +14548,771 @@
           "kind": "named",
           "name": "GitHubApiCall"
         }
+      }
+    },
+    {
+      "name": "LinearIssueState",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "type",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "backlog",
+                "unstarted",
+                "started",
+                "completed",
+                "canceled",
+                "triage"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "LinearComments",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearComment"
+        }
+      }
+    },
+    {
+      "name": "LinearAgentSessions",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearAgentSession"
+        }
+      }
+    },
+    {
+      "name": "LinearTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "LinearTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "LinearTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "LinearPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "LinearPrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "LinearCommentReplies",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearComment"
+        }
+      }
+    },
+    {
+      "name": "LinearAgentActivities",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearAgentActivity"
+        }
+      }
+    },
+    {
+      "name": "LinearExternalUrls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "object",
+          "fields": [
+            {
+              "name": "label",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            },
+            {
+              "name": "url",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "LinearPlan",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "object",
+          "fields": [
+            {
+              "name": "content",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false
+            },
+            {
+              "name": "status",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "pending",
+                  "inProgress",
+                  "completed",
+                  "canceled"
+                ]
+              },
+              "optional": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "LinearDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearDelivery"
+        }
+      }
+    },
+    {
+      "name": "LinearApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "LinearApiCall"
+        }
+      }
+    },
+    {
+      "name": "LinearApiCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "literal",
+              "value": "linear"
+            },
+            "optional": false
+          },
+          {
+            "name": "operation",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "NotionPropertySchema",
+      "type": {
+        "kind": "union",
+        "types": [
+          {
+            "kind": "enum",
+            "values": [
+              "title",
+              "rich_text",
+              "number",
+              "checkbox",
+              "date",
+              "people",
+              "url",
+              "email"
+            ]
+          },
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "select",
+                "type": {
+                  "kind": "array",
+                  "items": {
+                    "kind": "string"
+                  }
+                },
+                "optional": false
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "multi_select",
+                "type": {
+                  "kind": "array",
+                  "items": {
+                    "kind": "string"
+                  }
+                },
+                "optional": false
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "status",
+                "type": {
+                  "kind": "array",
+                  "items": {
+                    "kind": "string"
+                  }
+                },
+                "optional": false
+              }
+            ]
+          },
+          {
+            "kind": "object",
+            "fields": [
+              {
+                "name": "relation",
+                "type": {
+                  "kind": "ref",
+                  "resources": [
+                    "NotionDatabase"
+                  ]
+                },
+                "optional": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "NotionPropertyValue",
+      "type": {
+        "kind": "nullable",
+        "type": {
+          "kind": "union",
+          "types": [
+            {
+              "kind": "string"
+            },
+            {
+              "kind": "number"
+            },
+            {
+              "kind": "boolean"
+            },
+            {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            {
+              "kind": "object",
+              "fields": [
+                {
+                  "name": "start",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": false
+                },
+                {
+                  "name": "end",
+                  "type": {
+                    "kind": "string"
+                  },
+                  "optional": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "NotionDiscussions",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionDiscussion"
+        }
+      }
+    },
+    {
+      "name": "NotionBlocks",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "unknown"
+        }
+      }
+    },
+    {
+      "name": "NotionChildPages",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionPage"
+        }
+      }
+    },
+    {
+      "name": "NotionConnections",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionIntegration"
+        }
+      }
+    },
+    {
+      "name": "NotionTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "NotionTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "NotionTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "NotionPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "NotionPrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "NotionRows",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionPage"
+        }
+      }
+    },
+    {
+      "name": "NotionComments",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionComment"
+        }
+      }
+    },
+    {
+      "name": "NotionDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionDelivery"
+        }
+      }
+    },
+    {
+      "name": "NotionApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "NotionApiCall"
+        }
+      }
+    },
+    {
+      "name": "NotionApiCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "literal",
+              "value": "notion"
+            },
+            "optional": false
+          },
+          {
+            "name": "operation",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
       }
     },
     {

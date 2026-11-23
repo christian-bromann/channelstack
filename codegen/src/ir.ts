@@ -47,6 +47,10 @@ export interface IrWait {
   item: IrType;
   field?: string;
   not?: string[];
+  /** For `until`: the wait takes the value, or the values, to wait for as its first argument. */
+  in?: true;
+  /** For `next`: an item whose `field` is `value` starts a new turn; the wait looks only after the newest one. */
+  turn?: { field: string; value: string };
   /** The item field holding its author, which the `from` option filters on. */
   from?: string;
   /** A text field of the item; an option of the same name narrows the wait by a string or a pattern. */
@@ -85,8 +89,12 @@ export type IrType =
   /**
    * Files a test hands over. SDKs take a directory, files on disk or inline contents and send
    * paths with base64 contents: a whole tree (`tree`), or changes where `null` deletes (`changes`).
+   * `document` is one text: inline, or a fixture file's contents (`{ path }`), sent as the text;
+   * anything else (structured content) is sent as it is.
    */
-  | { kind: "files"; mode: "tree" | "changes" }
+  | { kind: "files"; mode: "tree" | "changes" | "document" }
+  /** Text to find: a string, or a pattern (a `RegExp`), sent as `{ source, flags }`. */
+  | { kind: "pattern" }
   /** A named data type from `types`. */
   | { kind: "named"; name: string }
   /** In a response: the wire data of a handle, which SDKs wrap into the handle again. */
@@ -183,6 +191,9 @@ export function buildIr(openapi: Json): Ir {
         return { kind: "nullable", type: typeOf(target ?? {}, where) };
       }
     }
+    // Kinds the SDKs build from more than one shape: before the alternatives are read as a union.
+    if (schema["x-channelstack-pattern"] === true) return { kind: "pattern" };
+    if (schema["x-channelstack-files"] === "document") return { kind: "files", mode: "document" };
     const alternatives: Json[] | undefined = schema.oneOf ?? schema.anyOf;
     if (Array.isArray(alternatives)) {
       // "One of these, or null": the alternatives that aren't null, marked as nullable.
@@ -375,11 +386,11 @@ export function buildIr(openapi: Json): Ir {
         const returned = responseSchema ? typeOf(responseSchema, `${where} → 200`) : null;
         if (
           wait.mode === "until" &&
-          (returned === null || typeof wait.field !== "string" || !Array.isArray(wait.not))
+          (returned === null || (wait.in !== true && (typeof wait.field !== "string" || !Array.isArray(wait.not))))
         ) {
           throw new SpecError(
             where,
-            "an `until` wait needs a response, a `field` and the values it must leave (`not`)",
+            "an `until` wait needs a response, and either a `field` and the values it must leave (`not`), or `in`",
           );
         }
         const item = wait.mode === "until" && returned ? returned : itemOf(returned, where);
@@ -393,7 +404,11 @@ export function buildIr(openapi: Json): Ir {
             ...(wait.from ? { from: wait.from } : {}),
             ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
-            ...(wait.mode === "until" ? { field: wait.field, not: wait.not } : {}),
+            ...(wait.mode === "next" && wait.turn ? { turn: { field: wait.turn.field, value: wait.turn.value } } : {}),
+            ...(wait.mode === "until" && wait.in !== true ? { field: wait.field, not: wait.not } : {}),
+            ...(wait.mode === "until" && wait.in === true
+              ? { in: true as const, ...(wait.field ? { field: wait.field } : {}) }
+              : {}),
             what: wait.what,
           },
         ];

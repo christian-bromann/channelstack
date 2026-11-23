@@ -11,7 +11,13 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { Duration, GitHubFixture, SlackFixture } from "../../sdks/typescript/client.ts";
+import type {
+  Duration,
+  GitHubFixture,
+  LinearFixture,
+  NotionFixture,
+  SlackFixture,
+} from "../../sdks/typescript/client.ts";
 import type { MatcherName, matchers } from "../matchers-core/index.ts";
 
 export interface ChannelstackIntegrationOptions {
@@ -56,6 +62,8 @@ declare module "vitest" {
     channelstack: ChannelstackFixture;
     slack: SlackFixture;
     github: GitHubFixture;
+    linear: LinearFixture;
+    notion: NotionFixture;
   }
 
   // The type parameters have to be Vitest 5's own for this to merge with its declaration.

@@ -28,6 +28,8 @@ export interface MatcherResult {
 export interface MatcherState {
   /** True under `.not`. */
   isNot: boolean;
+  /** The test framework's own equality, which understands asymmetric matchers (`expect.any(Number)`). */
+  equals?: (actual: unknown, expected: unknown) => boolean;
   /** Defaults from the integration's options. */
   timeout: Duration;
   quietFor: Duration;
@@ -154,10 +156,42 @@ async function stillOpen(subject: unknown): Promise<string[]> {
 const from = (author: AuthorRef, text?: string | RegExp) => (message: Message) =>
   fromMatches(message.author, author) && textMatches(message.text, text);
 
+interface Activity {
+  readonly type: string;
+  readonly author: Author;
+  readonly body?: string | undefined;
+}
+
+interface AgentSession {
+  state(): Promise<string>;
+  activities(): Promise<Activity[]>;
+}
+
+/** A Linear agent session, or the latest one of an issue (the subject a session matcher was given). */
+async function sessionOf(subject: unknown): Promise<AgentSession | undefined> {
+  const handle = subject as Partial<AgentSession> & { sessions?: () => Promise<AgentSession[]> };
+  if (typeof handle.state === "function" && typeof handle.activities === "function") return handle as AgentSession;
+  if (typeof handle.sessions === "function") return (await handle.sessions()).at(-1);
+  throw new TypeError("This matcher needs an agent session or an issue");
+}
+
+/** A comment: GitHub and Linear call its text `body`, Notion calls it `text`. */
 interface Comment {
   readonly author: Author;
-  readonly body: string;
+  readonly body?: string;
+  readonly text?: string;
 }
+const commentText = (comment: Comment) => comment.body ?? comment.text ?? "";
+
+/** The text of each block of a Notion page, nested ones included: its rich text, or a child page's title. */
+const blockTexts = (blocks: readonly unknown[]): string[] =>
+  blocks.flatMap((raw) => {
+    const block = raw as { type?: string; children?: unknown[] } & Record<string, unknown>;
+    const data = (block.type ? block[block.type] : undefined) as
+      { rich_text?: Array<{ plain_text?: string }>; title?: string } | undefined;
+    const text = data?.rich_text ? data.rich_text.map((item) => item.plain_text ?? "").join("") : (data?.title ?? "");
+    return [text, ...blockTexts(block.children ?? [])];
+  });
 
 interface ReviewComment extends Comment {
   readonly path: string;
@@ -171,9 +205,9 @@ const commentsOf = (subject: unknown): Promise<readonly Comment[]> => {
   return handle.comments();
 };
 const commentFrom = (author: AuthorRef, text?: string | RegExp) => (comment: Comment) =>
-  fromMatches(comment.author, author) && textMatches(comment.body, text);
+  fromMatches(comment.author, author) && textMatches(commentText(comment), text);
 const written = (comments: readonly Comment[]) =>
-  listing(comments.map((comment) => `${comment.author.name}: ${comment.body}`));
+  listing(comments.map((comment) => `${comment.author.name}: ${commentText(comment)}`));
 
 export const matchers = {
   /** The thread (or DM) has at least one reply from this author. */
@@ -386,7 +420,7 @@ export const matchers = {
             (expected.path === undefined || comment.path === expected.path) &&
             (expected.line === undefined || comment.line === expected.line) &&
             (expected.from === undefined || fromMatches(comment.author, expected.from)) &&
-            textMatches(comment.body, expected.text),
+            textMatches(commentText(comment), expected.text),
         ),
       describe: (comments) =>
         `Expected ${state.isNot ? "no" : "a"} comment on the diff${wanted}. The diff has:\n${listing(comments.map((comment) => `${comment.author.name} on ${comment.path}:${comment.line}: ${comment.body}`))}`,
@@ -455,6 +489,104 @@ export const matchers = {
       read: () => pull.merged(),
       holds: (merged) => merged,
       describe: () => `Expected the pull request ${state.isNot ? "not " : ""}to be merged`,
+    });
+  },
+
+  /** Subject: a Linear agent session, or an issue (its latest session). The session's status. */
+  toHaveSessionState(state: MatcherState, subject: unknown, wanted: string, options?: Timing) {
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => (await sessionOf(subject))?.state() ?? Promise.resolve("no session"),
+      holds: (current) => current === wanted,
+      describe: (current) => `Expected the agent session ${state.isNot ? "not " : ""}to be ${wanted}, it is ${current}`,
+    });
+  },
+
+  /** Subject: a Linear agent session, or an issue (its latest session). An activity matching every field that is given. */
+  toHaveActivity(
+    state: MatcherState,
+    subject: unknown,
+    expected: { type?: string; from?: AuthorRef; text?: string | RegExp },
+    options?: Timing,
+  ) {
+    const wanted = [
+      expected.type ?? "activity",
+      expected.from === undefined ? "" : ` from ${nameOf(expected.from)}`,
+      expected.text === undefined ? "" : ` matching ${show(expected.text)}`,
+    ].join("");
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => (await (await sessionOf(subject))?.activities()) ?? [],
+      holds: (activities) =>
+        activities.some(
+          (activity) =>
+            (expected.type === undefined || activity.type === expected.type) &&
+            (expected.from === undefined || fromMatches(activity.author, expected.from)) &&
+            textMatches(activity.body ?? "", expected.text),
+        ),
+      describe: (activities) =>
+        `Expected ${state.isNot ? "no" : "a"} ${wanted}. The session has:\n${listing(activities.map((activity) => `${activity.author.name} (${activity.type}): ${activity.body ?? ""}`))}`,
+    });
+  },
+
+  /** Subject: a Linear issue. It is delegated to this app, or (with `undefined`) to none. */
+  toBeDelegatedTo(state: MatcherState, subject: unknown, app: Author | undefined, options?: Timing) {
+    const issue = subject as { delegatedTo(): Promise<Author | undefined> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => issue.delegatedTo(),
+      holds: (delegate) => (app === undefined ? delegate === undefined : delegate?.id === app.id),
+      describe: (delegate) =>
+        `Expected the issue ${state.isNot ? "not " : ""}to be delegated to ${app?.name ?? "no one"}, it is delegated to ${delegate?.name ?? "no one"}`,
+    });
+  },
+
+  /** Subject: a Linear issue. It is assigned to this person, or (with `undefined`) to no one. */
+  toBeAssignedTo(state: MatcherState, subject: unknown, user: Author | undefined, options?: Timing) {
+    const issue = subject as { assignee(): Promise<Author | undefined> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => issue.assignee(),
+      holds: (assignee) => (user === undefined ? assignee === undefined : assignee?.id === user.id),
+      describe: (assignee) =>
+        `Expected the issue ${state.isNot ? "not " : ""}to be assigned to ${user?.name ?? "no one"}, it is assigned to ${assignee?.name ?? "no one"}`,
+    });
+  },
+
+  /** Subject: a Notion page. A block (at any depth) whose text matches. */
+  toHaveBlock(state: MatcherState, subject: unknown, text: string | RegExp, options?: Timing) {
+    const page = subject as { blocks(): Promise<unknown[]> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => blockTexts(await page.blocks()),
+      holds: (texts) => texts.some((line) => textMatches(line, text)),
+      describe: (texts) =>
+        `Expected the page ${state.isNot ? "not " : ""}to have a block matching ${show(text)}. Its blocks:\n${listing(texts)}`,
+    });
+  },
+
+  /** Subject: a Notion page. A property has this value; asymmetric matchers (`expect.any(Number)`) work. */
+  toHavePropertyValue(state: MatcherState, subject: unknown, name: string, expected: unknown, options?: Timing) {
+    const page = subject as { property(name: string): Promise<unknown> };
+    const equals = state.equals ?? ((a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b));
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: () => page.property(name),
+      holds: (value) => equals(value, expected),
+      describe: (value) =>
+        `Expected ${name} ${state.isNot ? "not " : ""}to be ${String(expected)}, it is ${JSON.stringify(value)}`,
+    });
+  },
+
+  /** Subject: a Linear issue. Its workflow state, by name. */
+  toHaveState(state: MatcherState, subject: unknown, name: string, options?: Timing) {
+    const issue = subject as { state(): Promise<{ name: string }> };
+    return settle(subject, state, options, {
+      onceQuiet: false,
+      read: async () => (await issue.state()).name,
+      holds: (current) => current.toLowerCase() === name.toLowerCase(),
+      describe: (current) =>
+        `Expected the issue ${state.isNot ? "not " : ""}to be in ${JSON.stringify(name)}, it is in ${JSON.stringify(current)}`,
     });
   },
 

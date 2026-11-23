@@ -56,3 +56,8 @@ export function readChanges(
   if (Array.isArray(input)) return input.flatMap(read);
   return Object.entries(input).map(([path, content]) => ({ path, content: content === null ? null : base64(content) }));
 }
+
+/** One text a test hands over: inline, or the contents of a fixture file (`{ path }`). Structured content passes as it is. */
+export function readDocument(input: string | { path: string } | unknown[]): string | unknown[] {
+  return typeof input === "string" || Array.isArray(input) ? input : readFileSync(located(input.path), "utf8");
+}

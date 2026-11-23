@@ -107,8 +107,9 @@ async function respond(thread: Thread, message: Message): Promise<void> {
 
 bot.onNewMention(async (thread, message) => {
   if (message.author.isBot === true) return;
-  // It keeps answering follow-ups in this thread without a new mention.
+  // It keeps answering follow-ups in this thread without a new mention, from the person who asked.
   await thread.subscribe();
+  await thread.setState({ helping: message.author.userId });
   if (/look at/i.test(message.text)) await slack.addReaction(thread.id, message.id, "eyes");
   // In a group DM the answer goes into the conversation itself; everywhere else, into the thread.
   const { channel } = await slack.webClient.conversations.info({ channel: thread.channelId.split(":").at(-1) ?? "" });
@@ -179,6 +180,10 @@ bot.onAssistantContextChanged((event) => {
 bot.onDirectMessage(respond);
 
 bot.onSubscribedMessage(async (thread, message) => {
+  // Someone else chiming in ("+1") isn't asking it: it answers the person it is helping, a question, or a new mention.
+  const helping = (await thread.state)?.helping;
+  const question = message.text.trim().endsWith("?");
+  if (!message.isMention && !question && helping !== undefined && helping !== message.author.userId) return;
   // A new mention in a thread it is part of gets the same treatment as the first one.
   if (message.isMention && /look at/i.test(message.text)) await slack.addReaction(thread.id, message.id, "eyes");
   await respond(thread, message);

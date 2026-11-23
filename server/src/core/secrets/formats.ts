@@ -45,6 +45,9 @@ export const SECRET_FORMATS = {
   "github.installationToken": { pattern: /^ghs_[A-Za-z0-9]{36}$/, generate: () => `ghs_${alnum(36)}` },
   "linear.oauthToken": { pattern: /^lin_oauth_[a-f0-9]{64}$/, generate: () => `lin_oauth_${hex(64)}` },
   "linear.apiKey": { pattern: /^lin_api_[A-Za-z0-9]{40}$/, generate: () => `lin_api_${alnum(40)}` },
+  // An OAuth app's client id and secret, as Linear shows them: 32 hex characters each.
+  "linear.clientId": { pattern: /^[a-f0-9]{32}$/, generate: () => hex(32) },
+  "linear.clientSecret": { pattern: /^[a-f0-9]{32}$/, generate: () => hex(32) },
   "linear.webhookSecret": { pattern: /^lin_wh_[A-Za-z0-9]{43}$/, generate: () => `lin_wh_${alnum(43)}` },
   "notion.token": { pattern: /^ntn_[A-Za-z0-9]{46}$/, generate: () => `ntn_${alnum(46)}` },
   "notion.verificationToken": { pattern: /^secret_[A-Za-z0-9]{43}$/, generate: () => `secret_${alnum(43)}` },

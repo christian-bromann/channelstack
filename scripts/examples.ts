@@ -43,6 +43,28 @@ const CHANNELS = {
     // The standard checks as a developer adds them (exit check 3.4).
     suites: ["test/acceptance/checks/github-checks.test.ts"],
   },
+  linear: {
+    examples: "api/examples/linear.test.ts",
+    enabled: [
+      "delegation and agent sessions > ",
+      "conversation inside a session > ",
+      "issue workflow > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+    ],
+    // The standard checks as a developer adds them (exit check 4.5).
+    suites: ["test/acceptance/checks/linear-checks.test.ts"],
+  },
+  notion: {
+    examples: "api/examples/notion.test.ts",
+    enabled: [
+      "comments and discussions > ",
+      "connections > ",
+      "pages and databases > ",
+      "delivery and failures \\(fake only\\) > ",
+    ],
+    suites: ["test/acceptance/checks/notion-checks.test.ts"],
+  },
 } as const;
 
 /** The reference agents the examples run against, by name: the channel they live in, and where they take webhooks. */
@@ -51,13 +73,24 @@ const AGENTS = {
   "chat-sdk-slack": { channel: "slack", path: "/slack/events" },
   probot: { channel: "github", path: "/api/github/webhooks" },
   "chat-sdk-github": { channel: "github", path: "/api/webhooks/github" },
+  "linear-sdk": { channel: "linear", path: "/webhooks/linear" },
+  "chat-sdk-linear": { channel: "linear", path: "/api/webhooks/linear" },
+  "notion-sdk": { channel: "notion", path: "/webhooks/notion" },
+} as const;
+
+/**
+ * Every channel in one run (exit check 4.6): `api/examples/shared.test.ts` against one server with
+ * one reference agent per channel, each with its own endpoint.
+ */
+const SHARED = {
+  examples: "api/examples/shared.test.ts",
+  agents: ["bolt-ai-sdk", "probot", "linear-sdk", "notion-sdk"],
+  enabled: ["answers in #support", "an admin and a regular member", "(slack|github|linear|notion) checks: "],
 } as const;
 
 /** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */
 export const ENABLED_TESTS = new RegExp(
-  `^(${Object.values(CHANNELS)
-    .flatMap((channel) => channel.enabled)
-    .join("|")})`,
+  `^(${[...Object.values(CHANNELS).flatMap((channel) => channel.enabled), ...SHARED.enabled].join("|")})`,
 );
 
 export async function runExamples(
@@ -76,4 +109,17 @@ export async function runExamples(
       for (const suite of suites) run("pnpm", [...vitest, suite], { cwd: ROOT, env });
     });
   }
+  if (options.agents !== undefined) return;
+  console.log(`\n${SHARED.examples} against ${SHARED.agents.join(", ")}`);
+  const [first, ...rest] = SHARED.agents.map((name) => ({
+    agent: join(ROOT, "examples", "agents", name, "agent.ts"),
+    webhook: { driver: AGENTS[name].channel, path: AGENTS[name].path },
+  }));
+  if (!first) return;
+  await withStack({ bin, ...first, others: rest }, ({ env }) => {
+    run("pnpm", ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", SHARED.examples], {
+      cwd: ROOT,
+      env,
+    });
+  });
 }

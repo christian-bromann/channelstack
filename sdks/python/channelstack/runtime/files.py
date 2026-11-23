@@ -12,6 +12,8 @@ type FileInput = dict[str, Any]
 type TreeInput = str | list[FileInput]
 # Changes to files: a list of files, or a map of path to its new contents, where `None` deletes the file.
 type ChangesInput = list[FileInput] | dict[str, str | None]
+# One text: inline, or a fixture file's contents (`{"path"}`). Structured content (a list) passes as it is.
+type DocumentInput = str | dict[str, Any] | list[Any]
 
 _root: Path | None = None
 
@@ -60,3 +62,10 @@ def read_changes(changes: ChangesInput) -> list[dict[str, Any]]:
     return [
         {"path": path, "content": None if content is None else _base64(content)} for path, content in changes.items()
     ]
+
+
+def read_document(document: DocumentInput) -> str | list[Any]:
+    """One text a test hands over: inline, or the contents of a fixture file. Structured content passes as it is."""
+    if isinstance(document, (str, list)):
+        return document
+    return _located(str(document["path"])).read_text(encoding="utf-8")

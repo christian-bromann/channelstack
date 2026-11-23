@@ -10,12 +10,11 @@ import { restProblems, webhookProblems } from "../../server/test/github-schemas.
 /** How many of the App's session-less calls were on record when each test began. */
 const before = new WeakMap<object, number>();
 
-beforeEach(async (context) => {
-  if (context.github) before.set(context, (await context.github.appCalls()).length);
+beforeEach(async ({ github, task }) => {
+  if (github) before.set(task, (await github.appCalls()).length);
 });
 
-afterEach(async (context) => {
-  const { github } = context;
+afterEach(async ({ github, task }) => {
   // A test that never got its fixtures has nothing to check.
   if (!github) return;
   // The App's own endpoints belong to no session: what was called there since this test began is checked too.
@@ -24,7 +23,7 @@ afterEach(async (context) => {
     github.appCalls(),
     github.deliveries(),
   ]);
-  const calls = [...inSession, ...aboutNoRepo.slice(before.get(context) ?? 0)];
+  const calls = [...inSession, ...aboutNoRepo.slice(before.get(task) ?? 0)];
   const problems = [
     ...calls.flatMap((call) => restProblems(call.method, call.path, call.responseStatus, call.response)),
     ...deliveries.flatMap((delivery) => webhookProblems(delivery.type, delivery.payload)),

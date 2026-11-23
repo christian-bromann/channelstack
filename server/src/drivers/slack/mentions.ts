@@ -1,17 +1,13 @@
+import { richTextPieces } from "../../core/rich-text/index.ts";
+
 /**
  * `RichText` → Slack mrkdwn: `@name` becomes a real mention (`<@U…>`) of the person or app with
  * that name, and `@@` is a literal `@`. A name nobody has is left as it was typed.
  */
 export function resolveMentions(text: string, lookup: (name: string) => string | undefined): string {
-  return text.replace(/@@|@([A-Za-z0-9][A-Za-z0-9._-]*)/g, (match, name: string | undefined) => {
-    if (name === undefined) return "@";
-    // A sentence may end right after the name: "@my-agent." mentions "my-agent".
-    for (let end = name.length; end > 0; end--) {
-      const id = lookup(name.slice(0, end));
-      if (id !== undefined && !/[A-Za-z0-9]/.test(name.slice(end, end + 1))) return `<@${id}>${name.slice(end)}`;
-    }
-    return match;
-  });
+  return richTextPieces(text, lookup)
+    .map((piece) => ("text" in piece ? piece.text : `<@${piece.mention}>`))
+    .join("");
 }
 
 /** A mention in Slack mrkdwn: `<@U…>`, or `<@U…|label>`. */

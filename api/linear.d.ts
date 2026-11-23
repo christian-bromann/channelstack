@@ -126,7 +126,8 @@ export interface LinearIssue extends HasTranscript {
   /** e.g. `ENG-12`. */
   readonly identifier: string;
   readonly url: string;
-  readonly creator: LinearUser;
+  /** A person, or an app that created it through the API. */
+  readonly creator: LinearAuthor;
 
   refresh(): Promise<LinearIssue>;
   title(): Promise<string>;
@@ -158,7 +159,8 @@ export interface LinearComment extends HasTranscript {
   replies(): Promise<LinearComment[]>;
 }
 
-export type LinearSessionState = "pending" | "active" | "awaitingInput" | "complete" | "error" | "stale";
+/** Linear's `AgentSessionStatus`. `stopping`: a person pressed Stop and the agent hasn't ended its turn yet. */
+export type LinearSessionState = "pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale";
 
 export interface LinearAgentSession extends HasTranscript {
   readonly id: string;
@@ -172,7 +174,10 @@ export interface LinearAgentSession extends HasTranscript {
   /** Wait until the session reaches one of these states. */
   waitForState(state: LinearSessionState | LinearSessionState[], options?: WaitOptions): Promise<LinearSessionState>;
   activities(): Promise<LinearAgentActivity[]>;
-  /** Wait for the next new activity matching `type` (any type if omitted). */
+  /**
+   * Wait for the next new activity matching `type` (any type if omitted). After a person's prompt,
+   * only what came after it counts: the answer to that prompt, not to an earlier one.
+   */
   waitForActivity(options?: { type?: LinearActivityType } & WaitOptions): Promise<LinearAgentActivity>;
   /** External links the agent attached (`agentSessionUpdate` `addedExternalUrls`). */
   externalUrls(): Promise<Array<{ label: string; url: string }>>;

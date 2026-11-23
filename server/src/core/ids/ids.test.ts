@@ -32,7 +32,7 @@ describe("exit check 0.5: ids look real", () => {
     const ids = generator();
     let last = "";
     for (let i = 0; i < COUNT; i++) {
-      const ts = ids.slackTs("C08E1F2G3H4");
+      const ts = ids.slackTs();
       expect(ts).toMatch(SLACK_TS_PATTERN);
       expect(ts > last).toBe(true);
       last = ts;
@@ -110,7 +110,7 @@ describe("exit check 0.5: ids look real", () => {
   test("the same seed gives the same ids, a different seed doesn't", () => {
     const draw = (seed: number) => {
       const ids = generator(seed);
-      return [...kinds.map((kind) => ids.next(kind)), ids.slackTs("C1"), ids.slackTs("C1")];
+      return [...kinds.map((kind) => ids.next(kind)), ids.slackTs(), ids.slackTs()];
     };
     expect(draw(7)).toEqual(draw(7));
     expect(draw(7)).not.toEqual(draw(8));

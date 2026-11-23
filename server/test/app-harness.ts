@@ -62,7 +62,13 @@ export interface Harness {
   /** Call the control API. Pass `token: null` to send no Authorization header. */
   call(method: string, path: string, body?: unknown, token?: string | null): Reply;
   /** Call a driver's fake provider API, as the agent would. `path` starts with the driver's name. */
-  provider(method: string, path: string, body?: unknown, token?: string | null): Reply;
+  provider(
+    method: string,
+    path: string,
+    body?: unknown,
+    token?: string | null,
+    headers?: Record<string, string>,
+  ): Reply;
 }
 
 /** The app as the unit tests drive it: built in memory, called through `fetch`, with no listener. */
@@ -86,13 +92,20 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
     timers,
     clock: () => Date.now() + ahead,
   });
-  const send = async (url: string, method: string, body: unknown, token: string | null | undefined): Reply => {
+  const send = async (
+    url: string,
+    method: string,
+    body: unknown,
+    token: string | null | undefined,
+    headers: Record<string, string> = {},
+  ): Reply => {
     const response = await app.fetch(
       new Request(url, {
         method,
         headers: {
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(body === undefined ? {} : { "content-type": "application/json" }),
+          ...headers,
         },
         ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
       }),
@@ -112,7 +125,8 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
     logs,
     call: (method, path, body, token = TOKEN) =>
       send(`http://127.0.0.1:4500/_channelstack${path}`, method, body, token),
-    provider: (method, path, body, token) => send(`http://127.0.0.1:4500/${path}`, method, body, token),
+    provider: (method, path, body, token, headers) =>
+      send(`http://127.0.0.1:4500/${path}`, method, body, token, headers),
   };
 }
 

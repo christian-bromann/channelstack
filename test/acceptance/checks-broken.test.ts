@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { GITHUB_CHECKS, SLACK_CHECKS } from "../../integrations/checks/index.ts";
+import { GITHUB_CHECKS, LINEAR_CHECKS, NOTION_CHECKS, SLACK_CHECKS } from "../../integrations/checks/index.ts";
 import { ROOT } from "../../scripts/lib/generate.ts";
 import { binaryPath } from "../../scripts/lib/packages.ts";
 import { withStack } from "../../scripts/lib/stack.ts";
@@ -12,6 +12,8 @@ import { withStack } from "../../scripts/lib/stack.ts";
 const CHANNELS = {
   slack: { agent: "broken-slack", path: "/slack/events", ids: SLACK_CHECKS },
   github: { agent: "broken-github", path: "/api/webhooks/github", ids: GITHUB_CHECKS },
+  linear: { agent: "broken-linear", path: "/webhooks/linear", ids: LINEAR_CHECKS },
+  notion: { agent: "broken-notion", path: "/webhooks/notion", ids: NOTION_CHECKS },
 } as const;
 
 /** Run a channel's standard checks (all, or one) against its agent with one fault switched on (or none). */
@@ -47,7 +49,7 @@ async function checks(
   return run;
 }
 
-// Exit checks 2.3 and 3.4: against a deliberately broken agent each check fails, one broken variant per check.
+// Exit checks 2.3, 3.4 and 4.5: against a deliberately broken agent each check fails, one broken variant per check.
 describe.for(Object.entries(CHANNELS))("the standard %s checks catch what they are for", ([name, { ids }]) => {
   const channel = name as keyof typeof CHANNELS;
 

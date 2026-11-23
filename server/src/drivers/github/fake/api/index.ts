@@ -2,8 +2,8 @@ import { type Context, Hono } from "hono";
 
 import { bearerFrom } from "../../../../core/auth/index.ts";
 import { ProtocolError } from "../../../../core/errors/index.ts";
-import { WORLD_SCOPE } from "../../../../core/events/index.ts";
 import type { DriverContext } from "../../../../core/router/index.ts";
+import { recordCall } from "../../../../core/router/inspect.ts";
 import { verifyGitHubAppJwt } from "../../../../core/signing/github.ts";
 import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
 import { githubTime } from "../../payloads.ts";
@@ -19,8 +19,6 @@ import { type Json, notFound, page, type Register } from "./shared.ts";
 const DOCS = "https://docs.github.com/rest";
 /** An installation token is good for an hour. */
 const TOKEN_LIFETIME_MS = 60 * 60 * 1000;
-/** How much of a request or response body the event log keeps. */
-const RECORD_LIMIT = 64 * 1024;
 
 type Variables = {
   repo?: GitHubRepoRecord;
@@ -272,7 +270,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     try {
       response = raw === "" ? undefined : JSON.parse(raw);
     } catch {
-      response = raw.slice(0, RECORD_LIMIT);
+      response = raw;
     }
     const repo = c.get("repo");
     // The path as GitHub has it: without the fake's own prefix, and without `/api/v3`.
@@ -283,10 +281,11 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
       path,
       request: c.get("requestBody"),
       responseStatus: c.res.status,
-      response: raw.length > RECORD_LIMIT ? undefined : response,
-      ...(c.res.status >= 400
-        ? { error: (response as { message?: string } | undefined)?.message ?? String(c.res.status) }
-        : {}),
+      response,
+      error:
+        c.res.status >= 400
+          ? ((response as { message?: string } | undefined)?.message ?? String(c.res.status))
+          : undefined,
       durationMs: clock() - startedAt,
     };
     // Only what authenticated as the App or its installation is on record. A call about a
@@ -294,8 +293,9 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     // session; the rest (the App's own endpoints, the token exchange) to no session, and the
     // core event log keeps those in the scope every session reads.
     if (!c.get("authenticated")) return;
-    const scope = repo ? store.sessionOf(repo) : (c.get("session") ?? WORLD_SCOPE);
-    context.events.append(scope, "github", "api_call", call);
+    recordCall(context.events, "github", [repo ? store.sessionOf(repo) : c.get("session")], call, {
+      unattributed: "world",
+    });
   });
 
   api.onError((error, c) => {

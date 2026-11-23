@@ -22,6 +22,7 @@ const STANDING: readonly Check[] = [
   { name: "Unit tests", script: ["test"] },
   { name: "Spec is current", script: ["spec:check"] },
   { name: "SDKs are current", script: ["sdk:check"] },
+  { name: "Linear's schema module matches its SDL", script: ["linear:schema:check"] },
   { name: "The examples type-check against the generated SDK", script: ["api:check"] },
   { name: "No secrets in output", script: ["test:redaction"] },
   { name: "No duplicate code", script: ["check:dupes"] },
@@ -56,6 +57,14 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // unit tests cover 3.2 and 3.3 for every route of the fake (`github-conformance.test.ts`), and
   // delivery cases G1 to G3 with `@octokit/webhooks` (3.5) are in `test:integration`.
   3: [],
+  // Phase 4 too. The acceptance run covers 4.1 and 4.2 (every fake Linear example against the
+  // `@linear/sdk` and Chat SDK agents, every fake Notion example against the `@notionhq/client`
+  // agent), 4.3 for that whole run (`test/acceptance/linear-schemas.setup.ts` holds every GraphQL
+  // answer and webhook to Linear's schema), 4.5 (`test/acceptance/checks` against the agents,
+  // `checks-broken.test.ts` against the agents with one fault per check) and 4.6
+  // (`api/examples/shared.test.ts` with one agent per channel). Delivery cases L1 to L3 and N1 to N3
+  // (4.4) are in `test:integration`; the schema module is a standing check.
+  4: [],
 };
 
 const phase = Number(process.argv[2]);
