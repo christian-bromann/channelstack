@@ -73,7 +73,10 @@ export const slackMaintenance: LiveMaintenance = {
     // What crashed runs recorded, in allowlisted workspaces only.
     for (const entry of [...entries].reverse()) {
       const what = `${entry.kind} ${entry.ref.name ?? entry.ref.channel ?? ""} (run ${entry.run})`;
-      if (!allowlist.allows(entry.workspace)) continue;
+      if (!allowlist.allows(entry.workspace)) {
+        report.left.push(`${what}: workspace ${entry.workspace} isn't in CHANNELSTACK_LIVE_SLACK_TEAMS`);
+        continue;
+      }
       if (check) {
         report.left.push(what);
         continue;

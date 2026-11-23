@@ -46,7 +46,7 @@ function context(): DriverContext {
       strict: false,
       vault: new LiveVault({}, () => {}),
       allowlist: new Allowlist("", {}),
-      ledger: new Ledger({ file: undefined, run: "test", clock: systemClock, log }),
+      ledger: new Ledger({ file: undefined, run: "test", server: "s1", clock: systemClock, log }),
       tag: "channelstack-run-test",
       fetch,
       apiBase: undefined,

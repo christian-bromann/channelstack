@@ -145,8 +145,15 @@ export function createApp(options: AppOptions): App {
 
   const liveEnv = options.live?.env ?? {};
   // Not from the seeded ids: two runs with the same seed must still tag their objects apart.
-  const run = runId(liveEnv, () => randomString(10, "abcdefghijklmnopqrstuvwxyz0123456789"));
-  const ledger = new Ledger({ file: options.live?.ledgerFile, run, clock, log });
+  const run = runId(liveEnv);
+  // Unique per server too: a re-run of a CI job keeps its run id.
+  const ledger = new Ledger({
+    file: options.live?.ledgerFile,
+    run,
+    server: randomString(6, "abcdefghijklmnopqrstuvwxyz0123456789"),
+    clock,
+    log,
+  });
   const vault = new LiveVault(liveEnv, (secret) => redactor.register(secret));
 
   const drivers: Driver[] = DRIVERS.map((definition) =>

@@ -276,16 +276,21 @@ export function createLiveWorld(deps: {
     return record;
   };
 
-  /** A DM a session wrote in can't be archived: the ledger lists it, and cleanup deletes what was written there since. */
-  const recordDm = (session: string, record: SlackConversationRecord, by: LiveCredential, oldest: string) => {
-    const already = live.ledger
-      .entries(session)
-      .some((entry) => entry.kind === "conversation" && entry.ref.channel === record.id);
-    if (already) return;
+  /**
+   * A DM can't be archived, and other sessions may write in the same one: the ledger lists each
+   * message this session wrote there, and cleanup deletes those and the replies under them.
+   */
+  const recordDm = (
+    session: string,
+    record: SlackConversationRecord,
+    by: LiveCredential,
+    ts: string,
+    thread: string | undefined,
+  ) => {
     live.ledger.record({
       channel: "slack",
-      kind: "conversation",
-      ref: { channel: record.id, oldest },
+      kind: "message",
+      ref: { channel: record.id, ts, ...(thread === undefined ? {} : { thread }) },
       workspace: known().team.id,
       by: by.owner,
       session,
@@ -332,7 +337,7 @@ export function createLiveWorld(deps: {
     });
     changed(target.id);
     const message = (answer.message ?? { ts: answer.ts, text, user: userId }) as WireMessage;
-    if (target.kind === "im" || target.kind === "mpim") recordDm(session, target, credential, message.ts);
+    if (target.kind === "im" || target.kind === "mpim") recordDm(session, target, credential, message.ts, thread?.ts);
     // A user token issued by the agent's own app posts as that app: Slack marks the message with the
     // app's bot, and the agent ignores it as its own (found in the first live run, live-mode.md V1).
     const { app } = known();

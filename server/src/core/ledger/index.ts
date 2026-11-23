@@ -53,6 +53,7 @@ function parse(raw: unknown): LedgerEntry[] {
 export class Ledger {
   readonly #file: string | undefined;
   readonly #run: string;
+  readonly #server: string;
   readonly #clock: Clock;
   readonly #log: Logger;
   readonly #entries: LedgerEntry[] = [];
@@ -60,9 +61,11 @@ export class Ledger {
   #next = 0;
 
   /** Without a file the ledger is kept in memory only (unit tests, and servers that never go live). */
-  constructor(options: { file: string | undefined; run: string; clock: Clock; log: Logger }) {
+  /** `server` tells this server's entries from another's of the same run (a re-run of a CI job). */
+  constructor(options: { file: string | undefined; run: string; server: string; clock: Clock; log: Logger }) {
     this.#file = options.file;
     this.#run = options.run;
+    this.#server = options.server;
     this.#clock = options.clock;
     this.#log = options.log;
   }
@@ -79,7 +82,7 @@ export class Ledger {
   record(entry: NewLedgerEntry): LedgerEntry {
     const recorded: LedgerEntry = {
       ...entry,
-      id: `${this.#run}-${++this.#next}`,
+      id: `${this.#run}-${this.#server}-${++this.#next}`,
       run: this.#run,
       createdAt: this.#clock(),
     };

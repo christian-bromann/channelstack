@@ -86,6 +86,9 @@ describe("live Slack: acting and reading back", () => {
     });
     expect(fixture.body.apiUrl).toBe("https://slack.com/api/");
     expect(JSON.stringify(fixture.body)).not.toContain(stub.bot.token);
+    // `channelstack env` has nothing for a live Slack: no fake URL, no fake or real token.
+    const env = await server.call("GET", "/env");
+    expect(Object.keys(env.body).filter((name) => name.startsWith("SLACK_"))).toEqual([]);
 
     const person = await session.slack("POST", "/users", { name: "Ana", token: ana.token });
     expect(person.body).toMatchObject({ id: ana.userId, name: "ana", kind: "user" });
@@ -255,13 +258,45 @@ describe("exit check 5.2: cleanup leaves nothing behind", () => {
       to: [stub.bot.userId],
     });
     stub.botSays(dm.body.channel, "Yes", dm.body.ts);
-    stub.botSays(dm.body.channel, "Anything else?");
+    const reply = await session.slack("POST", `/users/${ana.userId}/reply`, {
+      message: { text: "great" },
+      thread: { channel: dm.body.channel, ts: dm.body.ts },
+    });
+    expect(reply.status).toBe(200);
+    stub.botSays(dm.body.channel, "Anything else?", dm.body.ts);
 
     const closed = await server.call("DELETE", `/sessions/${session.id}`);
     expect(closed.status).toBe(204);
     expect(stub.channel(channel.body.id)?.archived).toBe(true);
-    // Ana's message with her token, the agent's with the bot token: the DM is as it was.
+    // Ana's messages with her token, the agent's answers in her thread with the bot token: the DM is as it was.
     expect(stub.channel(dm.body.channel)?.messages).toEqual([]);
+  });
+
+  test("closing a session leaves what another session wrote in the same DM", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    const first = await server.open();
+    const second = await server.open();
+    for (const session of [first, second]) await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const mine = await first.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "first" },
+      to: [stub.bot.userId],
+    });
+    stub.botSays(mine.body.channel, "answer to first", mine.body.ts);
+    // The same real DM: Ana and the app have one.
+    const theirs = await second.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "second" },
+      to: [stub.bot.userId],
+    });
+    expect(theirs.body.channel).toBe(mine.body.channel);
+    stub.botSays(theirs.body.channel, "answer to second", theirs.body.ts);
+
+    await server.call("DELETE", `/sessions/${first.id}`);
+    expect(stub.channel(mine.body.channel)?.messages.map((message) => message.text)).toEqual([
+      "second",
+      "answer to second",
+    ]);
   });
 
   test("the session's quiet can't be judged live without proxy mode", async () => {

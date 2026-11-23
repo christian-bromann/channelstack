@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -188,8 +188,75 @@ describe("exit check 5.2: channelstack sweep", () => {
       olderThanHours: undefined,
       now: Date.now(),
     });
-    expect(report).toEqual({ ok: true, text: "Nothing to remove.\n" });
+    // It is still there, so the sweep says so: it isn't "nothing".
+    expect(report.ok).toBe(false);
+    expect(report.text).toContain("isn't in CHANNELSTACK_LIVE_SLACK_TEAMS");
     expect(stub.channel(channel.id)?.archived).toBe(false);
     expect(stub.calls.filter((call) => call.method === "conversations.archive")).toEqual([]);
+  });
+
+  test("what a ledger lists for a channel without credentials here is reported, not passed over", async () => {
+    const { dir, live } = await crashedRun();
+    const report = await runSweep({
+      ...live,
+      env: {},
+      home: dir,
+      check: true,
+      run: "crash1",
+      olderThanHours: undefined,
+      now: Date.now(),
+    });
+    expect(report.ok).toBe(false);
+    expect(report.text).toContain(
+      "slack: can't look at channel channelstack-run-crash1-1 (run crash1): CHANNELSTACK_SLACK_APP_ID, CHANNELSTACK_SLACK_BOT_TOKEN not set",
+    );
+  });
+
+  test("two crashed servers of the same run with the same entry id: each entry is removed on its own", async () => {
+    const { stub, env, live, dir, channel } = await crashedRun();
+    // A re-run of the same CI job: another server, the same run id, the same counter.
+    const made = await stub.fetch(`${stub.apiBase}/conversations.create`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.CHANNELSTACK_SLACK_USER_ANA_TOKEN}`,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ name: "channelstack-run-crash1-1-again" }),
+    });
+    const { channel: again } = (await made.json()) as { channel: { id: string } };
+    const second = join(dir, "ledger", "999999998-1.json");
+    writePrivateFile(
+      second,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: "crash1-1",
+            channel: "slack",
+            kind: "channel",
+            ref: { channel: again.id, name: "channelstack-run-crash1-1-again" },
+            workspace: stub.team,
+            by: "user:NOBODY",
+            run: "crash1",
+            session: "ses_y",
+            createdAt: 0,
+          },
+        ],
+      }),
+    );
+    // Nobody's token removes the second: it must stay in its file, not vanish with the first.
+    const report = await runSweep({
+      ...live,
+      env,
+      home: dir,
+      check: false,
+      run: "crash1",
+      olderThanHours: undefined,
+      now: Date.now(),
+    });
+    expect(stub.channel(channel.id)?.archived).toBe(true);
+    expect(report.text).toContain("couldn't remove channel channelstack-run-crash1-1-again");
+    expect(existsSync(join(dir, "ledger", "999999999-1.json"))).toBe(false);
+    expect(readFileSync(second, "utf8")).toContain(again.id);
   });
 });

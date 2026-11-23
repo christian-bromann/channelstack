@@ -1,4 +1,5 @@
 import { ProtocolError } from "../errors/index.ts";
+import { randomString } from "../secrets/index.ts";
 
 /**
  * The live allowlists (implementation plan 12.2): live mode acts only in the workspaces, orgs,
@@ -54,14 +55,17 @@ export function taggedRun(name: string): string | undefined {
   return /^[a-z0-9]+/.exec(name.slice(at + RUN_TAG_PREFIX.length))?.[0];
 }
 
-/** A run id: from `CHANNELSTACK_RUN_ID` (CI sets it to the job's), else made up. Lowercase letters and digits only, so it fits every platform's names. */
-export function runId(env: Readonly<Record<string, string | undefined>>, generate: () => string): string {
+/** A run id: 1 to 24 lowercase letters and digits, so it fits every platform's names. */
+export function isRunId(value: string): boolean {
+  return /^[a-z0-9]{1,24}$/.test(value);
+}
+
+/** The run id: from `CHANNELSTACK_RUN_ID` (CI sets it to the job's), else made up from the CSPRNG. */
+export function runId(env: Readonly<Record<string, string | undefined>>): string {
   const given = env.CHANNELSTACK_RUN_ID?.trim().toLowerCase();
   if (given) {
-    if (!/^[a-z0-9]{1,24}$/.test(given)) {
-      throw new Error(`CHANNELSTACK_RUN_ID must be 1-24 letters and digits, got "${given}"`);
-    }
+    if (!isRunId(given)) throw new Error(`CHANNELSTACK_RUN_ID must be 1-24 letters and digits, got "${given}"`);
     return given;
   }
-  return generate();
+  return randomString(10, "abcdefghijklmnopqrstuvwxyz0123456789");
 }

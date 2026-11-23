@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
+import { runId } from "../server/src/core/safety/index.ts";
 import { DRIVERS } from "../server/src/drivers/index.ts";
 import { ROOT } from "./lib/generate.ts";
 import { binaryPath } from "./lib/packages.ts";
@@ -27,13 +28,13 @@ const bin = values.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
 const env = process.env;
 
 // One id for everything this run makes, so the sweep check can look for exactly that.
-const runId = (env.CHANNELSTACK_RUN_ID ?? `l${Date.now().toString(36)}`).toLowerCase();
+const thisRun = runId(env);
 const home = mkdtempSync(join(tmpdir(), "channelstack-live-"));
 const report = join(home, "vitest.json");
 const live: NodeJS.ProcessEnv = {
   ...env,
   CHANNELSTACK_HOME: home,
-  CHANNELSTACK_RUN_ID: runId,
+  CHANNELSTACK_RUN_ID: thisRun,
   CHANNELSTACK_LOG_LEVEL: "warn",
 };
 delete live.CHANNELSTACK_URL;
@@ -126,16 +127,16 @@ try {
 
 // Exit check 5.2: nothing this run made is left in any sandbox.
 try {
-  run(bin, ["sweep", "--check", "--run", runId], { env: live });
+  run(bin, ["sweep", "--check", "--run", thisRun], { env: live });
 } catch {
   // A leftover is a bug in cleanup, and the run fails for it; but it doesn't stay in the sandbox.
   failed = true;
-  process.stderr.write(`The sweep check found what run ${runId} left behind (above); removing it.\n`);
+  process.stderr.write(`The sweep check found what run ${thisRun} left behind (above); removing it.\n`);
   try {
-    run(bin, ["sweep", "--run", runId], { env: live });
+    run(bin, ["sweep", "--run", thisRun], { env: live });
   } catch {
     process.stderr.write(
-      `Some of it couldn't be removed: \`channelstack sweep --run ${runId}\` with the same credentials retries.\n`,
+      `Some of it couldn't be removed: \`channelstack sweep --run ${thisRun}\` with the same credentials retries.\n`,
     );
   }
 }

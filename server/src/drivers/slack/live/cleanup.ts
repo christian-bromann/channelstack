@@ -11,7 +11,7 @@ export interface SlackCredentials {
 }
 
 /** Slack answers that mean the object is gone already: cleanup is done. */
-const GONE = new Set(["already_archived", "channel_not_found", "message_not_found", "is_archived"]);
+const GONE = new Set(["already_archived", "channel_not_found", "message_not_found", "thread_not_found", "is_archived"]);
 
 const gone = (error: unknown) => error instanceof SlackRefusal && GONE.has(error.code);
 
@@ -23,8 +23,9 @@ interface Written {
 
 /**
  * Remove one thing the ledger lists. A channel is archived: Slack has no way to delete one outside
- * Enterprise Grid, and an archived channel is out of everyone's way. A DM can't be archived, so
- * everything written there since the session's first message is deleted, by whoever wrote it.
+ * Enterprise Grid, and an archived channel is out of everyone's way. A DM can't be archived, and
+ * other sessions may write in the same one, so a message the session wrote there is deleted with
+ * the replies under it (the agent's answer among them), each by whoever wrote it.
  */
 export async function removeSlackEntry(
   client: SlackWebClient,
@@ -42,31 +43,30 @@ export async function removeSlackEntry(
     }
     return;
   }
-  if (entry.kind === "conversation") {
-    const top = await client.all<Written>("conversations.history", by, "messages", {
-      channel,
-      oldest: entry.ref.oldest,
-      inclusive: true,
-    });
-    const replies = await Promise.all(
-      top
-        .filter((message) => (message.reply_count ?? 0) > 0)
-        .map((message) => client.all<Written>("conversations.replies", by, "messages", { channel, ts: message.ts })),
-    );
-    const written = new Map<string, Written>();
-    for (const message of [...top, ...replies.flat()]) written.set(message.ts, message);
-    // Replies before the messages they hang on, newest first.
-    for (const message of [...written.values()].sort((a, b) => b.ts.localeCompare(a.ts))) {
-      const author = message.user === undefined ? undefined : credentials.byUser(message.user);
+  if (entry.kind === "message") {
+    const ts = entry.ref.ts ?? "";
+    const remove = async (message: Written, author: LiveCredential | undefined) => {
       // Someone else's message (a person outside the test) stays.
-      if (!author) continue;
+      if (!author) return;
       try {
         await client.call("chat.delete", author, { channel, ts: message.ts });
       } catch (error) {
         if (!gone(error)) throw error;
       }
+    };
+    // A reply the session wrote in someone's thread: only the reply.
+    if (entry.ref.thread !== undefined) return remove({ ts }, by);
+    let thread: Written[] = [];
+    try {
+      thread = await client.all<Written>("conversations.replies", by, "messages", { channel, ts });
+    } catch (error) {
+      if (!gone(error)) throw error;
     }
-    return;
+    // The replies under it, newest first, then the message itself.
+    const replies = thread.filter((message) => message.ts !== ts).sort((a, b) => b.ts.localeCompare(a.ts));
+    for (const reply of replies)
+      await remove(reply, reply.user === undefined ? undefined : credentials.byUser(reply.user));
+    return remove({ ts }, by);
   }
   throw new Error(`channelstack doesn't know how to remove a Slack ${entry.kind}`);
 }
