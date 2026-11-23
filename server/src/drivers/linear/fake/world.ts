@@ -100,9 +100,6 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     return state;
   };
 
-  /** The webhook the app's subscription sends as: one id for all its deliveries. */
-  const webhookId = () => store.app.userId.replace(/^.{8}/, "0000beef");
-
   /**
    * Send a webhook to the app, if it is subscribed to this resource type and has a URL. The body
    * carries `webhookTimestamp`, which every attempt stamps and signs again.
@@ -117,7 +114,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       ...payload,
       type,
       organizationId: store.org.id,
-      webhookId: webhookId(),
+      webhookId: store.app.webhookId,
       webhookTimestamp: clock(),
     };
     delivery.enqueue({
@@ -232,7 +229,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       plan: null,
       externalUrls: [],
       summary: null,
-      slugId: ids.next("linear.uuid").slice(0, 8),
+      slugId: ids.next("linear.slugId"),
       createdAt: now,
       updatedAt: now,
       startedAt: null,
@@ -634,14 +631,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       },
     ) {
       // A generated key is unique in the world, so parallel tests never share an `ENG-1`.
-      const key =
-        input.key ??
-        `T${ids
-          .next("linear.uuid")
-          .replace(/[^0-9a-f]/g, "")
-          .slice(0, 5)
-          .toUpperCase()
-          .replace(/^[0-9]/, "X")}`;
+      const key = input.key ?? ids.next("linear.teamKey");
       if (!TEAM_KEY.test(key))
         throw new ProtocolError(
           "invalid_argument",

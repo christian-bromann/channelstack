@@ -17,7 +17,11 @@ export function createLinearFake(context: DriverContext): LinearFake {
   const world = createFakeWorld(context, store);
   // Who the workspace and the app are is drawn once: the agent holds the app's ids from
   // `channelstack env`, and a reset builds a new world with the same app in it.
-  const identity = { org: context.ids.next("linear.uuid"), appUser: context.ids.next("linear.uuid") };
+  const identity = {
+    org: context.ids.next("linear.uuid"),
+    appUser: context.ids.next("linear.uuid"),
+    webhook: context.ids.next("linear.uuid"),
+  };
   const fake = {
     api: createLinearApi(context, world),
     world,
@@ -26,7 +30,13 @@ export function createLinearFake(context: DriverContext): LinearFake {
       const now = context.clock();
       store.seed(
         { id: identity.org, name: "Acme", urlKey: "acme" },
-        { userId: identity.appUser, name: DEFAULT_APP.name, events: DEFAULT_APP.events, createdAt: now },
+        {
+          userId: identity.appUser,
+          name: DEFAULT_APP.name,
+          events: DEFAULT_APP.events,
+          webhookId: identity.webhook,
+          createdAt: now,
+        },
         {
           id: identity.appUser,
           name: DEFAULT_APP.name,

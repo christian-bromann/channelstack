@@ -390,7 +390,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     if (property.type === "status")
       throw invalid(`body failed validation: "${name}" is not an option of the status property ${property.name}`);
     property.options.push({
-      id: randomToken().slice(0, 4),
+      id: ids.next("notion.uuid"),
       name,
       color: OPTION_COLORS[property.options.length % 10] ?? "default",
     });
@@ -600,14 +600,14 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   };
 
   /** A property schema as a test writes it: `"number"`, `{ status: ["Todo", "Done"] }`, `{ relation: db }`. */
-  const propertySchema = (name: string, raw: unknown, index: number): NotionPropertyRecord => {
-    const id = index === 0 && raw === "title" ? "title" : randomToken().slice(0, 4);
-    if (typeof raw === "string")
-      return { id: raw === "title" ? "title" : id, name, type: raw as NotionPropertyType, options: [] };
+  const propertySchema = (name: string, raw: unknown): NotionPropertyRecord => {
+    // A database's title property is always `title`; the others get short ids of their own.
+    const id = raw === "title" ? "title" : ids.next("notion.propertyId");
+    if (typeof raw === "string") return { id, name, type: raw as NotionPropertyType, options: [] };
     const [type, value] = Object.entries(raw as Record<string, unknown>)[0] ?? [];
     if (type === "relation") return { id, name, type: "relation", options: [], relation: String(value) };
     const options = (value as string[]).map((option, at) => ({
-      id: randomToken().slice(0, 4),
+      id: ids.next("notion.uuid"),
       name: option,
       color: OPTION_COLORS[at % 10] ?? "default",
     }));
@@ -615,7 +615,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   };
 
   const createDatabase = (session: string, input: DatabaseInput, actor = store.owner.id) => {
-    const properties = Object.entries(input.properties).map(([name, raw], index) => propertySchema(name, raw, index));
+    const properties = Object.entries(input.properties).map(([name, raw]) => propertySchema(name, raw));
     if (properties.filter((property) => property.type === "title").length !== 1)
       throw new ProtocolError("invalid_argument", "A database needs exactly one title property");
     const now = clock();

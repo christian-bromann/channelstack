@@ -17,6 +17,8 @@ export interface LinearAppRecord {
   name: string;
   /** The webhook events the app is subscribed to (Linear's resource types). */
   events: readonly string[];
+  /** The app's webhook: every delivery names it (`webhookId`). */
+  webhookId: string;
   createdAt: number;
 }
 
