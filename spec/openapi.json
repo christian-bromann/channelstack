@@ -5522,7 +5522,7 @@
                   },
                   "flags": {
                     "type": "string",
-                    "pattern": "^[imsu]*$"
+                    "pattern": "^[dgimsuvy]*$"
                   }
                 },
                 "required": [
@@ -5765,7 +5765,7 @@
                   },
                   "flags": {
                     "type": "string",
-                    "pattern": "^[imsu]*$"
+                    "pattern": "^[dgimsuvy]*$"
                   }
                 },
                 "required": [

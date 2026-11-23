@@ -14,7 +14,8 @@ import {
   readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
-import { type FakeNotionWorld, NotionApiError, type PlainValue } from "./fake/world.ts";
+import { NotionApiError } from "./errors.ts";
+import { type FakeNotionWorld, type PlainValue } from "./fake/world.ts";
 import { plainText } from "./rich-text.ts";
 import { renderDiscussion, renderPage } from "./transcript.ts";
 import type {
@@ -145,7 +146,7 @@ const Content = z.union([z.string(), z.array(z.unknown())]).openapi({
 });
 /** Text to find in a page: a string, or a pattern (SDKs send a `RegExp` as its source and flags). */
 const TextPattern = z
-  .union([z.string().min(1), z.object({ source: z.string().min(1), flags: z.string().regex(/^[imsu]*$/) })])
+  .union([z.string().min(1), z.object({ source: z.string().min(1), flags: z.string().regex(/^[dgimsuvy]*$/) })])
   .openapi({ "x-channelstack-pattern": true });
 
 const UserParams = z.object({ user: pathParam("user") });

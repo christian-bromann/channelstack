@@ -4,6 +4,7 @@ import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signNotionWebhook } from "../../../core/signing/notion.ts";
+import { NotionApiError } from "../errors.ts";
 import { notionLinks } from "../links.ts";
 import { type BlockDraft, blockToMarkdown, markdownToBlocks } from "../markdown.ts";
 import { notionObjects } from "../objects.ts";
@@ -36,18 +37,6 @@ const NOTION_RETRIES: RetryPolicy = {
 /** How long `page.content_updated` waits to batch edits, unless a test sets another delay. */
 const DEFAULT_CONTENT_DELAY_MS = 1_000;
 const OPTION_COLORS = ["default", "gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red"];
-
-/** A refusal of the API, in Notion's error shape: `validation_error`, `object_not_found`, … */
-export class NotionApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
 
 const invalid = (message: string) => new NotionApiError(400, "validation_error", message);
 const unseen = (kind: string, id: string) =>
@@ -790,7 +779,8 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     else {
       let pattern: RegExp;
       try {
-        pattern = new RegExp(text.source, text.flags);
+        // `g` and `y` make a pattern remember where it stopped; finding a block needs neither.
+        pattern = new RegExp(text.source, text.flags.replace(/[gy]/g, ""));
       } catch {
         throw new ProtocolError("invalid_argument", `/${text.source}/${text.flags} is not a pattern`);
       }

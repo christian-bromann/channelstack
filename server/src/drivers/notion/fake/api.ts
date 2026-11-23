@@ -4,9 +4,10 @@ import { bearerFrom } from "../../../core/auth/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
+import { NotionApiError, pagingOf } from "../errors.ts";
 import { NOTION_API_VERSION } from "../payloads.ts";
 import type { NotionBlockRecord, NotionCapability, NotionDatabaseRecord, NotionPageRecord } from "../world.ts";
-import { type FakeNotionWorld, NotionApiError, type PlainValue } from "./world.ts";
+import { type FakeNotionWorld, type PlainValue } from "./world.ts";
 
 /** The versions the API takes; the client libraries send one in `Notion-Version`. */
 const VERSIONS = ["2022-06-28", NOTION_API_VERSION, "2026-03-11"];
@@ -139,14 +140,13 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
       return c.json(answer.body, status as 200);
     });
 
-  const paging = (c: Context) => ({
-    start_cursor: c.req.query("start_cursor"),
-    page_size: c.req.query("page_size") === undefined ? undefined : Number(c.req.query("page_size")),
-  });
-  const bodyPaging = (body: Record<string, unknown>) => ({
-    start_cursor: typeof body.start_cursor === "string" ? body.start_cursor : undefined,
-    page_size: typeof body.page_size === "number" ? body.page_size : undefined,
-  });
+  const paging = (c: Context) =>
+    pagingOf({
+      start_cursor: c.req.query("start_cursor"),
+      page_size: c.req.query("page_size") === undefined ? undefined : Number(c.req.query("page_size")),
+    });
+  const bodyPaging = (body: Record<string, unknown>) =>
+    pagingOf({ start_cursor: body.start_cursor, page_size: body.page_size });
 
   // --- Users ----------------------------------------------------------------------------------
 

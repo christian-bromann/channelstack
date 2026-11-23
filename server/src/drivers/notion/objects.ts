@@ -11,6 +11,7 @@ import type {
   UserObjectResponse,
 } from "@notionhq/client";
 
+import { NotionApiError } from "./errors.ts";
 import type { NotionLinks } from "./links.ts";
 import { textItem } from "./rich-text.ts";
 import type {
@@ -295,13 +296,15 @@ export function notionObjects(deps: NotionObjectsDeps) {
     query: { start_cursor?: string | undefined; page_size?: number | undefined },
     idOf: (item: T) => string,
   ) => {
-    const size = Math.min(Math.max(query.page_size ?? 100, 1), 100);
-    const start = query.start_cursor
-      ? Math.max(
-          items.findIndex((item) => idOf(item) === query.start_cursor),
-          0,
-        )
-      : 0;
+    const size = query.page_size ?? 100;
+    const start = query.start_cursor ? items.findIndex((item) => idOf(item) === query.start_cursor) : 0;
+    // A cursor that names nothing in the list (it was deleted, or never was) is refused, never page one again.
+    if (start === -1)
+      throw new NotionApiError(
+        400,
+        "validation_error",
+        "body failed validation: start_cursor is not a cursor of this list.",
+      );
     const results = items.slice(start, start + size);
     const next = items[start + size];
     return {

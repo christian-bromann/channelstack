@@ -72,6 +72,16 @@ describe("the REST API", () => {
       "heading_1",
       "bulleted_list_item",
     ]);
+    // Paging: a cursor of the list goes on from there; one that names nothing, or a size out of range, is refused.
+    const second = await api("GET", `blocks/${child.id}/children?page_size=1`);
+    expect(second.body).toMatchObject({ has_more: true });
+    const rest = await api("GET", `blocks/${child.id}/children?start_cursor=${second.body.next_cursor}`);
+    expect(rest.body.results.map((block: { type: string }) => block.type)).toEqual(["bulleted_list_item"]);
+    expect((await api("GET", `blocks/${child.id}/children?start_cursor=${hidden.id}`)).body.code).toBe(
+      "validation_error",
+    );
+    expect((await api("GET", `blocks/${child.id}/children?page_size=lots`)).body.code).toBe("validation_error");
+    expect((await api("GET", `blocks/${child.id}/children?page_size=101`)).body.code).toBe("validation_error");
     const search = await api("POST", "search", { query: "" });
     expect(search.body.results.map((result: { id: string }) => result.id).sort()).toEqual([space.id, child.id].sort());
   });
@@ -95,6 +105,12 @@ describe("the REST API", () => {
       anchor: { source: "^-?\\s*ONE$", flags: "i" },
     });
     expect(anchored.discussion.anchor).toBe("one");
+    const global = await post(`/users/${ana.id}/comment`, {
+      text: "again",
+      page: page.id,
+      anchor: { source: "one", flags: "gy" },
+    });
+    expect(global.discussion.anchor).toBe("one");
     expect(
       await refusal(post(`/users/${ana.id}/comment`, { text: "x", page: page.id, anchor: { source: "(", flags: "" } })),
     ).toBe("invalid_argument");
