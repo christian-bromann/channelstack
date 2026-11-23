@@ -180,9 +180,10 @@ bot.onAssistantContextChanged((event) => {
 bot.onDirectMessage(respond);
 
 bot.onSubscribedMessage(async (thread, message) => {
-  // Someone else chiming in ("+1") isn't asking it: it answers the person it is helping, or a new mention.
+  // Someone else chiming in ("+1") isn't asking it: it answers the person it is helping, a question, or a new mention.
   const helping = (await thread.state)?.helping;
-  if (!message.isMention && helping !== undefined && helping !== message.author.userId) return;
+  const question = message.text.trim().endsWith("?");
+  if (!message.isMention && !question && helping !== undefined && helping !== message.author.userId) return;
   // A new mention in a thread it is part of gets the same treatment as the first one.
   if (message.isMention && /look at/i.test(message.text)) await slack.addReaction(thread.id, message.id, "eyes");
   await respond(thread, message);

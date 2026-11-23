@@ -26,7 +26,8 @@ const firstTime = (eventId: string) => !handled.has(eventId) && handled.add(even
 
 /**
  * Threads the agent has answered in, and whom it is helping there: it keeps answering that
- * person's follow-ups without a new mention. Someone else chiming in ("+1") isn't asking it.
+ * person's follow-ups without a new mention, and anyone's question. Someone else chiming in
+ * ("+1, also need this") isn't asking it anything.
  */
 const joined = new Map<string, string | undefined>();
 
@@ -159,7 +160,7 @@ app.message(async ({ message, body, client, say }) => {
   const followUp =
     message.thread_ts !== undefined &&
     joined.has(`${message.channel}:${thread}`) &&
-    joined.get(`${message.channel}:${thread}`) === message.user;
+    (joined.get(`${message.channel}:${thread}`) === message.user || (message.text ?? "").trim().endsWith("?"));
   // A mention is answered by the app_mention handler; here: DMs, and follow-ups in a thread it is part of.
   if (!direct && !followUp) return;
   if ((message.text ?? "").includes("<@") && !direct) return;
