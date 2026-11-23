@@ -3,7 +3,7 @@ import { afterEach, expect } from "vitest";
 import { linearResponseProblems, linearWebhookProblems } from "../../server/test/linear-schema.ts";
 
 /**
- * Exit check 4.1, for the whole acceptance run: after every test, each GraphQL answer the agent
+ * Exit check 4.3, for the whole acceptance run: after every test, each GraphQL answer the agent
  * got in the test's session and each webhook the fake sent it are held to Linear's own schema. A
  * test that passes with an answer Linear wouldn't give still fails here.
  */
