@@ -46,16 +46,27 @@ export function background(
   };
 }
 
-/** A loopback port nothing is listening on right now. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close(() =>
-        typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port")),
-      );
+/** Ports this process has handed out. The system may name the same free port twice before anything binds it. */
+const handedOut = new Set<number>();
+
+/**
+ * A loopback port nothing is listening on right now, and that this process hasn't handed out
+ * before: stacks that start side by side each get their own, though none has bound its port yet.
+ */
+export async function freePort(): Promise<number> {
+  for (;;) {
+    const port = await new Promise<number>((resolve, reject) => {
+      const server = createServer();
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => {
+        const address = server.address();
+        server.close(() =>
+          typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port")),
+        );
+      });
     });
-  });
+    if (handedOut.has(port)) continue;
+    handedOut.add(port);
+    return port;
+  }
 }

@@ -108,6 +108,8 @@ export async function withStack(
         STARTUP,
       );
 
+    // Something answers on the port: make sure it is this agent, not one that took the port while this one failed to.
+    running();
     await use({ home, env });
   } finally {
     for (const stop of stops.reverse()) await stop();
