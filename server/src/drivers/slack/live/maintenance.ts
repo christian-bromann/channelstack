@@ -10,8 +10,18 @@ const PERSON = /^CHANNELSTACK_SLACK_USER_([A-Z0-9_]+)_TOKEN$/;
 /** The app's and every person's credentials in the environment, with who each is in Slack. */
 async function identities(client: SlackWebClient, env: Readonly<Record<string, string | undefined>>) {
   const vault = new LiveVault(env, () => {});
-  const found: Array<{ variable: string; credential: LiveCredential; who?: { user: string; team: string; bot: boolean }; problem?: string }> = [];
-  const variables = ["CHANNELSTACK_SLACK_BOT_TOKEN", ...Object.keys(env).filter((name) => PERSON.test(name)).sort()];
+  const found: Array<{
+    variable: string;
+    credential: LiveCredential;
+    who?: { user: string; team: string; bot: boolean };
+    problem?: string;
+  }> = [];
+  const variables = [
+    "CHANNELSTACK_SLACK_BOT_TOKEN",
+    ...Object.keys(env)
+      .filter((name) => PERSON.test(name))
+      .sort(),
+  ];
   for (const variable of variables) {
     const owner = variable === "CHANNELSTACK_SLACK_BOT_TOKEN" ? "app" : `user:${PERSON.exec(variable)?.[1]}`;
     const credential = vault.fromEnv(variable, owner);
@@ -48,7 +58,10 @@ export const slackMaintenance: LiveMaintenance = {
       if (!who) continue;
       const isApp = entry === app;
       if (isApp !== who.bot) {
-        checks.push({ ok: false, text: `${shown}: ${isApp ? "not a bot token (xoxb-)" : "a bot token, not a person's (xoxp-)"}` });
+        checks.push({
+          ok: false,
+          text: `${shown}: ${isApp ? "not a bot token (xoxb-)" : "a bot token, not a person's (xoxp-)"}`,
+        });
         continue;
       }
       if (!allowlist.allows(who.team)) {

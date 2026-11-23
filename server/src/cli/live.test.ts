@@ -45,7 +45,9 @@ describe("exit check 5.6: channelstack doctor", () => {
       storageStates: [],
     });
     expect(ok).toBe(false);
-    expect(text).toMatch(/FAIL {2}CHANNELSTACK_SLACK_BOT_TOKEN \(xoxb-…\): workspace T0STUB0001 isn't in CHANNELSTACK_LIVE_SLACK_TEAMS/);
+    expect(text).toMatch(
+      /FAIL {2}CHANNELSTACK_SLACK_BOT_TOKEN \(xoxb-…\): workspace T0STUB0001 isn't in CHANNELSTACK_LIVE_SLACK_TEAMS/,
+    );
     expect(text).toContain("FAIL  CHANNELSTACK_LIVE_LINEAR_WORKSPACES is empty");
     expect(text).toContain("FAIL  live linear isn't built yet");
   });
@@ -54,7 +56,8 @@ describe("exit check 5.6: channelstack doctor", () => {
     const { env, live } = sandbox();
     const dir = home();
     const now = Date.UTC(2026, 10, 23);
-    const state = (cookieExpires: number) => JSON.stringify({ cookies: [{ name: "d", value: "x", expires: cookieExpires }] });
+    const state = (cookieExpires: number) =>
+      JSON.stringify({ cookies: [{ name: "d", value: "x", expires: cookieExpires }] });
     mkdirSync(join(dir, "browser"));
     writePrivateFile(join(dir, "browser", "slack-ana.json"), state(now / 1000 + 86_400));
     writePrivateFile(join(dir, "browser", "notion-ana.json"), state(now / 1000 - 1));
@@ -108,19 +111,43 @@ describe("exit check 5.2: channelstack sweep", () => {
     const { stub, env, live, dir, channel } = await crashedRun();
     const now = (channel.created + 3600) * 1000;
 
-    const checked = await runSweep({ ...live, env, home: dir, check: true, run: "crash1", olderThanHours: undefined, now });
+    const checked = await runSweep({
+      ...live,
+      env,
+      home: dir,
+      check: true,
+      run: "crash1",
+      olderThanHours: undefined,
+      now,
+    });
     expect(checked.ok).toBe(false);
     expect(checked.text).toContain("slack: left channel channelstack-run-crash1-1 (run crash1)");
     expect(checked.text).toContain("slack: left channel #channelstack-run-crash1-1");
     expect(stub.channel(channel.id)?.archived).toBe(false);
 
-    const swept = await runSweep({ ...live, env, home: dir, check: false, run: undefined, olderThanHours: undefined, now });
+    const swept = await runSweep({
+      ...live,
+      env,
+      home: dir,
+      check: false,
+      run: undefined,
+      olderThanHours: undefined,
+      now,
+    });
     expect(swept.ok).toBe(true);
     expect(swept.text).toContain("slack: removed channel channelstack-run-crash1-1 (run crash1)");
     expect(stub.channel(channel.id)?.archived).toBe(true);
     expect(existsSync(join(dir, "ledger", "999999999-1.json"))).toBe(false);
 
-    const after = await runSweep({ ...live, env, home: dir, check: true, run: "crash1", olderThanHours: undefined, now });
+    const after = await runSweep({
+      ...live,
+      env,
+      home: dir,
+      check: true,
+      run: "crash1",
+      olderThanHours: undefined,
+      now,
+    });
     expect(after).toEqual({ ok: true, text: "Nothing left behind.\n" });
   });
 
@@ -134,7 +161,15 @@ describe("exit check 5.2: channelstack sweep", () => {
     });
     const { channel } = (await made.json()) as { channel: { id: string; created: number } };
     const sweep = (hoursLater: number) =>
-      runSweep({ ...live, env, home: dir, check: false, run: undefined, olderThanHours: "24", now: (channel.created + hoursLater * 3600) * 1000 });
+      runSweep({
+        ...live,
+        env,
+        home: dir,
+        check: false,
+        run: undefined,
+        olderThanHours: "24",
+        now: (channel.created + hoursLater * 3600) * 1000,
+      });
 
     expect((await sweep(2)).text).toBe("Nothing to remove.\n");
     expect(stub.channel(channel.id)?.archived).toBe(false);

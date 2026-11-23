@@ -172,7 +172,7 @@ export type Immediate<World> = {
 };
 
 /** A person's credential as a test hands it over: the token, and the saved browser session for UI-only actions. */
-export interface SlackPersonCredentials {
+interface SlackPersonCredentials {
   token?: string | undefined;
   browser?: { storageState: string } | undefined;
 }

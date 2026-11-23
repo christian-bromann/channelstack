@@ -72,7 +72,7 @@ export interface LiveContext {
 }
 
 /** A driver's way onto its real platform. */
-export interface LiveBackend {
+interface LiveBackend {
   /** The check before the first live action: the app's credentials work and its workspace is allowlisted. Runs once; a failure is kept. */
   ready(): Promise<void>;
   /** Forget what a closed session made live. The ledger has removed it from the platform already. */
@@ -80,7 +80,7 @@ export interface LiveBackend {
 }
 
 /** What makes a driver live: every one of `credentials` set in the server's environment. */
-export interface LiveDeclaration {
+interface LiveDeclaration {
   /** Environment variables, all of which make the driver live (`CHANNELSTACK_SLACK_APP_ID`, …). */
   readonly credentials: readonly string[];
   /** The allowlist variable (`CHANNELSTACK_LIVE_SLACK_TEAMS`). */

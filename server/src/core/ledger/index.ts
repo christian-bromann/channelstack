@@ -132,7 +132,10 @@ export class Ledger {
       removeFile(this.#file);
       return;
     }
-    writePrivateFile(this.#file, `${JSON.stringify({ version: 1, entries: this.#entries } satisfies LedgerFile, null, 2)}\n`);
+    writePrivateFile(
+      this.#file,
+      `${JSON.stringify({ version: 1, entries: this.#entries } satisfies LedgerFile, null, 2)}\n`,
+    );
   }
 }
 
@@ -155,5 +158,6 @@ export function readLedgers(home: string): Array<{ file: string; entries: Ledger
 /** Write what is left of a ledger file after a sweep: the entries that still couldn't be removed. */
 export function rewriteLedger(file: string, entries: readonly LedgerEntry[]): void {
   if (entries.length === 0) removeFile(file);
-  else writePrivateFile(file, `${JSON.stringify({ version: 1, entries: [...entries] } satisfies LedgerFile, null, 2)}\n`);
+  else
+    writePrivateFile(file, `${JSON.stringify({ version: 1, entries: [...entries] } satisfies LedgerFile, null, 2)}\n`);
 }

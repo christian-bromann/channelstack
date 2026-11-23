@@ -143,7 +143,8 @@ export async function runSweep(
     throw new CliError(`--older-than-hours takes a number of hours, got "${input.olderThanHours}"`);
   }
   const olderThanMs = hours * 3_600_000;
-  if (input.run !== undefined && !/^[a-z0-9]{1,24}$/.test(input.run)) throw new CliError(`--run takes a run id, got "${input.run}"`);
+  if (input.run !== undefined && !/^[a-z0-9]{1,24}$/.test(input.run))
+    throw new CliError(`--run takes a run id, got "${input.run}"`);
   const ledgers = readLedgers(input.home).filter((ledger) => !running(ledger.file));
   const lines: string[] = [];
   let left = 0;
@@ -171,7 +172,8 @@ export async function runSweep(
     }
     left += report.left.length;
     for (const what of report.removed) lines.push(`${definition.name}: removed ${what}`);
-    for (const what of report.left) lines.push(`${definition.name}: ${input.check ? "left" : "couldn't remove"} ${what}`);
+    for (const what of report.left)
+      lines.push(`${definition.name}: ${input.check ? "left" : "couldn't remove"} ${what}`);
   }
   if (lines.length === 0) lines.push(input.check ? "Nothing left behind." : "Nothing to remove.");
   return { text: `${lines.join("\n")}\n`, ok: left === 0 };

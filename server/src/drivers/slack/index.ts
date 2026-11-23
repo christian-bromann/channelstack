@@ -29,12 +29,24 @@ export const slack: DriverDefinition = {
   },
   create(context): Driver {
     const fake = createSlackFake(context);
-    const client = new SlackWebClient({ base: context.live.apiBase, fetch: context.live.fetch, timers: context.timers });
+    const client = new SlackWebClient({
+      base: context.live.apiBase,
+      fetch: context.live.fetch,
+      timers: context.timers,
+    });
     const live = context.live.active
-      ? createLiveWorld({ client, live: context.live, ids: context.ids, clock: context.clock, appName: fake.store.app.name })
+      ? createLiveWorld({
+          client,
+          live: context.live,
+          ids: context.ids,
+          clock: context.clock,
+          appName: fake.store.app.name,
+        })
       : undefined;
     if (live) {
-      context.live.ledger.onCleanup("slack", (entry) => removeSlackEntry(client, live.credentials(entry.session), entry));
+      context.live.ledger.onCleanup("slack", (entry) =>
+        removeSlackEntry(client, live.credentials(entry.session), entry),
+      );
     }
     return {
       name: "slack",

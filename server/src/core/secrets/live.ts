@@ -38,7 +38,7 @@ export class LiveCredential {
 }
 
 /** The person's part of `CHANNELSTACK_<CHANNEL>_USER_<NAME>_TOKEN`: `Ana` → `ANA`, `ana-smith` → `ANA_SMITH`. */
-export function credentialName(name: string): string {
+function credentialName(name: string): string {
   return name.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
 }
 

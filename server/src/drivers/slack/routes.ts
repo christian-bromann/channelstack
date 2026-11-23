@@ -207,7 +207,8 @@ const AGENT_SIDE: LiveSupport = {
 
 /** Uninstalling revokes every token of the installation, and reinstalling needs the OAuth consent in a browser. */
 const UNINSTALL: LiveSupport = {
-  unsupported: "it revokes the app's tokens, and reinstalling needs the OAuth consent flow in a browser (a dedicated job, not every run)",
+  unsupported:
+    "it revokes the app's tokens, and reinstalling needs the OAuth consent flow in a browser (a dedicated job, not every run)",
 };
 
 /** The Slack driver's control API: what a test's people do, and what a test reads back. */
@@ -1079,7 +1080,9 @@ export function registerSlackRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params }) =>
-      fake.message(session.id, params.channel, params.ts).deliveries.map((id) => deliveryWire(fake.delivery(session.id, id))),
+      fake
+        .message(session.id, params.channel, params.ts)
+        .deliveries.map((id) => deliveryWire(fake.delivery(session.id, id))),
   });
 
   const DeliveryParams = z.object({ delivery: z.string().openapi({ param: { name: "delivery", in: "path" } }) });

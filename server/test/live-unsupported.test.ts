@@ -35,7 +35,12 @@ function fakeOnlyRows(): MatrixRow[] {
 /** How each fake-only row is exercised: the channel, and the control call a test's step makes. */
 type Case = { channel: string; method: string; path: string; body?: unknown; reason?: RegExp };
 const CASES: Record<string, Case | Case[]> = {
-  "`createUser({ id })` (fixed id)": { channel: "slack", method: "POST", path: "/users", body: { name: "Ana", id: "U0FIXED0001" } },
+  "`createUser({ id })` (fixed id)": {
+    channel: "slack",
+    method: "POST",
+    path: "/users",
+    body: { name: "Ana", id: "U0FIXED0001" },
+  },
   "`delivery.attempts`, `status`, `settled()`": [
     { channel: "slack", method: "GET", path: "/deliveries/E0X" },
     { channel: "linear", method: "GET", path: "/deliveries/x" },
@@ -78,7 +83,12 @@ const CASES: Record<string, Case | Case[]> = {
     body: { checkRun: 1 },
     reason: /Re-run is a click/,
   },
-  "`delivery.redeliver()`": { channel: "linear", method: "POST", path: "/deliveries/x/redeliver", reason: /no API to redeliver/ },
+  "`delivery.redeliver()`": {
+    channel: "linear",
+    method: "POST",
+    path: "/deliveries/x/redeliver",
+    reason: /no API to redeliver/,
+  },
   "`ana.resolve` / `reopen` (discussion)": [
     { channel: "notion", method: "POST", path: "/users/x/resolve", body: { discussion: "d" }, reason: /resolve/ },
     { channel: "notion", method: "POST", path: "/users/x/reopen", body: { discussion: "d" }, reason: /resolve/ },

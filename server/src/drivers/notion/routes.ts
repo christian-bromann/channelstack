@@ -3,8 +3,8 @@ import { z } from "@hono/zod-openapi";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
+import type { DriverRouter } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -164,15 +164,24 @@ const PageOptions = z.object({
 });
 
 /** The REST API has no resolve action and no resolved field: a person resolves in Notion's UI. */
-const RESOLVE: LiveSupport = { unsupported: "not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved" };
+const RESOLVE: LiveSupport = {
+  unsupported: "not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved",
+};
 /** How long Notion holds `page.content_updated` is Notion's own, and undocumented. */
-const FAKE_BATCHING: LiveSupport = { unsupported: "Notion batches page.content_updated itself, for a time it doesn't document" };
+const FAKE_BATCHING: LiveSupport = {
+  unsupported: "Notion batches page.content_updated itself, for a time it doesn't document",
+};
 /** Notion sends the verification request once, when a subscription is created in its settings. */
-const FAKE_VERIFICATION: LiveSupport = { unsupported: "Notion sends the verification request once, when the subscription is created" };
+const FAKE_VERIFICATION: LiveSupport = {
+  unsupported: "Notion sends the verification request once, when the subscription is created",
+};
 /** Notion has no redelivery API. */
 const NO_REDELIVERY: LiveSupport = { unsupported: "Notion has no API to redeliver a webhook" };
 /** What only the integration's own calls show: live, proxy mode sees them. */
-const AGENT_SIDE: LiveSupport = { requires: "proxy", reason: "Notion doesn't report the integration's calls; proxy mode sees them" };
+const AGENT_SIDE: LiveSupport = {
+  requires: "proxy",
+  reason: "Notion doesn't report the integration's calls; proxy mode sees them",
+};
 
 /** The Notion driver's control API: what a test's people do, and what a test reads back. */
 export function registerNotionRoutes(

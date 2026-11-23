@@ -105,7 +105,13 @@ export async function taggedChannels(
     for (const channel of channels) {
       const tagged = taggedRun(channel.name);
       if (tagged === undefined || (run !== undefined && tagged !== run) || channel.is_archived) continue;
-      const entry = found.get(channel.id) ?? { id: channel.id, name: channel.name, run: tagged, created: channel.created, members: [] };
+      const entry = found.get(channel.id) ?? {
+        id: channel.id,
+        name: channel.name,
+        run: tagged,
+        created: channel.created,
+        members: [],
+      };
       if (channel.is_member) entry.members.push(credential);
       found.set(channel.id, entry);
     }
@@ -114,7 +120,10 @@ export async function taggedChannels(
 }
 
 /** Archive a tagged channel with a credential that is in it. */
-export async function archiveTagged(client: SlackWebClient, channel: { id: string; members: LiveCredential[] }): Promise<boolean> {
+export async function archiveTagged(
+  client: SlackWebClient,
+  channel: { id: string; members: LiveCredential[] },
+): Promise<boolean> {
   for (const member of channel.members) {
     try {
       await client.call("conversations.archive", member, { channel: channel.id });

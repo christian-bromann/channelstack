@@ -183,7 +183,8 @@ export function createLiveWorld(deps: {
   const reader = (session: string, channel: string): LiveCredential => {
     const members = conversationsOf(session).get(channel)?.members;
     for (const candidate of peopleOf(session).values()) {
-      if (candidate.credential && (members === undefined || members.has(candidate.record.id))) return candidate.credential;
+      if (candidate.credential && (members === undefined || members.has(candidate.record.id)))
+        return candidate.credential;
     }
     return botCredential();
   };
@@ -386,7 +387,9 @@ export function createLiveWorld(deps: {
         byOwner: (owner) =>
           owner === "app" ? bot : real.find((candidate) => candidate.credential?.owner === owner)?.credential,
         byUser: (userId) =>
-          userId === identity?.app.botUserId ? bot : real.find((candidate) => candidate.record.id === userId)?.credential,
+          userId === identity?.app.botUserId
+            ? bot
+            : real.find((candidate) => candidate.record.id === userId)?.credential,
       };
     },
 
@@ -396,10 +399,16 @@ export function createLiveWorld(deps: {
 
     async createUser(session, options) {
       if (options.id !== undefined) {
-        throw unsupportedInLive("SlackFixture.createUser({ id })", "real ids are assigned by Slack; a live person has the id of their account");
+        throw unsupportedInLive(
+          "SlackFixture.createUser({ id })",
+          "real ids are assigned by Slack; a live person has the id of their account",
+        );
       }
       if (options.bot === true) {
-        throw unsupportedInLive("SlackFixture.createUser({ bot })", "no API creates a bot in a workspace; use a pre-provisioned one");
+        throw unsupportedInLive(
+          "SlackFixture.createUser({ bot })",
+          "no API creates a bot in a workspace; use a pre-provisioned one",
+        );
       }
       const map = people.get(session) ?? new Map<string, LivePerson>();
       people.set(session, map);
@@ -441,7 +450,11 @@ export function createLiveWorld(deps: {
         );
       }
       if (typeof who.bot_id === "string") {
-        throw actionRequires("SlackFixture.createUser", "a user token", `${options.name}'s token is a bot token, not a person's (xoxp-)`);
+        throw actionRequires(
+          "SlackFixture.createUser",
+          "a user token",
+          `${options.name}'s token is a bot token, not a person's (xoxp-)`,
+        );
       }
       const info = await client.call("users.info", botCredential(), { user: String(who.user_id) });
       const record = userRecord(info.user as WireUser);
@@ -478,9 +491,12 @@ export function createLiveWorld(deps: {
         session,
       });
       const invited = members.filter((id) => id !== creatorId);
-      if (invited.length > 0) await client.call("conversations.invite", creator, { channel: channel.id, users: invited.join(",") });
-      if (options.topic) await client.call("conversations.setTopic", creator, { channel: channel.id, topic: options.topic });
-      if (options.purpose) await client.call("conversations.setPurpose", creator, { channel: channel.id, purpose: options.purpose });
+      if (invited.length > 0)
+        await client.call("conversations.invite", creator, { channel: channel.id, users: invited.join(",") });
+      if (options.topic)
+        await client.call("conversations.setTopic", creator, { channel: channel.id, topic: options.topic });
+      if (options.purpose)
+        await client.call("conversations.setPurpose", creator, { channel: channel.id, purpose: options.purpose });
       return mirror(session, {
         id: channel.id,
         kind: options.private === true ? "private_channel" : "channel",
@@ -512,7 +528,12 @@ export function createLiveWorld(deps: {
     async editAsUser(session, user, message, target) {
       const credential = actor(session, user);
       const text = resolveMentions(message.text ?? "", (name) => resolveName(session, name));
-      await client.call("chat.update", credential, { channel: target.channel, ts: target.ts, text, blocks: message.blocks });
+      await client.call("chat.update", credential, {
+        channel: target.channel,
+        ts: target.ts,
+        text,
+        blocks: message.blocks,
+      });
       changed(target.channel);
       return messageAt(session, target.channel, target.ts);
     },
@@ -561,7 +582,8 @@ export function createLiveWorld(deps: {
     async messages(session, channel) {
       conversation(session, channel);
       const top = (await history(session, channel)).filter(
-        (message) => message.thread_ts === undefined || message.thread_ts === message.ts || message.subtype === "thread_broadcast",
+        (message) =>
+          message.thread_ts === undefined || message.thread_ts === message.ts || message.subtype === "thread_broadcast",
       );
       return records(session, channel, top);
     },

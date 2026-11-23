@@ -25,7 +25,8 @@ function liveSlack(stub: SlackStub, allowlist = stub.team, extra: Record<string,
     const { body } = await h.call("POST", "/sessions", {});
     return {
       id: body.sessionId as string,
-      slack: (method: string, path: string, payload?: unknown) => h.call(method, `/sessions/${body.sessionId}/slack${path}`, payload),
+      slack: (method: string, path: string, payload?: unknown) =>
+        h.call(method, `/sessions/${body.sessionId}/slack${path}`, payload),
     };
   };
   return { ...h, open };
@@ -77,7 +78,12 @@ describe("live Slack: acting and reading back", () => {
 
     const fixture = await session.slack("GET", "");
     // A live app's credentials stay on the server.
-    expect(fixture.body.app).toMatchObject({ botUserId: stub.bot.userId, botToken: "", signingSecret: "", appToken: "" });
+    expect(fixture.body.app).toMatchObject({
+      botUserId: stub.bot.userId,
+      botToken: "",
+      signingSecret: "",
+      appToken: "",
+    });
     expect(fixture.body.apiUrl).toBe("https://slack.com/api/");
     expect(JSON.stringify(fixture.body)).not.toContain(stub.bot.token);
 
@@ -85,7 +91,10 @@ describe("live Slack: acting and reading back", () => {
     expect(person.body).toMatchObject({ id: ana.userId, name: "ana", kind: "user" });
     expect(JSON.stringify(person.body)).not.toContain(ana.token);
 
-    const channel = await session.slack("POST", "/channels", { name: "support", participants: [ana.userId, stub.bot.userId] });
+    const channel = await session.slack("POST", "/channels", {
+      name: "support",
+      participants: [ana.userId, stub.bot.userId],
+    });
     expect(channel.status).toBe(200);
     // Real names are unique in a workspace: the run's tag, a number, then the name the test asked for.
     expect(channel.body.name).toBe("channelstack-run-unit1-1-support");
@@ -108,9 +117,15 @@ describe("live Slack: acting and reading back", () => {
     server.clock.advance(1100);
     const replies = await session.slack("GET", `/conversations/${channel.body.id}/threads/${said.body.ts}/replies`);
     expect(replies.body).toHaveLength(1);
-    expect(replies.body[0]).toMatchObject({ text: "Here is today's summary", author: { kind: "app", name: "my-agent" } });
+    expect(replies.body[0]).toMatchObject({
+      text: "Here is today's summary",
+      author: { kind: "app", name: "my-agent" },
+    });
 
-    const transcript = await session.slack("GET", `/conversations/${channel.body.id}/threads/${said.body.ts}/transcript`);
+    const transcript = await session.slack(
+      "GET",
+      `/conversations/${channel.body.id}/threads/${said.body.ts}/transcript`,
+    );
     expect(transcript.body.text).toContain("ana: @my-agent summarize #support today");
     expect(transcript.body.text).toContain("my-agent: Here is today's summary");
   });
@@ -124,7 +139,10 @@ describe("live Slack: acting and reading back", () => {
     expect(ben.status).toBe(200);
     const channel = await session.slack("POST", "/channels", { participants: [real.body.id, ben.body.id] });
     expect(channel.body.error).toBe("fake_actor_in_live_world");
-    const dm = await session.slack("POST", `/users/${ben.body.id}/say`, { message: { text: "hi" }, to: [stub.bot.userId] });
+    const dm = await session.slack("POST", `/users/${ben.body.id}/say`, {
+      message: { text: "hi" },
+      to: [stub.bot.userId],
+    });
     expect(dm.body.error).toBe("fake_actor_in_live_world");
   });
 
@@ -134,8 +152,14 @@ describe("live Slack: acting and reading back", () => {
     const server = liveSlack(stub);
     const session = await server.open();
     await session.slack("POST", "/users", { name: "Ana", token: ana.token });
-    const said = await session.slack("POST", `/users/${ana.userId}/say`, { message: { text: "hi" }, to: [stub.bot.userId] });
-    expect(said.body).toMatchObject({ error: "action_requires", data: { requires: "a person's token from another Slack app" } });
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "hi" },
+      to: [stub.bot.userId],
+    });
+    expect(said.body).toMatchObject({
+      error: "action_requires",
+      data: { requires: "a person's token from another Slack app" },
+    });
     // What was posted is still removed with the session.
     await server.call("DELETE", `/sessions/${session.id}`);
     expect(stub.channels().flatMap((channel) => channel.messages)).toEqual([]);
@@ -162,9 +186,15 @@ describe("live Slack: acting and reading back", () => {
     await session.slack("POST", "/users", { name: "Ana", token: ana.token });
     const before = stub.calls.length;
 
-    const click = await session.slack("POST", `/users/${ana.userId}/click`, { button: { label: "Approve" }, channel: "C0X" });
+    const click = await session.slack("POST", `/users/${ana.userId}/click`, {
+      button: { label: "Approve" },
+      channel: "C0X",
+    });
     expect(click.status).toBe(422);
-    expect(click.body).toMatchObject({ error: "action_requires", data: { operation: "SlackUser.click", requires: "the browser actor" } });
+    expect(click.body).toMatchObject({
+      error: "action_requires",
+      data: { operation: "SlackUser.click", requires: "the browser actor" },
+    });
     const status = await session.slack("GET", "/conversations/C0X/threads/1.2/state");
     expect(status.body).toMatchObject({ error: "action_requires", data: { requires: "proxy mode" } });
     const retry = await session.slack("POST", "/deliveries/E0X/retry", {});

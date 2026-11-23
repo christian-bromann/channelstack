@@ -11,12 +11,12 @@ export type Reality = "fake" | "live";
  *   actor, proxy mode).
  */
 export type LiveSupport =
-  | { readonly unsupported: string }
-  | { readonly requires: "browser" | "proxy"; readonly reason: string };
+  { readonly unsupported: string } | { readonly requires: "browser" | "proxy"; readonly reason: string };
 
 /** The fake-only features every channel shares: delivery chaos. Live, the platform delivers to the agent itself. */
 export const DELIVERY_IS_THE_PLATFORMS: LiveSupport = {
-  unsupported: "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)",
+  unsupported:
+    "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)",
 };
 
 /** `CHANNELSTACK_REALITY`: `fake` keeps everything fake even with credentials; `live` refuses what would fall back to fake. */
@@ -87,7 +87,11 @@ export async function admitLive(
   }
   if (support && "unsupported" in support) throw unsupportedInLive(operation, support.unsupported);
   if (support && "requires" in support) {
-    throw actionRequires(operation, support.requires === "browser" ? "the browser actor" : "proxy mode", support.reason);
+    throw actionRequires(
+      operation,
+      support.requires === "browser" ? "the browser actor" : "proxy mode",
+      support.reason,
+    );
   }
   if (!reality.hasBackend) throw unsupportedInLive(operation, `live ${channel} isn't built yet`);
   await reality.ready();

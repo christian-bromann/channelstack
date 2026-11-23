@@ -13,7 +13,6 @@ import { IdGenerator } from "./core/ids/index.ts";
 import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
-import type { Redactor } from "./core/redact/index.ts";
 import {
   actionRequires,
   type DriverReality,
@@ -21,6 +20,7 @@ import {
   forcedReality,
   unsupportedInLive,
 } from "./core/reality/index.ts";
+import type { Redactor } from "./core/redact/index.ts";
 import { Registry } from "./core/registry/index.ts";
 import {
   type Driver,
@@ -177,7 +177,10 @@ export function createApp(options: AppOptions): App {
   );
   const driverNames = drivers.map((driver) => driver.name);
   const realities = new Map<string, DriverReality>(
-    drivers.map((driver, at) => [driver.name, driverReality(liveEnv, DRIVERS[at]?.live?.credentials ?? [], driver.live)]),
+    drivers.map((driver, at) => [
+      driver.name,
+      driverReality(liveEnv, DRIVERS[at]?.live?.credentials ?? [], driver.live),
+    ]),
   );
 
   // What a live session created comes off the real platform first, while its records still exist.

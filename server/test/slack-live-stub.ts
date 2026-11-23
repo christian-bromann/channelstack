@@ -52,9 +52,10 @@ interface StubChannel {
 export function slackStub(options: { team?: string } = {}): SlackStub {
   const team = options.team ?? "T0STUB0001";
   const bot = { token: `xoxb-${randomString(24, "abcdef0123456789")}`, userId: "U0STUBBOT1", botId: "B0STUBBOT1" };
-  const tokens = new Map<string, { handle: string; userId: string; team: string; isBot: boolean; viaAgentApp?: boolean }>([
-    [bot.token, { handle: "bot", userId: bot.userId, team, isBot: true }],
-  ]);
+  const tokens = new Map<
+    string,
+    { handle: string; userId: string; team: string; isBot: boolean; viaAgentApp?: boolean }
+  >([[bot.token, { handle: "bot", userId: bot.userId, team, isBot: true }]]);
   const users = new Map<string, { id: string; name: string }>([[bot.userId, { id: bot.userId, name: "robin" }]]);
   const channels = new Map<string, StubChannel>();
   const calls: SlackStub["calls"] = [];
@@ -91,7 +92,7 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
     p: any,
   ) => {
     const channel = typeof p.channel === "string" ? channels.get(p.channel) : undefined;
-    const member = () => channel !== undefined && channel.members.has(who.userId);
+    const member = () => channel?.members.has(who.userId) === true;
     switch (method) {
       case "auth.test":
         return ok({
@@ -103,7 +104,9 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         });
       case "users.info": {
         const user = users.get(p.user);
-        return user ? ok({ user: { id: user.id, name: user.name, profile: { display_name: user.name } } }) : refuse("user_not_found");
+        return user
+          ? ok({ user: { id: user.id, name: user.name, profile: { display_name: user.name } } })
+          : refuse("user_not_found");
       }
       case "conversations.create": {
         if (who.isBot) return refuse("missing_scope");
@@ -142,7 +145,10 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
       case "conversations.open": {
         const members = new Set([who.userId, ...String(p.users).split(",")]);
         const existing = [...channels.values()].find(
-          (candidate) => candidate.isIm && [...members].every((id) => candidate.members.has(id)) && candidate.members.size === members.size,
+          (candidate) =>
+            candidate.isIm &&
+            [...members].every((id) => candidate.members.has(id)) &&
+            candidate.members.size === members.size,
         );
         const dm: StubChannel = existing ?? {
           id: `D0${randomString(9, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}`,
@@ -162,7 +168,12 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         if (!channel) return refuse("channel_not_found");
         if (!member()) return refuse("not_in_channel");
         const oldest = typeof p.oldest === "string" ? p.oldest : "0";
-        return ok({ messages: top(channel).filter((message) => message.ts >= oldest).reverse(), has_more: false });
+        return ok({
+          messages: top(channel)
+            .filter((message) => message.ts >= oldest)
+            .reverse(),
+          has_more: false,
+        });
       }
       case "conversations.replies": {
         if (!channel) return refuse("channel_not_found");
@@ -170,7 +181,9 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         const asked = channel.messages.find((message) => message.ts === p.ts);
         if (!asked) return refuse("thread_not_found");
         const root = asked.thread_ts ?? asked.ts;
-        return ok({ messages: channel.messages.filter((message) => message.ts === root || message.thread_ts === root) });
+        return ok({
+          messages: channel.messages.filter((message) => message.ts === root || message.thread_ts === root),
+        });
       }
       case "conversations.list":
         return ok({
@@ -216,7 +229,10 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         let reaction = message.reactions.find((candidate) => candidate.name === p.name);
         if (method === "reactions.add") {
           if (reaction?.users.includes(who.userId)) return refuse("already_reacted");
-          if (!reaction) message.reactions.push((reaction = { name: p.name, users: [] }));
+          if (!reaction) {
+            reaction = { name: p.name, users: [] };
+            message.reactions.push(reaction);
+          }
           reaction.users.push(who.userId);
         } else {
           if (!reaction?.users.includes(who.userId)) return refuse("no_reaction");

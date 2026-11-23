@@ -65,6 +65,13 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // (`api/examples/shared.test.ts` with one agent per channel). Delivery cases L1 to L3 and N1 to N3
   // (4.4) are in `test:integration`; the schema module is a standing check.
   4: [],
+  // Phase 5's checks that need no sandbox are unit tests: 5.3 (`drivers/slack/live/live.test.ts`,
+  // allowlists against a Slack stand-in), 5.4 (`server/test/live-unsupported.test.ts`, every
+  // fake-only row of the reality matrix), 5.2's cleanup and sweep, and 5.6's doctor
+  // (`cli/live.test.ts`). The acceptance run covers 5.4's skip in Vitest (`live-skip.test.ts`).
+  // 5.1 and 5.2 against the real sandboxes run nightly (`.github/workflows/live.yml`, `pnpm live`),
+  // since they need the `live` environment's secrets.
+  5: [],
 };
 
 const phase = Number(process.argv[2]);

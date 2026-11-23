@@ -347,8 +347,15 @@ export function buildIr(openapi: Json): Ir {
         if (credential !== undefined) {
           const named = [...String(credential).matchAll(/\{(\w+)\}/g)].map((match) => match[1] as string);
           const fields = new Set(fieldsOf(body ?? {}, where).map((candidate) => candidate.name));
-          if (typeof credential !== "string" || !/^[A-Z][A-Z0-9_{}a-z]*$/.test(credential) || named.some((name) => !fields.has(name))) {
-            throw new SpecError(where, `x-channelstack-credential on "${field.name}" must name an env var whose {fields} are body fields`);
+          if (
+            typeof credential !== "string" ||
+            !/^[A-Z][A-Z0-9_{}a-z]*$/.test(credential) ||
+            named.some((name) => !fields.has(name))
+          ) {
+            throw new SpecError(
+              where,
+              `x-channelstack-credential on "${field.name}" must name an env var whose {fields} are body fields`,
+            );
           }
           if (field.type.kind !== "string" || !field.optional) {
             throw new SpecError(where, `x-channelstack-credential is for an optional string, not "${field.name}"`);

@@ -28,7 +28,12 @@ const env = process.env;
 // One id for everything this run makes, so the sweep check can look for exactly that.
 const runId = (env.CHANNELSTACK_RUN_ID ?? `l${Date.now().toString(36)}`).toLowerCase();
 const home = mkdtempSync(join(tmpdir(), "channelstack-live-"));
-const live = { ...env, CHANNELSTACK_HOME: home, CHANNELSTACK_RUN_ID: runId, CHANNELSTACK_LOG_LEVEL: "warn" };
+const live: NodeJS.ProcessEnv = {
+  ...env,
+  CHANNELSTACK_HOME: home,
+  CHANNELSTACK_RUN_ID: runId,
+  CHANNELSTACK_LOG_LEVEL: "warn",
+};
 delete live.CHANNELSTACK_URL;
 delete live.CHANNELSTACK_TOKEN;
 
@@ -59,7 +64,9 @@ try {
       { timeout: "30s" },
     );
   } else {
-    process.stdout.write("Slack: no CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_APP_TOKEN; its live block skips\n");
+    process.stdout.write(
+      "Slack: no CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_APP_TOKEN; its live block skips\n",
+    );
   }
 
   try {
@@ -92,8 +99,16 @@ try {
 try {
   run(bin, ["sweep", "--check", "--run", runId], { env: live });
 } catch {
+  // A leftover is a bug in cleanup, and the run fails for it; but it doesn't stay in the sandbox.
   failed = true;
-  process.stderr.write(`The sweep check found what run ${runId} left behind (above). \`channelstack sweep --run ${runId}\` removes it.\n`);
+  process.stderr.write(`The sweep check found what run ${runId} left behind (above); removing it.\n`);
+  try {
+    run(bin, ["sweep", "--run", runId], { env: live });
+  } catch {
+    process.stderr.write(
+      `Some of it couldn't be removed: \`channelstack sweep --run ${runId}\` with the same credentials retries.\n`,
+    );
+  }
 }
 rmSync(home, { recursive: true, force: true });
 process.exitCode = failed ? 1 : 0;

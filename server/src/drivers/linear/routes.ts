@@ -4,8 +4,8 @@ import { GraphQLError } from "graphql";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
+import type { DriverRouter } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -153,7 +153,10 @@ const IN_THE_UI: LiveSupport = {
 /** Linear has no redelivery mutation. */
 const NO_REDELIVERY: LiveSupport = { unsupported: "Linear has no API to redeliver a webhook" };
 /** What only the app's own calls show: live, proxy mode sees them. */
-const AGENT_SIDE: LiveSupport = { requires: "proxy", reason: "Linear doesn't report the app's calls; proxy mode sees them" };
+const AGENT_SIDE: LiveSupport = {
+  requires: "proxy",
+  reason: "Linear doesn't report the app's calls; proxy mode sees them",
+};
 
 /** The Linear driver's control API: what a test's people do, and what a test reads back. */
 export function registerLinearRoutes(

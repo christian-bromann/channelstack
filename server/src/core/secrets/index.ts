@@ -5,7 +5,7 @@ import { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
 
 export { randomSeed, randomString, randomToken } from "./csprng.ts";
 export { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
-export { credentialName, LiveCredential, LiveVault } from "./live.ts";
+export { LiveCredential, LiveVault } from "./live.ts";
 
 /** The secrets one driver needs: a name of its choosing → the format to generate. */
 export type SecretSpec = Readonly<Record<string, SecretFormatName>>;

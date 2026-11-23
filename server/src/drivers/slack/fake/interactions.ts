@@ -12,13 +12,13 @@ import {
   slashCommandFields,
 } from "../interaction-payloads.ts";
 import {
+  type Immediate,
   NOBODY,
   type SlackControlScope,
   type SlackConversationRecord,
   type SlackMessageInput,
   type SlackMessageRecord,
   type SlackUserRecord,
-  type Immediate,
   type SlackWorld,
 } from "../world.ts";
 import type { SlackStore } from "./store.ts";

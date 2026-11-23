@@ -3,7 +3,7 @@ import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { SlackRefusal } from "../world.ts";
 
 /** Real Slack's Web API. Only `createApp` can point the client elsewhere (a stub in unit tests), never the environment. */
-export const SLACK_API = "https://slack.com/api";
+const SLACK_API = "https://slack.com/api";
 
 /** How often a call that Slack rate-limited is tried again, after the `Retry-After` Slack asks for. */
 const RATE_LIMIT_RETRIES = 3;
@@ -52,7 +52,7 @@ export class SlackWebClient {
         continue;
       }
       const answer = (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined;
-      if (!answer || answer.ok !== true) {
+      if (answer?.ok !== true) {
         const code =
           typeof answer?.error === "string" ? answer.error : response.status === 429 ? "ratelimited" : "unexpected";
         throw new SlackRefusal(code, `Slack refused ${method}: ${code}`, { method });

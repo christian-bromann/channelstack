@@ -3,8 +3,8 @@ import { z } from "@hono/zod-openapi";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
+import type { DriverRouter } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -215,11 +215,16 @@ const issueBinding = { repo: "repoId", number: "number" };
 const commitBinding = { repo: "repoId", sha: "sha" };
 
 /** A person's Re-run is a click in GitHub: `rerequest` answers 403 to anyone but the App that owns the check run. */
-const RERUN: LiveSupport = { unsupported: "not yet: a person's Re-run is a click in GitHub's UI, and the API lets only the owning App rerequest" };
+const RERUN: LiveSupport = {
+  unsupported: "not yet: a person's Re-run is a click in GitHub's UI, and the API lets only the owning App rerequest",
+};
 /** The requested-action buttons on a check run send their webhook only when a person clicks them. */
 const IN_THE_UI: LiveSupport = { requires: "browser", reason: "GitHub sends this only when a person clicks in the UI" };
 /** What only the App's own calls show: live, proxy mode sees them. */
-const AGENT_SIDE: LiveSupport = { requires: "proxy", reason: "GitHub doesn't report the App's calls; proxy mode sees them" };
+const AGENT_SIDE: LiveSupport = {
+  requires: "proxy",
+  reason: "GitHub doesn't report the App's calls; proxy mode sees them",
+};
 
 /** The GitHub driver's control API: what a test's people do, and what a test reads back. */
 export function registerGitHubRoutes(
