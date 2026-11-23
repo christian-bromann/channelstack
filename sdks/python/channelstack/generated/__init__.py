@@ -9,17 +9,22 @@ from typing import Any, Literal, Self
 from urllib.parse import quote
 
 from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
+from ..runtime.credentials import credential
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes, read_document, read_tree
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.0.0"
 
 
 class AccountInactiveError(ChannelstackError):
+    pass
+
+
+class ActionRequiresError(ChannelstackError):
     pass
 
 
@@ -39,7 +44,15 @@ class CantUpdateMessageError(ChannelstackError):
     pass
 
 
+class CrossWorkspaceCredentialError(ChannelstackError):
+    pass
+
+
 class DispatchFailedError(ChannelstackError):
+    pass
+
+
+class FakeActorInLiveWorldError(ChannelstackError):
     pass
 
 
@@ -52,6 +65,14 @@ class InternalError(ChannelstackError):
 
 
 class InvalidArgumentError(ChannelstackError):
+    pass
+
+
+class InvalidAuthError(ChannelstackError):
+    pass
+
+
+class LiveNotAllowlistedError(ChannelstackError):
     pass
 
 
@@ -103,20 +124,33 @@ class UnauthorizedError(ChannelstackError):
     pass
 
 
+class UnsupportedInFakeError(ChannelstackError):
+    pass
+
+
+class UnsupportedInLiveError(ChannelstackError):
+    pass
+
+
 class ValidationFailedError(ChannelstackError):
     pass
 
 
 _ERRORS: dict[str, type[ChannelstackError]] = {
     "account_inactive": AccountInactiveError,
+    "action_requires": ActionRequiresError,
     "already_in_channel": AlreadyInChannelError,
     "already_reacted": AlreadyReactedError,
     "cant_delete_message": CantDeleteMessageError,
     "cant_update_message": CantUpdateMessageError,
+    "cross_workspace_credential": CrossWorkspaceCredentialError,
     "dispatch_failed": DispatchFailedError,
+    "fake_actor_in_live_world": FakeActorInLiveWorldError,
     "forbidden": ForbiddenError,
     "internal": InternalError,
     "invalid_argument": InvalidArgumentError,
+    "invalid_auth": InvalidAuthError,
+    "live_not_allowlisted": LiveNotAllowlistedError,
     "msg_too_long": MsgTooLongError,
     "name_taken": NameTakenError,
     "no_reaction": NoReactionError,
@@ -129,6 +163,8 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "split_view_unavailable": SplitViewUnavailableError,
     "stop_unavailable": StopUnavailableError,
     "unauthorized": UnauthorizedError,
+    "unsupported_in_fake": UnsupportedInFakeError,
+    "unsupported_in_live": UnsupportedInLiveError,
     "validation_failed": ValidationFailedError,
 }
 
@@ -1155,10 +1191,10 @@ class SlackFixture:
         self.team: SlackTeam = SlackTeam._from_wire(ctx, data["team"])
         self.socket_connections: int = data["socketConnections"]
 
-    async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, real_name: str | None = None, email: str | None = None, timezone: str | None = None, admin: bool | None = None, owner: bool | None = None, guest: bool | None = None, bot: bool | None = None) -> SlackUser:
+    async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, real_name: str | None = None, email: str | None = None, timezone: str | None = None, admin: bool | None = None, owner: bool | None = None, guest: bool | None = None, bot: bool | None = None, token: str | None = None, browser: dict[str, Any] | None = None) -> SlackUser:
         """Create a person in the workspace. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users", body={"name": name, "id": id, "displayName": display_name, "realName": real_name, "email": email, "timezone": timezone, "admin": admin, "owner": owner, "guest": guest, "bot": bot})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users", body={"name": name, "id": id, "displayName": display_name, "realName": real_name, "email": email, "timezone": timezone, "admin": admin, "owner": owner, "guest": guest, "bot": bot, "token": credential("CHANNELSTACK_SLACK_USER_{name}_TOKEN", {"name": name}) if token is None else token, "browser": browser})
         return SlackUser(ctx, data)
 
     async def users(self) -> SlackUsers:
@@ -1173,10 +1209,10 @@ class SlackFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations")
         return [SlackConversation(ctx, item) for item in data]
 
-    async def create_channel(self, *, name: str | None = None, private: bool | None = None, participants: list[SlackUser | SlackApp] | None = None, topic: str | None = None, purpose: str | None = None) -> SlackConversation:
+    async def create_channel(self, *, name: str | None = None, private: bool | None = None, participants: list[SlackUser | SlackApp] | None = None, topic: str | None = None, purpose: str | None = None, shared: bool | None = None) -> SlackConversation:
         """Create a channel. Only the listed participants are members; include the app for it to receive events. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/channels", body={"name": name, "private": private, "participants": None if participants is None else [item.id for item in participants], "topic": topic, "purpose": purpose})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/channels", body={"name": name, "private": private, "participants": None if participants is None else [item.id for item in participants], "topic": topic, "purpose": purpose, "shared": shared})
         return SlackConversation(ctx, data)
 
     async def deliveries(self) -> SlackDeliveries:

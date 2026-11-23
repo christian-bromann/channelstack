@@ -2,7 +2,14 @@ import { dirname } from "node:path";
 
 import { expect, inject, test, type TestContext } from "vitest";
 
-import { type Channelstack, connect, type Session, setFilesRoot, untilQuiet } from "../../sdks/typescript/client.ts";
+import {
+  type Channelstack,
+  connect,
+  onRefusal,
+  type Session,
+  setFilesRoot,
+  untilQuiet,
+} from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
 
 /** Runs in every test worker: one client per worker, one session per test, and the matchers. */
@@ -17,6 +24,19 @@ const connected = () => {
 };
 
 /**
+ * What live mode can't do skips the test, with the reason, instead of failing it: a fake-only
+ * feature (`unsupported_in_live`), or one that needs a piece this run doesn't have (`action_requires`:
+ * a person's token, the browser actor, proxy mode). The fake run never sees these refusals, so a
+ * test still runs in full on every PR (reality-matrix.md, "What this means for test authors").
+ * A worker runs one test at a time, so the running test is the one to skip.
+ */
+const SKIPS_LIVE = new Set(["unsupported_in_live", "action_requires"]);
+let running: { skip(note?: string): never } | undefined;
+onRefusal((error) => {
+  if (running && SKIPS_LIVE.has(error.code)) running.skip(`live: ${error.message}`);
+});
+
+/**
  * The fixtures, registered on Vitest's own `test` so that a suite's `test.extend` can build on
  * them (`ana: async ({ slack }, use) => …`). They are automatic: every test has its session,
  * opened before its hooks run and closed after them, whether it names a fixture or not.
@@ -28,13 +48,18 @@ const auto = { auto: true } as const;
 
 (test as unknown as { override(fixtures: Record<string, unknown>): void }).override({
   channelstackSession: [
-    async ({ task }: { task: { file: { filepath: string } } }, use: (session: Session) => Promise<void>) => {
+    async (
+      { task, skip }: { task: { file: { filepath: string } }; skip(note?: string): never },
+      use: (session: Session) => Promise<void>,
+    ) => {
       const session = await (await connected()).openSession();
       // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
       setFilesRoot(dirname(task.file.filepath));
+      running = { skip };
       try {
         await use(session);
       } finally {
+        running = undefined;
         // Closing the session removes everything the test created. Disposing never fails a test.
         await session[Symbol.asyncDispose]();
       }

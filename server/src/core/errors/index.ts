@@ -8,6 +8,8 @@ const CORE_ERRORS = {
   session_not_found: 404,
   internal: 500,
   // Live mode (implementation plan 4.4).
+  /** The operation isn't built in the fake yet. */
+  unsupported_in_fake: 501,
   /** The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. */
   unsupported_in_live: 501,
   /** A live action needs something missing: a person's token, the browser actor, proxy mode. */

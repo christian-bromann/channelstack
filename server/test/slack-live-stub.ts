@@ -223,7 +223,7 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
   };
 
   const apiBase = "https://slack.stub/api";
-  const stubFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const stubFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === "string" || input instanceof URL ? input : input.url);
     if (!url.href.startsWith(apiBase)) throw new Error(`The live backend called ${url.origin}, not the stub`);
     const method = url.pathname.split("/").at(-1) ?? "";

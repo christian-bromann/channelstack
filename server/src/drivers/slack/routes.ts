@@ -4,7 +4,12 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { slackTsTime } from "../../core/ids/index.ts";
-import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, type Reality } from "../../core/reality/index.ts";
+import {
+  DELIVERY_IS_THE_PLATFORMS,
+  type LiveSupport,
+  type Reality,
+  unsupportedInLive,
+} from "../../core/reality/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
 import {
   apiCallSchema,
@@ -421,17 +426,29 @@ export function registerSlackRoutes(
         participants: z.array(participantRef).default([]),
         topic: z.string().optional(),
         purpose: z.string().optional(),
+        shared: z.boolean().optional().openapi({ description: "Shared with another organization (Slack Connect)." }),
       })
       .openapi("SlackChannelOptions"),
     response: SlackConversation,
-    errors: ["not_found", "name_taken"],
+    errors: ["not_found", "name_taken", "unsupported_in_fake"],
     factory: {
       on: "SlackFixture",
       name: "createChannel",
-      options: ["name", "private", "participants", "topic", "purpose"],
+      options: ["name", "private", "participants", "topic", "purpose", "shared"],
     },
     stability,
-    handler: async ({ session, body }) => conversationWire(await world.createChannel(session.id, body)),
+    handler: async ({ session, body }) => {
+      if (body.shared === true) {
+        if (deps.reality() === "live") {
+          throw unsupportedInLive(
+            "SlackFixture.createChannel({ shared })",
+            "Slack Connect needs a second organization and a manual approval",
+          );
+        }
+        throw new ProtocolError("unsupported_in_fake", "Slack Connect channels aren't in the fake yet");
+      }
+      return conversationWire(await world.createChannel(session.id, body));
+    },
   });
 
   router.route({

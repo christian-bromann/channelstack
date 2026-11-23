@@ -204,6 +204,12 @@ export function emitPython(ir: Ir): Map<string, string> {
       param.shorthand === undefined
         ? encoded
         : `{${JSON.stringify(param.shorthand)}: ${name}} if isinstance(${name}, str) else ${encoded}`;
+    if (param.credential !== undefined) {
+      // Left out, it comes from the environment: the same test runs fake on PRs and live nightly.
+      const fields = [...param.credential.matchAll(/\{(\w+)\}/g)].map((match) => match[1] as string);
+      const values = fields.map((field) => `${JSON.stringify(field)}: ${snakeCase(field)}`).join(", ");
+      return `credential(${JSON.stringify(param.credential)}, {${values}}) if ${name} is None else ${value}`;
+    }
     return param.optional && value !== name ? `None if ${name} is None else ${value}` : value;
   };
 
@@ -439,6 +445,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     "from urllib.parse import quote",
     "",
     `from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly${allWaits.some((w) => w.mode === "latest") || allMethods.some((m) => m.onceQuiet) ? ", quiet_of" : ""}, session_of`,
+    ...(spec.includes('"credential":') ? ["from ..runtime.credentials import credential"] : []),
     ...(usesDurations || allWaits.length > 0
       ? [`from ..runtime.duration import Duration${usesDurations ? ", parse_duration" : ""}`]
       : []),

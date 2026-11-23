@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { connectWith, sessionOf } from "./client.ts";
+import { credential } from "./credentials.ts";
 import { parseDuration } from "./duration.ts";
 import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
@@ -345,5 +346,24 @@ describe("files a test hands over", () => {
       ["old.ts", null],
     ]);
     expect(readChanges([{ name: "a.txt", content: "a" }])).toEqual([{ path: "a.txt", content: "YQ==" }]);
+  });
+});
+
+describe("credentials", () => {
+  const variable = "CHANNELSTACK_SLACK_USER_ANA_SMITH_TOKEN";
+  afterEach(() => {
+    delete process.env[variable];
+  });
+
+  test("a person's token comes from CHANNELSTACK_<CHANNEL>_USER_<NAME>_TOKEN, by the name the test gave", () => {
+    const template = "CHANNELSTACK_SLACK_USER_{name}_TOKEN";
+    expect(credential(template, { name: "Ana Smith" })).toBeUndefined();
+    process.env[variable] = "xoxp-from-the-environment";
+    expect(credential(template, { name: "Ana Smith" })).toBe("xoxp-from-the-environment");
+    expect(credential(template, { name: "ana-smith" })).toBe("xoxp-from-the-environment");
+    // Without the name there is nothing to look up, and an empty variable is no credential.
+    expect(credential(template, {})).toBeUndefined();
+    process.env[variable] = "";
+    expect(credential(template, { name: "Ana Smith" })).toBeUndefined();
   });
 });

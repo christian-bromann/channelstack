@@ -77,7 +77,7 @@ Every feature runs in the fake server (in memory). The question this document an
 |---|---|---|---|---|
 | `slack.createChannel({ participants, private })` | Done | Yes | Seeding credentials (`conversations.create`, `conversations.invite`) | Including `slack.app` invites the bot |
 | `slack.createChannel({ shared: true })` (Slack Connect) | Yes | No | — | Needs a second organization and manual approval |
-| `slack.uninstallApp()` | Done | Partial | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run |
+| `slack.uninstallApp()` | Done | Not yet | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run. Live runs report `unsupported_in_live` until that job exists |
 | `ana.say(text, { channel })` | Done | Yes | User token (`chat.postMessage` as the user) | The platform sends real `message` and `app_mention` events |
 | `ana.say(text, { to: slack.app })` (DM) | Done | Yes | User token (`conversations.open`, then `chat.postMessage`) | Fires `message.im` |
 | `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Yes | User token | |

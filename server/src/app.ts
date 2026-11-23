@@ -14,7 +14,13 @@ import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
 import type { Redactor } from "./core/redact/index.ts";
-import { actionRequires, type DriverReality, driverReality, forcedReality } from "./core/reality/index.ts";
+import {
+  actionRequires,
+  type DriverReality,
+  driverReality,
+  forcedReality,
+  unsupportedInLive,
+} from "./core/reality/index.ts";
 import { Registry } from "./core/registry/index.ts";
 import {
   type Driver,
@@ -306,8 +312,16 @@ export function createApp(options: AppOptions): App {
     path: "/reset",
     summary: "Drop the whole world. Avoid in parallel suites",
     sdkMethod: { on: "Channelstack", name: "reset" },
+    errors: ["unsupported_in_live"],
     stability: "stable",
     handler: async () => {
+      const live = [...realities].filter(([, reality]) => reality.mode === "live").map(([name]) => name);
+      if (live.length > 0) {
+        throw unsupportedInLive(
+          "Channelstack.reset",
+          `${live.join(", ")} ${live.length === 1 ? "is" : "are"} live, and a real workspace is never wiped: each session removes what it made, and channelstack sweep removes leftovers`,
+        );
+      }
       await sessions.closeAll();
       events.drop(WORLD_SCOPE);
       registry.clear();

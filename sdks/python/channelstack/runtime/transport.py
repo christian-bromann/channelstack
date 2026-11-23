@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import httpx
@@ -21,6 +21,19 @@ class ChannelstackError(Exception):
         self.status = status
         self.message = message
         self.data: Mapping[str, Any] = data or {}
+
+
+_refusal_handler: Callable[[ChannelstackError], None] | None = None
+
+
+def on_refusal(handler: Callable[[ChannelstackError], None] | None) -> None:
+    """Set (or, with None, clear) what sees every refusal before it is raised.
+
+    A test integration uses it to turn a refusal into its framework's own outcome: an operation
+    live mode can't do skips the test, with the reason.
+    """
+    global _refusal_handler
+    _refusal_handler = handler
 
 
 def _without_none(values: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -53,9 +66,12 @@ class Transport:
         error: dict[str, Any] = payload if isinstance(payload, dict) else {}
         code = str(error.get("error", "internal"))
         error_class = self._errors.get(code, ChannelstackError)
-        raise error_class(
+        refusal = error_class(
             code, response.status_code, str(error.get("message", f"HTTP {response.status_code}")), error.get("data")
         )
+        if _refusal_handler is not None:
+            _refusal_handler(refusal)
+        raise refusal
 
     async def _send(
         self, method: str, path: str, body: dict[str, Any] | None, query: dict[str, Any] | None
