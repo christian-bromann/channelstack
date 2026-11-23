@@ -77,8 +77,8 @@ describe("exit check 5.2: channelstack sweep", () => {
     const dir = home();
     const created = await s.stub.fetch(`${s.stub.apiBase}/conversations.create`, {
       method: "POST",
-      headers: { authorization: `Bearer ${s.ana.token}` },
-      body: JSON.stringify({ name: "channelstack-run-crash1-1" }),
+      headers: { authorization: `Bearer ${s.ana.token}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ name: "channelstack-run-crash1-1" }),
     });
     const { channel } = (await created.json()) as { channel: { id: string; created: number } };
     // A pid no process has: the server that wrote it is gone.
@@ -129,8 +129,8 @@ describe("exit check 5.2: channelstack sweep", () => {
     const dir = home();
     const made = await stub.fetch(`${stub.apiBase}/conversations.create`, {
       method: "POST",
-      headers: { authorization: `Bearer ${ana.token}` },
-      body: JSON.stringify({ name: "channelstack-run-old1-3-support" }),
+      headers: { authorization: `Bearer ${ana.token}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ name: "channelstack-run-old1-3-support" }),
     });
     const { channel } = (await made.json()) as { channel: { id: string; created: number } };
     const sweep = (hoursLater: number) =>

@@ -12,7 +12,11 @@ export interface SlackStub {
   /** The app's bot token and bot user. */
   readonly bot: { token: string; userId: string; botId: string };
   /** Add a person; their token is what the test hands to `createUser`. */
-  person(handle: string, options?: { team?: string }): { token: string; userId: string };
+  /**
+   * Add a person; their token is what the test hands to `createUser`. `viaAgentApp`: the token was
+   * issued by the agent's own app, so what they post carries the app's bot, as on real Slack.
+   */
+  person(handle: string, options?: { team?: string; viaAgentApp?: boolean }): { token: string; userId: string };
   /** Every call so far: the method, and the handle (or `bot`) whose token made it. */
   readonly calls: Array<{ method: string; as: string; params: Record<string, unknown> }>;
   /** The app answers in a conversation, as the real agent would (Slack delivered the event to it, not channelstack). */
@@ -48,7 +52,7 @@ interface StubChannel {
 export function slackStub(options: { team?: string } = {}): SlackStub {
   const team = options.team ?? "T0STUB0001";
   const bot = { token: `xoxb-${randomString(24, "abcdef0123456789")}`, userId: "U0STUBBOT1", botId: "B0STUBBOT1" };
-  const tokens = new Map<string, { handle: string; userId: string; team: string; isBot: boolean }>([
+  const tokens = new Map<string, { handle: string; userId: string; team: string; isBot: boolean; viaAgentApp?: boolean }>([
     [bot.token, { handle: "bot", userId: bot.userId, team, isBot: true }],
   ]);
   const users = new Map<string, { id: string; name: string }>([[bot.userId, { id: bot.userId, name: "robin" }]]);
@@ -81,7 +85,11 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
   const top = (channel: StubChannel) =>
     channel.messages.filter((message) => message.thread_ts === undefined || message.thread_ts === message.ts);
 
-  const handle = (method: string, who: { handle: string; userId: string; team: string; isBot: boolean }, p: any) => {
+  const handle = (
+    method: string,
+    who: { handle: string; userId: string; team: string; isBot: boolean; viaAgentApp?: boolean },
+    p: any,
+  ) => {
     const channel = typeof p.channel === "string" ? channels.get(p.channel) : undefined;
     const member = () => channel !== undefined && channel.members.has(who.userId);
     switch (method) {
@@ -182,7 +190,7 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         if (channel.archived) return refuse("is_archived");
         if (!member()) return refuse("not_in_channel");
         if (!p.text && !p.blocks) return refuse("no_text");
-        const message = post(channel, who.userId, p.text ?? "", p.thread_ts, who.isBot);
+        const message = post(channel, who.userId, p.text ?? "", p.thread_ts, who.isBot || who.viaAgentApp === true);
         return ok({ channel: channel.id, ts: message.ts, message });
       }
       case "chat.update": {
@@ -228,7 +236,13 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
     if (!url.href.startsWith(apiBase)) throw new Error(`The live backend called ${url.origin}, not the stub`);
     const method = url.pathname.split("/").at(-1) ?? "";
     const token = new Headers(init?.headers).get("authorization")?.replace(/^Bearer /, "") ?? "";
-    const params = init?.body ? JSON.parse(String(init.body)) : {};
+    // Form-encoded, as real Slack's read methods require: a JSON body would come through empty.
+    const type = new Headers(init?.headers).get("content-type") ?? "";
+    if (!type.startsWith("application/x-www-form-urlencoded")) return refuse("invalid_form_data");
+    const params: Record<string, unknown> = {};
+    for (const [name, value] of new URLSearchParams(String(init?.body ?? ""))) {
+      params[name] = value === "true" ? true : value === "false" ? false : value;
+    }
     const who = tokens.get(token);
     calls.push({ method, as: who?.handle ?? "nobody", params });
     if (!who) return refuse("invalid_auth");
@@ -244,7 +258,13 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
     person(handleName, personOptions = {}) {
       const userId = `U0${randomString(9, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")}`;
       const token = `xoxp-${randomString(24, "abcdef0123456789")}`;
-      tokens.set(token, { handle: handleName, userId, team: personOptions.team ?? team, isBot: false });
+      tokens.set(token, {
+        handle: handleName,
+        userId,
+        team: personOptions.team ?? team,
+        isBot: false,
+        ...(personOptions.viaAgentApp ? { viaAgentApp: true } : {}),
+      });
       users.set(userId, { id: userId, name: handleName });
       return { token, userId };
     },

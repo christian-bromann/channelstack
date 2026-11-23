@@ -128,6 +128,19 @@ describe("live Slack: acting and reading back", () => {
     expect(dm.body.error).toBe("fake_actor_in_live_world");
   });
 
+  test("a person's token issued by the agent's own app is refused: Slack would show their message as the app's", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana", { viaAgentApp: true });
+    const server = liveSlack(stub);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, { message: { text: "hi" }, to: [stub.bot.userId] });
+    expect(said.body).toMatchObject({ error: "action_requires", data: { requires: "a person's token from another Slack app" } });
+    // What was posted is still removed with the session.
+    await server.call("DELETE", `/sessions/${session.id}`);
+    expect(stub.channels().flatMap((channel) => channel.messages)).toEqual([]);
+  });
+
   test("CHANNELSTACK_REALITY=live refuses a person without a token", async () => {
     const stub = slackStub();
     const session = await liveSlack(stub, stub.team, { CHANNELSTACK_REALITY: "live" }).open();

@@ -29,6 +29,7 @@ interface WireMessage {
   ts: string;
   user?: string;
   bot_id?: string;
+  app_id?: string;
   text?: string;
   blocks?: unknown[];
   thread_ts?: string;
@@ -324,6 +325,16 @@ export function createLiveWorld(deps: {
     changed(target.id);
     const message = (answer.message ?? { ts: answer.ts, text, user: userId }) as WireMessage;
     if (target.kind === "im" || target.kind === "mpim") recordDm(session, target, credential, message.ts);
+    // A user token issued by the agent's own app posts as that app: Slack marks the message with the
+    // app's bot, and the agent ignores it as its own (found in the first live run, live-mode.md V1).
+    const { app } = known();
+    if (message.bot_id === app.botId || (app.id !== "" && message.app_id === app.id)) {
+      throw actionRequires(
+        "SlackUser.say",
+        "a person's token from another Slack app",
+        `${person(session, userId).alias}'s token was issued by the agent's own app, so Slack shows the message as the app's and the agent ignores it. Install a separate Slack app for the sandbox's people and use the user token it issues`,
+      );
+    }
     const [record] = await records(session, target.id, [{ ...message, ts: (answer.ts as string) ?? message.ts }]);
     return record as SlackMessageRecord;
   };

@@ -31,13 +31,18 @@ export class SlackWebClient {
   }
 
   async call(method: string, credential: LiveCredential, params: Params = {}): Promise<SlackAnswer> {
-    const body = JSON.stringify(Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined)));
+    // Form-encoded, as Slack's own SDK sends them: read methods ignore a JSON body. Blocks and
+    // metadata go as JSON text in their field.
+    const body = new URLSearchParams();
+    for (const [name, value] of Object.entries(params)) {
+      if (value !== undefined) body.set(name, typeof value === "object" ? JSON.stringify(value) : String(value));
+    }
     for (let attempt = 0; ; attempt++) {
       const response = await this.#fetch(`${this.#base}/${method}`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${credential.reveal()}`,
-          "content-type": "application/json; charset=utf-8",
+          "content-type": "application/x-www-form-urlencoded",
         },
         body,
       });
