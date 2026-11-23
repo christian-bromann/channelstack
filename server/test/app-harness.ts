@@ -1,7 +1,7 @@
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { type App, createApp } from "../src/app.ts";
+import { type App, createApp, type LiveOptions } from "../src/app.ts";
 import type { Timers } from "../src/core/clock/index.ts";
 import { createLogger } from "../src/core/log/index.ts";
 import { Redactor } from "../src/core/redact/index.ts";
@@ -71,8 +71,14 @@ export interface Harness {
   ): Reply;
 }
 
-/** The app as the unit tests drive it: built in memory, called through `fetch`, with no listener. */
-export function harness(webhooks: Readonly<Record<string, string | undefined>> = {}): Harness {
+/**
+ * The app as the unit tests drive it: built in memory, called through `fetch`, with no listener.
+ * `live` makes drivers real, with a stub standing in for each platform (`apiBase`, `fetch`).
+ */
+export function harness(
+  webhooks: Readonly<Record<string, string | undefined>> = {},
+  options: { live?: LiveOptions } = {},
+): Harness {
   const secrets = Secrets.ephemeral(secretSpecs());
   const redactor = new Redactor();
   redactor.register(TOKEN, ...secrets.all());
@@ -91,6 +97,7 @@ export function harness(webhooks: Readonly<Record<string, string | undefined>> =
     ui: UI_PAGE,
     timers,
     clock: () => Date.now() + ahead,
+    ...(options.live ? { live: options.live } : {}),
   });
   const send = async (
     url: string,
