@@ -31,7 +31,11 @@ beforeEach(async (context) => {
   };
   // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
   setFilesRoot(dirname(context.task.file.filepath));
-  [context.slack, context.github] = await Promise.all([session.slack(), session.github()]);
+  [context.slack, context.github, context.linear] = await Promise.all([
+    session.slack(),
+    session.github(),
+    session.linear(),
+  ]);
 });
 
 afterEach(async (context) => {

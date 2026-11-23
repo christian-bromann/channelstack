@@ -17,7 +17,8 @@
       "!**/dist",
       "!.claude",
       "!**/*.md",
-      "!phase-log"
+      "!phase-log",
+      "!server/src/drivers/linear/schema"
     ]
   },
   "formatter": {

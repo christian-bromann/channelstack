@@ -5,7 +5,7 @@
   "minTokens": 50,
   "threshold": 0,
   "gitignore": true,
-  "ignore": ["**/node_modules/**", "**/dist/**", "**/generated/**", "**/.venv/**"],
+  "ignore": ["**/node_modules/**", "**/dist/**", "**/generated/**", "**/.venv/**", "**/linear/schema/**"],
   "reporters": ["console"],
   "exitCode": 1
 }

@@ -22,6 +22,7 @@ const STANDING: readonly Check[] = [
   { name: "Unit tests", script: ["test"] },
   { name: "Spec is current", script: ["spec:check"] },
   { name: "SDKs are current", script: ["sdk:check"] },
+  { name: "Linear's schema module matches its SDL", script: ["linear:schema:check"] },
   { name: "The examples type-check against the generated SDK", script: ["api:check"] },
   { name: "No secrets in output", script: ["test:redaction"] },
   { name: "No duplicate code", script: ["check:dupes"] },

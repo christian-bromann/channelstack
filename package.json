@@ -26,6 +26,8 @@
     "spec:check": "node scripts/spec.ts --check",
     "sdk": "node scripts/sdk.ts",
     "sdk:check": "node scripts/sdk.ts --check",
+    "linear:schema": "node scripts/linear-schema.ts",
+    "linear:schema:check": "node scripts/linear-schema.ts --check",
     "check:dupes": "jscpd",
     "check:deps": "depcruise server codegen sdks/typescript integrations examples scenarios scripts test --config .dependency-cruiser.cjs",
     "check:unused": "knip",
