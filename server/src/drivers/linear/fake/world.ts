@@ -737,7 +737,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       const issue = store.issue(record.issue);
       const session = store.sessionOf(issue);
       const data = payloads.comment(record);
-      store.forget(store.comments, session, record.id);
+      store.forget(store.comments, record.id);
       return entityEvent(session, "Comment", "remove", actor, data, links.comment(issue, record.id));
     },
 

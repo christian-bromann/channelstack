@@ -20,8 +20,6 @@ export class LinearStore {
   readonly comments: Collection<LinearCommentRecord>;
   readonly sessions: Collection<LinearSessionRecord>;
   readonly activities: Collection<LinearActivityRecord>;
-  /** Per session, in the order they were made: the registry has no listing. */
-  readonly #created = new Map<string, Map<Collection<Keyed>, string[]>>();
   #org: LinearOrgRecord | undefined;
   #app: LinearAppRecord | undefined;
   #appUser: LinearUserRecord | undefined;
@@ -55,37 +53,25 @@ export class LinearStore {
     this.#org = org;
     this.#app = app;
     this.#appUser = appUser;
-    this.#created.clear();
   }
 
   /** Keep a new object for its session. */
   add<T extends Keyed>(collection: Collection<T>, session: string, record: T): T {
-    let mine = this.#created.get(session);
-    if (!mine) {
-      mine = new Map();
-      this.#created.set(session, mine);
-    }
-    const ids = mine.get(collection as Collection<Keyed>) ?? [];
-    ids.push(record.id);
-    mine.set(collection as Collection<Keyed>, ids);
     return collection.add(record.id, record, session);
   }
 
   /** Everything of one kind a session made, oldest first. */
-  list<T extends Keyed>(collection: Collection<T>, session: string): T[] {
-    const ids = this.#created.get(session)?.get(collection as Collection<Keyed>) ?? [];
-    return ids.map((id) => collection.find(id)).filter((record): record is T => record !== undefined);
+  list<T>(collection: Collection<T>, session: string): T[] {
+    return collection.list(session);
   }
 
   /** Everything of one kind, in every session: what the app sees of the workspace. */
-  all<T extends Keyed>(collection: Collection<T>): T[] {
-    return [...this.#created.keys()].flatMap((session) => this.list(collection, session));
+  all<T>(collection: Collection<T>): T[] {
+    return collection.values();
   }
 
-  /** Delete an object: it leaves its session's listing and the registry. */
-  forget<T extends Keyed>(collection: Collection<T>, session: string, id: string): void {
-    const ids = this.#created.get(session)?.get(collection as Collection<Keyed>);
-    if (ids?.includes(id)) ids.splice(ids.indexOf(id), 1);
+  /** Delete an object: it leaves the registry, and with it its session's listing. */
+  forget<T>(collection: Collection<T>, id: string): void {
     collection.remove(id);
   }
 
@@ -133,10 +119,8 @@ export class LinearStore {
       : this.list(this.activities, owner).filter((activity) => activity.session === session.id);
   }
 
-  /** Forget a closed session's indexes. Answers with what the caller still has to give back. */
+  /** What a closing session has that the caller still has to give back, before the registry drops it. */
   release(session: string): { users: LinearUserRecord[]; teams: LinearTeamRecord[] } {
-    const released = { users: this.list(this.users, session), teams: this.list(this.teams, session) };
-    this.#created.delete(session);
-    return released;
+    return { users: this.list(this.users, session), teams: this.list(this.teams, session) };
   }
 }
