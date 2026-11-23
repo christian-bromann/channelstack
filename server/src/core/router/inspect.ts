@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-import type { EventLog } from "../events/index.ts";
+import { type EventLog, WORLD_SCOPE } from "../events/index.ts";
 
 /**
  * What every channel's fixture lets a test inspect, in one shape for all of them: deliveries with
@@ -89,4 +89,46 @@ export function readCalls<Channel extends string>(
       (call) =>
         query.error === undefined || (query.error === "true" ? call.error !== undefined : call.error === query.error),
     );
+}
+
+/** One API call of the agent as a fake puts it on record. `readCalls` reads it back. */
+export interface ApiCallRecord {
+  /** The platform's name for it: Slack's method, `POST /repos/{owner}/{repo}/issues`, a GraphQL root field, a client method. */
+  operation: string;
+  method: string;
+  path: string;
+  request: unknown;
+  responseStatus: number;
+  response: unknown;
+  /** The platform's error code, for a call it refused. */
+  error?: string | undefined;
+  durationMs: number;
+}
+
+/** How much of a request or an answer the event log keeps: a larger one is left out of the record. */
+const RECORD_LIMIT = 64 * 1024;
+const kept = (value: unknown) =>
+  value === undefined || JSON.stringify(value).length > RECORD_LIMIT ? undefined : value;
+
+/**
+ * Put an API call on record for the test sessions whose objects it read or changed: the one place
+ * a fake writes one. A call about no session's objects is kept for no session (`WORLD_SCOPE`,
+ * which every session reads) with `unattributed: "world"`, or not at all with `"drop"`.
+ */
+export function recordCall(
+  events: EventLog,
+  channel: string,
+  sessions: Iterable<string | undefined>,
+  call: ApiCallRecord,
+  options: { unattributed: "world" | "drop" },
+): void {
+  const owners = new Set([...sessions].filter((session): session is string => session !== undefined));
+  if (owners.size === 0 && options.unattributed === "world") owners.add(WORLD_SCOPE);
+  const record = {
+    ...call,
+    request: kept(call.request),
+    response: kept(call.response),
+    ...(call.error === undefined ? {} : { error: call.error }),
+  };
+  for (const session of owners) events.append(session, channel, "api_call", record);
 }

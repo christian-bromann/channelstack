@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { bearerFrom } from "../../../core/auth/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
+import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import type { EchoRoom } from "../world.ts";
 import type { EchoStore } from "./store.ts";
@@ -57,18 +58,22 @@ export function createEchoApi(context: DriverContext, store: EchoStore, world: F
         ? run(request, c.req.param("room") ?? "")
         : { status: 401, body: { ok: false, error: "invalid_auth" } };
       const session = outcome.room === undefined ? undefined : store.rooms.owner(outcome.room);
-      if (session !== undefined) {
-        context.events.append(session, "echo", "api_call", {
+      recordCall(
+        context.events,
+        "echo",
+        [session],
+        {
           operation,
           method,
           path: new URL(c.req.url).pathname,
           request: request ?? null,
           responseStatus: outcome.status,
           response: outcome.body,
-          ...(outcome.body.ok ? {} : { error: outcome.body.error }),
+          error: outcome.body.ok ? undefined : String(outcome.body.error),
           durationMs: context.clock() - startedAt,
-        });
-      }
+        },
+        { unattributed: "drop" },
+      );
       return c.json(outcome.body, outcome.status);
     });
 

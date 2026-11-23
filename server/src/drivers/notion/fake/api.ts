@@ -1,15 +1,13 @@
 import { type Context, Hono } from "hono";
 
 import { bearerFrom } from "../../../core/auth/index.ts";
-import { WORLD_SCOPE } from "../../../core/events/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
+import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { NOTION_API_VERSION } from "../payloads.ts";
 import type { NotionBlockRecord, NotionCapability, NotionDatabaseRecord, NotionPageRecord } from "../world.ts";
 import { type FakeNotionWorld, NotionApiError, type PlainValue } from "./world.ts";
 
-/** How much of a request or answer the event log keeps. */
-const RECORD_LIMIT = 64 * 1024;
 /** The versions the API takes; the client libraries send one in `Notion-Version`. */
 const VERSIONS = ["2022-06-28", NOTION_API_VERSION, "2026-03-11"];
 
@@ -121,20 +119,23 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
         answer = { body: errorBody(error.status, error.code, error.message), sessions: [], status: error.status };
       }
       const status = answer.status ?? 200;
-      const text = JSON.stringify(answer.body);
-      const call = {
-        operation,
-        method: method.toUpperCase(),
-        path: new URL(c.req.url).pathname,
-        request: method === "get" || method === "delete" ? Object.fromEntries(new URL(c.req.url).searchParams) : body,
-        responseStatus: status,
-        response: text.length > RECORD_LIMIT ? undefined : answer.body,
-        ...(status >= 400 ? { error: String((answer.body as { code?: string }).code ?? "error") } : {}),
-        durationMs: clock() - startedAt,
-      };
-      const sessions = new Set(answer.sessions);
-      for (const session of sessions.size > 0 ? sessions : [WORLD_SCOPE])
-        context.events.append(session, "notion", "api_call", call);
+      const url = new URL(c.req.url);
+      recordCall(
+        context.events,
+        "notion",
+        answer.sessions,
+        {
+          operation,
+          method: method.toUpperCase(),
+          path: url.pathname,
+          request: method === "get" || method === "delete" ? Object.fromEntries(url.searchParams) : body,
+          responseStatus: status,
+          response: answer.body,
+          error: status >= 400 ? String((answer.body as { code?: string }).code ?? "error") : undefined,
+          durationMs: clock() - startedAt,
+        },
+        { unattributed: "world" },
+      );
       return c.json(answer.body, status as 200);
     });
 

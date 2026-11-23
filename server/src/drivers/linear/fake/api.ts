@@ -1,16 +1,13 @@
 import { Hono } from "hono";
 
 import { bearerFrom } from "../../../core/auth/index.ts";
-import { WORLD_SCOPE } from "../../../core/events/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
+import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { type GraphQLRequest, rootFields, runGraphQL } from "./graphql.ts";
 import type { LinearCallContext } from "./models.ts";
 import { linearResolvers } from "./resolvers.ts";
 import type { FakeLinearWorld } from "./world.ts";
-
-/** How much of a request or answer the event log keeps. */
-const RECORD_LIMIT = 64 * 1024;
 
 const authError = (message: string) => ({
   errors: [
@@ -67,23 +64,26 @@ export function createLinearApi(context: DriverContext, world: FakeLinearWorld):
     };
     const [first] = result.errors ?? [];
     const fields = rootFields(document, request.operationName);
-    const text = JSON.stringify(body);
-    const call = {
-      operation: fields[0] ?? request.operationName ?? "query",
-      method: "POST",
-      path: "/graphql",
-      request: {
-        query: request.query.slice(0, RECORD_LIMIT),
-        variables: request.variables ?? {},
-        ...(request.operationName ? { operationName: request.operationName } : {}),
+    recordCall(
+      context.events,
+      "linear",
+      callContext.sessions,
+      {
+        operation: fields[0] ?? request.operationName ?? "query",
+        method: "POST",
+        path: "/graphql",
+        request: {
+          query: request.query,
+          variables: request.variables ?? {},
+          ...(request.operationName ? { operationName: request.operationName } : {}),
+        },
+        responseStatus: status,
+        response: body,
+        error: first ? String(first.extensions?.code ?? "GRAPHQL_ERROR") : undefined,
+        durationMs: clock() - startedAt,
       },
-      responseStatus: status,
-      response: text.length > RECORD_LIMIT ? undefined : body,
-      ...(first ? { error: String(first.extensions?.code ?? "GRAPHQL_ERROR") } : {}),
-      durationMs: clock() - startedAt,
-    };
-    const sessions = callContext.sessions.size > 0 ? [...callContext.sessions] : [WORLD_SCOPE];
-    for (const session of sessions) context.events.append(session, "linear", "api_call", call);
+      { unattributed: "world" },
+    );
     return c.json(body, status);
   });
 
