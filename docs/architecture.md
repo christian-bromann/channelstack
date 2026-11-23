@@ -115,7 +115,7 @@ ana.say("@my-agent hi", { channel })
   └─► POST …/slack/users/U08B5K2M9QX/say
         └─► world.postAsUser(ana, channel, text)
               ├─ fake: write to the store → build event_callback → sign → deliver to the agent → log
-              └─ live: chat.postMessage with Ana's token → record the created message in the ledger
+              └─ live: chat.postMessage with Ana's token → the ledger lists its channel or DM for cleanup
 ```
 
 That keeps the fake and the real platform from drifting apart in code. The nightly differential run compares them in behaviour (implementation plan 9).

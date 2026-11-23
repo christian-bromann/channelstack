@@ -52,10 +52,16 @@ All from environment variables in CI. None is committed or logged, and the contr
 
 | Channel | A1 app | A2 person (per sandbox person `ANA`) | A3 browser sign-in |
 |---|---|---|---|
-| Slack | `CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN` | `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (`xoxp-`) | Test inbox access |
+| Slack | `CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN` | `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (`xoxp-`), issued by a **separate** Slack app for the sandbox's people, never by the agent's own app | Test inbox access |
 | GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` | `CHANNELSTACK_GITHUB_USER_ANA_TOKEN` (fine-grained PAT, machine account) | `CHANNELSTACK_GITHUB_USER_ANA_PASSKEY` |
-| Linear | The app's OAuth token | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key) | `CHANNELSTACK_LINEAR_USER_ANA_PASSKEY`, or inbox |
+| Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key) | `CHANNELSTACK_LINEAR_USER_ANA_PASSKEY`, or inbox |
 | Notion | `CHANNELSTACK_NOTION_TOKEN` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) | Test inbox access |
+
+The A1 credentials make a driver live: with all of them set, its routes act on the real platform. With some set and not all, its routes are refused with `action_requires`, naming what is missing. The allowlists are `CHANNELSTACK_LIVE_SLACK_TEAMS`, `CHANNELSTACK_LIVE_GITHUB_ORGS`, `CHANNELSTACK_LIVE_LINEAR_WORKSPACES` and `CHANNELSTACK_LIVE_NOTION_WORKSPACES` (comma-separated ids).
+
+**Why Slack needs a second app for people.** A user token that the agent's own app issued posts as that app: Slack marks the message with the app's bot, and the agent ignores it as its own, so no `app_mention` either (found in the first live run). channelstack refuses such a token on the first message, with the fix in the message.
+
+How the agent itself is reachable is the agent's concern. channelstack's own nightly job runs Slack's reference agent in Socket Mode, with the app's `CHANNELSTACK_SLACK_APP_TOKEN` (`xapp-`), so it needs no public URL.
 
 The agent's own signing secrets are never needed live: channelstack doesn't sign anything the agent receives. In fake mode, channelstack generates them (implementation plan 1.1, "Secrets").
 
@@ -92,14 +98,16 @@ The nightly differential run (implementation plan 9) compares fake and real beha
 
 Paths follow implementation plan section 13.
 
-| # | Piece | Where | Done when |
-|---|---|---|---|
-| W1 | Live adapters for person actions (A2) per channel | `server/src/drivers/<channel>/live/actions.ts` | Each A2 row in the matrix works against a sandbox; created objects are in the ledger |
-| W2 | Live reads behind the transcript model and matchers (O) | `server/src/drivers/<channel>/live/reads.ts` | Matchers pass against real threads, timelines, sessions and pages, with polling and timeouts |
-| W3 | GitHub delivery-log reads | `server/src/drivers/github/live/deliveries.ts` | `delivery.attempts`, `toBeAccepted` and `toBeRejected` work live on GitHub from the log |
-| W4 | `unsupported_in_live` for fake-only features | `server/src/core/reality/` | Delivery chaos on Slack, Linear and Notion live reports `unsupported_in_live` with a reason; the test framework skips that step |
-| W5 | Browser actor with unattended sign-in | `server/src/core/browser/`, `server/src/drivers/<channel>/live/ui.ts` | The A3 rows work for Slack first (click, Stop), then the others; `channelstack doctor` checks saved sessions |
-| W6 | Allowlists, tagging and ledger cleanup | `server/src/core/safety/`, `server/src/core/ledger/` | Acting outside an allowlist is refused; `channelstack sweep` removes leftovers |
+| # | Piece | Where | Done when | Status |
+|---|---|---|---|---|
+| W1 | Live adapters for person actions (A2) per channel | `server/src/drivers/<channel>/live/world.ts` (the live `World`) | Each A2 row in the matrix works against a sandbox; created objects are in the ledger | Slack built (phase 5); GitHub, Linear, Notion wait for their sandboxes |
+| W2 | Live reads behind the transcript model and matchers (O) | `server/src/drivers/<channel>/live/world.ts` | Matchers pass against real threads, timelines, sessions and pages, with polling and timeouts | Slack built; the others as W1 |
+| W3 | GitHub delivery-log reads | `server/src/drivers/github/live/deliveries.ts` | `delivery.attempts`, `toBeAccepted` and `toBeRejected` work live on GitHub from the log | Waits for the GitHub App |
+| W4 | `unsupported_in_live` for fake-only features | `server/src/core/reality/`, `live` on each route | Delivery chaos on Slack, Linear and Notion live reports `unsupported_in_live` with a reason; the test framework skips that step | Built: every fake-only row of the matrix (exit check 5.4) |
+| W5 | Browser actor with unattended sign-in | `server/src/core/browser/`, `server/src/drivers/<channel>/live/ui.ts` | The A3 rows work for Slack first (click, Stop), then the others; `channelstack doctor` checks saved sessions | `channelstack doctor` checks saved sessions; the actor waits for a test inbox and passkeys |
+| W6 | Allowlists, tagging and ledger cleanup | `server/src/core/safety/`, `server/src/core/ledger/` | Acting outside an allowlist is refused; `channelstack sweep` removes leftovers | Built (exit checks 5.2, 5.3) |
+
+How it is put together: [decision 0015](decisions/0015-live-mode.md).
 
 Order: W6 → W1 → W2 → W4 → W3 → W5. The fake's delivery signing (phase 1) uses the delivery cases in phases.md (appendix) as its acceptance tests.
 
@@ -111,9 +119,11 @@ Before writing this spec, probes drove each platform's official receiver with th
 
 ### 8.2 Live spike (needs the sandboxes)
 
+`pnpm live` runs every "live mode" block of the examples against the sandboxes, then `channelstack sweep --check` for the run. It needs the credentials in the environment (locally, source them first). `.github/workflows/live.yml` runs it nightly with the `live` environment's secrets.
+
 | Id | What | Pass when |
 |---|---|---|
-| V1 | Slack A2: `ana.say` with a user token triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes |
+| V1 | Slack A2: `ana.say` with a user token triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes. 2026-11-23: channelstack's side works, and cleanup leaves nothing behind. The sandbox's person token came from the agent's own app, so the agent ignored her message. Waits for a person's token from a separate app |
 | V2 | GitHub delivery log lists a delivery within a few seconds and shows the agent's status code and duration | Fields present; delay under 5 s at p95 |
 | V3 | Browser sign-in without people on all four platforms in GitHub Actions | Sessions saved; second run reuses them |
 | V4 | Browser A3 on Slack: click and Stop reach the agent | Agent's response visible in the thread |
