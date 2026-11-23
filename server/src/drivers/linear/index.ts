@@ -11,6 +11,9 @@ export const linear: DriverDefinition = {
     clientId: "linear.clientId",
     clientSecret: "linear.clientSecret",
   },
+  // The agent app's OAuth token in a test workspace (live-mode.md, section 4). Its live backend
+  // isn't built yet: with it set, the driver refuses with unsupported_in_live instead of running fake.
+  live: { credentials: ["CHANNELSTACK_LINEAR_APP_TOKEN"], allowlist: "CHANNELSTACK_LIVE_LINEAR_WORKSPACES" },
   create(context): Driver {
     const fake = createLinearFake(context);
     return {

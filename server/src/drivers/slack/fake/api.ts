@@ -11,7 +11,8 @@ import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
 import { NOBODY, type SlackConversationRecord, type SlackMessageRecord, type SlackUserRecord } from "../world.ts";
 import type { SocketMode } from "./socket.ts";
 import type { SlackStore } from "./store.ts";
-import { type FakeSlackWorld, SlackRefusal } from "./world.ts";
+import { SlackRefusal } from "../world.ts";
+import type { FakeSlackWorld } from "./world.ts";
 
 /** A Web API refusal: Slack answers 200 with `{ ok: false, error }`. */
 class SlackApiError extends Error {

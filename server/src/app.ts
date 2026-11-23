@@ -10,9 +10,11 @@ import { DeliveryQueue } from "./core/delivery/index.ts";
 import { ProtocolError } from "./core/errors/index.ts";
 import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
+import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
 import type { Redactor } from "./core/redact/index.ts";
+import { actionRequires, type DriverReality, driverReality, forcedReality } from "./core/reality/index.ts";
 import { Registry } from "./core/registry/index.ts";
 import {
   type Driver,
@@ -22,7 +24,8 @@ import {
   SessionParams,
   type SocketSession,
 } from "./core/router/index.ts";
-import { randomToken, type Secrets } from "./core/secrets/index.ts";
+import { Allowlist, runId, runTag } from "./core/safety/index.ts";
+import { LiveVault, randomString, randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
 import { DRIVERS } from "./drivers/index.ts";
 
@@ -56,6 +59,18 @@ export interface AppOptions {
   clock?: Clock;
   /** How things happen later (a platform's retry). Tests pass timers they move themselves. */
   timers?: Timers;
+  /** Live mode: what makes drivers real (live-mode.md). Without it every driver is fake. */
+  live?: LiveOptions;
+}
+
+export interface LiveOptions {
+  /** Where credentials, allowlists, `CHANNELSTACK_REALITY` and `CHANNELSTACK_RUN_ID` come from: the server's environment. */
+  env: Readonly<Record<string, string | undefined>>;
+  /** The ledger file this server writes; without it the ledger stays in memory. */
+  ledgerFile?: string;
+  /** For unit tests: how the live backends reach their platforms, and the platforms' base URLs by driver. */
+  fetch?: typeof fetch;
+  apiBase?: Readonly<Record<string, string>>;
 }
 
 export interface App {
@@ -70,6 +85,8 @@ export interface App {
   uiLoginLink(): string;
   /** A WebSocket the agent wants to open to a fake: what handles it, or nothing when no fake expects one there. */
   socket(request: Request): SocketSession | undefined;
+  /** Close every session: what live sessions created is removed from the real platforms. */
+  close(): Promise<void>;
 }
 
 const Status = z.object({ ready: z.boolean(), version: z.string(), drivers: z.array(z.string()) }).openapi("Status");
@@ -120,6 +137,12 @@ export function createApp(options: AppOptions): App {
   const quiet = new QuietDetector(clock);
   events.onAppend((session) => quiet.touch(session));
 
+  const liveEnv = options.live?.env ?? {};
+  // Not from the seeded ids: two runs with the same seed must still tag their objects apart.
+  const run = runId(liveEnv, () => randomString(10, "abcdefghijklmnopqrstuvwxyz0123456789"));
+  const ledger = new Ledger({ file: options.live?.ledgerFile, run, clock, log });
+  const vault = new LiveVault(liveEnv, (secret) => redactor.register(secret));
+
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
       ids,
@@ -134,13 +157,31 @@ export function createApp(options: AppOptions): App {
       secret: (name) => secrets.get(definition.name, name),
       apiUrl: () => options.urls().driver(definition.name),
       webhookUrl: options.webhooks[definition.name],
+      live: {
+        active: driverReality(liveEnv, definition.live?.credentials ?? [], undefined).mode === "live",
+        strict: forcedReality(liveEnv) === "live",
+        vault,
+        allowlist: new Allowlist(definition.live?.allowlist ?? "", liveEnv),
+        ledger,
+        tag: runTag(run),
+        fetch: options.live?.fetch ?? fetch,
+        apiBase: options.live?.apiBase?.[definition.name],
+      },
     }),
   );
   const driverNames = drivers.map((driver) => driver.name);
+  const realities = new Map<string, DriverReality>(
+    drivers.map((driver, at) => [driver.name, driverReality(liveEnv, DRIVERS[at]?.live?.credentials ?? [], driver.live)]),
+  );
 
+  // What a live session created comes off the real platform first, while its records still exist.
+  sessions.onClose((session) => ledger.cleanup(session.id).then(() => undefined));
   sessions.onClose((session) => {
     delivery.cancel(session.id);
-    for (const driver of drivers) driver.fake.release(session.id);
+    for (const driver of drivers) {
+      driver.fake.release(session.id);
+      driver.live?.release(session.id);
+    }
     registry.release(session.id);
     events.drop(session.id);
     quiet.forget(session.id);
@@ -240,11 +281,19 @@ export function createApp(options: AppOptions): App {
     summary: "Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this",
     params: SessionParams,
     response: Quiet,
-    errors: ["session_not_found"],
+    errors: ["session_not_found", "action_requires"],
     sdkMethod: { on: "Session", name: "quiet" },
     stability: "stable",
     handler: ({ params }) => {
       const session = sessions.get(params.session).id;
+      // Live, the agent works on the real platform: nothing tells channelstack when it is done.
+      if (ledger.entries(session).length > 0) {
+        throw actionRequires(
+          "Session.quiet",
+          "proxy mode",
+          "this session acted live, and without proxy mode channelstack can't see when the agent is done",
+        );
+      }
       const pending = delivery.pending(session);
       const deliveries = `${pending} ${pending === 1 ? "delivery" : "deliveries"} in flight or about to be retried`;
       const open = [...(pending > 0 ? [deliveries] : []), ...drivers.flatMap((driver) => driver.openWork(session))];
@@ -258,8 +307,8 @@ export function createApp(options: AppOptions): App {
     summary: "Drop the whole world. Avoid in parallel suites",
     sdkMethod: { on: "Channelstack", name: "reset" },
     stability: "stable",
-    handler: () => {
-      sessions.closeAll();
+    handler: async () => {
+      await sessions.closeAll();
       events.drop(WORLD_SCOPE);
       registry.clear();
       ids.reset();
@@ -277,7 +326,11 @@ export function createApp(options: AppOptions): App {
     handler: () => Object.assign({}, ...drivers.map((driver) => driver.env())),
   });
 
-  for (const driver of drivers) driver.routes(new DriverRouter(control, driver.name, sessions));
+  DRIVERS.forEach((definition, at) => {
+    const driver = drivers[at] as Driver;
+    const reality = realities.get(driver.name) ?? { mode: "fake" as const };
+    driver.routes(new DriverRouter(control, driver.name, sessions, definition.live ? () => reality : undefined));
+  });
 
   const uiLoginLink = () => `${options.urls().control}/?login=${ui.issueCode()}`;
   registerRoute(control, {
@@ -342,6 +395,7 @@ export function createApp(options: AppOptions): App {
       }),
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),
+    close: () => sessions.closeAll(),
     uiLoginLink,
     socket(request) {
       // The same routing as for requests: a driver's own host, or its path prefix.

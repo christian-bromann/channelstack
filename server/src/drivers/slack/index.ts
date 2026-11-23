@@ -1,5 +1,8 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createSlackFake } from "./fake/index.ts";
+import { removeSlackEntry } from "./live/cleanup.ts";
+import { SlackWebClient } from "./live/client.ts";
+import { createLiveWorld } from "./live/world.ts";
 import { registerSlackRoutes } from "./routes.ts";
 
 /** The start of a text, short enough for one line of a failure message. */
@@ -17,14 +20,29 @@ export const slack: DriverDefinition = {
     signingSecret: "slack.signingSecret",
     verificationToken: "slack.verificationToken",
   },
+  // A real app in a sandbox workspace (live-mode.md, section 4). People bring their own tokens.
+  live: {
+    credentials: ["CHANNELSTACK_SLACK_APP_ID", "CHANNELSTACK_SLACK_BOT_TOKEN"],
+    allowlist: "CHANNELSTACK_LIVE_SLACK_TEAMS",
+  },
   create(context): Driver {
     const fake = createSlackFake(context);
+    const client = new SlackWebClient({ base: context.live.apiBase, fetch: context.live.fetch, timers: context.timers });
+    const live = context.live.active
+      ? createLiveWorld({ client, live: context.live, ids: context.ids, clock: context.clock, appName: fake.store.app.name })
+      : undefined;
+    if (live) {
+      context.live.ledger.onCleanup("slack", (entry) => removeSlackEntry(client, live.credentials(entry.session), entry));
+    }
     return {
       name: "slack",
       fake,
+      ...(live ? { live } : {}),
       routes: (router) =>
         registerSlackRoutes(router, {
-          world: fake.world,
+          fake: fake.world,
+          live,
+          reality: () => (live ? "live" : "fake"),
           events: context.events,
           apiUrl: context.apiUrl,
           secret: context.secret,

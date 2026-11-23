@@ -82,6 +82,7 @@ async function runStart(flags: {
     seed: seed ? parseSeed(seed) : randomSeed(),
     logLevel: parseLogLevel(flags["log-level"] ?? process.env.CHANNELSTACK_LOG_LEVEL),
     ui: UI_PAGE,
+    env: process.env,
     webhooks: Object.fromEntries(
       DRIVERS.map((driver) => [
         driver.name,

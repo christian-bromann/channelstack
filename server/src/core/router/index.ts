@@ -4,6 +4,9 @@ export type {
   DriverContext,
   DriverDefinition,
   FakeBackend,
+  LiveBackend,
+  LiveContext,
+  LiveDeclaration,
   SocketPeer,
   SocketSession,
 } from "./driver.ts";

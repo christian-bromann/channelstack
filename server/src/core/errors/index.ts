@@ -7,6 +7,17 @@ const CORE_ERRORS = {
   not_found: 404,
   session_not_found: 404,
   internal: 500,
+  // Live mode (implementation plan 4.4).
+  /** The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. */
+  unsupported_in_live: 501,
+  /** A live action needs something missing: a person's token, the browser actor, proxy mode. */
+  action_requires: 422,
+  /** The live workspace, org, team or Notion workspace isn't in its `CHANNELSTACK_LIVE_*` allowlist. */
+  live_not_allowlisted: 403,
+  /** A fake person acts in a live workspace. */
+  fake_actor_in_live_world: 409,
+  /** A person's token belongs to a different workspace than the app. */
+  cross_workspace_credential: 400,
 } as const;
 
 export type CoreErrorCode = keyof typeof CORE_ERRORS;

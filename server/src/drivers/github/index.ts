@@ -10,6 +10,12 @@ export const github: DriverDefinition = {
     privateKey: "github.privateKey",
     installationToken: "github.installationToken",
   },
+  // A real GitHub App on a test org (live-mode.md, section 4). Its live backend isn't built yet:
+  // with these set, the driver refuses with unsupported_in_live instead of running fake.
+  live: {
+    credentials: ["CHANNELSTACK_GITHUB_APP_ID", "CHANNELSTACK_GITHUB_PRIVATE_KEY"],
+    allowlist: "CHANNELSTACK_LIVE_GITHUB_ORGS",
+  },
   create(context): Driver {
     const fake = createGitHubFake(context);
     return {

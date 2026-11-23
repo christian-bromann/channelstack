@@ -4,9 +4,11 @@ import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { IdGenerator } from "../ids/index.ts";
+import type { Ledger } from "../ledger/index.ts";
 import type { Logger } from "../log/index.ts";
 import type { Registry } from "../registry/index.ts";
-import type { SecretSpec } from "../secrets/index.ts";
+import type { Allowlist } from "../safety/index.ts";
+import type { LiveVault, SecretSpec } from "../secrets/index.ts";
 import type { DriverRouter } from "./route.ts";
 
 /**
@@ -44,6 +46,47 @@ export interface SocketPeer {
 /** Per action: does it work in the fake, does it work live, and what does live need. */
 export type CapabilityTable = Readonly<Record<string, { fake: boolean; live: boolean; liveRequires: string[] }>>;
 
+/**
+ * What a driver needs to act on its real platform (live-mode.md). Every driver gets it; only a
+ * driver whose credentials are set ever uses it.
+ */
+export interface LiveContext {
+  /** Every credential the driver declares is set and `CHANNELSTACK_REALITY` isn't `fake`: the driver acts on its real platform. */
+  readonly active: boolean;
+  /** `CHANNELSTACK_REALITY=live`: nothing may fall back to fake, not even a person without a token. */
+  readonly strict: boolean;
+  /** The app's credentials from the server's environment, and the people's as tests hand them over. */
+  readonly vault: LiveVault;
+  /** The driver's `CHANNELSTACK_LIVE_*` allowlist. */
+  readonly allowlist: Allowlist;
+  /** Where everything created live is recorded, so its session (or `channelstack sweep`) removes it. */
+  readonly ledger: Ledger;
+  /** The tag live objects carry in their names: `channelstack-run-<run>`. */
+  readonly tag: string;
+  readonly fetch: typeof fetch;
+  /**
+   * The platform's API base URL, for unit tests that stand a stub in for the platform. Set only
+   * through `createApp`, never from the environment, so a credential can't be sent elsewhere.
+   */
+  readonly apiBase: string | undefined;
+}
+
+/** A driver's way onto its real platform. */
+export interface LiveBackend {
+  /** The check before the first live action: the app's credentials work and its workspace is allowlisted. Runs once; a failure is kept. */
+  ready(): Promise<void>;
+  /** Forget what a closed session made live. The ledger has removed it from the platform already. */
+  release(session: string): void;
+}
+
+/** What makes a driver live: every one of `credentials` set in the server's environment. */
+export interface LiveDeclaration {
+  /** Environment variables, all of which make the driver live (`CHANNELSTACK_SLACK_APP_ID`, …). */
+  readonly credentials: readonly string[];
+  /** The allowlist variable (`CHANNELSTACK_LIVE_SLACK_TEAMS`). */
+  readonly allowlist: string;
+}
+
 /** What core hands a driver. A driver never reaches past this into core, and never into another driver. */
 export interface DriverContext {
   readonly ids: IdGenerator;
@@ -65,6 +108,7 @@ export interface DriverContext {
   apiUrl(): string;
   /** Where the agent receives this driver's events, if it has an endpoint. */
   readonly webhookUrl: string | undefined;
+  readonly live: LiveContext;
 }
 
 export interface Driver {
@@ -72,6 +116,8 @@ export interface Driver {
   /** Control API routes and schemas: the source of the SDK surface. */
   routes(router: DriverRouter): void;
   readonly fake: FakeBackend;
+  /** The live backend, for a driver that has one. Without it the driver is fake only, credentials or not. */
+  readonly live?: LiveBackend;
   capabilities(): CapabilityTable;
   /** What `channelstack env` prints for this channel. */
   env(): Record<string, string>;
@@ -86,5 +132,7 @@ export interface Driver {
 export interface DriverDefinition {
   readonly name: string;
   readonly secrets: SecretSpec;
+  /** What makes it live. A driver without it is always fake. */
+  readonly live?: LiveDeclaration;
   create(context: DriverContext): Driver;
 }

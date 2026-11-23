@@ -14,7 +14,7 @@ export class Sessions {
   readonly #ids: IdGenerator;
   readonly #clock: Clock;
   readonly #open = new Map<string, Session>();
-  readonly #closeListeners: Array<(session: Session) => void> = [];
+  readonly #closeListeners: Array<(session: Session) => void | Promise<void>> = [];
 
   constructor(ids: IdGenerator, clock: Clock) {
     this.#ids = ids;
@@ -43,19 +43,22 @@ export class Sessions {
     return session;
   }
 
-  /** Close a session. Everything registered with `onClose` removes what the session owned. */
-  close(id: string): void {
+  /**
+   * Close a session. Everything registered with `onClose` removes what the session owned, in
+   * order; it resolves once the last of them did (live cleanup calls the real platform).
+   */
+  async close(id: string): Promise<void> {
     const session = this.get(id);
     this.#open.delete(id);
-    for (const listener of this.#closeListeners) listener(session);
+    for (const listener of this.#closeListeners) await listener(session);
   }
 
-  /** Close every session (`POST /reset`). */
-  closeAll(): void {
-    for (const id of [...this.#open.keys()]) this.close(id);
+  /** Close every session (`POST /reset`, and the server stopping). */
+  async closeAll(): Promise<void> {
+    for (const id of [...this.#open.keys()]) await this.close(id);
   }
 
-  onClose(listener: (session: Session) => void): void {
+  onClose(listener: (session: Session) => void | Promise<void>): void {
     this.#closeListeners.push(listener);
   }
 }

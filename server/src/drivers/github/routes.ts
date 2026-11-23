@@ -4,6 +4,7 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -212,6 +213,13 @@ const IssueParams = RepoParams.extend({ number: numberParam("number") });
 const CommitParams = RepoParams.extend({ sha: pathParam("sha") });
 const issueBinding = { repo: "repoId", number: "number" };
 const commitBinding = { repo: "repoId", sha: "sha" };
+
+/** A person's Re-run is a click in GitHub: `rerequest` answers 403 to anyone but the App that owns the check run. */
+const RERUN: LiveSupport = { unsupported: "not yet: a person's Re-run is a click in GitHub's UI, and the API lets only the owning App rerequest" };
+/** The requested-action buttons on a check run send their webhook only when a person clicks them. */
+const IN_THE_UI: LiveSupport = { requires: "browser", reason: "GitHub sends this only when a person clicks in the UI" };
+/** What only the App's own calls show: live, proxy mode sees them. */
+const AGENT_SIDE: LiveSupport = { requires: "proxy", reason: "GitHub doesn't report the App's calls; proxy mode sees them" };
 
 /** The GitHub driver's control API: what a test's people do, and what a test reads back. */
 export function registerGitHubRoutes(
@@ -1190,6 +1198,7 @@ export function registerGitHubRoutes(
     response: GitHubDelivery.nullable(),
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "rerun", options: ["checkRun"] },
+    live: RERUN,
     stability,
     handler: ({ session, params, body }) => {
       const run = checkRunOf(session.id, body.checkRun);
@@ -1209,6 +1218,7 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     // The button is there once the App has put it there: a person would wait for it.
     sdkMethod: { on: "GitHubUser", name: "requestAction", args: ["identifier"], options: ["checkRun"] },
+    live: IN_THE_UI,
     stability,
     handler: ({ session, params, body }) => {
       const run = checkRunOf(session.id, body.checkRun);
@@ -1520,6 +1530,7 @@ export function registerGitHubRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "GitHubDelivery", name: "resend", options: ["badSignature"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
   });
@@ -1532,6 +1543,7 @@ export function registerGitHubRoutes(
     query: CallsQuery,
     response: z.array(GitHubApiCall).openapi("GitHubAppCalls"),
     sdkMethod: { on: "GitHubFixture", name: "appCalls", options: ["operation", "error"] },
+    live: AGENT_SIDE,
     stability,
     handler: ({ query }) => readCalls(deps.events, WORLD_SCOPE, "github", query),
   });
@@ -1545,6 +1557,7 @@ export function registerGitHubRoutes(
     response: z.array(GitHubApiCall).openapi("GitHubApiCalls"),
     sdkMethod: { on: "GitHubFixture", name: "calls", options: ["operation", "error"] },
     waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, query }) => readCalls(deps.events, session.id, "github", query),
   });

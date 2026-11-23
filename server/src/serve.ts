@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { type App, type AppOptions, CONTROL_PREFIX, createApp, type ServerUrls } from "./app.ts";
 import { createBearerToken } from "./core/auth/index.ts";
 import { readPrivateJsonFile, removeFile, writePrivateFile } from "./core/home/index.ts";
+import { ledgerDir } from "./core/ledger/index.ts";
 import { createLogger, type LogLevel } from "./core/log/index.ts";
 import { registerAliases } from "./core/portless/index.ts";
 import { Redactor } from "./core/redact/index.ts";
@@ -28,6 +29,8 @@ export interface StartOptions {
   webhooks: AppOptions["webhooks"];
   /** The UI page (see `AppOptions.ui`). Without it the server has no UI. */
   ui?: string;
+  /** The environment live mode reads: credentials, allowlists, `CHANNELSTACK_REALITY`, `CHANNELSTACK_RUN_ID`. */
+  env?: Readonly<Record<string, string | undefined>>;
 }
 
 export interface RunningServer {
@@ -107,6 +110,8 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     log,
     webhooks: options.webhooks,
     ...(options.ui === undefined ? {} : { ui: options.ui }),
+    // One ledger file per server, so a crash leaves what this one created for `channelstack sweep`.
+    live: { env: options.env ?? {}, ledgerFile: join(ledgerDir(options.home), `${process.pid}-${Date.now()}.json`) },
     urls: () => {
       if (!urls) throw new Error("The server isn't listening yet");
       return urls;
@@ -163,6 +168,8 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     urls: listening,
     app,
     async stop() {
+      // Live sessions still open remove what they created on the real platforms first.
+      await app.close();
       // Only this server's own file: after a crash and restart it may already describe another one.
       if (readServerFile(serverFile)?.token === token) removeFile(serverFile);
       await removeAliases();

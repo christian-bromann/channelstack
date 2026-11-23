@@ -4,6 +4,7 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -161,6 +162,17 @@ const PageOptions = z.object({
   icon: z.string().optional(),
   connections: z.array(integrationRef).optional(),
 });
+
+/** The REST API has no resolve action and no resolved field: a person resolves in Notion's UI. */
+const RESOLVE: LiveSupport = { unsupported: "not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved" };
+/** How long Notion holds `page.content_updated` is Notion's own, and undocumented. */
+const FAKE_BATCHING: LiveSupport = { unsupported: "Notion batches page.content_updated itself, for a time it doesn't document" };
+/** Notion sends the verification request once, when a subscription is created in its settings. */
+const FAKE_VERIFICATION: LiveSupport = { unsupported: "Notion sends the verification request once, when the subscription is created" };
+/** Notion has no redelivery API. */
+const NO_REDELIVERY: LiveSupport = { unsupported: "Notion has no API to redeliver a webhook" };
+/** What only the integration's own calls show: live, proxy mode sees them. */
+const AGENT_SIDE: LiveSupport = { requires: "proxy", reason: "Notion doesn't report the integration's calls; proxy mode sees them" };
 
 /** The Notion driver's control API: what a test's people do, and what a test reads back. */
 export function registerNotionRoutes(
@@ -352,6 +364,7 @@ export function registerNotionRoutes(
       .object({ delay: duration("How long an edit waits for others to be sent with it.") })
       .openapi("NotionContentDelayBody"),
     sdkMethod: { on: "NotionFixture", name: "setContentUpdateDelay", args: ["delay"] },
+    live: FAKE_BATCHING,
     stability,
     handler: ({ session, body }) => {
       world.setContentDelay(session.id, body.delay);
@@ -365,6 +378,7 @@ export function registerNotionRoutes(
       "Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created",
     response: NotionDelivery.nullable(),
     sdkMethod: { on: "NotionFixture", name: "sendVerification" },
+    live: FAKE_VERIFICATION,
     stability,
     handler: ({ session }) => caused(session.id, world.verify(session.id)) ?? null,
   });
@@ -476,6 +490,7 @@ export function registerNotionRoutes(
       response: NotionDelivery.nullable(),
       errors: ["not_found"],
       sdkMethod: { on: "NotionUser", name, options: ["discussion"] },
+      live: RESOLVE,
       stability,
       handler: ({ session, params, body }) => {
         person(session.id, params.user);
@@ -769,6 +784,7 @@ export function registerNotionRoutes(
     response: z.boolean(),
     errors: ["not_found"],
     sdkMethod: { on: "NotionDiscussion", name: "resolved" },
+    live: RESOLVE,
     stability,
     handler: ({ session, params }) => discussionOf(session.id, params.discussion).resolved,
   });
@@ -810,6 +826,7 @@ export function registerNotionRoutes(
     }),
     response: z.array(NotionDelivery).openapi("NotionDeliveries"),
     sdkMethod: { on: "NotionFixture", name: "deliveries", options: ["type", "resource"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, query }) =>
       world
@@ -828,6 +845,7 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionDelivery", name: "refresh" },
     waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
   });
@@ -840,6 +858,7 @@ export function registerNotionRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "NotionDelivery", name: "redeliver" },
+    live: NO_REDELIVERY,
     stability,
     handler: ({ session, params }) => world.redeliver(session.id, params.delivery),
   });
@@ -853,6 +872,7 @@ export function registerNotionRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "NotionDelivery", name: "resend", options: ["badSignature"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
   });
@@ -866,6 +886,7 @@ export function registerNotionRoutes(
     response: z.array(NotionApiCall).openapi("NotionApiCalls"),
     sdkMethod: { on: "NotionFixture", name: "calls", options: ["operation", "error"] },
     waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, query }) => readCalls(deps.events, session.id, "notion", query),
   });

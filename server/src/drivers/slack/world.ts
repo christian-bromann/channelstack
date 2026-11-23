@@ -1,3 +1,5 @@
+import { ProtocolError } from "../../core/errors/index.ts";
+
 /** The Slack fake's nouns, as the control API and the transcript see them. */
 
 export interface SlackTeam {
@@ -161,9 +163,25 @@ export interface SlackMessageInput {
   metadata?: unknown;
 }
 
+/** A value now (the fake), or once the platform answered (live). */
+type Awaitable<T> = T | Promise<T>;
+
+/** The same world answering everything at once: the fake, which never waits for a platform. */
+export type Immediate<World> = {
+  [K in keyof World]: World[K] extends (...args: infer A) => infer R ? (...args: A) => Awaited<R> : World[K];
+};
+
+/** A person's credential as a test hands it over: the token, and the saved browser session for UI-only actions. */
+export interface SlackPersonCredentials {
+  token?: string | undefined;
+  browser?: { storageState: string } | undefined;
+}
+
 /**
- * Every control action, written once. The fake implements it over its store; a live backend
- * implements the same interface against real Slack (architecture.md 3.3).
+ * Every control action, written once. The fake implements it over its store; the live backend
+ * implements the same interface against real Slack (architecture.md 3.3). Looking up what the
+ * session made (people, conversations) answers at once in both; acting and reading may wait for
+ * the platform.
  */
 export interface SlackWorld {
   team(): SlackTeam;
@@ -182,8 +200,8 @@ export interface SlackWorld {
       owner?: boolean | undefined;
       guest?: boolean | undefined;
       bot?: boolean | undefined;
-    },
-  ): SlackUserRecord;
+    } & SlackPersonCredentials,
+  ): Awaitable<SlackUserRecord>;
   createChannel(
     session: string,
     options: {
@@ -193,24 +211,33 @@ export interface SlackWorld {
       topic?: string | undefined;
       purpose?: string | undefined;
     },
-  ): SlackConversationRecord;
-  openConversation(session: string, user: string, withParticipants: readonly string[]): SlackConversationRecord;
+  ): Awaitable<SlackConversationRecord>;
+  openConversation(
+    session: string,
+    user: string,
+    withParticipants: readonly string[],
+  ): Awaitable<SlackConversationRecord>;
 
-  postAsUser(session: string, user: string, message: SlackMessageInput, where: SlackDestination): SlackMessageRecord;
+  postAsUser(
+    session: string,
+    user: string,
+    message: SlackMessageInput,
+    where: SlackDestination,
+  ): Awaitable<SlackMessageRecord>;
   replyAsUser(
     session: string,
     user: string,
     message: SlackMessageInput,
     thread: { channel: string; ts: string },
     alsoSendToChannel: boolean,
-  ): SlackMessageRecord;
+  ): Awaitable<SlackMessageRecord>;
   editAsUser(
     session: string,
     user: string,
     message: SlackMessageInput,
     target: { channel: string; ts: string },
-  ): SlackMessageRecord;
-  deleteAsUser(session: string, user: string, target: { channel: string; ts: string }): void;
+  ): Awaitable<SlackMessageRecord>;
+  deleteAsUser(session: string, user: string, target: { channel: string; ts: string }): Awaitable<void>;
   /** Add or remove a reaction. Returns the delivery it caused, if the app heard about it. */
   reactAsUser(
     session: string,
@@ -218,7 +245,7 @@ export interface SlackWorld {
     emoji: string,
     target: { channel: string; ts: string },
     action: "add" | "remove",
-  ): string | undefined;
+  ): Awaitable<string | undefined>;
   /** Press a button: found by its label, its `action_id`, or both. Returns the `block_actions` delivery. */
   clickAsUser(
     session: string,
@@ -265,26 +292,33 @@ export interface SlackWorld {
   /** Close a modal. Returns the `view_closed` delivery when the app asked to be told. */
   closeModal(session: string, view: string): string | undefined;
 
-  invite(session: string, user: string, participants: readonly string[], channel: string): void;
-  kick(session: string, user: string, participant: string, channel: string): void;
+  invite(session: string, user: string, participants: readonly string[], channel: string): Awaitable<void>;
+  kick(session: string, user: string, participant: string, channel: string): Awaitable<void>;
 
   conversation(session: string, id: string): SlackConversationRecord;
   /** The session's conversations, the one with the newest message last. */
-  conversations(session: string): SlackConversationRecord[];
+  conversations(session: string): Awaitable<SlackConversationRecord[]>;
   /** The people the session created, in creation order. */
   users(session: string): SlackUserRecord[];
-  message(session: string, channel: string, ts: string): SlackMessageRecord;
+  message(session: string, channel: string, ts: string): Awaitable<SlackMessageRecord>;
   /** Top-level messages of a conversation, oldest first. */
-  messages(session: string, channel: string): SlackMessageRecord[];
+  messages(session: string, channel: string): Awaitable<SlackMessageRecord[]>;
   /** Replies in a thread, oldest first, without the root. */
-  replies(session: string, channel: string, ts: string): SlackMessageRecord[];
+  replies(session: string, channel: string, ts: string): Awaitable<SlackMessageRecord[]>;
   user(session: string, id: string): SlackUserRecord;
   /** Every message of a thread, root first, as stored (ephemeral ones included). */
-  thread(session: string, channel: string, ts: string): SlackMessageRecord[];
+  thread(session: string, channel: string, ts: string): Awaitable<SlackMessageRecord[]>;
   /** Every message of a conversation in posting order, replies included. */
-  everything(session: string, channel: string): SlackMessageRecord[];
+  everything(session: string, channel: string): Awaitable<SlackMessageRecord[]>;
   /** What the app has said about its work in a thread. */
   threadState(session: string, channel: string, ts: string): SlackThreadState;
   /** The ephemeral messages only this person can see, across the session's conversations. */
   ephemeral(session: string, user: string): SlackMessageRecord[];
+}
+
+/** Slack refusing what a person or the app tried, with Slack's own error code (`not_in_channel`). The fake and live both throw it. */
+export class SlackRefusal extends ProtocolError {
+  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
+    super({ platform: code, status: 409 }, message, data);
+  }
 }

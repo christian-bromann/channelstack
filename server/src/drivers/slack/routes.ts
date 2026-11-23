@@ -4,6 +4,7 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { slackTsTime } from "../../core/ids/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, type Reality } from "../../core/reality/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
 import {
   apiCallSchema,
@@ -25,6 +26,7 @@ import type {
   SlackMessageRecord,
   SlackUserRecord,
   SlackViewRecord,
+  SlackWorld,
 } from "./world.ts";
 
 const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
@@ -187,12 +189,45 @@ const ChannelParams = z.object({ channel: z.string().openapi({ param: { name: "c
 const MessageParams = ChannelParams.extend({ ts: z.string().openapi({ param: { name: "ts", in: "path" } }) });
 const messageBinding = { channel: "channel", ts: "ts" };
 
+/** What a person does only in Slack's client: live, the browser actor does it (live-mode.md, A3). */
+const IN_THE_CLIENT: LiveSupport = {
+  requires: "browser",
+  reason: "Slack sends this only when a person does it in the client; no API does it as a person",
+};
+/** What only the app's own calls show (status, suggested prompts, modals, ephemeral messages): live, proxy mode sees them. */
+const AGENT_SIDE: LiveSupport = {
+  requires: "proxy",
+  reason: "no Slack API reads this back; proxy mode sees the agent's own calls",
+};
+
+/** Uninstalling revokes every token of the installation, and reinstalling needs the OAuth consent in a browser. */
+const UNINSTALL: LiveSupport = {
+  unsupported: "it revokes the app's tokens, and reinstalling needs the OAuth consent flow in a browser (a dedicated job, not every run)",
+};
+
 /** The Slack driver's control API: what a test's people do, and what a test reads back. */
 export function registerSlackRoutes(
   router: DriverRouter,
-  deps: { world: FakeSlackWorld; events: EventLog; apiUrl: () => string; secret: (name: string) => string },
+  deps: {
+    /** The fake world, which every route uses on a fake driver and the fake-only routes use always. */
+    fake: FakeSlackWorld;
+    /** The live world, on a live driver. */
+    live: SlackWorld | undefined;
+    reality: () => Reality;
+    events: EventLog;
+    apiUrl: () => string;
+    secret: (name: string) => string;
+  },
 ): void {
-  const { world } = deps;
+  const { fake } = deps;
+  const live = deps.live;
+  /** The world a route that works live acts in. Routes that don't are refused live by the router, and use the fake. */
+  const world: SlackWorld = { ...fake };
+  const current = (): SlackWorld => (deps.reality() === "live" && live ? live : fake);
+  for (const key of Object.keys(world) as Array<keyof SlackWorld>) {
+    (world as unknown as Record<string, unknown>)[key] = (...args: unknown[]) =>
+      (current()[key] as (...rest: unknown[]) => unknown)(...args);
+  }
   const stability = "experimental";
 
   const userWire = (user: SlackUserRecord) => ({ ...user, kind: "user" as const });
@@ -202,9 +237,10 @@ export function registerSlackRoutes(
     kind: "app" as const,
     botUserId: app.botUserId,
     botId: app.botId,
-    botToken: deps.secret("botToken"),
-    appToken: deps.secret("appToken"),
-    signingSecret: deps.secret("signingSecret"),
+    // A live app's credentials stay on the server: the control API never returns them.
+    botToken: deps.reality() === "live" ? "" : deps.secret("botToken"),
+    appToken: deps.reality() === "live" ? "" : deps.secret("appToken"),
+    signingSecret: deps.reality() === "live" ? "" : deps.secret("signingSecret"),
     scopes: [...app.scopes],
   });
   const participantWire = (session: string, id: string) =>
@@ -226,8 +262,9 @@ export function registerSlackRoutes(
       ts: message.threadTs ?? message.ts,
       conversation: conversationWire(world.conversation(session, message.conversation)),
     },
+    // Only the fake delivers: a live message never has a delivery here.
     delivery:
-      message.deliveries[0] === undefined ? undefined : deliveryWire(world.delivery(session, message.deliveries[0])),
+      message.deliveries[0] === undefined ? undefined : deliveryWire(fake.delivery(session, message.deliveries[0])),
     stream:
       message.stream === undefined
         ? undefined
@@ -278,7 +315,7 @@ export function registerSlackRoutes(
     stability,
     handler: () => ({
       app: appWire(world.app()),
-      apiUrl: deps.apiUrl(),
+      apiUrl: deps.reality() === "live" ? "https://slack.com/api/" : deps.apiUrl(),
       team: world.team(),
       socketConnections: world.socketConnections(),
     }),
@@ -300,16 +337,39 @@ export function registerSlackRoutes(
         owner: z.boolean().optional(),
         guest: z.boolean().optional(),
         bot: z.boolean().optional(),
+        token: z.string().min(1).optional().openapi({
+          description:
+            "A real person's user token (`xoxp-`) in the live workspace. Read from CHANNELSTACK_SLACK_USER_<NAME>_TOKEN when left out.",
+          "x-channelstack-credential": "CHANNELSTACK_SLACK_USER_{name}_TOKEN",
+        }),
+        browser: z
+          .object({ storageState: z.string().min(1) })
+          .optional()
+          .openapi({ description: "A saved browser session, for the actions only Slack's client does (click, Stop)." }),
       })
       .openapi("SlackUserOptions"),
     response: SlackUser,
+    errors: ["invalid_auth", "account_inactive"],
     factory: {
       on: "SlackFixture",
       name: "createUser",
-      options: ["name", "id", "displayName", "realName", "email", "timezone", "admin", "owner", "guest", "bot"],
+      options: [
+        "name",
+        "id",
+        "displayName",
+        "realName",
+        "email",
+        "timezone",
+        "admin",
+        "owner",
+        "guest",
+        "bot",
+        "token",
+        "browser",
+      ],
     },
     stability,
-    handler: ({ session, body }) => userWire(world.createUser(session.id, body)),
+    handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
 
   router.route({
@@ -329,7 +389,7 @@ export function registerSlackRoutes(
     response: z.array(SlackConversation).openapi("SlackConversations"),
     sdkMethod: { on: "SlackFixture", name: "conversations" },
     stability: "experimental",
-    handler: ({ session }) => world.conversations(session.id).map(conversationWire),
+    handler: async ({ session }) => (await world.conversations(session.id)).map(conversationWire),
   });
 
   router.route({
@@ -341,9 +401,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackConversation", name: "latestMessage" },
     stability: "experimental",
-    handler: ({ session, params }) => {
-      const latest = world
-        .everything(session.id, params.channel)
+    handler: async ({ session, params }) => {
+      const latest = (await world.everything(session.id, params.channel))
         .filter((message) => message.ephemeralFor === undefined)
         .at(-1);
       if (!latest) throw new ProtocolError("not_found", "The conversation has no messages yet");
@@ -372,7 +431,7 @@ export function registerSlackRoutes(
       options: ["name", "private", "participants", "topic", "purpose"],
     },
     stability,
-    handler: ({ session, body }) => conversationWire(world.createChannel(session.id, body)),
+    handler: async ({ session, body }) => conversationWire(await world.createChannel(session.id, body)),
   });
 
   router.route({
@@ -387,13 +446,13 @@ export function registerSlackRoutes(
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
     sdkMethod: { on: "SlackUser", name: "say", args: ["message"], options: ["channel", "to"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const where =
         body.channel !== undefined ? { channel: body.channel } : body.to !== undefined ? { to: body.to } : undefined;
       if (!where || (body.channel !== undefined && body.to !== undefined)) {
         throw new ProtocolError("invalid_argument", "say needs exactly one of `channel` and `to`");
       }
-      return messageWire(session.id, world.postAsUser(session.id, params.user, body.message, where));
+      return messageWire(session.id, await world.postAsUser(session.id, params.user, body.message, where));
     },
   });
 
@@ -409,10 +468,10 @@ export function registerSlackRoutes(
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
     sdkMethod: { on: "SlackUser", name: "reply", args: ["message"], options: ["thread", "alsoSendToChannel"] },
     stability,
-    handler: ({ session, params, body }) =>
+    handler: async ({ session, params, body }) =>
       messageWire(
         session.id,
-        world.replyAsUser(session.id, params.user, body.message, body.thread, body.alsoSendToChannel === true),
+        await world.replyAsUser(session.id, params.user, body.message, body.thread, body.alsoSendToChannel === true),
       ),
   });
 
@@ -426,8 +485,8 @@ export function registerSlackRoutes(
     errors: ["not_found", "not_in_channel", "cant_update_message", "no_text"],
     sdkMethod: { on: "SlackUser", name: "edit", args: ["text"], options: ["message"] },
     stability,
-    handler: ({ session, params, body }) =>
-      messageWire(session.id, world.editAsUser(session.id, params.user, body.text, body.message)),
+    handler: async ({ session, params, body }) =>
+      messageWire(session.id, await world.editAsUser(session.id, params.user, body.text, body.message)),
   });
 
   router.route({
@@ -439,7 +498,9 @@ export function registerSlackRoutes(
     errors: ["not_found", "not_in_channel", "cant_delete_message"],
     sdkMethod: { on: "SlackUser", name: "delete", options: ["message"] },
     stability,
-    handler: ({ session, params, body }) => world.deleteAsUser(session.id, params.user, body.message),
+    handler: async ({ session, params, body }) => {
+      await world.deleteAsUser(session.id, params.user, body.message);
+    },
   });
 
   const controlRef = (name: string) =>
@@ -447,7 +508,7 @@ export function registerSlackRoutes(
       .object({ label: z.string().optional(), actionId: z.string().optional() })
       .openapi(name, { "x-channelstack-shorthand": "label" });
   /** The delivery an interaction caused, for the routes that answer with it. */
-  const interaction = (session: string, delivery: string) => deliveryWire(world.delivery(session, delivery));
+  const interaction = (session: string, delivery: string) => deliveryWire(fake.delivery(session, delivery));
 
   router.route({
     method: "post",
@@ -475,6 +536,7 @@ export function registerSlackRoutes(
       options: ["message", "thread", "channel"],
       retryWhile: ["not_found"],
     },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) => {
       const scopes = [
@@ -489,7 +551,7 @@ export function registerSlackRoutes(
       if (body.button.label === undefined && body.button.actionId === undefined) {
         throw new ProtocolError("invalid_argument", "Say which button: its label or its action_id");
       }
-      return interaction(session.id, world.clickAsUser(session.id, params.user, body.button, where));
+      return interaction(session.id, fake.clickAsUser(session.id, params.user, body.button, where));
     },
   });
 
@@ -515,9 +577,10 @@ export function registerSlackRoutes(
       options: ["menu", "message"],
       retryWhile: ["not_found"],
     },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, world.selectAsUser(session.id, params.user, body.option, body.menu, body.message)),
+      interaction(session.id, fake.selectAsUser(session.id, params.user, body.option, body.menu, body.message)),
   });
 
   router.route({
@@ -529,9 +592,10 @@ export function registerSlackRoutes(
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
     sdkMethod: { on: "SlackUser", name: "shortcut", args: ["callbackId"], options: ["message"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, world.shortcutAsUser(session.id, params.user, body.callbackId, body.message)),
+      interaction(session.id, fake.shortcutAsUser(session.id, params.user, body.callbackId, body.message)),
   });
 
   router.route({
@@ -543,9 +607,10 @@ export function registerSlackRoutes(
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
     sdkMethod: { on: "SlackUser", name: "runCommand", args: ["command"], options: ["channel"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, world.commandAsUser(session.id, params.user, body.command, body.channel)),
+      interaction(session.id, fake.commandAsUser(session.id, params.user, body.command, body.channel)),
   });
 
   router.route({
@@ -557,9 +622,10 @@ export function registerSlackRoutes(
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "stop_unavailable"],
     sdkMethod: { on: "SlackUser", name: "stop", args: [], options: ["thread"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, world.stopAsUser(session.id, params.user, body.thread)),
+      interaction(session.id, fake.stopAsUser(session.id, params.user, body.thread)),
   });
 
   const threadWire = (session: string, anchor: SlackMessageRecord) => ({
@@ -578,9 +644,10 @@ export function registerSlackRoutes(
     response: SlackThread,
     errors: ["not_found", "split_view_unavailable"],
     sdkMethod: { on: "SlackUser", name: "openAgentThread", args: [], options: ["from"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      threadWire(session.id, world.openAgentThread(session.id, params.user, body.from)),
+      threadWire(session.id, fake.openAgentThread(session.id, params.user, body.from)),
   });
 
   router.route({
@@ -592,9 +659,10 @@ export function registerSlackRoutes(
     response: SlackMessage,
     errors: ["not_found", "not_in_channel"],
     sdkMethod: { on: "SlackUser", name: "pickPrompt", args: ["title"], options: ["thread"], retryWhile: ["not_found"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      messageWire(session.id, world.pickPrompt(session.id, params.user, body.title, body.thread)),
+      messageWire(session.id, fake.pickPrompt(session.id, params.user, body.title, body.thread)),
   });
 
   router.route({
@@ -606,9 +674,10 @@ export function registerSlackRoutes(
     response: SlackDelivery,
     errors: ["not_found", "not_in_channel", "split_view_unavailable"],
     sdkMethod: { on: "SlackUser", name: "switchContext", args: ["channel"], options: ["thread"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, world.switchContext(session.id, params.user, body.channel, body.thread)),
+      interaction(session.id, fake.switchContext(session.id, params.user, body.channel, body.thread)),
   });
 
   router.route({
@@ -620,8 +689,9 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     // The app sets them after it hears the thread was opened: read once it has gone quiet.
     sdkMethod: { on: "SlackThread", name: "suggestedPrompts", bind: messageBinding, onceQuiet: true },
+    live: AGENT_SIDE,
     stability,
-    handler: ({ session, params }) => world.suggestedPrompts(session.id, params.channel, params.ts),
+    handler: ({ session, params }) => fake.suggestedPrompts(session.id, params.channel, params.ts),
   });
 
   const ViewParams = z.object({ view: z.string().openapi({ param: { name: "view", in: "path" } }) });
@@ -652,8 +722,9 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackUser", name: "modals" },
     waits: [{ name: "waitForModal", mode: "next", text: "title", what: "a modal from the agent" }],
+    live: AGENT_SIDE,
     stability,
-    handler: ({ session, params }) => world.modals(session.id, params.user).map((view) => modalWire(session.id, view)),
+    handler: ({ session, params }) => fake.modals(session.id, params.user).map((view) => modalWire(session.id, view)),
   });
 
   router.route({
@@ -665,9 +736,10 @@ export function registerSlackRoutes(
     response: z.record(z.string(), z.union([z.string(), z.array(z.string())]).nullable()).openapi("SlackModalValues"),
     errors: ["not_found"],
     sdkMethod: { on: "SlackModal", name: "values" },
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, params }) => {
-      const view = world.modal(session.id, params.view);
+      const view = fake.modal(session.id, params.view);
       return Object.fromEntries(
         viewInputs(view.definition.blocks).map((input) => [
           input.label || input.actionId,
@@ -688,9 +760,10 @@ export function registerSlackRoutes(
     response: SlackDelivery,
     errors: ["not_found", "dispatch_failed"],
     sdkMethod: { on: "SlackModal", name: "submit", args: ["values"] },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params, body }) =>
-      interaction(session.id, world.submitModal(session.id, params.view, body.values ?? {})),
+      interaction(session.id, fake.submitModal(session.id, params.view, body.values ?? {})),
   });
 
   router.route({
@@ -701,9 +774,10 @@ export function registerSlackRoutes(
     response: SlackDelivery.nullable(),
     errors: ["not_found", "dispatch_failed"],
     sdkMethod: { on: "SlackModal", name: "close" },
+    live: IN_THE_CLIENT,
     stability,
     handler: ({ session, params }) => {
-      const delivery = world.closeModal(session.id, params.view);
+      const delivery = fake.closeModal(session.id, params.view);
       return delivery === undefined ? null : interaction(session.id, delivery);
     },
   });
@@ -726,9 +800,9 @@ export function registerSlackRoutes(
       errors: ["not_found", "not_in_channel", action === "add" ? "already_reacted" : "no_reaction"],
       sdkMethod: { on: "SlackUser", name, args: ["emoji"], options: ["message"] },
       stability,
-      handler: ({ session, params, body }) => {
-        const delivery = world.reactAsUser(session.id, params.user, body.emoji, body.message, action);
-        return delivery === undefined ? null : deliveryWire(world.delivery(session.id, delivery));
+      handler: async ({ session, params, body }) => {
+        const delivery = await world.reactAsUser(session.id, params.user, body.emoji, body.message, action);
+        return delivery === undefined ? null : deliveryWire(fake.delivery(session.id, delivery));
       },
     });
   }
@@ -743,8 +817,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackUser", name: "openDM", args: ["participants"] },
     stability,
-    handler: ({ session, params, body }) =>
-      conversationWire(world.openConversation(session.id, params.user, body.participants)),
+    handler: async ({ session, params, body }) =>
+      conversationWire(await world.openConversation(session.id, params.user, body.participants)),
   });
 
   router.route({
@@ -756,7 +830,9 @@ export function registerSlackRoutes(
     errors: ["not_found", "not_in_channel", "already_in_channel"],
     sdkMethod: { on: "SlackUser", name: "invite", args: ["participants"], options: ["channel"] },
     stability,
-    handler: ({ session, params, body }) => world.invite(session.id, params.user, body.participants, body.channel),
+    handler: async ({ session, params, body }) => {
+      await world.invite(session.id, params.user, body.participants, body.channel);
+    },
   });
 
   router.route({
@@ -768,7 +844,9 @@ export function registerSlackRoutes(
     errors: ["not_found", "not_in_channel"],
     sdkMethod: { on: "SlackUser", name: "kick", args: ["participant"], options: ["channel"] },
     stability,
-    handler: ({ session, params, body }) => world.kick(session.id, params.user, body.participant, body.channel),
+    handler: async ({ session, params, body }) => {
+      await world.kick(session.id, params.user, body.participant, body.channel);
+    },
   });
 
   router.route({
@@ -781,8 +859,8 @@ export function registerSlackRoutes(
     sdkMethod: { on: "SlackConversation", name: "messages" },
     waits: [{ name: "waitForMessage", mode: "next", from: "author", what: "a message" }],
     stability,
-    handler: ({ session, params }) =>
-      world.messages(session.id, params.channel).map((message) => messageWire(session.id, message)),
+    handler: async ({ session, params }) =>
+      (await world.messages(session.id, params.channel)).map((message) => messageWire(session.id, message)),
   });
 
   router.route({
@@ -807,7 +885,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackMessage", name: "refresh", bind: messageBinding },
     stability,
-    handler: ({ session, params }) => messageWire(session.id, world.message(session.id, params.channel, params.ts)),
+    handler: async ({ session, params }) =>
+      messageWire(session.id, await world.message(session.id, params.channel, params.ts)),
   });
 
   router.route({
@@ -823,11 +902,11 @@ export function registerSlackRoutes(
       { name: "latestReply", mode: "latest", from: "author", what: "a reply" },
     ],
     stability,
-    handler: ({ session, params }) => {
-      const root = world.message(session.id, params.channel, params.ts);
-      return world
-        .replies(session.id, params.channel, root.threadTs ?? root.ts)
-        .map((message) => messageWire(session.id, message));
+    handler: async ({ session, params }) => {
+      const root = await world.message(session.id, params.channel, params.ts);
+      return (await world.replies(session.id, params.channel, root.threadTs ?? root.ts)).map((message) =>
+        messageWire(session.id, message),
+      );
     },
   });
 
@@ -840,8 +919,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackMessage", name: "reactions", bind: messageBinding },
     stability,
-    handler: ({ session, params }) =>
-      world.message(session.id, params.channel, params.ts).reactions.map((reaction) => ({
+    handler: async ({ session, params }) =>
+      (await world.message(session.id, params.channel, params.ts)).reactions.map((reaction) => ({
         emoji: reaction.name,
         by: reaction.users.map((id) => participantWire(session.id, id)),
       })),
@@ -855,10 +934,11 @@ export function registerSlackRoutes(
     response: SlackThreadStatus,
     errors: ["not_found"],
     sdkMethod: { on: "SlackThread", name: "status", bind: messageBinding },
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, params }) => {
-      const state = world.threadState(session.id, params.channel, params.ts);
-      const streams = world.thread(session.id, params.channel, params.ts).flatMap((message) => message.stream ?? []);
+      const state = fake.threadState(session.id, params.channel, params.ts);
+      const streams = fake.thread(session.id, params.channel, params.ts).flatMap((message) => message.stream ?? []);
       const working = state.statusText !== "" || state.sessionStatus === "processing";
       return {
         state: streams.some((stream) => stream.state === "open")
@@ -890,8 +970,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackMessage", name: "transcript", options: ["as"], bind: messageBinding },
     stability,
-    handler: ({ session, params, query }) =>
-      renderTranscript(world.thread(session.id, params.channel, params.ts), {
+    handler: async ({ session, params, query }) =>
+      renderTranscript(await world.thread(session.id, params.channel, params.ts), {
         viewer: query.as,
         principal: principal(session.id),
         mentionName: mentionName(session.id),
@@ -910,8 +990,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackThread", name: "transcript", options: ["as"], bind: messageBinding },
     stability,
-    handler: ({ session, params, query }) =>
-      renderTranscript(world.thread(session.id, params.channel, params.ts), {
+    handler: async ({ session, params, query }) =>
+      renderTranscript(await world.thread(session.id, params.channel, params.ts), {
         viewer: query.as,
         principal: principal(session.id),
         mentionName: mentionName(session.id),
@@ -930,8 +1010,8 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackConversation", name: "transcript", options: ["as"] },
     stability,
-    handler: ({ session, params, query }) =>
-      renderTranscript(world.everything(session.id, params.channel), {
+    handler: async ({ session, params, query }) =>
+      renderTranscript(await world.everything(session.id, params.channel), {
         viewer: query.as,
         principal: principal(session.id),
         mentionName: mentionName(session.id),
@@ -947,9 +1027,10 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     // What the app answered only this person with: read once it has gone quiet.
     sdkMethod: { on: "SlackUser", name: "ephemeral", onceQuiet: true },
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, params }) =>
-      world.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),
+      fake.ephemeral(session.id, params.user).map((message) => messageWire(session.id, message)),
   });
 
   router.route({
@@ -961,9 +1042,10 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackStream", name: "refresh", bind: messageBinding },
     waits: [{ name: "ended", mode: "until", field: "state", not: ["open"], what: "the stream to end" }],
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, params }) => {
-      const { stream } = messageWire(session.id, world.message(session.id, params.channel, params.ts));
+      const { stream } = messageWire(session.id, fake.message(session.id, params.channel, params.ts));
       if (!stream) throw new ProtocolError("not_found", `Message ${params.ts} isn't a stream`, { ts: params.ts });
       return stream;
     },
@@ -977,11 +1059,10 @@ export function registerSlackRoutes(
     response: z.array(SlackDelivery).openapi("SlackMessageDeliveries"),
     errors: ["not_found"],
     sdkMethod: { on: "SlackMessage", name: "deliveries", bind: messageBinding },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params }) =>
-      world
-        .message(session.id, params.channel, params.ts)
-        .deliveries.map((id) => deliveryWire(world.delivery(session.id, id))),
+      fake.message(session.id, params.channel, params.ts).deliveries.map((id) => deliveryWire(fake.delivery(session.id, id))),
   });
 
   const DeliveryParams = z.object({ delivery: z.string().openapi({ param: { name: "delivery", in: "path" } }) });
@@ -992,8 +1073,9 @@ export function registerSlackRoutes(
     summary: "Every event channelstack sent the agent for this session, with every attempt",
     response: z.array(SlackDelivery).openapi("SlackDeliveries"),
     sdkMethod: { on: "SlackFixture", name: "deliveries" },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session }) => world.deliveries(session.id).map(deliveryWire),
+    handler: ({ session }) => fake.deliveries(session.id).map(deliveryWire),
   });
 
   router.route({
@@ -1005,8 +1087,9 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackDelivery", name: "refresh" },
     waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
+    handler: ({ session, params }) => deliveryWire(fake.delivery(session.id, params.delivery)),
   });
 
   router.route({
@@ -1025,9 +1108,10 @@ export function registerSlackRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "SlackDelivery", name: "retry", options: ["after", "reason"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, body }) =>
-      world.retry(session.id, params.delivery, { afterMs: body.after, reason: body.reason }),
+      fake.retry(session.id, params.delivery, { afterMs: body.after, reason: body.reason }),
   });
 
   router.route({
@@ -1046,8 +1130,9 @@ export function registerSlackRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "SlackDelivery", name: "resend", options: ["badSignature", "stale", "headers"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
   });
 
   router.route({
@@ -1059,6 +1144,7 @@ export function registerSlackRoutes(
     response: z.array(SlackApiCall).openapi("SlackApiCalls"),
     sdkMethod: { on: "SlackFixture", name: "calls", options: ["operation", "error"] },
     waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, query }) => readCalls(deps.events, session.id, "slack", query),
   });
@@ -1070,8 +1156,9 @@ export function registerSlackRoutes(
     response: z.array(SlackDelivery).openapi("SlackUninstallDeliveries"),
     errors: ["account_inactive"],
     sdkMethod: { on: "SlackFixture", name: "uninstallApp" },
+    live: UNINSTALL,
     stability,
-    handler: ({ session }) => world.uninstallApp(session.id).map((id) => deliveryWire(world.delivery(session.id, id))),
+    handler: ({ session }) => fake.uninstallApp(session.id).map((id) => deliveryWire(fake.delivery(session.id, id))),
   });
 
   router.route({
@@ -1096,9 +1183,10 @@ export function registerSlackRoutes(
       name: "fault",
       options: ["type", "operation", "retryAfter", "delay", "after", "error", "times"],
     },
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, body }) => ({
-      id: world.addFault(session.id, {
+      id: fake.addFault(session.id, {
         type: body.type,
         operation: body.operation,
         remaining: body.times,
@@ -1116,7 +1204,8 @@ export function registerSlackRoutes(
     summary: "Remove a fault",
     params: z.object({ fault: z.string().openapi({ param: { name: "fault", in: "path" } }) }),
     sdkMethod: { on: "SlackFault", name: "undo", dispose: true },
+    live: AGENT_SIDE,
     stability,
-    handler: ({ session, params }) => world.removeFault(session.id, params.fault),
+    handler: ({ session, params }) => fake.removeFault(session.id, params.fault),
   });
 }

@@ -5,6 +5,7 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -143,6 +144,16 @@ const UserParams = z.object({ user: pathParam("user") });
 const IssueParams = z.object({ issue: pathParam("issue") });
 const SessionParams = z.object({ agentSession: pathParam("agentSession") });
 const CommentParams = z.object({ comment: pathParam("comment") });
+
+/** Stop is a button in Linear: the `stop` signal is generated only when a person presses it. */
+const IN_THE_UI: LiveSupport = {
+  requires: "browser",
+  reason: "Linear sends the stop signal only when a person presses Stop, and it can't be published through the API",
+};
+/** Linear has no redelivery mutation. */
+const NO_REDELIVERY: LiveSupport = { unsupported: "Linear has no API to redeliver a webhook" };
+/** What only the app's own calls show: live, proxy mode sees them. */
+const AGENT_SIDE: LiveSupport = { requires: "proxy", reason: "Linear doesn't report the app's calls; proxy mode sees them" };
 
 /** The Linear driver's control API: what a test's people do, and what a test reads back. */
 export function registerLinearRoutes(
@@ -702,6 +713,7 @@ export function registerLinearRoutes(
     response: LinearDelivery,
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "stop", options: ["session"] },
+    live: IN_THE_UI,
     stability,
     handler: ({ session, params, body }) => {
       const record = sessionOf(session.id, body.session);
@@ -953,6 +965,7 @@ export function registerLinearRoutes(
     }),
     response: z.array(LinearDelivery).openapi("LinearDeliveries"),
     sdkMethod: { on: "LinearFixture", name: "deliveries", options: ["type", "resource"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, query }) =>
       world
@@ -971,6 +984,7 @@ export function registerLinearRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "LinearDelivery", name: "refresh" },
     waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
   });
@@ -983,6 +997,7 @@ export function registerLinearRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "LinearDelivery", name: "redeliver" },
+    live: NO_REDELIVERY,
     stability,
     handler: ({ session, params }) => world.redeliver(session.id, params.delivery),
   });
@@ -999,6 +1014,7 @@ export function registerLinearRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "LinearDelivery", name: "resend", options: ["badSignature", "stale"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
   });
@@ -1012,6 +1028,7 @@ export function registerLinearRoutes(
     response: z.array(LinearApiCall).openapi("LinearApiCalls"),
     sdkMethod: { on: "LinearFixture", name: "calls", options: ["operation", "error"] },
     waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, query }) => readCalls(deps.events, session.id, "linear", query),
   });

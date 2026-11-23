@@ -18,6 +18,7 @@ import {
   type SlackMessageInput,
   type SlackMessageRecord,
   type SlackUserRecord,
+  type Immediate,
   type SlackWorld,
 } from "../world.ts";
 import type { SlackStore } from "./store.ts";
@@ -53,7 +54,7 @@ export interface InteractionKit {
   /** The person's DM with the app, opened if there is none yet. */
   directMessage(session: string, userId: string): SlackConversationRecord;
   /** A person writes in a thread. */
-  replyAsUser: SlackWorld["replyAsUser"];
+  replyAsUser: Immediate<SlackWorld>["replyAsUser"];
   /** The app's Socket Mode connection, once it has chosen that over a request URL. */
   transport(): DeliveryTransport | undefined;
   /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
