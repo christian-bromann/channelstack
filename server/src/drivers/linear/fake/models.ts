@@ -96,6 +96,12 @@ export function linearModels(world: FakeLinearWorld) {
     createdAt: iso(store.app.createdAt),
     updatedAt: iso(store.app.createdAt),
     userCount: store.all(store.users).length + 1,
+    // A new workspace's settings, as Linear sets them up.
+    releaseChannel: "public",
+    slaDayCount: "all",
+    projectUpdatesReminderFrequency: "week",
+    projectUpdateRemindersDay: "Friday",
+    initiativeUpdateRemindersDay: "Friday",
     users: (args: Args) => listOf([store.appUser, ...store.all(store.users)].map(user))(args),
     teams: (args: Args) => listOf(store.all(store.teams).map(team))(args),
   });
@@ -134,6 +140,7 @@ export function linearModels(world: FakeLinearWorld) {
       name: record.name,
       displayName: record.name,
       private: false,
+      visibility: "public",
       createdAt: iso(record.createdAt),
       updatedAt: iso(record.createdAt),
       organization: () => organization(),

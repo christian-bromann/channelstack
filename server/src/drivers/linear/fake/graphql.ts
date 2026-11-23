@@ -92,7 +92,6 @@ function emptyValue(type: GraphQLOutputType, where: string): unknown {
   if (!isNonNullType(type)) return null;
   const inner = type.ofType;
   if (isListType(inner)) return [];
-  if (isEnumType(inner)) return inner.getValues()[0]?.value;
   if (isScalarType(inner)) {
     switch (inner.name) {
       case "Int":
@@ -197,7 +196,13 @@ interface Paging {
 /** A Relay connection over a list, paged as Linear pages: `first`/`after`, `last`/`before`, 50 by default. */
 export function connection<T extends { id: string }>(items: readonly T[], paging: Paging): Record<string, unknown> {
   let list = [...items];
-  const at = (cursor: string | null | undefined) => (cursor ? list.findIndex((item) => item.id === cursor) : -1);
+  // A cursor names an item of the list; one that doesn't (it was deleted, or never was) is refused, so a client never pages from the start again.
+  const at = (cursor: string | null | undefined) => {
+    if (!cursor) return -1;
+    const index = list.findIndex((item) => item.id === cursor);
+    if (index === -1) throw new LinearError("Invalid cursor", "INPUT_ERROR", "invalid input");
+    return index;
+  };
   const start = at(paging.after) + 1;
   const end = paging.before ? Math.max(at(paging.before), 0) : list.length;
   const window = list.slice(start, end);
@@ -281,5 +286,3 @@ export function matchesFilter(
     return false;
   });
 }
-
-/** The named type of a field, for code that needs to know what an answer is. */
