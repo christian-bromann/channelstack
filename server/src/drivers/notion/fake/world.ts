@@ -177,6 +177,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   /** Content updates waiting to go out, by page: one event names every block changed meanwhile. */
   const pendingContent = new Map<string, { session: string; blocks: Set<string>; authors: Map<string, Author> }>();
 
+  /** Notion's headers for an event, signed with this token over the exact body. */
+  const signedWith = (token: string) => (body: string) => ({
+    "user-agent": "notion-api",
+    ...signNotionWebhook(token, body),
+  });
+
   /**
    * Send an event to the agent if the integration is subscribed to it, may see the page and has a
    * URL. Every attempt is stamped with its number and signed with the verification token.
@@ -200,7 +206,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       url: context.webhookUrl,
       body: JSON.stringify(payload),
       stamp: stampAttempt,
-      sign: (body) => ({ "user-agent": "notion-api", ...signNotionWebhook(context.secret("verificationToken"), body) }),
+      sign: signedWith(context.secret("verificationToken")),
       timeoutMs: ACK_WINDOW_MS,
       retry: NOTION_RETRIES,
       meta: { payload, entity, page: page.id },
@@ -966,7 +972,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     resend(session: string, id: string, options: { badSignature: boolean }) {
       const secret = options.badSignature ? `secret_${randomToken()}` : context.secret("verificationToken");
       return delivery.again(session, id, {
-        sign: (body) => ({ "user-agent": "notion-api", ...signNotionWebhook(secret, body) }),
+        sign: signedWith(secret),
         forged: options.badSignature,
       });
     },

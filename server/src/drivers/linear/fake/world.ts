@@ -100,6 +100,14 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     return state;
   };
 
+  /** Linear's headers for one delivery, signed with this secret over each attempt's body. */
+  const signedWith = (secret: string, id: string, type: string) => (body: string, atMs: number) => ({
+    "linear-delivery": id,
+    "linear-event": type,
+    "user-agent": "Linear-Webhook",
+    ...signLinearWebhook(secret, body, atMs),
+  });
+
   /**
    * Send a webhook to the app, if it is subscribed to this resource type and has a URL. The body
    * carries `webhookTimestamp`, which every attempt stamps and signs again.
@@ -125,12 +133,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       url: context.webhookUrl ?? "",
       body: JSON.stringify(full),
       stamp: stampLinearWebhook,
-      sign: (body, atMs) => ({
-        "linear-delivery": id,
-        "linear-event": type,
-        "user-agent": "Linear-Webhook",
-        ...signLinearWebhook(context.secret("webhookSecret"), body, atMs),
-      }),
+      sign: signedWith(context.secret("webhookSecret"), id, type),
       timeoutMs: ACK_WINDOW_MS,
       retry: LINEAR_RETRIES,
       meta: {
@@ -760,12 +763,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       const { request } = delivery.get(session, id);
       const secret = options.badSignature ? randomToken() : context.secret("webhookSecret");
       return delivery.again(session, id, {
-        sign: (body, atMs) => ({
-          "linear-delivery": id,
-          "linear-event": request.type,
-          "user-agent": "Linear-Webhook",
-          ...signLinearWebhook(secret, body, atMs),
-        }),
+        sign: signedWith(secret, id, request.type),
         // Linear's receivers refuse a timestamp more than a minute away from now.
         ...(options.stale ? { atMs: clock() - 120_000 } : {}),
         forged: options.badSignature || options.stale,
