@@ -151,6 +151,36 @@ describe("the REST API", () => {
       await refusal(post(`/users/${ana.id}/set-property`, { name: "Estimate", value: "lots", page: row.id })),
     ).toBe("invalid_argument");
   });
+  test("a data source query compares by type: numbers as numbers, text without case, lists by what they hold", async () => {
+    const { app, post, api } = await workspace();
+    const tasks = await post("/databases", {
+      title: "Estimates",
+      properties: { Name: "title", Estimate: "number", Tags: { multi_select: ["api", "ui"] } },
+      rows: [
+        { Name: "Ten", Estimate: 10, Tags: ["api"] },
+        { Name: "Nine", Estimate: 9, Tags: ["ui"] },
+        { Name: "None", Tags: [] },
+      ],
+      connections: [app.id],
+    });
+    const [source] = (await api("GET", `databases/${tasks.id}`)).body.data_sources;
+    const names = async (body: object) => {
+      const answer = await api("POST", `data_sources/${source.id}/query`, body);
+      if (answer.status !== 200) return answer.body.code;
+      return answer.body.results.map((row: { properties: { Name: { title: Array<{ plain_text: string }> } } }) =>
+        row.properties.Name.title.map((item) => item.plain_text).join(""),
+      );
+    };
+    expect(await names({ sorts: [{ property: "Estimate", direction: "ascending" }] })).toEqual(["Nine", "Ten", "None"]);
+    expect(await names({ filter: { property: "Tags", multi_select: { does_not_contain: "api" } } })).toEqual([
+      "Nine",
+      "None",
+    ]);
+    expect(await names({ filter: { property: "Name", title: { does_not_contain: "TEN" } } })).toEqual(["Nine", "None"]);
+    expect(await names({ filter: { property: "Estimate", number: { greater_than: 9 } } })).toEqual(["Ten"]);
+    expect(await names({ filter: { property: "Estimate", number: { is_empty: true } } })).toEqual(["None"]);
+    expect(await names({ filter: { property: "Estimate", number: { sounds_like: 9 } } })).toBe("validation_error");
+  });
 });
 
 describe("webhooks", () => {

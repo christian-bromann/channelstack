@@ -341,63 +341,144 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
     };
   });
 
-  /** Does a row pass a data source filter: a property condition, or `and` / `or` of them. */
+  /**
+   * Does a value pass one condition of a filter (`{ equals: "Done" }`)? Text compares without case
+   * for `contains` and its kin, as Notion's do; numbers and dates compare as numbers and dates. A
+   * list (multi-select, people, relations) contains or doesn't contain the operand.
+   */
+  const passes = (value: PlainValue | number, operator: string, operand: unknown): boolean => {
+    if (operator === "is_empty") return isEmpty(value) === (operand !== false);
+    if (operator === "is_not_empty") return isEmpty(value) !== (operand !== false);
+    if (Array.isArray(value)) {
+      const has = value.includes(String(operand));
+      if (operator === "contains" || operator === "equals") return has;
+      if (operator === "does_not_contain" || operator === "does_not_equal") return !has;
+      throw unsupported(operator);
+    }
+    if (value === null) return operator === "does_not_equal" || operator === "does_not_contain";
+    if (typeof value === "number") {
+      const wanted = Number(operand);
+      const compare: Record<string, boolean> = {
+        equals: value === wanted,
+        does_not_equal: value !== wanted,
+        greater_than: value > wanted,
+        less_than: value < wanted,
+        greater_than_or_equal_to: value >= wanted,
+        less_than_or_equal_to: value <= wanted,
+      };
+      if (!(operator in compare)) throw unsupported(operator);
+      return compare[operator] === true;
+    }
+    if (typeof value === "boolean") {
+      if (operator === "equals") return value === operand;
+      if (operator === "does_not_equal") return value !== operand;
+      throw unsupported(operator);
+    }
+    if (typeof value === "object") {
+      const [at, wanted] = [Date.parse(value.start), Date.parse(String(operand))];
+      const compare: Record<string, boolean> = {
+        equals: at === wanted,
+        before: at < wanted,
+        after: at > wanted,
+        on_or_before: at <= wanted,
+        on_or_after: at >= wanted,
+      };
+      if (!(operator in compare)) throw unsupported(operator);
+      return compare[operator] === true;
+    }
+    const [text, wanted] = [value.toLowerCase(), String(operand).toLowerCase()];
+    switch (operator) {
+      case "equals":
+        return value === String(operand);
+      case "does_not_equal":
+        return value !== String(operand);
+      case "contains":
+        return text.includes(wanted);
+      case "does_not_contain":
+        return !text.includes(wanted);
+      case "starts_with":
+        return text.startsWith(wanted);
+      case "ends_with":
+        return text.endsWith(wanted);
+      default:
+        throw unsupported(operator);
+    }
+  };
+  const isEmpty = (value: PlainValue | number) =>
+    value === null || value === "" || (Array.isArray(value) && value.length === 0);
+  const unsupported = (operator: string) =>
+    new NotionApiError(
+      400,
+      "validation_error",
+      `body failed validation: ${operator} is not a filter condition for this property`,
+    );
+
+  /** Does a row pass a data source filter: a property or timestamp condition, or `and` / `or` of them. */
   const matches = (database: NotionDatabaseRecord, row: NotionPageRecord, filter: unknown): boolean => {
     if (filter === undefined || filter === null) return true;
     const input = filter as Record<string, unknown>;
     if (Array.isArray(input.and)) return input.and.every((inner) => matches(database, row, inner));
     if (Array.isArray(input.or)) return input.or.some((inner) => matches(database, row, inner));
-    if (typeof input.property !== "string") return true;
+    const condition = (key: string) => Object.entries((input[key] ?? {}) as Record<string, unknown>)[0];
+    if (input.timestamp === "created_time" || input.timestamp === "last_edited_time") {
+      const [operator, operand] = condition(input.timestamp) ?? [];
+      if (operator === undefined) throw unsupported("an empty condition");
+      const at = input.timestamp === "created_time" ? row.createdAt : row.lastEditedAt;
+      return passes({ start: new Date(at).toISOString() }, operator, operand);
+    }
+    if (typeof input.property !== "string")
+      throw new NotionApiError(
+        400,
+        "validation_error",
+        "body failed validation: a filter names a property or a timestamp",
+      );
     const property = database.properties.find(
       (candidate) => candidate.name === input.property || candidate.id === input.property,
     );
     if (!property)
       throw new NotionApiError(400, "validation_error", `Could not find property with name or id: ${input.property}`);
-    const condition = (Object.entries(input).find(([key]) => key !== "property")?.[1] ?? {}) as Record<string, unknown>;
-    const value = world.toPlain(row.properties[property.name]);
-    const [operator, operand] = Object.entries(condition)[0] ?? ["is_not_empty", true];
-    const text = Array.isArray(value)
-      ? value
-      : value === null
-        ? ""
-        : String(typeof value === "object" ? value.start : value);
-    switch (operator) {
-      case "equals":
-        return Array.isArray(text) ? text.includes(String(operand)) : text === String(operand);
-      case "does_not_equal":
-        return text !== String(operand);
-      case "contains":
-        return Array.isArray(text)
-          ? text.includes(String(operand))
-          : text.toLowerCase().includes(String(operand).toLowerCase());
-      case "does_not_contain":
-        return !(Array.isArray(text) ? text.includes(String(operand)) : text.includes(String(operand)));
-      case "is_empty":
-        return value === null || text.length === 0;
-      case "is_not_empty":
-        return !(value === null || text.length === 0);
-      case "greater_than":
-        return typeof value === "number" && value > Number(operand);
-      case "less_than":
-        return typeof value === "number" && value < Number(operand);
-      default:
-        return true;
-    }
+    const [operator, operand] = condition(property.type) ?? [];
+    if (operator === undefined)
+      throw new NotionApiError(
+        400,
+        "validation_error",
+        `body failed validation: ${property.name} is filtered as ${property.type}`,
+      );
+    return passes(world.toPlain(row.properties[property.name]), operator, operand);
   };
 
+  /** Rows in the order of `sorts`: numbers and times as numbers, text by its letters, empty values last. */
   const sorted = (database: NotionDatabaseRecord, rows: NotionPageRecord[], sorts: unknown): NotionPageRecord[] => {
     if (!Array.isArray(sorts)) return rows;
+    const key = (row: NotionPageRecord, sort: { property?: string; timestamp?: string }): string | number | null => {
+      if (sort.timestamp === "created_time") return row.createdAt;
+      if (sort.timestamp === "last_edited_time") return row.lastEditedAt;
+      const property = database.properties.find(
+        (candidate) => candidate.name === sort.property || candidate.id === sort.property,
+      );
+      if (!property)
+        throw new NotionApiError(
+          400,
+          "validation_error",
+          `Could not find sort property with name or id: ${sort.property}`,
+        );
+      const value = world.toPlain(row.properties[property.name]);
+      if (value === null || typeof value === "number") return value;
+      if (typeof value === "boolean") return value ? 1 : 0;
+      if (Array.isArray(value)) return value.join(", ") || null;
+      return typeof value === "object" ? Date.parse(value.start) : value || null;
+    };
     return [...rows].sort((a, b) => {
       for (const sort of sorts as Array<{ property?: string; timestamp?: string; direction?: string }>) {
-        const direction = sort.direction === "descending" ? -1 : 1;
-        const key = (row: NotionPageRecord): PlainValue | number =>
-          sort.timestamp === "created_time"
-            ? row.createdAt
-            : sort.timestamp === "last_edited_time"
-              ? row.lastEditedAt
-              : world.toPlain(row.properties[database.properties.find((p) => p.name === sort.property)?.name ?? ""]);
-        const [left, right] = [JSON.stringify(key(a)), JSON.stringify(key(b))];
-        if (left !== right) return (left < right ? -1 : 1) * direction;
+        const [left, right] = [key(a, sort), key(b, sort)];
+        if (left === right) continue;
+        if (left === null) return 1;
+        if (right === null) return -1;
+        const order =
+          typeof left === "number" && typeof right === "number"
+            ? left - right
+            : String(left).localeCompare(String(right));
+        return sort.direction === "descending" ? -order : order;
       }
       return 0;
     });
