@@ -23,10 +23,10 @@ class ChannelstackError(Exception):
         self.data: Mapping[str, Any] = data or {}
 
 
-_refusal_handler: Callable[[ChannelstackError], None] | None = None
+_refusal_handler: Callable[[ChannelstackError, str], None] | None = None
 
 
-def on_refusal(handler: Callable[[ChannelstackError], None] | None) -> None:
+def on_refusal(handler: Callable[[ChannelstackError, str], None] | None) -> None:
     """Set (or, with None, clear) what sees every refusal before it is raised.
 
     A test integration uses it to turn a refusal into its framework's own outcome: an operation
@@ -70,7 +70,7 @@ class Transport:
             code, response.status_code, str(error.get("message", f"HTTP {response.status_code}")), error.get("data")
         )
         if _refusal_handler is not None:
-            _refusal_handler(refusal)
+            _refusal_handler(refusal, path)
         raise refusal
 
     async def _send(

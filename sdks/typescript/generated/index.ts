@@ -23,6 +23,7 @@ export class ForbiddenError extends ChannelstackError {}
 export class InternalError extends ChannelstackError {}
 export class InvalidArgumentError extends ChannelstackError {}
 export class InvalidAuthError extends ChannelstackError {}
+export class LiveMisconfiguredError extends ChannelstackError {}
 export class LiveNotAllowlistedError extends ChannelstackError {}
 export class MsgTooLongError extends ChannelstackError {}
 export class NameTakenError extends ChannelstackError {}
@@ -54,6 +55,7 @@ const ERRORS: ErrorClasses = {
   internal: InternalError,
   invalid_argument: InvalidArgumentError,
   invalid_auth: InvalidAuthError,
+  live_misconfigured: LiveMisconfiguredError,
   live_not_allowlisted: LiveNotAllowlistedError,
   msg_too_long: MsgTooLongError,
   name_taken: NameTakenError,

@@ -37,12 +37,12 @@ def test_a_refusal_is_seen_before_it_is_raised(monkeypatch: pytest.MonkeyPatch) 
     seen: list[str] = []
     client = Transport(url="http://127.0.0.1:1", token=secrets.token_hex(8), base_path="/_channelstack", errors={})
     monkeypatch.setattr(client, "_send", send)
-    on_refusal(lambda error: seen.append(error.code))
+    on_refusal(lambda error, path: seen.append(f"{error.code} {path}"))
     try:
         with pytest.raises(ChannelstackError) as raised:
             asyncio.run(client.request("POST", "/x"))
     finally:
         on_refusal(None)
     assert raised.value.code == "unsupported_in_live"
-    assert seen == ["unsupported_in_live"]
+    assert seen == ["unsupported_in_live /x"]
     assert transport._refusal_handler is None  # pyright: ignore[reportPrivateUsage]

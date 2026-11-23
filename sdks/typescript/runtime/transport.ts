@@ -17,7 +17,7 @@ export class ChannelstackError extends Error {
  * Called with every refusal before it is thrown. A test integration uses it to turn a refusal
  * into its framework's own outcome: an operation live mode can't do skips the test, with the reason.
  */
-type RefusalHandler = (error: ChannelstackError) => void;
+type RefusalHandler = (error: ChannelstackError, path: string) => void;
 let refusalHandler: RefusalHandler | undefined;
 
 /** Set (or, with `undefined`, clear) what sees every refusal before it is thrown. */
@@ -98,7 +98,7 @@ export class Transport {
     };
     const ErrorClass = this.#options.errors[error] ?? ChannelstackError;
     const refusal = new ErrorClass(error, response.status, message, data);
-    refusalHandler?.(refusal);
+    refusalHandler?.(refusal, path);
     throw refusal;
   }
 

@@ -88,6 +88,10 @@ export async function runDoctor(input: LiveCommandInput & { storageStates: reado
     if (!live) continue;
     const { set, missing } = liveState(definition, input.env);
     lines.push(definition.name);
+    if (reality === "fake") {
+      lines.push("  fake  CHANNELSTACK_REALITY=fake");
+      continue;
+    }
     if (set.length === 0) {
       lines.push(`  fake  set ${live.credentials.join(" and ")} to run it live`);
       continue;
@@ -101,7 +105,6 @@ export async function runDoctor(input: LiveCommandInput & { storageStates: reado
       mark({ ok: false, text: `live ${definition.name} isn't built yet: its steps are skipped (unsupported_in_live)` });
       continue;
     }
-    if (reality === "fake") continue;
     const checks = await live.maintenance.doctor({
       env: input.env,
       fetch: input.fetch ?? fetch,

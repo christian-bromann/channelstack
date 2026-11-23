@@ -226,14 +226,8 @@ export function registerSlackRoutes(
   },
 ): void {
   const { fake } = deps;
-  const live = deps.live;
   /** The world a route that works live acts in. Routes that don't are refused live by the router, and use the fake. */
-  const world: SlackWorld = { ...fake };
-  const current = (): SlackWorld => (deps.reality() === "live" && live ? live : fake);
-  for (const key of Object.keys(world) as Array<keyof SlackWorld>) {
-    (world as unknown as Record<string, unknown>)[key] = (...args: unknown[]) =>
-      (current()[key] as (...rest: unknown[]) => unknown)(...args);
-  }
+  const world: SlackWorld = deps.live ?? fake;
   const stability = "experimental";
 
   const userWire = (user: SlackUserRecord) => ({ ...user, kind: "user" as const });

@@ -52,6 +52,19 @@ describe("exit check 5.6: channelstack doctor", () => {
     expect(text).toContain("FAIL  live linear isn't built yet");
   });
 
+  test("CHANNELSTACK_REALITY=fake: every channel is fake, and that is no failure", async () => {
+    const { stub, env, live } = sandbox();
+    const { text, ok } = await runDoctor({
+      ...live,
+      env: { ...env, CHANNELSTACK_REALITY: "fake", CHANNELSTACK_LINEAR_APP_TOKEN: "a stand-in" },
+      home: home(),
+      storageStates: [],
+    });
+    expect(ok).toBe(true);
+    expect(text).toContain("fake  CHANNELSTACK_REALITY=fake");
+    expect(stub.calls).toEqual([]);
+  });
+
   test("saved browser sessions: private, and still signed in", async () => {
     const { env, live } = sandbox();
     const dir = home();

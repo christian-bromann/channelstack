@@ -28,12 +28,14 @@ const connected = () => {
  * feature (`unsupported_in_live`), or one that needs a piece this run doesn't have (`action_requires`:
  * a person's token, the browser actor, proxy mode). The fake run never sees these refusals, so a
  * test still runs in full on every PR (reality-matrix.md, "What this means for test authors").
- * A worker runs one test at a time, so the running test is the one to skip.
  */
 const SKIPS_LIVE = new Set(["unsupported_in_live", "action_requires"]);
-let running: { skip(note?: string): never } | undefined;
-onRefusal((error) => {
-  if (running && SKIPS_LIVE.has(error.code)) running.skip(`live: ${error.message}`);
+/** Each running test's `skip`, by its session: the refused request names the session, so concurrent tests skip only themselves. */
+const skips = new Map<string, (note?: string) => never>();
+onRefusal((error, path) => {
+  const session = /^\/sessions\/([^/]+)/.exec(path)?.[1];
+  const skip = session === undefined ? undefined : skips.get(session);
+  if (skip && SKIPS_LIVE.has(error.code)) skip(`live: ${error.message}`);
 });
 
 /**
@@ -55,11 +57,11 @@ const auto = { auto: true } as const;
       const session = await (await connected()).openSession();
       // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
       setFilesRoot(dirname(task.file.filepath));
-      running = { skip };
+      skips.set(session.sessionId, skip);
       try {
         await use(session);
       } finally {
-        running = undefined;
+        skips.delete(session.sessionId);
         // Closing the session removes everything the test created. Disposing never fails a test.
         await session[Symbol.asyncDispose]();
       }

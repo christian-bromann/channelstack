@@ -42,7 +42,6 @@ const STALE_MS = 6 * 60_000;
 const MAX_TEXT_LENGTH = 40_000;
 
 /** A refusal with Slack's own error code. The control API surfaces it; the fake Web API answers with the code. */
-
 const refuse = (code: string, message: string, data: Record<string, unknown> = {}) =>
   new SlackRefusal(code, message, data);
 
