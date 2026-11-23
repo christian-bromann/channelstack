@@ -469,7 +469,13 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         };
       }
       default:
-        return fromPlain(property, inner as PlainValue);
+        // A number, checkbox, url or email: the plain value, which Notion checks for its type.
+        try {
+          return fromPlain(property, inner as PlainValue);
+        } catch (error) {
+          if (error instanceof ProtocolError) throw fail();
+          throw error;
+        }
     }
   };
 

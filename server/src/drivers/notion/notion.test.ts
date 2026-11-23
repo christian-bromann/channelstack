@@ -140,6 +140,11 @@ describe("the REST API", () => {
     expect((await api("PATCH", `pages/${row.id}`, { properties: { Missing: { number: 1 } } })).body.code).toBe(
       "validation_error",
     );
+    // A value of the wrong type is Notion's 400, not a server error.
+    for (const properties of [{ Estimate: { number: "five" } }, { Estimate: { checkbox: true } }]) {
+      const refused = await api("PATCH", `pages/${row.id}`, { properties });
+      expect([refused.status, refused.body.code]).toEqual([400, "validation_error"]);
+    }
     const [first] = await post(`/databases/${tasks.id}/rows`, { filter: { Name: "Write docs" } });
     expect(first.id).toBe(row.id);
     expect(
