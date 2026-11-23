@@ -4,7 +4,7 @@ import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { IdGenerator } from "../ids/index.ts";
-import type { Ledger } from "../ledger/index.ts";
+import type { Ledger, LedgerEntry } from "../ledger/index.ts";
 import type { Logger } from "../log/index.ts";
 import type { Registry } from "../registry/index.ts";
 import type { Allowlist } from "../safety/index.ts";
@@ -85,6 +85,48 @@ export interface LiveDeclaration {
   readonly credentials: readonly string[];
   /** The allowlist variable (`CHANNELSTACK_LIVE_SLACK_TEAMS`). */
   readonly allowlist: string;
+  /** `channelstack doctor` and `channelstack sweep`, for a driver whose live backend is built. */
+  readonly maintenance?: LiveMaintenance;
+}
+
+/** One line of `channelstack doctor`. Its text names variables and token prefixes, never a credential. */
+export interface LiveCheck {
+  readonly ok: boolean;
+  readonly text: string;
+}
+
+/** What a sweep removed, and what is still there (with why). */
+export interface SweepReport {
+  removed: string[];
+  left: string[];
+  /** The ledger entries it removed, so their files can forget them. */
+  done: LedgerEntry[];
+}
+
+/** What the command line runs for a live driver, outside any server, from the credentials in the environment. */
+export interface LiveMaintenance {
+  doctor(input: MaintenanceInput): Promise<LiveCheck[]>;
+  /**
+   * Remove what crashed runs left: the ledger's entries, and tagged objects older than `olderThanMs`
+   * (any age for one `run`). With `check`, only report what is still there.
+   */
+  sweep(
+    input: MaintenanceInput & {
+      entries: readonly LedgerEntry[];
+      check: boolean;
+      run: string | undefined;
+      olderThanMs: number;
+      now: number;
+    },
+  ): Promise<SweepReport>;
+}
+
+interface MaintenanceInput {
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly fetch: typeof fetch;
+  readonly timers: Timers;
+  /** For unit tests only: a stand-in for the platform. */
+  readonly apiBase?: string;
 }
 
 /** What core hands a driver. A driver never reaches past this into core, and never into another driver. */

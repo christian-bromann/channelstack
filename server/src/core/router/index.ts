@@ -6,7 +6,10 @@ export type {
   FakeBackend,
   LiveBackend,
   LiveContext,
+  LiveCheck,
   LiveDeclaration,
+  LiveMaintenance,
+  SweepReport,
   SocketPeer,
   SocketSession,
 } from "./driver.ts";

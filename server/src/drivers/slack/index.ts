@@ -2,6 +2,7 @@ import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createSlackFake } from "./fake/index.ts";
 import { removeSlackEntry } from "./live/cleanup.ts";
 import { SlackWebClient } from "./live/client.ts";
+import { slackMaintenance } from "./live/maintenance.ts";
 import { createLiveWorld } from "./live/world.ts";
 import { registerSlackRoutes } from "./routes.ts";
 
@@ -24,6 +25,7 @@ export const slack: DriverDefinition = {
   live: {
     credentials: ["CHANNELSTACK_SLACK_APP_ID", "CHANNELSTACK_SLACK_BOT_TOKEN"],
     allowlist: "CHANNELSTACK_LIVE_SLACK_TEAMS",
+    maintenance: slackMaintenance,
   },
   create(context): Driver {
     const fake = createSlackFake(context);
