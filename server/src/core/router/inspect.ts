@@ -132,3 +132,73 @@ export function recordCall(
   };
   for (const session of owners) events.append(session, channel, "api_call", record);
 }
+
+/** Who wrote a line of a transcript. */
+export interface TranscriptPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+/** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
+export interface TranscriptEntry {
+  id: string;
+  author: TranscriptPrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+}
+
+/** Who wrote a line, as a channel's schema names it (`SlackPrincipal`). */
+export const principalSchema = (name: string) =>
+  z.object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) }).openapi(name);
+
+/**
+ * A channel's transcript schema (`SlackTranscript`, its entries `SlackTranscriptEntry`): every
+ * channel's entry fields, and the fields a channel adds (`extra`). SDKs read it as text too.
+ */
+export function transcriptSchema<Extra extends z.ZodRawShape = Record<never, never>>(
+  prefix: string,
+  principal: z.ZodType<TranscriptPrincipal>,
+  extra: Extra = {} as Extra,
+) {
+  return z
+    .object({
+      entries: z.array(
+        z
+          .object({
+            id: z.string(),
+            author: principal,
+            at: z.string(),
+            text: z.string(),
+            controls: z.array(z.string()),
+            edited: z.boolean(),
+            depth: z.number().int(),
+            ...extra,
+          })
+          .openapi(`${prefix}TranscriptEntry`),
+      ),
+      text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
+    })
+    .openapi(`${prefix}Transcript`, { "x-channelstack-string": "text" });
+}
+
+/**
+ * A transcript as plain text: a line per entry, indented two spaces per level, `Name: text`, then
+ * what `after` adds (Slack's controls) and the entry's marks in parentheses (`edited` by default).
+ */
+export function transcriptText<Entry extends TranscriptEntry>(
+  entries: readonly Entry[],
+  options: { marks?: (entry: Entry) => string[]; after?: (entry: Entry) => string } = {},
+): string {
+  const marks = options.marks ?? ((entry: Entry) => (entry.edited ? ["edited"] : []));
+  return entries
+    .map((entry) => {
+      const named = marks(entry).filter((mark) => mark !== "");
+      const suffix = named.length === 0 ? "" : ` (${named.join(", ")})`;
+      return `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${options.after?.(entry) ?? ""}${suffix}`;
+    })
+    .join("\n");
+}

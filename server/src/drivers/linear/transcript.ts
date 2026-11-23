@@ -1,15 +1,5 @@
+import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
 import type { LinearActivityRecord, LinearCommentRecord, LinearIssueRecord, LinearSessionRecord } from "./world.ts";
-
-/** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
-export interface TranscriptEntry {
-  id: string;
-  author: { id: string; name: string; kind: "user" | "app" };
-  at: string;
-  text: string;
-  controls: string[];
-  edited: boolean;
-  depth: number;
-}
 
 /** What an activity reads as: its body, or for an action what it did and to what. */
 function activityText(activity: LinearActivityRecord): string {
@@ -111,8 +101,5 @@ export function renderTranscript(
     if (!threaded.has(session.id)) for (const activity of activitiesOf(session)) top.push(activityLine(activity, 0));
   inOrder(top);
 
-  const text = entries
-    .map((entry) => `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${entry.edited ? " (edited)" : ""}`)
-    .join("\n");
-  return { entries, text };
+  return { entries, text: transcriptText(entries) };
 }

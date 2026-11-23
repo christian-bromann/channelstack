@@ -4,7 +4,15 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
-import { apiCallSchema, CallsQuery, DeliveryAttempt, DeliveryStatus, readCalls } from "../../core/router/inspect.ts";
+import {
+  apiCallSchema,
+  CallsQuery,
+  DeliveryAttempt,
+  DeliveryStatus,
+  principalSchema,
+  readCalls,
+  transcriptSchema,
+} from "../../core/router/inspect.ts";
 import type { FakeGitHubWorld } from "./fake/world.ts";
 import { githubTime } from "./payloads.ts";
 import { renderTranscript } from "./transcript.ts";
@@ -168,28 +176,9 @@ const GitHubCheckRun = z
   })
   .openapi("GitHubCheckRun", { "x-channelstack-resource": { id: "id" } });
 
-const Principal = z
-  .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })
-  .openapi("GitHubPrincipal");
+const Principal = principalSchema("GitHubPrincipal");
 
-const GitHubTranscript = z
-  .object({
-    entries: z.array(
-      z
-        .object({
-          id: z.string(),
-          author: Principal,
-          at: z.string(),
-          text: z.string(),
-          controls: z.array(z.string()),
-          edited: z.boolean(),
-          depth: z.number().int(),
-        })
-        .openapi("GitHubTranscriptEntry"),
-    ),
-    text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
-  })
-  .openapi("GitHubTranscript", { "x-channelstack-string": "text" });
+const GitHubTranscript = transcriptSchema("GitHub", Principal);
 
 const GitHubApiCall = apiCallSchema("github", "GitHubApiCall");
 

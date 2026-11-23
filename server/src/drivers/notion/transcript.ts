@@ -1,24 +1,11 @@
+import {
+  type TranscriptEntry,
+  type TranscriptPrincipal as Principal,
+  transcriptText,
+} from "../../core/router/inspect.ts";
 import type { FakeNotionWorld } from "./fake/world.ts";
 import { plainText } from "./rich-text.ts";
 import type { NotionDiscussionRecord, NotionPageRecord } from "./world.ts";
-
-type Principal = { id: string; name: string; kind: "user" | "app" };
-
-/** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
-interface TranscriptEntry {
-  id: string;
-  author: Principal;
-  at: string;
-  text: string;
-  controls: string[];
-  edited: boolean;
-  depth: number;
-}
-
-const toText = (entries: TranscriptEntry[]) =>
-  entries
-    .map((entry) => `${"  ".repeat(entry.depth)}${entry.author.name}: ${entry.text}${entry.edited ? " (edited)" : ""}`)
-    .join("\n");
 
 const commentLines = (
   world: FakeNotionWorld,
@@ -43,7 +30,7 @@ export function renderDiscussion(
   principal: (id: string) => Principal,
 ) {
   const entries = commentLines(world, discussion, principal, 0);
-  return { entries, text: toText(entries) };
+  return { entries, text: transcriptText(entries) };
 }
 
 /**
@@ -68,5 +55,5 @@ export function renderPage(world: FakeNotionWorld, page: NotionPageRecord, princ
       lines[0] = { ...lines[0], depth: 0, text: `(on "${discussion.anchor}") ${lines[0].text}` };
     entries.push(...lines);
   }
-  return { entries, text: toText(entries) };
+  return { entries, text: transcriptText(entries) };
 }

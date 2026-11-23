@@ -10,7 +10,9 @@ import {
   DeliveryAttempt,
   DeliveryStatus,
   duration,
+  principalSchema,
   readCalls,
+  transcriptSchema,
 } from "../../core/router/inspect.ts";
 import { type FakeNotionWorld, NotionApiError, type PlainValue } from "./fake/world.ts";
 import { plainText } from "./rich-text.ts";
@@ -121,28 +123,9 @@ const PropertySchema = z
   ])
   .openapi("NotionPropertySchema");
 
-const Principal = z
-  .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })
-  .openapi("NotionPrincipal");
+const Principal = principalSchema("NotionPrincipal");
 
-const NotionTranscript = z
-  .object({
-    entries: z.array(
-      z
-        .object({
-          id: z.string(),
-          author: Principal,
-          at: z.string(),
-          text: z.string(),
-          controls: z.array(z.string()),
-          edited: z.boolean(),
-          depth: z.number().int(),
-        })
-        .openapi("NotionTranscriptEntry"),
-    ),
-    text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
-  })
-  .openapi("NotionTranscript", { "x-channelstack-string": "text" });
+const NotionTranscript = transcriptSchema("Notion", Principal);
 
 const NotionApiCall = apiCallSchema("notion", "NotionApiCall");
 

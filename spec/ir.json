@@ -13852,6 +13852,20 @@
             "optional": false
           },
           {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
             "name": "files",
             "type": {
               "kind": "array",
@@ -13868,13 +13882,6 @@
               "value": true
             },
             "optional": true
-          },
-          {
-            "name": "edited",
-            "type": {
-              "kind": "boolean"
-            },
-            "optional": false
           },
           {
             "name": "streaming",
@@ -13895,13 +13902,6 @@
               "name": "SlackPrincipal"
             },
             "optional": true
-          },
-          {
-            "name": "depth",
-            "type": {
-              "kind": "integer"
-            },
-            "optional": false
           }
         ]
       }

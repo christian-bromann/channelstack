@@ -1770,6 +1770,12 @@
               "type": "string"
             }
           },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          },
           "files": {
             "type": "array",
             "items": {
@@ -1784,9 +1790,6 @@
             ],
             "description": "A reply that was also sent to the channel."
           },
-          "edited": {
-            "type": "boolean"
-          },
           "streaming": {
             "type": "string",
             "enum": [
@@ -1797,9 +1800,6 @@
           },
           "visibleTo": {
             "$ref": "#/components/schemas/SlackPrincipal"
-          },
-          "depth": {
-            "type": "integer"
           }
         },
         "required": [
@@ -1808,9 +1808,9 @@
           "at",
           "text",
           "controls",
-          "files",
           "edited",
-          "depth"
+          "depth",
+          "files"
         ]
       },
       "SlackPrincipal": {

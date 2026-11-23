@@ -11,7 +11,9 @@ import {
   DeliveryAttempt,
   DeliveryStatus,
   duration,
+  principalSchema,
   readCalls,
+  transcriptSchema,
 } from "../../core/router/inspect.ts";
 import { plain } from "./blocks.ts";
 import type { FakeSlackWorld } from "./fake/world.ts";
@@ -135,35 +137,14 @@ const SlackThreadStatus = z
   })
   .openapi("SlackThreadStatus");
 
-const Principal = z
-  .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })
-  .openapi("SlackPrincipal");
+const Principal = principalSchema("SlackPrincipal");
 
-const SlackTranscript = z
-  .object({
-    entries: z.array(
-      z
-        .object({
-          id: z.string(),
-          author: Principal,
-          at: z.string(),
-          text: z.string(),
-          controls: z.array(z.string()),
-          files: z.array(z.string()).openapi({ description: "The names of the files shared with the message." }),
-          alsoInChannel: z
-            .literal(true)
-            .optional()
-            .openapi({ description: "A reply that was also sent to the channel." }),
-          edited: z.boolean(),
-          streaming: z.enum(["open", "stopped", "completed"]).optional(),
-          visibleTo: Principal.optional(),
-          depth: z.number().int(),
-        })
-        .openapi("SlackTranscriptEntry"),
-    ),
-    text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
-  })
-  .openapi("SlackTranscript", { "x-channelstack-string": "text" });
+const SlackTranscript = transcriptSchema("Slack", Principal, {
+  files: z.array(z.string()).openapi({ description: "The names of the files shared with the message." }),
+  alsoInChannel: z.literal(true).optional().openapi({ description: "A reply that was also sent to the channel." }),
+  streaming: z.enum(["open", "stopped", "completed"]).optional(),
+  visibleTo: Principal.optional(),
+});
 
 const SlackApiCall = apiCallSchema("slack", "SlackApiCall");
 

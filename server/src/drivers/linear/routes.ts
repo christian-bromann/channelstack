@@ -5,7 +5,15 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
-import { apiCallSchema, CallsQuery, DeliveryAttempt, DeliveryStatus, readCalls } from "../../core/router/inspect.ts";
+import {
+  apiCallSchema,
+  CallsQuery,
+  DeliveryAttempt,
+  DeliveryStatus,
+  principalSchema,
+  readCalls,
+  transcriptSchema,
+} from "../../core/router/inspect.ts";
 import type { FakeLinearWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
 import type {
@@ -112,28 +120,9 @@ const LinearAgentActivity = z
   })
   .openapi("LinearAgentActivity", { "x-channelstack-resource": { id: "id" } });
 
-const Principal = z
-  .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })
-  .openapi("LinearPrincipal");
+const Principal = principalSchema("LinearPrincipal");
 
-const LinearTranscript = z
-  .object({
-    entries: z.array(
-      z
-        .object({
-          id: z.string(),
-          author: Principal,
-          at: z.string(),
-          text: z.string(),
-          controls: z.array(z.string()),
-          edited: z.boolean(),
-          depth: z.number().int(),
-        })
-        .openapi("LinearTranscriptEntry"),
-    ),
-    text: z.string().openapi({ description: "The transcript as plain text, one entry per line." }),
-  })
-  .openapi("LinearTranscript", { "x-channelstack-string": "text" });
+const LinearTranscript = transcriptSchema("Linear", Principal);
 
 const LinearApiCall = apiCallSchema("linear", "LinearApiCall");
 

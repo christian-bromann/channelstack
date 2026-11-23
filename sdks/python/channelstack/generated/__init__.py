@@ -486,9 +486,9 @@ class SlackTranscriptEntry:
     at: str
     text: str
     controls: list[str]
-    files: list[str]
     edited: bool
     depth: int
+    files: list[str]
     also_in_channel: Literal[True] | None = None
     streaming: Literal["open", "stopped", "completed"] | None = None
     visible_to: SlackPrincipal | None = None
@@ -501,9 +501,9 @@ class SlackTranscriptEntry:
             at=data["at"],
             text=data["text"],
             controls=data["controls"],
-            files=data["files"],
             edited=data["edited"],
             depth=data["depth"],
+            files=data["files"],
             also_in_channel=data.get("alsoInChannel"),
             streaming=data.get("streaming"),
             visible_to=None if data.get("visibleTo") is None else SlackPrincipal._from_wire(ctx, data["visibleTo"]),

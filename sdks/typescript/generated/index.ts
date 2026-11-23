@@ -273,12 +273,12 @@ export interface SlackTranscriptEntry {
   at: string;
   text: string;
   controls: string[];
+  edited: boolean;
+  depth: number;
   files: string[];
   alsoInChannel?: true;
-  edited: boolean;
   streaming?: "open" | "stopped" | "completed";
   visibleTo?: SlackPrincipal;
-  depth: number;
 }
 
 export interface SlackPrincipal {

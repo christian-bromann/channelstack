@@ -1,16 +1,6 @@
+import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
 import { githubTime } from "./payloads.ts";
 import type { GitHubCommentRecord, GitHubIssueRecord, GitHubReviewCommentRecord, GitHubReviewRecord } from "./world.ts";
-
-/** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
-export interface TranscriptEntry {
-  id: string;
-  author: { id: string; name: string; kind: "user" | "app" };
-  at: string;
-  text: string;
-  controls: string[];
-  edited: boolean;
-  depth: number;
-}
 
 const REVIEW_VERDICT: Readonly<Record<string, string>> = {
   APPROVED: "approved",
@@ -102,8 +92,5 @@ export function renderTranscript(
   const listed = new Set(thread.reviews.map((review) => review.id));
   for (const head of heads) if (!listed.has(head.review)) timed.push({ at: head.createdAt, entries: inThread(head) });
   const entries = timed.sort((a, b) => a.at - b.at).flatMap((group) => group.entries);
-  const text = entries
-    .map((line) => `${"  ".repeat(line.depth)}${line.author.name}: ${line.text}${line.edited ? " (edited)" : ""}`)
-    .join("\n");
-  return { entries, text };
+  return { entries, text: transcriptText(entries) };
 }
