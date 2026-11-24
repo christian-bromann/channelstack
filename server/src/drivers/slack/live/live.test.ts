@@ -173,6 +173,21 @@ describe("live Slack: acting and reading back", () => {
     expect(ben.body.message).toContain("CHANNELSTACK_REALITY is live and Ben has no token");
   });
 
+  test("a real account's role is Slack's: a test asking for another one is refused", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const ben = stub.person("ben", { admin: true });
+    const session = await liveSlack(stub).open();
+    const member = await session.slack("POST", "/users", { name: "Ana", token: ana.token, admin: true });
+    expect(member.body.error).toBe("live_misconfigured");
+    expect(member.body.message).toContain("Ana's account is not a workspace admin, but the test asks for admin: true");
+    const admin = await session.slack("POST", "/users", { name: "Ben", token: ben.token, admin: true });
+    expect(admin.status).toBe(200);
+    expect(admin.body.isAdmin).toBe(true);
+    const unasked = await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    expect(unasked.body.isAdmin).toBe(false);
+  });
+
   test("a network error on the first check doesn't stick: the next action asks Slack again", async () => {
     const stub = slackStub();
     let failNext = true;

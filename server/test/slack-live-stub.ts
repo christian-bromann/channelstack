@@ -13,7 +13,7 @@ export interface SlackStub {
   readonly bot: { token: string; userId: string; botId: string };
   /** Add a person; their token is what the test hands to `createUser`. */
   /** Add a person; their token is what the test hands to `createUser`. */
-  person(handle: string, options?: { team?: string }): { token: string; userId: string };
+  person(handle: string, options?: { team?: string; admin?: boolean }): { token: string; userId: string };
   /**
    * A person types a message in Slack's client: it carries no app's bot, unlike one posted through
    * the API with their token (decision 0015). The browser actor will do this live; tests stand in.
@@ -63,7 +63,9 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
   const tokens = new Map<string, { handle: string; userId: string; team: string; isBot: boolean }>([
     [bot.token, { handle: "bot", userId: bot.userId, team, isBot: true }],
   ]);
-  const users = new Map<string, { id: string; name: string }>([[bot.userId, { id: bot.userId, name: "robin" }]]);
+  const users = new Map<string, { id: string; name: string; admin?: boolean }>([
+    [bot.userId, { id: bot.userId, name: "robin" }],
+  ]);
   const channels = new Map<string, StubChannel>();
   const calls: SlackStub["calls"] = [];
   let clock = 1_800_000_000;
@@ -110,7 +112,14 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
       case "users.info": {
         const user = users.get(p.user);
         return user
-          ? ok({ user: { id: user.id, name: user.name, profile: { display_name: user.name } } })
+          ? ok({
+              user: {
+                id: user.id,
+                name: user.name,
+                is_admin: user.admin === true,
+                profile: { display_name: user.name },
+              },
+            })
           : refuse("user_not_found");
       }
       case "conversations.create": {
@@ -286,7 +295,7 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         team: personOptions.team ?? team,
         isBot: false,
       });
-      users.set(userId, { id: userId, name: handleName });
+      users.set(userId, { id: userId, name: handleName, admin: personOptions.admin === true });
       return { token, userId };
     },
     botSays(channelId, text, threadTs, blocks) {

@@ -539,6 +539,21 @@ export function createLiveWorld(deps: {
       });
       const info = await client.call("users.info", botCredential(), { user: who.user });
       const record = userRecord(info.user as WireUser);
+      // A real account's role is Slack's: a test that asks for another one would pass or fail for
+      // the wrong reason (an agent that lets only admins approve refuses a member's click).
+      const roles = [
+        ["admin", record.isAdmin, "a workspace admin"],
+        ["owner", record.isOwner, "a workspace owner"],
+        ["guest", record.isGuest, "a guest"],
+      ] as const;
+      for (const [option, has, role] of roles) {
+        const wanted = options[option];
+        if (wanted === undefined || wanted === has) continue;
+        throw liveMisconfigured(
+          `${options.name}'s account is ${has ? "" : "not "}${role}, but the test asks for ${option}: ${wanted}`,
+          `make the account ${wanted ? "" : "no longer "}${role} in the sandbox workspace, or change the test`,
+        );
+      }
       map.set(record.id, { record, alias: options.name, credential, browser: browserOf(options) });
       return record;
     },
