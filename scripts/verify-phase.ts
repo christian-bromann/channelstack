@@ -1,34 +1,43 @@
 /**
- * `pnpm verify:phase <n>`: the gate. Runs the standing checks, then the exit checks of
- * phases 0..n in order (docs/phases.md, "How a gate works"). Every check runs even when
- * an earlier one fails, so one run shows everything that is red.
+ * `pnpm verify:phase <n> [--group <group>] [--part <part>] [--repeat <k>]`: the gate. Runs the
+ * standing checks, then the exit checks of phases 0..n in order (docs/phases.md, "How a gate
+ * works"). Every check runs even when an earlier one fails, so one run shows everything that is red.
+ *
+ * Without `--group` it is the whole gate. CI runs it in pieces side by side (`.github/workflows/ci.yml`):
+ * `--group static`, `--group unit`, and `--group accept` once per acceptance part and run
+ * (`--part`, `--repeat 1`). Every group, and every part three times, is the whole gate.
  */
 import { spawnSync } from "node:child_process";
 
 import { ROOT } from "./lib/generate.ts";
 
+/** Where a check runs in CI: what needs no server, what tests the server and packages, and the acceptance suite. */
+type Group = "static" | "unit" | "accept";
+const GROUPS: readonly Group[] = ["static", "unit", "accept"];
+
 interface Check {
   name: string;
   /** A package.json script and its arguments. */
   script: readonly string[];
+  group: Group;
 }
 
 /** Everything else needs the SDK build and the compiled binary, so this runs first and must pass. */
-const BUILD: Check = { name: "Build the SDK and the server binary", script: ["build"] };
+const BUILD = { name: "Build the SDK and the server binary", script: ["build"] } as const;
 
 const STANDING: readonly Check[] = [
-  { name: "Types", script: ["typecheck"] },
-  { name: "Lint and format", script: ["lint"] },
-  { name: "Unit tests", script: ["test"] },
-  { name: "Spec is current", script: ["spec:check"] },
-  { name: "SDKs are current", script: ["sdk:check"] },
-  { name: "Linear's schema module matches its SDL", script: ["linear:schema:check"] },
-  { name: "The examples type-check against the generated SDK", script: ["api:check"] },
-  { name: "No secrets in output", script: ["test:redaction"] },
-  { name: "No duplicate code", script: ["check:dupes"] },
-  { name: "Architecture boundaries", script: ["check:deps"] },
-  { name: "No dead code", script: ["check:unused"] },
-  { name: "Flake-free acceptance (3 runs)", script: ["test:accept", "--repeat", "3"] },
+  { name: "Types", script: ["typecheck"], group: "static" },
+  { name: "Lint and format", script: ["lint"], group: "static" },
+  { name: "Unit tests", script: ["test"], group: "unit" },
+  { name: "Spec is current", script: ["spec:check"], group: "static" },
+  { name: "SDKs are current", script: ["sdk:check"], group: "static" },
+  { name: "Linear's schema module matches its SDL", script: ["linear:schema:check"], group: "static" },
+  { name: "The examples type-check against the generated SDK", script: ["api:check"], group: "static" },
+  { name: "No secrets in output", script: ["test:redaction"], group: "unit" },
+  { name: "No duplicate code", script: ["check:dupes"], group: "static" },
+  { name: "Architecture boundaries", script: ["check:deps"], group: "static" },
+  { name: "No dead code", script: ["check:unused"], group: "static" },
+  { name: "Flake-free acceptance (3 runs)", script: ["test:accept", "--repeat", "3"], group: "accept" },
 ];
 
 /** Exit checks that aren't already a standing check. 0.5, 0.6 and 0.7 are unit tests; 0.2 is the acceptance run. */
@@ -37,9 +46,10 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
     {
       name: "0.1 The control API needs the token; 0.6 state files are private (compiled binary)",
       script: ["test:integration"],
+      group: "unit",
     },
-    { name: "0.3 Packaging works", script: ["test:pack"] },
-    { name: "0.4 The stale checks catch drift", script: ["test:stale"] },
+    { name: "0.3 Packaging works", script: ["test:pack"], group: "unit" },
+    { name: "0.4 The stale checks catch drift", script: ["test:stale"], group: "static" },
   ],
   // Phase 1's exit checks all run in checks above. The acceptance run (standing) covers 1.1 and
   // 1.2 (`api/examples` against both reference agents), 1.5 and 1.7 (`test/acceptance/stack`),
@@ -75,12 +85,34 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
 };
 
 const phase = Number(process.argv[2]);
-if (!Number.isInteger(phase) || !(phase in EXIT_CHECKS)) {
-  console.error(`Usage: pnpm verify:phase <n>, with n one of ${Object.keys(EXIT_CHECKS).join(", ")}`);
+const flag = (name: string) => {
+  const at = process.argv.indexOf(name);
+  return at === -1 ? undefined : process.argv[at + 1];
+};
+const group = flag("--group") as Group | undefined;
+if (!Number.isInteger(phase) || !(phase in EXIT_CHECKS) || (group !== undefined && !GROUPS.includes(group))) {
+  console.error(
+    `Usage: pnpm verify:phase <n> [--group ${GROUPS.join("|")}] [--part <part>] [--repeat <k>], with n one of ${Object.keys(EXIT_CHECKS).join(", ")}`,
+  );
   process.exit(2);
 }
+// One acceptance part, and how many runs of it: CI's pieces of the acceptance check.
+const part = flag("--part");
+const repeat = flag("--repeat");
+const accept = (check: Check): Check =>
+  check.group === "accept" && (part !== undefined || repeat !== undefined)
+    ? {
+        ...check,
+        name: `Acceptance${part ? ` (${part})` : ""}, ${repeat ?? "3"} run${repeat === "1" ? "" : "s"}`,
+        script: ["test:accept", "--repeat", repeat ?? "3", ...(part ? ["--part", part] : [])],
+      }
+    : check;
 
-function run(check: Check): { check: Check; ok: boolean; seconds: number } {
+function run(check: Pick<Check, "name" | "script">): {
+  check: Pick<Check, "name" | "script">;
+  ok: boolean;
+  seconds: number;
+} {
   console.log(`\n━━ ${check.name} (pnpm ${check.script.join(" ")})`);
   const started = Date.now();
   const result = spawnSync("pnpm", ["run", ...check.script], {
@@ -96,10 +128,12 @@ if (results[0]?.ok) {
   const exitChecks = Object.entries(EXIT_CHECKS)
     .filter(([n]) => Number(n) <= phase)
     .flatMap(([, checks]) => checks);
-  for (const check of [...STANDING, ...exitChecks]) results.push(run(check));
+  for (const check of [...STANDING, ...exitChecks]) {
+    if (group === undefined || check.group === group) results.push(run(accept(check)));
+  }
 }
 
-console.log(`\n━━ verify:phase ${phase}`);
+console.log(`\n━━ verify:phase ${phase}${group ? ` (${group}${part ? `, ${part}` : ""})` : ""}`);
 for (const { check, ok, seconds } of results)
   console.log(`${ok ? "pass" : "FAIL"}  ${check.name}  (${seconds.toFixed(1)}s)`);
 const failed = results.filter((result) => !result.ok);

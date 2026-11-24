@@ -93,8 +93,12 @@ export const ENABLED_TESTS = new RegExp(
   `^(${[...Object.values(CHANNELS).flatMap((channel) => channel.enabled), ...SHARED.enabled].join("|")})`,
 );
 
+/**
+ * The examples against each reference agent (all, or these), then `shared.test.ts` with one agent
+ * per channel (`shared`, by default only when every agent runs).
+ */
 export async function runExamples(
-  options: { agents?: ReadonlyArray<keyof typeof AGENTS>; bin?: string } = {},
+  options: { agents?: ReadonlyArray<keyof typeof AGENTS>; shared?: boolean; bin?: string } = {},
 ): Promise<void> {
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
@@ -109,7 +113,7 @@ export async function runExamples(
       for (const suite of suites) run("pnpm", [...vitest, suite], { cwd: ROOT, env });
     });
   }
-  if (options.agents !== undefined) return;
+  if (!(options.shared ?? options.agents === undefined)) return;
   console.log(`\n${SHARED.examples} against ${SHARED.agents.join(", ")}`);
   const [first, ...rest] = SHARED.agents.map((name) => ({
     agent: join(ROOT, "examples", "agents", name, "agent.ts"),
