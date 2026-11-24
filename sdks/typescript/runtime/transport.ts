@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 /** An error from the control API. `code` is the protocol's stable error code. */
 export class ChannelstackError extends Error {
   readonly code: string;
@@ -23,6 +25,18 @@ let refusalHandler: RefusalHandler | undefined;
 /** Set (or, with `undefined`, clear) what sees every refusal before it is thrown. */
 export function onRefusal(handler: RefusalHandler | undefined): void {
   refusalHandler = handler;
+}
+
+/** Reads whose refusals go to their caller only: scoped to their own async context, so others' still do. */
+const unreported = new AsyncLocalStorage<true>();
+
+/**
+ * Run a read whose refusals go only to its caller, not to the refusal handler: for what is only
+ * nice to have, like the open work a failure message adds. A refused read then can't turn a
+ * failing test into a skipped one.
+ */
+export function unreportedRefusals<T>(read: () => Promise<T>): Promise<T> {
+  return unreported.run(true, read);
 }
 
 /** Error code → the typed exception the generated SDK declares for it. */
@@ -98,7 +112,7 @@ export class Transport {
     };
     const ErrorClass = this.#options.errors[error] ?? ChannelstackError;
     const refusal = new ErrorClass(error, response.status, message, data);
-    refusalHandler?.(refusal, path);
+    if (!unreported.getStore()) refusalHandler?.(refusal, path);
     throw refusal;
   }
 
