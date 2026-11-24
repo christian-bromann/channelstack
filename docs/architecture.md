@@ -131,7 +131,7 @@ That keeps the fake and the real platform from drifting apart in code. The night
 | Reality rules | Decides fake or live per object from credentials, and refuses mixes like a fake person in a live workspace |
 | Secrets | Fake tokens and signing secrets, generated once per install (`~/.channelstack/secrets.json`, mode 0600). Live credentials live only in memory and are never returned |
 | Safety and ledger | Live allowlists; every live object is tagged and recorded so the session or `channelstack sweep` deletes it |
-| Proxy + CA | For agents with hard-coded hosts: routes `slack.com`, `api.github.com`, … to the fakes, with a name-constrained CA trusted only by the agent |
+| Proxy + CA | For agents with hard-coded hosts (`start --proxy`): a loopback proxy routes each driver's `hosts` (`slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com`) to a TLS listener that serves the fakes, with a certificate from channelstack's own CA (name-constrained to those hosts, trusted only by the agent); other hosts tunnel through. A live driver's calls are passed on to the platform. `--record` writes every exchange's and webhook's shape for the shape differ ([decisions/0016](decisions/0016-proxy-mode-and-conformance.md)) |
 | Quiet detector | Knows when the agent is idle (no open stream, no call in flight, a short settle window). Negative and exact-count matchers wait for it |
 | State directory | `~/.channelstack`, or `CHANNELSTACK_HOME`: `secrets.json` and the running server's `server.json` (URL and bearer token), both 0600. A private server started by an SDK writes its token file elsewhere ([decisions/0004-state-directory.md](decisions/0004-state-directory.md)) |
 

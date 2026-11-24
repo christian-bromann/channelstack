@@ -96,6 +96,11 @@ The nightly differential run (implementation plan 9) compares fake and real beha
 
 - **UI-only payloads** (`block_actions`, Stop, modal submit) are produced by the browser actor and received the same way.
 
+Built in phase 6 ([decisions/0016](decisions/0016-proxy-mode-and-conformance.md)): `pnpm conformance` runs each scenario of `scenarios/<channel>/` against the fake and against the sandbox. Both runs go through the proxy with the recorder, so the platforms' real API answers are written as shapes. The webhooks arrive like this:
+
+- **GitHub, Linear and Notion:** received from the relay channel each platform's webhook points at. A tap in front of the agent writes each one's shape, then hands it on unchanged.
+- **Slack:** not received. Socket Mode spreads an app's events over its connections, so a second one would take events from the agent; its webhooks aren't compared yet.
+
 ## 7. Work breakdown
 
 Paths follow implementation plan section 13.
