@@ -88,6 +88,33 @@ describe("exit check 5.2: removing what a session wrote in a DM", () => {
     );
   });
 
+  test("R5.4: two sessions interleaved in the agent-view thread: no answer goes while the earlier one may be its", async () => {
+    for (const first of ["one", "two"] as const) {
+      const { stub, ana, client, credentials, channel, entry } = await dm();
+      const root = stub.botSays(channel, "New Assistant Thread");
+      const one = stub.typed(ana.userId, channel, "deploy web", root);
+      const two = stub.typed(ana.userId, channel, "deploy api", root);
+      stub.botSays(channel, "deploying web", root);
+      stub.botSays(channel, "deploying api", root);
+      const texts = () => stub.channel(channel)?.messages.map((message) => message.text);
+      const close = (ts: string) => removeSlackEntry(client, credentials, entry(ts, { thread: root }));
+
+      if (first === "two") {
+        // The later session closes first: session one's answer may be among the answers, so both stay.
+        await close(two);
+        expect(texts()).toEqual(["New Assistant Thread", "deploy web", "deploying web", "deploying api"]);
+        await close(one);
+      } else {
+        // The earlier session closes first: no answer follows its message before the next person's.
+        await close(one);
+        expect(texts()).toEqual(["New Assistant Thread", "deploy api", "deploying web", "deploying api"]);
+        await close(two);
+      }
+      // Whoever closes last takes the answers with them: nothing is left.
+      expect(texts()).toEqual(["New Assistant Thread"]);
+    }
+  });
+
   test("something already gone is done, not a failure", async () => {
     const { client, credentials, entry } = await dm();
     await expect(removeSlackEntry(client, credentials, entry("1800000000.000001"))).resolves.toBeUndefined();

@@ -1,9 +1,18 @@
 import { describe, expect, test } from "vitest";
 
-import { mentionedUsers, resolveMentions } from "./mentions.ts";
+import { mentionedUsers, resolveMentions, typedText } from "./mentions.ts";
 
 const ids: Record<string, string> = { "my-agent": "U0AGENT0001", ana: "U0ANA000001", "ana.b": "U0ANAB00001" };
 const resolve = (text: string) => resolveMentions(text, (name) => ids[name]);
+
+describe("typedText", () => {
+  test("Slack's stored text reads as it was typed: links unwrapped, & < > unescaped, mentions kept", () => {
+    expect(typedText("a &amp; b &lt;3 &gt; <https://example.com/x>")).toBe("a & b <3 > https://example.com/x");
+    expect(typedText("see <https://example.com|the docs> <@U0ANA000001> <#C0001|general> <!here>")).toBe(
+      "see the docs <@U0ANA000001> <#C0001|general> <!here>",
+    );
+  });
+});
 
 describe("mentions", () => {
   test("@name becomes a Slack mention of that person or app", () => {

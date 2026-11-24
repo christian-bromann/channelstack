@@ -293,6 +293,24 @@ describe("the browser actor: what only Slack's client does", () => {
     expect(reply.body).toMatchObject({ text: "thanks", threadTs: said.body.ts });
   });
 
+  test("R5.3: a typed message Slack stores escaped, with a link, is read back", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "@my-agent ship a&b <now> per https://example.com/plan" },
+      channel: channel.body.id,
+    });
+    expect(said.status).toBe(200);
+    const typed = stub.channel(channel.body.id)?.messages.at(-1);
+    expect(typed?.text).toBe(`<@${stub.bot.userId}> ship a&amp;b &lt;now&gt; per <https://example.com/plan>`);
+    expect(said.body.ts).toBe(typed?.ts);
+  });
+
   test("a click on the app's button, found by its label in the thread", async () => {
     const stub = slackStub();
     const ana = stub.person("ana");

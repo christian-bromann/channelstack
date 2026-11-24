@@ -6,6 +6,7 @@ import { type Clock, pollUntil, type Timers } from "../../../core/clock/index.ts
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
 import type { Logger } from "../../../core/log/index.ts";
+import { LivePeople } from "../../../core/people/index.ts";
 import {
   actionRequires,
   checkRoles,
@@ -18,7 +19,7 @@ import type { LiveContext } from "../../../core/router/index.ts";
 import { taggedNames } from "../../../core/safety/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { findButton, plain } from "../blocks.ts";
-import { mentionedUsers, resolveMentions } from "../mentions.ts";
+import { mentionedUsers, resolveMentions, typedText } from "../mentions.ts";
 import {
   type SlackAppRecord,
   type SlackConversationKind,
@@ -73,12 +74,14 @@ interface WireUser {
   profile?: { display_name?: string; real_name?: string; bot_id?: string };
 }
 
-/** A person of a session: the real account behind their token, or a fake one that can't act here. */
+/**
+ * A person of a session as the session sees them: the real account behind their token, or a fake
+ * one that can't act here. A real person's credential is held in `LivePeople`, as in every live world.
+ */
 interface LivePerson {
   readonly record: SlackUserRecord;
   /** The name the test gave them (`createUser({ name: "Ana" })`), which `@Ana` resolves against too. */
   readonly alias: string;
-  readonly credential: LiveCredential | undefined;
   /**
    * Their saved browser session, for what only Slack's client does: the path the test gave
    * (`createUser({ browser: { storageState } })`, which must exist), or where `channelstack login`
@@ -129,8 +132,14 @@ export function createLiveWorld(deps: {
   let identity: { team: SlackTeam; app: SlackAppRecord } | undefined;
   let checked: Promise<void> | undefined;
   const people = new Map<string, Map<string, LivePerson>>();
-  /** Messages a read-back took, by conversation and ts: two sessions that type the same words in one DM each get their own. */
-  const claimed = new Set<string>();
+  /** The real people of open sessions, with their credentials (core's one place for them). */
+  const real = new LivePeople();
+  /**
+   * Messages a read-back took, by conversation and ts, with when: two sessions that type the same
+   * words in one DM each get their own. A claim older than a read-back's wait can't matter to any
+   * read-back still waiting (it looks only at messages since it began), so it goes.
+   */
+  const claimed = new Map<string, number>();
   const conversations = new Map<string, Map<string, SlackConversationRecord>>();
   /** People nobody in a session created who wrote or were mentioned in what a session read. */
   const others = new Map<string, SlackUserRecord>();
@@ -186,8 +195,7 @@ export function createLiveWorld(deps: {
   /** The person acting, who must be real: a fake person can't act in a live workspace (core's rule). */
   const actor = (session: string, id: string): LiveCredential => {
     const found = person(session, id);
-    if (!found.credential) throw fakeActorInLiveWorld(found.alias, "slack");
-    return found.credential;
+    return real.actingAs(session, id, () => fakeActorInLiveWorld(found.alias, "slack"));
   };
   const conversation = (session: string, id: string): SlackConversationRecord => {
     const found = conversationsOf(session).get(id);
@@ -216,9 +224,8 @@ export function createLiveWorld(deps: {
   /** Who reads a conversation: a real person of the session in it, else the app. */
   const reader = (session: string, channel: string): LiveCredential => {
     const members = conversationsOf(session).get(channel)?.members;
-    for (const candidate of peopleOf(session).values()) {
-      if (candidate.credential && (members === undefined || members.has(candidate.record.id)))
-        return candidate.credential;
+    for (const candidate of real.of(session)) {
+      if (members === undefined || members.has(candidate.id)) return candidate.credential;
     }
     return botCredential();
   };
@@ -376,8 +383,9 @@ export function createLiveWorld(deps: {
     });
 
   /**
-   * A person types a message in Slack's client; then it is read back through the API: the newest
-   * message of theirs there since they began.
+   * A person types a message in Slack's client; then it is read back through the API: the first
+   * message of theirs there since they began that has what they typed in it, and that no other
+   * read-back took.
    */
   const typedMessage = async (
     session: string,
@@ -400,8 +408,10 @@ export function createLiveWorld(deps: {
     // The person's message with what was typed in it: in a DM other sessions write in too, their
     // newest message may be another session's. Slack turns mentions into ids; the text stays.
     const pieces = typed.flatMap((piece) => ("text" in piece && piece.text.trim() !== "" ? [piece.text.trim()] : []));
+    for (const [key, at] of claimed) if (clock() - at > READ_BACK_MS) claimed.delete(key);
     const isTyped = (message: WireMessage) =>
-      !claimed.has(`${target.id}:${message.ts}`) && pieces.every((piece) => (message.text ?? "").includes(piece));
+      !claimed.has(`${target.id}:${message.ts}`) &&
+      pieces.every((piece) => typedText(message.text ?? "").includes(piece));
     deps.log.debug("browser actor typed and sent", { operation, ms: clock() - started });
     return pollUntil(
       { clock, timers },
@@ -426,7 +436,7 @@ export function createLiveWorld(deps: {
           )
           .sort((a, b) => a.ts.localeCompare(b.ts))[0];
         if (mine) {
-          claimed.add(`${target.id}:${mine.ts}`);
+          claimed.set(`${target.id}:${mine.ts}`, clock());
           const inThread =
             thread ?? (mine.thread_ts !== undefined && mine.thread_ts !== mine.ts ? mine.thread_ts : undefined);
           if (target.kind === "im" || target.kind === "mpim")
@@ -501,18 +511,17 @@ export function createLiveWorld(deps: {
 
     release(session) {
       people.delete(session);
+      real.leave(session);
       conversations.delete(session);
     },
 
     credentials(session) {
-      const real = [...peopleOf(session).values()].filter((candidate) => candidate.credential);
       return {
-        byOwner: (owner) =>
-          owner === "app" ? bot : real.find((candidate) => candidate.credential?.owner === owner)?.credential,
+        byOwner: (owner) => (owner === "app" ? bot : real.byOwner(session, owner)),
         byUser: (userId) =>
           userId === identity?.app.botUserId
             ? bot
-            : real.find((candidate) => candidate.record.id === userId)?.credential,
+            : real.of(session).find((candidate) => candidate.id === userId)?.credential,
       };
     },
 
@@ -558,7 +567,7 @@ export function createLiveWorld(deps: {
           botId: undefined,
           fixedId: false,
         };
-        map.set(id, { record, alias: options.name, credential: undefined, browser: undefined });
+        map.set(id, { record, alias: options.name, browser: undefined });
         return record;
       }
       const credential = live.vault.person(options.name, options.token);
@@ -576,16 +585,15 @@ export function createLiveWorld(deps: {
         { option: "owner", wanted: options.owner, has: record.isOwner, role: "a workspace owner" },
         { option: "guest", wanted: options.guest, has: record.isGuest, role: "a guest" },
       ]);
-      map.set(record.id, { record, alias: options.name, credential, browser: browserOf(options) });
+      map.set(record.id, { record, alias: options.name, browser: browserOf(options) });
+      real.join(session, record.id, options.name, credential);
       return record;
     },
 
     async createChannel(session, options) {
       const { team, app } = known();
       const members = options.participants.map((id) => participant(session, id));
-      const creatorId =
-        members.find((id) => id !== app.botUserId) ??
-        [...peopleOf(session).values()].find((candidate) => candidate.credential)?.record.id;
+      const creatorId = members.find((id) => id !== app.botUserId) ?? real.of(session)[0]?.id;
       if (creatorId === undefined) {
         throw actionRequires(
           "SlackFixture.createChannel",

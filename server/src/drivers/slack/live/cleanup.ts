@@ -56,6 +56,10 @@ export async function removeSlackEntry(
     };
     // A reply the session wrote in someone's thread (or in an app's agent-view DM, which is one
     // thread): the reply, and the app's answers right after it, up to the next person's message.
+    // Those answers are this reply's only if no earlier person's message there is still waiting
+    // for one: sessions that write in one thread interleave, and the app answers whichever it
+    // answers. Then they stay, for whoever cleans up last: once the earlier message is gone (its
+    // session closed), the answers follow the last message still there, and go with it.
     if (entry.ref.thread !== undefined) {
       let thread: Array<Written & { bot_id?: string }> = [];
       try {
@@ -64,7 +68,12 @@ export async function removeSlackEntry(
         if (!gone(error)) throw error;
       }
       const at = thread.findIndex((message) => message.ts === ts);
-      const after = at === -1 ? [] : thread.slice(at + 1);
+      // Back from the reply to the app's last answer before it: a person's message on the way (not
+      // the thread's root, which goes with its own session) is still waiting for its answer.
+      const before = at === -1 ? [] : thread.slice(1, at);
+      const answered = before.findLastIndex((message) => message.bot_id !== undefined);
+      const waiting = before.slice(answered + 1).some((message) => message.bot_id === undefined);
+      const after = at === -1 || waiting ? [] : thread.slice(at + 1);
       const end = after.findIndex((message) => message.bot_id === undefined);
       const answers = end === -1 ? after : after.slice(0, end);
       for (const answer of [...answers].reverse()) {

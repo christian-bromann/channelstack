@@ -71,9 +71,19 @@ export function slackClientStub(stub: SlackStub) {
             return id ? `<@${id}>` : typed;
           });
         } else if (value === "") {
-          stub.typed(user, page.channel, draft, page.thread);
+          // Slack keeps what was typed as mrkdwn: a link it recognizes in angle brackets.
+          stub.typed(
+            user,
+            page.channel,
+            draft.replace(/https?:\/\/[^\s<>]+/g, (url) => `<${url}>`),
+            page.thread,
+          );
           draft = "";
-        } else draft += Array.isArray(value) ? value.join("") : value;
+        } else {
+          // ... and `&`, `<` and `>` escaped.
+          const text = Array.isArray(value) ? value.join("") : value;
+          draft += text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+        }
       },
       pause: async () => {},
       deleteSession: async () => {},
