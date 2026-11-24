@@ -2,18 +2,20 @@ import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { readStorageState, storageStatePath, writeStorageState } from "../../../core/browser/index.ts";
-import { type Clock, delay, type Timers } from "../../../core/clock/index.ts";
+import { type Clock, pollUntil, type Timers } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
 import type { Logger } from "../../../core/log/index.ts";
 import {
   actionRequires,
+  checkRoles,
   fakeActorInLiveWorld,
   liveMisconfigured,
   unsupportedInLive,
 } from "../../../core/reality/index.ts";
 import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
+import { taggedNames } from "../../../core/safety/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { findButton, plain } from "../blocks.ts";
 import { mentionedUsers, resolveMentions } from "../mentions.ts";
@@ -127,11 +129,13 @@ export function createLiveWorld(deps: {
   let identity: { team: SlackTeam; app: SlackAppRecord } | undefined;
   let checked: Promise<void> | undefined;
   const people = new Map<string, Map<string, LivePerson>>();
+  /** Messages a read-back took, by conversation and ts: two sessions that type the same words in one DM each get their own. */
+  const claimed = new Set<string>();
   const conversations = new Map<string, Map<string, SlackConversationRecord>>();
   /** People nobody in a session created who wrote or were mentioned in what a session read. */
   const others = new Map<string, SlackUserRecord>();
   const reads = new Map<string, { at: number; answer: Promise<unknown> }>();
-  let channelCount = 0;
+  const channelName = taggedNames(live.tag);
 
   const known = () => {
     if (!identity) throw new Error("The live Slack world isn't ready: the router checks it before every action");
@@ -391,42 +395,53 @@ export function createLiveWorld(deps: {
     const ui = await clientFor(session, userId, operation);
     deps.log.debug("browser actor ready", { operation, ms: clock() - started });
     const since = (clock() / 1000).toFixed(6);
-    await send(ui, typedOf(session, input));
+    const typed = typedOf(session, input);
+    await send(ui, typed);
+    // The person's message with what was typed in it: in a DM other sessions write in too, their
+    // newest message may be another session's. Slack turns mentions into ids; the text stays.
+    const pieces = typed.flatMap((piece) => ("text" in piece && piece.text.trim() !== "" ? [piece.text.trim()] : []));
+    const isTyped = (message: WireMessage) =>
+      !claimed.has(`${target.id}:${message.ts}`) && pieces.every((piece) => (message.text ?? "").includes(piece));
     deps.log.debug("browser actor typed and sent", { operation, ms: clock() - started });
-    const deadline = clock() + READ_BACK_MS;
-    for (;;) {
-      changed(target.id);
-      const written =
-        thread === undefined ? await history(session, target.id) : await threadOf(session, target.id, thread);
-      // A DM with an app in Slack's agent view keeps every exchange in a thread: what was typed
-      // there is a reply, in a thread that has had one since.
-      const replied =
-        thread === undefined
-          ? await Promise.all(
-              written
-                .filter((root) => (root.latest_reply ?? "") > since)
-                .map((root) => threadOf(session, target.id, root.ts)),
-            )
-          : [];
-      const mine = [...written, ...replied.flat()]
-        .filter((message) => message.user === userId && message.ts > since && message.ts !== thread)
-        .sort((a, b) => b.ts.localeCompare(a.ts))[0];
-      if (mine) {
-        const inThread =
-          thread ?? (mine.thread_ts !== undefined && mine.thread_ts !== mine.ts ? mine.thread_ts : undefined);
-        if (target.kind === "im" || target.kind === "mpim")
-          recordDm(session, target, actor(session, userId), mine.ts, inThread);
-        const [record] = await records(session, target.id, [mine]);
-        return record as SlackMessageRecord;
-      }
-      if (clock() >= deadline) {
-        throw new ProtocolError(
+    return pollUntil(
+      { clock, timers },
+      { withinMs: READ_BACK_MS, everyMs: READ_BACK_POLL_MS },
+      async () => {
+        changed(target.id);
+        const written =
+          thread === undefined ? await history(session, target.id) : await threadOf(session, target.id, thread);
+        // A DM with an app in Slack's agent view keeps every exchange in a thread: what was typed
+        // there is a reply, in a thread that has had one since.
+        const replied =
+          thread === undefined
+            ? await Promise.all(
+                written
+                  .filter((root) => (root.latest_reply ?? "") > since)
+                  .map((root) => threadOf(session, target.id, root.ts)),
+              )
+            : [];
+        const mine = [...written, ...replied.flat()]
+          .filter(
+            (message) => message.user === userId && message.ts > since && message.ts !== thread && isTyped(message),
+          )
+          .sort((a, b) => a.ts.localeCompare(b.ts))[0];
+        if (mine) {
+          claimed.add(`${target.id}:${mine.ts}`);
+          const inThread =
+            thread ?? (mine.thread_ts !== undefined && mine.thread_ts !== mine.ts ? mine.thread_ts : undefined);
+          if (target.kind === "im" || target.kind === "mpim")
+            recordDm(session, target, actor(session, userId), mine.ts, inThread);
+          const [record] = await records(session, target.id, [mine]);
+          return record as SlackMessageRecord;
+        }
+        return undefined;
+      },
+      () =>
+        new ProtocolError(
           { platform: "not_sent", status: 409 },
           `What ${person(session, userId).alias} typed in Slack's client didn't arrive in ${READ_BACK_MS / 1000}s`,
-        );
-      }
-      await delay(timers, READ_BACK_POLL_MS);
-    }
+        ),
+    );
   };
 
   /**
@@ -556,21 +571,11 @@ export function createLiveWorld(deps: {
       });
       const info = await client.call("users.info", botCredential(), { user: who.user });
       const record = userRecord(info.user as WireUser);
-      // A real account's role is Slack's: a test that asks for another one would pass or fail for
-      // the wrong reason (an agent that lets only admins approve refuses a member's click).
-      const roles = [
-        ["admin", record.isAdmin, "a workspace admin"],
-        ["owner", record.isOwner, "a workspace owner"],
-        ["guest", record.isGuest, "a guest"],
-      ] as const;
-      for (const [option, has, role] of roles) {
-        const wanted = options[option];
-        if (wanted === undefined || wanted === has) continue;
-        throw liveMisconfigured(
-          `${options.name}'s account is ${has ? "" : "not "}${role}, but the test asks for ${option}: ${wanted}`,
-          `make the account ${wanted ? "" : "no longer "}${role} in the sandbox workspace, or change the test`,
-        );
-      }
+      checkRoles(options.name, [
+        { option: "admin", wanted: options.admin, has: record.isAdmin, role: "a workspace admin" },
+        { option: "owner", wanted: options.owner, has: record.isOwner, role: "a workspace owner" },
+        { option: "guest", wanted: options.guest, has: record.isGuest, role: "a guest" },
+      ]);
       map.set(record.id, { record, alias: options.name, credential, browser: browserOf(options) });
       return record;
     },
@@ -590,9 +595,7 @@ export function createLiveWorld(deps: {
       }
       const creator = actor(session, creatorId);
       // Names are unique in a real workspace: every live channel carries the run's tag and a number.
-      const name = [live.tag, String(++channelCount), ...(options.name ? [channelSlug(options.name)] : [])]
-        .join("-")
-        .slice(0, MAX_CHANNEL_NAME);
+      const name = channelName(options.name ? channelSlug(options.name) : undefined).slice(0, MAX_CHANNEL_NAME);
       const answer = await client.call("conversations.create", creator, { name, is_private: options.private === true });
       const channel = answer.channel as { id: string; name: string; created?: number };
       live.ledger.record({
@@ -640,7 +643,13 @@ export function createLiveWorld(deps: {
       );
     },
 
-    async replyAsUser(session, user, message, thread) {
+    async replyAsUser(session, user, message, thread, alsoSendToChannel) {
+      if (alsoSendToChannel) {
+        throw unsupportedInLive(
+          "SlackUser.reply({ alsoSendToChannel })",
+          "not yet: the browser actor doesn't tick Slack's \"Also send to #channel\"",
+        );
+      }
       const root = await messageAt(session, thread.channel, thread.ts);
       const rootTs = root.threadTs ?? root.ts;
       const target = conversation(session, thread.channel);

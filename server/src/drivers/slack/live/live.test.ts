@@ -377,6 +377,45 @@ describe("the browser actor: what only Slack's client does", () => {
     }
   });
 
+  test("a reply also sent to the channel isn't live yet, and says so", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+    const root = stub.typed(ana.userId, channel.body.id, "first");
+    const reply = await session.slack("POST", `/users/${ana.userId}/reply`, {
+      message: { text: "and the channel" },
+      thread: { channel: channel.body.id, ts: root },
+      alsoSendToChannel: true,
+    });
+    expect(reply.body).toMatchObject({ error: "unsupported_in_live" });
+    expect(reply.body.message).toContain("Also send to #channel");
+    expect(stub.channel(channel.body.id)?.messages).toHaveLength(1);
+  });
+
+  test("in a DM two sessions write in, each reads back what it typed, not the other's", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const sessions = [await server.open(), await server.open()];
+    for (const session of sessions) await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const said = await Promise.all(
+      sessions.map((session, at) =>
+        session.slack("POST", `/users/${ana.userId}/say`, {
+          message: { text: at === 0 ? "deploy web" : "deploy api" },
+          to: [stub.bot.userId],
+        }),
+      ),
+    );
+    expect(said.map((reply) => reply.status)).toEqual([200, 200]);
+    expect(said.map((reply) => reply.body.text)).toEqual(["deploy web", "deploy api"]);
+    expect(new Set(said.map((reply) => reply.body.ts)).size).toBe(2);
+  });
+
   test("the cookies Slack renewed while the session was used are kept when it closes", async () => {
     const stub = slackStub();
     const ana = stub.person("ana");
