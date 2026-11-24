@@ -10,10 +10,10 @@ import { parse } from "yaml";
 /**
  * Keys whose values differ between any two runs by design: ids, times, links, and the names a
  * sandbox gives its accounts (the agent's app is "my-agent" in the fake and whatever the sandbox
- * app is called live). The comparison keeps structure, order and text, and drops these.
+ * app is called live), and how the sandbox app is set up (its scopes). The comparison keeps structure, order and text, and drops these.
  */
 const NOISE =
-  /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner)$/;
+  /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner|block_id|scopes)$/;
 /**
  * Fields a fixture hands the agent (`privateKey`, `webhookSecret`, `token`): no recording, comparison,
  * result file or log holds them: normalizing drops them, before anything leaves the run's private
