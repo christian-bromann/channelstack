@@ -63,7 +63,7 @@ A driver declares its live credentials (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTA
 | `webdriverio` (server) | 10.2.0 | The browser actor: a real browser driven as a person over WebDriver BiDi, for what only a platform's client does. Already the repo's browser for the UI acceptance test | MIT | Yes |
 | `pytest` (Python SDK, dev only) | 8.4.2 | The Python runtime's own tests (`sdks/python/tests`), the counterpart of the TypeScript runtime's Vitest tests (review finding R1.10) | MIT | Yes |
 
-No runtime dependency. The Slack Web API is called with `fetch`: the server needs a dozen methods, and `@slack/web-api` would bring axios and its own retry logic into the binary.
+Slack's Web API is the one called with `fetch`: the server needs a dozen methods, and `@slack/web-api` would bring axios and its own retry logic into the binary. GitHub and Notion use their platforms' own clients (above); Linear's GraphQL goes through `fetch` as well, with its own operations.
 
 ## Docs to update
 

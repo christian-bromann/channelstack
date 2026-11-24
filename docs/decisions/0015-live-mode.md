@@ -11,7 +11,7 @@ A driver declares the environment variables that make it live (`live.credentials
 - **Some set, not all** refuses every route of that driver with `live_misconfigured`, naming what is missing. A typo in a variable name must not run silently fake.
 - **`CHANNELSTACK_REALITY=live`** also refuses a person without a token, and a driver without its credentials (`live_misconfigured`).
 - **Reality is per driver, not per object.** The implementation plan's rule ("a conversation lives where its app lives") makes every container live once the app is. People are per object: a person without a token can exist, but acting in a live workspace is refused with `fake_actor_in_live_world`.
-- **GitHub, Linear and Notion declare their credentials, and their live backends aren't built.** With the credentials set, their routes refuse with `unsupported_in_live` ("live github isn't built yet"), so a nightly run skips their tests instead of running them fake and passing.
+- **Every driver declares its credentials, and each has a live backend.** With a driver's credentials set, its routes act on the real platform; what isn't built live yet declares `unsupported_in_live` on its route, so a nightly run skips that step with the reason instead of running it fake and passing. (A driver without a live backend would refuse every route with "live <channel> isn't built yet"; none is left.)
 
 Alternative: decide reality in each driver from `process.env`. Rejected by the code map: core decides, drivers don't branch on credentials.
 
@@ -21,9 +21,9 @@ A route says how it works live (`live` on the route, `x-channelstack-live` in th
 
 The Vitest integration skips a test that hits either refusal, with the reason in the report (`context.skip(note)`, through a refusal hook on the SDK transport that also names the request, so a concurrent test skips only itself). The fake run never meets these refusals, so the test still runs in full on every PR.
 
-Every test has all four channels' fixtures. A channel whose fixture is refused live (its live backend isn't built, its credentials are set in part) gets a stand-in that refuses when the test first uses it. So only that channel's tests skip or fail, and a Slack test runs even while live GitHub isn't built.
+Every test has all four channels' fixtures. A channel whose fixture is refused live (its credentials are set in part, or its App's key can't sign) gets a stand-in that refuses when the test first uses it. So only that channel's tests skip or fail, and a Slack test runs even while live GitHub is set up wrong.
 
-**A setup that can't work fails instead: `live_misconfigured`.** Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token. If those skipped, a nightly run with a broken setup would skip everything and pass. `pnpm live` also fails when a channel whose credentials are set passed no live test, a channel whose live backend isn't built among them: its tests skip, and the job reports that 5.1 isn't met for it.
+**A setup that can't work fails instead: `live_misconfigured`.** Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token. If those skipped, a nightly run with a broken setup would skip everything and pass. `pnpm live` also fails when a channel whose credentials are set passed no live test: its tests skipped, and the job reports that 5.1 isn't met for it.
 
 ## One `World` for both: lookups at once, actions and reads awaited
 
@@ -108,7 +108,7 @@ The Linear routes read the fake's records directly (issues, comments, sessions, 
 
 - People act with their personal API keys; reads and agent sessions go through the app's OAuth token. Linear's agent sessions query has no issue filter: the live world lists the app's sessions by id (with their activities, Linear refuses the query as too complex) and reads each one on the issue.
 - A team is created by a real person, named `channelstack-run-<run>-<n>[-<name>]` with a key of its own, and deleted when the session closes: Linear deletes its issues, comments and sessions with it.
-- Delegating waits up to 15 seconds for Linear to open the agent session. Against the sandbox, Linear opened none: it opens one only for an app installed as an agent whose webhook reaches a running agent.
+- Delegating waits up to 15 seconds for Linear to open the agent session. Linear opens one only for an app installed as an agent whose webhook (agent session events) reaches a running agent: on 2026-11-23 it reached none and Linear opened no session; with the webhook at a relay channel the live run forwards to the reference agent, Linear opens the session and the agent's activity is read back (2026-11-24).
 - A session's `delivery`, and what `prompt` and `answer` resolve with, are fake-only in the contract (`api/linear.d.ts`): live, Linear delivers to the agent itself.
 
 ## The Web API is called with `fetch`, form-encoded
