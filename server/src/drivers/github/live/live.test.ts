@@ -87,6 +87,29 @@ describe("R4.1: one person of the pool in parallel sessions", () => {
     expect(issue.status).toBe(200);
     expect(issue.body.author).toMatchObject({ login: "ana-channelstack" });
   });
+
+  test("R5.1: a session can't act as, or add, a person only another session holds", async () => {
+    const stub = githubStub();
+    const ana = stub.person("ana-channelstack");
+    const server = liveGitHub(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    const fixture = await two.github("GET", "");
+    await one.github("POST", "/users", { login: "ana-channelstack", token: ana.token });
+    const repo = await two.github("POST", "/repos", { apps: [fixture.body.app.id] });
+    const sent = stub.calls.length;
+    const issue = await two.github("POST", `/users/${ana.id}/issues`, {
+      issue: { title: "Not mine" },
+      repo: repo.body.id,
+    });
+    expect(issue.body.error).toBe("not_found");
+    const collaborator = await two.github("POST", "/repos", {
+      collaborators: [{ user: String(ana.id) }],
+      apps: [fixture.body.app.id],
+    });
+    expect(collaborator.body.error).toBe("not_found");
+    expect(stub.calls.slice(sent).filter((call) => call.as === "ana-channelstack")).toEqual([]);
+    expect(stub.calls.slice(sent).some((call) => call.path.includes("/collaborators/"))).toBe(false);
+  });
 });
 
 describe("live GitHub: acting and reading back", () => {

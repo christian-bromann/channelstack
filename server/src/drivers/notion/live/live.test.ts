@@ -82,6 +82,30 @@ describe("R4.1: one person of the pool in parallel sessions", () => {
     expect(after.status).toBe(200);
     expect(after.body.author).toMatchObject({ id: ana.userId, name: "Ana" });
   });
+
+  test("R5.6: another session's name for the same person renames them in no session", async () => {
+    const stub = notionStub();
+    const ana = stub.person("Ana");
+    const server = liveNotion(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    await one.notion("POST", "/users", { name: "Ana", token: ana.token });
+    const page = await one.notion("POST", "/pages", { title: "Named", connections: [stub.integration.botId] });
+    await two.notion("POST", "/users", { name: "Ana B", token: ana.token });
+    const comment = await one.notion("POST", `/users/${ana.userId}/comment`, { text: "still Ana", page: page.body.id });
+    expect(comment.body.author).toMatchObject({ id: ana.userId, name: "Ana" });
+  });
+
+  test("R5.1: a session can't act as a person only another session holds, and makes nothing as them", async () => {
+    const stub = notionStub();
+    const ana = stub.person("Ana");
+    const server = liveNotion(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    await one.notion("POST", "/users", { name: "Ana", token: ana.token });
+    const sent = stub.calls.length;
+    const page = await two.notion("POST", `/users/${ana.userId}/pages`, { page: { title: "Not mine" } });
+    expect(page.body.error).toBe("not_found");
+    expect(stub.calls.slice(sent)).toEqual([]);
+  });
 });
 
 describe("live Notion: acting and reading back", () => {

@@ -152,11 +152,8 @@ export function createLiveNotionWorld(deps: {
     return appToken;
   };
   /** The person acting, who must be real: a fake person can't act in a live workspace (core's rule). */
-  const actor = (userId: string): LiveCredential => {
-    const key = people.credential(userId);
-    if (!key) throw fakeActorInLiveWorld(store.users.find(userId)?.name ?? userId, "notion");
-    return key;
-  };
+  const actor = (session: string, userId: string): LiveCredential =>
+    people.actingAs(session, userId, () => fakeActorInLiveWorld(store.users.find(userId)?.name ?? userId, "notion"));
   /** Who reads for a session: its first real person, who sees what they made; the integration otherwise. */
   const reader = (session: string): LiveCredential => people.of(session)[0]?.credential ?? app();
 
@@ -503,10 +500,11 @@ export function createLiveNotionWorld(deps: {
       });
       const person = who.person as string;
       people.join(session, person, input.name, key);
-      // One record, no session's: parallel tests have the same person. The name the test gave
-      // them (Notion's can be their email, which never leaves the server).
+      // One record, no session's: parallel tests have the same person. The name the first test
+      // gave them (Notion's can be their email, which never leaves the server); another session's
+      // name for them resolves its own `@` mentions (`people`), and renames them nowhere.
       const known = store.users.find(person);
-      if (known) return Object.assign(known, { name: input.name });
+      if (known) return known;
       return store.users.add(person, {
         id: person,
         name: input.name,
@@ -525,7 +523,7 @@ export function createLiveNotionWorld(deps: {
           "a live page is made by a person with a token: create one first (createUser with CHANNELSTACK_NOTION_USER_<NAME>_TOKEN)",
         );
       }
-      const by = actor(creatorId);
+      const by = actor(session, creatorId);
       const connected = (input.connections ?? []).includes(store.bot.id);
       let parent: string;
       if (input.parent !== undefined) {
@@ -553,7 +551,7 @@ export function createLiveNotionWorld(deps: {
     },
 
     async edit(session, page, change, userId) {
-      const by = actor(userId);
+      const by = actor(session, userId);
       if (change.replace !== undefined) {
         for (const block of reads.childrenOf(page.children)) {
           if (block.type === "child_page") continue;
@@ -572,7 +570,7 @@ export function createLiveNotionWorld(deps: {
     },
 
     async rename(session, page, title, userId) {
-      await client.call(actor(userId), "patch", `pages/${page.id}`, {
+      await client.call(actor(session, userId), "patch", `pages/${page.id}`, {
         body: { properties: { title: { title: [{ text: { content: title } }] } } },
       });
       await readPage(session, page.id, true);
@@ -580,7 +578,7 @@ export function createLiveNotionWorld(deps: {
     },
 
     async mention(session, page, inBlock, userId) {
-      const by = actor(userId);
+      const by = actor(session, userId);
       if (inBlock === undefined) {
         await client.call(by, "patch", `blocks/${page.id}/children`, {
           body: { children: [{ type: "paragraph", paragraph: { rich_text: [requestRich(mentionOfApp())] } }] },
@@ -596,7 +594,7 @@ export function createLiveNotionWorld(deps: {
     },
 
     async comment(session, page, rich, userId, anchor) {
-      const by = actor(userId);
+      const by = actor(session, userId);
       const block = anchor === undefined ? undefined : reads.blockWith(page, anchor);
       const wire = await client.call<WireComment>(by, "post", "comments", {
         body: {
@@ -608,22 +606,22 @@ export function createLiveNotionWorld(deps: {
     },
 
     async reply(session, discussion, rich, userId) {
-      const wire = await client.call<WireComment>(actor(userId), "post", "comments", {
+      const wire = await client.call<WireComment>(actor(session, userId), "post", "comments", {
         body: { discussion_id: discussion.id, rich_text: rich.map(requestRich) },
       });
       return toComment(session, discussion.page, wire);
     },
 
     async editComment(session, comment, rich, userId) {
-      const wire = await client.call<WireComment>(actor(userId), "patch", `comments/${comment.id}`, {
+      const wire = await client.call<WireComment>(actor(session, userId), "patch", `comments/${comment.id}`, {
         body: { rich_text: rich.map(requestRich) },
       });
       toComment(session, comment.page, wire);
       return undefined;
     },
 
-    async deleteComment(_session, comment, userId) {
-      await client.call(actor(userId), "delete", `comments/${comment.id}`);
+    async deleteComment(session, comment, userId) {
+      await client.call(actor(session, userId), "delete", `comments/${comment.id}`);
       store.comments.remove(comment.id);
       readAt.delete(comment.page);
       return undefined;

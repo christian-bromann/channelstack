@@ -118,11 +118,11 @@ export function createLiveGitHubWorld(deps: {
   const asApp: GitHubCaller = { app: true };
   const installation = (): GitHubCaller => ({ installation: store.app.installationId });
   /** The person acting, who must be real: a fake person can't act in a live org (core's rule). */
-  const actor = (userId: number): GitHubCaller => {
-    const key = people.credential(String(userId));
-    if (!key) throw fakeActorInLiveWorld(store.users.find(String(userId))?.login ?? String(userId), "github");
-    return { token: key };
-  };
+  const actor = (session: string, userId: number): GitHubCaller => ({
+    token: people.actingAs(session, String(userId), () =>
+      fakeActorInLiveWorld(store.users.find(String(userId))?.login ?? String(userId), "github"),
+    ),
+  });
   const path = (repo: GitHubRepoRecord) => ({ owner: repo.owner, repo: repo.name });
   const time = (iso: string | null | undefined) => (iso ? Date.parse(iso) : undefined);
   const loginOf = (id: number) => store.actor(id).login;
@@ -474,6 +474,8 @@ export function createLiveGitHubWorld(deps: {
       }
       for (const { user, permission } of input.collaborators ?? []) {
         const login = store.actor(user).login;
+        // Only this session's own people: one it doesn't hold isn't added, nor acts.
+        const as = actor(session, user);
         const added = await client.request(installation(), "PUT /repos/{owner}/{repo}/collaborators/{username}", {
           ...path(repo),
           username: login,
@@ -482,12 +484,12 @@ export function createLiveGitHubWorld(deps: {
         // An org member is added at once; anyone else is invited, and accepts as themselves.
         if (added.status === 201) {
           const invitations = await client.all<{ id: number; repository: { id: number } }>(
-            actor(user),
+            as,
             "GET /user/repository_invitations",
           );
           const invitation = invitations.find((candidate) => candidate.repository.id === repo.id);
           if (invitation) {
-            await client.call(actor(user), "PATCH /user/repository_invitations/{invitation_id}", {
+            await client.call(as, "PATCH /user/repository_invitations/{invitation_id}", {
               invitation_id: invitation.id,
             });
           }
@@ -518,33 +520,41 @@ export function createLiveGitHubWorld(deps: {
     },
 
     async openIssue(repo, userId, input) {
-      const wire = await client.call<WireIssue>(actor(userId), "POST /repos/{owner}/{repo}/issues", {
-        ...path(repo),
-        title: input.title,
-        ...(input.body !== undefined ? { body: input.body } : {}),
-        ...(input.labels?.length ? { labels: input.labels } : {}),
-        ...(input.assignees?.length ? { assignees: input.assignees.map(loginOf) } : {}),
-      });
+      const wire = await client.call<WireIssue>(
+        actor(store.sessionOf(repo), userId),
+        "POST /repos/{owner}/{repo}/issues",
+        {
+          ...path(repo),
+          title: input.title,
+          ...(input.body !== undefined ? { body: input.body } : {}),
+          ...(input.labels?.length ? { labels: input.labels } : {}),
+          ...(input.assignees?.length ? { assignees: input.assignees.map(loginOf) } : {}),
+        },
+      );
       return toIssue(repo, wire);
     },
 
     async updateIssue(issue, userId, changes) {
       const repo = store.repo(issue.repo);
-      const wire = await client.call<WireIssue>(actor(userId), "PATCH /repos/{owner}/{repo}/issues/{issue_number}", {
-        ...path(repo),
-        issue_number: issue.number,
-        ...(changes.title !== undefined ? { title: changes.title } : {}),
-        ...(changes.body !== undefined ? { body: changes.body } : {}),
-        ...(changes.state !== undefined ? { state: changes.state } : {}),
-        ...(changes.stateReason !== undefined ? { state_reason: changes.stateReason } : {}),
-      });
+      const wire = await client.call<WireIssue>(
+        actor(store.sessionOf(repo), userId),
+        "PATCH /repos/{owner}/{repo}/issues/{issue_number}",
+        {
+          ...path(repo),
+          issue_number: issue.number,
+          ...(changes.title !== undefined ? { title: changes.title } : {}),
+          ...(changes.body !== undefined ? { body: changes.body } : {}),
+          ...(changes.state !== undefined ? { state: changes.state } : {}),
+          ...(changes.stateReason !== undefined ? { state_reason: changes.stateReason } : {}),
+        },
+      );
       toIssue(repo, wire);
       return undefined;
     },
 
     async label(issue, userId, labels, add) {
       const repo = store.repo(issue.repo);
-      const by = actor(userId);
+      const by = actor(store.sessionOf(repo), userId);
       if (add) {
         await client.call(by, "POST /repos/{owner}/{repo}/issues/{issue_number}/labels", {
           ...path(repo),
@@ -568,7 +578,7 @@ export function createLiveGitHubWorld(deps: {
       const repo = store.repo(issue.repo);
       const logins = assignees.map(loginOf);
       const wire = await client.call<WireIssue>(
-        actor(userId),
+        actor(store.sessionOf(repo), userId),
         "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees",
         { ...path(repo), issue_number: issue.number, assignees: logins },
       );
@@ -579,7 +589,7 @@ export function createLiveGitHubWorld(deps: {
     async comment(issue, userId, body) {
       const repo = store.repo(issue.repo);
       const wire = await client.call<WireComment>(
-        actor(userId),
+        actor(store.sessionOf(repo), userId),
         "POST /repos/{owner}/{repo}/issues/{issue_number}/comments",
         { ...path(repo), issue_number: issue.number, body },
       );
@@ -591,7 +601,7 @@ export function createLiveGitHubWorld(deps: {
     async editComment(comment, userId, body) {
       const repo = store.repo(comment.repo);
       const wire = await client.call<WireComment>(
-        actor(userId),
+        actor(store.sessionOf(repo), userId),
         "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}",
         { ...path(repo), comment_id: comment.id, body },
       );
@@ -601,10 +611,14 @@ export function createLiveGitHubWorld(deps: {
 
     async deleteComment(comment, userId) {
       const repo = store.repo(comment.repo);
-      await client.call(actor(userId), "DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}", {
-        ...path(repo),
-        comment_id: comment.id,
-      });
+      await client.call(
+        actor(store.sessionOf(repo), userId),
+        "DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}",
+        {
+          ...path(repo),
+          comment_id: comment.id,
+        },
+      );
       store.forget(store.comments, store.sessionOf(repo), comment.id);
       return undefined;
     },
@@ -612,7 +626,7 @@ export function createLiveGitHubWorld(deps: {
     async react(target, userId, content) {
       const repo = store.repo(target.repo);
       const made = await client.call<{ id: number; created_at: string }>(
-        actor(userId),
+        actor(store.sessionOf(repo), userId),
         "issue" in target
           ? "POST /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions"
           : "POST /repos/{owner}/{repo}/issues/{issue_number}/reactions",

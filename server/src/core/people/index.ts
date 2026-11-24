@@ -1,3 +1,4 @@
+import { ProtocolError } from "../errors/index.ts";
 import type { LiveCredential } from "../secrets/index.ts";
 
 /**
@@ -17,13 +18,18 @@ export class LivePeople {
     this.#sessions.set(session, held);
   }
 
-  /** The person's credential, from any session that holds them: it is the same account. */
-  credential(id: string): LiveCredential | undefined {
-    for (const held of this.#sessions.values()) {
-      const person = held.get(id);
-      if (person) return person.credential;
+  /**
+   * The credential to act as this person in this session. Only a session that holds them acts as
+   * them: another session's person is `not_found` here, as a person of another session is in the
+   * fake, and someone no session holds is a fake person (`fake`, the live world's refusal).
+   */
+  actingAs(session: string, id: string, fake: () => Error): LiveCredential {
+    const person = this.#sessions.get(session)?.get(id);
+    if (person) return person.credential;
+    if ([...this.#sessions.values()].some((held) => held.has(id))) {
+      throw new ProtocolError("not_found", `No user "${id}" in this session`, { id });
     }
-    return undefined;
+    throw fake();
   }
 
   /** Whether this session holds the person. */

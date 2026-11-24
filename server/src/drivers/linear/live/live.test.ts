@@ -73,6 +73,26 @@ describe("R4.1: one person of the pool in parallel sessions", () => {
     expect(issue.status).toBe(200);
     expect(issue.body.creator).toMatchObject({ id: ana.userId });
   });
+
+  test("R5.1: a session can't act as, or add, a person only another session holds", async () => {
+    const stub = linearStub();
+    const ana = stub.person("ana");
+    const ben = stub.person("ben");
+    const server = liveLinear(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    await one.linear("POST", "/users", { name: "Ana", token: ana.token });
+    await two.linear("POST", "/users", { name: "Ben", token: ben.token });
+    const sent = stub.calls.length;
+    const team = await two.linear("POST", "/teams", { members: [ben.userId, ana.userId] });
+    expect(team.body.error).toBe("not_found");
+    const own = await two.linear("POST", "/teams", { members: [ben.userId] });
+    const issue = await two.linear("POST", `/users/${ana.userId}/issues`, {
+      issue: { title: "Not mine" },
+      team: own.body.id,
+    });
+    expect(issue.body.error).toBe("not_found");
+    expect(stub.calls.slice(sent).filter((call) => call.as === "ana")).toEqual([]);
+  });
 });
 
 describe("live Linear: acting and reading back", () => {

@@ -292,11 +292,10 @@ export function createLiveLinearWorld(deps: {
     return appToken;
   };
   /** The person acting, who must be real: a fake person can't act in a live workspace (core's rule). */
-  const actor = (userId: string): LiveCredential => {
-    const key = people.credential(userId);
-    if (!key) throw fakeActorInLiveWorld(aliases.get(userId) ?? store.user(userId)?.name ?? userId, "linear");
-    return key;
-  };
+  const actor = (session: string, userId: string): LiveCredential =>
+    people.actingAs(session, userId, () =>
+      fakeActorInLiveWorld(aliases.get(userId) ?? store.user(userId)?.name ?? userId, "linear"),
+    );
 
   const toIssue = (issue: WireIssue): LinearIssueRecord => ({
     id: issue.id,
@@ -595,7 +594,7 @@ export function createLiveLinearWorld(deps: {
 
     async createTeam(session, input) {
       const real = input.members.filter((id) => people.holds(session, id));
-      for (const member of input.members) actor(member);
+      for (const member of input.members) actor(session, member);
       const creatorId = real[0] ?? people.of(session)[0]?.id;
       if (creatorId === undefined) {
         throw actionRequires(
@@ -604,7 +603,7 @@ export function createLiveLinearWorld(deps: {
           "a live team is created by a person with a key; the app can't create teams",
         );
       }
-      const creator = actor(creatorId);
+      const creator = actor(session, creatorId);
       // A real workspace's keys and names are unique: the run's tag in the name, a key of its own.
       const name = teamName(input.name);
       const created = await client.call<{
@@ -723,9 +722,9 @@ export function createLiveLinearWorld(deps: {
     },
 
     async createIssue(team, creator, input) {
-      const key = actor(creator);
       const session = store.teams.owner(team.id);
       if (session === undefined) throw new Error("A team belongs to a test session");
+      const key = actor(session, creator);
       const state =
         input.state === undefined
           ? undefined
@@ -769,8 +768,8 @@ export function createLiveLinearWorld(deps: {
     },
 
     async updateIssue(issue, actorId, changes) {
-      const key = actor(actorId);
       const session = store.sessionOf(issue);
+      const key = actor(session, actorId);
       const answer = await client.call<{ issueUpdate: { issue: WireIssue } }>(
         key,
         /* GraphQL */ `
@@ -821,8 +820,8 @@ export function createLiveLinearWorld(deps: {
     },
 
     async comment(issue, user, body, parent) {
-      const key = actor(user);
       const session = store.sessionOf(issue);
+      const key = actor(session, user);
       const answer = await client.call<{ commentCreate: { comment: WireComment } }>(
         key,
         /* GraphQL */ `
@@ -842,7 +841,7 @@ export function createLiveLinearWorld(deps: {
 
     async editComment(record, actorId, body) {
       const answer = await client.call<{ commentUpdate: { comment: WireComment } }>(
-        actor(actorId),
+        actor(store.sessionOf(store.issue(record.issue)), actorId),
         /* GraphQL */ `
           mutation CommentUpdate($id: String!, $input: CommentUpdateInput!) {
             commentUpdate(id: $id, input: $input) {
@@ -861,7 +860,7 @@ export function createLiveLinearWorld(deps: {
 
     async deleteComment(record, actorId) {
       await client.call(
-        actor(actorId),
+        actor(store.sessionOf(store.issue(record.issue)), actorId),
         /* GraphQL */ `
           mutation CommentDelete($id: String!) {
             commentDelete(id: $id) {
@@ -877,7 +876,7 @@ export function createLiveLinearWorld(deps: {
 
     async react(record, user, emoji) {
       await client.call(
-        actor(user),
+        actor(store.sessionOf(store.issue(record.issue)), user),
         /* GraphQL */ `
           mutation ReactionCreate($input: ReactionCreateInput!) {
             reactionCreate(input: $input) {
@@ -891,9 +890,10 @@ export function createLiveLinearWorld(deps: {
     },
 
     async promptSession(record, user) {
-      actor(user);
+      const session = store.sessionOf(store.issue(record.issue));
+      actor(session, user);
       // A person's turn is a reply in the session's thread; without one there is nothing to reply in.
-      await world.refresh(store.sessionOf(store.issue(record.issue)), { agentSession: record.id });
+      await world.refresh(session, { agentSession: record.id });
       throw unsupportedInLive(
         "LinearUser.prompt",
         "this session has no comment thread yet, and Linear takes a person's turn only as a reply in one",
