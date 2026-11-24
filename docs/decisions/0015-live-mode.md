@@ -21,6 +21,8 @@ A route says how it works live (`live` on the route, `x-channelstack-live` in th
 
 The Vitest integration skips a test that hits either refusal, with the reason in the report (`context.skip(note)`, through a refusal hook on the SDK transport that also names the request, so a concurrent test skips only itself). The fake run never meets these refusals, so the test still runs in full on every PR.
 
+Every test has all four channels' fixtures. A channel whose fixture is refused live (its live backend isn't built, its credentials are set in part) gets a stand-in that refuses when the test first uses it. So only that channel's tests skip or fail, and a Slack test runs even while live GitHub isn't built.
+
 **A setup that can't work fails instead: `live_misconfigured`.** Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token. If those skipped, a nightly run with a broken setup would skip everything and pass. `pnpm live` also fails when a channel whose credentials are set passed no live test, a channel whose live backend isn't built among them: its tests skip, and the job reports that 5.1 isn't met for it.
 
 ## One `World` for both: lookups at once, actions and reads awaited

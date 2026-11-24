@@ -166,7 +166,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |
 | Running the server from source | `dev-server.sh` | Stands in for the binary (`CHANNELSTACK_SERVER_BIN`) on machines that block freshly compiled executables. CI never uses it |
 | Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check |
-| A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints; `others` adds one agent per channel (every channel in one run). Everything that needs both uses it |
+| A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints; `others` adds one agent per channel (every channel in one run); `serverEnv` gives the server alone live credentials. Everything that needs both uses it |
 | `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack`, each channel's checks, and `shared.test.ts` with one agent per channel |
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |
 | Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) or their own server (`live-skip`, a live server whose refusals skip) |
@@ -179,7 +179,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Concern | Module | Notes |
 |---|---|---|
 | Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
-| Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test, registered with `test.override` so a suite's `test.extend` builds on them, the `expect.extend` adapter, and skipping a test live mode can't run, with the reason (`setup.ts`) |
+| Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test, registered with `test.override` so a suite's `test.extend` builds on them, the `expect.extend` adapter, and skipping a test live mode can't run, with the reason (`setup.ts`); a channel's fixture refused live becomes a stand-in that refuses on first use, so only that channel's tests skip (`refused.ts`, `refusedLive` for channelstack's own per-test checks) |
 | Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
 | Checks | `integrations/checks/` | `slackChecks()`, `githubChecks()`, `linearChecks()`, `notionChecks()`: the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS` and `NOTION_CHECKS` list their ids |
 | pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |

@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 
 import { expect, test } from "vitest";
 
 import { ROOT } from "../../scripts/lib/generate.ts";
 import { binaryPath } from "../../scripts/lib/packages.ts";
 import { startBinary } from "../../scripts/lib/server.ts";
+import { withStack } from "../../scripts/lib/stack.ts";
 
 // Exit check 5.4: what live mode can't do skips the test with the reason, and doesn't fail it. The
 // server gets GitHub App credentials (stand-ins: nothing is ever sent to GitHub), so GitHub is live,
@@ -89,4 +91,42 @@ test("a Slack example on a server with Slack's credentials set in part fails", a
   } finally {
     await server.stop();
   }
+}, 60_000);
+
+// Every test has all four channels' fixtures. A channel refused live must not touch the others':
+// with GitHub live and not built, a Slack example (fake, against its reference agent) still passes.
+test("a channel refused live doesn't skip the tests of the others", async () => {
+  let run: { status: number | null; output: string } | undefined;
+  await withStack(
+    {
+      bin: process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath(),
+      agent: join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts"),
+      webhook: { driver: "slack", path: "/slack/events" },
+      serverEnv: {
+        CHANNELSTACK_GITHUB_APP_ID: "1",
+        CHANNELSTACK_GITHUB_PRIVATE_KEY: "a stand-in, never sent anywhere",
+      },
+    },
+    ({ env }) => {
+      const result = spawnSync(
+        "pnpm",
+        [
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "test/acceptance/vitest.config.ts",
+          "api/examples/slack.test.ts",
+          "-t",
+          "a mention gets exactly one reply, in the thread",
+          "--reporter",
+          "verbose",
+        ],
+        { cwd: ROOT, env: { ...env, NO_COLOR: "1" }, encoding: "utf8" },
+      );
+      run = { status: result.status, output: `${result.stdout}\n${result.stderr}` };
+    },
+  );
+  expect(run?.status, run?.output).toBe(0);
+  expect(run?.output).toMatch(/✓ .*a mention gets exactly one reply, in the thread/);
 }, 60_000);

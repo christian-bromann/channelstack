@@ -1,5 +1,6 @@
 import { afterEach, expect } from "vitest";
 
+import { refusedLive } from "../../integrations/vitest/refused.ts";
 import { linearResponseProblems, linearWebhookProblems } from "../../server/test/linear-schema.ts";
 
 /**
@@ -9,7 +10,7 @@ import { linearResponseProblems, linearWebhookProblems } from "../../server/test
  */
 afterEach(async ({ linear }) => {
   // A test that never got its fixtures has nothing to check.
-  if (!linear) return;
+  if (!linear || refusedLive(linear)) return;
   const [calls, deliveries] = await Promise.all([linear.calls(), linear.deliveries()]);
   const problems = [
     ...calls.flatMap((call) =>

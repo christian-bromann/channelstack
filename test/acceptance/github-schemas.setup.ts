@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect } from "vitest";
 
+import { refusedLive } from "../../integrations/vitest/refused.ts";
 import { restProblems, webhookProblems } from "../../server/test/github-schemas.ts";
 
 /**
@@ -11,12 +12,12 @@ import { restProblems, webhookProblems } from "../../server/test/github-schemas.
 const before = new WeakMap<object, number>();
 
 beforeEach(async ({ github, task }) => {
-  if (github) before.set(task, (await github.appCalls()).length);
+  if (github && !refusedLive(github)) before.set(task, (await github.appCalls()).length);
 });
 
 afterEach(async ({ github, task }) => {
   // A test that never got its fixtures has nothing to check.
-  if (!github) return;
+  if (!github || refusedLive(github)) return;
   // The App's own endpoints belong to no session: what was called there since this test began is checked too.
   const [inSession, aboutNoRepo, deliveries] = await Promise.all([
     github.calls(),
