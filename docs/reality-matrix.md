@@ -149,7 +149,7 @@ Built (phase 5), and checked against the test organization on 2026-11-24: the Ap
 | `repo.readFile(path, { ref })` | Done | Built | User token | |
 | `github.appCalls()` | Done | Yes, with proxy | Proxy (sees the App's calls) | The App's calls about no repository: its own endpoints and the token exchange. Fake: the same list for every session |
 | `delivery.redeliver()` | Done | Built | App credentials (`POST /app/hook/deliveries/{id}/attempts`, App JWT) | Confirmed. GitHub redelivers to the agent's own webhook URL |
-| `delivery.attempts`, `status` for the agent's webhook | Done | Built | App credentials (`GET /app/hook/deliveries`, App JWT) | Read-only: GitHub's delivery log shows each delivery to the agent, its status code and duration. channelstack stays out of the path |
+| `delivery.attempts`, `status` for the agent's webhook | Done | Built | App credentials (`GET /app/hook/deliveries`, App JWT) | Read-only: GitHub's delivery log shows each delivery to the agent, its status code and duration. channelstack stays out of the path. The log lags: a delivery shows a few seconds after GitHub sent it, so a test polls `deliveries()` (the live example uses `expect.poll(…, { timeout: 30_000 })`) |
 
 ---
 
