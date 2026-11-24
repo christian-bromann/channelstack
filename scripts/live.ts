@@ -4,13 +4,11 @@
  *
  * Credentials come from the environment (CI's `live` environment, or `~/.channelstack/live.env`
  * sourced locally). channelstack never relays events live: each platform delivers to the agent
- * itself. Slack's reference agent runs here in Socket Mode, so it needs no public URL. GitHub,
- * Linear and Notion deliver over HTTP to agents deployed at their own public URLs; their live
- * blocks skip until those credentials exist.
+ * itself. Each channel's reference agent runs here (`lib/live-agents.ts`): Slack's in Socket Mode,
+ * the others behind the smee.io channel their platform's webhook points at.
  *
  *   node scripts/live.ts [--bin <server>]
  */
-import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,8 +17,9 @@ import { parseArgs } from "node:util";
 import { runId } from "../server/src/core/safety/index.ts";
 import { DRIVERS } from "../server/src/drivers/index.ts";
 import { ROOT } from "./lib/generate.ts";
+import { startAgents, writeSessions } from "./lib/live-agents.ts";
 import { binaryPath } from "./lib/packages.ts";
-import { run } from "./lib/process.ts";
+import { run, runAsync } from "./lib/process.ts";
 import { startBinary } from "./lib/server.ts";
 
 const { values } = parseArgs({ options: { bin: { type: "string" } } });
@@ -33,6 +32,8 @@ const home = mkdtempSync(join(tmpdir(), "channelstack-live-"));
 // The people's saved browser sessions (`channelstack login`), where this run's server looks for them.
 const saved = join(env.CHANNELSTACK_HOME || join(homedir(), ".channelstack"), "browser");
 if (existsSync(saved)) cpSync(saved, join(home, "browser"), { recursive: true });
+// In the nightly job they come from a secret instead.
+writeSessions(env, home);
 const report = join(home, "vitest.json");
 const live: NodeJS.ProcessEnv = {
   ...env,
@@ -52,42 +53,11 @@ try {
   serverLog = server.output;
   stops.push(server.stop);
 
-  // Slack: the reference agent connects to real Slack itself, in Socket Mode.
-  if (env.CHANNELSTACK_SLACK_BOT_TOKEN && env.CHANNELSTACK_SLACK_APP_TOKEN) {
-    const agent = spawn(process.execPath, [join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts")], {
-      env: {
-        PATH: env.PATH,
-        HOME: env.HOME,
-        SLACK_BOT_TOKEN: env.CHANNELSTACK_SLACK_BOT_TOKEN,
-        SLACK_APP_TOKEN: env.CHANNELSTACK_SLACK_APP_TOKEN,
-        SLACK_SOCKET_MODE: "1",
-      },
-      stdio: ["ignore", "pipe", "inherit"],
-    });
-    const exited = new Promise<void>((resolve) => agent.once("exit", () => resolve()));
-    stops.push(async () => {
-      if (agent.exitCode === null) agent.kill("SIGTERM");
-      await exited;
-    });
-    // The agent says when its socket to Slack is up.
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("The Slack agent didn't connect to Slack in 30s")), 30_000);
-      agent.stdout.on("data", (chunk: Buffer) => {
-        if (chunk.toString().includes("Bolt app is running")) {
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-      agent.once("exit", (code) => reject(new Error(`The Slack agent exited with ${code}`)));
-    });
-  } else {
-    process.stdout.write(
-      "Slack: no CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_APP_TOKEN; its live block skips\n",
-    );
-  }
+  await startAgents(env, stops);
 
   try {
-    run(
+    // Not run: the relays in this process forward the platforms' webhooks to the agents meanwhile.
+    await runAsync(
       "pnpm",
       [
         "exec",

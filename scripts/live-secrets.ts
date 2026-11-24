@@ -1,16 +1,17 @@
 /**
  * Copy the live sandboxes' credentials into the repository's `live` environment, for the nightly
  * job (`.github/workflows/live.yml`). The names come from the workflow itself (`secrets.<NAME>`
- * and `vars.<NAME>`), the values from `~/.channelstack/live.env` (or `$CHANNELSTACK_HOME/live.env`).
+ * and `vars.<NAME>`), the values from `~/.channelstack/live.env` (or `$CHANNELSTACK_HOME/live.env`),
+ * and the saved browser sessions next to it (`browser/*.json`) as `CHANNELSTACK_BROWSER_SESSIONS`.
  * A secret's value goes to `gh` on its standard input, never as an argument, and nothing prints
  * a value: only names.
  *
  *   node scripts/live-secrets.ts [--env-file <path>] [--repo <owner/name>] [--dry-run]
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { ROOT } from "./lib/generate.ts";
@@ -64,6 +65,28 @@ for (const line of readFileSync(envFile, "utf8").split("\n")) {
   if (value.length >= 2 && (value[0] === "'" || value[0] === '"') && value.at(-1) === value[0])
     value = value.slice(1, -1);
   if (value !== "") env.set(found[1] as string, value);
+}
+
+// The people's saved browser sessions (`channelstack login`), as one secret the nightly job writes
+// back to files: `{ "<channel>-<person>.json": <storage state> }`.
+const sessions = join(dirname(envFile), "browser");
+let bundled: Record<string, unknown> = {};
+try {
+  for (const file of readdirSync(sessions).filter((name) => name.endsWith(".json"))) {
+    const path = join(sessions, file);
+    if (process.platform !== "win32" && (statSync(path).mode & 0o077) !== 0)
+      fail(`${path} can be read by others: chmod 600 it`);
+    bundled[file] = JSON.parse(readFileSync(path, "utf8"));
+  }
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  bundled = {};
+}
+if (Object.keys(bundled).length > 0) {
+  const value = JSON.stringify(bundled);
+  // GitHub keeps a secret of up to 48 KB.
+  if (Buffer.byteLength(value) > 48 * 1024) fail(`the saved browser sessions are over GitHub's 48 KB for a secret`);
+  env.set("CHANNELSTACK_BROWSER_SESSIONS", value);
 }
 
 const repo =
