@@ -233,7 +233,7 @@ The browser actor runs in CI, so nobody signs in by hand. Each sandbox person is
 
 | Platform | Unattended sign-in | Secrets in CI |
 |---|---|---|
-| **GitHub** | Passkey through WebDriver's virtual authenticator, or password plus TOTP. GitHub skips the new-device email check when 2FA or a passkey is used | The passkey's private key (`CHANNELSTACK_GITHUB_USER_ANA_PASSKEY`), or the password and TOTP seed. Use a machine account; GitHub's terms allow one free machine account per person |
+| **GitHub** | Passkey through WebDriver's virtual authenticator, or password plus TOTP. GitHub skips the new-device email check when 2FA or a passkey is used | The passkey's private key (`CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_PASSKEY`), or the password and TOTP seed. Use a machine account; GitHub's terms allow one free machine account per person |
 | **Linear** | Passkey through the virtual authenticator, or the emailed sign-in code | The passkey's private key, or access to the person's test inbox |
 | **Slack** | The emailed sign-in code. Developer sandboxes sign people in with a single-use code sent to their email; custom SAML isn't available there | Access to the test inbox (a mail-testing service or your own domain). Set a long session duration in the sandbox so sign-ins are rare |
 | **Notion** | The emailed sign-in code | Access to the test inbox |

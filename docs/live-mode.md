@@ -53,7 +53,7 @@ All from environment variables in CI. None is committed or logged, and the contr
 | Channel | A1 app | A2 person (per sandbox person `ANA`) | A3 browser sign-in |
 |---|---|---|---|
 | Slack | `CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN` | `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (`xoxp-`), issued by a **separate** Slack app for the sandbox's people, never by the agent's own app | Test inbox access |
-| GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` | `CHANNELSTACK_GITHUB_USER_ANA_TOKEN` (fine-grained PAT, machine account) | `CHANNELSTACK_GITHUB_USER_ANA_PASSKEY` |
+| GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` | `CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN` (fine-grained PAT, machine account) | `CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_PASSKEY` |
 | Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key) | `CHANNELSTACK_LINEAR_USER_ANA_PASSKEY`, or inbox |
 | Notion | `CHANNELSTACK_NOTION_TOKEN` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) | Test inbox access |
 

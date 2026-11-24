@@ -172,10 +172,10 @@ describe("inspecting what the agent did", () => {
 });
 
 describe("live mode", () => {
-  // With the App's credentials and CHANNELSTACK_GITHUB_USER_ANA_TOKEN (a machine account's
+  // With the App's credentials and CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN (a machine account's
   // fine-grained PAT) set, this runs in the real test org. GitHub delivers to the agent itself;
   // channelstack creates the repo, acts as Ana and reads the result back.
-  test.skipIf(!process.env.CHANNELSTACK_GITHUB_USER_ANA_TOKEN)("a real comment on a real repo", async ({ github }) => {
+  test.skipIf(!process.env.CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN)("a real comment on a real repo", async ({ github }) => {
     const ana = await github.createUser({ login: "ana-channelstack" });
     const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
     const issue = await ana.openIssue({ title: "Live smoke test" }, { repo });
