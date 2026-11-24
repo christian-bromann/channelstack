@@ -1,5 +1,5 @@
 {
-  "path": ["server", "codegen", "sdks", "integrations", "examples", "scenarios", "scripts", "test"],
+  "path": ["server", "codegen", "sdks", "integrations", "examples", "scenarios", "scripts", "test", "conformance"],
   "format": ["typescript", "javascript", "python"],
   "minLines": 15,
   "minTokens": 50,

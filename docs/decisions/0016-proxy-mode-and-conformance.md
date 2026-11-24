@@ -16,7 +16,7 @@ Status: accepted, phase 6.
 channelstack has its own CA for proxy mode, separate from portless's.
 
 - **Where.** It is made once per install in `<home>/ca/` (0600, in a 0700 directory).
-- **Name-constrained.** It may vouch only for the routed hosts, and for no IP address at all. A certificate it signs for any other name fails verification, whoever made it (exit check 6.3 proves this with a real TLS handshake).
+- **Name-constrained.** It may vouch only for the routed hosts: not for their subdomains (each `.host` is excluded again, since a permitted `slack.com` would also permit `app.slack.com`), and for no IP address at all. A certificate it signs for any other name fails verification, whoever made it (exit check 6.3 proves this with a real TLS handshake). Routed hosts that nest can't be constrained that way, so the CA refuses them. A CA made before the subdomains were excluded is replaced at the next start (`CA_VERSION`).
 - **Issuing.** A leaf certificate for the routed hosts is made at each start and kept in memory.
 - **Rotation.** The CA is replaced when it is about to expire, or when the routed hosts change. `channelstack ca rotate` replaces it on demand.
 - **Trust.** It is never added to a system trust store. Only the agent's environment trusts it: `channelstack env --proxy` prints `NODE_EXTRA_CA_CERTS` (the CA), and `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE`, a bundle of the public roots and the CA, for runtimes that replace their bundle.
@@ -49,7 +49,9 @@ The differential run (implementation plan 9) is channelstack's own CI, not a use
 - **GitHub:** the fake made test repositories private and live made them public. Now one default (`PRIVATE_BY_DEFAULT`) serves both, and it is private.
 - **Linear:** real Linear records the delegating person's prompt, "Work on [KEY-1](url)", as a session's first activity. The fake now does too.
 - **Notion:** every answer of Notion's carries a `request_id`. The fake's now do too.
-- **Recorded, with issues:** fields GitHub's, Linear's and Notion's payloads have that the fakes don't send yet ([#25](https://github.com/christian-bromann/channelstack/issues/25), [#26](https://github.com/christian-bromann/channelstack/issues/26), [#27](https://github.com/christian-bromann/channelstack/issues/27)). Also recorded: Notion's `page.created` for a seeded page made by a real person.
+- **Recorded, with issues:** fields GitHub's, Linear's and Notion's payloads have that the fakes don't send yet ([#25](https://github.com/christian-bromann/channelstack/issues/25), [#26](https://github.com/christian-bromann/channelstack/issues/26), [#27](https://github.com/christian-bromann/channelstack/issues/27)).
+- **Notion's seeded pages:** live, a seeded page is made by a real person, so Notion sends `page.created`, and the fake's seeds send nothing. The scenario makes its page as Ana, which sends the event in both worlds; the fixture's gap is [#29](https://github.com/christian-bromann/channelstack/issues/29).
+- **Slack's webhooks** aren't received live for the shape differ ([#28](https://github.com/christian-bromann/channelstack/issues/28)).
 
 ## Alternatives considered
 
