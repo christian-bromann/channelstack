@@ -112,7 +112,10 @@ export async function admitLive(
     throw actionRequires(
       operation,
       support.requires === "browser" ? "the browser actor" : "proxy mode",
-      support.reason,
+      support.requires === "proxy"
+        ? // Proxy mode exists, but live it records the agent's calls as shapes only (issue #24).
+          `${support.reason}; live, \`start --proxy\` doesn't read the agent's calls back yet`
+        : support.reason,
     );
   }
   if (!reality.hasBackend) throw unsupportedInLive(operation, `live ${channel} isn't built yet`);
