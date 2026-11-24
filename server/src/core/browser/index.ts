@@ -91,9 +91,22 @@ export interface BrowserOptions {
 
 async function launchChrome(headed: boolean): Promise<Driver> {
   const { remote } = await import("webdriverio");
-  const args = ["--no-sandbox", "--disable-gpu", "--window-size=1280,900", ...(headed ? [] : ["--headless=new"])];
+  const args = [
+    "--no-sandbox",
+    "--disable-gpu",
+    "--window-size=1280,900",
+    // macOS: Chrome would ask the login keychain for its cookie key, and a prompt nobody answers
+    // holds a fresh browser for about two minutes. The session's cookies are restored by the actor.
+    "--use-mock-keychain",
+    "--password-store=basic",
+    ...(headed ? [] : ["--headless=new"]),
+  ];
   return (await remote({
     logLevel: "error",
+    // A request to Chromedriver that hangs (a fresh Chrome now and then takes about two minutes,
+    // WebdriverIO's default wait) is given up on sooner and sent again.
+    connectionRetryTimeout: 30_000,
+    connectionRetryCount: 3,
     capabilities: { browserName: "chrome", webSocketUrl: true, "goog:chromeOptions": { args } },
   })) as unknown as Driver;
 }

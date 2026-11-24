@@ -183,8 +183,11 @@ describe("live mode", () => {
     await ana.comment("@my-agent please triage", { issue });
 
     await expect(issue).toHaveCommentFrom(github.app, { timeout: "60s" });
-    // GitHub's delivery log is readable live, so this works too.
-    const [delivery] = await github.deliveries({ type: "issue_comment", resource: repo });
+    // GitHub's delivery log is readable live, so this works too. It shows a delivery a few
+    // seconds after GitHub sent it.
+    const comments = () => github.deliveries({ type: "issue_comment", resource: repo });
+    await expect.poll(async () => (await comments()).length, { timeout: 30_000 }).toBeGreaterThan(0);
+    const [delivery] = await comments();
     await expect(delivery!).toBeAccepted();
   });
 });
