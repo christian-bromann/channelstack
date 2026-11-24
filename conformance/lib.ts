@@ -16,7 +16,8 @@ const NOISE =
   /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner)$/;
 /**
  * Fields a fixture hands the agent (`privateKey`, `webhookSecret`, `token`): no recording, comparison,
- * result file or log holds them. The scenario runner drops them as it records, and normalizing again.
+ * result file or log holds them: normalizing drops them, before anything leaves the run's private
+ * work directory (the scenario runner, which uses only the SDK, records what the handles hold).
  */
 export const SECRET_FIELD = /token|secret|privatekey|password/i;
 /**

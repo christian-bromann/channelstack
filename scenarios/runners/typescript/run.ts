@@ -10,8 +10,6 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { ChannelstackError, connect, waitFor } from "channelstack/client";
 import { parse } from "yaml";
 
-import { SECRET_FIELD } from "../../../conformance/lib.ts";
-
 interface Check {
   value: unknown;
   equals?: unknown;
@@ -38,7 +36,12 @@ const mode = (flag("--mode") ?? "auto") as "auto" | "attach" | "start";
 const recordTo = flag("--record");
 const recorded: Record<string, unknown> = {};
 
-/** A value as data: a handle's fields, nothing callable, no secret, nothing twice on one path, a few levels deep. */
+/**
+ * A value as data: a handle's fields, nothing callable, nothing twice on one path, a few levels deep.
+ * The runner uses only the SDK (packaging runs it outside the repository), so it records what the
+ * handles hold; the differential run keeps the file in its private work directory and drops secret
+ * fields when it normalizes (`SECRET_FIELD` in conformance/lib.ts), before anything is written out.
+ */
 function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value === null || typeof value !== "object") return typeof value === "function" ? undefined : value;
   if (seen.has(value) || depth > 4) return "<handle>";
@@ -47,7 +50,6 @@ function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown
     ? value.map((item) => plain(item, depth + 1, seen))
     : Object.fromEntries(
         Object.entries(value)
-          .filter(([key]) => !SECRET_FIELD.test(key))
           .map(([key, item]) => [key, plain(item, depth + 1, seen)])
           .filter(([, item]) => item !== undefined),
       );
