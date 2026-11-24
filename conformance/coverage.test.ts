@@ -50,7 +50,9 @@ const results: ConformanceResults = {
     },
   ],
 };
-const scenarios = [{ name: "slack/mention", channel: "slack", covers: ["SlackUser.say"] }];
+const scenarios = [
+  { name: "slack/mention", channel: "slack", covers: ["SlackUser.say"], calls: ["createUser", "say"] },
+];
 
 describe("exit check 6.5: the coverage page", () => {
   test("each action of each channel, how it works live, and when fake and live last agreed on it", () => {
@@ -121,7 +123,7 @@ describe("exit check 6.5: the coverage page", () => {
 
   test("a scenario is credited only with the actions it names, and a name the spec doesn't have is refused", () => {
     // `select` on the same type isn't `say`: only what a scenario names is credited.
-    const other = [{ name: "slack/mention", channel: "slack", covers: ["SlackUser.select"] }];
+    const other = [{ name: "slack/mention", channel: "slack", covers: ["SlackUser.select"], calls: ["select"] }];
     expect(coverageRows({ spec, divergences: [], scenarios: other, results })[0]?.agreed).toBe(
       "Not covered by a scenario",
     );
@@ -129,9 +131,18 @@ describe("exit check 6.5: the coverage page", () => {
       coverageRows({
         spec,
         divergences: [],
-        scenarios: [{ name: "x", channel: "slack", covers: ["SlackUser.sya"] }],
+        scenarios: [{ name: "x", channel: "slack", covers: ["SlackUser.sya"], calls: ["sya"] }],
         results,
       }),
     ).toThrow(/SlackUser\.sya/);
+    // An action the spec has, but no step calls, isn't covered either.
+    expect(() =>
+      coverageRows({
+        spec,
+        divergences: [],
+        scenarios: [{ name: "y", channel: "slack", covers: ["SlackUser.say"], calls: ["createUser"] }],
+        results,
+      }),
+    ).toThrow(/no step of it calls/);
   });
 });

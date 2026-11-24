@@ -89,7 +89,9 @@ const sameHosts = (a: readonly string[], b: readonly string[]) =>
 function nameConstraints(hosts: readonly string[]): x509.Extension {
   const nested = hosts.filter((host) => hosts.some((other) => other !== host && host.endsWith(`.${other}`)));
   if (nested.length > 0) {
-    throw new Error(`channelstack's CA can't vouch for ${nested.join(", ")} without every other name next to it`);
+    throw new Error(
+      `channelstack's CA can't vouch for ${nested.join(", ")} without every other name next to it: route only the host above it, or drop ${nested.join(", ")} from its driver's hosts`,
+    );
   }
   const under = hosts.map((host) => new GeneralSubtree({ base: new GeneralName({ dNSName: `.${host}` }) }));
   const constraints = new NameConstraints({

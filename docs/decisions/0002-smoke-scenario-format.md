@@ -50,7 +50,8 @@ Waiting uses the SDK runtime's `wait` module, so the scenarios also exercise the
 The differential run (decision 0016) runs scenarios of the same format from `scenarios/<channel>/`. They add two things, which the runners read:
 
 - **A call on a handle inside a variable:** `call: message.thread.waitForReply`. The path before the method is resolved like a reference.
-- **`record`:** a step with `record: { replies: $replies }` saves values by name. The TypeScript runner writes them with `--record <file>`, as plain data, with no callable member and no secret. The Python runner reads the step and ignores it.
+- **`record`:** a step with `record: { replies: $replies }` saves values by name. The TypeScript runner writes them with `--record <file>` (0600), as plain data, with no callable member and no secret field (`secrets.ts` beside the runner holds the rule). The Python runner reads the step and ignores it.
+- **`covers`:** a scenario lists the actions it covers by the spec's names (`covers: [SlackUser.say]`). The coverage page credits exactly those, and refuses a name the spec doesn't have or that no step of the scenario calls. Runners ignore it.
 
 ## Why
 

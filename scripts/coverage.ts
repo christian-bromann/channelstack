@@ -19,15 +19,20 @@ const { values } = parseArgs({
 });
 const out = values.out ?? join(ROOT, "build", "coverage", "index.html");
 
-/** Each scenario of each channel, with the actions it says it covers (`covers`). */
+/** Each scenario of each channel: the actions it says it covers (`covers`), and the methods its steps call. */
 const scenarios: CoverageInput["scenarios"] = ["slack", "github", "linear", "notion"].flatMap((channel) => {
   const dir = join(ROOT, "scenarios", channel);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((file) => file.endsWith(".yaml"))
     .map((file) => {
-      const scenario = parse(readFileSync(join(dir, file), "utf8")) as { name: string; covers?: string[] };
-      return { name: scenario.name, channel, covers: scenario.covers ?? [] };
+      const scenario = parse(readFileSync(join(dir, file), "utf8")) as {
+        name: string;
+        covers?: string[];
+        steps: Array<{ call?: string }>;
+      };
+      const calls = scenario.steps.flatMap((step) => (step.call ? [step.call.split(".").at(-1) ?? ""] : []));
+      return { name: scenario.name, channel, covers: scenario.covers ?? [], calls };
     });
 });
 

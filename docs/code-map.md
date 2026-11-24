@@ -126,8 +126,8 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 | Concern | Module | Notes |
 |---|---|---|
 | Protocol parity scenarios | `smoke/*.yaml` | The format is [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md) |
-| Conformance scenarios | `<channel>/*.yaml` | The differential run's scenarios: the same format, with `record` steps; each runs against the fake and against the sandbox (decision 0016) |
-| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`), as plain data with no secret |
+| Conformance scenarios | `<channel>/*.yaml` | The differential run's scenarios: the same format, with `record` steps and `covers`; each runs against the fake and against the sandbox (decision 0016) |
+| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`, 0600), as plain data with no secret field (`runners/typescript/secrets.ts`, the one rule, which `conformance/lib.ts` uses too) |
 | Reference agents | `agents/` | Plain programs with no channelstack code in them, configured from `channelstack env` |
 
 ## Examples (`examples/agents/`)
@@ -203,7 +203,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Comparing a fake with its platform | `lib.ts` | `normalize` (ids, times, links, mentions, account names and secrets out), `diff` (by path), `loadDivergences` and `classify` (a difference a divergence allows until it expires); the results' shape |
 | Known divergences | `divergences.yaml` | Each with a reason and a date it expires; a unit test fails on an expired one |
 | The coverage page | `coverage.ts` | `coverageRows`, `coveragePage`, `coverageSummary`: from the spec's `x-channelstack-live`, the divergences and a run's results |
-| The shape differ | `shapes.ts` | `readShapes` (a recording's operations, merged, refusals left out) and `compareShapes` (what the platform sends that the fake doesn't, and types with nothing in common) |
+| The shape differ | `shapes.ts` | `readShapes` (a recording's operations, merged, refusals left out) and `compareShapes` (what the platform sends that the fake doesn't, types with nothing in common, codes the fake never sends); a refusal is its own operation |
 
 ## Test integrations (`integrations/`)
 

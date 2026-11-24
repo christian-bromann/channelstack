@@ -19,8 +19,11 @@ export interface CoverageInput {
   divergences: readonly Divergence[];
   /** The latest differential run, if there is one. */
   results?: ConformanceResults;
-  /** Each scenario's name and the actions it covers (`SlackUser.say`), so a result reaches them. */
-  scenarios: ReadonlyArray<{ name: string; channel: string; covers: readonly string[] }>;
+  /**
+   * Each scenario's name, the actions it says it covers (`SlackUser.say`), so a result reaches
+   * them, and the methods its steps call (`say`), which every covered action must be among.
+   */
+  scenarios: ReadonlyArray<{ name: string; channel: string; covers: readonly string[]; calls: readonly string[] }>;
 }
 
 export interface CoverageRow {
@@ -71,6 +74,10 @@ export function coverageRows(input: CoverageInput): CoverageRow[] {
     const unknown = scenario.covers.filter((action) => !actions.has(action));
     if (unknown.length > 0)
       throw new Error(`${scenario.name} covers ${unknown.join(", ")}, which the spec doesn't have`);
+    // A scenario covers only what one of its steps calls.
+    const uncalled = scenario.covers.filter((action) => !scenario.calls.includes(action.split(".").at(-1) ?? ""));
+    if (uncalled.length > 0)
+      throw new Error(`${scenario.name} covers ${uncalled.join(", ")}, which no step of it calls`);
   }
   for (const [path, operations] of Object.entries(input.spec.paths)) {
     const channel = CHANNELS.find((name) => path.includes(`/${name}`));
