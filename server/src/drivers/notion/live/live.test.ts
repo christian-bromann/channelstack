@@ -2,6 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import { harness } from "../../../../test/app-harness.ts";
 import { type NotionStub, notionStub } from "../../../../test/notion-live-stub.ts";
+import { systemTimers } from "../../../core/clock/index.ts";
+import type { LedgerEntry } from "../../../core/ledger/index.ts";
+import { NotionRefusal, passing } from "./client.ts";
+import { notionMaintenance } from "./maintenance.ts";
 
 /** A server whose Notion driver is live against the stub: the integration's token and the allowlist set, as in CI. */
 function liveNotion(stub: NotionStub, allowlist = stub.workspace, extra: Record<string, string> = {}) {
@@ -60,6 +64,23 @@ describe("exit check 5.3: Notion's allowlist holds", () => {
     const person = await session.notion("POST", "/users", { name: "Ana", token: ana.token });
     expect(person.body.error).toBe("live_misconfigured");
     expect(person.body.message).toContain("CHANNELSTACK_NOTION_TOKEN acts as a person");
+  });
+});
+
+describe("R4.1: one person of the pool in parallel sessions", () => {
+  test("the same person in two open sessions acts in both, and stays when one closes", async () => {
+    const stub = notionStub();
+    const ana = stub.person("Ana");
+    const server = liveNotion(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    for (const session of [one, two]) await session.notion("POST", "/users", { name: "Ana", token: ana.token });
+    const page = await one.notion("POST", "/pages", { title: "Shared", connections: [stub.integration.botId] });
+    const first = await one.notion("POST", `/users/${ana.userId}/comment`, { text: "from one", page: page.body.id });
+    expect(first.status).toBe(200);
+    await server.call("DELETE", `/sessions/${two.id}`);
+    const after = await one.notion("POST", `/users/${ana.userId}/comment`, { text: "still here", page: page.body.id });
+    expect(after.status).toBe(200);
+    expect(after.body.author).toMatchObject({ id: ana.userId, name: "Ana" });
   });
 });
 
@@ -151,6 +172,22 @@ describe("live Notion: acting and reading back", () => {
     expect((await session.notion("GET", `/discussions/${anchored.body.discussion.id}/comments`)).body).toEqual([]);
   });
 
+  test("no session can name the integration's own page", async () => {
+    const stub = notionStub();
+    const ana = stub.person("Ana");
+    const session = await liveNotion(stub).open();
+    await session.notion("POST", "/users", { name: "Ana", token: ana.token });
+    const under = await session.notion("POST", "/pages", {
+      title: "Straight in",
+      parent: stub.root,
+      connections: [stub.integration.botId],
+    });
+    expect(under.body.error).toBe("not_found");
+    const comment = await session.notion("POST", `/users/${ana.userId}/comment`, { text: "hi", page: stub.root });
+    expect(comment.body.error).toBe("not_found");
+    expect(stub.commentsOn(stub.root)).toEqual([]);
+  });
+
   test("a page needs a real person, and one the integration can't see needs a page for that", async () => {
     const stub = notionStub();
     const ana = stub.person("Ana");
@@ -204,5 +241,87 @@ describe("exit check 5.2: Notion cleanup", () => {
     await server.call("DELETE", `/sessions/${session.id}`);
     expect(stub.page(home)?.inTrash).toBe(true);
     expect(stub.calls.at(-1)).toEqual({ method: "PATCH", path: `pages/${home}`, as: "Ana" });
+  });
+});
+
+describe("R4.5: Notion's own failure on the first check passes", () => {
+  test("a rate limit or Notion's own failure is asked again later; a refusal of the credential isn't", () => {
+    // Notion's client retries these three times itself; what still fails reaches the first check.
+    for (const code of ["rate_limited", "service_unavailable", "internal_server_error", "gateway_timeout"]) {
+      expect(passing(new NotionRefusal(code, "busy")), code).toBe(true);
+    }
+    for (const code of ["unauthorized", "restricted_resource", "object_not_found", "validation_error"]) {
+      expect(passing(new NotionRefusal(code, "no")), code).toBe(false);
+    }
+  });
+});
+
+describe("exit check 5.2: Notion's doctor and sweep", () => {
+  const env = (stub: NotionStub, person: { token: string }, extra: Record<string, string> = {}) => ({
+    CHANNELSTACK_NOTION_TOKEN: stub.integration.token,
+    CHANNELSTACK_NOTION_USER_ANA_TOKEN: person.token,
+    CHANNELSTACK_LIVE_NOTION_WORKSPACES: stub.workspace,
+    ...extra,
+  });
+  const input = (stub: NotionStub, environment: Record<string, string>) => ({
+    env: environment,
+    fetch: stub.fetch,
+    timers: systemTimers,
+    apiBase: stub.url,
+  });
+
+  test("doctor: the integration and a person in the workspace, and what isn't", async () => {
+    const stub = notionStub();
+    const ana = stub.person("Ana");
+    const ok = await notionMaintenance.doctor(input(stub, env(stub, ana)));
+    expect(ok.map((check) => check.ok)).toEqual([true, true]);
+    expect(ok[0]?.text).toContain(`the integration in workspace ${stub.workspace}`);
+    const elsewhere = await notionMaintenance.doctor(
+      input(stub, env(stub, ana, { CHANNELSTACK_LIVE_NOTION_WORKSPACES: "nope" })),
+    );
+    expect(elsewhere.every((check) => !check.ok)).toBe(true);
+    const swapped = await notionMaintenance.doctor(
+      input(stub, env(stub, ana, { CHANNELSTACK_NOTION_TOKEN: ana.token })),
+    );
+    expect(swapped[0]?.text).toContain("acts as a person");
+  });
+
+  test("sweep: a ledgered page once, a tagged page of the run, and the age cutoff", async () => {
+    const stub = notionStub();
+    const ana = stub.person("Ana");
+    const session = await liveNotion(stub).open();
+    await session.notion("POST", "/users", { name: "Ana", token: ana.token });
+    const page = await session.notion("POST", "/pages", { title: "Seed", connections: [stub.integration.botId] });
+    const home = stub.page(page.body.id)?.parent as string;
+    const entry: LedgerEntry = {
+      id: "unit3-1-1",
+      channel: "notion",
+      kind: "page",
+      ref: { page: home, name: "channelstack-run-unit3-1" },
+      workspace: stub.workspace,
+      by: "user:ANA",
+      run: "unit3",
+      session: session.id,
+      createdAt: 0,
+    };
+    const sweep = (options: { check: boolean; entries: LedgerEntry[]; run?: string; olderThanMs?: number }) =>
+      notionMaintenance.sweep({
+        ...input(stub, env(stub, ana)),
+        entries: options.entries,
+        check: options.check,
+        run: options.run,
+        olderThanMs: options.olderThanMs ?? 0,
+        now: Date.now(),
+      });
+    // Listed once: the ledger names it, so the scan for tagged pages doesn't list it again.
+    expect((await sweep({ check: true, entries: [entry], run: "unit3" })).left).toEqual([
+      "page channelstack-run-unit3-1 (run unit3)",
+    ]);
+    // Without a ledger: found by its tag, for this run, and not before it is old enough for every run.
+    expect((await sweep({ check: true, entries: [], run: "unit3" })).left).toEqual(["page channelstack-run-unit3-1"]);
+    expect((await sweep({ check: true, entries: [], olderThanMs: 3_600_000 })).left).toEqual([]);
+    const swept = await sweep({ check: false, entries: [entry], run: "unit3" });
+    expect(swept.done).toEqual([entry]);
+    expect(stub.page(home)?.inTrash).toBe(true);
   });
 });

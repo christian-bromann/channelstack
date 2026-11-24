@@ -1,6 +1,7 @@
 import type { Clock } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
+import { LivePeople } from "../../../core/people/index.ts";
 import {
   actionRequires,
   fakeActorInLiveWorld,
@@ -9,6 +10,7 @@ import {
 } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
+import { taggedNames } from "../../../core/safety/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import type { NotionWorld } from "../backend.ts";
 import { NotionStore } from "../fake/store.ts";
@@ -25,13 +27,15 @@ import type {
   NotionPageRecord,
   NotionUserRecord,
 } from "../world.ts";
-import { NotionRefusal, type NotionRestClient } from "./client.ts";
+import { NotionRefusal, type NotionRestClient, passing } from "./client.ts";
 import { checkNotionCredential, identifyNotion } from "./identity.ts";
 
 /** Real Notion's web app: where its links point. */
 const NOTION_WEB = "https://www.notion.so";
 /** How long a page read from Notion is used again before it is read anew. */
 const READ_CACHE_MS = 1_000;
+/** Who holds the integration's page in the mirror: no test session, so none can name it. */
+const INTEGRATION_PAGE = "channelstack:integration-page";
 /** Who seed data is by in the mirror when nobody is: no Notion id is all zeros. */
 const NOBODY = "00000000-0000-0000-0000-000000000000";
 
@@ -118,7 +122,12 @@ export function createLiveNotionWorld(deps: {
   const { client, live, ids, clock } = deps;
   const registry = new Registry();
   const store = new NotionStore(registry);
-  const reads = notionReads(store);
+  /** The real people the open sessions hold: one record each, whichever sessions have them. */
+  const people = new LivePeople();
+  const reads = notionReads(store, (session) => [
+    ...store.users.list(session),
+    ...people.of(session).map((person) => ({ id: person.id, name: person.alias })),
+  ]);
   const links = notionLinks(() => NOTION_WEB, reads.titleOf);
   const objects = notionObjects({
     links,
@@ -129,15 +138,13 @@ export function createLiveNotionWorld(deps: {
     discussion: (id) => store.discussion(id),
   });
   const appToken = live.vault.fromEnv("CHANNELSTACK_NOTION_TOKEN");
-  /** Each person's token, by session and user id. A person without one is fake and can't act here. */
-  const keys = new Map<string, Map<string, LiveCredential>>();
   /** The page each session's pages go in: one the integration sees, and one it doesn't. */
   const homes = new Map<string, { seen?: Promise<string>; unseen?: Promise<string> }>();
   const readAt = new Map<string, number>();
   let checked: Promise<void> | undefined;
   /** The page the integration is connected to, by hand, once. */
   let root = "";
-  let homeCount = 0;
+  const homeName = taggedNames(live.tag);
 
   const app = (): LiveCredential => {
     if (!appToken)
@@ -146,13 +153,12 @@ export function createLiveNotionWorld(deps: {
   };
   /** The person acting, who must be real: a fake person can't act in a live workspace (core's rule). */
   const actor = (userId: string): LiveCredential => {
-    const session = store.users.owner(userId);
-    const key = session === undefined ? undefined : keys.get(session)?.get(userId);
+    const key = people.credential(userId);
     if (!key) throw fakeActorInLiveWorld(store.users.find(userId)?.name ?? userId, "notion");
     return key;
   };
   /** Who reads for a session: its first real person, who sees what they made; the integration otherwise. */
-  const reader = (session: string): LiveCredential => [...(keys.get(session)?.values() ?? [])][0] ?? app();
+  const reader = (session: string): LiveCredential => people.of(session)[0]?.credential ?? app();
 
   // --- Mirroring what Notion answers ------------------------------------------------------------
 
@@ -360,7 +366,7 @@ export function createLiveNotionWorld(deps: {
           "set CHANNELSTACK_NOTION_UNSEEN_PAGE to a page the people can write in and the integration isn't connected to",
         );
       }
-      const name = [live.tag, String(++homeCount)].join("-");
+      const name = homeName();
       const wire = await client.call<WirePage>(by, "post", "pages", {
         body: { parent: { page_id: parent }, properties: { title: { title: [{ text: { content: name } }] } } },
       });
@@ -427,22 +433,20 @@ export function createLiveNotionWorld(deps: {
         }
         const [page] = pages as [WirePage];
         root = page.id;
-        const record = toPage("", page, [who.bot]);
-        // The integration's page belongs to no session: every session's pages are under it.
-        store.pages.remove(record.id);
-        store.pages.add(record.id, record);
+        // The integration's page: every session's pages are under it, and no session can name it,
+        // so nothing a test does lands there, outside its own page and the ledger.
+        toPage(INTEGRATION_PAGE, page, [who.bot]);
       })().catch((error: unknown) => {
-        // A definitive answer is kept; a network error or a rate limit isn't: the next action asks again.
-        if (!(error instanceof ProtocolError) || error.code === "rate_limited" || error.code === "unexpected") {
-          checked = undefined;
-        }
+        // A definitive answer is kept; a network error, a rate limit or Notion's own failure isn't: the next action asks again.
+        if (!(error instanceof ProtocolError) || passing(error)) checked = undefined;
         throw error;
       });
       return checked;
     },
 
     release(session) {
-      keys.delete(session);
+      // A person another open session holds stays theirs.
+      for (const id of people.leave(session)) store.users.remove(id);
       homes.delete(session);
       for (const page of store.pages.list(session)) readAt.delete(page.id);
       registry.release(session);
@@ -450,7 +454,7 @@ export function createLiveNotionWorld(deps: {
 
     credential(owner, session) {
       if (owner === "app") return appToken;
-      return [...(keys.get(session)?.values() ?? [])].find((key) => key.owner === owner);
+      return people.byOwner(session, owner);
     },
 
     async createUser(session, input) {
@@ -468,7 +472,11 @@ export function createLiveNotionWorld(deps: {
           );
         }
       }
-      if (store.users.list(session).some((user) => user.name.toLowerCase() === input.name.toLowerCase()))
+      const named = [
+        ...store.users.list(session).map((user) => user.name),
+        ...people.of(session).map((person) => person.alias),
+      ];
+      if (named.some((name) => name.toLowerCase() === input.name.toLowerCase()))
         throw new ProtocolError("invalid_argument", `There is already a person "${input.name}" in this session`);
       if (input.token === undefined) {
         if (live.strict) {
@@ -494,19 +502,22 @@ export function createLiveNotionWorld(deps: {
         appWorkspace: store.workspace.id,
       });
       const person = who.person as string;
-      const map = keys.get(session) ?? new Map<string, LiveCredential>();
-      map.set(person, key);
-      keys.set(session, map);
-      // The name the test gave them: Notion's can be their email, which never leaves the server.
-      return store.users.add(
-        person,
-        { id: person, name: input.name, email: "", avatarUrl: null, fixedId: false } satisfies NotionUserRecord,
-        session,
-      );
+      people.join(session, person, input.name, key);
+      // One record, no session's: parallel tests have the same person. The name the test gave
+      // them (Notion's can be their email, which never leaves the server).
+      const known = store.users.find(person);
+      if (known) return Object.assign(known, { name: input.name });
+      return store.users.add(person, {
+        id: person,
+        name: input.name,
+        email: "",
+        avatarUrl: null,
+        fixedId: false,
+      } satisfies NotionUserRecord);
     },
 
     async createPage(session, input: PageInput) {
-      const creatorId = input.createdBy ?? [...(keys.get(session)?.keys() ?? [])][0];
+      const creatorId = input.createdBy ?? people.of(session)[0]?.id;
       if (creatorId === undefined) {
         throw actionRequires(
           "NotionFixture.createPage",

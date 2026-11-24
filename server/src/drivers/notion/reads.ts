@@ -12,7 +12,11 @@ export type TextPattern = string | { source: string; flags: string };
  * Reading a Notion workspace's records, written once for both worlds: the fake's own store, and
  * the live world's mirror of real Notion, which keeps the same record shapes (architecture.md 3.3).
  */
-export function notionReads(store: NotionStore) {
+export function notionReads(
+  store: NotionStore,
+  /** The people a session can name: its own, as the fake keeps them; live, the shared pool's it holds too. */
+  peopleOf: (session: string) => ReadonlyArray<{ id: string; name: string }> = (session) => store.users.list(session),
+) {
   /** A page's title: its title property, whatever the database calls it. */
   const titleOf = (page: NotionPageRecord): string => {
     const title = Object.values(page.properties).find((value) => value.type === "title");
@@ -56,7 +60,7 @@ export function notionReads(store: NotionStore) {
   const richText = (session: string, text: string): RichTextItem[] =>
     richTextPieces(text, (name) => {
       if (name.toLowerCase() === store.bot.name.toLowerCase()) return store.bot.id;
-      return store.users.list(session).find((user) => user.name.toLowerCase() === name.toLowerCase())?.id;
+      return peopleOf(session).find((user) => user.name.toLowerCase() === name.toLowerCase())?.id;
     }).map((piece) =>
       "text" in piece
         ? textItem(piece.text)

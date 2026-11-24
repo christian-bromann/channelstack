@@ -7,7 +7,7 @@ import type { LiveCredential } from "../../../core/secrets/index.ts";
 const { APIResponseError, Client, isNotionClientError } = notionClient;
 
 /** Real Notion's REST API. Only `createApp` can point the client elsewhere (a stub in unit tests), never the environment. */
-const NOTION_API = "https://api.notion.com";
+export const NOTION_API = "https://api.notion.com";
 /** The version the fake answers as (data sources split from databases). */
 const NOTION_VERSION = "2025-09-03";
 
@@ -19,6 +19,18 @@ export class NotionRefusal extends ProtocolError {
 }
 
 type Method = "get" | "post" | "patch" | "delete";
+
+/** Codes of a refusal that will pass: a rate limit, or Notion's own failure. Asked again later, it may well be answered. */
+const PASSING = new Set([
+  "rate_limited",
+  "internal_server_error",
+  "service_unavailable",
+  "database_connection_unavailable",
+  "gateway_timeout",
+  "unexpected",
+]);
+
+export const passing = (error: unknown): boolean => error instanceof NotionRefusal && PASSING.has(error.code);
 
 /**
  * Calls Notion's REST API through Notion's own client, with one credential per call: the

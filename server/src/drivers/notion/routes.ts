@@ -18,6 +18,7 @@ import {
 import type { NotionWorld } from "./backend.ts";
 import { NotionApiError } from "./errors.ts";
 import type { FakeNotionWorld, PlainValue } from "./fake/world.ts";
+import { NOTION_API } from "./live/client.ts";
 import { plainText } from "./rich-text.ts";
 import { renderDiscussion, renderPage } from "./transcript.ts";
 import type {
@@ -185,8 +186,6 @@ const CONNECTIONS: LiveSupport = {
   requires: "browser",
   reason: "no API connects a page to an integration; Notion's UI does (… → Connections)",
 };
-/** Real Notion's REST API, where a live agent reaches Notion. */
-const NOTION_API = "https://api.notion.com";
 /** What only the integration's own calls show: live, proxy mode sees them. */
 const AGENT_SIDE: LiveSupport = {
   requires: "proxy",

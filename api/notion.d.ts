@@ -167,7 +167,10 @@ export interface NotionComment {
   readonly author: NotionAuthor;
   readonly text: string;
   readonly createdAt: Timestamp;
-  /** The `comment.created` delivery, if the integration is connected and subscribed. */
+  /**
+   * The `comment.created` delivery, if the integration is connected and subscribed. Fake mode
+   * only: live, Notion delivers to the agent itself, and there is none.
+   */
   readonly delivery?: NotionDelivery;
 }
 
