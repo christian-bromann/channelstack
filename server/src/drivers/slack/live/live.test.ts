@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 import { harness } from "../../../../test/app-harness.ts";
-import { slackClientStub } from "../../../../test/slack-client-stub.ts";
+import { SIGNED_OUT, slackClientStub } from "../../../../test/slack-client-stub.ts";
 import { type SlackStub, slackStub } from "../../../../test/slack-live-stub.ts";
 import { storageStatePath, writeStorageState } from "../../../core/browser/index.ts";
 
@@ -319,6 +319,25 @@ describe("the browser actor: what only Slack's client does", () => {
     expect(server.client.clicks).toEqual([
       { user: ana.userId, channel: channel.body.id, thread: asked, label: "Approve" },
     ]);
+  });
+
+  test("a saved session Slack has signed out is said as such, with how to sign in again", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", SIGNED_OUT);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "hi" },
+      channel: channel.body.id,
+    });
+    expect(said.body.error).toBe("live_misconfigured");
+    expect(said.body.message).toBe(
+      "Ana's saved Slack session is signed out: sign in again: channelstack login slack --user ana",
+    );
+    expect(stub.channel(channel.body.id)?.messages ?? []).toEqual([]);
   });
 
   test("a saved session others can read, or none where the test said, is refused", async () => {

@@ -5,7 +5,7 @@ import { SlackRefusal } from "../world.ts";
 import { archiveTagged, removeSlackEntry, taggedChannels } from "./cleanup.ts";
 import { SlackWebClient } from "./client.ts";
 import { checkSlackCredential, identify, type SlackIdentity } from "./identity.ts";
-import { SLACK_CLIENT } from "./ui.ts";
+import { signedInToSlack, SLACK_CLIENT } from "./ui.ts";
 
 const PERSON = /^CHANNELSTACK_SLACK_USER_([A-Z0-9_]+)_TOKEN$/;
 
@@ -48,7 +48,7 @@ export const slackMaintenance: LiveMaintenance = {
     return {
       start: who.url,
       origins: [new URL(who.url).origin, SLACK_CLIENT],
-      signedIn: (url) => url.startsWith(`${SLACK_CLIENT}/client/`),
+      signedIn: signedInToSlack,
       cookieDomains: ["slack.com"],
     };
   },

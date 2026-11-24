@@ -1,7 +1,12 @@
 import type { BrowserActor } from "../../../core/browser/index.ts";
+import { ProtocolError } from "../../../core/errors/index.ts";
+import { liveMisconfigured } from "../../../core/reality/index.ts";
 
 /** Slack's web client: the only origin the Slack browser actor opens. */
 export const SLACK_CLIENT = "https://app.slack.com";
+
+/** A page of the signed-in client, not a sign-in page Slack sent a signed-out person to. */
+export const signedInToSlack = (url: string) => url.startsWith(`${SLACK_CLIENT}/client/`);
 
 /** What a person types: text, and mentions picked from Slack's suggestions by the handle. */
 export type Typed = Array<{ text: string } | { mention: string }>;
@@ -43,35 +48,57 @@ async function compose(actor: BrowserActor, typed: Typed): Promise<void> {
   await actor.press("Enter");
 }
 
-/** A person in Slack's web client, as the browser actor drives it. */
-export function slackClient(actor: BrowserActor, team: string) {
+/**
+ * A person in Slack's web client, as the browser actor drives it. `person` names them in the
+ * refusal when their saved session is signed out (Slack ends it when they sign out, or after a while).
+ */
+export function slackClient(actor: BrowserActor, team: string, person: { name: string; login: string }) {
+  const signedOut = () =>
+    liveMisconfigured(
+      `${person.name}'s saved Slack session is signed out`,
+      `sign in again: channelstack login slack --user ${person.login}`,
+    );
+  /** Open a page of the client and act on it: a sign-in page instead of the client is said as such. */
+  const on = async (url: string, act: () => Promise<void>) => {
+    await actor.open(url);
+    if (!signedInToSlack(await actor.url())) throw signedOut();
+    try {
+      await act();
+    } catch (error) {
+      // Slack can send a signed-out person to its sign-in page after the client began to load.
+      if (error instanceof ProtocolError && error.code === "not_shown" && !signedInToSlack(await actor.url())) {
+        throw signedOut();
+      }
+      throw error;
+    }
+  };
   return {
     /** Write a message in a conversation, as a person does: in the composer, then Enter. */
-    async say(channel: string, typed: Typed): Promise<void> {
-      await actor.open(conversationUrl(team, channel));
-      await actor.click(SELECTORS.composer);
-      await compose(actor, typed);
-    },
+    say: (channel: string, typed: Typed) =>
+      on(conversationUrl(team, channel), async () => {
+        await actor.click(SELECTORS.composer);
+        await compose(actor, typed);
+      }),
 
     /** Reply in a thread: in the thread pane's composer. */
-    async reply(channel: string, rootTs: string, typed: Typed): Promise<void> {
-      await actor.open(threadUrl(team, channel, rootTs));
-      await actor.click([SELECTORS.threadComposer, SELECTORS.composer]);
-      await compose(actor, typed);
-    },
+    reply: (channel: string, rootTs: string, typed: Typed) =>
+      on(threadUrl(team, channel, rootTs), async () => {
+        await actor.click([SELECTORS.threadComposer, SELECTORS.composer]);
+        await compose(actor, typed);
+      }),
 
     /** Click a button by its label, on a message in a conversation or in a thread. */
-    async click(label: string, where: { channel: string; thread?: string | undefined }): Promise<void> {
-      await actor.open(
+    click: (label: string, where: { channel: string; thread?: string | undefined }) =>
+      on(
         where.thread === undefined
           ? conversationUrl(team, where.channel)
           : threadUrl(team, where.channel, where.thread),
-      );
-      await actor.click(
-        where.thread === undefined
-          ? SELECTORS.button(label, "conversation")
-          : [SELECTORS.button(label, "thread"), SELECTORS.button(label, "conversation")],
-      );
-    },
+        () =>
+          actor.click(
+            where.thread === undefined
+              ? SELECTORS.button(label, "conversation")
+              : [SELECTORS.button(label, "thread"), SELECTORS.button(label, "conversation")],
+          ),
+      ),
   };
 }

@@ -343,7 +343,8 @@ export function createLiveWorld(deps: {
       origins: [SLACK_CLIENT],
       state: () => readStorageState(browser.path),
     });
-    return slackClient(started, known().team.id);
+    const alias = person(session, userId).alias;
+    return slackClient(started, known().team.id, { name: alias, login: alias.toLowerCase() });
   };
 
   /** What a person types for a test's text: its text, and each mention as the handle Slack suggests. */

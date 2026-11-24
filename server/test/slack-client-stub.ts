@@ -6,8 +6,10 @@ import type { SlackStub } from "./slack-live-stub.ts";
  * does (open a page, click the composer or a button, type, press Tab and Enter) over the Slack
  * stub. What a person types and sends arrives there as a message they typed, with no app's bot
  * on it; `@handle` and Tab picks the mention, as Slack's suggestions do. The person is whoever the
- * saved session's `d` cookie names.
+ * saved session's `d` cookie names; a session whose `d` is `SIGNED_OUT` is sent to the sign-in page.
  */
+export const SIGNED_OUT = "signed-out";
+
 export function slackClientStub(stub: SlackStub) {
   const clicks: Array<{ user: string; channel: string; thread: string | undefined; label: string }> = [];
   const opened: string[] = [];
@@ -15,6 +17,7 @@ export function slackClientStub(stub: SlackStub) {
     let user = "";
     let page: { channel: string; thread: string | undefined } | undefined;
     let draft: string | undefined;
+    let current = "about:blank";
     const element = (selector: string) => {
       const label = /normalize-space\(\.\)=("(?:[^"\\]|\\.)*")/.exec(selector)?.[1];
       const shown = () => {
@@ -36,11 +39,17 @@ export function slackClientStub(stub: SlackStub) {
     return {
       url: async (url: string) => {
         opened.push(url);
+        draft = undefined;
+        if (user === SIGNED_OUT && new URL(url).pathname.startsWith("/client")) {
+          current = "https://app.slack.com/workspace-signin?redir=%2Fclient";
+          page = undefined;
+          return;
+        }
+        current = url;
         const match = /\/client\/[^/]+\/([^/]+)(?:\/thread\/[^-]+-(.+))?$/.exec(new URL(url).pathname);
         page = match ? { channel: match[1] as string, thread: match[2] } : undefined;
-        draft = undefined;
       },
-      getUrl: async () => opened.at(-1) ?? "about:blank",
+      getUrl: async () => current,
       setCookies: async (cookies) => {
         user = cookies.find((cookie) => cookie.name === "d")?.value ?? "";
       },
