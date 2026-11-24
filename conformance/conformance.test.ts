@@ -149,7 +149,11 @@ describe("exit check 6.4: the shape differ", () => {
       { path: "count", fake: "number", live: "string" },
     ]);
     // Kept codes are compared: an event type or an error code the fake never sends is a difference.
-    expect(compareShapes({ type: "=message" }, { type: "=message|=app_mention" })).toEqual([]);
+    expect(compareShapes({ type: "=message|=app_mention" }, { type: "=message" })).toEqual([]);
+    // A code only the platform sends is a difference, even next to one both send.
+    expect(compareShapes({ type: "=message" }, { type: "=message|=app_mention" })).toEqual([
+      { path: "type", fake: "=message", live: "=app_mention" },
+    ]);
     expect(compareShapes({ error: "=not_in_channel" }, { error: "=channel_not_found" })).toEqual([
       { path: "error", fake: "=not_in_channel", live: "=channel_not_found" },
     ]);
@@ -159,7 +163,7 @@ describe("exit check 6.4: the shape differ", () => {
     expect(compareShapes({ items: [] }, { items: [{ id: "string" }] })).toEqual([]);
   });
 
-  test("recordings are read per operation, merged, and refusals left out", async () => {
+  test("recordings are read per operation, merged, and a refusal is its own operation", async () => {
     const { readShapes } = await import("./shapes.ts");
     const dir = mkdtempSync(join(tmpdir(), "channelstack-shapes-"));
     try {
@@ -192,6 +196,7 @@ describe("exit check 6.4: the shape differ", () => {
       );
       expect(Object.fromEntries(readShapes([file, join(dir, "missing.jsonl")]))).toEqual({
         "api slack POST /api/chat.postMessage": { ok: "=true", ts: "string", channel: "string" },
+        "api slack POST /api/chat.postMessage refused": { ok: "=false", error: "=not_in_channel" },
         "webhook github issues": { action: "=opened" },
       });
     } finally {

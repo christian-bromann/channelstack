@@ -78,6 +78,7 @@ divergences:
       - "webhook AgentSessionEvent created agentSession.workspaceDiff"
       - "webhook AgentSessionEvent created guidance"
       - "webhook AgentSessionEvent created previousComments"
+      - "api POST /graphql team_states data.team.states.nodes.[].type"
     reason: >-
       Real Linear's AgentSessionEvent on delegation carries more of the session (slugId, plan,
       context and others), a comment thread and the opening prompt as agentActivity, with
@@ -93,6 +94,7 @@ divergences:
       - "api GET /v1/blocks/{id}/children results.[].child_page"
       - "api GET /v1/blocks/{id}/children results.[].paragraph.icon"
       - "api PATCH /v1/blocks/{id}/children results.[].paragraph.icon"
+      - "api GET /v1/blocks/{id}/children results.[].type"
     reason: >-
       Real Notion's mention of a bot in rich text carries the bot user's name, avatar_url, type and
       bot; the fake's has its id only. To add to the fake: #27.

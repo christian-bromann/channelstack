@@ -13,7 +13,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { mergeShapes, type RecordedShape, type Shape } from "../server/src/core/proxy/record.ts";
 import type { Difference } from "./lib.ts";
 
-/** Every recorded operation, its shapes merged: `api slack POST /api/chat.postMessage` → its shape. */
+/**
+ * Every recorded operation, its shapes merged: `api slack POST /api/chat.postMessage` → its shape.
+ * A refusal has its own shape (`{ ok: false, error }`, a 4xx, a GraphQL answer with `errors`), so
+ * it is its own operation (`… refused`): the error codes the platform answers with are compared
+ * with the fake's, apart from the answers that worked.
+ */
 export function readShapes(files: readonly string[]): Map<string, Shape> {
   const shapes = new Map<string, Shape>();
   for (const file of files) {
@@ -21,13 +26,14 @@ export function readShapes(files: readonly string[]): Map<string, Shape> {
     for (const line of readFileSync(file, "utf8").split("\n")) {
       if (line.trim() === "") continue;
       const recorded = JSON.parse(line) as RecordedShape;
-      // A refusal has its own shape (`{ ok: false, error }`): only answers that worked are compared.
-      if (recorded.kind === "api" && (recorded.status ?? 200) >= 400) continue;
-      // Slack's `{ ok: false }` and a GraphQL answer with `errors` are refusals too.
-      if (recorded.kind === "api" && typeof recorded.shape === "object" && !Array.isArray(recorded.shape)) {
-        if (recorded.shape.ok === "=false" || recorded.shape.errors !== undefined) continue;
-      }
-      const key = `${recorded.kind} ${recorded.channel} ${recorded.operation}`;
+      const shape = recorded.shape;
+      const refused =
+        recorded.kind === "api" &&
+        ((recorded.status ?? 200) >= 400 ||
+          (typeof shape === "object" &&
+            !Array.isArray(shape) &&
+            (shape.ok === "=false" || shape.errors !== undefined)));
+      const key = `${recorded.kind} ${recorded.channel} ${recorded.operation}${refused ? " refused" : ""}`;
       const known = shapes.get(key);
       shapes.set(key, known === undefined ? recorded.shape : mergeShapes(known, recorded.shape));
     }
@@ -54,13 +60,14 @@ export function compareShapes(fake: Shape, live: Shape, path = ""): Difference[]
     return fake[0] === undefined || live[0] === undefined ? [] : compareShapes(fake[0], live[0], at("[]"));
   }
   if (typeof fake === "string" && typeof live === "string") {
-    // Codes on both sides (`=message`, `=channel_not_found`): the platform's must be among the fake's.
+    // Codes on both sides (`=message`, `=channel_not_found`): every code the platform sent there
+    // must be one the fake sends too.
     const codes = (shape: string) => shape.split("|").filter((type) => type !== "null");
     if ([...codes(fake), ...codes(live)].every((type) => type.startsWith("="))) {
-      const theirs = codes(live);
-      return theirs.length === 0 || codes(fake).length === 0 || theirs.some((code) => codes(fake).includes(code))
+      const missing = codes(live).filter((code) => !codes(fake).includes(code));
+      return codes(fake).length === 0 || missing.length === 0
         ? []
-        : [{ path: path || "(value)", fake, live }];
+        : [{ path: path || "(value)", fake, live: missing.join("|") }];
     }
     const mine = types(fake);
     // `null` next to a type only says the value was missing once.
