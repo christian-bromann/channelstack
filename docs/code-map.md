@@ -54,7 +54,8 @@
 | State directory | `home/` | `CHANNELSTACK_HOME`, writing 0600 files atomically, reading JSON state | Write a file with a secret any other way |
 | Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency; the server's one polling loop (`pollUntil`: ask until there is an answer or the time is up) | Call `Date.now()` or `setTimeout` in core or a driver; write a deadline-and-poll loop |
 | portless | `portless/` | Registering and removing `*.localhost` names through the `portless` CLI | Spawn `portless` anywhere else |
-| Proxy and CA | `proxy/`, `ca/` *(planned, phase 6)* | Host routing to fakes, the name-constrained CA | — |
+| Proxy mode's CA | `ca/` | channelstack's own CA in `<home>/ca/` (0600), name-constrained to the routed provider hosts and to no IP address (`loadCa`, `rotateCa`); the certificates it issues, only for those hosts (`ProxyCa.issue`); the bundle of the public roots and the CA for `SSL_CERT_FILE` | Make a certificate or a key pair anywhere else; write to a system trust store |
+| Proxy | `proxy/` *(planned, phase 6)* | Host routing to fakes for agents with hard-coded hosts | — |
 
 ## Server: drivers (`server/src/drivers/<channel>/`)
 
