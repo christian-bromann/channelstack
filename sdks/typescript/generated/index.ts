@@ -777,10 +777,10 @@ export class Channelstack extends ClientBase {
     await ctx.transport.request("POST", `/reset`);
   }
 
-  /** Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). */
-  async env(): Promise<Env> {
+  /** Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs. */
+  async env(options: { proxy?: boolean } = {}): Promise<Env> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/env`)) as Env;
+    const data = (await ctx.transport.request("GET", `/env`, { query: { proxy: options.proxy } })) as Env;
     return data;
   }
 

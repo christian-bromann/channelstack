@@ -2,14 +2,17 @@ import { join } from "node:path";
 
 import { type App, type AppOptions, CONTROL_PREFIX, createApp, type LiveOptions, type ServerUrls } from "./app.ts";
 import { createBearerToken } from "./core/auth/index.ts";
+import { loadCa } from "./core/ca/index.ts";
 import { readPrivateJsonFile, removeFile, writePrivateFile } from "./core/home/index.ts";
 import { ledgerDir } from "./core/ledger/index.ts";
 import { createLogger, type LogLevel } from "./core/log/index.ts";
 import { registerAliases } from "./core/portless/index.ts";
+import { type RunningProxy, startProxy } from "./core/proxy/index.ts";
+import { writeNodePreload } from "./core/proxy/node.ts";
 import { Redactor } from "./core/redact/index.ts";
 import type { SocketSession } from "./core/router/index.ts";
 import { Secrets } from "./core/secrets/index.ts";
-import { secretSpecs } from "./drivers/index.ts";
+import { DRIVERS, proxyHosts, secretSpecs } from "./drivers/index.ts";
 
 /** The only address the server binds: the control API is never reachable from another machine. */
 const LOOPBACK = "127.0.0.1";
@@ -31,6 +34,11 @@ export interface StartOptions {
   ui?: string;
   /** The environment live mode reads: credentials, allowlists, `CHANNELSTACK_REALITY`, `CHANNELSTACK_RUN_ID`. */
   env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * Proxy mode (implementation plan 6.2): also listen on this loopback port as an HTTP proxy that
+   * routes the provider hosts to the fakes. 0 picks a free one. Without it, no proxy.
+   */
+  proxyPort?: number;
   /**
    * For tests that start a whole server: stand-ins for the platforms live mode calls. Only code
    * can pass it, never a flag or the environment, so a token can't be sent elsewhere.
@@ -56,6 +64,8 @@ interface ServerFile {
   version: string;
   /** The loopback origin the server listens on, whatever `url` is. */
   local: string;
+  /** Proxy mode: the proxy's URL. */
+  proxy?: string;
 }
 
 /** The server file's contents, if it is there and readable as one. */
@@ -128,10 +138,9 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     },
   });
 
-  const server = Bun.serve<{ session: SocketSession }>({
-    hostname: LOOPBACK,
-    port: options.port,
-    fetch(request, listening) {
+  // The same answers on every listener: the loopback port, and in proxy mode the TLS one behind the proxy.
+  const handler = {
+    fetch(request: Request, listening: Bun.Server<{ session: SocketSession }>) {
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return app.fetch(request);
       // A WebSocket is only opened where a fake expects one (Slack's Socket Mode, with its ticket).
       const session = app.socket(request);
@@ -139,20 +148,60 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       return new Response("Not Found", { status: 404 });
     },
     websocket: {
-      open: (socket) =>
+      open: (socket: Bun.ServerWebSocket<{ session: SocketSession }>) =>
         socket.data.session.open({ send: (text) => void socket.send(text), close: () => socket.terminate() }),
-      message: (socket, message) => socket.data.session.message(String(message)),
-      close: (socket) => socket.data.session.closed(),
+      message: (socket: Bun.ServerWebSocket<{ session: SocketSession }>, message: string | Buffer) =>
+        socket.data.session.message(String(message)),
+      close: (socket: Bun.ServerWebSocket<{ session: SocketSession }>) => socket.data.session.closed(),
     },
-  });
+  };
+  const server = Bun.serve<{ session: SocketSession }>({ hostname: LOOPBACK, port: options.port, ...handler });
   const origin = `http://${LOOPBACK}:${server.port}`;
-  const listening: ServerUrls = options.portless
-    ? { control: "https://channelstack.localhost", driver: (name) => `https://${name}.localhost` }
-    : { control: origin, driver: (name) => `${origin}/${name}` };
-  urls = listening;
 
+  let proxy: RunningProxy | undefined;
+  let proxyServer: Bun.Server<{ session: SocketSession }> | undefined;
   let removeAliases = async () => {};
   try {
+    let proxied: ServerUrls["proxy"];
+    if (options.proxyPort !== undefined) {
+      // Proxy mode: the provider hosts, served over TLS by a certificate from channelstack's own CA.
+      const hosts = proxyHosts();
+      const ca = await loadCa(options.home, hosts);
+      const leaf = await ca.issue(hosts);
+      const tls = Bun.serve<{ session: SocketSession }>({
+        hostname: LOOPBACK,
+        port: 0,
+        tls: { cert: leaf.cert, key: leaf.key },
+        ...handler,
+      });
+      proxyServer = tls;
+      proxy = await startProxy({
+        port: options.proxyPort,
+        log,
+        route: (host) => (hosts.includes(host) ? { host: LOOPBACK, port: Number(tls.port) } : undefined),
+      });
+      proxied = {
+        url: proxy.url,
+        caFile: ca.caFile,
+        bundleFile: ca.bundleFile,
+        nodePreload: writeNodePreload(options.home),
+      };
+    }
+    // In proxy mode a fake's own URLs are the provider's (`wss://slack.com/link`), so an agent that
+    // reaches the platforms only through the proxy reaches them too.
+    const providerOrigin = (name: string) => {
+      const host = proxied ? DRIVERS.find((driver) => driver.name === name)?.hosts?.[0] : undefined;
+      return host ? `https://${host}` : undefined;
+    };
+    const listening: ServerUrls = options.portless
+      ? {
+          control: "https://channelstack.localhost",
+          driver: (name) => providerOrigin(name) ?? `https://${name}.localhost`,
+        }
+      : { control: origin, driver: (name) => providerOrigin(name) ?? `${origin}/${name}` };
+    if (proxied) listening.proxy = proxied;
+    urls = listening;
+
     if (options.portless) removeAliases = await registerAliases(app.hosts(), Number(server.port));
     const file: ServerFile = {
       url: listening.control,
@@ -160,18 +209,23 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       pid: process.pid,
       version: options.version,
       local: origin,
+      ...(proxy ? { proxy: proxy.url } : {}),
     };
     writePrivateFile(serverFile, `${JSON.stringify(file, null, 2)}\n`);
   } catch (error) {
     // Nothing may be left behind by a start that failed: no names pointing at a dead port, no listener.
     await removeAliases();
+    await proxy?.stop();
+    await proxyServer?.stop(true);
     await server.stop(true);
     throw error;
   }
+  const listening = urls;
   log.info("listening", {
     address: `${LOOPBACK}:${server.port}`,
     control: `${listening.control}${CONTROL_PREFIX}`,
     portless: options.portless,
+    ...(proxy ? { proxy: proxy.url } : {}),
   });
 
   return {
@@ -183,6 +237,8 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       // Only this server's own file: after a crash and restart it may already describe another one.
       if (readServerFile(serverFile)?.token === token) removeFile(serverFile);
       await removeAliases();
+      await proxy?.stop();
+      await proxyServer?.stop(true);
       await server.stop(true);
     },
   };

@@ -13,6 +13,7 @@ import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
 import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
+import { nodeOptions } from "./core/proxy/node.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
 import {
   actionRequires,
@@ -42,8 +43,45 @@ export const CONTROL_PREFIX = "/_channelstack";
 export interface ServerUrls {
   /** UI and control API base, e.g. `https://channelstack.localhost`. */
   control: string;
-  /** A driver's fake provider API, e.g. `https://echo.localhost` or `http://127.0.0.1:4500/echo`. */
+  /**
+   * A driver's fake provider API, e.g. `https://echo.localhost` or `http://127.0.0.1:4500/echo`.
+   * In proxy mode, the provider's own origin (`https://slack.com`), which the proxy routes to it.
+   */
   driver(name: string): string;
+  /** Proxy mode: where the proxy listens and the files the agent trusts channelstack's CA from. */
+  proxy?: ProxyEnv;
+}
+
+/** What an agent needs for proxy mode (implementation plan 6.2). */
+interface ProxyEnv {
+  /** `http://127.0.0.1:<port>`. */
+  url: string;
+  /** channelstack's CA alone, for `NODE_EXTRA_CA_CERTS`. */
+  caFile: string;
+  /** The public roots and the CA, for runtimes that replace their bundle (`SSL_CERT_FILE`). */
+  bundleFile: string;
+  /** The preload that keeps Node's proxy-aware `fetch` in an agent that loads undici (`writeNodePreload`). */
+  nodePreload: string;
+}
+
+/** The environment that points an agent at the proxy and trusts channelstack's CA in it, and only there. */
+function proxyEnv(proxy: ProxyEnv): Record<string, string> {
+  // Loopback and *.localhost stay direct: the agent's own server, and anything portless serves.
+  const direct = "localhost,127.0.0.1,::1,.localhost";
+  return {
+    HTTPS_PROXY: proxy.url,
+    HTTP_PROXY: proxy.url,
+    https_proxy: proxy.url,
+    http_proxy: proxy.url,
+    NO_PROXY: direct,
+    no_proxy: direct,
+    // Node 24 routes its own http, https and fetch through the proxy only with this.
+    NODE_USE_ENV_PROXY: "1",
+    NODE_OPTIONS: nodeOptions(proxy.nodePreload),
+    NODE_EXTRA_CA_CERTS: proxy.caFile,
+    SSL_CERT_FILE: proxy.bundleFile,
+    REQUESTS_CA_BUNDLE: proxy.bundleFile,
+  };
 }
 
 export interface AppOptions {
@@ -352,11 +390,39 @@ export function createApp(options: AppOptions): App {
   registerRoute(control, {
     method: "get",
     path: "/env",
-    summary: "Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints)",
+    summary:
+      "Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs",
+    query: z.object({
+      proxy: z
+        .stringbool()
+        .optional()
+        // On the wire `true` or `false`; to the SDKs a boolean.
+        .openapi({
+          type: "boolean",
+          param: { name: "proxy", in: "query" },
+          description: "For proxy mode: `channelstack env --proxy`",
+        }),
+    }),
     response: Env,
-    sdkMethod: { on: "Channelstack", name: "env" },
+    errors: ["action_requires"],
+    sdkMethod: { on: "Channelstack", name: "env", options: ["proxy"] },
     stability: "stable",
-    handler: () => Object.assign({}, ...drivers.map((driver) => driver.env())),
+    handler: ({ query }) => {
+      const env: Record<string, string> = Object.assign({}, ...drivers.map((driver) => driver.env()));
+      if (query.proxy !== true) return env;
+      const proxy = options.urls().proxy;
+      if (!proxy) {
+        throw new ProtocolError(
+          "action_requires",
+          "channelstack env --proxy needs proxy mode: start the server with --proxy",
+          { operation: "Channelstack.env", requires: "proxy mode" },
+        );
+      }
+      // An agent in proxy mode keeps its own API URLs: the proxy sends the provider's hosts to the fakes.
+      const origins = DRIVERS.flatMap((definition) => (definition.hosts ?? []).map((host) => `https://${host}`));
+      const urls = (value: string) => origins.some((origin) => value === origin || value.startsWith(`${origin}/`));
+      return { ...Object.fromEntries(Object.entries(env).filter(([, value]) => !urls(value))), ...proxyEnv(proxy) };
+    },
   });
 
   DRIVERS.forEach((definition, at) => {
@@ -408,7 +474,13 @@ export function createApp(options: AppOptions): App {
   for (const driver of drivers) root.route(`/${driver.name}`, driver.fake.api);
   root.notFound((c) => c.json(new ProtocolError("not_found", "Nothing is served here").toBody(), 404));
 
-  const byHost = new Map(drivers.map((driver) => [`${driver.name}.localhost`, driver]));
+  // A driver's own name, and in proxy mode the provider's hosts, which arrive through the proxy's TLS listener.
+  const byHost = new Map(
+    drivers.flatMap((driver, at) => [
+      [`${driver.name}.localhost`, driver] as const,
+      ...(DRIVERS[at]?.hosts ?? []).map((host) => [host, driver] as const),
+    ]),
+  );
 
   return {
     fetch(request) {

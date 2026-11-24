@@ -7,11 +7,12 @@ import { attach, type Attached } from "./cli/attach.ts";
 import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runSlack } from "./cli/slack.ts";
 import { runShow, runTail } from "./cli/watch.ts";
+import { rotateCa } from "./core/ca/index.ts";
 import { homeDir } from "./core/home/index.ts";
 import { parseSeed } from "./core/ids/index.ts";
 import { parseLogLevel } from "./core/log/index.ts";
 import { randomSeed, Secrets } from "./core/secrets/index.ts";
-import { DRIVERS, secretSpecs } from "./drivers/index.ts";
+import { DRIVERS, proxyHosts, secretSpecs } from "./drivers/index.ts";
 import { start } from "./serve.ts";
 import { UI_PAGE } from "./ui/page.ts";
 
@@ -23,7 +24,12 @@ Usage:
       --port <n>                  The loopback port (default 4500 without portless; 0 picks a free one)
       --server-file <path>        Where to write the control API's URL and token (default <home>/server.json)
       --log-level <level>         debug, info, warn, error or silent (default info)
+      --proxy                     Also run an HTTP proxy for agents with hard-coded hosts: slack.com, api.github.com,
+                                  api.linear.app and api.notion.com go to the fakes, every other host passes through
+      --proxy-port <n>            The proxy's loopback port (default 7464; 0 picks a free one)
   channelstack env                Print .env lines for the agent, from the running server
+      --proxy                     For proxy mode: HTTPS_PROXY and the CA the agent trusts, instead of the API URLs
+  channelstack ca rotate          Replace proxy mode's CA (<home>/ca); restart the server and run \`channelstack env --proxy\`
 
   Attached to the running server (a shared "dev" session; people and channels are created on first use):
   channelstack slack say   --as <name> --in "#channel" "<text>"
@@ -60,6 +66,15 @@ Environment:
 `;
 
 const DEFAULT_PORT = 4500;
+/** Proxy mode's port, fixed so the `HTTPS_PROXY` line in an agent's `.env` stays right across restarts. */
+const DEFAULT_PROXY_PORT = 7464;
+
+/** A port flag's value, or the default when it isn't given. */
+function portFlag(name: string, value: string | undefined, fallback: number): number {
+  const port = value === undefined ? fallback : Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) fail(`--${name} must be a port number, got "${value}"`);
+  return port;
+}
 
 function fail(message: string): never {
   process.stderr.write(`channelstack: ${message}\n`);
@@ -71,10 +86,13 @@ async function runStart(flags: {
   port?: string;
   "server-file"?: string;
   "log-level"?: string;
+  proxy?: boolean;
+  "proxy-port"?: string;
 }) {
   const portless = !flags["no-portless"];
-  const port = flags.port === undefined ? (portless ? 0 : DEFAULT_PORT) : Number(flags.port);
-  if (!Number.isInteger(port) || port < 0 || port > 65535) fail(`--port must be a port number, got "${flags.port}"`);
+  const port = portFlag("port", flags.port, portless ? 0 : DEFAULT_PORT);
+  const proxyPort = flags.proxy ? portFlag("proxy-port", flags["proxy-port"], DEFAULT_PROXY_PORT) : undefined;
+  if (!flags.proxy && flags["proxy-port"] !== undefined) fail("--proxy-port needs --proxy");
 
   // The signals are caught before the server exists: its token file appears while it starts, and a
   // signal that arrives right then must still end in a clean stop, not a file left behind.
@@ -91,6 +109,7 @@ async function runStart(flags: {
     home: homeDir(),
     portless,
     port,
+    ...(proxyPort === undefined ? {} : { proxyPort }),
     serverFile: flags["server-file"] ?? process.env.CHANNELSTACK_SERVER_FILE,
     seed: seed ? parseSeed(seed) : randomSeed(),
     logLevel: parseLogLevel(flags["log-level"] ?? process.env.CHANNELSTACK_LOG_LEVEL),
@@ -109,10 +128,13 @@ async function runStart(flags: {
     "",
     `  Control  ${running.urls.control}${CONTROL_PREFIX}`,
     ...DRIVERS.map((driver) => `  ${driver.name.padEnd(8)} ${running.urls.driver(driver.name)}`),
+    ...(running.urls.proxy ? [`  Proxy    ${running.urls.proxy.url}  (CA ${running.urls.proxy.caFile})`] : []),
     // A one-time link: it signs this browser in. `channelstack ui` prints a fresh one.
     `  UI       ${running.app.uiLoginLink()}`,
     "",
-    "  `channelstack env` prints tokens and URLs as .env lines",
+    running.urls.proxy
+      ? "  `channelstack env --proxy` prints tokens, the proxy and the CA as .env lines"
+      : "  `channelstack env` prints tokens and URLs as .env lines",
     "",
   ];
   process.stdout.write(lines.join("\n"));
@@ -130,11 +152,19 @@ async function runStart(flags: {
 }
 
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */
-async function runEnv(server: Attached) {
-  const env = await server.request<Record<string, string>>("GET", "/env");
+async function runEnv(server: Attached, proxy: boolean) {
+  const env = await server.request<Record<string, string>>("GET", proxy ? "/env?proxy=true" : "/env");
   return `${Object.entries(env)
     .map(([key, value]) => `${key}=${value}`)
     .join("\n")}\n`;
+}
+
+async function runCa(action: string | undefined) {
+  if (action !== "rotate") fail(`unknown ca command "${action ?? ""}". Did you mean \`channelstack ca rotate\`?`);
+  const ca = await rotateCa(homeDir(), proxyHosts());
+  process.stdout.write(
+    `Replaced proxy mode's CA (${ca.caFile}). Restart the server; agents trust the new one from the same files.\n`,
+  );
 }
 
 function runSecrets(action: string | undefined) {
@@ -157,6 +187,8 @@ async function main() {
       port: { type: "string" },
       "server-file": { type: "string" },
       "log-level": { type: "string" },
+      proxy: { type: "boolean" },
+      "proxy-port": { type: "string" },
       server: { type: "string" },
       as: { type: "string" },
       in: { type: "string" },
@@ -178,6 +210,7 @@ async function main() {
   const [command = "start", action, ...rest] = positionals;
   if (command === "start") return runStart(values);
   if (command === "secrets") return runSecrets(action);
+  if (command === "ca") return runCa(action);
   if (command === "login") {
     const result = await runLogin({
       env: process.env,
@@ -209,7 +242,7 @@ async function main() {
 
   // Everything else attaches to the running server.
   const print = (text: string) => void process.stdout.write(text);
-  if (command === "env") return print(await runEnv(attach(values)));
+  if (command === "env") return print(await runEnv(attach(values), values.proxy === true));
   if (command === "slack") return print(await runSlack(attach(values), action, rest, values));
   if (command === "ui") {
     const { url } = await attach(values).request<{ url: string }>("POST", "/ui/login-links");

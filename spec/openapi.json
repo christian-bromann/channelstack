@@ -6427,7 +6427,7 @@
     },
     "/env": {
       "get": {
-        "summary": "Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints)",
+        "summary": "Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs",
         "security": [
           {
             "bearer": []
@@ -6435,14 +6435,30 @@
         ],
         "x-channelstack-method": {
           "on": "Channelstack",
-          "name": "env"
+          "name": "env",
+          "options": [
+            "proxy"
+          ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
-          "internal"
+          "internal",
+          "action_requires"
         ],
         "x-channelstack-stability": "stable",
+        "parameters": [
+          {
+            "schema": {
+              "type": "boolean",
+              "description": "For proxy mode: `channelstack env --proxy`"
+            },
+            "required": false,
+            "description": "For proxy mode: `channelstack env --proxy`",
+            "name": "proxy",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",

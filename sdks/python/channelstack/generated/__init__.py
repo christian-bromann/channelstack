@@ -1047,10 +1047,10 @@ class Channelstack(ClientBase):
         ctx = self._ctx
         await ctx.transport.request("POST", f"/reset")
 
-    async def env(self) -> Env:
-        """Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints)."""
+    async def env(self, *, proxy: bool | None = None) -> Env:
+        """Env vars for the agent: fake tokens, signing secrets and API URLs (what `channelstack env` prints). With `proxy`, the proxy and the CA instead of the API URLs."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/env")
+        data = await ctx.transport.request("GET", f"/env", query={"proxy": proxy})
         return data
 
     async def ui_login_link(self) -> UiLoginLink:

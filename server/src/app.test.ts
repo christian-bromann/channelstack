@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { type Harness, harness, TOKEN } from "../test/app-harness.ts";
+import type { ServerUrls } from "./app.ts";
 import { signEchoDelivery } from "./core/signing/echo.ts";
 
 const servers: Server[] = [];
@@ -384,5 +385,65 @@ describe("the UI", () => {
     expect((await h.call("POST", "/ui/login-links")).body.url).toMatch(
       /^http:\/\/127\.0\.0\.1:4500\/\?login=[A-Za-z0-9_-]{20,}$/,
     );
+  });
+});
+
+describe("proxy mode", () => {
+  const proxied = (): ServerUrls => ({
+    control: "http://127.0.0.1:4500",
+    driver: (name) =>
+      ({
+        slack: "https://slack.com",
+        github: "https://api.github.com",
+        linear: "https://api.linear.app",
+        notion: "https://api.notion.com",
+      })[name] ?? `http://127.0.0.1:4500/${name}`,
+    proxy: {
+      url: "http://127.0.0.1:7464",
+      caFile: "/home/ca/ca.pem",
+      bundleFile: "/home/ca/bundle.pem",
+      nodePreload: "/home/proxy/node-env-proxy.mjs",
+    },
+  });
+
+  test("env --proxy: the proxy and the CA instead of the API URLs, and the same tokens", async () => {
+    const h = harness({}, { urls: proxied });
+    const plain = (await h.call("GET", "/env")).body as Record<string, string>;
+    const env = (await h.call("GET", "/env?proxy=true")).body as Record<string, string>;
+    expect(env).toMatchObject({
+      HTTPS_PROXY: "http://127.0.0.1:7464",
+      HTTP_PROXY: "http://127.0.0.1:7464",
+      NO_PROXY: "localhost,127.0.0.1,::1,.localhost",
+      NODE_USE_ENV_PROXY: "1",
+      NODE_OPTIONS: '--import="/home/proxy/node-env-proxy.mjs"',
+      NODE_EXTRA_CA_CERTS: "/home/ca/ca.pem",
+      SSL_CERT_FILE: "/home/ca/bundle.pem",
+      REQUESTS_CA_BUNDLE: "/home/ca/bundle.pem",
+      SLACK_BOT_TOKEN: plain.SLACK_BOT_TOKEN,
+    });
+    // An agent in proxy mode keeps its own API URLs: none is printed for a provider the proxy routes.
+    for (const name of ["SLACK_API_URL", "GITHUB_API_URL", "LINEAR_API_URL", "NOTION_BASE_URL"]) {
+      expect(plain[name]).toBeDefined();
+      expect(env[name]).toBeUndefined();
+    }
+    // The echo driver has no provider host: its URL stays.
+    expect(env.ECHO_API_URL).toBe(plain.ECHO_API_URL);
+  });
+
+  test("env --proxy without proxy mode says what it needs", async () => {
+    const refused = await harness().call("GET", "/env?proxy=true");
+    expect(refused.status).toBe(422);
+    expect(refused.body).toMatchObject({ error: "action_requires", data: { requires: "proxy mode" } });
+  });
+
+  test("a provider host the proxy routes is served by that driver's fake", async () => {
+    const h = harness({}, { urls: proxied });
+    const response = await h.app.fetch(
+      new Request("https://slack.com/api/auth.test", {
+        method: "POST",
+        headers: { authorization: `Bearer ${h.secrets.get("slack", "botToken")}` },
+      }),
+    );
+    expect(await response.json()).toMatchObject({ ok: true, user: "my-agent" });
   });
 });

@@ -9,6 +9,7 @@ import { registerNotionRoutes } from "./routes.ts";
 /** The Notion driver: the fake REST API and its webhooks, and the control actions a test's people take. */
 export const notion: DriverDefinition = {
   name: "notion",
+  hosts: ["api.notion.com"],
   secrets: { token: "notion.token", verificationToken: "notion.verificationToken" },
   // The integration's token in a test workspace (live-mode.md, section 4). People bring their own tokens.
   live: {

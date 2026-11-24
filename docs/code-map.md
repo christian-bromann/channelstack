@@ -16,9 +16,9 @@
 
 | Concern | Module | Use it for | Don't |
 |---|---|---|---|
-| Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, quiet, reset, env; mounting each driver's fake; serving the UI page and its login link | Build services or mount routes anywhere else |
-| Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration, upgrading a WebSocket a fake expects (`app.socket`) | Call `Bun.serve` anywhere else (everything else also runs under Node) |
-| The command line | `cli.ts` | Parsing arguments and dispatching: `start`, `secrets rotate`, `doctor`, `sweep`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
+| Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, quiet, reset, env (and `proxyEnv`, what `env --proxy` adds); mounting each driver's fake, by its `*.localhost` name and by the provider hosts it declares (`hosts`); serving the UI page and its login link | Build services or mount routes anywhere else |
+| Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration, upgrading a WebSocket a fake expects (`app.socket`); in proxy mode, the TLS listener the proxy routes the provider hosts to, with the CA's certificate, and the provider origins as the drivers' URLs | Call `Bun.serve` anywhere else (everything else also runs under Node) |
+| The command line | `cli.ts` | Parsing arguments and dispatching: `start` (and `--proxy`), `secrets rotate`, `ca rotate`, `doctor`, `sweep`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
 | Live mode from the terminal | `cli/live.ts` | `doctor` (which channels run live, whether their credentials work and are allowlisted, saved browser sessions), `sweep` (what crashed runs left, `--check` for the nightly job) and `login` (a person signs in by hand, once; the session is saved for the browser actor), over each driver's `live.maintenance` | Call a platform from the CLI without the driver's maintenance |
 | Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError` | Read `server.json` or call the control API from another CLI module |
 | Acting from the terminal | `cli/slack.ts` | `slack say`, `reply`, `react`, `click`, `stop`; people and channels by name, created on first use; what `last` means | Resolve names or `last` anywhere else |
@@ -55,7 +55,7 @@
 | Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency; the server's one polling loop (`pollUntil`: ask until there is an answer or the time is up) | Call `Date.now()` or `setTimeout` in core or a driver; write a deadline-and-poll loop |
 | portless | `portless/` | Registering and removing `*.localhost` names through the `portless` CLI | Spawn `portless` anywhere else |
 | Proxy mode's CA | `ca/` | channelstack's own CA in `<home>/ca/` (0600), name-constrained to the routed provider hosts and to no IP address (`loadCa`, `rotateCa`); the certificates it issues, only for those hosts (`ProxyCa.issue`); the bundle of the public roots and the CA for `SSL_CERT_FILE` | Make a certificate or a key pair anywhere else; write to a system trust store |
-| Proxy | `proxy/` *(planned, phase 6)* | Host routing to fakes for agents with hard-coded hosts | — |
+| Proxy | `proxy/` | Proxy mode's HTTP proxy on loopback (`startProxy`): a `CONNECT` to a routed host goes to the server's TLS listener, any other is a plain tunnel; plain HTTP for a routed host is refused. `node.ts`: the preload that keeps Node's proxy-aware `fetch` in an agent that loads undici (`writeNodePreload`, `nodeOptions`) | Open a listener for agents anywhere else |
 
 ## Server: drivers (`server/src/drivers/<channel>/`)
 

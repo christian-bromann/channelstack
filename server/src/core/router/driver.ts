@@ -195,5 +195,10 @@ export interface DriverDefinition {
   readonly secrets: SecretSpec;
   /** What makes it live. A driver without it is always fake. */
   readonly live?: LiveDeclaration;
+  /**
+   * The provider hosts proxy mode routes to this fake (`slack.com`), first the one its API is at.
+   * They are what channelstack's CA may vouch for, and nothing else.
+   */
+  readonly hosts?: readonly string[];
   create(context: DriverContext): Driver;
 }
