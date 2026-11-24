@@ -18,8 +18,8 @@ interface SavedCookie {
   value: string;
   domain: string;
   path?: string;
-  /** Seconds since the epoch; missing or -1 for a cookie of the browser's session. */
-  expires?: number;
+  /** Seconds since the epoch (WebDriver's name for it); missing for a cookie of the browser's session. */
+  expiry?: number;
   httpOnly?: boolean;
   secure?: boolean;
   sameSite?: "Strict" | "Lax" | "None";

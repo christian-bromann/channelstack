@@ -32,7 +32,7 @@ function liveState(definition: DriverDefinition, env: Env): { set: string[]; mis
 /** A saved browser session (storage state): private to its owner, with cookies that haven't expired. */
 function storageStateCheck(path: string, now: number): LiveCheck {
   let mode: number;
-  let state: { cookies?: Array<{ expires?: number }> };
+  let state: { cookies?: Array<{ expiry?: number }> };
   try {
     mode = statSync(path).mode;
     state = JSON.parse(readFileSync(path, "utf8"));
@@ -44,12 +44,13 @@ function storageStateCheck(path: string, now: number): LiveCheck {
     return { ok: false, text: `${path}: others can read it; it holds a signed-in session (chmod 600)` };
   }
   const cookies = state.cookies ?? [];
-  // `expires` is in seconds; -1 (or none) is a cookie for the browser's session, which a saved state can't keep.
-  const valid = cookies.filter((cookie) => typeof cookie.expires === "number" && cookie.expires * 1000 > now);
+  // `expiry` (WebDriver's name, as the browser actor saves it) is in seconds; none is a cookie for
+  // the browser's session, which a saved state can't keep.
+  const valid = cookies.filter((cookie) => typeof cookie.expiry === "number" && cookie.expiry * 1000 > now);
   if (valid.length === 0) {
     return { ok: false, text: `${path}: expired; sign in again to save a new session` };
   }
-  const until = new Date(Math.min(...valid.map((cookie) => (cookie.expires as number) * 1000))).toISOString();
+  const until = new Date(Math.min(...valid.map((cookie) => (cookie.expiry as number) * 1000))).toISOString();
   return { ok: true, text: `${path}: signed in, the first cookie expires ${until}` };
 }
 

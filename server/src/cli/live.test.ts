@@ -70,7 +70,7 @@ describe("exit check 5.6: channelstack doctor", () => {
     const dir = home();
     const now = Date.UTC(2026, 10, 23);
     const state = (cookieExpires: number) =>
-      JSON.stringify({ cookies: [{ name: "d", value: "x", expires: cookieExpires }] });
+      JSON.stringify({ cookies: [{ name: "d", value: "x", expiry: cookieExpires }] });
     mkdirSync(join(dir, "browser"));
     writePrivateFile(join(dir, "browser", "slack-ana.json"), state(now / 1000 + 86_400));
     writePrivateFile(join(dir, "browser", "notion-ana.json"), state(now / 1000 - 1));
