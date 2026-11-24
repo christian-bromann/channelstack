@@ -2568,9 +2568,9 @@ export class LinearFixture {
   }
 
   /** Create a person in the workspace. Experimental. */
-  async createUser(options: { name: string; id?: string; displayName?: string; email?: string; admin?: boolean; guest?: boolean }): Promise<LinearUser> {
+  async createUser(options: { name: string; id?: string; displayName?: string; email?: string; admin?: boolean; guest?: boolean; token?: string }): Promise<LinearUser> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users`, { body: { name: options.name, id: options.id, displayName: options.displayName, email: options.email, admin: options.admin, guest: options.guest } })) as LinearUserData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users`, { body: { name: options.name, id: options.id, displayName: options.displayName, email: options.email, admin: options.admin, guest: options.guest, token: options.token ?? credential("CHANNELSTACK_LINEAR_USER_{name}_TOKEN", { name: options.name }) } })) as LinearUserData;
     return new LinearUser(ctx, data);
   }
 
@@ -2765,17 +2765,17 @@ export class LinearUser {
   }
 
   /** Send a follow-up in an agent session. Sends `AgentSessionEvent` (`prompted`). Experimental. */
-  async prompt(body: string, options: { session: LinearAgentSession }): Promise<LinearDelivery> {
+  async prompt(body: string, options: { session: LinearAgentSession }): Promise<LinearDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/prompt`, { body: { body, session: options.session.id } })) as LinearDeliveryData;
-    return new LinearDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/prompt`, { body: { body, session: options.session.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
   }
 
   /** Answer a question the agent asked (an `elicitation` activity). Sends `AgentSessionEvent` (`prompted`). Experimental. */
-  async answer(body: string, options: { elicitation: LinearAgentActivity }): Promise<LinearDelivery> {
+  async answer(body: string, options: { elicitation: LinearAgentActivity }): Promise<LinearDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/answer`, { body: { body, elicitation: options.elicitation.id } })) as LinearDeliveryData;
-    return new LinearDelivery(ctx, data);
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/users/${segment(this.id)}/answer`, { body: { body, elicitation: options.elicitation.id } })) as LinearDeliveryData | null;
+    return (data === null ? undefined : new LinearDelivery(ctx, data));
   }
 
   /** Press Stop on an agent session. Sends `AgentSessionEvent` (`prompted`) with the `stop` signal. Experimental. */
@@ -3016,7 +3016,7 @@ export interface LinearAgentSessionData {
   issue: LinearIssueData;
   app: LinearAppData;
   startedBy: LinearUserData;
-  delivery: LinearDeliveryData;
+  delivery?: LinearDeliveryData;
 }
 
 export class LinearAgentSession {
@@ -3024,7 +3024,7 @@ export class LinearAgentSession {
   readonly issue: LinearIssue;
   readonly app: LinearApp;
   readonly startedBy: LinearUser;
-  readonly delivery: LinearDelivery;
+  readonly delivery: LinearDelivery | undefined;
   readonly #ctx: HandleContext;
   readonly #seen = new Map<string, number>();
 
@@ -3035,7 +3035,7 @@ export class LinearAgentSession {
     this.issue = new LinearIssue(ctx, data.issue);
     this.app = new LinearApp(ctx, data.app);
     this.startedBy = new LinearUser(ctx, data.startedBy);
-    this.delivery = new LinearDelivery(ctx, data.delivery);
+    this.delivery = data.delivery === undefined ? undefined : new LinearDelivery(ctx, data.delivery);
   }
 
   /** The session's status. Experimental. */

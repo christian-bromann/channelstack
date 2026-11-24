@@ -14,7 +14,6 @@ import {
   type SlackAppRecord,
   type SlackConversationKind,
   type SlackConversationRecord,
-  type SlackMessageInput,
   type SlackMessageRecord,
   SlackRefusal,
   type SlackTeam,
@@ -22,7 +21,7 @@ import {
   type SlackWorld,
 } from "../world.ts";
 import type { SlackCredentials } from "./cleanup.ts";
-import type { SlackAnswer, SlackWebClient } from "./client.ts";
+import type { SlackWebClient } from "./client.ts";
 import { checkSlackCredential, identify } from "./identity.ts";
 
 /** How long a read of real Slack is reused: matchers poll every 50ms, and Slack's read methods allow about one call a second. */

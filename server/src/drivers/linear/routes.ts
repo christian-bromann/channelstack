@@ -15,6 +15,7 @@ import {
   readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
+import type { LinearWorld } from "./backend.ts";
 import type { FakeLinearWorld } from "./fake/world.ts";
 import { renderTranscript } from "./transcript.ts";
 import type {
@@ -88,8 +89,8 @@ const LinearAgentSession = z
     issue: LinearIssue,
     app: LinearApp,
     startedBy: LinearUser,
-    // The `AgentSessionEvent` (`created`) delivery that opened the session.
-    delivery: LinearDelivery,
+    // The `AgentSessionEvent` (`created`) delivery that opened the session. Fake only: live, Linear delivers to the agent itself.
+    delivery: LinearDelivery.optional(),
   })
   .openapi("LinearAgentSession", { "x-channelstack-resource": { id: "id" } });
 
@@ -161,16 +162,27 @@ const AGENT_SIDE: LiveSupport = {
 /** The Linear driver's control API: what a test's people do, and what a test reads back. */
 export function registerLinearRoutes(
   router: DriverRouter,
-  deps: { world: FakeLinearWorld; events: EventLog; apiUrl: () => string; secret: (name: string) => string },
+  deps: {
+    /** The fake world, which every route uses on a fake driver and the fake-only routes use always. */
+    fake: FakeLinearWorld;
+    /** The live world, on a live driver. */
+    live: LinearWorld | undefined;
+    events: EventLog;
+    apiUrl: () => string;
+    secret: (name: string) => string;
+  },
 ): void {
-  const { world } = deps;
+  const { fake } = deps;
+  /** The world a route that works live acts in. Routes that don't are refused live by the router, and use the fake. */
+  const world: LinearWorld = deps.live ?? fake;
+  const isLive = deps.live !== undefined;
   const { store } = world;
   const stability = "experimental";
 
   /** A refusal of the fake's own world (Linear's `INPUT_ERROR`), as the control API's error. */
-  const asProtocol = <T>(run: () => T): T => {
+  const asProtocol = async <T>(run: () => T | Promise<T>): Promise<T> => {
     try {
-      return run();
+      return await run();
     } catch (error) {
       if (error instanceof GraphQLError) throw new ProtocolError("invalid_argument", error.message);
       throw error;
@@ -193,10 +205,11 @@ export function registerLinearRoutes(
     name: store.appUser.name,
     kind: "app" as const,
     botUserId: store.appUser.id,
-    accessToken: deps.secret("oauthToken"),
-    webhookSecret: deps.secret("webhookSecret"),
-    clientId: deps.secret("clientId"),
-    clientSecret: deps.secret("clientSecret"),
+    // A live app's credentials stay on the server: the control API never returns them.
+    accessToken: isLive ? "" : deps.secret("oauthToken"),
+    webhookSecret: isLive ? "" : deps.secret("webhookSecret"),
+    clientId: isLive ? "" : deps.secret("clientId"),
+    clientSecret: isLive ? "" : deps.secret("clientSecret"),
   });
   const authorWire = (id: string) =>
     id === store.appUser.id ? appWire() : userWire(store.user(id) as LinearUserRecord);
@@ -223,18 +236,15 @@ export function registerLinearRoutes(
     status: attempts.at(-1)?.status ?? ("pending" as const),
   });
   const caused = (session: string, id: string | undefined) =>
-    id === undefined ? undefined : deliveryWire(world.delivery(session, id));
-  const sessionWire = (session: string, record: LinearSessionRecord) => {
-    const delivered = caused(session, record.delivery);
-    if (!delivered) throw new Error("Every agent session has the delivery that opened it");
-    return {
-      id: record.id,
-      issue: issueWire(store.issue(record.issue)),
-      app: appWire(),
-      startedBy: userWire(store.user(record.creator) as LinearUserRecord),
-      delivery: delivered,
-    };
-  };
+    // Only the fake delivers: live, Linear delivers to the agent itself, and there is none here.
+    id === undefined ? undefined : deliveryWire(fake.delivery(session, id));
+  const sessionWire = (session: string, record: LinearSessionRecord) => ({
+    id: record.id,
+    issue: issueWire(store.issue(record.issue)),
+    app: appWire(),
+    startedBy: userWire(store.user(record.creator) as LinearUserRecord),
+    delivery: caused(session, record.delivery),
+  });
   const commentWire = (session: string, comment: LinearCommentRecord) => {
     const issue = store.issue(comment.issue);
     const owned = comment.session === undefined ? undefined : store.sessions.find(comment.session);
@@ -298,7 +308,7 @@ export function registerLinearRoutes(
     response: LinearFixture,
     factory: { on: "Session", name: "linear" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: `${deps.apiUrl()}/graphql` }),
+    handler: () => ({ app: appWire(), apiUrl: isLive ? "https://api.linear.app/graphql" : `${deps.apiUrl()}/graphql` }),
   });
 
   router.route({
@@ -313,16 +323,21 @@ export function registerLinearRoutes(
         email: z.string().optional(),
         admin: z.boolean().optional(),
         guest: z.boolean().optional(),
+        token: z.string().min(1).optional().openapi({
+          description:
+            "A real person's personal API key in the live workspace. Read from CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN when left out.",
+          "x-channelstack-credential": "CHANNELSTACK_LINEAR_USER_{name}_TOKEN",
+        }),
       })
       .openapi("LinearUserOptions"),
     response: LinearUser,
     factory: {
       on: "LinearFixture",
       name: "createUser",
-      options: ["name", "id", "displayName", "email", "admin", "guest"],
+      options: ["name", "id", "displayName", "email", "admin", "guest", "token"],
     },
     stability,
-    handler: ({ session, body }) => userWire(world.createUser(session.id, body)),
+    handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
 
   router.route({
@@ -349,9 +364,9 @@ export function registerLinearRoutes(
     response: LinearTeam,
     factory: { on: "LinearFixture", name: "createTeam", options: ["key", "name", "members", "states", "labels"] },
     stability,
-    handler: ({ session, body }) => {
+    handler: async ({ session, body }) => {
       for (const member of body.members) person(session.id, member);
-      return teamWire(world.createTeam(session.id, body));
+      return teamWire(await world.createTeam(session.id, body));
     },
   });
 
@@ -400,7 +415,7 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "createIssue", args: ["issue"], options: ["team"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const team = teamOf(session.id, body.team);
       const user = person(session.id, params.user);
       mayAct(user, team);
@@ -408,7 +423,7 @@ export function registerLinearRoutes(
       if (issue.assignee) person(session.id, issue.assignee);
       if (issue.parent) issueOf(session.id, issue.parent);
       return issueWire(
-        asProtocol(() =>
+        await asProtocol(() =>
           world.createIssue(team, user.id, {
             ...issue,
             description: issue.description === undefined ? undefined : world.markdown(session.id, issue.description),
@@ -425,7 +440,7 @@ export function registerLinearRoutes(
     summary: string,
     body: z.ZodObject<z.ZodRawShape>,
     options: { args: string[]; options: string[] },
-    changes: (input: any, issue: LinearIssueRecord, session: string) => Parameters<FakeLinearWorld["updateIssue"]>[2],
+    changes: (input: any, issue: LinearIssueRecord, session: string) => Parameters<LinearWorld["updateIssue"]>[2],
   ) =>
     router.route({
       method: "post",
@@ -437,10 +452,10 @@ export function registerLinearRoutes(
       errors: ["not_found", "forbidden", "invalid_argument"],
       sdkMethod: { on: "LinearUser", name, ...options },
       stability,
-      handler: ({ session, params, body: input }) => {
+      handler: async ({ session, params, body: input }) => {
         const issue = issueOf(session.id, (input as { issue: string }).issue);
         const user = actor(session.id, params.user, issue);
-        const sent = asProtocol(() => world.updateIssue(issue, user.id, changes(input, issue, session.id)));
+        const sent = await asProtocol(() => world.updateIssue(issue, user.id, changes(input, issue, session.id)));
         return caused(session.id, sent) ?? null;
       },
     });
@@ -527,12 +542,12 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden", "invalid_argument"],
     sdkMethod: { on: "LinearUser", name: "delegate", args: ["app"], options: ["issue"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const user = actor(session.id, params.user, issue);
       if (issue.delegate === store.appUser.id)
         throw new ProtocolError("invalid_argument", `${issue.identifier} is already delegated to the app`);
-      asProtocol(() => world.updateIssue(issue, user.id, { delegateId: store.appUser.id }));
+      await asProtocol(() => world.updateIssue(issue, user.id, { delegateId: store.appUser.id }));
       const opened = store.sessionsOn(issue).at(-1) as LinearSessionRecord;
       return sessionWire(session.id, opened);
     },
@@ -551,12 +566,12 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "comment", args: ["body"], options: ["issue"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const user = actor(session.id, params.user, issue);
       return commentWire(
         session.id,
-        asProtocol(() => world.comment(issue, user.id, world.markdown(session.id, body.body))),
+        await asProtocol(() => world.comment(issue, user.id, world.markdown(session.id, body.body))),
       );
     },
   });
@@ -572,13 +587,13 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "reply", args: ["body"], options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const parent = commentOf(session.id, body.comment);
       const issue = store.issue(parent.issue);
       const user = actor(session.id, params.user, issue);
       return commentWire(
         session.id,
-        asProtocol(() => world.comment(issue, user.id, world.markdown(session.id, body.body), parent)),
+        await asProtocol(() => world.comment(issue, user.id, world.markdown(session.id, body.body), parent)),
       );
     },
   });
@@ -593,7 +608,7 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "edit", args: ["body"], options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const comment = commentOf(session.id, body.comment);
       const user = actor(session.id, params.user, store.issue(comment.issue));
       if (comment.user !== user.id && !user.admin)
@@ -604,7 +619,7 @@ export function registerLinearRoutes(
       return (
         caused(
           session.id,
-          asProtocol(() => world.editComment(comment, user.id, world.markdown(session.id, body.body))),
+          await asProtocol(() => world.editComment(comment, user.id, world.markdown(session.id, body.body))),
         ) ?? null
       );
     },
@@ -620,7 +635,7 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "delete", options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const comment = commentOf(session.id, body.comment);
       const user = actor(session.id, params.user, store.issue(comment.issue));
       if (comment.user !== user.id && !user.admin)
@@ -628,7 +643,7 @@ export function registerLinearRoutes(
           { platform: "forbidden", status: 409 },
           "Only its author or an admin can delete a comment",
         );
-      return caused(session.id, world.deleteComment(comment, user.id)) ?? null;
+      return caused(session.id, await world.deleteComment(comment, user.id)) ?? null;
     },
   });
 
@@ -641,25 +656,26 @@ export function registerLinearRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "react", args: ["emoji"], options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const comment = commentOf(session.id, body.comment);
       const user = actor(session.id, params.user, store.issue(comment.issue));
-      world.react(comment, user.id, body.emoji.replace(/^:|:$/g, ""));
+      await world.react(comment, user.id, body.emoji.replace(/^:|:$/g, ""));
     },
   });
 
   // --- What people do: agent sessions -----------------------------------------------------------
 
   /** A person's turn in a session goes into its thread, where it has one, as a reply. */
-  const turn = (session: string, userId: string, record: LinearSessionRecord, text: string) => {
+  const turn = async (session: string, userId: string, record: LinearSessionRecord, text: string) => {
+    await world.refresh(session, { issue: record.issue });
     const issue = store.issue(record.issue);
     const user = actor(session, userId, issue);
     const body = world.markdown(session, text);
     // In a session with a thread (its mention, or the comments Linear wrote for it), the prompt is a
     // reply there; a session without one yet takes it directly.
     const root = record.thread === null ? undefined : store.comments.find(record.thread);
-    if (root) return caused(session, world.comment(issue, user.id, body, root).prompted);
-    return caused(session, world.promptSession(record, user.id, body));
+    if (root) return caused(session, (await world.comment(issue, user.id, body, root)).prompted);
+    return caused(session, await world.promptSession(record, user.id, body));
   };
 
   router.route({
@@ -668,15 +684,13 @@ export function registerLinearRoutes(
     summary: "Send a follow-up in an agent session. Sends `AgentSessionEvent` (`prompted`)",
     params: UserParams,
     body: z.object({ body: z.string().min(1), session: sessionRef }).openapi("LinearPromptBody"),
-    response: LinearDelivery,
+    // The prompt's delivery; none live, where Linear delivers to the agent itself.
+    response: LinearDelivery.nullable(),
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "LinearUser", name: "prompt", args: ["body"], options: ["session"] },
     stability,
-    handler: ({ session, params, body }) => {
-      const sent = turn(session.id, params.user, sessionOf(session.id, body.session), body.body);
-      if (!sent) throw new Error("A prompt always reaches the agent's webhook");
-      return sent;
-    },
+    handler: async ({ session, params, body }) =>
+      (await turn(session.id, params.user, sessionOf(session.id, body.session), body.body)) ?? null,
   });
 
   router.route({
@@ -685,25 +699,26 @@ export function registerLinearRoutes(
     summary: "Answer a question the agent asked (an `elicitation` activity). Sends `AgentSessionEvent` (`prompted`)",
     params: UserParams,
     body: z.object({ body: z.string().min(1), elicitation: activityRef }).openapi("LinearAnswerBody"),
-    response: LinearDelivery,
+    // The answer's delivery; none live, where Linear delivers to the agent itself.
+    response: LinearDelivery.nullable(),
     errors: ["not_found", "forbidden", "invalid_argument"],
     sdkMethod: { on: "LinearUser", name: "answer", args: ["body"], options: ["elicitation"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const elicitation = activityOf(session.id, body.elicitation);
       if (elicitation.content.type !== "elicitation")
         throw new ProtocolError(
           "invalid_argument",
           `That activity is a ${elicitation.content.type}, not an elicitation`,
         );
-      const sent = turn(
-        session.id,
-        params.user,
-        store.sessions.find(elicitation.session) as LinearSessionRecord,
-        body.body,
+      return (
+        (await turn(
+          session.id,
+          params.user,
+          store.sessions.find(elicitation.session) as LinearSessionRecord,
+          body.body,
+        )) ?? null
       );
-      if (!sent) throw new Error("An answer always reaches the agent's webhook");
-      return sent;
     },
   });
 
@@ -721,7 +736,7 @@ export function registerLinearRoutes(
     handler: ({ session, params, body }) => {
       const record = sessionOf(session.id, body.session);
       const user = actor(session.id, params.user, store.issue(record.issue));
-      const sent = caused(session.id, world.stop(record, user.id));
+      const sent = caused(session.id, fake.stop(record, user.id));
       if (!sent) throw new Error("Stop always reaches the agent's webhook");
       return sent;
     },
@@ -752,7 +767,11 @@ export function registerLinearRoutes(
       },
       ...(extra.waits ? { waits: extra.waits } : {}),
       stability,
-      handler: ({ session, params }) => read(issueOf(session.id, params.issue), session.id) as never,
+      handler: async ({ session, params }) => {
+        const issue = issueOf(session.id, params.issue);
+        await world.refresh(session.id, { issue: issue.id });
+        return read(issue, session.id) as never;
+      },
     });
 
   issueRead("", "refresh", "Read the issue again", LinearIssue, issueWire);
@@ -842,7 +861,8 @@ export function registerLinearRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "LinearComment", name: "replies", onceQuiet: true },
     stability,
-    handler: ({ session, params }) => {
+    handler: async ({ session, params }) => {
+      await world.refresh(session.id, { issue: commentOf(session.id, params.comment).issue });
       const root = world.rootOf(commentOf(session.id, params.comment));
       return store
         .commentsOn(store.issue(root.issue))
@@ -860,7 +880,8 @@ export function registerLinearRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "LinearComment", name: "transcript" },
     stability,
-    handler: ({ session, params }) => {
+    handler: async ({ session, params }) => {
+      await world.refresh(session.id, { issue: commentOf(session.id, params.comment).issue });
       const root = world.rootOf(commentOf(session.id, params.comment));
       const issue = store.issue(root.issue);
       const thread = store.commentsOn(issue).filter((comment) => comment.id === root.id || comment.parent === root.id);
@@ -893,7 +914,11 @@ export function registerLinearRoutes(
       sdkMethod: { on: "LinearAgentSession", name },
       ...(extra.waits ? { waits: extra.waits } : {}),
       stability,
-      handler: ({ session, params }) => read(sessionOf(session.id, params.agentSession), session.id) as never,
+      handler: async ({ session, params }) => {
+        const record = sessionOf(session.id, params.agentSession);
+        await world.refresh(session.id, { agentSession: record.id });
+        return read(sessionOf(session.id, params.agentSession), session.id) as never;
+      },
     });
 
   sessionRead("/state", "state", "The session's status", SessionState, (record) => record.status, {
@@ -971,7 +996,7 @@ export function registerLinearRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, query }) =>
-      world
+      fake
         .deliveries(session.id)
         .filter(({ request }) => query.type === undefined || request.type === query.type)
         .filter(({ request }) => query.resource === undefined || request.meta?.issue === query.resource)
@@ -989,7 +1014,7 @@ export function registerLinearRoutes(
     waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
+    handler: ({ session, params }) => deliveryWire(fake.delivery(session.id, params.delivery)),
   });
 
   router.route({
@@ -1002,7 +1027,7 @@ export function registerLinearRoutes(
     sdkMethod: { on: "LinearDelivery", name: "redeliver" },
     live: NO_REDELIVERY,
     stability,
-    handler: ({ session, params }) => world.redeliver(session.id, params.delivery),
+    handler: ({ session, params }) => fake.redeliver(session.id, params.delivery),
   });
 
   router.route({
@@ -1019,7 +1044,7 @@ export function registerLinearRoutes(
     sdkMethod: { on: "LinearDelivery", name: "resend", options: ["badSignature", "stale"] },
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
   });
 
   router.route({

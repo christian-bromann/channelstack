@@ -8430,6 +8430,15 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_LINEAR_USER_{name}_TOKEN"
             }
           ],
           "returns": {
@@ -9720,8 +9729,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "LinearDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -9783,8 +9795,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "LinearDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
           },
           "errors": [
             "unauthorized",
@@ -10718,7 +10733,7 @@
             "kind": "resource",
             "name": "LinearDelivery"
           },
-          "optional": false
+          "optional": true
         }
       ],
       "methods": [

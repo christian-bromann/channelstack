@@ -4074,6 +4074,12 @@
           },
           "guest": {
             "type": "boolean"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real person's personal API key in the live workspace. Read from CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_LINEAR_USER_{name}_TOKEN"
           }
         },
         "required": [
@@ -4452,8 +4458,7 @@
           "id",
           "issue",
           "app",
-          "startedBy",
-          "delivery"
+          "startedBy"
         ],
         "x-channelstack-resource": {
           "id": "id"
@@ -16039,7 +16044,8 @@
             "displayName",
             "email",
             "admin",
-            "guest"
+            "guest",
+            "token"
           ]
         },
         "x-channelstack-error-codes": [
@@ -17394,7 +17400,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinearDelivery"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LinearDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }
@@ -17480,7 +17493,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinearDelivery"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LinearDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }

@@ -40,7 +40,7 @@ describe("exit check 5.6: channelstack doctor", () => {
     const { env, live } = sandbox({ allowlist: "T0SOMEWHERE" });
     const { text, ok } = await runDoctor({
       ...live,
-      env: { ...env, CHANNELSTACK_LINEAR_APP_TOKEN: "a stand-in" },
+      env: { ...env, CHANNELSTACK_NOTION_TOKEN: "a stand-in" },
       home: home(),
       storageStates: [],
     });
@@ -48,8 +48,8 @@ describe("exit check 5.6: channelstack doctor", () => {
     expect(text).toMatch(
       /FAIL {2}CHANNELSTACK_SLACK_BOT_TOKEN \(xoxb-…\): Slack workspace T0STUB0001 isn't in CHANNELSTACK_LIVE_SLACK_TEAMS/,
     );
-    expect(text).toContain("FAIL  CHANNELSTACK_LIVE_LINEAR_WORKSPACES is empty");
-    expect(text).toContain("FAIL  live linear isn't built yet");
+    expect(text).toContain("FAIL  CHANNELSTACK_LIVE_NOTION_WORKSPACES is empty");
+    expect(text).toContain("FAIL  live notion isn't built yet");
   });
 
   test("CHANNELSTACK_REALITY=fake: every channel is fake, and that is no failure", async () => {

@@ -394,6 +394,10 @@ export function linearChecks(options: ChecksOptions): void {
     return { ana, issue, session };
   };
   const ended = ["complete", "awaitingInput", "error"] as const;
+  /** The delivery that opened a session. Live, Linear delivers to the agent itself: these checks are fake-only, and skip. */
+  type Opening = NonNullable<Awaited<ReturnType<typeof delegated>>["session"]["delivery"]>;
+  const opening = (session: { delivery?: Opening | undefined }, context: TestContext): Opening =>
+    session.delivery ?? context.skip("live: Linear delivers to the agent itself, so delivery checks are fake-only");
 
   describe(`linear checks: ${app}`, () => {
     check("linear.first-activity", "acknowledges a new session within 10 seconds", async (context) => {
@@ -418,7 +422,7 @@ export function linearChecks(options: ChecksOptions): void {
     check("linear.redelivery", "a redelivered webhook doesn't start the work again", async (context) => {
       const { session } = await delegated(context);
       await session.waitForState([...ended], wait);
-      await session.delivery.redeliver();
+      await opening(session, context).redeliver();
       await context.channelstack.quiet(wait);
       const responses = (await session.activities()).filter((activity) => activity.type === "response");
       expect(responses.length).toBeLessThanOrEqual(1);
@@ -426,14 +430,16 @@ export function linearChecks(options: ChecksOptions): void {
 
     check("linear.stale", "rejects a webhook whose timestamp is more than a minute old", async (context) => {
       const { session } = await delegated(context);
-      await session.delivery.resend({ stale: true });
-      await expect(session.delivery).toBeRejected(wait);
+      const delivery = opening(session, context);
+      await delivery.resend({ stale: true });
+      await expect(delivery).toBeRejected(wait);
     });
 
     check("linear.bad-signature", "rejects a webhook with a bad signature", async (context) => {
       const { session } = await delegated(context);
-      await session.delivery.resend({ badSignature: true });
-      await expect(session.delivery).toBeRejected(wait);
+      const delivery = opening(session, context);
+      await delivery.resend({ badSignature: true });
+      await expect(delivery).toBeRejected(wait);
     });
   });
 }

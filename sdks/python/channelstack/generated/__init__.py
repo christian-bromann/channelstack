@@ -2095,10 +2095,10 @@ class LinearFixture:
         self.app: LinearApp = LinearApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
 
-    async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, email: str | None = None, admin: bool | None = None, guest: bool | None = None) -> LinearUser:
+    async def create_user(self, *, name: str, id: str | None = None, display_name: str | None = None, email: str | None = None, admin: bool | None = None, guest: bool | None = None, token: str | None = None) -> LinearUser:
         """Create a person in the workspace. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users", body={"name": name, "id": id, "displayName": display_name, "email": email, "admin": admin, "guest": guest})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users", body={"name": name, "id": id, "displayName": display_name, "email": email, "admin": admin, "guest": guest, "token": credential("CHANNELSTACK_LINEAR_USER_{name}_TOKEN", {"name": name}) if token is None else token})
         return LinearUser(ctx, data)
 
     async def create_team(self, *, key: str | None = None, name: str | None = None, members: list[LinearUser] | None = None, states: list[dict[str, Any]] | None = None, labels: list[str] | None = None) -> LinearTeam:
@@ -2219,17 +2219,17 @@ class LinearUser:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "comment": comment.id})
 
-    async def prompt(self, body: str, *, session: LinearAgentSession) -> LinearDelivery:
+    async def prompt(self, body: str, *, session: LinearAgentSession) -> LinearDelivery | None:
         """Send a follow-up in an agent session. Sends `AgentSessionEvent` (`prompted`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/prompt", body={"body": body, "session": session.id})
-        return LinearDelivery(ctx, data)
+        return (None if data is None else LinearDelivery(ctx, data))
 
-    async def answer(self, body: str, *, elicitation: LinearAgentActivity) -> LinearDelivery:
+    async def answer(self, body: str, *, elicitation: LinearAgentActivity) -> LinearDelivery | None:
         """Answer a question the agent asked (an `elicitation` activity). Sends `AgentSessionEvent` (`prompted`). Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/answer", body={"body": body, "elicitation": elicitation.id})
-        return LinearDelivery(ctx, data)
+        return (None if data is None else LinearDelivery(ctx, data))
 
     async def stop(self, *, session: LinearAgentSession) -> LinearDelivery:
         """Press Stop on an agent session. Sends `AgentSessionEvent` (`prompted`) with the `stop` signal. Experimental."""
@@ -2379,7 +2379,7 @@ class LinearAgentSession:
         self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
         self.app: LinearApp = LinearApp(ctx, data["app"])
         self.started_by: LinearUser = LinearUser(ctx, data["startedBy"])
-        self.delivery: LinearDelivery = LinearDelivery(ctx, data["delivery"])
+        self.delivery: LinearDelivery | None = None if data.get("delivery") is None else LinearDelivery(ctx, data["delivery"])
 
     async def state(self) -> Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]:
         """The session's status. Experimental."""

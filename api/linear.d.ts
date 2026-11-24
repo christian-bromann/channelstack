@@ -90,10 +90,10 @@ export interface LinearUser extends User {
   react(emoji: string, target: { comment: LinearComment }): Promise<void>;
 
   // ------------------------------------------------------------ agent sessions
-  /** Send a follow-up in a session. Sends `AgentSessionEvent` (action `prompted`). */
-  prompt(body: RichText, where: { session: LinearAgentSession }): Promise<LinearDelivery>;
-  /** Answer a question the agent asked (an `elicitation` activity). */
-  answer(body: RichText, where: { elicitation: LinearAgentActivity }): Promise<LinearDelivery>;
+  /** Send a follow-up in a session. Sends `AgentSessionEvent` (action `prompted`); resolves with that delivery, none live. */
+  prompt(body: RichText, where: { session: LinearAgentSession }): Promise<LinearDelivery | undefined>;
+  /** Answer a question the agent asked (an `elicitation` activity). Resolves with the delivery, none live. */
+  answer(body: RichText, where: { elicitation: LinearAgentActivity }): Promise<LinearDelivery | undefined>;
   /** Press Stop in Linear. Sends the stop signal to the agent. */
   stop(target: { session: LinearAgentSession }): Promise<LinearDelivery>;
 }
@@ -167,8 +167,11 @@ export interface LinearAgentSession extends HasTranscript {
   readonly issue: LinearIssue;
   readonly app: LinearApp;
   readonly startedBy: LinearUser;
-  /** The `AgentSessionEvent` (action `created`) delivery that opened the session. */
-  readonly delivery: LinearDelivery;
+  /**
+   * The `AgentSessionEvent` (action `created`) delivery that opened the session. Fake mode only:
+   * live, Linear delivers to the agent itself, and channelstack has no delivery to show.
+   */
+  readonly delivery?: LinearDelivery;
 
   state(): Promise<LinearSessionState>;
   /** Wait until the session reaches one of these states. */
