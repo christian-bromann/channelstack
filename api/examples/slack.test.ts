@@ -320,9 +320,10 @@ describe("live mode", () => {
     await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
   });
 
-  // Button clicks have no API. Live, the browser actor clicks as Ana.
+  // Button clicks have no API. Live, the browser actor clicks as Ana. The agent lets only admins
+  // approve, so Ana's account must be one: live, a role the account doesn't have is refused.
   test.skipIf(!process.env.CHANNELSTACK_SLACK_USER_ANA_TOKEN)("a real click on a real button", async ({ slack }) => {
-    const ana = await slack.createUser({ name: "Ana", browser: { storageState: ".auth/ana-slack.json" } });
+    const ana = await slack.createUser({ name: "Ana", admin: true, browser: { storageState: ".auth/ana-slack.json" } });
     const msg = await ana.say("deploy web to staging", { to: slack.app });
 
     await ana.click("Approve", { thread: msg.thread });

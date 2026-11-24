@@ -3,12 +3,12 @@ import {
   type TranscriptPrincipal as Principal,
   transcriptText,
 } from "../../core/router/inspect.ts";
-import type { FakeNotionWorld } from "./fake/world.ts";
+import type { NotionReads } from "./reads.ts";
 import { plainText } from "./rich-text.ts";
 import type { NotionDiscussionRecord, NotionPageRecord } from "./world.ts";
 
 const commentLines = (
-  world: FakeNotionWorld,
+  world: Pick<NotionReads, "commentsOf" | "discussionsOf" | "markdownOf" | "titleOf">,
   discussion: NotionDiscussionRecord,
   principal: (id: string) => Principal,
   depth: number,
@@ -25,7 +25,7 @@ const commentLines = (
 
 /** A discussion as a person reads it: its comments, oldest first. */
 export function renderDiscussion(
-  world: FakeNotionWorld,
+  world: Pick<NotionReads, "commentsOf" | "discussionsOf" | "markdownOf" | "titleOf">,
   discussion: NotionDiscussionRecord,
   principal: (id: string) => Principal,
 ) {
@@ -37,7 +37,11 @@ export function renderDiscussion(
  * A page as a person reads it: who made it and its title, its body as Markdown, then each
  * discussion, a block's under a line naming what it is anchored to.
  */
-export function renderPage(world: FakeNotionWorld, page: NotionPageRecord, principal: (id: string) => Principal) {
+export function renderPage(
+  world: Pick<NotionReads, "commentsOf" | "discussionsOf" | "markdownOf" | "titleOf">,
+  page: NotionPageRecord,
+  principal: (id: string) => Principal,
+) {
   const entries: TranscriptEntry[] = [];
   const body = world.markdownOf(page);
   entries.push({

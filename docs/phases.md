@@ -13,7 +13,7 @@
 | 2 | done | 2026-11-21, [#12](https://github.com/christian-bromann/channelstack/pull/12) |
 | 3 | done | 2026-11-22, [#14](https://github.com/christian-bromann/channelstack/pull/14) |
 | 4 | done | 2026-11-23, [#17](https://github.com/christian-bromann/channelstack/pull/17) |
-| 5 | not started | |
+| 5 | done | 2026-11-24, [#18](https://github.com/christian-bromann/channelstack/pull/18) (5.1, 5.2, 5.5 and 5.6 tracked in #19–#22) |
 | 6 | not started | |
 | 7 | not started | |
 | 8 | not started | |
@@ -35,7 +35,7 @@ Every phase adds its checks to one script:
 pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 ```
 
-`verify:phase` runs the **standing checks** below plus the phase's own **exit checks**. CI runs `verify:phase <current>` on every PR, so a later phase can't break an earlier one.
+`verify:phase` runs the **standing checks** below plus the phase's own **exit checks**. CI runs `verify:phase <current>` on every PR, so a later phase can't break an earlier one. It runs it in pieces side by side, each job well under five minutes: `--group static`, `--group unit`, and `--group accept` once per acceptance part (`--part`) and run (`--repeat 1`, three jobs per part). Together they are the whole gate; locally, `pnpm verify:phase <n>` with no group runs all of it.
 
 ### Standing checks (every phase, from phase 0 on)
 

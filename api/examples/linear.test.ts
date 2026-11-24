@@ -147,6 +147,7 @@ describe("issue workflow", () => {
   });
 });
 
+// A session's `delivery` is there in the fake only: live, Linear delivers to the agent itself.
 describe("delivery and failures (fake only)", () => {
   test("a redelivered webhook doesn't duplicate activities", async ({ linear }) => {
     const ana = await linear.createUser({ name: "Ana" });
@@ -156,7 +157,7 @@ describe("delivery and failures (fake only)", () => {
     await expect(session).toHaveActivity({ type: "thought" });
     const before = (await session.activities()).length;
 
-    await session.delivery.redeliver();
+    await session.delivery!.redeliver();
 
     await expect(issue).toHaveSessionState("complete");
     const thoughts = (await session.activities()).filter((a) => a.type === "thought");
@@ -169,9 +170,9 @@ describe("delivery and failures (fake only)", () => {
     const issue = await ana.createIssue({ title: "Anything" }, { team });
     const session = await ana.delegate(linear.app, { issue });
 
-    await session.delivery.resend({ stale: true });
+    await session.delivery!.resend({ stale: true });
 
-    await expect(session.delivery).toBeRejected();
+    await expect(session.delivery!).toBeRejected();
   });
 });
 

@@ -5,6 +5,9 @@
   "type": "module",
   "dependencies": {
     "@hono/zod-openapi": "1.6.3",
+    "@notionhq/client": "5.31.1",
+    "@octokit/auth-app": "8.3.1",
+    "@octokit/rest": "22.0.1",
     "diff": "9.0.0",
     "graphql": "16.15.0",
     "hono": "4.13.19",
@@ -13,10 +16,10 @@
     "marked": "18.2.0",
     "memfs": "4.80.1",
     "pure-rand": "8.4.2",
+    "webdriverio": "10.2.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@linear/sdk": "103.0.0",
-    "@notionhq/client": "5.31.1"
+    "@linear/sdk": "103.0.0"
   }
 }

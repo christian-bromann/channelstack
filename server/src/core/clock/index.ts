@@ -22,3 +22,22 @@ export const systemTimers: Timers = {
 /** Resolves after `delayMs` on these timers. */
 export const delay = (timers: Timers, delayMs: number): Promise<void> =>
   delayMs <= 0 ? Promise.resolve() : new Promise((resolve) => timers.after(delayMs, resolve));
+
+/**
+ * The server's one polling loop: `ask` again every `everyMs` until it has an answer, or `withinMs`
+ * have passed on `clock`, then `timedOut()` is thrown. The SDKs' waits are theirs (`runtime/wait`).
+ */
+export async function pollUntil<T>(
+  on: { clock: Clock; timers: Timers },
+  options: { withinMs: number; everyMs: number },
+  ask: () => Promise<T | undefined>,
+  timedOut: () => Error,
+): Promise<T> {
+  const deadline = on.clock() + options.withinMs;
+  for (;;) {
+    const answer = await ask();
+    if (answer !== undefined) return answer;
+    if (on.clock() >= deadline) throw timedOut();
+    await delay(on.timers, options.everyMs);
+  }
+}

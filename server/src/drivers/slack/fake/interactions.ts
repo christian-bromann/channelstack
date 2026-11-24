@@ -12,6 +12,7 @@ import {
   slashCommandFields,
 } from "../interaction-payloads.ts";
 import {
+  type Immediate,
   NOBODY,
   type SlackControlScope,
   type SlackConversationRecord,
@@ -53,7 +54,7 @@ export interface InteractionKit {
   /** The person's DM with the app, opened if there is none yet. */
   directMessage(session: string, userId: string): SlackConversationRecord;
   /** A person writes in a thread. */
-  replyAsUser: SlackWorld["replyAsUser"];
+  replyAsUser: Immediate<SlackWorld>["replyAsUser"];
   /** The app's Socket Mode connection, once it has chosen that over a request URL. */
   transport(): DeliveryTransport | undefined;
   /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
@@ -77,7 +78,7 @@ export interface InteractionDispatch {
 }
 
 type Interactions = Pick<
-  SlackWorld,
+  Immediate<SlackWorld>,
   | "clickAsUser"
   | "selectAsUser"
   | "shortcutAsUser"

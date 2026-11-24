@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
 import { attach, type Attached } from "./cli/attach.ts";
+import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runSlack } from "./cli/slack.ts";
 import { runShow, runTail } from "./cli/watch.ts";
 import { homeDir } from "./core/home/index.ts";
@@ -35,6 +36,18 @@ Usage:
   channelstack ui                               A one-time link that opens the UI in a browser
       --server <url>              The server to attach to (default: the one in server.json; also CHANNELSTACK_URL
                                   with CHANNELSTACK_TOKEN)
+
+  Live mode (credentials in the environment; see docs/live-mode.md):
+  channelstack doctor             Which channels run live, whether their credentials work and are allowlisted,
+                                  and whether saved browser sessions are still signed in
+      --storage-state <path>      A saved browser session to check, besides those in <home>/browser
+  channelstack login slack --user <name>   Sign a sandbox person in by hand, once, in a browser window, and save the
+                                  session for the browser actor (<home>/browser/slack-<name>.json, 0600)
+      --save <path>               Also save it here, e.g. .auth/ana-slack.json for a test that names it
+  channelstack sweep              Remove what crashed live runs left: their ledgers' objects, and tagged channels
+      --older-than-hours <n>      Only tagged objects older than this (default 24)
+      --run <id>                  Only what this run made, of any age
+      --check                     Remove nothing; exit 1 if anything is left
 
   channelstack secrets rotate     Replace every fake token and signing secret
   channelstack --version
@@ -82,6 +95,7 @@ async function runStart(flags: {
     seed: seed ? parseSeed(seed) : randomSeed(),
     logLevel: parseLogLevel(flags["log-level"] ?? process.env.CHANNELSTACK_LOG_LEVEL),
     ui: UI_PAGE,
+    env: process.env,
     webhooks: Object.fromEntries(
       DRIVERS.map((driver) => [
         driver.name,
@@ -150,6 +164,12 @@ async function main() {
       on: { type: "string" },
       json: { type: "boolean" },
       once: { type: "boolean" },
+      "storage-state": { type: "string", multiple: true },
+      "older-than-hours": { type: "string" },
+      run: { type: "string" },
+      check: { type: "boolean" },
+      user: { type: "string" },
+      save: { type: "string" },
     },
   });
   if (values.version) return void process.stdout.write(`${pkg.version}\n`);
@@ -158,6 +178,34 @@ async function main() {
   const [command = "start", action, ...rest] = positionals;
   if (command === "start") return runStart(values);
   if (command === "secrets") return runSecrets(action);
+  if (command === "login") {
+    const result = await runLogin({
+      env: process.env,
+      home: homeDir(),
+      drivers: DRIVERS,
+      channel: action,
+      user: values.user,
+      save: values.save,
+    });
+    process.stdout.write(result.text);
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
+  if (command === "doctor" || command === "sweep") {
+    const live = { env: process.env, home: homeDir(), drivers: DRIVERS };
+    const result =
+      command === "doctor"
+        ? await runDoctor({ ...live, storageStates: values["storage-state"] ?? [] })
+        : await runSweep({
+            ...live,
+            check: values.check === true,
+            run: values.run,
+            olderThanHours: values["older-than-hours"],
+          });
+    process.stdout.write(result.text);
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
 
   // Everything else attaches to the running server.
   const print = (text: string) => void process.stdout.write(text);

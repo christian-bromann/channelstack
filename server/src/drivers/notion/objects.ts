@@ -320,3 +320,5 @@ export function notionObjects(deps: NotionObjectsDeps) {
 
   return { user, page, block, database, dataSource, comment, propertyValue, list, parent };
 }
+
+export type NotionObjects = ReturnType<typeof notionObjects>;

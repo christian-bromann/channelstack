@@ -2,8 +2,17 @@ import { dirname } from "node:path";
 
 import { expect, inject, test, type TestContext } from "vitest";
 
-import { type Channelstack, connect, type Session, setFilesRoot, untilQuiet } from "../../sdks/typescript/client.ts";
+import {
+  type Channelstack,
+  ChannelstackError,
+  connect,
+  onRefusal,
+  type Session,
+  setFilesRoot,
+  untilQuiet,
+} from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
+import { refusedFixture, SKIPS_LIVE, unskipped } from "./refused.ts";
 
 /** Runs in every test worker: one client per worker, one session per test, and the matchers. */
 const server = inject("channelstack");
@@ -17,6 +26,50 @@ const connected = () => {
 };
 
 /**
+ * What live mode can't do skips the test, with the reason, instead of failing it: a fake-only
+ * feature (`unsupported_in_live`), or one that needs a piece this run doesn't have (`action_requires`:
+ * the browser actor, proxy mode). The fake run never sees these refusals, so a
+ * test still runs in full on every PR (reality-matrix.md, "What this means for test authors").
+ */
+/** Each running test's `skip`, by its session: the refused request names the session, so concurrent tests skip only themselves. */
+const skips = new Map<string, (note?: string) => never>();
+onRefusal((error, path) => {
+  const session = /^\/sessions\/([^/]+)/.exec(path)?.[1];
+  if (session === undefined || unskipped.has(session)) return;
+  const skip = skips.get(session);
+  if (skip && SKIPS_LIVE.has(error.code)) skip(`live: ${error.message}`);
+});
+
+/**
+ * A channel's fixture. Every test gets all four, so a channel that is refused live (its live
+ * backend isn't built, its credentials are set in part) must not touch the tests of the others:
+ * the refusal is kept, and comes when the test first uses that channel. It skips the test or fails
+ * it, as the refusal would have.
+ */
+function channelFixture(open: (session: Session) => Promise<unknown>) {
+  return async (
+    { channelstackSession: session, skip }: Fixtures & { skip(note?: string): never },
+    use: (value: unknown) => Promise<void>,
+  ) => {
+    let fixture: unknown;
+    // A refusal while setting up is kept for the test's first use of that channel.
+    unskipped.add(session.sessionId);
+    try {
+      fixture = await open(session);
+    } catch (error) {
+      const refuse = () => {
+        if (error instanceof ChannelstackError && SKIPS_LIVE.has(error.code)) skip(`live: ${error.message}`);
+        throw error;
+      };
+      fixture = refusedFixture(refuse);
+    } finally {
+      unskipped.delete(session.sessionId);
+    }
+    await use(fixture);
+  };
+}
+
+/**
  * The fixtures, registered on Vitest's own `test` so that a suite's `test.extend` can build on
  * them (`ana: async ({ slack }, use) => …`). They are automatic: every test has its session,
  * opened before its hooks run and closed after them, whether it names a fixture or not.
@@ -28,13 +81,18 @@ const auto = { auto: true } as const;
 
 (test as unknown as { override(fixtures: Record<string, unknown>): void }).override({
   channelstackSession: [
-    async ({ task }: { task: { file: { filepath: string } } }, use: (session: Session) => Promise<void>) => {
+    async (
+      { task, skip }: { task: { file: { filepath: string } }; skip(note?: string): never },
+      use: (session: Session) => Promise<void>,
+    ) => {
       const session = await (await connected()).openSession();
       // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
       setFilesRoot(dirname(task.file.filepath));
+      skips.set(session.sessionId, skip);
       try {
         await use(session);
       } finally {
+        skips.delete(session.sessionId);
         // Closing the session removes everything the test created. Disposing never fails a test.
         await session[Symbol.asyncDispose]();
       }
@@ -54,26 +112,10 @@ const auto = { auto: true } as const;
     },
     auto,
   ],
-  slack: [
-    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
-      use(await channelstackSession.slack()),
-    auto,
-  ],
-  github: [
-    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
-      use(await channelstackSession.github()),
-    auto,
-  ],
-  linear: [
-    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
-      use(await channelstackSession.linear()),
-    auto,
-  ],
-  notion: [
-    async ({ channelstackSession }: Fixtures, use: (value: unknown) => Promise<void>) =>
-      use(await channelstackSession.notion()),
-    auto,
-  ],
+  slack: [channelFixture((session) => session.slack()), auto],
+  github: [channelFixture((session) => session.github()), auto],
+  linear: [channelFixture((session) => session.linear()), auto],
+  notion: [channelFixture((session) => session.notion()), auto],
 });
 
 expect.extend(

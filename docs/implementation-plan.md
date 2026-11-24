@@ -195,7 +195,8 @@ Errors follow the WebDriver style: a stable `error` code, a human-readable `mess
 |---|---|
 | `fake_actor_in_live_world` | A fake user acts in a live workspace (section 5) |
 | `live_not_allowlisted` | The live workspace/org/team isn't in `CHANNELSTACK_LIVE_*` |
-| `action_requires` | A live action needs something missing, for example `click` needs `{ browser }` for a real Slack user |
+| `action_requires` | A live action needs a piece this run doesn't have, for example `click` needs the browser actor for a real Slack user. Test integrations skip the test with the reason |
+| `live_misconfigured` | Live mode is set up wrong: credentials set in part, a token of the wrong kind. Test integrations fail the test |
 | `cross_workspace_credential` | The user's token belongs to a different workspace than the app |
 | `unsupported_in_fake` / `unsupported_in_live` | The action isn't implemented for that reality yet |
 | `not_found`, `invalid_argument`, `session_not_found`, `unauthorized` | The usual |

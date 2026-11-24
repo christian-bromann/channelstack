@@ -78,7 +78,8 @@
           "errors": [
             "unauthorized",
             "invalid_argument",
-            "internal"
+            "internal",
+            "unsupported_in_live"
           ],
           "dispose": false
         },
@@ -245,7 +246,8 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "action_requires"
           ],
           "dispose": false
         },
@@ -303,7 +305,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -332,7 +340,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -361,7 +375,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -390,7 +410,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         }
@@ -903,6 +929,32 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_SLACK_USER_{name}_TOKEN"
+            },
+            {
+              "name": "browser",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "storageState",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "body"
             }
           ],
           "returns": {
@@ -913,7 +965,15 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "invalid_auth",
+            "account_inactive"
           ],
           "dispose": false
         },
@@ -942,7 +1002,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -971,7 +1037,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -1038,6 +1110,14 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "shared",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
             }
           ],
           "returns": {
@@ -1049,8 +1129,15 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
-            "name_taken"
+            "name_taken",
+            "unsupported_in_fake"
           ],
           "dispose": false
         },
@@ -1079,7 +1166,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -1134,7 +1227,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -1164,6 +1263,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "account_inactive"
           ],
           "dispose": false
@@ -1256,7 +1361,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         }
@@ -1486,6 +1597,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "no_text",
@@ -1556,6 +1673,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "no_text",
@@ -1617,6 +1740,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "cant_update_message",
@@ -1664,6 +1793,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "cant_delete_message"
@@ -1739,14 +1874,23 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "SlackDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
           },
           "errors": [
             "unauthorized",
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "dispatch_failed"
@@ -1822,6 +1966,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "dispatch_failed"
@@ -1883,6 +2033,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "dispatch_failed"
@@ -1941,6 +2097,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "dispatch_failed"
@@ -1991,6 +2153,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "stop_unavailable"
@@ -2040,6 +2208,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "split_view_unavailable"
           ],
@@ -2098,6 +2272,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel"
           ],
@@ -2162,6 +2342,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "split_view_unavailable"
@@ -2199,6 +2385,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2258,6 +2450,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "already_reacted"
@@ -2319,6 +2517,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "no_reaction"
@@ -2373,6 +2577,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2434,6 +2644,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel",
             "already_in_channel"
@@ -2493,6 +2709,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "not_in_channel"
           ],
@@ -2529,6 +2751,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -2615,6 +2843,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2650,6 +2884,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2685,6 +2925,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2733,6 +2979,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2907,6 +3159,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -2947,6 +3205,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3000,6 +3264,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3040,6 +3310,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3113,6 +3389,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -3154,6 +3436,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3194,6 +3482,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3247,6 +3541,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3384,6 +3684,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3441,6 +3747,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3504,6 +3816,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3621,6 +3939,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3731,6 +4055,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -3789,6 +4119,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "dispatch_failed"
           ],
@@ -3828,6 +4164,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "dispatch_failed"
           ],
@@ -3877,7 +4219,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": true
         }
@@ -3971,6 +4319,15 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_GITHUB_USER_{login}_TOKEN"
             }
           ],
           "returns": {
@@ -3981,7 +4338,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -4131,7 +4494,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -4180,7 +4549,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -4235,7 +4610,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -4290,7 +4671,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         }
@@ -4418,6 +4805,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -4563,6 +4956,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -4660,6 +5059,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -4777,6 +5182,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -4854,6 +5265,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -4905,6 +5322,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -4957,6 +5380,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -5019,6 +5448,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5080,6 +5515,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5145,6 +5586,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -5203,6 +5650,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5264,6 +5717,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5316,6 +5775,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5392,6 +5857,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5451,6 +5922,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5578,6 +6055,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -5664,6 +6147,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -5722,6 +6211,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5773,6 +6268,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5824,6 +6325,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -5892,6 +6399,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -5944,6 +6457,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "validation_failed"
@@ -6009,6 +6528,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden",
             "not_allowed"
@@ -6061,6 +6586,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -6121,6 +6652,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -6224,6 +6761,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "validation_failed"
           ],
@@ -6275,6 +6818,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "validation_failed"
           ],
@@ -6320,6 +6869,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6364,6 +6919,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6419,6 +6980,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -6464,6 +7031,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6577,6 +7150,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6612,6 +7191,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6656,6 +7241,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6770,6 +7361,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6809,6 +7406,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6852,6 +7455,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -6895,6 +7504,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6948,6 +7563,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -6988,6 +7609,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7028,6 +7655,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7157,6 +7790,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7197,6 +7836,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7454,6 +8099,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7489,6 +8140,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7607,6 +8264,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -7642,6 +8305,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7677,6 +8346,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -7767,6 +8442,15 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_LINEAR_USER_{name}_TOKEN"
             }
           ],
           "returns": {
@@ -7777,7 +8461,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -7883,7 +8573,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -7932,7 +8628,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -7987,7 +8689,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         }
@@ -8252,6 +8960,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8335,6 +9049,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8386,6 +9106,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8449,6 +9175,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8509,6 +9241,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8573,6 +9311,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8633,6 +9377,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8690,6 +9440,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8747,6 +9503,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8807,6 +9569,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8858,6 +9626,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8912,6 +9686,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -8961,14 +9741,23 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "LinearDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
           },
           "errors": [
             "unauthorized",
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -9018,14 +9807,23 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "LinearDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "LinearDelivery"
+            }
           },
           "errors": [
             "unauthorized",
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -9074,6 +9872,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -9150,6 +9954,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9242,6 +10052,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9276,6 +10092,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9311,6 +10133,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9349,6 +10177,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9387,6 +10221,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9424,6 +10264,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9459,6 +10305,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9494,6 +10346,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9529,6 +10387,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -9567,6 +10431,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9705,6 +10575,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9740,6 +10616,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9792,6 +10674,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9857,7 +10745,7 @@
             "kind": "resource",
             "name": "LinearDelivery"
           },
-          "optional": false
+          "optional": true
         }
       ],
       "methods": [
@@ -9900,6 +10788,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9935,6 +10829,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -9970,6 +10870,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -10005,6 +10911,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -10040,6 +10952,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -10191,6 +11109,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -10227,6 +11151,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -10409,6 +11339,15 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_NOTION_USER_{name}_TOKEN"
             }
           ],
           "returns": {
@@ -10419,7 +11358,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -10511,6 +11456,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -10602,6 +11553,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -10637,7 +11594,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -10669,7 +11632,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -10718,7 +11687,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         },
@@ -10773,7 +11748,13 @@
             "unauthorized",
             "invalid_argument",
             "internal",
-            "session_not_found"
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
           ],
           "dispose": false
         }
@@ -10957,6 +11938,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11013,6 +12000,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11072,6 +12065,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -11123,6 +12122,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found",
             "forbidden"
           ],
@@ -11174,6 +12179,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11224,6 +12235,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11315,6 +12332,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11392,6 +12415,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11451,6 +12480,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11521,6 +12556,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11589,6 +12630,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11649,6 +12696,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11705,6 +12758,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11761,6 +12820,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11835,6 +12900,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11869,6 +12940,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -11905,6 +12982,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11949,6 +13032,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -11984,6 +13073,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12019,6 +13114,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12054,6 +13155,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12141,6 +13248,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12263,6 +13376,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12298,6 +13417,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12342,6 +13467,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12489,6 +13620,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12523,6 +13660,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12558,6 +13701,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12695,6 +13844,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12735,6 +13890,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false,
@@ -12776,6 +13937,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12816,6 +13983,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12856,6 +14029,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -12895,6 +14074,12 @@
             "invalid_argument",
             "internal",
             "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
             "not_found"
           ],
           "dispose": false
@@ -15333,14 +16518,20 @@
   ],
   "errors": [
     "account_inactive",
+    "action_requires",
     "already_in_channel",
     "already_reacted",
     "cant_delete_message",
     "cant_update_message",
+    "cross_workspace_credential",
     "dispatch_failed",
+    "fake_actor_in_live_world",
     "forbidden",
     "internal",
     "invalid_argument",
+    "invalid_auth",
+    "live_misconfigured",
+    "live_not_allowlisted",
     "msg_too_long",
     "name_taken",
     "no_reaction",
@@ -15353,6 +16544,8 @@
     "split_view_unavailable",
     "stop_unavailable",
     "unauthorized",
+    "unsupported_in_fake",
+    "unsupported_in_live",
     "validation_failed"
   ]
 }

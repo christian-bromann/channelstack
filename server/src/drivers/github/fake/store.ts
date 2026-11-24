@@ -98,6 +98,20 @@ export class GitHubStore {
     return collection.add(String(record.id), record, session);
   }
 
+  /**
+   * Keep an object a session shares with others (live, a person of the sandbox's pool): it is in
+   * the session's listing, and belongs to none of them, so no session's closing removes it.
+   */
+  share<T extends { id: number }>(collection: Collection<T>, session: string, record: T): T {
+    const mine = this.#created.get(session) ?? new Map<Collection<{ id: number }>, number[]>();
+    this.#created.set(session, mine);
+    const ids = mine.get(collection as Collection<{ id: number }>) ?? [];
+    if (!ids.includes(record.id)) ids.push(record.id);
+    mine.set(collection as Collection<{ id: number }>, ids);
+    const known = collection.find(String(record.id));
+    return known ? Object.assign(known, record) : collection.add(String(record.id), record);
+  }
+
   /** Everything of one kind a session made, oldest first. */
   list<T extends { id: number }>(collection: Collection<T>, session: string): T[] {
     const ids = this.#created.get(session)?.get(collection as Collection<{ id: number }>) ?? [];

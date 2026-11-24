@@ -1,8 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
-import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
+import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts";
 import type { DriverRouter } from "../../core/router/index.ts";
 import {
   apiCallSchema,
@@ -13,7 +13,10 @@ import {
   readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
+import type { GitHubDeliveryView, GitHubWorld } from "./backend.ts";
+import { fakeGitHubWorld, mayChange } from "./fake/actions.ts";
 import type { FakeGitHubWorld } from "./fake/world.ts";
+import { GITHUB_API } from "./live/client.ts";
 import { githubTime } from "./payloads.ts";
 import { renderTranscript } from "./transcript.ts";
 import {
@@ -213,17 +216,54 @@ const CommitParams = RepoParams.extend({ sha: pathParam("sha") });
 const issueBinding = { repo: "repoId", number: "number" };
 const commitBinding = { repo: "repoId", sha: "sha" };
 
+/** A person's Re-run is a click in GitHub: `rerequest` answers 403 to anyone but the App that owns the check run. */
+const RERUN: LiveSupport = {
+  unsupported: "not yet: a person's Re-run is a click in GitHub's UI, and the API lets only the owning App rerequest",
+};
+/** The requested-action buttons on a check run send their webhook only when a person clicks them. */
+const IN_THE_UI: LiveSupport = { requires: "browser", reason: "GitHub sends this only when a person clicks in the UI" };
+/** Pull requests, reviews, pushes, checks and installs aren't built live yet. */
+const NOT_YET: LiveSupport = {
+  unsupported: "not yet: pull requests, reviews, pushes, checks and installs aren't built live",
+};
+/** What only the App's own calls show: live, proxy mode sees them. */
+const AGENT_SIDE: LiveSupport = {
+  requires: "proxy",
+  reason: "GitHub doesn't report the App's calls; proxy mode sees them",
+};
+
 /** The GitHub driver's control API: what a test's people do, and what a test reads back. */
 export function registerGitHubRoutes(
   router: DriverRouter,
-  deps: { world: FakeGitHubWorld; events: EventLog; apiUrl: () => string; secret: (name: string) => string },
+  deps: {
+    fake: FakeGitHubWorld;
+    /** The live world, on a live driver. */
+    live: GitHubWorld | undefined;
+    events: EventLog;
+    apiUrl: () => string;
+    secret: (name: string) => string;
+  },
 ): void {
-  const { world } = deps;
-  const { kit, repos, issues, pulls, checks } = world;
-  const { store, git } = kit;
+  const { fake } = deps;
+  const { kit, repos, issues, pulls, checks } = fake;
+  const { git } = kit;
+  /** The world a route that works live acts in. Routes that don't are refused live by the router, and use the fake. */
+  const world: GitHubWorld = deps.live ?? fakeGitHubWorld(fake);
+  const isLive = deps.live !== undefined;
+  const { store } = world;
+  /** What a person did, on the session's timeline. */
+  const record = (session: string, name: string, data: Record<string, unknown>) =>
+    deps.events.append(session, "github", "action", { action: name, ...data });
   const stability = "experimental";
 
   // --- Records → wire ---------------------------------------------------------------------------
+
+  /** An issue of a repository in the world's store: the fake's, or the live mirror. */
+  const issueIn = (repo: GitHubRepoRecord, number: number) => {
+    const issue = store.issue(repo, number);
+    if (!issue) throw new ProtocolError("not_found", `No issue or pull request #${number} in that repository`);
+    return issue;
+  };
 
   const userWire = (user: GitHubUserRecord) => ({
     id: String(user.id),
@@ -243,8 +283,9 @@ export function registerGitHubRoutes(
     botLogin: store.bot.login,
     botUserId: String(store.bot.id),
     appId: store.app.id,
-    privateKey: deps.secret("privateKey"),
-    webhookSecret: deps.secret("webhookSecret"),
+    // A live App's credentials stay on the server: the control API never returns them.
+    privateKey: isLive ? "" : deps.secret("privateKey"),
+    webhookSecret: isLive ? "" : deps.secret("webhookSecret"),
   });
   const authorWire = (id: number) => (id === store.bot.id ? appWire() : userWire(store.actor(id)));
   const principal = (id: number) => {
@@ -265,7 +306,7 @@ export function registerGitHubRoutes(
       repoId: String(repo.id),
       number: issue.number,
       repo: repoWire(repo),
-      url: `${kit.objects.repoWeb(repo)}/${issue.pull ? "pull" : "issues"}/${issue.number}`,
+      url: `${world.repoWeb(repo)}/${issue.pull ? "pull" : "issues"}/${issue.number}`,
       author: authorWire(issue.author),
     };
   };
@@ -274,7 +315,7 @@ export function registerGitHubRoutes(
     head: issue.pull?.head ?? "",
     base: issue.pull?.base ?? "",
   });
-  const deliveryWire = ({ request, attempts }: DeliveryRecord) => ({
+  const deliveryWire = ({ request, attempts }: GitHubDeliveryView) => ({
     id: request.id,
     channel: "github" as const,
     type: request.type,
@@ -286,12 +327,12 @@ export function registerGitHubRoutes(
   });
   /** The delivery an action caused, when the App could be told. */
   const caused = (session: string, guid: string | undefined) =>
-    guid === undefined ? null : deliveryWire(world.delivery(session, guid));
+    guid === undefined ? null : deliveryWire(fake.delivery(session, guid));
   const delivered = (session: string, guids: ReadonlyArray<string | undefined>) =>
-    guids.flatMap((guid) => (guid === undefined ? [] : [deliveryWire(world.delivery(session, guid))]));
+    guids.flatMap((guid) => (guid === undefined ? [] : [deliveryWire(fake.delivery(session, guid))]));
   const commentWire = (session: string, comment: GitHubCommentRecord) => {
     const repo = store.repo(comment.repo);
-    const issue = kit.requireIssue(repo, comment.issue);
+    const issue = issueIn(repo, comment.issue);
     return {
       id: comment.id,
       url: `${issueWire(issue).url}#issuecomment-${comment.id}`,
@@ -361,8 +402,13 @@ export function registerGitHubRoutes(
    * contract (`api/github.d.ts`) takes the App here; whether GitHub itself accepts an App's bot is
    * not verified (docs/reality-matrix.md).
    */
-  const people = (session: string, ids: readonly string[]) =>
-    ids.map((id) => (id === String(store.app.id) ? store.bot.id : person(session, id)));
+  const people = (session: string, ids: readonly string[], operation: string) =>
+    ids.map((id) => {
+      if (id !== String(store.app.id)) return person(session, id);
+      // Unverified live, and likely refused: GitHub's docs don't cover an App's bot as an assignee or reviewer.
+      if (isLive) throw unsupportedInLive(operation, "GitHub doesn't take an App's bot here (docs/reality-matrix.md)");
+      return store.bot.id;
+    });
   const repoOf = (session: string, id: string) => store.repos.get(session, id);
   const issueOf = (session: string, ref: { repoId: string; number: number }) => {
     const issue = store.issue(repoOf(session, ref.repoId), ref.number);
@@ -407,7 +453,7 @@ export function registerGitHubRoutes(
     response: GitHubFixture,
     factory: { on: "Session", name: "github" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: deps.apiUrl(), org: store.org.login }),
+    handler: () => ({ app: appWire(), apiUrl: isLive ? GITHUB_API : deps.apiUrl(), org: store.org.login }),
   });
 
   router.route({
@@ -421,12 +467,21 @@ export function registerGitHubRoutes(
         name: z.string().optional(),
         email: z.string().optional(),
         role: z.enum(["member", "admin", "outside_collaborator"]).optional(),
+        token: z.string().min(1).optional().openapi({
+          description:
+            "A real machine user's token (a fine-grained or classic PAT) in the live org. Read from CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN when left out.",
+          "x-channelstack-credential": "CHANNELSTACK_GITHUB_USER_{login}_TOKEN",
+        }),
       })
       .openapi("GitHubUserOptions"),
     response: GitHubUser,
-    factory: { on: "GitHubFixture", name: "createUser", options: ["login", "id", "name", "email", "role"] },
+    factory: {
+      on: "GitHubFixture",
+      name: "createUser",
+      options: ["login", "id", "name", "email", "role", "token"],
+    },
     stability,
-    handler: ({ session, body }) => userWire(repos.createUser(session.id, body)),
+    handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
 
   router.route({
@@ -469,7 +524,7 @@ export function registerGitHubRoutes(
     stability,
     handler: async ({ session, body }) =>
       repoWire(
-        await repos.createRepo(session.id, {
+        await world.createRepo(session.id, {
           name: body.name,
           private: body.private,
           defaultBranch: body.defaultBranch,
@@ -520,6 +575,7 @@ export function registerGitHubRoutes(
       response: GitHubDelivery.nullable(),
       errors: ["not_found", "validation_failed"],
       sdkMethod: { on: "GitHubRepo", name, args: ["app"] },
+      live: NOT_YET,
       stability,
       handler: ({ session, params }) =>
         caused(session.id, repos.setInstalled(repoOf(session.id, params.repo), installed)),
@@ -559,6 +615,7 @@ export function registerGitHubRoutes(
     response: GitHubPullRequest,
     errors: ["not_found"],
     sdkMethod: { on: "GitHubRepo", name: "pullRequest", args: ["number"] },
+    live: NOT_YET,
     stability,
     handler: ({ session, params, query }) =>
       pullWire(pullOf(session.id, { repoId: params.repo, number: query.number })),
@@ -582,7 +639,7 @@ export function registerGitHubRoutes(
     sdkMethod: { on: "GitHubRepo", name: "readFile", args: ["path"], options: ["ref"], onceQuiet: true },
     stability,
     handler: async ({ session, params, query }) => {
-      const content = await repos.readFile(repoOf(session.id, params.repo), query.path, query.ref);
+      const content = await world.readFile(repoOf(session.id, params.repo), query.path, query.ref);
       return content === undefined ? null : Buffer.from(content).toString("utf8");
     },
   });
@@ -601,6 +658,7 @@ export function registerGitHubRoutes(
     response: z.array(GitHubCommit).openapi("GitHubCommits"),
     errors: ["not_found"],
     sdkMethod: { on: "GitHubRepo", name: "commits", options: ["branch"] },
+    live: NOT_YET,
     stability,
     handler: async ({ session, params, query }) => {
       const repo = repoOf(session.id, params.repo);
@@ -619,6 +677,7 @@ export function registerGitHubRoutes(
     response: z.array(GitHubCheckRun).openapi("GitHubCheckRuns"),
     errors: ["not_found"],
     sdkMethod: { on: "GitHubCommit", name: "checkRuns", bind: commitBinding },
+    live: NOT_YET,
     stability,
     handler: ({ session, params }) => checks.latest(repoOf(session.id, params.repo), params.sha).map(checkRunWire),
   });
@@ -639,6 +698,7 @@ export function registerGitHubRoutes(
       .openapi("GitHubStatuses"),
     errors: ["not_found"],
     sdkMethod: { on: "GitHubCommit", name: "statuses", bind: commitBinding },
+    live: NOT_YET,
     stability,
     handler: ({ session, params }) => {
       return checks.latestStatuses(repoOf(session.id, params.repo), params.sha).map((status) => ({
@@ -663,6 +723,7 @@ export function registerGitHubRoutes(
     response: GitHubCommit,
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "push", args: ["changes"], options: ["repo", "branch", "message"] },
+    live: NOT_YET,
     stability,
     handler: async ({ session, params, body }) => {
       const repo = repoOf(session.id, body.repo);
@@ -699,19 +760,16 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "openIssue", args: ["issue"], options: ["repo"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const repo = repoOf(session.id, body.repo);
       const actor = person(session.id, params.user);
-      kit.allow(repo, actor, "read");
-      // Only people who can triage may label and assign; from anyone else GitHub drops both silently.
-      const triage = kit.can(repo, actor, "triage");
-      kit.action(repo, "openIssue", { user: actor, title: body.issue.title });
-      const { issue } = issues.openIssue(repo, actor, {
+      const issue = await world.openIssue(repo, actor, {
         title: body.issue.title,
         body: body.issue.body,
-        labels: triage ? body.issue.labels : [],
-        assignees: triage ? people(session.id, body.issue.assignees ?? []) : [],
+        labels: body.issue.labels,
+        assignees: people(session.id, body.issue.assignees ?? [], "GitHubUser.openIssue({ assignees: [github.app] })"),
       });
+      record(session.id, "openIssue", { user: actor, title: body.issue.title });
       return issueWire(issue);
     },
   });
@@ -739,6 +797,7 @@ export function registerGitHubRoutes(
     response: GitHubPullRequest,
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "openPullRequest", args: ["pr"], options: ["repo"] },
+    live: NOT_YET,
     stability,
     handler: async ({ session, params, body }) => {
       const repo = repoOf(session.id, body.repo);
@@ -746,7 +805,7 @@ export function registerGitHubRoutes(
       const { pr } = body;
       kit.allow(repo, actor, pr.changes ? "write" : "read");
       // Refused before anything is pushed or opened.
-      const reviewers = people(session.id, pr.reviewers ?? []);
+      const reviewers = people(session.id, pr.reviewers ?? [], "GitHubUser.openPullRequest({ reviewers })");
       pulls.mayRequest(actor, reviewers);
       kit.action(repo, "openPullRequest", { user: actor, from: pr.from });
       if (pr.changes) {
@@ -765,10 +824,6 @@ export function registerGitHubRoutes(
     },
   });
 
-  /** May this person change an issue someone else opened? Its author always may. */
-  const mayChange = (issue: GitHubIssueRecord, actor: number) =>
-    kit.allow(store.repo(issue.repo), actor, issue.author === actor ? "read" : "triage");
-
   router.route({
     method: "post",
     path: "/users/{user}/edit-issue",
@@ -785,12 +840,12 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "editIssue", args: ["changes"], options: ["issue"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const actor = person(session.id, params.user);
-      mayChange(issue, actor);
-      kit.action(store.repo(issue.repo), "editIssue", { user: actor, number: issue.number });
-      return caused(session.id, issues.updateIssue(issue, actor, body.changes));
+      const sent = await world.updateIssue(issue, actor, body.changes);
+      record(session.id, "editIssue", { user: actor, number: issue.number });
+      return caused(session.id, sent);
     },
   });
 
@@ -808,12 +863,12 @@ export function registerGitHubRoutes(
       errors: ["not_found", "forbidden", "validation_failed"],
       sdkMethod: { on: "GitHubUser", name: path, options: ["issue"] },
       stability,
-      handler: ({ session, params, body }) => {
+      handler: async ({ session, params, body }) => {
         const issue = issueOf(session.id, body.issue);
         const actor = person(session.id, params.user);
-        mayChange(issue, actor);
-        kit.action(store.repo(issue.repo), path, { user: actor, number: issue.number });
-        return caused(session.id, issues.updateIssue(issue, actor, { state }));
+        const sent = await world.updateIssue(issue, actor, { state });
+        record(session.id, path, { user: actor, number: issue.number });
+        return caused(session.id, sent);
       },
     });
   }
@@ -837,11 +892,10 @@ export function registerGitHubRoutes(
       errors: ["not_found", "forbidden"],
       sdkMethod: { on: "GitHubUser", name, args: ["labels"], options: ["issue"] },
       stability,
-      handler: ({ session, params, body }) => {
+      handler: async ({ session, params, body }) => {
         const issue = issueOf(session.id, body.issue);
         const repo = store.repo(issue.repo);
         const actor = person(session.id, params.user);
-        kit.allow(repo, actor, "triage");
         // A person picks from the labels the repository has.
         const unknown = body.labels.filter((label) => !repo.labels.has(label.toLowerCase()));
         if (unknown.length > 0) {
@@ -850,13 +904,9 @@ export function registerGitHubRoutes(
             `${repo.owner}/${repo.name} has no label ${unknown.map((label) => `"${label}"`).join(", ")}. Its labels: ${[...repo.labels.values()].map((label) => label.name).join(", ")}`,
           );
         }
-        kit.action(repo, name, { user: actor, number: issue.number, labels: body.labels });
-        return delivered(
-          session.id,
-          name === "label"
-            ? issues.addLabels(issue, actor, body.labels)
-            : issues.removeLabels(issue, actor, body.labels),
-        );
+        const sent = await world.label(issue, actor, body.labels, name === "label");
+        record(session.id, name, { user: actor, number: issue.number, labels: body.labels });
+        return delivered(session.id, sent);
       },
     });
   }
@@ -871,12 +921,14 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "assign", args: ["assignees"], options: ["issue"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
+      // The App among the assignees is refused live before anything else.
+      const assignees = people(session.id, body.assignees, "GitHubUser.assign(github.app)");
       const issue = issueOf(session.id, body.issue);
       const actor = person(session.id, params.user);
-      kit.allow(store.repo(issue.repo), actor, "triage");
-      kit.action(store.repo(issue.repo), "assign", { user: actor, number: issue.number });
-      return delivered(session.id, issues.assign(issue, actor, people(session.id, body.assignees)));
+      const sent = await world.assign(issue, actor, assignees);
+      record(session.id, "assign", { user: actor, number: issue.number });
+      return delivered(session.id, sent);
     },
   });
 
@@ -892,12 +944,12 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "comment", args: ["body"], options: ["issue"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const issue = issueOf(session.id, body.issue);
       const actor = person(session.id, params.user);
-      kit.allow(store.repo(issue.repo), actor, "read");
-      kit.action(store.repo(issue.repo), "comment", { user: actor, number: issue.number });
-      return commentWire(session.id, issues.comment(issue, actor, body.body));
+      const comment = await world.comment(issue, actor, body.body);
+      record(session.id, "comment", { user: actor, number: issue.number });
+      return commentWire(session.id, comment);
     },
   });
 
@@ -911,19 +963,17 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "edit", args: ["body"], options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const actor = person(session.id, params.user);
       const { review, comment } = anyComment(session.id, body.comment);
-      const target = review ?? comment;
-      // GitHub lets you edit your own comment; someone else's needs write access.
-      kit.allow(store.repo(target.repo), actor, target.author === actor ? "read" : "write");
-      kit.action(store.repo(target.repo), "edit", { user: actor, comment: target.id });
-      return caused(
-        session.id,
-        review
-          ? pulls.editReviewComment(kit.requirePull(store.repo(review.repo), review.pull), review, body.body)
-          : issues.editComment(comment, actor, body.body),
-      );
+      let sent: string | undefined;
+      if (review) {
+        // GitHub lets you edit your own comment; someone else's needs write access.
+        kit.allow(store.repo(review.repo), actor, review.author === actor ? "read" : "write");
+        sent = pulls.editReviewComment(kit.requirePull(store.repo(review.repo), review.pull), review, body.body);
+      } else sent = await world.editComment(comment, actor, body.body);
+      record(session.id, "edit", { user: actor, comment: (review ?? comment).id });
+      return caused(session.id, sent);
     },
   });
 
@@ -937,18 +987,16 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "delete", options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const actor = person(session.id, params.user);
       const { review, comment } = anyComment(session.id, body.comment);
-      const target = review ?? comment;
-      kit.allow(store.repo(target.repo), actor, target.author === actor ? "read" : "write");
-      kit.action(store.repo(target.repo), "delete", { user: actor, comment: target.id });
-      return caused(
-        session.id,
-        review
-          ? pulls.deleteReviewComment(kit.requirePull(store.repo(review.repo), review.pull), review)
-          : issues.deleteComment(comment, actor),
-      );
+      let sent: string | undefined;
+      if (review) {
+        kit.allow(store.repo(review.repo), actor, review.author === actor ? "read" : "write");
+        sent = pulls.deleteReviewComment(kit.requirePull(store.repo(review.repo), review.pull), review);
+      } else sent = await world.deleteComment(comment, actor);
+      record(session.id, "delete", { user: actor, comment: (review ?? comment).id });
+      return caused(session.id, sent);
     },
   });
 
@@ -963,17 +1011,21 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "react", args: ["content"], options: ["issue", "comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const actor = person(session.id, params.user);
       if ((body.issue === undefined) === (body.comment === undefined)) {
         throw new ProtocolError("invalid_argument", "React to one thing: an issue or a comment");
       }
       const found = body.comment === undefined ? undefined : anyComment(session.id, body.comment);
-      const target = body.issue ? issueOf(session.id, body.issue) : (found?.review ?? found?.comment);
-      if (!target) throw new ProtocolError("not_found", "Nothing to react to");
-      kit.allow(store.repo(target.repo), actor, "read");
-      kit.action(store.repo(target.repo), "react", { user: actor, content: body.content });
-      issues.react(target, actor, body.content);
+      if (found?.review) {
+        kit.allow(store.repo(found.review.repo), actor, "read");
+        issues.react(found.review, actor, body.content);
+      } else {
+        const target = body.issue ? issueOf(session.id, body.issue) : found?.comment;
+        if (!target) throw new ProtocolError("not_found", "Nothing to react to");
+        await world.react(target, actor, body.content);
+      }
+      record(session.id, "react", { user: actor, content: body.content });
     },
   });
 
@@ -990,6 +1042,7 @@ export function registerGitHubRoutes(
       .openapi("GitHubMinimizeBody"),
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "minimize", options: ["comment", "reason"] },
+    live: NOT_YET,
     stability,
     handler: ({ session, params, body }) => {
       const actor = person(session.id, params.user);
@@ -1031,6 +1084,7 @@ export function registerGitHubRoutes(
     response: GitHubReview,
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "review", args: ["review"] },
+    live: NOT_YET,
     stability,
     handler: async ({ session, params, body }) => {
       const pull = pullOf(session.id, body.review.pr);
@@ -1059,6 +1113,7 @@ export function registerGitHubRoutes(
     response: GitHubReviewComment,
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "reviewComment", args: ["body"], options: ["pr", "path", "line", "side"] },
+    live: NOT_YET,
     stability,
     handler: async ({ session, params, body }) => {
       const pull = pullOf(session.id, body.pr);
@@ -1078,6 +1133,7 @@ export function registerGitHubRoutes(
     response: GitHubReviewComment,
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "reply", args: ["body"], options: ["comment"] },
+    live: NOT_YET,
     stability,
     handler: ({ session, params, body }) => {
       const to = reviewCommentOf(session.id, body.comment);
@@ -1101,6 +1157,7 @@ export function registerGitHubRoutes(
       response: GitHubDelivery.nullable(),
       errors: ["not_found", "forbidden"],
       sdkMethod: { on: "GitHubUser", name, options: ["comment"] },
+      live: NOT_YET,
       stability,
       handler: ({ session, params, body }) => {
         const comment = reviewCommentOf(session.id, body.comment);
@@ -1125,13 +1182,14 @@ export function registerGitHubRoutes(
     response: GitHubDelivery.nullable(),
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "requestReview", args: ["reviewers"], options: ["pr"] },
+    live: NOT_YET,
     stability,
     handler: ({ session, params, body }) => {
       const pull = pullOf(session.id, body.pr);
       const actor = person(session.id, params.user);
-      mayChange(pull, actor);
+      mayChange(kit, pull, actor);
       kit.action(store.repo(pull.repo), "requestReview", { user: actor, number: pull.number });
-      const sent = pulls.requestReviewers(pull, actor, people(session.id, body.reviewers));
+      const sent = pulls.requestReviewers(pull, actor, people(session.id, body.reviewers, "GitHubUser.requestReview"));
       return caused(
         session.id,
         sent.find((guid) => guid !== undefined),
@@ -1148,6 +1206,7 @@ export function registerGitHubRoutes(
     response: GitHubDelivery.nullable(),
     errors: ["not_found", "forbidden", "validation_failed"],
     sdkMethod: { on: "GitHubUser", name: "markReady", options: ["pr"] },
+    live: NOT_YET,
     stability,
     handler: ({ session, params, body }) => {
       const pull = pullOf(session.id, body.pr);
@@ -1169,6 +1228,7 @@ export function registerGitHubRoutes(
     response: GitHubDelivery.nullable(),
     errors: ["not_found", "forbidden", "not_allowed"],
     sdkMethod: { on: "GitHubUser", name: "merge", options: ["pr", "method"] },
+    live: NOT_YET,
     stability,
     handler: async ({ session, params, body }) => {
       const pull = pullOf(session.id, body.pr);
@@ -1190,6 +1250,7 @@ export function registerGitHubRoutes(
     response: GitHubDelivery.nullable(),
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "GitHubUser", name: "rerun", options: ["checkRun"] },
+    live: RERUN,
     stability,
     handler: ({ session, params, body }) => {
       const run = checkRunOf(session.id, body.checkRun);
@@ -1209,6 +1270,7 @@ export function registerGitHubRoutes(
     errors: ["not_found", "forbidden"],
     // The button is there once the App has put it there: a person would wait for it.
     sdkMethod: { on: "GitHubUser", name: "requestAction", args: ["identifier"], options: ["checkRun"] },
+    live: IN_THE_UI,
     stability,
     handler: ({ session, params, body }) => {
       const run = checkRunOf(session.id, body.checkRun);
@@ -1243,8 +1305,11 @@ export function registerGitHubRoutes(
       },
       ...(extra.waits ? { waits: extra.waits } : {}),
       stability,
-      handler: ({ session, params }) =>
-        read(issueOf(session.id, { repoId: params.repo, number: params.number }), session.id) as never,
+      handler: async ({ session, params }) => {
+        const ref = { repoId: params.repo, number: params.number };
+        await world.refresh(session.id, issueOf(session.id, ref));
+        return read(issueOf(session.id, ref), session.id) as never;
+      },
     });
 
   issueRead("", "refresh", "Read the issue again", GitHubIssue, issueWire);
@@ -1314,6 +1379,7 @@ export function registerGitHubRoutes(
       response,
       errors: ["not_found"],
       sdkMethod: { on: "GitHubPullRequest", name, bind: issueBinding, ...(onceQuiet ? { onceQuiet: true } : {}) },
+      live: NOT_YET,
       stability,
       handler: ({ session, params }) =>
         read(pullOf(session.id, { repoId: params.repo, number: params.number }), session.id) as never,
@@ -1381,7 +1447,11 @@ export function registerGitHubRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "GitHubComment", name: "refresh" },
     stability,
-    handler: ({ session, params }) => commentWire(session.id, store.comments.get(session.id, String(params.comment))),
+    handler: async ({ session, params }) => {
+      const { repo, issue } = store.comments.get(session.id, String(params.comment));
+      await world.refresh(session.id, issueIn(store.repo(repo), issue));
+      return commentWire(session.id, store.comments.get(session.id, String(params.comment)));
+    },
   });
 
   router.route({
@@ -1394,6 +1464,7 @@ export function registerGitHubRoutes(
       .openapi("GitHubReactions"),
     errors: ["not_found"],
     sdkMethod: { on: "GitHubComment", name: "reactions" },
+    live: NOT_YET,
     stability,
     handler: ({ session, params }) => {
       const { reactions } = store.comments.get(session.id, String(params.comment));
@@ -1421,6 +1492,7 @@ export function registerGitHubRoutes(
     response: z.array(GitHubReviewComment).openapi("GitHubReviewCommentReplies"),
     errors: ["not_found"],
     sdkMethod: { on: "GitHubReviewComment", name: "replies", onceQuiet: true },
+    live: NOT_YET,
     stability,
     handler: ({ session, params }) =>
       threadOf(session.id, params.comment).replies.map((comment) => reviewCommentWire(session.id, comment)),
@@ -1434,6 +1506,7 @@ export function registerGitHubRoutes(
     response: z.boolean(),
     errors: ["not_found"],
     sdkMethod: { on: "GitHubReviewComment", name: "resolved" },
+    live: NOT_YET,
     stability,
     handler: ({ session, params }) => pulls.isResolved(threadOf(session.id, params.comment).head),
   });
@@ -1446,6 +1519,7 @@ export function registerGitHubRoutes(
     response: GitHubTranscript,
     errors: ["not_found"],
     sdkMethod: { on: "GitHubReviewComment", name: "transcript" },
+    live: NOT_YET,
     stability,
     handler: ({ session, params }) => {
       const { head, replies } = threadOf(session.id, params.comment);
@@ -1478,9 +1552,8 @@ export function registerGitHubRoutes(
     response: z.array(GitHubDelivery).openapi("GitHubDeliveries"),
     sdkMethod: { on: "GitHubFixture", name: "deliveries", options: ["type", "resource"] },
     stability,
-    handler: ({ session, query }) =>
-      world
-        .deliveries(session.id)
+    handler: async ({ session, query }) =>
+      (await world.deliveries(session.id))
         .filter(({ request }) => query.type === undefined || request.type === query.type)
         .filter(({ request }) => query.resource === undefined || String(request.meta?.repo) === query.resource)
         .map(deliveryWire),
@@ -1496,7 +1569,7 @@ export function registerGitHubRoutes(
     sdkMethod: { on: "GitHubDelivery", name: "refresh" },
     waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
     stability,
-    handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
+    handler: async ({ session, params }) => deliveryWire(await world.delivery(session.id, params.delivery)),
   });
 
   router.route({
@@ -1520,8 +1593,9 @@ export function registerGitHubRoutes(
     response: DeliveryAttempt,
     errors: ["not_found"],
     sdkMethod: { on: "GitHubDelivery", name: "resend", options: ["badSignature"] },
+    live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
   });
 
   router.route({
@@ -1532,6 +1606,7 @@ export function registerGitHubRoutes(
     query: CallsQuery,
     response: z.array(GitHubApiCall).openapi("GitHubAppCalls"),
     sdkMethod: { on: "GitHubFixture", name: "appCalls", options: ["operation", "error"] },
+    live: AGENT_SIDE,
     stability,
     handler: ({ query }) => readCalls(deps.events, WORLD_SCOPE, "github", query),
   });
@@ -1545,6 +1620,7 @@ export function registerGitHubRoutes(
     response: z.array(GitHubApiCall).openapi("GitHubApiCalls"),
     sdkMethod: { on: "GitHubFixture", name: "calls", options: ["operation", "error"] },
     waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
+    live: AGENT_SIDE,
     stability,
     handler: ({ session, query }) => readCalls(deps.events, session.id, "github", query),
   });

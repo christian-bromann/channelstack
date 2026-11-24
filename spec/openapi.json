@@ -644,6 +644,25 @@
           },
           "bot": {
             "type": "boolean"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real person's user token (`xoxp-`) in the live workspace. Read from CHANNELSTACK_SLACK_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_SLACK_USER_{name}_TOKEN"
+          },
+          "browser": {
+            "type": "object",
+            "properties": {
+              "storageState": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "storageState"
+            ],
+            "description": "A saved browser session, for the actions only Slack's client does (click, Stop)."
           }
         },
         "required": [
@@ -967,6 +986,10 @@
           },
           "purpose": {
             "type": "string"
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Shared with another organization (Slack Connect)."
           }
         }
       },
@@ -2158,6 +2181,12 @@
               "admin",
               "outside_collaborator"
             ]
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real machine user's token (a fine-grained or classic PAT) in the live org. Read from CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_GITHUB_USER_{login}_TOKEN"
           }
         },
         "required": [
@@ -4051,6 +4080,12 @@
           },
           "guest": {
             "type": "boolean"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real person's personal API key in the live workspace. Read from CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_LINEAR_USER_{name}_TOKEN"
           }
         },
         "required": [
@@ -4429,8 +4464,7 @@
           "id",
           "issue",
           "app",
-          "startedBy",
-          "delivery"
+          "startedBy"
         ],
         "x-channelstack-resource": {
           "id": "id"
@@ -5084,6 +5118,12 @@
           },
           "avatarUrl": {
             "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real person's personal access token in the live workspace, which acts as them. Read from CHANNELSTACK_NOTION_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_NOTION_USER_{name}_TOKEN"
           }
         },
         "required": [
@@ -6310,7 +6350,8 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "action_requires"
         ],
         "x-channelstack-stability": "stable",
         "parameters": [
@@ -6363,7 +6404,8 @@
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
-          "internal"
+          "internal",
+          "unsupported_in_live"
         ],
         "x-channelstack-stability": "stable",
         "responses": {
@@ -6902,7 +6944,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -6961,14 +7009,24 @@
             "admin",
             "owner",
             "guest",
-            "bot"
+            "bot",
+            "token",
+            "browser"
           ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "invalid_auth",
+          "account_inactive"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -7030,7 +7088,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -7084,7 +7148,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -7139,6 +7209,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -7201,7 +7277,8 @@
             "private",
             "participants",
             "topic",
-            "purpose"
+            "purpose",
+            "shared"
           ]
         },
         "x-channelstack-error-codes": [
@@ -7209,8 +7286,15 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
-          "name_taken"
+          "name_taken",
+          "unsupported_in_fake"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -7282,6 +7366,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "no_text",
@@ -7365,6 +7455,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "no_text",
@@ -7447,6 +7543,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "cant_update_message",
@@ -7526,6 +7628,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "cant_delete_message"
@@ -7605,6 +7713,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "dispatch_failed"
@@ -7645,7 +7759,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SlackDelivery"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SlackDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }
@@ -7690,11 +7811,21 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "dispatch_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -7771,11 +7902,21 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "dispatch_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -7852,11 +7993,21 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "dispatch_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -7931,11 +8082,21 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "stop_unavailable"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -8010,10 +8171,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "split_view_unavailable"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -8093,10 +8264,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -8173,11 +8354,21 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "split_view_unavailable"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -8253,9 +8444,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -8332,9 +8533,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -8395,9 +8606,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -8461,10 +8682,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "dispatch_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -8535,10 +8766,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "dispatch_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Slack sends this only when a person does it in the client; no API does it as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -8612,6 +8853,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "already_reacted"
@@ -8700,6 +8947,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "no_reaction"
@@ -8785,6 +9038,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -8864,6 +9123,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel",
           "already_in_channel"
@@ -8938,6 +9203,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "not_in_channel"
         ],
@@ -9013,6 +9284,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9076,6 +9353,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9143,6 +9426,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9232,6 +9521,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9307,6 +9602,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9382,9 +9683,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -9460,6 +9771,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9550,6 +9867,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9636,6 +9959,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -9712,9 +10041,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -9790,9 +10129,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -9865,9 +10214,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -9935,9 +10293,18 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -10001,9 +10368,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -10068,9 +10444,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -10146,9 +10531,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -10230,9 +10624,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -10313,9 +10717,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "account_inactive"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "it revokes the app's tokens, and reinstalling needs the OAuth consent flow in a browser (a dedicated job, not every run)"
+        },
         "parameters": [
           {
             "schema": {
@@ -10376,9 +10789,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -10441,9 +10864,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+        },
         "parameters": [
           {
             "schema": {
@@ -10496,7 +10929,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -10550,14 +10989,21 @@
             "id",
             "name",
             "email",
-            "role"
+            "role",
+            "token"
           ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -10630,7 +11076,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -10698,6 +11150,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -10766,10 +11224,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -10850,10 +11317,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -10934,6 +11410,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -11008,9 +11490,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11086,6 +11577,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -11175,9 +11672,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11250,9 +11756,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11325,9 +11840,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11404,10 +11928,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11484,6 +12017,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
@@ -11565,11 +12104,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11646,6 +12194,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -11730,6 +12284,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
@@ -11815,6 +12375,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
@@ -11903,6 +12469,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -11983,6 +12555,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -12063,6 +12641,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
@@ -12144,6 +12728,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -12224,6 +12814,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -12308,6 +12904,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -12396,6 +12998,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -12467,10 +13075,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12537,11 +13154,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12621,11 +13247,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12702,10 +13337,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12779,10 +13423,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12863,10 +13516,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12950,11 +13612,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13035,11 +13706,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13121,11 +13801,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden",
           "not_allowed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13206,10 +13895,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: a person's Re-run is a click in GitHub's UI, and the API lets only the owning App rerequest"
+        },
         "parameters": [
           {
             "schema": {
@@ -13293,10 +13991,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "GitHub sends this only when a person clicks in the UI"
+        },
         "parameters": [
           {
             "schema": {
@@ -13378,6 +14086,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13453,6 +14167,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13529,6 +14249,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13608,6 +14334,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13686,6 +14418,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13793,6 +14531,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13868,6 +14612,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -13943,9 +14693,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14019,9 +14778,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14094,9 +14862,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14169,9 +14946,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14244,9 +15030,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14319,9 +15114,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14390,6 +15194,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -14453,9 +15263,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14517,9 +15336,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14580,9 +15408,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14643,9 +15480,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14709,7 +15555,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -14798,6 +15650,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -14861,6 +15719,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -14927,9 +15791,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -15003,9 +15876,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "GitHub doesn't report the App's calls; proxy mode sees them"
+        },
         "parameters": [
           {
             "schema": {
@@ -15097,9 +15980,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "GitHub doesn't report the App's calls; proxy mode sees them"
+        },
         "parameters": [
           {
             "schema": {
@@ -15179,7 +16072,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -15234,14 +16133,21 @@
             "displayName",
             "email",
             "admin",
-            "guest"
+            "guest",
+            "token"
           ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -15312,7 +16218,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -15380,6 +16292,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -15457,6 +16375,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -15537,6 +16461,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -15622,6 +16552,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -15709,6 +16645,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -15796,6 +16738,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -15883,6 +16831,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -15970,6 +16924,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16050,6 +17010,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16130,6 +17096,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16210,6 +17182,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16294,6 +17272,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16381,6 +17365,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16454,6 +17444,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16493,7 +17489,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinearDelivery"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LinearDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }
@@ -16534,6 +17537,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -16573,7 +17582,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LinearDelivery"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/LinearDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }
@@ -16611,10 +17627,20 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "Linear sends the stop signal only when a person presses Stop, and it can't be published through the API"
+        },
         "parameters": [
           {
             "schema": {
@@ -16685,6 +17711,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -16748,6 +17780,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -16811,6 +17849,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -16874,6 +17918,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -16944,6 +17994,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17014,6 +18070,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17095,6 +18157,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17158,6 +18226,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17224,6 +18298,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17287,6 +18367,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17351,6 +18437,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17414,6 +18506,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17485,6 +18583,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17569,6 +18673,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17632,6 +18742,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17695,6 +18811,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17758,6 +18880,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -17824,9 +18952,18 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -17913,9 +19050,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -17976,9 +19122,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Linear has no API to redeliver a webhook"
+        },
         "parameters": [
           {
             "schema": {
@@ -18043,9 +19198,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -18127,9 +19291,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "Linear doesn't report the app's calls; proxy mode sees them"
+        },
         "parameters": [
           {
             "schema": {
@@ -18209,7 +19383,13 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -18262,14 +19442,21 @@
             "name",
             "id",
             "email",
-            "avatarUrl"
+            "avatarUrl",
+            "token"
           ]
         },
         "x-channelstack-error-codes": [
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
         "parameters": [
@@ -18342,6 +19529,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -18414,9 +19607,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -18481,9 +19683,18 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Notion batches page.content_updated itself, for a time it doesn't document"
+        },
         "parameters": [
           {
             "schema": {
@@ -18538,9 +19749,18 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Notion sends the verification request once, when the subscription is created"
+        },
         "parameters": [
           {
             "schema": {
@@ -18607,6 +19827,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -18686,6 +19912,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -18765,6 +19997,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -18849,6 +20087,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found",
           "forbidden"
         ],
@@ -18933,9 +20177,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved"
+        },
         "parameters": [
           {
             "schema": {
@@ -19016,9 +20269,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved"
+        },
         "parameters": [
           {
             "schema": {
@@ -19099,6 +20361,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19178,6 +20446,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19264,6 +20538,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19351,6 +20631,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19438,9 +20724,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -19524,9 +20819,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -19603,9 +20907,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "no API connects a page to an integration; Notion's UI does (… → Connections)"
+        },
         "parameters": [
           {
             "schema": {
@@ -19675,9 +20989,19 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "no API connects a page to an integration; Notion's UI does (… → Connections)"
+        },
         "parameters": [
           {
             "schema": {
@@ -19741,6 +21065,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19805,6 +21135,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19868,6 +21204,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -19934,9 +21276,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -20005,6 +21356,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -20068,6 +21425,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -20131,6 +21494,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -20197,9 +21566,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -20284,6 +21662,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -20347,9 +21731,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion's API can't resolve or reopen a discussion, or say whether one is resolved"
+        },
         "parameters": [
           {
             "schema": {
@@ -20410,6 +21803,12 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
@@ -20476,9 +21875,18 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -20565,9 +21973,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -20628,9 +22045,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Notion has no API to redeliver a webhook"
+        },
         "parameters": [
           {
             "schema": {
@@ -20694,9 +22120,18 @@
           "invalid_argument",
           "internal",
           "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
         "parameters": [
           {
             "schema": {
@@ -20778,9 +22213,19 @@
           "unauthorized",
           "invalid_argument",
           "internal",
-          "session_not_found"
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "Notion doesn't report the integration's calls; proxy mode sees them"
+        },
         "parameters": [
           {
             "schema": {

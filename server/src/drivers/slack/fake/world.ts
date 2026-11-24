@@ -18,14 +18,16 @@ import {
   reactionEvent,
   richTextBlock,
 } from "../payloads.ts";
-import type {
-  SlackConversationKind,
-  SlackConversationRecord,
-  SlackFileRecord,
-  SlackMessageInput,
-  SlackMessageRecord,
-  SlackUserRecord,
-  SlackWorld,
+import {
+  type Immediate,
+  type SlackConversationKind,
+  type SlackConversationRecord,
+  type SlackFileRecord,
+  type SlackMessageInput,
+  type SlackMessageRecord,
+  SlackRefusal,
+  type SlackUserRecord,
+  type SlackWorld,
 } from "../world.ts";
 import { createInteractions, type InteractionKit } from "./interactions.ts";
 import type { SocketMode } from "./socket.ts";
@@ -40,17 +42,11 @@ const STALE_MS = 6 * 60_000;
 const MAX_TEXT_LENGTH = 40_000;
 
 /** A refusal with Slack's own error code. The control API surfaces it; the fake Web API answers with the code. */
-export class SlackRefusal extends ProtocolError {
-  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
-    super({ platform: code, status: 409 }, message, data);
-  }
-}
-
 const refuse = (code: string, message: string, data: Record<string, unknown> = {}) =>
   new SlackRefusal(code, message, data);
 
 /** What the fake `SlackWorld` adds for the provider API, where the agent acts as the app. */
-export interface FakeSlackWorld extends SlackWorld {
+export interface FakeSlackWorld extends Immediate<SlackWorld> {
   /** Post as the app (`chat.postMessage`). The caller has checked membership and scopes. */
   postAsApp(
     conversation: SlackConversationRecord,

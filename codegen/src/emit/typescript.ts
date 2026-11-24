@@ -198,7 +198,18 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return part.from === "session" ? `\${segment(sessionOf(ctx))}` : `\${segment(this.${part.field})}`;
       })
       .join("");
-    const value = (param: IrParam) => encode(param, m.args.includes(param) ? param.name : `options.${param.name}`);
+    const given = (param: IrParam) => (m.args.includes(param) ? param.name : `options.${param.name}`);
+    const value = (param: IrParam) => {
+      const sent = encode(param, given(param));
+      if (param.credential === undefined) return sent;
+      // Left out, it comes from the environment: the same test runs fake on PRs and live nightly.
+      const fields = [...param.credential.matchAll(/\{(\w+)\}/g)].map((match) => match[1] as string);
+      const values = fields.map((field) => {
+        const source = [...m.args, ...m.options].find((candidate) => candidate.name === field);
+        return `${field}: ${source ? given(source) : "undefined"}`;
+      });
+      return `${sent} ?? credential(${JSON.stringify(param.credential)}, { ${values.join(", ")} })`;
+    };
     const entry = (param: IrParam) => (value(param) === param.name ? param.name : `${param.name}: ${value(param)}`);
     const params = [...m.args, ...m.options];
     const body = params.filter((param) => param.in === "body");
@@ -411,6 +422,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     ...(allMethods.some((m) => m.onceQuiet) ? ["untilQuiet"] : []),
     ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["patternOnWire"] : []),
   ];
+  const usesCredentials = JSON.stringify(ir).includes('"credential":');
   const usesSession = ir.resources.some((resource) =>
     resource.methods.some((m) => m.http.pathParams.some((p) => p.from === "session")),
   );
@@ -418,6 +430,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
   const lines = [
     `// ${BANNER}`,
     `import { ClientBase, connectWith${disposes ? ", disposeQuietly" : ""}, type HandleContext${ir.types.some((type) => type.stringField !== undefined) ? ", printsAs" : ""}, QUIET, quietOf${usesSession ? ", sessionOf" : ""} } from "../runtime/client.ts";`,
+    ...(usesCredentials ? ['import { credential } from "../runtime/credentials.ts";'] : []),
     ...(usesDurations ? ['import { type Duration, parseDuration } from "../runtime/duration.ts";'] : []),
     ...(usesFiles
       ? [

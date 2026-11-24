@@ -172,10 +172,10 @@ describe("inspecting what the agent did", () => {
 });
 
 describe("live mode", () => {
-  // With the App's credentials and CHANNELSTACK_GITHUB_USER_ANA_TOKEN (a machine account's
+  // With the App's credentials and CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN (a machine account's
   // fine-grained PAT) set, this runs in the real test org. GitHub delivers to the agent itself;
   // channelstack creates the repo, acts as Ana and reads the result back.
-  test.skipIf(!process.env.CHANNELSTACK_GITHUB_USER_ANA_TOKEN)("a real comment on a real repo", async ({ github }) => {
+  test.skipIf(!process.env.CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN)("a real comment on a real repo", async ({ github }) => {
     const ana = await github.createUser({ login: "ana-channelstack" });
     const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
     const issue = await ana.openIssue({ title: "Live smoke test" }, { repo });
@@ -183,8 +183,11 @@ describe("live mode", () => {
     await ana.comment("@my-agent please triage", { issue });
 
     await expect(issue).toHaveCommentFrom(github.app, { timeout: "60s" });
-    // GitHub's delivery log is readable live, so this works too.
-    const [delivery] = await github.deliveries({ type: "issue_comment", resource: repo });
+    // GitHub's delivery log is readable live, so this works too. It shows a delivery a few
+    // seconds after GitHub sent it.
+    const comments = () => github.deliveries({ type: "issue_comment", resource: repo });
+    await expect.poll(async () => (await comments()).length, { timeout: 30_000 }).toBeGreaterThan(0);
+    const [delivery] = await comments();
     await expect(delivery!).toBeAccepted();
   });
 });

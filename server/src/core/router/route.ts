@@ -1,6 +1,7 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 
 import { type CoreErrorCode, ErrorBody, ProtocolError } from "../errors/index.ts";
+import { admitLive, type DriverReality, type LiveSupport } from "../reality/index.ts";
 import type { Session, Sessions } from "../sessions/index.ts";
 
 /** How an operation shows up in the SDKs: as a method on a handle (`x-channelstack-method`) or a factory (`x-channelstack-factory`). */
@@ -74,6 +75,11 @@ interface RouteBase<P extends AnyObject, Q extends AnyObject, B extends z.ZodTyp
   /** Waits SDKs build on this list read. */
   waits?: readonly WaitBinding[];
   stability: "experimental" | "stable";
+  /**
+   * How the operation works on a live driver (reality-matrix.md). Left out, it works live. A route
+   * that doesn't is refused there before its handler runs: `unsupported_in_live` or `action_requires`.
+   */
+  live?: LiveSupport;
 }
 
 interface Input<P extends AnyObject, Q extends AnyObject, B extends z.ZodType> {
@@ -141,6 +147,7 @@ export function registerRoute<
     ...(spec.waits ? { "x-channelstack-waits": spec.waits } : {}),
     "x-channelstack-error-codes": [...new Set([...ALWAYS, ...(spec.errors ?? [])])],
     "x-channelstack-stability": spec.stability,
+    ...(spec.live ? { "x-channelstack-live": spec.live } : {}),
   });
 
   // The handler's types come from the spec's schemas above; Hono's own inference isn't needed on top.
@@ -166,16 +173,32 @@ export const SessionParams = z.object({
   session: z.string().openapi({ param: { name: "session", in: "path" }, example: "ses_k3f9a1b2c3d4e5f6g7h8" }),
 });
 
-/** Registers a driver's routes under `/sessions/{session}/<driver>` and resolves the session for each call. */
+/** What every driver route can be refused with live, besides its own errors. */
+const LIVE_ERRORS = [
+  "unsupported_in_live",
+  "action_requires",
+  "live_misconfigured",
+  "live_not_allowlisted",
+  "fake_actor_in_live_world",
+  "cross_workspace_credential",
+] as const;
+
+/**
+ * Registers a driver's routes under `/sessions/{session}/<driver>`, resolves the session for each
+ * call, and on a live driver lets through only what works live (core decides, not the driver).
+ */
 export class DriverRouter {
   readonly #app: OpenAPIHono;
   readonly #driver: string;
   readonly #sessions: Sessions;
+  readonly #reality: (() => DriverReality) | undefined;
 
-  constructor(app: OpenAPIHono, driver: string, sessions: Sessions) {
+  /** `reality` is for a driver that can be live: its routes then also list what live refuses with. */
+  constructor(app: OpenAPIHono, driver: string, sessions: Sessions, reality?: () => DriverReality) {
     this.#app = app;
     this.#driver = driver;
     this.#sessions = sessions;
+    this.#reality = reality;
   }
 
   route<
@@ -189,11 +212,14 @@ export class DriverRouter {
       ...spec,
       path: `/sessions/{session}/${this.#driver}${spec.path}`,
       params,
-      errors: ["session_not_found", ...(spec.errors ?? [])],
-      handler: (input) => {
+      errors: ["session_not_found", ...(this.#reality ? LIVE_ERRORS : []), ...(spec.errors ?? [])],
+      handler: (async (input: Input<P, Q, B>) => {
         const session = this.#sessions.get((input.params as { session: string }).session);
+        const binding = spec.sdkMethod ?? spec.factory;
+        const operation = binding ? `${binding.on}.${binding.name}` : `${spec.method.toUpperCase()} ${spec.path}`;
+        if (this.#reality) await admitLive(this.#reality(), operation, spec.live, this.#driver);
         return spec.handler({ ...input, session });
-      },
+      }) as RouteSpec<P, Q, B, R>["handler"],
     });
   }
 }

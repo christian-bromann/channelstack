@@ -49,8 +49,12 @@ async function checks(
   return run;
 }
 
+/** `CHANNELSTACK_BROKEN_CHANNELS=slack,github`: only these channels, so CI can run them side by side. */
+const only = process.env.CHANNELSTACK_BROKEN_CHANNELS?.split(",").filter(Boolean);
+const channels = Object.entries(CHANNELS).filter(([name]) => only === undefined || only.includes(name));
+
 // Exit checks 2.3, 3.4 and 4.5: against a deliberately broken agent each check fails, one broken variant per check.
-describe.for(Object.entries(CHANNELS))("the standard %s checks catch what they are for", ([name, { ids }]) => {
+describe.for(channels)("the standard %s checks catch what they are for", ([name, { ids }]) => {
   const channel = name as keyof typeof CHANNELS;
 
   test("with no fault switched on, the agent passes every check", async () => {

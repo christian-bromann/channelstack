@@ -24,6 +24,8 @@ export interface StackOptions {
   socketMode?: boolean;
   /** Extra environment for the agent, on top of what `channelstack env` prints. */
   agentEnv?: Readonly<Record<string, string>>;
+  /** Extra environment for the server only: live credentials, for a test of what live does to a run. */
+  serverEnv?: Readonly<Record<string, string>>;
   /** More agents next to it, one per channel, all against the same server (every channel in one run). */
   others?: ReadonlyArray<{ agent: string; webhook: { driver: string; path: string } }>;
 }
@@ -65,6 +67,7 @@ export async function withStack(
         ...env,
         ...(options.socketMode ? {} : webhookUrl(options.webhook, port)),
         ...Object.assign({}, ...others.map((other) => webhookUrl(other.webhook, other.port))),
+        ...options.serverEnv,
       },
     });
     stops.push(server.stop);

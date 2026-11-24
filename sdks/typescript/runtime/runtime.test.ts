@@ -7,10 +7,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { connectWith, sessionOf } from "./client.ts";
+import { credential } from "./credentials.ts";
 import { parseDuration } from "./duration.ts";
 import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
-import { ChannelstackError, segment, Transport } from "./transport.ts";
+import { ChannelstackError, onRefusal, segment, Transport, unreportedRefusals } from "./transport.ts";
 import { patternOnWire, untilQuiet, waitFor, waitForNext, WaitTimeoutError } from "./wait.ts";
 
 const servers: Server[] = [];
@@ -162,6 +163,22 @@ describe("transport", () => {
       ["POST", "/_channelstack/rooms/a%2Fb%20c?since=c_1", "Bearer t0ken", "application/json", '{"text":"hi"}'],
       ["DELETE", "/_channelstack/sessions/s", "Bearer t0ken", undefined, ""],
     ]);
+  });
+
+  test("a refusal reaches the refusal hook, unless its read asked to keep it to itself", async () => {
+    const url = await serve(() => [422, { error: "action_requires", message: "needs proxy mode" }]);
+    const client = transport(url);
+    const heard: string[] = [];
+    onRefusal((error, path) => heard.push(`${error.code} ${path}`));
+    try {
+      await expect(client.request("GET", "/sessions/s/quiet")).rejects.toMatchObject({ code: "action_requires" });
+      await expect(unreportedRefusals(() => client.request("GET", "/sessions/s/quiet"))).rejects.toMatchObject({
+        code: "action_requires",
+      });
+      expect(heard).toEqual(["action_requires /sessions/s/quiet"]);
+    } finally {
+      onRefusal(undefined);
+    }
   });
 
   test("protocol errors become typed exceptions", async () => {
@@ -345,5 +362,24 @@ describe("files a test hands over", () => {
       ["old.ts", null],
     ]);
     expect(readChanges([{ name: "a.txt", content: "a" }])).toEqual([{ path: "a.txt", content: "YQ==" }]);
+  });
+});
+
+describe("credentials", () => {
+  const variable = "CHANNELSTACK_SLACK_USER_ANA_SMITH_TOKEN";
+  afterEach(() => {
+    delete process.env[variable];
+  });
+
+  test("a person's token comes from CHANNELSTACK_<CHANNEL>_USER_<NAME>_TOKEN, by the name the test gave", () => {
+    const template = "CHANNELSTACK_SLACK_USER_{name}_TOKEN";
+    expect(credential(template, { name: "Ana Smith" })).toBeUndefined();
+    process.env[variable] = "xoxp-from-the-environment";
+    expect(credential(template, { name: "Ana Smith" })).toBe("xoxp-from-the-environment");
+    expect(credential(template, { name: "ana-smith" })).toBe("xoxp-from-the-environment");
+    // Without the name there is nothing to look up, and an empty variable is no credential.
+    expect(credential(template, {})).toBeUndefined();
+    process.env[variable] = "";
+    expect(credential(template, { name: "Ana Smith" })).toBeUndefined();
   });
 });

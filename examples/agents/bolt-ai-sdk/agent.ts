@@ -4,6 +4,7 @@
  * configuration from the environment (`channelstack env` prints it) and talks to whatever
  * `SLACK_API_URL` points at: the fake in tests, Slack itself when the variable is unset.
  */
+import type { SayFn } from "@slack/bolt";
 import { streamText } from "ai";
 
 import { createApp, listen } from "../shared/bolt.ts";
@@ -31,6 +32,34 @@ const firstTime = (eventId: string) => !handled.has(eventId) && handled.add(even
  */
 const joined = new Map<string, string | undefined>();
 
+/** Workflows first: a deploy needs an approval or an environment, an incident needs its form. True when one started. */
+async function startedWorkflow(text: string, thread: string, say: SayFn): Promise<boolean> {
+  const deploy = deployRequest(text);
+  if (deploy?.environment) {
+    const { service, environment } = deploy;
+    await say({
+      thread_ts: thread,
+      text: texts.askApproval(service, environment),
+      blocks: approvalBlocks(service, environment),
+    });
+    return true;
+  }
+  if (deploy) {
+    const { service } = deploy;
+    await say({
+      thread_ts: thread,
+      text: texts.askEnvironment(service),
+      blocks: environmentBlocks(service),
+    });
+    return true;
+  }
+  if (/file an incident/i.test(text)) {
+    await say({ thread_ts: thread, text: texts.askIncident, blocks: incidentOfferBlocks() });
+    return true;
+  }
+  return false;
+}
+
 app.event("app_mention", async ({ event, body, client, say }) => {
   // Other bots don't get answers, and a retried event was already answered.
   if ("bot_id" in event || !firstTime(body.event_id)) return;
@@ -38,27 +67,7 @@ app.event("app_mention", async ({ event, body, client, say }) => {
   joined.set(`${event.channel}:${thread}`, event.user);
   if (/look at/i.test(event.text))
     await client.reactions.add({ channel: event.channel, timestamp: event.ts, name: "eyes" });
-  // Workflows first: a deploy needs an approval or an environment, an incident needs its form.
-  const deploy = deployRequest(event.text);
-  if (deploy?.environment) {
-    const { service, environment } = deploy;
-    return void (await say({
-      thread_ts: thread,
-      text: texts.askApproval(service, environment),
-      blocks: approvalBlocks(service, environment),
-    }));
-  }
-  if (deploy) {
-    const { service } = deploy;
-    return void (await say({
-      thread_ts: thread,
-      text: texts.askEnvironment(service),
-      blocks: environmentBlocks(service),
-    }));
-  }
-  if (/file an incident/i.test(event.text)) {
-    return void (await say({ thread_ts: thread, text: texts.askIncident, blocks: incidentOfferBlocks() }));
-  }
+  if (await startedWorkflow(event.text, thread, say)) return;
   // In a group DM the answer goes into the conversation itself; everywhere else, into the thread.
   const { channel } = await client.conversations.info({ channel: event.channel });
   await sendOrShorten(answer(event.text, event.user ?? ""), (text) =>
@@ -172,6 +181,8 @@ app.message(async ({ message, body, client, say }) => {
     const { channel } = await client.conversations.info({ channel: looking });
     return void (await say({ text: texts.channelSummary(channel?.name ?? looking), thread_ts: thread }));
   }
+  // A DM starts the same workflows a mention does.
+  if (direct && (await startedWorkflow(prompt, thread, say))) return;
   if (!wantsWriting(prompt)) {
     return sendOrShorten(answer(prompt, message.user), (text) => say({ text, thread_ts: thread }));
   }

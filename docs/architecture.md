@@ -115,7 +115,7 @@ ana.say("@my-agent hi", { channel })
   └─► POST …/slack/users/U08B5K2M9QX/say
         └─► world.postAsUser(ana, channel, text)
               ├─ fake: write to the store → build event_callback → sign → deliver to the agent → log
-              └─ live: chat.postMessage with Ana's token → record the created message in the ledger
+              └─ live: chat.postMessage with Ana's token → the ledger lists its channel or DM for cleanup
 ```
 
 That keeps the fake and the real platform from drifting apart in code. The nightly differential run compares them in behaviour (implementation plan 9).
@@ -195,6 +195,8 @@ router.route({
 | `x-channelstack-method` | An operation | A method on a handle. `args` become positional parameters and `options` the trailing options object. Path parameters bind to the handle: `{session}` to its session, the remaining one to its id, or to the field named in `bind`. `dispose: true` marks the method SDKs call when the handle is disposed |
 | `x-channelstack-error-codes` | An operation | Error codes the operation can return, mapped to typed exceptions |
 | `x-channelstack-stability` | An operation | `experimental` or `stable` (implementation plan 4.5) |
+| `x-channelstack-live` | An operation | How it works on a live driver: `{ unsupported }` (refused with `unsupported_in_live`) or `{ requires: "browser" \| "proxy" }` (refused with `action_requires`), each with its reason. Left out, it works live ([decision 0015](decisions/0015-live-mode.md)) |
+| `x-channelstack-credential` | A request field | An optional credential: left out, SDKs read it from the environment variable the template names, `{field}` filled in from that field (`CHANNELSTACK_SLACK_USER_{name}_TOKEN`) |
 
 Every operation must have a factory or a method binding, and every body field and query parameter must be an argument or an option. The IR builder refuses a spec that no SDK could call.
 

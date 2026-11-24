@@ -1,16 +1,18 @@
 import type { RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { ID_FORMATS } from "../../../core/ids/index.ts";
-import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signLinearWebhook, stampLinearWebhook } from "../../../core/signing/linear.ts";
 import { linearLinks } from "../links.ts";
 import { linearPayloads } from "../payloads.ts";
+import { linearText } from "../text.ts";
 import type {
   LinearActivityRecord,
   LinearActivityType,
   LinearCommentRecord,
+  LinearIssueChanges,
+  LinearIssueInput,
   LinearIssueRecord,
   LinearLabelRecord,
   LinearPlanEntry,
@@ -52,27 +54,6 @@ const STATE_COLOR: Readonly<Record<LinearStateType, string>> = {
   canceled: "#95a2b3",
 };
 
-export interface LinearIssueInput {
-  title: string;
-  description?: string | undefined;
-  priority?: number | undefined;
-  state?: string | undefined;
-  labels?: readonly string[] | undefined;
-  assignee?: string | undefined;
-  delegate?: string | undefined;
-  parent?: string | undefined;
-}
-
-export interface LinearIssueChanges {
-  title?: string | undefined;
-  description?: string | null | undefined;
-  priority?: number | undefined;
-  stateId?: string | undefined;
-  labelIds?: readonly string[] | undefined;
-  assigneeId?: string | null | undefined;
-  delegateId?: string | null | undefined;
-}
-
 /**
  * The fake Linear world: every change to the state happens here once, for people (through the
  * control API) and for the app (through GraphQL) alike. The caller brings the permission check.
@@ -80,11 +61,10 @@ export interface LinearIssueChanges {
 export function createFakeWorld(context: DriverContext, store: LinearStore) {
   const { ids, clock, delivery } = context;
   const links = linearLinks(context.apiUrl, () => store.org);
-  const userOf = (id: string): LinearUserRecord => {
-    const user = store.user(id);
-    if (!user) throw new Error(`No Linear user ${id}`);
-    return user;
-  };
+  const { userOf, markdown, mentioned, readable, rootOf, stateOf } = linearText(store, links, (session, name) => {
+    if (name.toLowerCase() === store.appUser.displayName.toLowerCase()) return store.appUser.id;
+    return store.list(store.users, session).find((user) => user.displayName.toLowerCase() === name.toLowerCase())?.id;
+  });
   const payloads = linearPayloads({
     links,
     user: userOf,
@@ -93,12 +73,6 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     comment: (id) => store.comments.find(id),
     state: (issue) => stateOf(issue),
   });
-
-  const stateOf = (issue: LinearIssueRecord): LinearStateRecord => {
-    const state = store.team(issue.team).states.find((candidate) => candidate.id === issue.state);
-    if (!state) throw new Error(`Issue ${issue.identifier} is in no state of its team`);
-    return state;
-  };
 
   /** Linear's headers for one delivery, signed with this secret over each attempt's body. */
   const signedWith = (secret: string, id: string, type: string) => (body: string, atMs: number) => ({
@@ -171,30 +145,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
 
   // --- Text -------------------------------------------------------------------------------------
 
-  /** `RichText` → Linear Markdown: a mention of a person or the app is the link to their profile. */
-  const markdown = (session: string, text: string): string =>
-    richTextPieces(text, (name) => {
-      if (name.toLowerCase() === store.appUser.displayName.toLowerCase()) return store.appUser.id;
-      return store.list(store.users, session).find((user) => user.displayName.toLowerCase() === name.toLowerCase())?.id;
-    })
-      .map((piece) => ("text" in piece ? piece.text : links.profile(userOf(piece.mention))))
-      .join("");
-
-  /** The people and apps a Markdown text mentions. */
-  const mentioned = (body: string): string[] => {
-    const handles = [...body.matchAll(links.profilePattern())].map((match) => match[1]);
-    const everyone = [store.appUser, ...store.all(store.users)];
-    return everyone.filter((user) => handles.includes(user.displayName)).map((user) => user.id);
-  };
-
-  /** Linear Markdown → what a person reads: a profile link is `@name` again. */
-  const readable = (body: string): string => body.replace(links.profilePattern(), (_, handle: string) => `@${handle}`);
-
   // --- Sessions ---------------------------------------------------------------------------------
-
-  /** The thread a comment is in: its root comment. */
-  const rootOf = (comment: LinearCommentRecord): LinearCommentRecord =>
-    comment.parent ? (store.comments.find(comment.parent) ?? comment) : comment;
 
   /** A session's issue, with its context as Linear writes it for a prompt. */
   const promptContext = (issue: LinearIssueRecord, comment: LinearCommentRecord | undefined): string => {
@@ -595,6 +546,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     store,
     links,
     payloads,
+    // The fake holds the truth already: a read has nothing to ask first.
+    refresh: () => {},
     stateOf,
     markdown,
     readable,

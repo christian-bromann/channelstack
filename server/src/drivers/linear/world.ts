@@ -175,3 +175,26 @@ export interface LinearActivityRecord {
   sourceComment: string | null;
   createdAt: number;
 }
+
+/** An issue as a person or the app creates it: names for state and labels, ids for people. */
+export interface LinearIssueInput {
+  title: string;
+  description?: string | undefined;
+  priority?: number | undefined;
+  state?: string | undefined;
+  labels?: readonly string[] | undefined;
+  assignee?: string | undefined;
+  delegate?: string | undefined;
+  parent?: string | undefined;
+}
+
+/** A change to an issue, as `issueUpdate` takes it. */
+export interface LinearIssueChanges {
+  title?: string | undefined;
+  description?: string | null | undefined;
+  priority?: number | undefined;
+  stateId?: string | undefined;
+  labelIds?: readonly string[] | undefined;
+  assigneeId?: string | null | undefined;
+  delegateId?: string | null | undefined;
+}

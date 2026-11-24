@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { QUIET } from "../../sdks/typescript/client.ts";
+import { ChannelstackError, QUIET } from "../../sdks/typescript/client.ts";
 import { matchers } from "./index.ts";
 
 const state = { isNot: false, timeout: "100ms", quietFor: "10ms" } as const;
@@ -151,5 +151,18 @@ describe("toHaveOpenedModal", () => {
       false,
       'Expected a modal titled "Deploy" to have been opened. Opened: "File an incident"',
     ]);
+  });
+});
+
+describe("a failure's message", () => {
+  test("leaves out what is still open when the server can't tell (live), and still fails", async () => {
+    // Live, without proxy mode, the server refuses to say when the agent is done.
+    const refused = async () => {
+      throw new ChannelstackError("action_requires", 422, "Session.quiet live needs proxy mode");
+    };
+    const issue = { [QUIET]: refused, comments: async () => [] };
+    const result = await matchers.toHaveCommentFrom(state, issue, agent);
+    expect(result.pass).toBe(false);
+    expect(result.message()).not.toContain("Still open");
   });
 });

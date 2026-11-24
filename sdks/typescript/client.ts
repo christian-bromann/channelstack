@@ -7,7 +7,7 @@ export { type Duration, parseDuration } from "./runtime/duration.ts";
 export { type FileInput, setFilesRoot } from "./runtime/files.ts";
 export { type InSession, QUIET } from "./runtime/client.ts";
 export type { LaunchOptions } from "./runtime/launcher.ts";
-export { ChannelstackError } from "./runtime/transport.ts";
+export { ChannelstackError, onRefusal, unreportedRefusals } from "./runtime/transport.ts";
 export {
   fromMatches,
   type QuietOptions,

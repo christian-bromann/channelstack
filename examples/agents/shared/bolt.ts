@@ -28,5 +28,8 @@ export const createApp = (overrides: Partial<AppOptions> = {}): App =>
     ...overrides,
   });
 
-/** Start: listen on `PORT`, or in Socket Mode, connect. */
-export const listen = (app: App) => (socketMode ? app.start() : app.start(Number(PORT)));
+/** Start: listen on `PORT`, or in Socket Mode, connect. Says so once it is, as Bolt's own examples do. */
+export const listen = async (app: App) => {
+  await (socketMode ? app.start() : app.start(Number(PORT)));
+  console.log("⚡️ Bolt app is running");
+};

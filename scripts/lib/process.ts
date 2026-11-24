@@ -13,6 +13,23 @@ export function run(
     throw new Error(`${command} ${args.join(" ")} exited with ${result.status ?? result.signal}`);
 }
 
+/**
+ * Run a command to completion without blocking this process: what this process does meanwhile
+ * (a relay forwarding webhooks to an agent) keeps running. Throws when it fails.
+ */
+export async function runAsync(
+  command: string,
+  args: readonly string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): Promise<void> {
+  const child = spawn(command, args, { stdio: "inherit", ...options });
+  const code = await new Promise<number | string | null>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (status, signal) => resolve(status ?? signal));
+  });
+  if (code !== 0) throw new Error(`${command} ${args.join(" ")} exited with ${code}`);
+}
+
 /** Run a command and return what it printed. Throws when it fails. */
 export function capture(
   command: string,

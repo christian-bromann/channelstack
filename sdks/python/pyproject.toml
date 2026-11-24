@@ -11,6 +11,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pyright==1.1.414",
+    "pytest==8.4.2",
     "pyyaml==6.0.4",
     "ruff==0.17.6",
     "types-pyyaml==6.0.12.20261113",
@@ -35,6 +36,6 @@ ignore = ["ASYNC109", "S101", "S603"]
 known-first-party = ["channelstack"]
 
 [tool.pyright]
-include = ["channelstack", "../../scenarios/runners/python"]
+include = ["channelstack", "tests", "../../scenarios/runners/python"]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"

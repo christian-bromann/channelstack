@@ -450,10 +450,21 @@ const ana = await slack.createUser({ name: "Ana" });
 ```
 
 - **One test file, two runs.** CI runs it fake on every PR and live nightly, with no edits. `CHANNELSTACK_REALITY=fake` forces fake locally, even with credentials present.
-- **Safety:** live mode only runs in workspaces, orgs and teams listed in `CHANNELSTACK_LIVE_*` allowlists. Everything a test creates is tagged and deleted at the end of its session.
+- **Safety:** live mode only runs in workspaces, orgs and teams listed in `CHANNELSTACK_LIVE_*` allowlists, and refuses anywhere else with `live_not_allowlisted` before it does anything there. Everything a test creates carries the run's tag in its name (`channelstack-run-<run>-…`) and is removed when its session closes: Slack channels are archived, and what the test wrote in a DM is deleted.
 - **Acting, not relaying.** Live mode acts on the real platform (as the app, or as a person with their token) and reads the results back. The platform delivers events to your agent directly; how your agent is reachable is up to it. Delivery chaos (retries, bad signatures, redelivery) is fake-only.
 - **UI-only actions** such as Slack button clicks, Stop and modal submit have no public API. Live, the **browser actor** does them, signing in on its own with no one at the keyboard: a passkey on GitHub and Linear, the emailed code from a test inbox on Slack and Notion.
-- **A bot token alone** acts as the bot, never as a person. Person actions need a user token per sandbox person. Tests declare what they need (`test.requires(["browser"])`), and a live run without it skips them with a reason.
+- **A bot token alone** acts as the bot, never as a person. Person actions need a user token per sandbox person. On Slack, that token comes from a separate app for the sandbox's people. A person's message is the exception: Slack marks one posted through its API with the posting app's bot, and agents ignore it, so a person's `say` and `reply` are typed in the client by the browser actor.
+- **What live can't do skips, with the reason.** A fake-only step (delivery chaos, `channelstack reset`) is refused with `unsupported_in_live`, and one that needs a piece the run doesn't have (the browser actor, proxy mode) with `action_requires`. Vitest reports the test as skipped with that reason, for example `[live: SlackUser.click live needs the browser actor: …]`. The fake run on every PR runs it in full. A setup that can't work fails instead, so a broken nightly run goes red: credentials set in part or a token of the wrong kind (`live_misconfigured`), or a person without a token acting in a live workspace (`fake_actor_in_live_world`; `live_misconfigured` already at `createUser` under `CHANNELSTACK_REALITY=live`).
+- **Checking the setup and cleaning up:**
+
+  ```bash
+  channelstack doctor                      # per channel: fake or live, credentials, allowlist, saved browser sessions
+  channelstack sweep                       # what crashed runs left: their ledgers, and tagged objects older than 24h
+  channelstack sweep --check --run <id>    # remove nothing; exit 1 if that run left anything (the nightly job's check)
+  channelstack login slack --user ana      # sign Ana in by hand, once; the browser actor uses the saved session
+  ```
+
+  `CHANNELSTACK_RUN_ID` names the run (CI sets it per job); without it, each server makes one up.
 - **It keeps the fakes honest.** The nightly run compares fake and live transcripts. Where they differ, the fake gets fixed, or the difference is recorded as a known divergence. The published coverage page shows the result per action.
 
 [live-mode.md](live-mode.md) is the build spec: how each live action is done (as the app, as a person, or in the browser) and how results are observed. [reality-matrix.md](reality-matrix.md) lists every method with what it needs live: a user token, app credentials, the browser actor, the relay or proxy mode, or nothing (fake-only). The details (reality rules, per-platform credentials, cleanup ledger) are in the implementation plan, sections 5, 9 and 12.

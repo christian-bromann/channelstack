@@ -7,6 +7,24 @@ const CORE_ERRORS = {
   not_found: 404,
   session_not_found: 404,
   internal: 500,
+  // Live mode (implementation plan 4.4).
+  /** The operation isn't built in the fake yet. */
+  unsupported_in_fake: 501,
+  /** The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. */
+  unsupported_in_live: 501,
+  /** A live action needs a piece this run doesn't have: the browser actor, proxy mode. A test is skipped for it. */
+  action_requires: 422,
+  /**
+   * Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person without
+   * a token under `CHANNELSTACK_REALITY=live`. A test fails for it, so a broken nightly run goes red.
+   */
+  live_misconfigured: 412,
+  /** The live workspace, org, team or Notion workspace isn't in its `CHANNELSTACK_LIVE_*` allowlist. */
+  live_not_allowlisted: 403,
+  /** A fake person acts in a live workspace. */
+  fake_actor_in_live_world: 409,
+  /** A person's token belongs to a different workspace than the app. */
+  cross_workspace_credential: 400,
 } as const;
 
 export type CoreErrorCode = keyof typeof CORE_ERRORS;

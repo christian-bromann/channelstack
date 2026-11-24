@@ -26,6 +26,21 @@ export function nameMentions(text: string, nameOf: (userId: string) => string | 
   return text.replace(MENTION, (_, id: string, label: string | undefined) => `@${nameOf(id) ?? (label || id)}`);
 }
 
+/** A link in Slack mrkdwn, `<https://…>` or `<https://…|label>`: not a mention, channel or special (`<@`, `<#`, `<!`). */
+const LINK = /<([^@#!>|][^>|]*)(?:\|([^>]*))?>/g;
+
+/**
+ * Slack mrkdwn → the text a person typed in Slack's client: Slack wraps what it reads as a link
+ * (`<https://…>`, `<https://…|label>`) and escapes `&`, `<` and `>`. Mentions stay as they are.
+ */
+export function typedText(text: string): string {
+  return text
+    .replace(LINK, (_, url: string, label: string | undefined) => label ?? url)
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+}
+
 /** Text split at its mentions: each piece is plain text, or the id of the user one mention names. */
 export function splitAtMentions(text: string): Array<{ text: string } | { user: string }> {
   const pieces: Array<{ text: string } | { user: string }> = [];

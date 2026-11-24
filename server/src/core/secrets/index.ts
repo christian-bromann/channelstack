@@ -3,8 +3,9 @@ import { join } from "node:path";
 import { readPrivateJsonFile, writePrivateFile } from "../home/index.ts";
 import { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
 
-export { randomSeed, randomToken } from "./csprng.ts";
+export { randomSeed, randomString, randomToken } from "./csprng.ts";
 export { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
+export { LiveCredential, LiveVault } from "./live.ts";
 
 /** The secrets one driver needs: a name of its choosing → the format to generate. */
 export type SecretSpec = Readonly<Record<string, SecretFormatName>>;

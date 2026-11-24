@@ -110,6 +110,12 @@ export interface IrParam extends IrField {
   in: "body" | "query";
   /** For an object argument: a plain string is shorthand for `{ [shorthand]: string }` (`ana.say("hi", …)`). */
   shorthand?: string;
+  /**
+   * A credential the caller may leave out: SDKs then read it from the environment variable this
+   * template names, with `{field}` replaced by that field's value in `NAME` form
+   * (`CHANNELSTACK_SLACK_USER_{name}_TOKEN`, Ana → `CHANNELSTACK_SLACK_USER_ANA_TOKEN`).
+   */
+  credential?: string;
 }
 
 interface IrPathParam {
@@ -337,7 +343,30 @@ export function buildIr(openapi: Json): Ir {
         const schema: Json =
           (typeof property.$ref === "string" ? schemas[property.$ref.slice(REF_PREFIX.length)] : property) ?? {};
         const shorthand: unknown = schema["x-channelstack-shorthand"];
-        available.set(field.name, { ...field, in: "body", ...(typeof shorthand === "string" ? { shorthand } : {}) });
+        const credential: unknown = property["x-channelstack-credential"];
+        if (credential !== undefined) {
+          const named = [...String(credential).matchAll(/\{(\w+)\}/g)].map((match) => match[1] as string);
+          const fields = new Set(fieldsOf(body ?? {}, where).map((candidate) => candidate.name));
+          if (
+            typeof credential !== "string" ||
+            !/^[A-Z][A-Z0-9_{}a-z]*$/.test(credential) ||
+            named.some((name) => !fields.has(name))
+          ) {
+            throw new SpecError(
+              where,
+              `x-channelstack-credential on "${field.name}" must name an env var whose {fields} are body fields`,
+            );
+          }
+          if (field.type.kind !== "string" || !field.optional) {
+            throw new SpecError(where, `x-channelstack-credential is for an optional string, not "${field.name}"`);
+          }
+        }
+        available.set(field.name, {
+          ...field,
+          in: "body",
+          ...(typeof shorthand === "string" ? { shorthand } : {}),
+          ...(typeof credential === "string" ? { credential } : {}),
+        });
       }
       const pathParams: IrPathParam[] = [];
       for (const parameter of (operation.parameters ?? []) as Json[]) {

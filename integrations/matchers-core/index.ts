@@ -7,6 +7,7 @@
  * - A negated matcher, and one with an exact count, waits until the agent is quiet and checks once.
  */
 import {
+  ChannelstackError,
   type Duration,
   fromMatches,
   type InSession,
@@ -14,6 +15,7 @@ import {
   QUIET,
   type SlackConversation,
   textMatches,
+  unreportedRefusals,
   untilQuiet,
   waitFor,
   WaitTimeoutError,
@@ -147,10 +149,20 @@ async function settle<T>(
   return { pass, message: () => `${options.describe(value)}${leftover}` };
 }
 
-/** What the agent has left open in the subject's session, in words. Nothing for a subject outside a session. */
+/**
+ * What the agent has left open in the subject's session, in words. Nothing for a subject outside a
+ * session, or where the server can't tell (live, without proxy mode): it only adds to a failure's
+ * message, so its refusal must not turn the failure into a skip.
+ */
 async function stillOpen(subject: unknown): Promise<string[]> {
   const handle = subject as Partial<InSession>;
-  return typeof handle[QUIET] === "function" ? (await (handle as InSession)[QUIET]()).open : [];
+  if (typeof handle[QUIET] !== "function") return [];
+  try {
+    return (await unreportedRefusals(() => (handle as InSession)[QUIET]())).open;
+  } catch (error) {
+    if (error instanceof ChannelstackError) return [];
+    throw error;
+  }
 }
 
 const from = (author: AuthorRef, text?: string | RegExp) => (message: Message) =>
