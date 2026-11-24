@@ -27,6 +27,8 @@ Usage:
       --proxy                     Also run an HTTP proxy for agents with hard-coded hosts: slack.com, api.github.com,
                                   api.linear.app and api.notion.com go to the fakes, every other host passes through
       --proxy-port <n>            The proxy's loopback port (default 7464; 0 picks a free one)
+      --record <dir>              With --proxy: write the shape of every exchange with those hosts, and of every
+                                  webhook, to <dir>/shapes.jsonl (structure only, never a value)
   channelstack env                Print .env lines for the agent, from the running server
       --proxy                     For proxy mode: HTTPS_PROXY and the CA the agent trusts, instead of the API URLs
   channelstack ca rotate          Replace proxy mode's CA (<home>/ca); restart the server and run \`channelstack env --proxy\`
@@ -88,11 +90,13 @@ async function runStart(flags: {
   "log-level"?: string;
   proxy?: boolean;
   "proxy-port"?: string;
+  record?: string;
 }) {
   const portless = !flags["no-portless"];
   const port = portFlag("port", flags.port, portless ? 0 : DEFAULT_PORT);
   const proxyPort = flags.proxy ? portFlag("proxy-port", flags["proxy-port"], DEFAULT_PROXY_PORT) : undefined;
   if (!flags.proxy && flags["proxy-port"] !== undefined) fail("--proxy-port needs --proxy");
+  if (!flags.proxy && flags.record !== undefined) fail("--record needs --proxy");
 
   // The signals are caught before the server exists: its token file appears while it starts, and a
   // signal that arrives right then must still end in a clean stop, not a file left behind.
@@ -110,6 +114,7 @@ async function runStart(flags: {
     portless,
     port,
     ...(proxyPort === undefined ? {} : { proxyPort }),
+    ...(flags.record === undefined ? {} : { recordDir: flags.record }),
     serverFile: flags["server-file"] ?? process.env.CHANNELSTACK_SERVER_FILE,
     seed: seed ? parseSeed(seed) : randomSeed(),
     logLevel: parseLogLevel(flags["log-level"] ?? process.env.CHANNELSTACK_LOG_LEVEL),
@@ -189,6 +194,7 @@ async function main() {
       "log-level": { type: "string" },
       proxy: { type: "boolean" },
       "proxy-port": { type: "string" },
+      record: { type: "string" },
       server: { type: "string" },
       as: { type: "string" },
       in: { type: "string" },

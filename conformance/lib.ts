@@ -80,8 +80,8 @@ export function diff(fake: unknown, live: unknown, path = ""): Difference[] {
 export interface Divergence {
   /** The scenario's name: `slack/mention`. */
   scenario: string;
-  /** The difference's path, or a prefix of it ending in `.*`: `replies.*`. */
-  path: string;
+  /** The difference's path, or a prefix of it ending in `.*` (`replies.*`); or a list of them. */
+  path: string | readonly string[];
   /** Why it is allowed, in a sentence. */
   reason: string;
   /** `YYYY-MM-DD`: after this date it is a failure again, until someone looks at it. */
@@ -94,8 +94,11 @@ export function loadDivergences(file: string): Divergence[] {
   const list = parsed?.divergences ?? [];
   if (!Array.isArray(list)) throw new Error(`${file}: divergences must be a list`);
   return list.map((entry: Record<string, unknown>, index) => {
-    const missing = ["scenario", "path", "reason", "expires"].filter(
-      (key) => typeof entry?.[key] !== "string" || (entry[key] as string).trim() === "",
+    const text = (value: unknown) => typeof value === "string" && value.trim() !== "";
+    const missing = ["scenario", "path", "reason", "expires"].filter((key) =>
+      key === "path"
+        ? !(text(entry?.path) || (Array.isArray(entry?.path) && entry.path.length > 0 && entry.path.every(text)))
+        : !text(entry?.[key]),
     );
     if (missing.length > 0) throw new Error(`${file}: divergence ${index + 1} has no ${missing.join(", ")}`);
     const expires = entry.expires as string;
@@ -113,9 +116,10 @@ export function expired(divergences: readonly Divergence[], today: string): Dive
 
 const covers = (divergence: Divergence, scenario: string, path: string) =>
   divergence.scenario === scenario &&
-  (divergence.path === path ||
-    (divergence.path.endsWith(".*") && path.startsWith(divergence.path.slice(0, -1))) ||
-    divergence.path === "*");
+  (typeof divergence.path === "string" ? [divergence.path] : divergence.path).some(
+    (allowed) =>
+      allowed === path || allowed === "*" || (allowed.endsWith(".*") && path.startsWith(allowed.slice(0, -1))),
+  );
 
 /** A scenario's differences, each with the divergence that allows it, if one does and hasn't expired. */
 export function classify(
@@ -144,11 +148,23 @@ export interface ScenarioResult {
   recordings?: { fake: unknown; live: unknown };
 }
 
+/** One operation the shape differ compared: what the platform's shape has that the fake's doesn't. */
+export interface ShapeResult {
+  channel: string;
+  kind: "api" | "webhook";
+  /** `POST /api/chat.postMessage`, or a webhook's event type. */
+  operation: string;
+  /** Each path `<kind> <operation> <path>`, as a divergence names it (scenario `shapes/<channel>`). */
+  differences: Array<Difference & { allowedBy?: Divergence }>;
+}
+
 export interface ConformanceResults {
   /** When the run ended, ISO. */
   at: string;
   /** Whether live ran at all (`--fake-only` or no credentials: it didn't). */
   live: boolean;
+  /** The shape differ's operations (implementation plan 9.2); none when live didn't run. */
+  shapes: ShapeResult[];
   scenarios: ScenarioResult[];
   /** Divergences whose date has passed: each one fails the run until someone looks at it. */
   expired: Divergence[];

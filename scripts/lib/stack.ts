@@ -27,6 +27,8 @@ export interface StackOptions {
    * `channelstack env --proxy` prints, with no API URL, so it calls the platforms' own hosts.
    */
   proxy?: boolean;
+  /** With `proxy`: the recorder's directory (`--record`), for the shape differ. */
+  record?: string;
   /** Extra environment for the agent, on top of what `channelstack env` prints. */
   agentEnv?: Readonly<Record<string, string>>;
   /** Extra environment for the server only: live credentials, for a test of what live does to a run. */
@@ -68,7 +70,14 @@ export async function withStack(
     const server = await startBinary({
       bin: options.bin,
       home,
-      ...(options.proxy ? { args: ["--no-portless", "--port", "0", "--proxy", "--proxy-port", "0"] } : {}),
+      ...(options.proxy
+        ? {
+            args: [
+              ...["--no-portless", "--port", "0", "--proxy", "--proxy-port", "0"],
+              ...(options.record ? ["--record", options.record] : []),
+            ],
+          }
+        : {}),
       env: {
         ...env,
         ...(options.socketMode ? {} : webhookUrl(options.webhook, port)),

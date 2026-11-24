@@ -8,6 +8,8 @@
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createServer, type IncomingHttpHeaders } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
 import { createAppAuth } from "@octokit/auth-app";
@@ -15,6 +17,7 @@ import { Octokit } from "@octokit/rest";
 import SmeeClient from "smee-client";
 
 import { type StorageState, writeStorageState } from "../../server/src/core/browser/index.ts";
+import type { Recorder } from "../../server/src/core/proxy/record.ts";
 import { ROOT } from "./generate.ts";
 import { freePort } from "./process.ts";
 
@@ -22,6 +25,14 @@ type Env = NodeJS.ProcessEnv;
 type Stop = () => Promise<unknown>;
 
 const say = (line: string) => process.stdout.write(`${line}\n`);
+
+/**
+ * What the live run adds to every agent: nothing, or with `record` the proxy's environment
+ * (`channelstack env --proxy` without the fake tokens), so its calls go through the recorder.
+ */
+let proxied: Record<string, string> = {};
+/** With `record`: where each relay's webhooks are written as shapes before the agent gets them. */
+let tap: Recorder | undefined;
 
 /** A reference agent with only its own configuration: none of channelstack's environment reaches it. */
 function spawnAgent(
@@ -32,7 +43,7 @@ function spawnAgent(
 ): ChildProcess {
   // Its output is read only where it says it is ready; a pipe nobody reads would fill and stall it.
   const agent = spawn(process.execPath, [join(ROOT, "examples", "agents", dir, "agent.ts")], {
-    env: { PATH: process.env.PATH, HOME: process.env.HOME, ...agentEnv },
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, ...proxied, ...agentEnv },
     stdio: ["ignore", output, "inherit"],
   });
   const exited = new Promise<void>((resolve) => agent.once("exit", () => resolve()));
@@ -74,7 +85,7 @@ const isRelay = (url: string | undefined) => {
 async function relay(name: string, source: string, target: string, stops: Stop[]): Promise<void> {
   const smee = new SmeeClient({
     source,
-    target,
+    target: tap ? await tapped(name.toLowerCase(), target, tap, stops) : target,
     logger: {
       info: () => {},
       // The reason, never a URL: the relay channel's is a secret.
@@ -87,6 +98,47 @@ async function relay(name: string, source: string, target: string, stops: Stop[]
   });
   await smee.start();
   stops.push(() => smee.stop());
+}
+
+/** A webhook's event type, the way the platform names it: GitHub's header, Linear's and Notion's `type`. */
+function eventType(headers: IncomingHttpHeaders, body: string): string {
+  const header = headers["x-github-event"];
+  if (typeof header === "string") return header;
+  try {
+    return String((JSON.parse(body) as { type?: unknown }).type ?? "unknown");
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Between a relay and its agent: each webhook's shape is recorded (live-mode.md 6, the platforms'
+ * real payloads), then the delivery goes on to the agent as it came, and the agent's answer back.
+ */
+async function tapped(channel: string, target: string, recorder: Recorder, stops: Stop[]): Promise<string> {
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", async () => {
+      const body = Buffer.concat(chunks);
+      recorder.webhook(channel, eventType(request.headers, body.toString("utf8")), body.toString("utf8"));
+      const headers = Object.fromEntries(
+        Object.entries(request.headers).flatMap(([name, value]) =>
+          typeof value === "string" && name !== "host" && name !== "content-length" ? [[name, value]] : [],
+        ),
+      );
+      try {
+        const answer = await fetch(target, { method: request.method ?? "POST", headers, body });
+        response.writeHead(answer.status, { "content-type": answer.headers.get("content-type") ?? "text/plain" });
+        response.end(Buffer.from(await answer.arrayBuffer()));
+      } catch {
+        response.writeHead(502).end();
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  stops.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
 /** An agent that takes webhooks: started on a free port, then its relay channel forwarded to it. */
@@ -102,8 +154,18 @@ async function webhookAgent(
   say(`${name}: the reference agent takes the platform's webhooks through its relay channel`);
 }
 
-/** Every channel's reference agent whose configuration is in the environment. Says why one doesn't run. */
-export async function startAgents(env: Env, stops: Stop[]): Promise<void> {
+/**
+ * Every channel's reference agent whose configuration is in the environment. Says why one doesn't
+ * run. With `record`, each agent runs behind the server's proxy (`proxy`, from `env --proxy`) and
+ * each relay is tapped into `recorder`.
+ */
+export async function startAgents(
+  env: Env,
+  stops: Stop[],
+  record?: { proxy: Record<string, string>; recorder: Recorder },
+): Promise<void> {
+  proxied = record?.proxy ?? {};
+  tap = record?.recorder;
   // Slack: the reference agent connects to real Slack itself, in Socket Mode.
   if (env.CHANNELSTACK_SLACK_BOT_TOKEN && env.CHANNELSTACK_SLACK_APP_TOKEN) {
     const agent = spawnAgent(

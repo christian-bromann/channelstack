@@ -11,10 +11,15 @@ import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createRecorder } from "../../server/src/core/proxy/record.ts";
 import { runId } from "../../server/src/core/safety/index.ts";
 import { startAgents, writeSessions } from "./live-agents.ts";
-import { run } from "./process.ts";
+import { capture, run } from "./process.ts";
 import { startBinary } from "./server.ts";
+
+/** What `env --proxy` adds for an agent: the proxy, and the CA it trusts. Live, nothing else is printed. */
+const PROXY_ENV =
+  /^(HTTPS?_PROXY|https?_proxy|NO_PROXY|no_proxy|NODE_USE_ENV_PROXY|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|REQUESTS_CA_BUNDLE)=/;
 
 export interface LiveStack {
   /** The environment for what runs against it: attached to this server, with this run's id. */
@@ -30,7 +35,7 @@ export interface LiveStack {
  * `use` without throwing, and the sweep check.
  */
 export async function withLiveStack(
-  options: { bin: string; env: NodeJS.ProcessEnv },
+  options: { bin: string; env: NodeJS.ProcessEnv; record?: string },
   use: (stack: LiveStack) => Promise<void>,
 ): Promise<boolean> {
   const { bin, env } = options;
@@ -55,10 +60,26 @@ export async function withLiveStack(
   let serverLog = () => "";
   let ok = true;
   try {
-    const server = await startBinary({ bin, home, env: live });
+    const record = options.record;
+    const server = await startBinary({
+      bin,
+      home,
+      env: live,
+      ...(record ? { args: ["--no-portless", "--port", "0", "--proxy", "--proxy-port", "0", "--record", record] } : {}),
+    });
     serverLog = server.output;
     stops.push(server.stop);
-    await startAgents(env, stops);
+    if (record) {
+      // The agents run behind the server's proxy, so the recorder sees their calls to the platforms,
+      // and each relay is tapped for the platforms' real webhooks.
+      const proxy = Object.fromEntries(
+        capture(bin, ["env", "--proxy"], { env: live })
+          .split("\n")
+          .filter((line) => PROXY_ENV.test(line))
+          .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+      );
+      await startAgents(env, stops, { proxy, recorder: createRecorder(join(record, "relay")) });
+    } else await startAgents(env, stops);
     await use({ env: live, home, serverLog: () => serverLog() });
   } catch (error) {
     ok = false;

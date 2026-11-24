@@ -27,6 +27,7 @@ const results: ConformanceResults = {
   at: "2026-11-24T03:00:00.000Z",
   live: true,
   expired: [],
+  shapes: [],
   scenarios: [
     {
       scenario: "slack/mention",

@@ -24,7 +24,9 @@ import {
   loadDivergences,
   normalize,
   type ScenarioResult,
+  type ShapeResult,
 } from "../conformance/lib.ts";
+import { compareShapes, readShapes } from "../conformance/shapes.ts";
 import { DRIVERS } from "../server/src/drivers/index.ts";
 import { AGENTS } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
@@ -93,8 +95,17 @@ try {
     const agent = join(ROOT, "examples", "agents", name, "agent.ts");
     // The fake half is fake whatever credentials are in the environment.
     const fake = { CHANNELSTACK_REALITY: "fake" };
+    // In proxy mode with the recorder: the agent calls the platform's own hosts, and every
+    // exchange and webhook is written as its shape for the shape differ.
     await withStack(
-      { bin, agent, webhook: { driver: channel, path: AGENTS[name].path }, serverEnv: fake },
+      {
+        bin,
+        agent,
+        webhook: { driver: channel, path: AGENTS[name].path },
+        serverEnv: fake,
+        proxy: true,
+        record: join(work, `fake-${channel}`),
+      },
       async ({ env }) => {
         for (const file of files) {
           const failed = await record(file, "fake", { ...env, ...fake });
@@ -125,7 +136,7 @@ try {
   }
   let liveOk = true;
   if (liveChannels.length > 0) {
-    liveOk = await withLiveStack({ bin, env: process.env }, async ({ env }) => {
+    liveOk = await withLiveStack({ bin, env: process.env, record: join(work, "live") }, async ({ env }) => {
       for (const [file, result] of results) {
         if (!liveChannels.includes(result.channel)) continue;
         const failed = await record(file, "live", env);
@@ -145,9 +156,33 @@ try {
     });
   }
 
+  // The shape differ: each operation both sides saw, the fake's shape against the platform's.
+  const liveShapes = readShapes([join(work, "live", "shapes.jsonl"), join(work, "live", "relay", "shapes.jsonl")]);
+  const shapes: ShapeResult[] = liveChannels.flatMap((channel) => {
+    const fakeShapes = readShapes([join(work, `fake-${channel}`, "shapes.jsonl")]);
+    return [...fakeShapes].flatMap(([key, fakeShape]) => {
+      const [kind = "", owner = "", ...operation] = key.split(" ");
+      const liveShape = liveShapes.get(key);
+      if (owner !== channel || liveShape === undefined) return [];
+      const differences = compareShapes(fakeShape, liveShape).map((difference) => ({
+        ...difference,
+        path: `${kind} ${operation.join(" ")} ${difference.path}`,
+      }));
+      return [
+        {
+          channel,
+          kind: kind as "api" | "webhook",
+          operation: operation.join(" "),
+          differences: classify(`shapes/${channel}`, differences, divergences, today),
+        },
+      ];
+    });
+  });
+
   const report: ConformanceResults = {
     at: new Date().toISOString(),
     live: liveChannels.length > 0,
+    shapes,
     scenarios: [...results.values()],
     expired: expired(divergences, today),
   };
@@ -170,6 +205,14 @@ try {
             `${result.scenario}: ${difference.path} is ${JSON.stringify(difference.fake)} in the fake and ${JSON.stringify(difference.live)} live`,
         ),
     ),
+    ...report.shapes.flatMap((result) =>
+      result.differences
+        .filter((difference) => !difference.allowedBy)
+        .map(
+          (difference) =>
+            `shapes/${result.channel}: ${difference.path} is ${JSON.stringify(difference.fake ?? "missing")} in the fake and ${JSON.stringify(difference.live)} live`,
+        ),
+    ),
     ...report.expired.map(
       (divergence) => `divergences.yaml: ${divergence.scenario} ${divergence.path} expired on ${divergence.expires}`,
     ),
@@ -181,6 +224,11 @@ try {
       `${result.scenario}: fake ${result.fake}, live ${result.live}${result.live === "passed" ? `, ${result.differences.length - allowed} differences, ${allowed} allowed` : ""}`,
     );
   }
+  const compared = report.shapes.length;
+  const differing = report.shapes.filter((result) =>
+    result.differences.some((difference) => !difference.allowedBy),
+  ).length;
+  if (report.live) console.log(`shapes: ${compared} operations seen both ways, ${differing} with differences`);
   console.log(`\nconformance: results in ${out}`);
   if (problems.length > 0) {
     console.error(

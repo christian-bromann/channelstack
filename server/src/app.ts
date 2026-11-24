@@ -14,6 +14,7 @@ import { IdGenerator } from "./core/ids/index.ts";
 import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
 import { nodeOptions } from "./core/proxy/node.ts";
+import type { Recorder } from "./core/proxy/record.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
 import {
   actionRequires,
@@ -106,6 +107,8 @@ export interface AppOptions {
   timers?: Timers;
   /** Live mode: what makes drivers real (live-mode.md). Without it every driver is fake. */
   live?: LiveOptions;
+  /** Proxy mode's `--record`: the shape of every webhook a fake delivers (and, in `serve.ts`, every exchange). */
+  recorder?: Recorder;
 }
 
 export interface LiveOptions {
@@ -136,6 +139,8 @@ export interface App {
   socket(request: Request): SocketSession | undefined;
   /** Close every session: what live sessions created is removed from the real platforms. */
   close(): Promise<void>;
+  /** Whether this driver runs live: in proxy mode, its agent's calls go on to the platform. */
+  live(driver: string): boolean;
 }
 
 const Status = z.object({ ready: z.boolean(), version: z.string(), drivers: z.array(z.string()) }).openapi("Status");
@@ -181,7 +186,14 @@ export function createApp(options: AppOptions): App {
   const registry = new Registry();
   const events = new EventLog(clock, redactor);
   const timers = options.timers ?? systemTimers;
-  const delivery = new DeliveryQueue({ events, clock, timers, log });
+  const { recorder } = options;
+  const delivery = new DeliveryQueue({
+    events,
+    clock,
+    timers,
+    log,
+    ...(recorder ? { observe: (request) => recorder.webhook(request.driver, request.type, request.body) } : {}),
+  });
 
   const quiet = new QuietDetector(clock);
   events.onAppend((session) => quiet.touch(session));
@@ -501,6 +513,7 @@ export function createApp(options: AppOptions): App {
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),
     close: () => sessions.closeAll(),
+    live: (driver) => realities.get(driver)?.mode === "live",
     uiLoginLink,
     socket(request) {
       // The same routing as for requests: a driver's own host, or its path prefix.

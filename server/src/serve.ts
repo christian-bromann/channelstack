@@ -9,6 +9,7 @@ import { createLogger, type LogLevel } from "./core/log/index.ts";
 import { registerAliases } from "./core/portless/index.ts";
 import { type RunningProxy, startProxy } from "./core/proxy/index.ts";
 import { writeNodePreload } from "./core/proxy/node.ts";
+import { createRecorder, forward } from "./core/proxy/record.ts";
 import { Redactor } from "./core/redact/index.ts";
 import type { SocketSession } from "./core/router/index.ts";
 import { Secrets } from "./core/secrets/index.ts";
@@ -39,6 +40,8 @@ export interface StartOptions {
    * routes the provider hosts to the fakes. 0 picks a free one. Without it, no proxy.
    */
   proxyPort?: number;
+  /** Proxy mode only: record the shape of every exchange with a routed host, and every webhook, in this directory. */
+  recordDir?: string;
   /**
    * For tests that start a whole server: stand-ins for the platforms live mode calls. Only code
    * can pass it, never a flag or the environment, so a token can't be sent elsewhere.
@@ -116,7 +119,10 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   const log = createLogger({ level: options.logLevel, redactor, write: (line) => process.stderr.write(`${line}\n`) });
 
   let urls: ServerUrls | undefined;
+  if (options.recordDir !== undefined && options.proxyPort === undefined) throw new Error("--record needs --proxy");
+  const recorder = options.recordDir === undefined ? undefined : createRecorder(options.recordDir);
   const app = createApp({
+    ...(recorder ? { recorder } : {}),
     version: options.version,
     token,
     seed: options.seed,
@@ -168,11 +174,21 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       const hosts = proxyHosts();
       const ca = await loadCa(options.home, hosts);
       const leaf = await ca.issue(hosts);
+      const channelOf = (host: string) => DRIVERS.find((driver) => driver.hosts?.includes(host))?.name;
       const tls = Bun.serve<{ session: SocketSession }>({
         hostname: LOOPBACK,
         port: 0,
         tls: { cert: leaf.cert, key: leaf.key },
         ...handler,
+        fetch(request, listening) {
+          const channel = channelOf(new URL(request.url).hostname);
+          if (!channel || request.headers.get("upgrade")?.toLowerCase() === "websocket") {
+            return handler.fetch(request, listening);
+          }
+          // A live driver's agent talks to the platform itself; the proxy only passes it on (and records it).
+          const send = app.live(channel) ? (sent: Request) => forward(sent) : async (sent: Request) => app.fetch(sent);
+          return recorder ? recorder.exchange(channel, request, send) : send(request);
+        },
       });
       proxyServer = tls;
       proxy = await startProxy({

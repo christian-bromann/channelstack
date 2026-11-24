@@ -134,7 +134,7 @@ ${body}
 ${input.divergences
   .map(
     (divergence) =>
-      `<tr><td>${escapeHtml(divergence.scenario)}</td><td><code>${escapeHtml(divergence.path)}</code></td><td>${escapeHtml(divergence.reason)}</td><td>${escapeHtml(divergence.expires)}</td></tr>`,
+      `<tr><td>${escapeHtml(divergence.scenario)}</td><td><code>${escapeHtml(typeof divergence.path === "string" ? divergence.path : divergence.path.join(", "))}</code></td><td>${escapeHtml(divergence.reason)}</td><td>${escapeHtml(divergence.expires)}</td></tr>`,
   )
   .join("\n")}
 </tbody></table>`;

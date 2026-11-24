@@ -121,3 +121,65 @@ describe("exit check 6.4: the differential run's comparison", () => {
     expect(expired(divergences, new Date().toISOString().slice(0, 10))).toEqual([]);
   });
 });
+
+describe("exit check 6.4: the shape differ", () => {
+  test("it reports what the platform sends that the fake doesn't, and types with nothing in common", async () => {
+    const { compareShapes } = await import("./shapes.ts");
+    expect(compareShapes({ ok: "=true", ts: "string" }, { ok: "=true", ts: "string" })).toEqual([]);
+    expect(
+      compareShapes(
+        { ok: "=true", message: { text: "string" }, extra: "string" },
+        { ok: "=true", message: { text: "string", blocks: [] }, warning: "string" },
+      ),
+    ).toEqual([
+      { path: "message.blocks", fake: undefined, live: [] },
+      { path: "warning", fake: undefined, live: "string" },
+    ]);
+    expect(compareShapes({ count: "number" }, { count: "string" })).toEqual([
+      { path: "count", fake: "number", live: "string" },
+    ]);
+    // A null now and then, or a list empty on one side, says nothing.
+    expect(compareShapes({ next: "string" }, { next: "null|string" })).toEqual([]);
+    expect(compareShapes({ items: [] }, { items: [{ id: "string" }] })).toEqual([]);
+  });
+
+  test("recordings are read per operation, merged, and refusals left out", async () => {
+    const { readShapes } = await import("./shapes.ts");
+    const dir = mkdtempSync(join(tmpdir(), "channelstack-shapes-"));
+    try {
+      const file = join(dir, "shapes.jsonl");
+      const line = (value: object) => `${JSON.stringify(value)}\n`;
+      writeFileSync(
+        file,
+        line({
+          kind: "api",
+          channel: "slack",
+          operation: "POST /api/chat.postMessage",
+          status: 200,
+          shape: { ok: "=true", ts: "string" },
+        }) +
+          line({
+            kind: "api",
+            channel: "slack",
+            operation: "POST /api/chat.postMessage",
+            status: 200,
+            shape: { ok: "=true", channel: "string" },
+          }) +
+          line({
+            kind: "api",
+            channel: "slack",
+            operation: "POST /api/chat.postMessage",
+            status: 200,
+            shape: { ok: "=false", error: "=not_in_channel" },
+          }) +
+          line({ kind: "webhook", channel: "github", operation: "issues", shape: { action: "=opened" } }),
+      );
+      expect(Object.fromEntries(readShapes([file, join(dir, "missing.jsonl")]))).toEqual({
+        "api slack POST /api/chat.postMessage": { ok: "=true", ts: "string", channel: "string" },
+        "webhook github issues": { action: "=opened" },
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
