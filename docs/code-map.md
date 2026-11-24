@@ -150,7 +150,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 
 | Concern | Module | Notes |
 |---|---|---|
-| The gate | `verify-phase.ts` | Standing checks, then the exit checks of phase 0..n |
+| The gate | `verify-phase.ts` | Standing checks, then the exit checks of phase 0..n; one group of them (`--group static|unit|accept`) and one acceptance part (`--part`, `--repeat`), as CI runs them side by side |
 | Building the spec from the routes; comparing generated files | `lib/generate.ts` | Used by `spec.ts` and `sdk.ts` (write, or `--check`) |
 | Build targets and where build output goes | `lib/packages.ts` | The five targets, `binaryPath`, the platform package directories. Package and binary names come from the SDK launcher |
 | Running processes | `lib/process.ts` | `run`, `capture`, `background`, `freePort`. Waiting is `waitFor` from the SDK runtime's `wait` module, here too |
@@ -168,7 +168,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The binary under test, with a control API client | `server/test/integration/harness.ts` | `BINARY`, `cli`, `startBinary` (adds `control` to `lib/server.ts`'s). Shared by the server's and the SDK's integration tests |
 | Compiling the server | `build-binary.ts` | `bun build --compile`, one npm package per platform |
 | Running the server from source | `dev-server.sh` | Stands in for the binary (`CHANNELSTACK_SERVER_BIN`) on machines that block freshly compiled executables. CI never uses it |
-| Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check |
+| Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check; `--part` for one part of the acceptance suite (Slack; GitHub and Linear; Notion, every channel at once and the tests with their own agent; the checks against the broken agents, Slack's and the others') |
 | A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints; `others` adds one agent per channel (every channel in one run); `serverEnv` gives the server alone live credentials. Everything that needs both uses it |
 | `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack`, each channel's checks, and `shared.test.ts` with one agent per channel |
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |

@@ -35,7 +35,7 @@ Every phase adds its checks to one script:
 pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 ```
 
-`verify:phase` runs the **standing checks** below plus the phase's own **exit checks**. CI runs `verify:phase <current>` on every PR, so a later phase can't break an earlier one.
+`verify:phase` runs the **standing checks** below plus the phase's own **exit checks**. CI runs `verify:phase <current>` on every PR, so a later phase can't break an earlier one. It runs it in pieces side by side, each job well under five minutes: `--group static`, `--group unit`, and `--group accept` once per acceptance part (`--part`) and run (`--repeat 1`, three jobs per part). Together they are the whole gate; locally, `pnpm verify:phase <n>` with no group runs all of it.
 
 ### Standing checks (every phase, from phase 0 on)
 
