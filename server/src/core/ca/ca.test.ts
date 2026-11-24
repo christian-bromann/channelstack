@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -8,7 +8,8 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { caDir, type Leaf, loadCa, rotateCa, signLeaf } from "./index.ts";
 
-const HOSTS = ["slack.com", "files.slack.com", "api.github.com", "api.linear.app", "api.notion.com"];
+/** The routed hosts, as the drivers declare them. */
+const HOSTS = ["slack.com", "api.github.com", "api.linear.app", "api.notion.com"];
 const homes: string[] = [];
 const home = () => {
   const dir = mkdtempSync(join(tmpdir(), "channelstack-ca-"));
@@ -56,6 +57,11 @@ describe("exit check 6.3: the CA is contained", () => {
       const forged = await signLeaf({ cert: ca.cert, key }, [outside]);
       expect(await handshake(forged, ca.cert, outside)).toBe("permitted subtree violation");
     }
+    // A routed host's subdomains are outside too: the CA vouches for slack.com, not for app.slack.com.
+    for (const under of ["app.slack.com", "hooks.slack.com", "x.api.github.com", "a.b.api.notion.com"]) {
+      const forged = await signLeaf({ cert: ca.cert, key }, [under]);
+      expect(await handshake(forged, ca.cert, under)).toBe("excluded subtree violation");
+    }
     // A routed name next to one outside: the whole certificate is refused.
     const mixed = await signLeaf({ cert: ca.cert, key }, ["slack.com", "example.com"]);
     expect(await handshake(mixed, ca.cert, "slack.com")).toBe("permitted subtree violation");
@@ -95,6 +101,15 @@ describe("exit check 6.3: the CA is contained", () => {
     expect(touching.map((entry) => entry.name)).toEqual([]);
   });
 
+  test("a CA an earlier make wrote is replaced", async () => {
+    const dir = home();
+    const first = await loadCa(dir, HOSTS);
+    const file = join(caDir(dir), "ca.json");
+    const { version: _, ...old } = JSON.parse(readFileSync(file, "utf8")) as { version: number };
+    writeFileSync(file, JSON.stringify(old));
+    expect((await loadCa(dir, HOSTS)).cert).not.toBe(first.cert);
+  });
+
   test("the CA is kept across starts, and replaced when rotated or when the routed hosts change", async () => {
     const dir = home();
     const first = await loadCa(dir, HOSTS);
@@ -103,5 +118,7 @@ describe("exit check 6.3: the CA is contained", () => {
     expect(rotated.cert).not.toBe(first.cert);
     expect((await loadCa(dir, HOSTS)).cert).toBe(rotated.cert);
     expect((await loadCa(dir, [...HOSTS, "uploads.github.com"])).cert).not.toBe(rotated.cert);
+    // A routed host under another can't be vouched for alone.
+    await expect(loadCa(home(), [...HOSTS, "files.slack.com"])).rejects.toThrow(/files\.slack\.com/);
   });
 });

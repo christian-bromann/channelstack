@@ -29,7 +29,15 @@ export function caDir(home: string): string {
   return join(home, "ca");
 }
 
+/**
+ * The CA's make. A CA made by an earlier one (version 1 let a routed host's subdomains through) is
+ * replaced at the next start, like an expired one.
+ */
+const CA_VERSION = 2;
+
 interface CaFile {
+  /** `CA_VERSION` when it was made. */
+  version?: number;
   /** The CA certificate, PEM. */
   cert: string;
   /** Its private key, PKCS#8 PEM. Only this file holds it. */
@@ -72,15 +80,26 @@ const importKey = (pem: string) =>
 const sameHosts = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((host, at) => host === b[at]);
 
-/** Permit exactly these DNS names (and their subdomains, as name constraints do), and no IP address at all. */
+/**
+ * Permit exactly these DNS names and no IP address at all. A permitted `slack.com` also permits
+ * every name under it, so each host's subdomains are excluded again (`.slack.com`, the leading dot
+ * meaning "under it"). Name constraints can't permit a host and one of its subdomains while
+ * excluding the others, so routed hosts that nest are refused.
+ */
 function nameConstraints(hosts: readonly string[]): x509.Extension {
+  const nested = hosts.filter((host) => hosts.some((other) => other !== host && host.endsWith(`.${other}`)));
+  if (nested.length > 0) {
+    throw new Error(`channelstack's CA can't vouch for ${nested.join(", ")} without every other name next to it`);
+  }
+  const under = hosts.map((host) => new GeneralSubtree({ base: new GeneralName({ dNSName: `.${host}` }) }));
   const constraints = new NameConstraints({
     permittedSubtrees: new GeneralSubtrees(
       hosts.map((host) => new GeneralSubtree({ base: new GeneralName({ dNSName: host }) })),
     ),
-    excludedSubtrees: new GeneralSubtrees(
-      ["0.0.0.0/0", "::/0"].map((range) => new GeneralSubtree({ base: new GeneralName({ iPAddress: range }) })),
-    ),
+    excludedSubtrees: new GeneralSubtrees([
+      ...under,
+      ...["0.0.0.0/0", "::/0"].map((range) => new GeneralSubtree({ base: new GeneralName({ iPAddress: range }) })),
+    ]),
   });
   return new x509.Extension(id_ce_nameConstraints, true, AsnConvert.serialize(constraints));
 }
@@ -100,7 +119,7 @@ async function createCa(hosts: readonly string[], now: number): Promise<CaFile> 
       await x509.SubjectKeyIdentifierExtension.create(keys.publicKey),
     ],
   });
-  return { cert: cert.toString("pem"), key: await pemKey(keys.privateKey), hosts: [...hosts] };
+  return { version: CA_VERSION, cert: cert.toString("pem"), key: await pemKey(keys.privateKey), hosts: [...hosts] };
 }
 
 function writeCa(home: string, ca: CaFile): void {
@@ -149,6 +168,7 @@ export async function loadCa(home: string, hosts: readonly string[], now = Date.
   const file = readPrivateJsonFile(join(caDir(home), "ca.json")) as CaFile | undefined;
   const current =
     file &&
+    file.version === CA_VERSION &&
     sameHosts(file.hosts, hosts) &&
     new x509.X509Certificate(file.cert).notAfter.getTime() > now + LEAF_DAYS * DAY_MS
       ? file
