@@ -126,7 +126,8 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 | Concern | Module | Notes |
 |---|---|---|
 | Protocol parity scenarios | `smoke/*.yaml` | The format is [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md) |
-| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module |
+| Conformance scenarios | `<channel>/*.yaml` | The differential run's scenarios: the same format, with `record` steps; each runs against the fake and against the sandbox (decision 0016) |
+| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`), as plain data with no secret |
 | Reference agents | `agents/` | Plain programs with no channelstack code in them, configured from `channelstack env` |
 
 ## Examples (`examples/agents/`)
@@ -186,11 +187,22 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |
 | A whole server against a stand-in platform | `test/acceptance/stand-ins/` | `github-live-server.sh`: the server from source with GitHub live against `githubStub`, through `start({ platforms })`, which only code can set |
 | Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) or their own server (`live-skip`, a live server whose refusals skip) |
-| The live run | `live.ts` (`pnpm live`) | Every "live mode" block against the real sandboxes, Slack's agent in Socket Mode, then `sweep --check` for the run; nightly in `.github/workflows/live.yml` |
+| The live run | `live.ts` (`pnpm live`) | Every "live mode" block against the real sandboxes; nightly in `.github/workflows/live.yml` |
+| A live server with every agent | `lib/live-stack.ts` | `withLiveStack`: the live server, each channel's agent, the saved browser sessions, then `sweep --check` for the run and the removal of what is left; for `pnpm live` and `pnpm conformance` |
+| The differential run | `conformance.ts` (`pnpm conformance`) | Each conformance scenario against the fake (`withStack`) and, for the channels with credentials, the sandbox (`withLiveStack`); the comparison is `conformance/lib.ts`; `--fake-only` in CI |
+| The coverage page | `coverage.ts` (`pnpm coverage`) | The page from `conformance/coverage.ts`, with a summary for a CI job |
 | The nightly job's credentials | `live-secrets.ts` (`pnpm live:secrets`) | Every secret and variable `live.yml` names, from `live.env` into the repository's `live` environment through `gh`, values on standard input, names only in its output; the saved browser sessions as `CHANNELSTACK_BROWSER_SESSIONS` |
 | The live run's agents | `lib/live-agents.ts` | Each channel's reference agent against its real platform: Slack's in Socket Mode, the others behind the smee.io channel their webhook points at (`smee-client`); the people's saved browser sessions from `CHANNELSTACK_BROWSER_SESSIONS` |
 | Packaging check | `pack-test.ts` | `npm pack` into an empty project |
 | Stale-check self-test | `selftest-stale.ts` | Proves `spec:check` and `sdk:check` fail on drift |
+
+## Conformance (`conformance/`)
+
+| Concern | Module | Notes |
+|---|---|---|
+| Comparing a fake with its platform | `lib.ts` | `normalize` (ids, times, links, mentions, account names and secrets out), `diff` (by path), `loadDivergences` and `classify` (a difference a divergence allows until it expires); the results' shape |
+| Known divergences | `divergences.yaml` | Each with a reason and a date it expires; a unit test fails on an expired one |
+| The coverage page | `coverage.ts` | `coverageRows`, `coveragePage`, `coverageSummary`: from the spec's `x-channelstack-live`, the divergences and a run's results |
 
 ## Test integrations (`integrations/`)
 
