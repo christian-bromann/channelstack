@@ -119,7 +119,7 @@ Before writing this spec, probes drove each platform's official receiver with th
 
 ### 8.2 Live spike (needs the sandboxes)
 
-`pnpm live` runs every "live mode" block of the examples against the sandboxes, then `channelstack sweep --check` for the run. It needs the credentials in the environment (locally, source them first). `.github/workflows/live.yml` runs it nightly with the `live` environment's secrets.
+`pnpm live` runs every "live mode" block of the examples against the sandboxes, then `channelstack sweep --check` for the run. It needs the credentials in the environment (locally, source them first). `.github/workflows/live.yml` runs it nightly with the `live` environment's secrets. `pnpm live:secrets` puts them there: every secret and variable the workflow names, from `~/.channelstack/live.env`, through `gh` (`--dry-run` lists them first). It prints names only.
 
 | Id | What | Pass when |
 |---|---|---|

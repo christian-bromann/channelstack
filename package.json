@@ -20,6 +20,7 @@
     "test:redaction": "vitest run --project redaction",
     "test:accept": "node scripts/accept.ts",
     "live": "node scripts/live.ts",
+    "live:secrets": "node scripts/live-secrets.ts",
     "test:pack": "node scripts/pack-test.ts",
     "test:stale": "node scripts/selftest-stale.ts",
     "api:check": "node scripts/api-check.ts",

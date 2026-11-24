@@ -183,6 +183,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | A whole server against a stand-in platform | `test/acceptance/stand-ins/` | `github-live-server.sh`: the server from source with GitHub live against `githubStub`, through `start({ platforms })`, which only code can set |
 | Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) or their own server (`live-skip`, a live server whose refusals skip) |
 | The live run | `live.ts` (`pnpm live`) | Every "live mode" block against the real sandboxes, Slack's agent in Socket Mode, then `sweep --check` for the run; nightly in `.github/workflows/live.yml` |
+| The nightly job's credentials | `live-secrets.ts` (`pnpm live:secrets`) | Every secret and variable `live.yml` names, from `live.env` into the repository's `live` environment through `gh`, values on standard input, names only in its output |
 | Packaging check | `pack-test.ts` | `npm pack` into an empty project |
 | Stale-check self-test | `selftest-stale.ts` | Proves `spec:check` and `sdk:check` fail on drift |
 
