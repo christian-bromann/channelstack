@@ -21,7 +21,7 @@ A route says how it works live (`live` on the route, `x-channelstack-live` in th
 
 The Vitest integration skips a test that hits either refusal, with the reason in the report (`context.skip(note)`, through a refusal hook on the SDK transport that also names the request, so a concurrent test skips only itself). The fake run never meets these refusals, so the test still runs in full on every PR.
 
-**A setup that can't work fails instead: `live_misconfigured`.** Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token, a person's token from the agent's own app. If those skipped, a nightly run with a broken setup would skip everything and pass. `pnpm live` also fails when a channel whose credentials are set passed no live test, a channel whose live backend isn't built among them: its tests skip, and the job reports that 5.1 isn't met for it.
+**A setup that can't work fails instead: `live_misconfigured`.** Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token. If those skipped, a nightly run with a broken setup would skip everything and pass. `pnpm live` also fails when a channel whose credentials are set passed no live test, a channel whose live backend isn't built among them: its tests skip, and the job reports that 5.1 isn't met for it.
 
 ## One `World` for both: lookups at once, actions and reads awaited
 
@@ -49,9 +49,20 @@ Live, the agent works on the real platform, and nothing tells channelstack when 
 
 `createUser({ name: "Ana" })` reads `CHANNELSTACK_SLACK_USER_ANA_TOKEN` in the SDK when the test leaves `token` out (`x-channelstack-credential` on the field, runtime `credentials` in both SDKs). The app's credentials come from the server's environment. Both stay in memory as `LiveCredential`, which shows `[redacted]` in JSON, strings and `console.log`, and is registered with the redactor. The control API returns empty strings for a live app's tokens.
 
-## What the first live run found (V1)
+## A person's message needs Slack's client
 
-The Slack sandbox's person token was issued by the agent's own app. Slack shows every message posted with such a token as the app's (`bot_id`, `app_id`), so the agent ignores it as its own and no `app_mention` is sent. **A person's token must come from a separate Slack app installed for the sandbox's people.** channelstack now refuses such a token on the first message with `live_misconfigured`, and says how to fix it. The message is still recorded for cleanup. `auth.test` doesn't say which app issued a user token, so `channelstack doctor` can't see this ahead of time.
+Found against the real sandbox on 2026-11-23, in two steps:
+
+1. The sandbox's first person token was issued by the agent's own app, so Ana's messages showed as the app's.
+2. With a token from a separate app for the sandbox's people, they are Ana's, but **Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`**, a person's user token included, and `as_user=true` doesn't change that.
+
+The reference agent drops any event with a `bot_id` (Bolt agents commonly do), and so does the standard check "ignores other bots" (`slackChecks()`). So no person's message posted through the API reaches the agent. Only a person typing in Slack's client makes a message without that mark.
+
+Decision (the maintainer's): **live, a Slack person's `say` and `reply` are typed in the client by the browser actor.** Their routes declare `requires: "browser"`, so they report `action_requires` until the browser actor exists, and Vitest skips them with the reason. The person's user token stays the credential for everything else: creating channels, invites, kicks, DMs, reactions, edits, deletes and reads. Whether an edit through the API carries the same mark is unverified.
+
+Alternative: keep posting through the API and make the reference agent accept a message with the people app's bot. Rejected: it weakens the "ignores other bots" check for every agent, and a real agent wouldn't do it.
+
+What a session writes in a DM is deleted when it closes, with the replies under it (ledger kind `message`). The browser actor will record what it types there. A Slack app configuration token doesn't help either: it only calls the App Manifest APIs.
 
 ## The Web API is called with `fetch`, form-encoded
 

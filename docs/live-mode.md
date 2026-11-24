@@ -29,8 +29,8 @@ Every live action is one of three mechanisms. Observing is a fourth.
 | # | Mechanism | Used for | Needs |
 |---|---|---|---|
 | A1 | **API call as the app** | Posting as the bot, installing the App on a repo, GitHub redelivery, reads the app can do | App credentials |
-| A2 | **API call as a person** | Everything people do through normal API surfaces: say, reply, DM, edit, delete, react, comment, review, inline comment, resolve review threads, label, assign, delegate, create issues and pages | One user token per sandbox person |
-| A3 | **Browser actor** | UI-only actions: Slack click, select, modal submit, shortcut, slash command, Stop, opening the agent thread, switching context; GitHub requested actions; Linear Stop; Notion "Add connections" | Sign-in secrets per person (section 5) |
+| A2 | **API call as a person** | Everything people do through normal API surfaces: DM, edit, delete, react, comment, review, inline comment, resolve review threads, label, assign, delegate, create issues and pages; say and reply on GitHub, Linear and Notion | One user token per sandbox person |
+| A3 | **Browser actor** | UI-only actions, and a Slack person's messages (below): Slack say and reply, click, select, modal submit, shortcut, slash command, Stop, opening the agent thread, switching context; GitHub requested actions; Linear Stop; Notion "Add connections" | Sign-in secrets per person (section 5) |
 | O | **Observe** | Checking that the agent reacted | Section 3 |
 
 **Is a bot token enough?** Only for A1. A bot token acts as the bot, never as a person. So with only a bot token, live mode can post as the bot and read, but every `ana.*` action needs Ana's token (or the browser).
@@ -59,7 +59,7 @@ All from environment variables in CI. None is committed or logged, and the contr
 
 The A1 credentials make a driver live: with all of them set, its routes act on the real platform. With some set and not all, its routes are refused with `live_misconfigured`, naming what is missing, and the test fails. The allowlists are `CHANNELSTACK_LIVE_SLACK_TEAMS`, `CHANNELSTACK_LIVE_GITHUB_ORGS`, `CHANNELSTACK_LIVE_LINEAR_WORKSPACES` and `CHANNELSTACK_LIVE_NOTION_WORKSPACES` (comma-separated ids).
 
-**Why Slack needs a second app for people.** A user token that the agent's own app issued posts as that app: Slack marks the message with the app's bot, and the agent ignores it as its own, so no `app_mention` either (found in the first live run). channelstack refuses such a token on the first message, with the fix in the message.
+**A Slack person's message is typed in the client.** Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included, whichever app issued it, and `as_user=true` doesn't change that. Agents drop such a message as a bot's (the reference agent does, and so does the "ignores other bots" check), so no API post of a person's reaches the agent. Live, `say` and `reply` are typed in Slack's client by the browser actor (A3), and report `action_requires` until it exists. The person's user token, from a separate Slack app for the sandbox's people (not the agent's own), stays the A2 credential for everything else: channels, invites, DMs, reactions, edits, deletes and reads.
 
 How the agent itself is reachable is the agent's concern. channelstack's own nightly job runs Slack's reference agent in Socket Mode, with the app's `CHANNELSTACK_SLACK_APP_TOKEN` (`xapp-`), so it needs no public URL.
 
@@ -123,7 +123,7 @@ Before writing this spec, probes drove each platform's official receiver with th
 
 | Id | What | Pass when |
 |---|---|---|
-| V1 | Slack A2: `ana.say` with a user token triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes. 2026-11-23: channelstack's side works, and cleanup leaves nothing behind. The sandbox's person token came from the agent's own app, so the agent ignored her message. Waits for a person's token from a separate app |
+| V1 | Slack: `ana.say` triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes. 2026-11-23: channelstack's side works, and cleanup leaves nothing behind. A message posted through the API carries the posting app's bot, with a token from any app, so the agent ignores it. Blocked on the browser actor, which types it in the client |
 | V2 | GitHub delivery log lists a delivery within a few seconds and shows the agent's status code and duration | Fields present; delay under 5 s at p95 |
 | V3 | Browser sign-in without people on all four platforms in GitHub Actions | Sessions saved; second run reuses them |
 | V4 | Browser A3 on Slack: click and Stop reach the agent | Agent's response visible in the thread |

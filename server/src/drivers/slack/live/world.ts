@@ -35,7 +35,6 @@ interface WireMessage {
   ts: string;
   user?: string;
   bot_id?: string;
-  app_id?: string;
   text?: string;
   blocks?: unknown[];
   thread_ts?: string;
@@ -276,27 +275,6 @@ export function createLiveWorld(deps: {
     return record;
   };
 
-  /**
-   * A DM can't be archived, and other sessions may write in the same one: the ledger lists each
-   * message this session wrote there, and cleanup deletes those and the replies under them.
-   */
-  const recordDm = (
-    session: string,
-    record: SlackConversationRecord,
-    by: LiveCredential,
-    ts: string,
-    thread: string | undefined,
-  ) => {
-    live.ledger.record({
-      channel: "slack",
-      kind: "message",
-      ref: { channel: record.id, ts, ...(thread === undefined ? {} : { thread }) },
-      workspace: known().team.id,
-      by: by.owner,
-      session,
-    });
-  };
-
   const open = async (session: string, userId: string, others: readonly string[]) => {
     const credential = actor(session, userId);
     const users = others.map((id) => participant(session, id));
@@ -316,39 +294,6 @@ export function createLiveWorld(deps: {
       created: channel.created ?? Math.floor(clock() / 1000),
       isArchived: false,
     });
-  };
-
-  const post = async (
-    session: string,
-    userId: string,
-    target: SlackConversationRecord,
-    input: SlackMessageInput,
-    thread: { ts: string; broadcast: boolean } | undefined,
-  ): Promise<SlackMessageRecord> => {
-    const credential = actor(session, userId);
-    const text = resolveMentions(input.text ?? "", (name) => resolveName(session, name));
-    const answer: SlackAnswer = await client.call("chat.postMessage", credential, {
-      channel: target.id,
-      text,
-      blocks: input.blocks,
-      metadata: input.metadata as object | undefined,
-      thread_ts: thread?.ts,
-      reply_broadcast: thread?.broadcast === true ? true : undefined,
-    });
-    changed(target.id);
-    const message = (answer.message ?? { ts: answer.ts, text, user: userId }) as WireMessage;
-    if (target.kind === "im" || target.kind === "mpim") recordDm(session, target, credential, message.ts, thread?.ts);
-    // A user token issued by the agent's own app posts as that app: Slack marks the message with the
-    // app's bot, and the agent ignores it as its own (found in the first live run, live-mode.md V1).
-    const { app } = known();
-    if (message.bot_id === app.botId || (app.id !== "" && message.app_id === app.id)) {
-      throw liveMisconfigured(
-        `${person(session, userId).alias}'s token was issued by the agent's own app, so Slack shows the message as the app's and the agent ignores it`,
-        "install a separate Slack app for the sandbox's people and use the user token it issues",
-      );
-    }
-    const [record] = await records(session, target.id, [{ ...message, ts: (answer.ts as string) ?? message.ts }]);
-    return record as SlackMessageRecord;
   };
 
   const notHere = (operation: string, requires: "the browser actor" | "proxy mode") => () => {
@@ -510,18 +455,10 @@ export function createLiveWorld(deps: {
 
     openConversation: (session, user, withParticipants) => open(session, user, withParticipants),
 
-    async postAsUser(session, user, message, where) {
-      const target = "channel" in where ? conversation(session, where.channel) : await open(session, user, where.to);
-      return post(session, user, target, message, undefined);
-    },
-
-    async replyAsUser(session, user, message, thread, alsoSendToChannel) {
-      const root = await messageAt(session, thread.channel, thread.ts);
-      return post(session, user, conversation(session, thread.channel), message, {
-        ts: root.threadTs ?? root.ts,
-        broadcast: alsoSendToChannel,
-      });
-    },
+    // A person's message is typed in Slack's client (the router refuses these live until the
+    // browser actor exists): through the API, Slack marks it with the posting app's bot.
+    postAsUser: notHere("SlackUser.say", "the browser actor"),
+    replyAsUser: notHere("SlackUser.reply", "the browser actor"),
 
     async editAsUser(session, user, message, target) {
       const credential = actor(session, user);

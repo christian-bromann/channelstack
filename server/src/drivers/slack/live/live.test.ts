@@ -105,30 +105,34 @@ describe("live Slack: acting and reading back", () => {
     expect(created?.creator).toBe(ana.userId);
     expect([...(created?.members ?? [])].sort()).toEqual([ana.userId, stub.bot.userId].sort());
 
+    // Through the API, Slack would mark Ana's message with the posting app's bot, and the agent
+    // would ignore it: her message is typed in Slack's client, which the browser actor does.
     const said = await session.slack("POST", `/users/${ana.userId}/say`, {
       message: { text: "@my-agent summarize #support today" },
       channel: channel.body.id,
     });
-    expect(said.status).toBe(200);
-    const post = stub.calls.find((call) => call.method === "chat.postMessage");
-    // Ana's own token, and the app's name as a real mention of its bot.
-    expect(post).toMatchObject({ as: "ana", params: { text: `<@${stub.bot.userId}> summarize #support today` } });
-    expect(said.body.delivery).toBeUndefined();
+    expect(said.status).toBe(422);
+    expect(said.body).toMatchObject({
+      error: "action_requires",
+      data: { operation: "SlackUser.say", requires: "the browser actor" },
+    });
+    expect(said.body.message).toContain("carries the posting app's bot_id");
+    expect(stub.calls.filter((call) => call.method === "chat.postMessage")).toEqual([]);
 
-    // Real Slack delivers to the agent; here it answers the way it would.
-    stub.botSays(channel.body.id, "Here is today's summary", said.body.ts);
-    server.clock.advance(1100);
-    const replies = await session.slack("GET", `/conversations/${channel.body.id}/threads/${said.body.ts}/replies`);
+    // Here a stand-in types it, and the agent answers the way it would: Slack delivered to it.
+    const asked = stub.typed(ana.userId, channel.body.id, `<@${stub.bot.userId}> summarize #support today`);
+    stub.botSays(channel.body.id, "Here is today's summary", asked);
+    const messages = await session.slack("GET", `/conversations/${channel.body.id}/messages`);
+    expect(messages.body).toHaveLength(1);
+    expect(messages.body[0]).toMatchObject({ ts: asked, author: { kind: "user", name: "ana" } });
+    const replies = await session.slack("GET", `/conversations/${channel.body.id}/threads/${asked}/replies`);
     expect(replies.body).toHaveLength(1);
     expect(replies.body[0]).toMatchObject({
       text: "Here is today's summary",
       author: { kind: "app", name: "my-agent" },
     });
 
-    const transcript = await session.slack(
-      "GET",
-      `/conversations/${channel.body.id}/threads/${said.body.ts}/transcript`,
-    );
+    const transcript = await session.slack("GET", `/conversations/${channel.body.id}/threads/${asked}/transcript`);
     expect(transcript.body.text).toContain("ana: @my-agent summarize #support today");
     expect(transcript.body.text).toContain("my-agent: Here is today's summary");
   });
@@ -142,30 +146,8 @@ describe("live Slack: acting and reading back", () => {
     expect(ben.status).toBe(200);
     const channel = await session.slack("POST", "/channels", { participants: [real.body.id, ben.body.id] });
     expect(channel.body.error).toBe("fake_actor_in_live_world");
-    const dm = await session.slack("POST", `/users/${ben.body.id}/say`, {
-      message: { text: "hi" },
-      to: [stub.bot.userId],
-    });
+    const dm = await session.slack("POST", `/users/${ben.body.id}/open-dm`, { participants: [stub.bot.userId] });
     expect(dm.body.error).toBe("fake_actor_in_live_world");
-  });
-
-  test("a person's token issued by the agent's own app is refused: Slack would show their message as the app's", async () => {
-    const stub = slackStub();
-    const ana = stub.person("ana", { viaAgentApp: true });
-    const server = liveSlack(stub);
-    const session = await server.open();
-    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
-    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
-      message: { text: "hi" },
-      to: [stub.bot.userId],
-    });
-    // A setup that can't work fails the test (it isn't skipped), with the fix in the message.
-    expect(said.status).toBe(412);
-    expect(said.body.error).toBe("live_misconfigured");
-    expect(said.body.message).toContain("install a separate Slack app for the sandbox's people");
-    // What was posted is still removed with the session.
-    await server.call("DELETE", `/sessions/${session.id}`);
-    expect(stub.channels().flatMap((channel) => channel.messages)).toEqual([]);
   });
 
   test("CHANNELSTACK_REALITY=live refuses a person without a token", async () => {
@@ -246,57 +228,16 @@ describe("live Slack: acting and reading back", () => {
 });
 
 describe("exit check 5.2: cleanup leaves nothing behind", () => {
-  test("closing the session archives its channels and deletes what was written in its DMs", async () => {
+  test("closing the session archives its channels", async () => {
     const stub = slackStub();
     const ana = stub.person("ana");
     const server = liveSlack(stub);
     const session = await server.open();
     await session.slack("POST", "/users", { name: "Ana", token: ana.token });
     const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
-    const dm = await session.slack("POST", `/users/${ana.userId}/say`, {
-      message: { text: "@my-agent are you there?" },
-      to: [stub.bot.userId],
-    });
-    stub.botSays(dm.body.channel, "Yes", dm.body.ts);
-    const reply = await session.slack("POST", `/users/${ana.userId}/reply`, {
-      message: { text: "great" },
-      thread: { channel: dm.body.channel, ts: dm.body.ts },
-    });
-    expect(reply.status).toBe(200);
-    stub.botSays(dm.body.channel, "Anything else?", dm.body.ts);
-
     const closed = await server.call("DELETE", `/sessions/${session.id}`);
     expect(closed.status).toBe(204);
     expect(stub.channel(channel.body.id)?.archived).toBe(true);
-    // Ana's messages with her token, the agent's answers in her thread with the bot token: the DM is as it was.
-    expect(stub.channel(dm.body.channel)?.messages).toEqual([]);
-  });
-
-  test("closing a session leaves what another session wrote in the same DM", async () => {
-    const stub = slackStub();
-    const ana = stub.person("ana");
-    const server = liveSlack(stub);
-    const first = await server.open();
-    const second = await server.open();
-    for (const session of [first, second]) await session.slack("POST", "/users", { name: "Ana", token: ana.token });
-    const mine = await first.slack("POST", `/users/${ana.userId}/say`, {
-      message: { text: "first" },
-      to: [stub.bot.userId],
-    });
-    stub.botSays(mine.body.channel, "answer to first", mine.body.ts);
-    // The same real DM: Ana and the app have one.
-    const theirs = await second.slack("POST", `/users/${ana.userId}/say`, {
-      message: { text: "second" },
-      to: [stub.bot.userId],
-    });
-    expect(theirs.body.channel).toBe(mine.body.channel);
-    stub.botSays(theirs.body.channel, "answer to second", theirs.body.ts);
-
-    await server.call("DELETE", `/sessions/${first.id}`);
-    expect(stub.channel(mine.body.channel)?.messages.map((message) => message.text)).toEqual([
-      "second",
-      "answer to second",
-    ]);
   });
 
   test("the session's quiet can't be judged live without proxy mode", async () => {

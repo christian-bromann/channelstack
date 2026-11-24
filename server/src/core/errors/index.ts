@@ -15,8 +15,8 @@ const CORE_ERRORS = {
   /** A live action needs a piece this run doesn't have: the browser actor, proxy mode. A test is skipped for it. */
   action_requires: 422,
   /**
-   * Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person's token
-   * from the agent's own app. A test fails for it, so a broken nightly run goes red.
+   * Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person without
+   * a token under `CHANNELSTACK_REALITY=live`. A test fails for it, so a broken nightly run goes red.
    */
   live_misconfigured: 412,
   /** The live workspace, org, team or Notion workspace isn't in its `CHANNELSTACK_LIVE_*` allowlist. */

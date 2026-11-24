@@ -79,12 +79,12 @@ Every feature runs in the fake server (in memory). The question this document an
 | `slack.createChannel({ participants, private })` | Done | Built | User token of the first real person in it (`conversations.create`, `conversations.invite`) | Including `slack.app` invites the bot. The app's bot can't create channels, so a person does; no separate seeding token is needed |
 | `slack.createChannel({ shared: true })` (Slack Connect) | Yes | No | — | Needs a second organization and manual approval |
 | `slack.uninstallApp()` | Done | Not yet | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run. Live runs report `unsupported_in_live` until that job exists |
-| `ana.say(text, { channel })` | Done | Built | User token (`chat.postMessage` as the user) | The platform sends real `message` and `app_mention` events. The person's token must come from a separate Slack app, not the agent's: Slack shows a message posted with a user token of the agent's own app as the app's, and the agent ignores it (found in the first live run; channelstack refuses such a token with `live_misconfigured`, and the test fails) |
-| `ana.say(text, { to: slack.app })` (DM) | Done | Built | User token (`conversations.open`, then `chat.postMessage`) | Fires `message.im` |
-| `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Built | User token | |
-| `ana.say({ files })` | Yes | Yes | User token (files upload v2) | |
-| `ana.reply(text, { thread })` | Done | Built | User token (`chat.postMessage` with `thread_ts`) | `alsoSendToChannel` → `reply_broadcast` |
-| `ana.edit(text, { message })` | Done | Built | User token (`chat.update`) | Only the person's own messages, as in Slack |
+| `ana.say(text, { channel })` | Done | Yes, with browser | Browser (typed in Slack's client) | The platform sends real `message` and `app_mention` events only for a message a person types. Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included (`as_user` too), and agents drop it as a bot's (found against the sandbox, [decision 0015](decisions/0015-live-mode.md)). Live runs report `action_requires` until the browser actor types it in Slack's client |
+| `ana.say(text, { to: slack.app })` (DM) | Done | Yes, with browser | Browser; the DM is opened with the user token (`conversations.open`) | Fires `message.im`. As `say` in a channel |
+| `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Yes, with browser | Browser | As `say` in a channel |
+| `ana.say({ files })` | Yes | Yes, with browser | Browser | As `say` in a channel |
+| `ana.reply(text, { thread })` | Done | Yes, with browser | Browser | `alsoSendToChannel` → `reply_broadcast`. As `say` in a channel |
+| `ana.edit(text, { message })` | Done | Built | User token (`chat.update`) | Only the person's own messages, as in Slack. **unverified**: whether an edit through the API carries the posting app's bot as a new message does |
 | `ana.delete({ message })` | Done | Built | User token (`chat.delete`) | |
 | `ana.react` / `unreact` | Done | Built | User token (`reactions.add` / `remove`) | |
 | `ben.click("Approve", { message })` | Done | Yes, with browser | Browser | Confirmed: `block_actions` is only sent when a real person clicks; there's no API to trigger it |
@@ -207,9 +207,9 @@ Notion now has **personal access tokens** that act as the person who created the
 
 ## What this means for test authors
 
-1. **Most of a test runs live with plain tokens.** Posting, replying, commenting, reviewing, delegating and every read work on all four platforms through a person's token, including Notion, now that it has personal access tokens.
+1. **Most of a test runs live with plain tokens.** Commenting, reviewing, delegating and every read work on all four platforms through a person's token, including Notion, now that it has personal access tokens. Slack is the exception for messages: one posted through the API carries the posting app's bot, so a person's `say` and `reply` are typed in the client by the browser actor.
 2. **The UI-only actions** are:
-   - Slack: clicks, modals, slash commands, Stop and the agent split view.
+   - Slack: a person's messages (`say`, `reply`), clicks, modals, slash commands, Stop and the agent split view.
    - GitHub: the requested-action buttons on check runs. (Re-run is not yet supported live.)
    - Linear: Stop.
    - Notion: adding connections. (Resolving discussions is not yet supported live.)
@@ -240,7 +240,7 @@ The browser actor runs in CI, so nobody signs in by hand. Each sandbox person is
 
 Answered so far (2026-11-23, Slack sandbox):
 
-- **V1, Slack A2: not yet confirmed end to end.** channelstack's side works against real Slack: the tagged channel, the invite, Ana's message with a real mention of the bot, reading the thread back, and cleanup (the sweep check found nothing left). But the sandbox's person token was issued by the agent's own app, so Slack showed Ana's message as the app's and the agent ignored it. The fix is a separate Slack app for the sandbox's people, whose user token Ana uses; channelstack now refuses the other kind with `live_misconfigured`, so the nightly job fails until the token is replaced. V1 is answered once that token exists and the nightly job passes.
+- **V1, Slack A2: not possible through the API; blocked on the browser actor.** channelstack's side works against real Slack: the tagged channel, the invite, reading the thread back, and cleanup (the sweep check found nothing left). But Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included, whichever app issued it (a separate app for the sandbox's people was tried) and with `as_user=true` too. The reference agent, most agents and `slackChecks()` ("ignores other bots") drop such a message, so no API post of a person's reaches the agent. A person's message needs Slack's client: live `say` and `reply` go through the browser actor, and report `action_requires` until it exists. V1 is answered once the browser actor types the message.
 - **Slack's read methods ignore a JSON body.** `users.info` answers `user_not_found` to one; the live client sends parameters form-encoded, as Slack's SDK does.
 
 Still open:

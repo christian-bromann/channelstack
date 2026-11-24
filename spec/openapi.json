@@ -7361,6 +7361,10 @@
           "msg_too_long"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "a message posted through Slack's API carries the posting app's bot_id, and agents ignore it as a bot's; only Slack's client posts as a person"
+        },
         "parameters": [
           {
             "schema": {
@@ -7450,6 +7454,10 @@
           "msg_too_long"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "a message posted through Slack's API carries the posting app's bot_id, and agents ignore it as a bot's; only Slack's client posts as a person"
+        },
         "parameters": [
           {
             "schema": {

@@ -34,8 +34,8 @@ export async function identify(client: SlackWebClient, credential: LiveCredentia
  * workspace. Throws the refusal: `live_misconfigured`, `cross_workspace_credential` or
  * `live_not_allowlisted`.
  *
- * One thing it can't see: whether a person's token was issued by the agent's own app. `auth.test`
- * doesn't say, and the live world finds out from the person's first message.
+ * It can't see which app issued a person's token: `auth.test` doesn't say. It doesn't matter for
+ * what the token does live, since a person's messages are typed in the client (decision 0015).
  */
 export function checkSlackCredential(
   identity: SlackIdentity,

@@ -12,11 +12,13 @@ export interface SlackStub {
   /** The app's bot token and bot user. */
   readonly bot: { token: string; userId: string; botId: string };
   /** Add a person; their token is what the test hands to `createUser`. */
+  /** Add a person; their token is what the test hands to `createUser`. */
+  person(handle: string, options?: { team?: string }): { token: string; userId: string };
   /**
-   * Add a person; their token is what the test hands to `createUser`. `viaAgentApp`: the token was
-   * issued by the agent's own app, so what they post carries the app's bot, as on real Slack.
+   * A person types a message in Slack's client: it carries no app's bot, unlike one posted through
+   * the API with their token (decision 0015). The browser actor will do this live; tests stand in.
    */
-  person(handle: string, options?: { team?: string; viaAgentApp?: boolean }): { token: string; userId: string };
+  typed(userId: string, channel: string, text: string, threadTs?: string): string;
   /** Every call so far: the method, and the handle (or `bot`) whose token made it. */
   readonly calls: Array<{ method: string; as: string; params: Record<string, unknown> }>;
   /** The app answers in a conversation, as the real agent would (Slack delivered the event to it, not channelstack). */
@@ -51,11 +53,12 @@ interface StubChannel {
 
 export function slackStub(options: { team?: string } = {}): SlackStub {
   const team = options.team ?? "T0STUB0001";
+  /** The bot of the app that issued the people's tokens: what Slack marks their API posts with. */
+  const PEOPLE_APP_BOT = "B0STUBPEOPLE";
   const bot = { token: `xoxb-${randomString(24, "abcdef0123456789")}`, userId: "U0STUBBOT1", botId: "B0STUBBOT1" };
-  const tokens = new Map<
-    string,
-    { handle: string; userId: string; team: string; isBot: boolean; viaAgentApp?: boolean }
-  >([[bot.token, { handle: "bot", userId: bot.userId, team, isBot: true }]]);
+  const tokens = new Map<string, { handle: string; userId: string; team: string; isBot: boolean }>([
+    [bot.token, { handle: "bot", userId: bot.userId, team, isBot: true }],
+  ]);
   const users = new Map<string, { id: string; name: string }>([[bot.userId, { id: bot.userId, name: "robin" }]]);
   const channels = new Map<string, StubChannel>();
   const calls: SlackStub["calls"] = [];
@@ -65,12 +68,13 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
   const ok = (body: Record<string, unknown> = {}) => Response.json({ ok: true, ...body });
   const refuse = (error: string) => Response.json({ ok: false, error });
 
-  const post = (channel: StubChannel, user: string, text: string, threadTs?: string, isBot = false): StubMessage => {
+  /** `botId`: the app whose bot a message carries (any API post), or none (typed in the client). */
+  const post = (channel: StubChannel, user: string, text: string, threadTs?: string, botId?: string): StubMessage => {
     const message: StubMessage = {
       ts: ts(),
       user,
       text,
-      ...(isBot ? { bot_id: bot.botId } : {}),
+      ...(botId ? { bot_id: botId } : {}),
       ...(threadTs ? { thread_ts: threadTs } : {}),
     };
     channel.messages.push(message);
@@ -86,11 +90,7 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
   const top = (channel: StubChannel) =>
     channel.messages.filter((message) => message.thread_ts === undefined || message.thread_ts === message.ts);
 
-  const handle = (
-    method: string,
-    who: { handle: string; userId: string; team: string; isBot: boolean; viaAgentApp?: boolean },
-    p: any,
-  ) => {
+  const handle = (method: string, who: { handle: string; userId: string; team: string; isBot: boolean }, p: any) => {
     const channel = typeof p.channel === "string" ? channels.get(p.channel) : undefined;
     const member = () => channel?.members.has(who.userId) === true;
     switch (method) {
@@ -203,7 +203,8 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         if (channel.archived) return refuse("is_archived");
         if (!member()) return refuse("not_in_channel");
         if (!p.text && !p.blocks) return refuse("no_text");
-        const message = post(channel, who.userId, p.text ?? "", p.thread_ts, who.isBot || who.viaAgentApp === true);
+        // Through the API a message carries the posting app's bot, a person's token included.
+        const message = post(channel, who.userId, p.text ?? "", p.thread_ts, who.isBot ? bot.botId : PEOPLE_APP_BOT);
         return ok({ channel: channel.id, ts: message.ts, message });
       }
       case "chat.update": {
@@ -279,7 +280,6 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
         userId,
         team: personOptions.team ?? team,
         isBot: false,
-        ...(personOptions.viaAgentApp ? { viaAgentApp: true } : {}),
       });
       users.set(userId, { id: userId, name: handleName });
       return { token, userId };
@@ -287,7 +287,12 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
     botSays(channelId, text, threadTs) {
       const channel = channels.get(channelId);
       if (!channel) throw new Error(`No channel ${channelId}`);
-      return post(channel, bot.userId, text, threadTs, true).ts;
+      return post(channel, bot.userId, text, threadTs, bot.botId).ts;
+    },
+    typed(userId, channelId, text, threadTs) {
+      const channel = channels.get(channelId);
+      if (!channel) throw new Error(`No channel ${channelId}`);
+      return post(channel, userId, text, threadTs).ts;
     },
     channel: (id) => channels.get(id),
     channels: () => [...channels.values()],
