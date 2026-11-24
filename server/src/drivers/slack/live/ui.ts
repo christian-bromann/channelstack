@@ -5,6 +5,9 @@ import { liveMisconfigured } from "../../../core/reality/index.ts";
 /** Slack's web client: the only origin the Slack browser actor opens. */
 export const SLACK_CLIENT = "https://app.slack.com";
 
+/** Where Slack keeps a signed-in session: its cookies on these domains. */
+export const SLACK_COOKIE_DOMAINS = ["slack.com"] as const;
+
 /** A page of the signed-in client, not a sign-in page Slack sent a signed-out person to. */
 export const signedInToSlack = (url: string) => url.startsWith(`${SLACK_CLIENT}/client/`);
 

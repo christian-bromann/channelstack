@@ -53,7 +53,11 @@ export function slackClientStub(stub: SlackStub) {
       setCookies: async (cookies) => {
         user = cookies.find((cookie) => cookie.name === "d")?.value ?? "";
       },
-      getCookies: async () => [{ name: "d", value: user, domain: ".slack.com" }],
+      // Slack renews a session while it is used: `d-s` says how many pages this one opened.
+      getCookies: async () => [
+        { name: "d", value: user, domain: ".slack.com" },
+        { name: "d-s", value: String(opened.length), domain: ".slack.com" },
+      ],
       $$: element,
       keys: async (value: string | string[]) => {
         if (draft === undefined || !page) throw new Error("Nothing to type into");

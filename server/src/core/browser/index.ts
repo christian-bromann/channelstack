@@ -194,20 +194,26 @@ export type Launch = (headed: boolean) => Promise<Driver>;
 /** The actors of the open test sessions: one per person, started on first use, closed with the session. */
 export class BrowserActors {
   readonly #actors = new Map<string, Promise<BrowserActor>>();
+  readonly #keep = new Map<string, KeepSession>();
   readonly #launch: Launch | undefined;
 
   constructor(launch?: Launch) {
     this.#launch = launch;
   }
 
-  /** The person's actor in this session, started (headless, from their saved session) the first time. */
+  /**
+   * The person's actor in this session, started (headless, from their saved session) the first
+   * time. With `keep`, the session's cookies are saved again when it closes, as a browser keeps
+   * the ones a platform renews while it is used.
+   */
   for(
     session: string,
     person: string,
-    options: { origins: readonly string[]; state: () => StorageState },
+    options: { origins: readonly string[]; state: () => StorageState; keep?: KeepSession },
   ): Promise<BrowserActor> {
     const key = `${session}\u0000${person}`;
     let actor = this.#actors.get(key);
+    if (options.keep) this.#keep.set(key, options.keep);
     if (!actor) {
       actor = (async () =>
         BrowserActor.start({
@@ -226,7 +232,26 @@ export class BrowserActors {
     for (const [key, actor] of this.#actors) {
       if (!key.startsWith(`${session}\u0000`)) continue;
       this.#actors.delete(key);
-      await (await actor.catch(() => undefined))?.close();
+      const keep = this.#keep.get(key);
+      this.#keep.delete(key);
+      const started = await actor.catch(() => undefined);
+      if (!started) continue;
+      if (keep) {
+        try {
+          // Only a session still signed in is kept: a signed-out one would replace the file with nothing usable.
+          if (keep.signedIn(await started.url())) keep.save(await started.state(keep.domains));
+        } catch {
+          // A browser that went away keeps nothing; the saved session stays as it was.
+        }
+      }
+      await started.close();
     }
   }
+}
+
+/** How a person's session is kept when their actor closes: the cookies of these domains, saved while signed in. */
+export interface KeepSession {
+  domains: readonly string[];
+  signedIn(url: string): boolean;
+  save(state: StorageState): void;
 }

@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -338,6 +338,28 @@ describe("the browser actor: what only Slack's client does", () => {
       "Ana's saved Slack session is signed out: sign in again: channelstack login slack --user ana",
     );
     expect(stub.channel(channel.body.id)?.messages ?? []).toEqual([]);
+    // A signed-out session isn't saved over the file: signing in again replaces it.
+    await server.call("DELETE", `/sessions/${session.id}`);
+    const kept = JSON.parse(readFileSync(storageStatePath(server.home, "slack", "Ana"), "utf8"));
+    expect(kept.cookies).toEqual([{ name: "d", value: SIGNED_OUT, domain: ".slack.com" }]);
+  });
+
+  test("the cookies Slack renewed while the session was used are kept when it closes", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+    await session.slack("POST", `/users/${ana.userId}/say`, { message: { text: "hi" }, channel: channel.body.id });
+    await server.call("DELETE", `/sessions/${session.id}`);
+    const path = storageStatePath(server.home, "slack", "Ana");
+    expect(JSON.parse(readFileSync(path, "utf8")).cookies).toEqual([
+      { name: "d", value: ana.userId, domain: ".slack.com" },
+      { name: "d-s", value: "2", domain: ".slack.com" },
+    ]);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 
   test("a saved session others can read, or none where the test said, is refused", async () => {

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { readStorageState, storageStatePath } from "../../../core/browser/index.ts";
+import { readStorageState, storageStatePath, writeStorageState } from "../../../core/browser/index.ts";
 import { type Clock, delay, type Timers } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
@@ -31,7 +31,7 @@ import {
 import type { SlackCredentials } from "./cleanup.ts";
 import type { SlackWebClient } from "./client.ts";
 import { checkSlackCredential, identify } from "./identity.ts";
-import { SLACK_CLIENT, slackClient, type Typed } from "./ui.ts";
+import { signedInToSlack, SLACK_CLIENT, SLACK_COOKIE_DOMAINS, slackClient, type Typed } from "./ui.ts";
 
 /** How long a read of real Slack is reused: matchers poll every 50ms, and Slack's read methods allow about one call a second. */
 const READ_TTL_MS = 1000;
@@ -342,6 +342,12 @@ export function createLiveWorld(deps: {
     const started = await live.browsers.for(session, userId, {
       origins: [SLACK_CLIENT],
       state: () => readStorageState(browser.path),
+      // Slack renews a session's cookies while it is used: they go back where they came from.
+      keep: {
+        domains: SLACK_COOKIE_DOMAINS,
+        signedIn: signedInToSlack,
+        save: (state) => writeStorageState(browser.path, state),
+      },
     });
     const alias = person(session, userId).alias;
     return slackClient(started, known().team.id, { name: alias, login: alias.toLowerCase() });
