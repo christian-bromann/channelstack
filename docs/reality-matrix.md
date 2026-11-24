@@ -153,23 +153,23 @@ The live backend isn't built yet. With the App's credentials set (`CHANNELSTACK_
 
 ## Linear
 
-The live backend isn't built yet. With the app's token set (`CHANNELSTACK_LINEAR_APP_TOKEN`), every Linear operation reports `unsupported_in_live` and its test is skipped (the nightly job then fails for it, since its live block passed nothing), until the test workspace exists.
+The live backend is built: people act with their personal API keys, reads go through the app's OAuth token, and a session's teams are deleted when it closes ([decision 0015](decisions/0015-live-mode.md)). Rows marked **Yes** below are built unless their notes say otherwise. Against the sandbox (2026-11-23), a person, a team, an issue and the delegation work; Linear opened no agent session, because the app's webhook doesn't reach a running agent yet.
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `linear.createTeam({ key, members, states, labels })` | Done | Yes | Seeding credentials (admin API key, `teamCreate`) | Generated keys avoid collisions. Deleted (or archived) at the end of the session |
-| `ana.createIssue({ … }, { team })` | Done | Yes | User token (`issueCreate`) | |
-| `ana.createIssue({ delegate: linear.app })` | Done | Yes | User token (`issueCreate` with `delegateId`) | Confirmed |
-| `ana.editIssue`, `assign`, `setState`, `label` | Done | Yes | User token (`issueUpdate`) | |
-| `ana.delegate(linear.app, { issue })` | Done | Yes | User token (`issueUpdate` with `delegateId`) | Confirmed: changing the delegate can start an agent session |
-| `ana.undelegate({ issue })` | Done | Yes | User token (`issueUpdate` with `delegateId: null`) | Confirmed |
-| `ana.comment("@my-agent …", { issue })` | Done | Yes | User token (`commentCreate`) | Confirmed for people: channelstack writes the profile URL (`https://linear.app/<workspace>/profiles/<user>`) into the Markdown body, and Linear turns it into a mention. **unverified** whether an app's profile URL opens a session the same way |
-| `ana.reply` / `edit` / `delete` / `react` (comments) | Done | Yes | User token | |
-| `ana.prompt(text, { session })` | Done | Yes | User token (`commentCreate` with `parentId` set to the session's root comment) | **unverified**: the docs say a person's new message in a session sends `prompted`, but don't say an API reply counts. First live spike |
-| `ana.answer(text, { elicitation })` | Done | Yes | User token (same as prompt) | |
+| `linear.createTeam({ key, members, states, labels })` | Done | Built | The first real member's key (`teamCreate`); a person with a key is needed, the app can't create teams | Generated keys avoid collisions. Deleted (or archived) at the end of the session |
+| `ana.createIssue({ … }, { team })` | Done | Built | User token (`issueCreate`) | |
+| `ana.createIssue({ delegate: linear.app })` | Done | Built | User token (`issueCreate` with `delegateId`) | Confirmed |
+| `ana.editIssue`, `assign`, `setState`, `label` | Done | Built | User token (`issueUpdate`) | |
+| `ana.delegate(linear.app, { issue })` | Done | Built | User token (`issueUpdate` with `delegateId`) | Confirmed: changing the delegate can start an agent session |
+| `ana.undelegate({ issue })` | Done | Built | User token (`issueUpdate` with `delegateId: null`) | Confirmed |
+| `ana.comment("@my-agent …", { issue })` | Done | Built | User token (`commentCreate`) | Confirmed for people: channelstack writes the profile URL (`https://linear.app/<workspace>/profiles/<user>`) into the Markdown body, and Linear turns it into a mention. **unverified** whether an app's profile URL opens a session the same way |
+| `ana.reply` / `edit` / `delete` / `react` (comments) | Done | Built | User token | |
+| `ana.prompt(text, { session })` | Done | Built | User token (`commentCreate` with `parentId` set to the session's root comment) | **unverified**: the docs say a person's new message in a session sends `prompted`, but don't say an API reply counts. First live spike |
+| `ana.answer(text, { elicitation })` | Done | Built | User token (same as prompt) | |
 | `ana.stop({ session })` | Done | Yes, with browser | Browser | Confirmed: the `stop` signal is only generated when a person presses Stop in Linear, and it can't be published through `agentActivityCreate` |
-| `session.state()`, `activities()`, `plan()`, `externalUrls()`, `toHaveSessionState`, `toHaveActivity` | Done | Yes | User token (GraphQL reads) | |
-| `issue.comments()`, `toHaveCommentFrom`, `toBeDelegatedTo`, `toHaveState` | Done | Yes | User token | |
+| `session.state()`, `activities()`, `plan()`, `externalUrls()`, `toHaveSessionState`, `toHaveActivity` | Done | Built | App credentials (`agentSessions`, `agentSession`: the app's own sessions) | |
+| `issue.comments()`, `toHaveCommentFrom`, `toBeDelegatedTo`, `toHaveState` | Done | Built | User token | |
 | `delivery.redeliver()` | Done | No | — | Fake-only. Linear has no redelivery mutation. The fake stamps a new `webhookTimestamp` into the body and signs it again, as Linear's own retries do |
 | An agent's `response`, `elicitation` and `error` as comments | Done | Yes | — | **unverified**: the fake writes them as the app's comments in the session's thread (the mention, or for a delegation a thread of their own), with the activity's `sourceComment` on that comment. The Chat SDK's Linear adapter relies on a response having one. First live spike |
 | Webhook deliveries to the agent | Done | Agent's concern | — | Linear delivers to the agent's own webhook URL |
@@ -242,6 +242,9 @@ Answered so far (2026-11-23, Slack sandbox):
 
 - **V1, Slack A2: not possible through the API; blocked on the browser actor.** channelstack's side works against real Slack: the tagged channel, the invite, reading the thread back, and cleanup (the sweep check found nothing left). But Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included, whichever app issued it (a separate app for the sandbox's people was tried) and with `as_user=true` too. The reference agent, most agents and `slackChecks()` ("ignores other bots") drop such a message, so no API post of a person's reaches the agent. A person's message needs Slack's client: live `say` and `reply` go through the browser actor, and report `action_requires` until it exists. V1 is answered once the browser actor types the message.
 - **Slack's read methods ignore a JSON body.** `users.info` answers `user_not_found` to one; the live client sends parameters form-encoded, as Slack's SDK does.
+
+- **Linear: delegating through the API opens no agent session while the app's webhook doesn't reach a running agent.** A person's key creates the team and the issue and sets the delegate; Linear records it, and the app sees the team. But Linear opened no session for it (the app's earlier sessions, from 2026-11-06, show it did when its webhook worked). The live backend waits 15 seconds for the session and then says so.
+- **Linear refuses a query that is too complex** (over 10,000 points): every agent session with its activities in one query is. The live backend lists the app's sessions by id and reads each one on its own.
 
 Still open:
 

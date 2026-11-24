@@ -12,7 +12,7 @@ import {
   untilQuiet,
 } from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
-import { refusedFixture } from "./refused.ts";
+import { refusedFixture, SKIPS_LIVE, unskipped } from "./refused.ts";
 
 /** Runs in every test worker: one client per worker, one session per test, and the matchers. */
 const server = inject("channelstack");
@@ -31,14 +31,11 @@ const connected = () => {
  * the browser actor, proxy mode). The fake run never sees these refusals, so a
  * test still runs in full on every PR (reality-matrix.md, "What this means for test authors").
  */
-const SKIPS_LIVE = new Set(["unsupported_in_live", "action_requires"]);
 /** Each running test's `skip`, by its session: the refused request names the session, so concurrent tests skip only themselves. */
 const skips = new Map<string, (note?: string) => never>();
-/** Sessions setting up their channel fixtures: a refusal there is kept for the test's first use of that channel. */
-const settingUp = new Set<string>();
 onRefusal((error, path) => {
   const session = /^\/sessions\/([^/]+)/.exec(path)?.[1];
-  if (session === undefined || settingUp.has(session)) return;
+  if (session === undefined || unskipped.has(session)) return;
   const skip = skips.get(session);
   if (skip && SKIPS_LIVE.has(error.code)) skip(`live: ${error.message}`);
 });
@@ -55,7 +52,8 @@ function channelFixture(open: (session: Session) => Promise<unknown>) {
     use: (value: unknown) => Promise<void>,
   ) => {
     let fixture: unknown;
-    settingUp.add(session.sessionId);
+    // A refusal while setting up is kept for the test's first use of that channel.
+    unskipped.add(session.sessionId);
     try {
       fixture = await open(session);
     } catch (error) {
@@ -65,7 +63,7 @@ function channelFixture(open: (session: Session) => Promise<unknown>) {
       };
       fixture = refusedFixture(refuse);
     } finally {
-      settingUp.delete(session.sessionId);
+      unskipped.delete(session.sessionId);
     }
     await use(fixture);
   };

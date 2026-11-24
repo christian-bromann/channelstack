@@ -117,7 +117,7 @@ const SESSION_FIELDS = /* GraphQL */ `
       label
       url
     }
-    activities(first: 250) {
+    activities(first: 100) {
       nodes {
         id
         createdAt
@@ -409,6 +409,21 @@ export function createLiveLinearWorld(deps: {
     }
   };
 
+  const refreshSession = async (session: string, id: string) => {
+    const answer = await client.call<{ agentSession: WireSession }>(
+      app(),
+      /* GraphQL */ `
+        query RefreshSession($id: String!) {
+          agentSession(id: $id) {
+            ...SessionFields
+          }
+        }
+        ${SESSION_FIELDS}
+      `,
+      { id },
+    );
+    await upsertSessions(session, [answer.agentSession]);
+  };
   const refreshIssue = async (session: string, issueId: string) => {
     const answer = await client.call<{ issue: WireIssue & { comments: { nodes: WireComment[] } } }>(
       app(),
@@ -438,36 +453,26 @@ export function createLiveLinearWorld(deps: {
     );
     for (const comment of comments) store.add(store.comments, session, toComment(comment, issueId));
     // The app's sessions: the query takes no filter, so the issue's are picked out here.
-    const sessions = await client.call<{ agentSessions: { nodes: WireSession[] } }>(
+    // Only ids and issues in the list: with every activity, Linear refuses it as too complex. Then each
+    // of this issue's sessions in full, oldest first.
+    const listed = await client.call<{ agentSessions: { nodes: Array<{ id: string; issue: { id: string } | null }> } }>(
       app(),
       /* GraphQL */ `
         query RefreshSessions {
           agentSessions(first: 50) {
             nodes {
-              ...SessionFields
+              id
+              issue {
+                id
+              }
             }
           }
         }
-        ${SESSION_FIELDS}
       `,
     );
-    await upsertSessions(session, sessions.agentSessions.nodes.filter((node) => node.issue?.id === issueId).reverse());
-  };
-
-  const refreshSession = async (session: string, id: string) => {
-    const answer = await client.call<{ agentSession: WireSession }>(
-      app(),
-      /* GraphQL */ `
-        query RefreshSession($id: String!) {
-          agentSession(id: $id) {
-            ...SessionFields
-          }
-        }
-        ${SESSION_FIELDS}
-      `,
-      { id },
-    );
-    await upsertSessions(session, [answer.agentSession]);
+    for (const node of listed.agentSessions.nodes.filter((candidate) => candidate.issue?.id === issueId).reverse()) {
+      await refreshSession(session, node.id);
+    }
   };
 
   const world: LiveLinearWorld = {
@@ -787,7 +792,7 @@ export function createLiveLinearWorld(deps: {
           if (clock() >= deadline) {
             throw new ProtocolError(
               { platform: "no_agent_session", status: 409 },
-              `Linear opened no agent session for ${issue.identifier} within ${SESSION_WAIT_MS / 1000}s: is the app installed as an agent, with access to the team?`,
+              `Linear opened no agent session for ${issue.identifier} within ${SESSION_WAIT_MS / 1000}s: Linear opens one only for an app installed as an agent whose webhook, with agent session events, reaches a running agent`,
             );
           }
           await delay(timers, SESSION_POLL_MS);

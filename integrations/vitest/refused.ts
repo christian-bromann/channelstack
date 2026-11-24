@@ -1,3 +1,32 @@
+import { ChannelstackError, type Session } from "../../sdks/typescript/client.ts";
+
+/** The refusals live mode skips a test for (setup.ts): what it can't do, or needs a piece this run lacks. */
+export const SKIPS_LIVE: ReadonlySet<string> = new Set(["unsupported_in_live", "action_requires"]);
+
+/** A test context with the test's session, as the integration's own fixture holds it. */
+export type WithSession = { channelstackSession?: Session | undefined };
+
+/** Sessions whose refused requests don't skip their test right now: the caller handles the refusal. */
+export const unskipped = new Set<string>();
+
+/**
+ * Run a read that may be refused live, without skipping the test for it: for channelstack's own
+ * per-test checks of what the fake sends (its calls, its webhooks), which a live channel has none
+ * of. Resolves with nothing when the read is refused live.
+ */
+export async function withoutLiveSkips<T>(context: WithSession, read: () => Promise<T>): Promise<T | undefined> {
+  const session = context.channelstackSession;
+  if (session) unskipped.add(session.sessionId);
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof ChannelstackError && SKIPS_LIVE.has(error.code)) return undefined;
+    throw error;
+  } finally {
+    if (session) unskipped.delete(session.sessionId);
+  }
+}
+
 /** What a channel's fixture answers when it was refused live: the stand-in says so without throwing. */
 const REFUSED = Symbol.for("channelstack.refusedLive");
 

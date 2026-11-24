@@ -66,6 +66,15 @@ Alternative: keep posting through the API and make the reference agent accept a 
 
 What a session writes in a DM is deleted when it closes, with the replies under it (ledger kind `message`). The browser actor will record what it types there. A Slack app configuration token doesn't help either: it only calls the App Manifest APIs.
 
+## Linear: the live world keeps a mirror in the fake's store shape
+
+The Linear routes read the fake's records directly (issues, comments, sessions, activities), and a `LinearWorld` interface (`backend.ts`) now carries the actions both worlds implement. The live world keeps its own `LinearStore`, with the fake's record shapes, as a mirror of real Linear: actions write to Linear and put what Linear answered into it; a read refreshes what it is about first (an issue with its comments and sessions, or one session). So the routes read the same way from both, and the text helpers (mentions as profile links, a comment's thread, an issue's state) are written once (`text.ts`).
+
+- People act with their personal API keys; reads and agent sessions go through the app's OAuth token. Linear's agent sessions query has no issue filter: the live world lists the app's sessions by id (with their activities, Linear refuses the query as too complex) and reads each one on the issue.
+- A team is created by a real person, named `channelstack-run-<run>-<n>[-<name>]` with a key of its own, and deleted when the session closes: Linear deletes its issues, comments and sessions with it.
+- Delegating waits up to 15 seconds for Linear to open the agent session. Against the sandbox, Linear opened none: it opens one only for an app installed as an agent whose webhook reaches a running agent.
+- A session's `delivery`, and what `prompt` and `answer` resolve with, are fake-only in the contract (`api/linear.d.ts`): live, Linear delivers to the agent itself.
+
 ## The Web API is called with `fetch`, form-encoded
 
 There is no Slack SDK in the server: it needs a dozen methods, and `@slack/web-api` brings axios and its own retry logic into the binary. Parameters go form-encoded, as Slack's own SDK sends them. Read methods ignore a JSON body: the first live run got `user_not_found` from `users.info`. A 429 waits for `Retry-After` on the injected timers. A refusal is a `SlackRefusal` with Slack's code and the method, never the token or the rest of Slack's answer. The base URL can be changed only through `createApp`, for the unit tests' stand-in, never from the environment, so a token can't be sent elsewhere.
