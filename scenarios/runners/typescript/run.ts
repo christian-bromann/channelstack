@@ -1,8 +1,11 @@
 /**
  * Runs a smoke scenario (docs/decisions/0002-smoke-scenario-format.md) through the TypeScript SDK.
- * Usage: node run.ts <scenario.yaml> [--mode auto|attach|start]
+ * Usage: node run.ts <scenario.yaml> [--mode auto|attach|start] [--record <file.json>]
+ *
+ * `--record` writes what the scenario's `record` steps saved, as plain data: the differential run
+ * compares a scenario's recording against the fake with its recording against the real platform.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 import { ChannelstackError, connect, waitFor } from "channelstack/client";
 import { parse } from "yaml";
@@ -22,11 +25,36 @@ interface Step {
   until?: Check[];
   throws?: string;
   expect?: Check[];
+  /** Save these values, by name, for `--record`. */
+  record?: Record<string, unknown>;
 }
 
 const [file, ...flags] = process.argv.slice(2);
 if (!file) throw new Error("Usage: node run.ts <scenario.yaml> [--mode auto|attach|start]");
-const mode = (flags[flags.indexOf("--mode") + 1] ?? "auto") as "auto" | "attach" | "start";
+const flag = (name: string) => (flags.includes(name) ? flags[flags.indexOf(name) + 1] : undefined);
+const mode = (flag("--mode") ?? "auto") as "auto" | "attach" | "start";
+const recordTo = flag("--record");
+const recorded: Record<string, unknown> = {};
+
+/** Fields a fixture hands the agent (`privateKey`, `webhookSecret`, `token`): a recording never holds them. */
+const SECRET = /token|secret|privatekey|password/i;
+
+/** A value as data: a handle's fields, nothing callable, no secret, nothing twice on one path, a few levels deep. */
+function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (value === null || typeof value !== "object") return typeof value === "function" ? undefined : value;
+  if (seen.has(value) || depth > 4) return "<handle>";
+  seen.add(value);
+  const result = Array.isArray(value)
+    ? value.map((item) => plain(item, depth + 1, seen))
+    : Object.fromEntries(
+        Object.entries(value)
+          .filter(([key]) => !SECRET.test(key))
+          .map(([key, item]) => [key, plain(item, depth + 1, seen)])
+          .filter(([, item]) => item !== undefined),
+      );
+  seen.delete(value);
+  return result;
+}
 const scenario = parse(readFileSync(file, "utf8")) as { name: string; steps: Step[] };
 
 const variables = new Map<string, unknown>();
@@ -82,8 +110,10 @@ function assertAll(checks: Check[], step: number): void {
 }
 
 async function call(step: Step): Promise<unknown> {
-  const [name = "", method = ""] = (step.call ?? "").split(".");
-  const target = variables.get(name) as Record<string, (...args: unknown[]) => Promise<unknown>> | undefined;
+  // `<variable>.<method>`, or a method on a handle inside one: `message.thread.waitForReply`.
+  const path = (step.call ?? "").split(".");
+  const method = path.pop() ?? "";
+  const target = resolve(`$${path.join(".")}`) as Record<string, (...args: unknown[]) => Promise<unknown>> | undefined;
   if (typeof target?.[method] !== "function") throw new Error(`${step.call}: no such method`);
   const args = [...(resolve(step.args ?? []) as unknown[]), ...(step.options ? [resolve(step.options)] : [])];
   return target[method](...args);
@@ -96,6 +126,7 @@ variables.set("channelstack", channelstack).set("session", session);
 for (const [index, step] of scenario.steps.entries()) {
   const number = index + 1;
   if (step.expect) assertAll(step.expect, number);
+  for (const [name, value] of Object.entries(step.record ?? {})) recorded[name] = plain(resolve(value));
   if (!step.call) continue;
   if (step.throws !== undefined) {
     const error = await call(step).then(
@@ -128,4 +159,5 @@ for (const [index, step] of scenario.steps.entries()) {
   });
 }
 
+if (recordTo) writeFileSync(recordTo, `${JSON.stringify({ scenario: scenario.name, values: recorded }, null, 2)}\n`);
 console.log(`ok ${scenario.name} (typescript, ${scenario.steps.length} steps)`);

@@ -6,7 +6,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["{server,codegen,sdks/typescript,integrations}/**/*.test.ts"],
+          include: ["{server,codegen,sdks/typescript,integrations,conformance}/**/*.test.ts"],
           exclude: ["**/node_modules/**", "**/dist/**", "**/test/integration/**"],
         },
       },

@@ -6,6 +6,8 @@
  * `--part` runs one part of it, so CI can run the parts side by side (`.github/workflows/ci.yml`);
  * every part, run once each, is the whole suite once.
  */
+import { join } from "node:path";
+
 import { runExamples, runGoDockerExamples, runProxyExamples } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";
@@ -34,6 +36,8 @@ const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
     await runProxyExamples();
     await runGoDockerExamples();
   },
+  // Each conformance scenario against the fake (exit check 6.4); the nightly job runs them live too.
+  conformance: () => run(process.execPath, [join(ROOT, "scripts", "conformance.ts"), "--fake-only"], { cwd: ROOT }),
   "broken-slack": broken("slack"),
   "broken-others": broken("github,linear,notion"),
 };

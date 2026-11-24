@@ -1,0 +1,20 @@
+# Known differences between a fake and its real platform (implementation plan 9.1, exit check 6.4).
+#
+# The nightly differential run compares each scenario in scenarios/<channel>/ against the fake and
+# against the sandbox. A difference listed here, with a reason and a date it expires, doesn't fail
+# the run; after that date it does again, until someone looks at it. Everything else is fixed in the
+# fake. The unit tests check this file in every CI run (`conformance/conformance.test.ts`).
+#
+#   - scenario: slack/mention        # the scenario's name
+#     path: replies.0.blocks         # where it differs, or a prefix ending in .*
+#     reason: One sentence on why the fake may differ here.
+#     expires: 2027-03-01            # YYYY-MM-DD
+divergences:
+  - scenario: notion/comment
+    path: comments.1.text
+    reason: >-
+      Live, a seeded page is made by a real person, so Notion sends page.created and the reference
+      agent writes its summary into the page before it answers; the fake's seeded pages send
+      nothing (notion.createPage is a fixture; ana.createPage sends the event in both). The agent's
+      answer reads the page, so it differs by that summary.
+    expires: 2027-02-28

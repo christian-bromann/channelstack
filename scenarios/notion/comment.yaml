@@ -1,0 +1,23 @@
+name: notion/comment
+description: A person asks the integration about a page in a comment and the agent replies in the discussion. Runs against the fake and against the test workspace (the differential run).
+requires: [notion-agent]
+steps:
+  - call: session.notion
+    as: notion
+  - call: notion.createUser
+    options: { name: Ana }
+    as: ana
+  - call: notion.createPage
+    options: { title: Conformance smoke test, connections: [$notion.app] }
+    as: page
+  - call: ana.comment
+    args: ["@my-agent summarize this page"]
+    options: { page: $page }
+    as: question
+  - call: question.discussion.waitForComment
+    options: { from: $notion.app, timeout: 60s }
+    as: answer
+  - call: question.discussion.comments
+    as: comments
+  - record:
+      comments: $comments

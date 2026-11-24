@@ -1,0 +1,24 @@
+name: slack/mention
+description: A person mentions the app in a channel and the agent answers in the thread. Runs against the fake and against the sandbox (the differential run).
+requires: [slack-agent]
+steps:
+  - call: session.slack
+    as: slack
+  - call: slack.createUser
+    options: { name: Ana }
+    as: ana
+  - call: slack.createChannel
+    options: { participants: [$ana, $slack.app] }
+    as: channel
+  - call: ana.say
+    args: ["@my-agent summarize #support today"]
+    options: { channel: $channel }
+    as: message
+  - call: message.thread.waitForReply
+    options: { from: my-agent, timeout: 60s }
+    as: reply
+  - call: message.thread.replies
+    as: replies
+  - record:
+      question: $message
+      replies: $replies

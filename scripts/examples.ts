@@ -69,7 +69,7 @@ const CHANNELS = {
 } as const;
 
 /** The reference agents the examples run against, by name: the channel they live in, and where they take webhooks. */
-const AGENTS = {
+export const AGENTS = {
   "bolt-ai-sdk": { channel: "slack", path: "/slack/events" },
   "chat-sdk-slack": { channel: "slack", path: "/slack/events" },
   probot: { channel: "github", path: "/api/github/webhooks" },

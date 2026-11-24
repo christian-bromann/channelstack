@@ -127,8 +127,9 @@ class Runner:
             raise AssertionError(f"step {number}: {failed}")
 
     async def call(self, step: Step) -> Any:
-        name, method = str(step["call"]).split(".")
-        target = getattr(self.variables.get(name), snake_case(method), None)
+        # `<variable>.<method>`, or a method on a handle inside one: `message.thread.wait_for_reply`.
+        *path, method = str(step["call"]).split(".")
+        target = getattr(self.resolve("$" + ".".join(path)), snake_case(method), None)
         if not callable(target):
             raise TypeError(f"{step['call']}: no such method")
         invoke = cast(Callable[..., Awaitable[Any]], target)
