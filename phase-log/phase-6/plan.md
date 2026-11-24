@@ -21,7 +21,7 @@ Proxy mode, the CA, the Go agent and the conformance tooling need no new credent
 | 6.1 | `test/acceptance/proxy/slack-proxy.test.ts`: the phase 1 Slack examples' agent steps against `examples/agents/bolt-ai-sdk` with only what `channelstack env --proxy` prints | new `server/src/core/proxy/`, `server/src/core/ca/`, `app.ts` (provider hosts), `serve.ts` (the proxy listener), `cli.ts` (`--proxy`, `env --proxy`, `ca rotate`), each driver's `hosts`, `scripts/lib/stack.ts` (`proxy: true`) |
 | 6.2 | `test/acceptance/proxy/go-docker.test.ts` (skipped, with the reason, where Docker isn't running; CI's Linux job requires it) | new `examples/agents/go-slack/` (`main.go`, `Dockerfile`) |
 | 6.3 | `server/src/core/ca/ca.test.ts`: a certificate for a host outside the routed list, signed by the CA, fails a real TLS handshake on the name constraints; the CA refuses to issue one; its files are 0600 under `<home>/ca/`; nothing writes to a system trust store | `core/ca/` |
-| 6.4 | `conformance/conformance.test.ts` (normalizing, diffing, divergences with a reason and an expiry, an expired one fails); `pnpm conformance` against the sandboxes; `.github/workflows/live.yml` (nightly) | new `conformance/` (runner, normalizer, `divergences.yaml`), `scenarios/<driver>/*.yaml`, the recorder in `core/proxy` (live pass-through), the shape differ |
+| 6.4 | `conformance/conformance.test.ts` (normalizing, diffing, divergences with a reason and an expiry, an expired one fails, the shape differ); `server/src/core/proxy/record.test.ts` (shapes hold no value, operations, the private recording, forwarding); `pnpm conformance` against the sandboxes; the `conformance` acceptance part (every scenario against the fake); `.github/workflows/live.yml` (nightly) | new `conformance/` (`lib.ts`, `shapes.ts`, `divergences.yaml`), `scenarios/<channel>/*.yaml`, `core/proxy/record.ts` (the recorder, `forward`), `scripts/conformance.ts`, `scripts/lib/live-stack.ts` (shared with `pnpm live`), the relay taps in `scripts/lib/live-agents.ts`, the runners' `record` step |
 | 6.5 | `conformance/coverage.test.ts` (the page from a fixed set of inputs); the `coverage` step in CI uploads it | new `conformance/coverage.ts` |
 
 ## Design in one paragraph
@@ -53,7 +53,7 @@ Proxy mode, the CA, the Go agent and the conformance tooling need no new credent
 | `@peculiar/x509` (server) | 3.1.0 | X.509 certificates over WebCrypto: the CA, its name constraints, and the leaf certificates. Pure TypeScript, no native code, so it compiles into the binary | MIT | Yes |
 | `@peculiar/asn1-x509`, `@peculiar/asn1-schema` (server) | 3.1.0, 3.1.0 | The name constraints extension's ASN.1 (`NameConstraints`, `GeneralSubtree`) and its DER encoding; `@peculiar/x509` has no class for that extension. Already its own dependencies | MIT | Yes |
 | `reflect-metadata` (server) | 0.2.2 | The Reflect metadata API that `@peculiar/x509`'s tsyringe needs before it loads. Microsoft's own, the polyfill tsyringe names | Apache-2.0 | Stable (last release 2024-03) |
-| `github.com/slack-go/slack` (Go reference agent) | to pin in `go.mod` | The Go community's Slack client, so the Go agent is what a Go team would write | BSD-2-Clause | Yes |
+| `github.com/slack-go/slack` (Go reference agent) | v0.35.0 (needs Go 1.26) | The Go community's Slack client, so the Go agent is what a Go team would write | BSD-2-Clause | Yes |
 
 ## Docs to update
 
