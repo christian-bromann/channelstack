@@ -177,7 +177,11 @@ bot.onAssistantContextChanged((event) => {
   if (event.context.channelId) lookingAt.set(event.threadId, event.context.channelId);
 });
 
-bot.onDirectMessage(respond);
+// A DM starts the same workflows a mention does, then gets an answer.
+bot.onDirectMessage(async (thread, message) => {
+  if (message.author.isBot !== true && (await startedWorkflow(thread, message))) return;
+  await respond(thread, message);
+});
 
 bot.onSubscribedMessage(async (thread, message) => {
   // Someone else chiming in ("+1") isn't asking it: it answers the person it is helping, a question, or a new mention.

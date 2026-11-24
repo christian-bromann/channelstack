@@ -64,6 +64,30 @@ describe("exit check 5.2: removing what a session wrote in a DM", () => {
     expect(stub.channel(channel)?.messages.map((message) => message.text)).toEqual(["How can I help?"]);
   });
 
+  test("in an app's agent-view DM (one long thread), a reply goes with the app's answers to it", async () => {
+    const { stub, ana, client, credentials, channel, entry } = await dm();
+    const root = stub.botSays(channel, "New Assistant Thread");
+    const earlier = stub.typed(ana.userId, channel, "an earlier question", root);
+    stub.botSays(channel, "an earlier answer", root);
+    const mine = stub.typed(ana.userId, channel, "deploy web to staging", root);
+    stub.botSays(channel, "Deploy web to staging?", root);
+    stub.botSays(channel, "Waiting for your approval", root);
+    const next = stub.typed(ana.userId, channel, "someone else's turn", root);
+    stub.botSays(channel, "their answer", root);
+
+    await removeSlackEntry(client, credentials, entry(mine, { thread: root }));
+    expect(stub.channel(channel)?.messages.map((message) => message.text)).toEqual([
+      "New Assistant Thread",
+      "an earlier question",
+      "an earlier answer",
+      "someone else's turn",
+      "their answer",
+    ]);
+    expect([earlier, next].every((ts) => stub.channel(channel)?.messages.some((message) => message.ts === ts))).toBe(
+      true,
+    );
+  });
+
   test("something already gone is done, not a failure", async () => {
     const { client, credentials, entry } = await dm();
     await expect(removeSlackEntry(client, credentials, entry("1800000000.000001"))).resolves.toBeUndefined();

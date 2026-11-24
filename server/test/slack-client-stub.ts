@@ -24,18 +24,14 @@ export function slackClientStub(stub: SlackStub) {
         return messages.some((message) => JSON.stringify(message.blocks ?? []).includes(JSON.parse(label)));
       };
       const self = {
-        waitForDisplayed: async () => {
-          if (!shown()) throw new Error(`Nothing shown for ${selector}`);
-        },
+        isDisplayed: async () => shown(),
         click: async () => {
           if (!page) throw new Error("No page open");
           if (label === undefined) draft = "";
           else clicks.push({ user, channel: page.channel, thread: page.thread, label: JSON.parse(label) });
         },
-        $: () => self,
-        isExisting: async () => shown(),
       };
-      return self;
+      return [self];
     };
     return {
       url: async (url: string) => {
@@ -49,7 +45,7 @@ export function slackClientStub(stub: SlackStub) {
         user = cookies.find((cookie) => cookie.name === "d")?.value ?? "";
       },
       getCookies: async () => [{ name: "d", value: user, domain: ".slack.com" }],
-      $: element,
+      $$: element,
       keys: async (value: string | string[]) => {
         if (draft === undefined || !page) throw new Error("Nothing to type into");
         if (value === "") {

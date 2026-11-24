@@ -44,9 +44,12 @@ delete live.CHANNELSTACK_URL;
 delete live.CHANNELSTACK_TOKEN;
 
 const stops: Array<() => Promise<unknown>> = [];
+/** The server's own log (redacted by the server), shown when the run fails. */
+let serverLog = () => "";
 let failed = false;
 try {
   const server = await startBinary({ bin, home, env: live });
+  serverLog = server.output;
   stops.push(server.stop);
 
   // Slack: the reference agent connects to real Slack itself, in Socket Mode.
@@ -134,6 +137,7 @@ try {
 } finally {
   // Stopping the server closes every session still open, and so removes what they made.
   for (const stop of stops.reverse()) await stop();
+  if (failed) process.stderr.write(`\nThe server's log:\n${serverLog()}\n`);
 }
 
 // Exit check 5.2: nothing this run made is left in any sandbox.

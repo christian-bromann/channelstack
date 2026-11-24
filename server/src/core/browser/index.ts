@@ -70,16 +70,14 @@ interface Driver {
   getUrl(): Promise<string>;
   setCookies(cookies: SavedCookie[]): Promise<unknown>;
   getCookies(): Promise<SavedCookie[]>;
-  $(selector: string): ChainablePromiseElement;
+  $$(selector: string): Promise<ArrayLike<ChainablePromiseElement>> | ArrayLike<ChainablePromiseElement>;
   keys(value: string | string[]): Promise<unknown>;
   pause(ms: number): Promise<unknown>;
   deleteSession(): Promise<unknown>;
 }
 interface ChainablePromiseElement {
-  waitForDisplayed(options: { timeout: number }): Promise<unknown>;
+  isDisplayed(): Promise<boolean>;
   click(): Promise<unknown>;
-  $(selector: string): ChainablePromiseElement;
-  isExisting(): Promise<boolean>;
 }
 
 export interface BrowserOptions {
@@ -138,14 +136,31 @@ export class BrowserActor {
     return this.#driver.getUrl();
   }
 
-  /** The element, once it is shown: what a person waits for before they act on it. */
-  async find(selector: string, timeoutMs = 15_000): Promise<ChainablePromiseElement> {
-    const element = this.#driver.$(selector);
-    await element.waitForDisplayed({ timeout: timeoutMs });
-    return element;
+  /**
+   * The first element shown that matches, once there is one: what a person waits for before they
+   * act on it. A page often has more than one match, and some of them hidden (Slack has two composers).
+   */
+  async find(selector: string | readonly string[], timeoutMs = 15_000): Promise<ChainablePromiseElement> {
+    const deadline = Date.now() + timeoutMs;
+    // Alternatives in order: the first that has an element shown wins.
+    const alternatives = typeof selector === "string" ? [selector] : selector;
+    for (;;) {
+      for (const candidate of alternatives) {
+        for (const element of Array.from(await this.#driver.$$(candidate))) {
+          if (await element.isDisplayed().catch(() => false)) return element;
+        }
+      }
+      if (Date.now() >= deadline) {
+        throw new ProtocolError(
+          { platform: "not_shown", status: 409 },
+          `Nothing shown for ${alternatives.join(" or ")} in ${timeoutMs / 1000}s`,
+        );
+      }
+      await this.#driver.pause(250);
+    }
   }
 
-  async click(selector: string, timeoutMs?: number): Promise<void> {
+  async click(selector: string | readonly string[], timeoutMs?: number): Promise<void> {
     await (await this.find(selector, timeoutMs)).click();
   }
 

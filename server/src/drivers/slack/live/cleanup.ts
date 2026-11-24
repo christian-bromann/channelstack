@@ -54,8 +54,24 @@ export async function removeSlackEntry(
         if (!gone(error)) throw error;
       }
     };
-    // A reply the session wrote in someone's thread: only the reply.
-    if (entry.ref.thread !== undefined) return remove({ ts }, by);
+    // A reply the session wrote in someone's thread (or in an app's agent-view DM, which is one
+    // thread): the reply, and the app's answers right after it, up to the next person's message.
+    if (entry.ref.thread !== undefined) {
+      let thread: Array<Written & { bot_id?: string }> = [];
+      try {
+        thread = await client.all("conversations.replies", by, "messages", { channel, ts: entry.ref.thread });
+      } catch (error) {
+        if (!gone(error)) throw error;
+      }
+      const at = thread.findIndex((message) => message.ts === ts);
+      const after = at === -1 ? [] : thread.slice(at + 1);
+      const end = after.findIndex((message) => message.bot_id === undefined);
+      const answers = end === -1 ? after : after.slice(0, end);
+      for (const answer of [...answers].reverse()) {
+        await remove(answer, answer.user === undefined ? undefined : credentials.byUser(answer.user));
+      }
+      return remove({ ts }, by);
+    }
     let thread: Written[] = [];
     try {
       thread = await client.all<Written>("conversations.replies", by, "messages", { channel, ts });

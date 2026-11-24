@@ -5,6 +5,7 @@ import { readStorageState, storageStatePath } from "../../../core/browser/index.
 import { type Clock, delay, type Timers } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
+import type { Logger } from "../../../core/log/index.ts";
 import {
   actionRequires,
   fakeActorInLiveWorld,
@@ -49,6 +50,8 @@ interface WireMessage {
   blocks?: unknown[];
   thread_ts?: string;
   reply_count?: number;
+  /** For a thread's root: when its newest reply was written. */
+  latest_reply?: string;
   subtype?: string;
   edited?: { ts: string };
   reactions?: Array<{ name: string; users?: string[] }>;
@@ -109,6 +112,8 @@ export function createLiveWorld(deps: {
   ids: IdGenerator;
   clock: Clock;
   timers: Timers;
+  /** For what the browser actor does, at debug level: live runs are where it is slow or stuck. */
+  log: Logger;
   /** The app's name as tests write it (`@my-agent`), whatever its bot is called in the workspace. */
   appName: string;
 }): LiveSlackWorld {
@@ -365,20 +370,35 @@ export function createLiveWorld(deps: {
     if (input.blocks !== undefined || input.metadata !== undefined) {
       throw unsupportedInLive(operation, "a person types text in Slack's client: blocks and metadata are the app's");
     }
+    const started = clock();
     const ui = await clientFor(session, userId, operation);
+    deps.log.debug("browser actor ready", { operation, ms: clock() - started });
     const since = (clock() / 1000).toFixed(6);
     await send(ui, typedOf(session, input));
+    deps.log.debug("browser actor typed and sent", { operation, ms: clock() - started });
     const deadline = clock() + READ_BACK_MS;
     for (;;) {
       changed(target.id);
       const written =
         thread === undefined ? await history(session, target.id) : await threadOf(session, target.id, thread);
-      const mine = written
+      // A DM with an app in Slack's agent view keeps every exchange in a thread: what was typed
+      // there is a reply, in a thread that has had one since.
+      const replied =
+        thread === undefined
+          ? await Promise.all(
+              written
+                .filter((root) => (root.latest_reply ?? "") > since)
+                .map((root) => threadOf(session, target.id, root.ts)),
+            )
+          : [];
+      const mine = [...written, ...replied.flat()]
         .filter((message) => message.user === userId && message.ts > since && message.ts !== thread)
         .sort((a, b) => b.ts.localeCompare(a.ts))[0];
       if (mine) {
+        const inThread =
+          thread ?? (mine.thread_ts !== undefined && mine.thread_ts !== mine.ts ? mine.thread_ts : undefined);
         if (target.kind === "im" || target.kind === "mpim")
-          recordDm(session, target, actor(session, userId), mine.ts, thread);
+          recordDm(session, target, actor(session, userId), mine.ts, inThread);
         const [record] = await records(session, target.id, [mine]);
         return record as SlackMessageRecord;
       }

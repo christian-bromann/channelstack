@@ -18,6 +18,8 @@ const SELECTORS = {
   /** A button with this label in the messages in view; the newest one when there are several. */
   button: (label: string, pane: "conversation" | "thread") =>
     `(${pane === "thread" ? '//*[@data-qa="threads_flexpane"]' : ""}//button[normalize-space(.)=${JSON.stringify(label)}])[last()]`,
+  // A DM with an app in Slack's agent view shows its one thread in the main pane (the Chat tab),
+  // with no thread pane: there, the conversation's own composer and buttons are the thread's.
 } as const;
 
 /** How long Slack's mention suggestions take to show the match, before Tab picks it. */
@@ -54,7 +56,7 @@ export function slackClient(actor: BrowserActor, team: string) {
     /** Reply in a thread: in the thread pane's composer. */
     async reply(channel: string, rootTs: string, typed: Typed): Promise<void> {
       await actor.open(threadUrl(team, channel, rootTs));
-      await actor.click(SELECTORS.threadComposer);
+      await actor.click([SELECTORS.threadComposer, SELECTORS.composer]);
       await compose(actor, typed);
     },
 
@@ -65,7 +67,11 @@ export function slackClient(actor: BrowserActor, team: string) {
           ? conversationUrl(team, where.channel)
           : threadUrl(team, where.channel, where.thread),
       );
-      await actor.click(SELECTORS.button(label, where.thread === undefined ? "conversation" : "thread"));
+      await actor.click(
+        where.thread === undefined
+          ? SELECTORS.button(label, "conversation")
+          : [SELECTORS.button(label, "thread"), SELECTORS.button(label, "conversation")],
+      );
     },
   };
 }
