@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { pollUntil, systemClock, type Timers } from "../clock/index.ts";
+import { pollUntil, systemClock, systemTimers } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import { writePrivateFile } from "../home/index.ts";
 import { liveMisconfigured } from "../reality/index.ts";
@@ -171,15 +171,8 @@ export class BrowserActor {
   async find(selector: string | readonly string[], timeoutMs = 15_000): Promise<ChainablePromiseElement> {
     // Alternatives in order: the first that has an element shown wins.
     const alternatives = typeof selector === "string" ? [selector] : selector;
-    // Waiting is the browser's own pause, as a person looks again.
-    const pausing: Timers = {
-      after: (ms, task) => {
-        void this.#driver.pause(ms).then(task);
-        return () => {};
-      },
-    };
     return pollUntil(
-      { clock: systemClock, timers: pausing },
+      { clock: systemClock, timers: systemTimers },
       { withinMs: timeoutMs, everyMs: 250 },
       async () => {
         for (const candidate of alternatives) {

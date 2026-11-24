@@ -261,9 +261,8 @@ Still open:
 3. **Linear:**
    - Does an API reply (`commentCreate` with `parentId`) in a session send `prompted`?
    - Does an app's profile URL in a comment body open a session?
-4. **Notion:**
-   - Is `created_by` on a comment made with a PAT the person or a bot?
-   - Do comments and edits made by a person's PAT fire the agent integration's webhooks?
+4. **Notion:** (answered against the sandbox: a comment made with a PAT is by the person, and it fires the integration's webhook, which the passing live example shows)
+   - Does a page edit made with a person's PAT fire the integration's webhooks?
    - Does an in-body mention of an integration reach the agent?
 
 5. **Sign-in:** how often do scripted sign-ins from CI get challenged on each platform, and how long does a saved session last with the longest session setting?
