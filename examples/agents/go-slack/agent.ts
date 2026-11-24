@@ -2,11 +2,11 @@
  * Starts the Go reference agent's image in Docker with what `channelstack env --proxy` printed, the
  * way a developer runs a Go agent in proxy mode: the proxy's address as it is (the container shares
  * the host's network), and the CA bundle mounted, since Go reads `SSL_CERT_FILE` only on Linux.
+ * Only the bundle file is mounted: the CA's private key, next to it, never enters the container.
  * The scripts start it like any reference agent (`node agent.ts`, with `PORT`); stopping it stops
  * the container.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { basename, dirname } from "node:path";
 
 const IMAGE = "channelstack-go-slack:local";
 const { SSL_CERT_FILE, PORT } = process.env;
@@ -26,9 +26,9 @@ const container = spawn(
     "--network",
     "host",
     "--volume",
-    `${dirname(SSL_CERT_FILE)}:/channelstack-ca:ro`,
+    `${SSL_CERT_FILE}:/etc/channelstack/bundle.pem:ro`,
     "--env",
-    `SSL_CERT_FILE=/channelstack-ca/${basename(SSL_CERT_FILE)}`,
+    "SSL_CERT_FILE=/etc/channelstack/bundle.pem",
     ...passed.flatMap((variable) => ["--env", variable]),
     IMAGE,
   ],
