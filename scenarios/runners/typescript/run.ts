@@ -5,10 +5,12 @@
  * `--record` writes what the scenario's `record` steps saved, as plain data: the differential run
  * compares a scenario's recording against the fake with its recording against the real platform.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 
 import { ChannelstackError, connect, waitFor } from "channelstack/client";
 import { parse } from "yaml";
+
+import { SECRET_FIELD } from "./secrets.ts";
 
 interface Check {
   value: unknown;
@@ -36,12 +38,7 @@ const mode = (flag("--mode") ?? "auto") as "auto" | "attach" | "start";
 const recordTo = flag("--record");
 const recorded: Record<string, unknown> = {};
 
-/**
- * A value as data: a handle's fields, nothing callable, nothing twice on one path, a few levels deep.
- * The runner uses only the SDK (packaging runs it outside the repository), so it records what the
- * handles hold; the differential run keeps the file in its private work directory and drops secret
- * fields when it normalizes (`SECRET_FIELD` in conformance/lib.ts), before anything is written out.
- */
+/** A value as data: a handle's fields, nothing callable, no secret field, nothing twice on one path, a few levels deep. */
 function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value === null || typeof value !== "object") return typeof value === "function" ? undefined : value;
   if (seen.has(value) || depth > 4) return "<handle>";
@@ -50,6 +47,7 @@ function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown
     ? value.map((item) => plain(item, depth + 1, seen))
     : Object.fromEntries(
         Object.entries(value)
+          .filter(([key]) => !SECRET_FIELD.test(key))
           .map(([key, item]) => [key, plain(item, depth + 1, seen)])
           .filter(([, item]) => item !== undefined),
       );
@@ -160,5 +158,11 @@ for (const [index, step] of scenario.steps.entries()) {
   });
 }
 
-if (recordTo) writeFileSync(recordTo, `${JSON.stringify({ scenario: scenario.name, values: recorded }, null, 2)}\n`);
+// Private (0600): what a scenario recorded is no one else's to read.
+if (recordTo) {
+  writeFileSync(recordTo, `${JSON.stringify({ scenario: scenario.name, values: recorded }, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  chmodSync(recordTo, 0o600);
+}
 console.log(`ok ${scenario.name} (typescript, ${scenario.steps.length} steps)`);

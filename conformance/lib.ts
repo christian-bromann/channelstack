@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
+import { SECRET_FIELD } from "../scenarios/runners/typescript/secrets.ts";
+
 /**
  * Keys whose values differ between any two runs by design: ids, times, links, and the names a
  * sandbox gives its accounts (the agent's app is "my-agent" in the fake and whatever the sandbox
@@ -14,12 +16,6 @@ import { parse } from "yaml";
  */
 const NOISE =
   /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner|block_id|scopes)$/;
-/**
- * Fields a fixture hands the agent (`privateKey`, `webhookSecret`, `token`): no recording, comparison,
- * result file or log holds them: normalizing drops them, before anything leaves the run's private
- * work directory (the scenario runner, which uses only the SDK, records what the handles hold).
- */
-const SECRET_FIELD = /token|secret|privatekey|password/i;
 /**
  * Fields the contract says only the fake has (`delivery`: live, the platform delivers to the agent
  * itself). Their absence live is the contract, not drift.

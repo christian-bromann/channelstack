@@ -11,7 +11,16 @@
  * CI runs `--fake-only` on every pull request, so a scenario is known to pass against the fake;
  * the nightly job runs it in full.
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -27,6 +36,7 @@ import {
   type ShapeResult,
 } from "../conformance/lib.ts";
 import { compareShapes, readShapes } from "../conformance/shapes.ts";
+import { SECRET_FIELD } from "../scenarios/runners/typescript/secrets.ts";
 import { DRIVERS } from "../server/src/drivers/index.ts";
 import { AGENTS } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
@@ -72,6 +82,25 @@ const scenariosOf = (channel: Channel) => {
 const recording = (side: "fake" | "live", file: string) =>
   join(work, `${side}-${file.slice(ROOT.length + 1).replaceAll("/", "_")}.json`);
 
+/** A key anywhere in a value that names a secret field. */
+const secretKey = (value: unknown, path = ""): string | undefined => {
+  if (value === null || typeof value !== "object") return undefined;
+  for (const [key, item] of Object.entries(value)) {
+    const at = path ? `${path}.${key}` : key;
+    if (SECRET_FIELD.test(key)) return at;
+    const found = secretKey(item, at);
+    if (found) return found;
+  }
+  return undefined;
+};
+
+/** What is wrong with a recording the runner wrote: it must be private and hold no secret field. */
+function recordingProblem(file: string): string | undefined {
+  if ((statSync(file).mode & 0o077) !== 0) return `the recording ${file} can be read by others`;
+  const found = secretKey(JSON.parse(readFileSync(file, "utf8")));
+  return found ? `the recording holds a secret field (${found})` : undefined;
+}
+
 /** Run one scenario attached to a server, recording it. Answers an error's message, or nothing when it passed. */
 async function record(file: string, side: "fake" | "live", env: NodeJS.ProcessEnv): Promise<string | undefined> {
   try {
@@ -79,7 +108,7 @@ async function record(file: string, side: "fake" | "live", env: NodeJS.ProcessEn
       cwd: ROOT,
       env,
     });
-    return undefined;
+    return recordingProblem(recording(side, file));
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
