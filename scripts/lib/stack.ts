@@ -22,6 +22,11 @@ export interface StackOptions {
    * and the server is given no endpoint to deliver to.
    */
   socketMode?: boolean;
+  /**
+   * Proxy mode (exit check 6.1): the server runs its proxy, and the agent gets what
+   * `channelstack env --proxy` prints, with no API URL, so it calls the platforms' own hosts.
+   */
+  proxy?: boolean;
   /** Extra environment for the agent, on top of what `channelstack env` prints. */
   agentEnv?: Readonly<Record<string, string>>;
   /** Extra environment for the server only: live credentials, for a test of what live does to a run. */
@@ -63,6 +68,7 @@ export async function withStack(
     const server = await startBinary({
       bin: options.bin,
       home,
+      ...(options.proxy ? { args: ["--no-portless", "--port", "0", "--proxy", "--proxy-port", "0"] } : {}),
       env: {
         ...env,
         ...(options.socketMode ? {} : webhookUrl(options.webhook, port)),
@@ -73,7 +79,7 @@ export async function withStack(
     stops.push(server.stop);
 
     const agentEnv = Object.fromEntries(
-      capture(options.bin, ["env"], { env })
+      capture(options.bin, options.proxy ? ["env", "--proxy"] : ["env"], { env })
         .split("\n")
         .filter((line) => line.includes("="))
         .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),

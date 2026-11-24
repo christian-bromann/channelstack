@@ -6,7 +6,7 @@
  * `--part` runs one part of it, so CI can run the parts side by side (`.github/workflows/ci.yml`);
  * every part, run once each, is the whole suite once.
  */
-import { runExamples } from "./examples.ts";
+import { runExamples, runProxyExamples } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";
 import { runSmoke, SDKS } from "./smoke.ts";
@@ -28,6 +28,8 @@ const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
     await runExamples({ agents: ["notion-sdk"], shared: true });
     run("pnpm", [...vitest, "--exclude", BROKEN], { cwd: ROOT });
   },
+  // Proxy mode: the Slack examples against an agent that only knows slack.com (exit check 6.1).
+  proxy: () => runProxyExamples(),
   "broken-slack": broken("slack"),
   "broken-others": broken("github,linear,notion"),
 };

@@ -88,6 +88,22 @@ const SHARED = {
   enabled: ["answers in #support", "an admin and a regular member", "(slack|github|linear|notion) checks: "],
 } as const;
 
+/**
+ * Proxy mode (exit check 6.1): the phase 1 Slack examples against the Bolt reference agent as it
+ * is, configured only from `channelstack env --proxy`: with no `SLACK_API_URL` it calls slack.com,
+ * and the proxy sends that to the fake.
+ */
+const PROXY = {
+  agent: "bolt-ai-sdk",
+  enabled: [
+    "mentions and threads > ",
+    "direct messages > ",
+    "reactions, edits and deletes > ",
+    "inspecting what the agent did > ",
+    "streaming, status and Stop > ",
+  ],
+} as const;
+
 /** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */
 export const ENABLED_TESTS = new RegExp(
   `^(${[...Object.values(CHANNELS).flatMap((channel) => channel.enabled), ...SHARED.enabled].join("|")})`,
@@ -114,6 +130,35 @@ export async function runExamples(
     });
   }
   if (!(options.shared ?? options.agents === undefined)) return;
+  await runSharedExamples(bin);
+}
+
+/** The phase 1 Slack examples in proxy mode (exit check 6.1). */
+export async function runProxyExamples(options: { bin?: string } = {}): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  const { channel, path } = AGENTS[PROXY.agent];
+  console.log(`\napi/examples against ${PROXY.agent} in proxy mode`);
+  const agent = join(ROOT, "examples", "agents", PROXY.agent, "agent.ts");
+  await withStack({ bin, agent, webhook: { driver: channel, path }, proxy: true }, ({ env }) => {
+    run(
+      "pnpm",
+      [
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/acceptance/vitest.config.ts",
+        CHANNELS[channel].examples,
+        "-t",
+        `^(${PROXY.enabled.join("|")})`,
+      ],
+      { cwd: ROOT, env },
+    );
+  });
+}
+
+async function runSharedExamples(bin: string): Promise<void> {
   console.log(`\n${SHARED.examples} against ${SHARED.agents.join(", ")}`);
   const [first, ...rest] = SHARED.agents.map((name) => ({
     agent: join(ROOT, "examples", "agents", name, "agent.ts"),

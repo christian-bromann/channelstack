@@ -82,6 +82,10 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // 5.1 and 5.2 against the real sandboxes run nightly (`.github/workflows/live.yml`, `pnpm live`),
   // since they need the `live` environment's secrets.
   5: [],
+  // Phase 6: 6.3 is a unit test (`core/ca/ca.test.ts`, a real TLS handshake against the name
+  // constraints). The acceptance run covers 6.1 (its `proxy` part: the phase 1 Slack examples
+  // against the Bolt agent with only what `channelstack env --proxy` prints).
+  6: [],
 };
 
 const phase = Number(process.argv[2]);
