@@ -75,7 +75,10 @@ A real browser, driven as a sandbox person, for what only a platform's client do
 - **It opens only its own origins** (`https://app.slack.com`), one browser per person per test session, closed when the session closes.
 - **What a person types is read back through the API**: the newest message of theirs since they began, within 15 seconds. A mention is typed as `@handle` and picked from Slack's suggestions with Tab, so it is a real mention.
 - **A click finds its button through the API first:** the message that has it, by label or `action_id`, and the label a person sees; then the actor clicks that label there.
-- Slack's selectors are a first guess until checked against the real client. They are in one place (`ui.ts`).
+- Slack's selectors are checked against the real client (2026-11-24) and are in one place (`ui.ts`). The client shows two composers, one hidden, so the actor acts on the first match that is shown, and takes alternatives in order.
+- **A DM with an app in Slack's agent view is one long thread** under a root "New Assistant Thread", in the main pane with no thread pane. A reply or click in a thread falls back to the conversation's composer and buttons; a DM message is read back from the replies of roots that changed since the person began; cleanup deletes a reply with the app's answers after it, up to the next person's message.
+- **A real account's role is Slack's.** Live, `createUser` refuses (`live_misconfigured`) an `admin`, `owner` or `guest` option the account doesn't match: an agent that lets only admins approve would refuse the click, and the test would fail for the wrong reason.
+- The first start after Chrome updates can take a minute or two while WebdriverIO fetches the matching Chromedriver; it is cached after that. The actor logs how long it took to start and to type, at debug level.
 
 ## Linear: the live world keeps a mirror in the fake's store shape
 

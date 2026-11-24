@@ -123,10 +123,10 @@ Before writing this spec, probes drove each platform's official receiver with th
 
 | Id | What | Pass when |
 |---|---|---|
-| V1 | Slack: `ana.say` triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes. 2026-11-23: channelstack's side works, and cleanup leaves nothing behind. A message posted through the API carries the posting app's bot, with a token from any app, so the agent ignores it. Blocked on the browser actor, which types it in the client |
+| V1 | Slack: `ana.say` triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes. 2026-11-23: a message posted through the API carries the posting app's bot, with a token from any app, so the agent ignores it. **Passed 2026-11-24** with the browser actor typing the message in Slack's client; cleanup leaves nothing behind |
 | V2 | GitHub delivery log lists a delivery within a few seconds and shows the agent's status code and duration | Fields present; delay under 5 s at p95 |
 | V3 | Browser sign-in without people on all four platforms in GitHub Actions | Sessions saved; second run reuses them |
-| V4 | Browser A3 on Slack: click and Stop reach the agent | Agent's response visible in the thread |
+| V4 | Browser A3 on Slack: click and Stop reach the agent | Agent's response visible in the thread. 2026-11-24: the click goes through in the client; the reference agent lets only admins approve, and the sandbox's Ana is a member, so the example (which asks for `admin: true`) reports `live_misconfigured` until her account is an admin. Stop isn't built yet |
 | V5 | The open items in the matrix's "Still to confirm" list | Each answered and recorded in the matrix |
 
 **Not yet supported live:** GitHub `ana.rerun`, and Notion `ana.resolve` / `reopen` with `discussion.resolved()` (all work in the fake). Live runs report `unsupported_in_live`.
