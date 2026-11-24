@@ -1,6 +1,9 @@
 name: github/triage
 description: A person asks the App to triage an issue in a comment and the App answers. Runs against the fake and against the test org (the differential run).
 requires: [github-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers:
+  [GitHubFixture.createUser, GitHubFixture.createRepo, GitHubUser.openIssue, GitHubUser.comment, GitHubIssue.comments]
 steps:
   - call: session.github
     as: github

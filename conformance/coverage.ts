@@ -19,8 +19,8 @@ export interface CoverageInput {
   divergences: readonly Divergence[];
   /** The latest differential run, if there is one. */
   results?: ConformanceResults;
-  /** Each scenario's name and the SDK methods it calls (`say`, `waitForReply`), so a result reaches the actions it covers. */
-  scenarios: ReadonlyArray<{ name: string; channel: string; methods: readonly string[] }>;
+  /** Each scenario's name and the actions it covers (`SlackUser.say`), so a result reaches them. */
+  scenarios: ReadonlyArray<{ name: string; channel: string; covers: readonly string[] }>;
 }
 
 export interface CoverageRow {
@@ -58,19 +58,32 @@ const agreed = (result: ScenarioResult | undefined, at: string | undefined): str
 /** Every action of every channel, as the page lists them. */
 export function coverageRows(input: CoverageInput): CoverageRow[] {
   const rows: CoverageRow[] = [];
+  // A scenario can only cover an action the spec has: a name that isn't there is a typo, not coverage.
+  const actions = new Set(
+    Object.values(input.spec.paths).flatMap((operations) =>
+      Object.values(operations).flatMap((operation) => {
+        const method = operation["x-channelstack-method"] ?? operation["x-channelstack-factory"];
+        return method ? [`${method.on}.${method.name}`] : [];
+      }),
+    ),
+  );
+  for (const scenario of input.scenarios) {
+    const unknown = scenario.covers.filter((action) => !actions.has(action));
+    if (unknown.length > 0)
+      throw new Error(`${scenario.name} covers ${unknown.join(", ")}, which the spec doesn't have`);
+  }
   for (const [path, operations] of Object.entries(input.spec.paths)) {
     const channel = CHANNELS.find((name) => path.includes(`/${name}`));
     if (!channel) continue;
     for (const operation of Object.values(operations)) {
       const method = operation["x-channelstack-method"] ?? operation["x-channelstack-factory"];
       if (!method) continue;
-      const scenario = input.scenarios.find(
-        (candidate) => candidate.channel === channel && candidate.methods.includes(method.name),
-      );
+      const action = `${method.on}.${method.name}`;
+      const scenario = input.scenarios.find((candidate) => candidate.covers.includes(action));
       const result = input.results?.scenarios.find((candidate) => candidate.scenario === scenario?.name);
       rows.push({
         channel,
-        action: `${method.on}.${method.name}`,
+        action,
         live: liveOf(operation),
         agreed: agreed(result, input.results?.at),
       });

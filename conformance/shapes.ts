@@ -3,8 +3,9 @@
  * the platform, operation by operation, compared. It catches drift in endpoints and webhooks no
  * scenario asserts on.
  *
- * What it reports: a key the platform sends that the fake doesn't, and a value whose types differ
- * with nothing in common. A key only the fake sends isn't reported: the platform leaves out
+ * What it reports: a key the platform sends that the fake doesn't, a value whose types differ
+ * with nothing in common, and a kept code (`type`, `error`, `ok`) the platform sends that the
+ * fake never does where the fake sends codes there too. A key only the fake sends isn't reported: the platform leaves out
  * optional fields its data doesn't have, which a single run can't tell from drift.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -53,6 +54,14 @@ export function compareShapes(fake: Shape, live: Shape, path = ""): Difference[]
     return fake[0] === undefined || live[0] === undefined ? [] : compareShapes(fake[0], live[0], at("[]"));
   }
   if (typeof fake === "string" && typeof live === "string") {
+    // Codes on both sides (`=message`, `=channel_not_found`): the platform's must be among the fake's.
+    const codes = (shape: string) => shape.split("|").filter((type) => type !== "null");
+    if ([...codes(fake), ...codes(live)].every((type) => type.startsWith("="))) {
+      const theirs = codes(live);
+      return theirs.length === 0 || codes(fake).length === 0 || theirs.some((code) => codes(fake).includes(code))
+        ? []
+        : [{ path: path || "(value)", fake, live }];
+    }
     const mine = types(fake);
     // `null` next to a type only says the value was missing once.
     const theirs = [...types(live)].filter((type) => type !== "null");

@@ -50,7 +50,7 @@ const results: ConformanceResults = {
     },
   ],
 };
-const scenarios = [{ name: "slack/mention", channel: "slack", methods: ["createUser", "say", "waitForReply"] }];
+const scenarios = [{ name: "slack/mention", channel: "slack", covers: ["SlackUser.say"] }];
 
 describe("exit check 6.5: the coverage page", () => {
   test("each action of each channel, how it works live, and when fake and live last agreed on it", () => {
@@ -117,5 +117,21 @@ describe("exit check 6.5: the coverage page", () => {
     expect(summary).toContain("| slack | 2 | 1 | 1 |");
     expect(summary).toContain("| github | 1 | 0 | 0 |");
     expect(summary).toContain("The differential run ended 2026-11-24T03:00:00.000Z.");
+  });
+
+  test("a scenario is credited only with the actions it names, and a name the spec doesn't have is refused", () => {
+    // `select` on the same type isn't `say`: only what a scenario names is credited.
+    const other = [{ name: "slack/mention", channel: "slack", covers: ["SlackUser.select"] }];
+    expect(coverageRows({ spec, divergences: [], scenarios: other, results })[0]?.agreed).toBe(
+      "Not covered by a scenario",
+    );
+    expect(() =>
+      coverageRows({
+        spec,
+        divergences: [],
+        scenarios: [{ name: "x", channel: "slack", covers: ["SlackUser.sya"] }],
+        results,
+      }),
+    ).toThrow(/SlackUser\.sya/);
   });
 });

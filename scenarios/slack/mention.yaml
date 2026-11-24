@@ -1,6 +1,8 @@
 name: slack/mention
 description: A person mentions the app in a channel and the agent answers in the thread. Runs against the fake and against the sandbox (the differential run).
 requires: [slack-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers: [SlackFixture.createUser, SlackFixture.createChannel, SlackUser.say, SlackThread.replies]
 steps:
   - call: session.slack
     as: slack

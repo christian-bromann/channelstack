@@ -62,6 +62,16 @@ describe("exit check 6.4: the differential run's comparison", () => {
     expect(normalize("Work on [ENG-12](https://linear.app/acme/issue/ENG-12)")).toBe("Work on [<issue>](<url>)");
   });
 
+  test("a result never holds a secret field or an email, whatever a recording had", () => {
+    const recording = {
+      author: { kind: "app", token: "ntn_x", privateKey: "k", signingSecret: "s", password: "p" },
+      text: "Ping ana@example.com or ana.b+test@sub.example.org",
+    };
+    const normalized = JSON.stringify(normalize(recording));
+    expect(normalized).not.toMatch(/token|privateKey|signingSecret|password|ntn_x|@example/);
+    expect(normalized).toContain("Ping <email> or <email>");
+  });
+
   test("a difference is found by its path: in text, in kind, and in a list's length", () => {
     const fake = normalize({ replies: [{ author: { kind: "app" }, text: "Here's the summary" }] });
     expect(diff(fake, normalize({ replies: [{ author: { kind: "app" }, text: "Here's the summary" }] }))).toEqual([]);
@@ -138,6 +148,12 @@ describe("exit check 6.4: the shape differ", () => {
     expect(compareShapes({ count: "number" }, { count: "string" })).toEqual([
       { path: "count", fake: "number", live: "string" },
     ]);
+    // Kept codes are compared: an event type or an error code the fake never sends is a difference.
+    expect(compareShapes({ type: "=message" }, { type: "=message|=app_mention" })).toEqual([]);
+    expect(compareShapes({ error: "=not_in_channel" }, { error: "=channel_not_found" })).toEqual([
+      { path: "error", fake: "=not_in_channel", live: "=channel_not_found" },
+    ]);
+    expect(compareShapes({ type: "string" }, { type: "=message" })).toEqual([]);
     // A null now and then, or a list empty on one side, says nothing.
     expect(compareShapes({ next: "string" }, { next: "null|string" })).toEqual([]);
     expect(compareShapes({ items: [] }, { items: [{ id: "string" }] })).toEqual([]);

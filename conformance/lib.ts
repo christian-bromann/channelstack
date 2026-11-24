@@ -14,8 +14,11 @@ import { parse } from "yaml";
  */
 const NOISE =
   /^(id|numericId|ts|threadTs|channel|number|identifier|url|htmlUrl|postedAt|createdAt|updatedAt|editedAt|at|key|name|login|displayName|realName|email|botUserId|botLogin|installationId|appId|clientId|repoId|slug|owner|fullName|admin|isAdmin|isOwner)$/;
-/** A secret never reaches a comparison, a result file or a log, even if a recording had one. */
-const SECRET = /token|secret|privatekey|password/i;
+/**
+ * Fields a fixture hands the agent (`privateKey`, `webhookSecret`, `token`): no recording, comparison,
+ * result file or log holds them. The scenario runner drops them as it records, and normalizing again.
+ */
+export const SECRET_FIELD = /token|secret|privatekey|password/i;
 /**
  * Fields the contract says only the fake has (`delivery`: live, the platform delivers to the agent
  * itself). Their absence live is the contract, not drift.
@@ -31,6 +34,8 @@ const IN_TEXT: ReadonlyArray<[RegExp, string]> = [
   [/<@[UW][A-Z0-9]{6,}>/g, "<@id>"],
   [/\b[UCBTDGW][A-Z0-9]{8,}\b/g, "<id>"],
   [/channelstack-run-[a-z0-9-]+/g, "<tagged>"],
+  // A person's email, which a platform may put in a text: a result file never holds one.
+  [/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "<email>"],
   // An issue's key (`ENG-1`): a team's key differs per run.
   [/\b[A-Z][A-Z0-9]{1,9}-\d+\b/g, "<issue>"],
   // A mention by name, of the app or a person (Slack's `<@U…>` is an id, above).
@@ -48,7 +53,7 @@ export function normalize(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([key]) => !NOISE.test(key) && !FAKE_ONLY.has(key) && !SECRET.test(key))
+      .filter(([key]) => !NOISE.test(key) && !FAKE_ONLY.has(key) && !SECRET_FIELD.test(key))
       .map(([key, item]) => [key, normalize(item)]),
   );
 }

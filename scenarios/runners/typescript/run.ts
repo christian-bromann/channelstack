@@ -10,6 +10,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { ChannelstackError, connect, waitFor } from "channelstack/client";
 import { parse } from "yaml";
 
+import { SECRET_FIELD } from "../../../conformance/lib.ts";
+
 interface Check {
   value: unknown;
   equals?: unknown;
@@ -36,9 +38,6 @@ const mode = (flag("--mode") ?? "auto") as "auto" | "attach" | "start";
 const recordTo = flag("--record");
 const recorded: Record<string, unknown> = {};
 
-/** Fields a fixture hands the agent (`privateKey`, `webhookSecret`, `token`): a recording never holds them. */
-const SECRET = /token|secret|privatekey|password/i;
-
 /** A value as data: a handle's fields, nothing callable, no secret, nothing twice on one path, a few levels deep. */
 function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value === null || typeof value !== "object") return typeof value === "function" ? undefined : value;
@@ -48,7 +47,7 @@ function plain(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown
     ? value.map((item) => plain(item, depth + 1, seen))
     : Object.fromEntries(
         Object.entries(value)
-          .filter(([key]) => !SECRET.test(key))
+          .filter(([key]) => !SECRET_FIELD.test(key))
           .map(([key, item]) => [key, plain(item, depth + 1, seen)])
           .filter(([, item]) => item !== undefined),
       );
