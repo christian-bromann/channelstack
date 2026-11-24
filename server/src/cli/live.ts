@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { BrowserActor, type Launch, storageStatePath, writeStorageState } from "../core/browser/index.ts";
 import { delay, systemTimers } from "../core/clock/index.ts";
@@ -216,6 +216,8 @@ export async function runLogin(
   input: LiveCommandInput & {
     channel: string | undefined;
     user: string | undefined;
+    /** Also save it here: a path a test names (`createUser({ browser: { storageState } })`). */
+    save?: string | undefined;
     launch?: Launch;
     say?: (line: string) => void;
   },
@@ -252,9 +254,16 @@ export async function runLogin(
         return { text: `Not signed in after ${SIGN_IN_MS / 60_000} minutes: nothing saved.\n`, ok: false };
       await delay(systemTimers, SIGN_IN_POLL_MS);
     }
-    const path = storageStatePath(input.home, definition.name, input.user);
-    writeStorageState(path, await actor.state(page.cookieDomains));
-    return { text: `Saved ${input.user}'s ${definition.name} session to ${path} (only you can read it).\n`, ok: true };
+    const state = await actor.state(page.cookieDomains);
+    const paths = [
+      storageStatePath(input.home, definition.name, input.user),
+      ...(input.save ? [resolve(input.save)] : []),
+    ];
+    for (const path of paths) writeStorageState(path, state);
+    return {
+      text: `Saved ${input.user}'s ${definition.name} session to ${paths.join(" and ")} (only you can read it).\n`,
+      ok: true,
+    };
   } finally {
     await actor.close();
   }

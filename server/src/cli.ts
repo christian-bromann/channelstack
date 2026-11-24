@@ -43,6 +43,7 @@ Usage:
       --storage-state <path>      A saved browser session to check, besides those in <home>/browser
   channelstack login slack --user <name>   Sign a sandbox person in by hand, once, in a browser window, and save the
                                   session for the browser actor (<home>/browser/slack-<name>.json, 0600)
+      --save <path>               Also save it here, e.g. .auth/ana-slack.json for a test that names it
   channelstack sweep              Remove what crashed live runs left: their ledgers' objects, and tagged channels
       --older-than-hours <n>      Only tagged objects older than this (default 24)
       --run <id>                  Only what this run made, of any age
@@ -168,6 +169,7 @@ async function main() {
       run: { type: "string" },
       check: { type: "boolean" },
       user: { type: "string" },
+      save: { type: "string" },
     },
   });
   if (values.version) return void process.stdout.write(`${pkg.version}\n`);
@@ -183,6 +185,7 @@ async function main() {
       drivers: DRIVERS,
       channel: action,
       user: values.user,
+      save: values.save,
     });
     process.stdout.write(result.text);
     if (!result.ok) process.exitCode = 1;

@@ -11,8 +11,8 @@
  *   node scripts/live.ts [--bin <server>]
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -30,6 +30,9 @@ const env = process.env;
 // One id for everything this run makes, so the sweep check can look for exactly that.
 const thisRun = runId(env);
 const home = mkdtempSync(join(tmpdir(), "channelstack-live-"));
+// The people's saved browser sessions (`channelstack login`), where this run's server looks for them.
+const saved = join(env.CHANNELSTACK_HOME || join(homedir(), ".channelstack"), "browser");
+if (existsSync(saved)) cpSync(saved, join(home, "browser"), { recursive: true });
 const report = join(home, "vitest.json");
 const live: NodeJS.ProcessEnv = {
   ...env,
