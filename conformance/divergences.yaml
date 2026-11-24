@@ -40,10 +40,11 @@ divergences:
       - "webhook issues opened repository.description"
       - "webhook issues opened repository.has_pull_requests"
       - "webhook issues opened repository.pull_request_creation_policy"
+      - "webhook installation_repositories added sender.type"
     reason: >-
       GitHub's payloads have gained fields the fake doesn't send yet (issue types, status,
       sub-issue and dependency summaries, pins, repository policies, the administration
-      permission), and an App's own comment names the App in performed_via_github_app. To add to
+      permission), and an App's own comment names the App in performed_via_github_app, and a repository the installation adds has the App's bot as its sender. To add to
       the fake, against the pinned schemas: #25.
     expires: 2027-02-28
   - scenario: shapes/linear
@@ -89,7 +90,17 @@ divergences:
       - "api GET /v1/comments/{id} rich_text.[].mention.user.bot"
       - "api GET /v1/comments/{id} rich_text.[].mention.user.name"
       - "api GET /v1/comments/{id} rich_text.[].mention.user.type"
+      - "api GET /v1/blocks/{id}/children results.[].child_page"
+      - "api GET /v1/blocks/{id}/children results.[].paragraph.icon"
+      - "api PATCH /v1/blocks/{id}/children results.[].paragraph.icon"
     reason: >-
       Real Notion's mention of a bot in rich text carries the bot user's name, avatar_url, type and
       bot; the fake's has its id only. To add to the fake: #27.
+    expires: 2027-02-28
+  - scenario: shapes/notion
+    path: webhook page.created data.parent.type
+    reason: >-
+      Live, a session's pages go under a page of its own (so they are tagged and trashed with the
+      session), and their parent is a page; in the fake, a page without a parent is at the
+      workspace's top level. Where live mode puts pages, not drift.
     expires: 2027-02-28
