@@ -2,6 +2,9 @@ import { describe, expect, test } from "vitest";
 
 import { harness } from "../../../../test/app-harness.ts";
 import { type LinearStub, linearStub } from "../../../../test/linear-live-stub.ts";
+import { systemTimers } from "../../../core/clock/index.ts";
+import type { LedgerEntry } from "../../../core/ledger/index.ts";
+import { linearMaintenance } from "./maintenance.ts";
 
 /** A server whose Linear driver is live against the stub: the app's token and the allowlist set, as in CI. */
 function liveLinear(stub: LinearStub, allowlist = stub.org) {
@@ -54,6 +57,24 @@ describe("exit check 5.3: Linear's allowlist holds", () => {
   });
 });
 
+describe("R4.1: one person of the pool in parallel sessions", () => {
+  test("the same person in two open sessions acts in both, and stays when one closes", async () => {
+    const stub = linearStub();
+    const ana = stub.person("ana");
+    const server = liveLinear(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    for (const session of [one, two]) await session.linear("POST", "/users", { name: "Ana", token: ana.token });
+    const team = await one.linear("POST", "/teams", { members: [ana.userId] });
+    await server.call("DELETE", `/sessions/${two.id}`);
+    const issue = await one.linear("POST", `/users/${ana.userId}/issues`, {
+      issue: { title: "Still here" },
+      team: team.body.id,
+    });
+    expect(issue.status).toBe(200);
+    expect(issue.body.creator).toMatchObject({ id: ana.userId });
+  });
+});
+
 describe("live Linear: acting and reading back", () => {
   test("a real person delegates an issue, and the agent's activity is read back", async () => {
     const stub = linearStub();
@@ -98,6 +119,20 @@ describe("live Linear: acting and reading back", () => {
     expect(activities.body).toHaveLength(1);
     expect(activities.body[0]).toMatchObject({ type: "thought", body: "Looking into it", author: { kind: "app" } });
     expect((await session.linear("GET", `/agent-sessions/${delegated.body.id}/state`)).body).toBe("active");
+    // Linear answers newest first; a test reads them in the order they happened, however many a read brings.
+    stub.agentSays(delegated.body.id, "thought", "Found it");
+    stub.agentSays(delegated.body.id, "response", "Fixed in the login form");
+    // What was read a moment ago is used again for a second (a matcher reads every 50 ms).
+    const calls = stub.calls.length;
+    expect((await session.linear("GET", `/agent-sessions/${delegated.body.id}/activities`)).body).toHaveLength(1);
+    expect(stub.calls.length).toBe(calls);
+    server.clock.advance(1_000);
+    const all = await session.linear("GET", `/agent-sessions/${delegated.body.id}/activities`);
+    expect(all.body.map((activity: { body: string }) => activity.body)).toEqual([
+      "Looking into it",
+      "Found it",
+      "Fixed in the login form",
+    ]);
   });
 
   test("a fake person can't act in a live workspace", async () => {
@@ -136,5 +171,163 @@ describe("exit check 5.2: Linear cleanup", () => {
     await server.call("DELETE", `/sessions/${session.id}`);
     expect(stub.team(team.body.id)?.deleted).toBe(true);
     expect(stub.calls.find((call) => call.operation === "TeamDelete")?.as).toBe("ana");
+  });
+});
+
+describe("live Linear: teams, comments and what Linear refuses", () => {
+  test("a team with its states, labels and members; a comment edited, reacted to and deleted", async () => {
+    const stub = linearStub();
+    const ana = stub.person("ana");
+    const ben = stub.person("ben");
+    const session = await liveLinear(stub).open();
+    await session.linear("POST", "/users", { name: "Ana", token: ana.token });
+    await session.linear("POST", "/users", { name: "Ben", token: ben.token });
+    const team = await session.linear("POST", "/teams", {
+      members: [ana.userId, ben.userId],
+      states: [{ name: "In review", type: "started" }],
+      labels: ["bug"],
+    });
+    expect(team.status).toBe(200);
+    const made = stub.made();
+    expect(made.members).toEqual([{ team: team.body.id, user: ben.userId }]);
+    expect(made.states.filter((state) => state.team === team.body.id).map((state) => state.name)).toContain(
+      "In review",
+    );
+    expect(made.labels).toEqual([{ team: team.body.id, name: "bug" }]);
+
+    const issue = await session.linear("POST", `/users/${ana.userId}/issues`, {
+      issue: { title: "Typo" },
+      team: team.body.id,
+    });
+    const comment = await session.linear("POST", `/users/${ana.userId}/comment`, {
+      body: "first",
+      issue: issue.body.id,
+    });
+    expect(
+      (await session.linear("POST", `/users/${ana.userId}/edit`, { body: "edited", comment: comment.body.id })).status,
+    ).toBe(200);
+    await session.linear("POST", `/users/${ben.userId}/react`, { emoji: "+1", comment: comment.body.id });
+    expect(stub.made().reactions).toEqual([{ comment: comment.body.id, emoji: "+1", user: ben.userId }]);
+    const notHers = await session.linear("POST", `/users/${ben.userId}/edit`, {
+      body: "mine",
+      comment: comment.body.id,
+    });
+    expect(notHers.body.error).toBe("FORBIDDEN");
+    expect((await session.linear("POST", `/users/${ana.userId}/delete`, { comment: comment.body.id })).status).toBe(
+      200,
+    );
+  });
+
+  test("a delegation Linear opens no session for is said as such, after Linear's wait", async () => {
+    const stub = linearStub();
+    stub.openNoSessions();
+    const ana = stub.person("ana");
+    const server = liveLinear(stub);
+    const session = await server.open();
+    await session.linear("POST", "/users", { name: "Ana", token: ana.token });
+    const team = await session.linear("POST", "/teams", { members: [ana.userId] });
+    const issue = await session.linear("POST", `/users/${ana.userId}/issues`, {
+      issue: { title: "Hm" },
+      team: team.body.id,
+    });
+    const delegated = session.linear("POST", `/users/${ana.userId}/delegate`, {
+      app: stub.app.userId,
+      issue: issue.body.id,
+    });
+    // Linear's wait, a second at a time.
+    for (let second = 0; second < 16; second++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      server.clock.advance(1_000);
+      server.timers.advance(1_000);
+    }
+    const refused = await delegated;
+    expect(refused.body.error).toBe("no_agent_session");
+    expect(refused.body.message).toContain("within 15s");
+  });
+
+  test("a real account's role is Linear's: a test asking for another one is refused", async () => {
+    const stub = linearStub();
+    const ana = stub.person("ana");
+    const session = await liveLinear(stub).open();
+    // The stub's people are workspace admins.
+    const asMember = await session.linear("POST", "/users", { name: "Ana", token: ana.token, admin: false });
+    expect(asMember.body.error).toBe("live_misconfigured");
+    expect(asMember.body.message).toContain("Ana's account is a workspace admin, but the test asks for admin: false");
+  });
+});
+
+describe("exit check 5.2: Linear's doctor and sweep", () => {
+  const env = (stub: LinearStub, person: { token: string }, extra: Record<string, string> = {}) => ({
+    CHANNELSTACK_LINEAR_APP_TOKEN: stub.app.token,
+    CHANNELSTACK_LINEAR_USER_ANA_TOKEN: person.token,
+    CHANNELSTACK_LIVE_LINEAR_WORKSPACES: stub.org,
+    ...extra,
+  });
+  const input = (stub: LinearStub, environment: Record<string, string>) => ({
+    env: environment,
+    fetch: stub.fetch,
+    timers: systemTimers,
+    apiBase: stub.url,
+  });
+
+  test("doctor: the app and a person in the workspace, and what isn't", async () => {
+    const stub = linearStub();
+    const ana = stub.person("ana");
+    const ok = await linearMaintenance.doctor(input(stub, env(stub, ana)));
+    expect(ok.map((check) => check.ok)).toEqual([true, true]);
+    expect(ok[0]?.text).toContain(`the app in workspace ${stub.org}`);
+    const elsewhere = await linearMaintenance.doctor(
+      input(stub, env(stub, ana, { CHANNELSTACK_LIVE_LINEAR_WORKSPACES: "nope" })),
+    );
+    expect(elsewhere.every((check) => !check.ok && check.text.includes("CHANNELSTACK_LIVE_LINEAR_WORKSPACES"))).toBe(
+      true,
+    );
+    const swapped = await linearMaintenance.doctor(
+      input(stub, env(stub, ana, { CHANNELSTACK_LINEAR_APP_TOKEN: ana.token })),
+    );
+    expect(swapped[0]).toMatchObject({ ok: false });
+    expect(swapped[0]?.text).toContain("doesn't act as an app");
+  });
+
+  test("sweep: a ledgered team once, a tagged team of the run, and the age cutoff", async () => {
+    const stub = linearStub();
+    const ana = stub.person("ana");
+    const server = liveLinear(stub);
+    const session = await server.open();
+    await session.linear("POST", "/users", { name: "Ana", token: ana.token });
+    const ledgered = await session.linear("POST", "/teams", { members: [ana.userId] });
+    const stray = await session.linear("POST", "/teams", { members: [ana.userId], name: "stray" });
+    const entry: LedgerEntry = {
+      id: "unit2-1-1",
+      channel: "linear",
+      kind: "team",
+      ref: { team: ledgered.body.id, name: ledgered.body.name },
+      workspace: stub.org,
+      by: "user:ANA",
+      run: "unit2",
+      session: session.id,
+      createdAt: 0,
+    };
+    const sweep = (options: { check: boolean; run?: string; olderThanMs?: number; now?: number }) =>
+      linearMaintenance.sweep({
+        ...input(stub, env(stub, ana)),
+        entries: [entry],
+        check: options.check,
+        run: options.run,
+        olderThanMs: options.olderThanMs ?? 0,
+        now: options.now ?? Date.now(),
+      });
+    const checked = await sweep({ check: true, run: "unit2" });
+    expect(checked.left).toEqual([`team ${ledgered.body.name} (run unit2)`, `team ${stray.body.name}`]);
+    // Not old enough, and not this run: left alone (the stub's clock starts at 10:00).
+    const soon = Date.parse("2026-11-23T10:30:00Z");
+    expect((await sweep({ check: true, olderThanMs: 3_600_000, now: soon })).left).toEqual([
+      `team ${ledgered.body.name} (run unit2)`,
+    ]);
+    const swept = await sweep({ check: false, run: "unit2" });
+    expect(swept.removed).toEqual([`team ${ledgered.body.name} (run unit2)`, `team ${stray.body.name}`]);
+    expect(swept.done).toEqual([entry]);
+    expect(stub.team(ledgered.body.id)?.deleted).toBe(true);
+    expect(stub.team(stray.body.id)?.deleted).toBe(true);
   });
 });

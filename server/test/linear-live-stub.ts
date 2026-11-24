@@ -16,6 +16,15 @@ export interface LinearStub {
   agentSays(session: string, type: "thought" | "response", body: string): void;
   sessionsOf(issue: string): Array<{ id: string }>;
   team(id: string): { id: string; name: string; deleted: boolean } | undefined;
+  /** What people made besides issues and comments: memberships, states, labels, reactions. */
+  made(): {
+    members: Array<{ team: string; user: string }>;
+    states: Array<{ team: string; name: string }>;
+    labels: Array<{ team: string; name: string }>;
+    reactions: Array<{ comment: string; emoji: string; user: string }>;
+  };
+  /** Linear opens no agent session for a delegation: the app's webhook reaches no agent. */
+  openNoSessions(): void;
 }
 
 const uuid = () =>
@@ -43,6 +52,11 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
     { id: string; issue: string; creator: string; createdAt: string; activities: Array<Record<string, unknown>> }
   >();
   const calls: LinearStub["calls"] = [];
+  let said = 0;
+  let quiet = false;
+  const members: Array<{ team: string; user: string }> = [];
+  const labels: Array<{ id: string; name: string; team: string }> = [];
+  const reactions: Array<{ comment: string; emoji: string; user: string }> = [];
   let clock = Date.parse("2026-11-23T10:00:00Z");
   const now = () => {
     clock += 1000;
@@ -79,7 +93,8 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
     creator: { id: session.creator },
     comment: null,
     externalLinks: [],
-    activities: { nodes: session.activities },
+    // Newest first, as Linear answers them.
+    activities: { nodes: [...session.activities].reverse() },
   });
 
   const answer = (
@@ -161,7 +176,7 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
       case "IssueUpdate": {
         const issue = issues.get(v.id);
         if (!issue) throw Object.assign(new Error("Issue not found"), { code: "INPUT_ERROR" });
-        if (v.input.delegateId === app.userId && issue.delegate !== app.userId) {
+        if (v.input.delegateId === app.userId && issue.delegate !== app.userId && !quiet) {
           // Linear opens an agent session when an issue is delegated to an agent.
           const id = uuid();
           sessions.set(id, { id, issue: issue.id, creator: who.id, createdAt: now(), activities: [] });
@@ -193,6 +208,50 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
         };
         issue.comments.push(comment);
         return { commentCreate: { comment } };
+      }
+      case "TeamMembershipCreate": {
+        const team = teams.get(v.input.teamId);
+        if (!team) throw Object.assign(new Error("Team not found"), { code: "INPUT_ERROR" });
+        members.push({ team: team.id, user: v.input.userId });
+        return { teamMembershipCreate: { success: true } };
+      }
+      case "WorkflowStateCreate": {
+        const team = teams.get(v.input.teamId);
+        if (!team) throw Object.assign(new Error("Team not found"), { code: "INPUT_ERROR" });
+        const state = {
+          id: uuid(),
+          name: v.input.name,
+          type: v.input.type,
+          color: v.input.color,
+          position: team.states.length,
+        };
+        team.states.push(state);
+        return { workflowStateCreate: { workflowState: state } };
+      }
+      case "IssueLabelCreate": {
+        const label = { id: uuid(), name: v.input.name, color: "#bec2c8" };
+        labels.push({ ...label, team: v.input.teamId });
+        return { issueLabelCreate: { issueLabel: label } };
+      }
+      case "CommentUpdate":
+      case "CommentDelete":
+      case "ReactionCreate": {
+        const id = operation === "ReactionCreate" ? v.input.commentId : v.id;
+        const issue = [...issues.values()].find((candidate) => candidate.comments.some((comment) => comment.id === id));
+        const comment = issue?.comments.find((candidate) => candidate.id === id);
+        if (!issue || !comment) throw Object.assign(new Error("Entity not found"), { code: "INPUT_ERROR" });
+        if (operation === "ReactionCreate") {
+          reactions.push({ comment: id, emoji: v.input.emoji, user: who.id });
+          return { reactionCreate: { success: true } };
+        }
+        if ((comment.user as { id: string }).id !== who.id)
+          throw Object.assign(new Error("Only its author can change a comment"), { code: "FORBIDDEN" });
+        if (operation === "CommentDelete") {
+          issue.comments.splice(issue.comments.indexOf(comment), 1);
+          return { commentDelete: { success: true } };
+        }
+        Object.assign(comment, { body: v.input.body, editedAt: now(), updatedAt: now() });
+        return { commentUpdate: { comment } };
       }
       default:
         throw Object.assign(new Error(`The stub doesn't answer ${operation}`), { code: "INPUT_ERROR" });
@@ -258,7 +317,8 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
       if (!session) throw new Error(`No session ${sessionId}`);
       session.activities.push({
         id: uuid(),
-        createdAt: now(),
+        // One after the other, however fast the test says them.
+        createdAt: new Date(Date.now() + ++said).toISOString(),
         ephemeral: false,
         signal: null,
         signalMetadata: null,
@@ -269,5 +329,16 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
     },
     sessionsOf: (issue) => [...sessions.values()].filter((session) => session.issue === issue),
     team: (id) => teams.get(id),
+    made: () => ({
+      members,
+      states: [...teams.values()].flatMap((team) =>
+        (team.states as Array<{ name: string }>).map((state) => ({ team: team.id, name: state.name })),
+      ),
+      labels: labels.map(({ team, name }) => ({ team, name })),
+      reactions,
+    }),
+    openNoSessions() {
+      quiet = true;
+    },
   };
 }

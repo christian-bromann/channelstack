@@ -15,6 +15,11 @@ export async function removeLinearEntry(
   const by = byOwner(entry.by);
   if (!by) throw new Error(`No credential for ${entry.by} to remove ${entry.kind} ${entry.ref.name ?? ""}`);
   if (entry.kind !== "team") throw new Error(`channelstack doesn't know how to remove a Linear ${entry.kind}`);
+  await deleteLinearTeam(client, by, String(entry.ref.team));
+}
+
+/** A team deleted, and its issues, comments and sessions with it; one gone already is left as it is. */
+export async function deleteLinearTeam(client: LinearGraphqlClient, by: LiveCredential, team: string): Promise<void> {
   try {
     await client.call(
       by,
@@ -26,7 +31,7 @@ export async function removeLinearEntry(
         }
       `,
       {
-        id: entry.ref.team,
+        id: team,
       },
     );
   } catch (error) {

@@ -1,14 +1,17 @@
-import { type Clock, delay, type Timers } from "../../../core/clock/index.ts";
+import { type Clock, pollUntil, type Timers } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
+import { LivePeople } from "../../../core/people/index.ts";
 import {
   actionRequires,
+  checkRoles,
   fakeActorInLiveWorld,
   liveMisconfigured,
   unsupportedInLive,
 } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
+import { taggedNames } from "../../../core/safety/index.ts";
 import { type LiveCredential, randomString } from "../../../core/secrets/index.ts";
 import type { LinearWorld } from "../backend.ts";
 import { LinearStore } from "../fake/store.ts";
@@ -33,6 +36,8 @@ const LINEAR_WEB = "https://linear.app";
 /** How long a delegation waits for Linear to open the agent session. */
 const SESSION_WAIT_MS = 15_000;
 const SESSION_POLL_MS = 1_000;
+/** How long an issue or a session read from Linear is used again before it is read anew. */
+const READ_CACHE_MS = 1_000;
 
 const ISSUE_FIELDS = /* GraphQL */ `
   fragment IssueFields on Issue {
@@ -258,25 +263,27 @@ export function createLiveLinearWorld(deps: {
     () => store.org,
   );
   const appToken = live.vault.fromEnv("CHANNELSTACK_LINEAR_APP_TOKEN");
-  /** Each person's key, by session and user id. A person without one is fake and can't act here. */
-  const keys = new Map<string, Map<string, LiveCredential>>();
+  /** The real people the open sessions hold: one record each, whichever sessions have them. */
+  const people = new LivePeople();
   const aliases = new Map<string, string>();
   let checked: Promise<void> | undefined;
-  let teamCount = 0;
+  const readAt = new Map<string, number>();
+  const teamName = taggedNames(live.tag);
 
   const text = linearText(store, links, (session, name) => {
     const wanted = name.toLowerCase();
     if (wanted === deps.appName.toLowerCase() || wanted === store.appUser.displayName.toLowerCase()) {
       return store.appUser.id;
     }
-    return store
-      .list(store.users, session)
-      .find(
-        (user) =>
-          user.displayName.toLowerCase() === wanted ||
-          user.name.toLowerCase() === wanted ||
-          aliases.get(user.id)?.toLowerCase() === wanted,
-      )?.id;
+    // The session's own people: its fake ones, and the real ones it holds, by the session's name too.
+    const held = people.of(session);
+    const users = [...store.list(store.users, session), ...held.flatMap(({ id }) => store.users.find(id) ?? [])];
+    return users.find(
+      (user) =>
+        user.displayName.toLowerCase() === wanted ||
+        user.name.toLowerCase() === wanted ||
+        (held.find((person) => person.id === user.id)?.alias ?? aliases.get(user.id))?.toLowerCase() === wanted,
+    )?.id;
   });
 
   const app = (): LiveCredential => {
@@ -286,8 +293,7 @@ export function createLiveLinearWorld(deps: {
   };
   /** The person acting, who must be real: a fake person can't act in a live workspace (core's rule). */
   const actor = (userId: string): LiveCredential => {
-    const session = store.users.owner(userId);
-    const key = session === undefined ? undefined : keys.get(session)?.get(userId);
+    const key = people.credential(userId);
     if (!key) throw fakeActorInLiveWorld(aliases.get(userId) ?? store.user(userId)?.name ?? userId, "linear");
     return key;
   };
@@ -386,7 +392,10 @@ export function createLiveLinearWorld(deps: {
         delivery: undefined,
       };
       store.add(store.sessions, session, record);
-      for (const activity of wire.activities.nodes) {
+      // Linear answers newest first; the store keeps what it holds in the order it first saw it, and
+      // every reader (the route, the transcript) reads oldest first.
+      const oldestFirst = [...wire.activities.nodes].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+      for (const activity of oldestFirst) {
         store.add(store.activities, session, {
           id: activity.id,
           session: wire.id,
@@ -514,13 +523,15 @@ export function createLiveLinearWorld(deps: {
     },
 
     release(session) {
-      keys.delete(session);
+      // A person another open session holds stays theirs.
+      const gone = people.leave(session);
       registry.release(session);
+      for (const id of gone) store.users.remove(id);
     },
 
     credential(owner, session) {
       if (owner === "app") return appToken;
-      return [...(keys.get(session)?.values() ?? [])].find((key) => key.owner === owner);
+      return people.byOwner(session, owner);
     },
 
     async createUser(session, input) {
@@ -560,11 +571,13 @@ export function createLiveLinearWorld(deps: {
         allowlist: live.allowlist,
         appOrg: store.org.id,
       });
-      const map = keys.get(session) ?? new Map<string, LiveCredential>();
-      map.set(who.user, key);
-      keys.set(session, map);
-      aliases.set(who.user, input.name);
-      return store.add(store.users, session, {
+      checkRoles(input.name, [
+        { option: "admin", wanted: input.admin, has: who.admin, role: "a workspace admin" },
+        { option: "guest", wanted: input.guest, has: who.guest, role: "a guest" },
+      ]);
+      people.join(session, who.user, input.name, key);
+      // One record, no session's: parallel tests have the same person.
+      const record = {
         id: who.user,
         name: who.name,
         displayName: who.displayName,
@@ -575,13 +588,15 @@ export function createLiveLinearWorld(deps: {
         app: false,
         fixedId: false,
         createdAt: clock(),
-      } satisfies LinearUserRecord);
+      } satisfies LinearUserRecord;
+      const known = store.users.find(who.user);
+      return known ? Object.assign(known, record) : store.users.add(who.user, record);
     },
 
     async createTeam(session, input) {
-      const real = input.members.filter((id) => keys.get(session)?.has(id));
+      const real = input.members.filter((id) => people.holds(session, id));
       for (const member of input.members) actor(member);
-      const creatorId = real[0] ?? [...(keys.get(session)?.keys() ?? [])][0];
+      const creatorId = real[0] ?? people.of(session)[0]?.id;
       if (creatorId === undefined) {
         throw actionRequires(
           "LinearFixture.createTeam",
@@ -591,7 +606,7 @@ export function createLiveLinearWorld(deps: {
       }
       const creator = actor(creatorId);
       // A real workspace's keys and names are unique: the run's tag in the name, a key of its own.
-      const name = [live.tag, String(++teamCount), ...(input.name ? [input.name] : [])].join("-");
+      const name = teamName(input.name);
       const created = await client.call<{
         teamCreate: {
           team: {
@@ -785,18 +800,21 @@ export function createLiveLinearWorld(deps: {
       // Delegating opens an agent session on Linear's side, a moment later: wait for it.
       if (changes.delegateId !== undefined && changes.delegateId !== null) {
         const before = store.sessionsOn(issue).length;
-        const deadline = clock() + SESSION_WAIT_MS;
-        for (;;) {
-          await world.refresh(session, { issue: issue.id });
-          if (store.sessionsOn(issue).length > before) break;
-          if (clock() >= deadline) {
-            throw new ProtocolError(
+        await pollUntil(
+          { clock, timers },
+          { withinMs: SESSION_WAIT_MS, everyMs: SESSION_POLL_MS },
+          async () => {
+            // Linear's answer now, not the one read a moment ago.
+            readAt.delete(issue.id);
+            await world.refresh(session, { issue: issue.id });
+            return store.sessionsOn(issue).length > before ? true : undefined;
+          },
+          () =>
+            new ProtocolError(
               { platform: "no_agent_session", status: 409 },
               `Linear opened no agent session for ${issue.identifier} within ${SESSION_WAIT_MS / 1000}s: Linear opens one only for an app installed as an agent whose webhook, with agent session events, reaches a running agent`,
-            );
-          }
-          await delay(timers, SESSION_POLL_MS);
-        }
+            ),
+        );
       }
       // Live, Linear delivers to the agent itself: there is no delivery here.
       return undefined;
@@ -883,8 +901,13 @@ export function createLiveLinearWorld(deps: {
     },
 
     async refresh(session, about) {
-      if ("issue" in about) return refreshIssue(session, about.issue);
-      return refreshSession(session, about.agentSession);
+      // A matcher reads every 50 ms: what was read a moment ago is used again, not asked for again.
+      const key = "issue" in about ? about.issue : about.agentSession;
+      const last = readAt.get(key);
+      if (last !== undefined && clock() - last < READ_CACHE_MS) return;
+      if ("issue" in about) await refreshIssue(session, about.issue);
+      else await refreshSession(session, about.agentSession);
+      readAt.set(key, clock());
     },
   };
   return world;
