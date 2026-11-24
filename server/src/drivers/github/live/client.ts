@@ -8,7 +8,7 @@ import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { GitHubRefusal } from "../fake/kit.ts";
 
 /** Real GitHub's REST API. Only `createApp` can point the client elsewhere (a stub in unit tests), never the environment. */
-const GITHUB_API = "https://api.github.com";
+export const GITHUB_API = "https://api.github.com";
 
 /** Octokit logs requests and deprecations: nothing of it belongs in channelstack's output. */
 const SILENT = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
@@ -25,6 +25,19 @@ function refusal(error: unknown, route: string): unknown {
     failed.status,
     `GitHub refused ${route}: ${typeof said === "string" ? said : `HTTP ${failed.status}`}`,
     Array.isArray(errors) ? errors : undefined,
+  );
+}
+
+/**
+ * A refusal that will pass: GitHub's own failure (5xx), or a rate limit (429, or a 403 that says
+ * so). The same question asked again later may well be answered.
+ */
+export function passing(error: unknown): boolean {
+  if (!(error instanceof GitHubRefusal)) return false;
+  return (
+    error.githubStatus >= 500 ||
+    error.githubStatus === 429 ||
+    (error.githubStatus === 403 && /rate limit/i.test(error.message))
   );
 }
 

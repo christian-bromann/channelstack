@@ -23,6 +23,8 @@ export interface GitHubStub {
   /** The App's installation is on a user account instead. */
   onUserAccount(): void;
   agentComments(repo: string, issue: number, body: string, delivery?: { status?: number }): void;
+  /** The next call to this route (`GET /app`) is refused with this status, as a rate limit or GitHub's own failure. */
+  failOnce(route: string, status: number, message: string): void;
   repo(name: string): { name: string; deleted: boolean; collaborators: string[]; labels: string[] } | undefined;
 }
 
@@ -83,6 +85,7 @@ export function githubStub(options: { org?: string } = {}): GitHubStub {
   }> = [];
   const calls: GitHubStub["calls"] = [];
   let selection: "all" | "selected" = "all";
+  const failures = new Map<string, { status: number; message: string }>();
   let accountType = "Organization";
   const now = () => new Date().toISOString();
 
@@ -209,7 +212,8 @@ export function githubStub(options: { org?: string } = {}): GitHubStub {
     }
     if (route === `POST /orgs/${org}/repos`) {
       if (!byInstallation) return refuse(403, "Resource not accessible by personal access token");
-      const name = String(body.name);
+      // GitHub makes a name of letters, digits, `.`, `_` and `-`, whatever was asked for.
+      const name = String(body.name).replace(/[^A-Za-z0-9._-]/g, "-");
       if (repos.has(name)) return refuse(422, "Repository creation failed: name already exists on this account");
       const repo: Repo = {
         id: id(),
@@ -368,6 +372,11 @@ export function githubStub(options: { org?: string } = {}): GitHubStub {
     const text = method === "GET" || method === "HEAD" ? "" : await request.text();
     const body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     if (as === "nobody") return refuse(401, "Bad credentials");
+    const failing = failures.get(`${method} ${path}`);
+    if (failing) {
+      failures.delete(`${method} ${path}`);
+      return refuse(failing.status, failing.message);
+    }
     return handle(as, method, path, body, request.headers.get("accept") ?? "");
   }) as typeof fetch;
 
@@ -384,6 +393,9 @@ export function githubStub(options: { org?: string } = {}): GitHubStub {
       people.set(login, user);
       tokens.set(token, login);
       return { token, id: user.id };
+    },
+    failOnce(route, status, message) {
+      failures.set(route, { status, message });
     },
     selectOnly() {
       selection = "selected";

@@ -2,6 +2,11 @@ import type { GitHubWorld } from "../backend.ts";
 import type { GitHubIssueRecord } from "../world.ts";
 import type { FakeGitHubWorld } from "./world.ts";
 
+/** May this person change an issue or pull request someone else opened? Its author always may. */
+export function mayChange(kit: FakeGitHubWorld["kit"], issue: GitHubIssueRecord, actor: number): void {
+  kit.allow(kit.store.repo(issue.repo), actor, issue.author === actor ? "read" : "triage");
+}
+
 /**
  * The fake's `GitHubWorld`: each action over the fake's parts, with the permission check real
  * GitHub makes itself (404 for a repository a person can't see, 403 for one they can't change).
@@ -9,10 +14,6 @@ import type { FakeGitHubWorld } from "./world.ts";
 export function fakeGitHubWorld(world: FakeGitHubWorld): GitHubWorld {
   const { kit, repos, issues } = world;
   const { store } = kit;
-  /** May this person change an issue someone else opened? Its author always may. */
-  const mayChange = (issue: GitHubIssueRecord, actor: number) =>
-    kit.allow(store.repo(issue.repo), actor, issue.author === actor ? "read" : "triage");
-
   return {
     store,
     repoWeb: (repo) => kit.objects.repoWeb(repo),
@@ -32,7 +33,7 @@ export function fakeGitHubWorld(world: FakeGitHubWorld): GitHubWorld {
       }).issue;
     },
     updateIssue(issue, actor, changes) {
-      mayChange(issue, actor);
+      mayChange(kit, issue, actor);
       return issues.updateIssue(issue, actor, changes);
     },
     label(issue, actor, labels, add) {

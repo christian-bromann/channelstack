@@ -12,7 +12,12 @@ export async function removeGitHubEntry(
   entry: LedgerEntry,
 ): Promise<void> {
   if (entry.kind !== "repo") throw new Error(`channelstack doesn't know how to remove a GitHub ${entry.kind}`);
-  const [owner, repo] = String(entry.ref.repo).split("/");
+  await deleteGitHubRepo(client, installation, String(entry.ref.repo));
+}
+
+/** A repository deleted, `owner/name`; one gone already is left as it is. */
+export async function deleteGitHubRepo(client: GitHubLiveClient, installation: GitHubCaller, fullName: string) {
+  const [owner, repo] = fullName.split("/");
   try {
     await client.call(installation, "DELETE /repos/{owner}/{repo}", { owner, repo });
   } catch (error) {

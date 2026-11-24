@@ -2,10 +2,11 @@ import type { Clock } from "../../../core/clock/index.ts";
 import type { DeliveryAttempt } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
+import { LivePeople } from "../../../core/people/index.ts";
 import { fakeActorInLiveWorld, liveMisconfigured, unsupportedInLive } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
-import type { LiveCredential } from "../../../core/secrets/index.ts";
+import { taggedNames } from "../../../core/safety/index.ts";
 import type { GitHubDeliveryView, GitHubWorld } from "../backend.ts";
 import { GitHubRefusal } from "../fake/kit.ts";
 import { GitHubStore } from "../fake/store.ts";
@@ -16,7 +17,8 @@ import type {
   GitHubRepoRecord,
   GitHubUserRecord,
 } from "../world.ts";
-import type { GitHubCaller, GitHubLiveClient } from "./client.ts";
+import { type GitHubCaller, type GitHubLiveClient, passing } from "./client.ts";
+import { checkGitHubPerson, identifyApp, identifyPerson, testOrg } from "./identity.ts";
 
 /** Real GitHub's web app: where its links point. */
 const GITHUB_WEB = "https://github.com";
@@ -103,22 +105,21 @@ export function createLiveGitHubWorld(deps: {
   const { client, live, ids, clock } = deps;
   const registry = new Registry();
   const store = new GitHubStore(registry);
-  /** Each person's token, by session and user id. A person without one is fake and can't act here. */
-  const keys = new Map<string, Map<number, LiveCredential>>();
+  /** The real people the open sessions hold: one record each, whichever sessions have them. */
+  const people = new LivePeople();
   const readAt = new Map<number, number>();
   const payloads = new Map<number, unknown>();
   let checked: Promise<void> | undefined;
   let selection: "all" | "selected" = "selected";
   /** Where GitHub sends the App's webhooks: the agent's own URL. */
   let hookUrl = "";
-  let repoCount = 0;
+  const repoName = taggedNames(live.tag);
 
   const asApp: GitHubCaller = { app: true };
   const installation = (): GitHubCaller => ({ installation: store.app.installationId });
   /** The person acting, who must be real: a fake person can't act in a live org (core's rule). */
   const actor = (userId: number): GitHubCaller => {
-    const session = store.users.owner(String(userId));
-    const key = session === undefined ? undefined : keys.get(session)?.get(userId);
+    const key = people.credential(String(userId));
     if (!key) throw fakeActorInLiveWorld(store.users.find(String(userId))?.login ?? String(userId), "github");
     return { token: key };
   };
@@ -288,38 +289,10 @@ export function createLiveGitHubWorld(deps: {
 
     async ready() {
       checked ??= (async () => {
-        const app = await client.call<{
-          id: number;
-          slug: string;
-          name: string;
-          client_id?: string;
-          events: string[];
-          created_at: string;
-        }>(asApp, "GET /app");
-        const installs = await client.all<{
-          id: number;
-          account: { id: number; login: string; type: string } | null;
-          repository_selection: "all" | "selected";
-          permissions: Record<string, "read" | "write">;
-        }>(asApp, "GET /app/installations");
-        const allowed = installs.filter((install) => install.account && live.allowlist.allows(install.account.login));
-        const [install] = allowed;
-        if (!install?.account) {
-          const first = installs.find((candidate) => candidate.account)?.account;
-          // An installation outside the allowlist is refused the way every live refusal of it is.
-          if (first) live.allowlist.assert(first.login, `GitHub account ${first.login}`);
-          throw liveMisconfigured(
-            `the GitHub App ${app.slug} isn't installed anywhere`,
-            "install it on the test organization",
-          );
-        }
-        if (install.account.type !== "Organization") {
-          throw liveMisconfigured(
-            `the GitHub App is installed on ${install.account.login}, a user account`,
-            "install it on a test organization and allowlist that: only an organization lets the App make and delete the test repositories",
-          );
-        }
-        selection = install.repository_selection;
+        const identity = await identifyApp(client);
+        const install = testOrg(identity, live.allowlist);
+        const { app } = identity;
+        selection = install.selection;
         // An App without a webhook URL has none to show: its deliveries have no URL either.
         const hook = await client.call<{ url?: string }>(asApp, "GET /app/hook/config").catch(() => undefined);
         hookUrl = hook?.url ?? "";
@@ -332,29 +305,29 @@ export function createLiveGitHubWorld(deps: {
             id: app.id,
             slug: app.slug,
             name: app.name,
-            clientId: app.client_id ?? "",
+            clientId: app.clientId,
             botId: bot.id,
             installationId: install.id,
             events: app.events,
             permissions: install.permissions,
-            createdAt: Date.parse(app.created_at),
+            createdAt: app.createdAt,
           },
         );
       })().catch((error: unknown) => {
-        // A definitive answer is kept; a network error or a rate limit isn't: the next action asks again.
-        if (!(error instanceof ProtocolError) || (error instanceof GitHubRefusal && error.githubStatus >= 500)) {
-          checked = undefined;
-        }
+        // A definitive answer is kept; a network error, a rate limit or GitHub's own failure isn't: the next action asks again.
+        if (!(error instanceof ProtocolError) || passing(error)) checked = undefined;
         throw error;
       });
       return checked;
     },
 
     release(session) {
-      keys.delete(session);
       for (const issue of store.list(store.issues, session)) readAt.delete(issue.id);
+      // A person another open session holds stays theirs.
+      const gone = people.leave(session);
       store.release(session);
       registry.release(session);
+      for (const id of gone) store.users.remove(id);
     },
 
     async createUser(session, input) {
@@ -389,24 +362,11 @@ export function createLiveGitHubWorld(deps: {
         } satisfies GitHubUserRecord);
       }
       const key = live.vault.person(input.login, input.token);
-      const who = await client.call<WireUser>({ token: key }, "GET /user");
-      if (who.type !== "User") {
-        throw liveMisconfigured(
-          `${input.login}'s token acts as ${who.login}, not a person`,
-          "use a machine user's token",
-        );
-      }
-      if (who.login.toLowerCase() !== input.login.toLowerCase()) {
-        throw liveMisconfigured(
-          `${input.login}'s token is ${who.login}'s`,
-          "name the person by their GitHub login (createUser({ login }))",
-        );
-      }
-      const map = keys.get(session) ?? new Map<number, LiveCredential>();
-      map.set(who.id, key);
-      keys.set(session, map);
-      store.users.remove(String(who.id));
-      return store.add(store.users, session, {
+      const who = await identifyPerson(client, key);
+      checkGitHubPerson(who, { who: `${input.login}'s token`, login: input.login });
+      people.join(session, String(who.id), input.login, key);
+      // One record, no session's: parallel tests have the same person.
+      return store.share(store.users, session, {
         id: who.id,
         login: who.login,
         name: undefined,
@@ -434,7 +394,7 @@ export function createLiveGitHubWorld(deps: {
           `the App's installation covers all of ${org}'s repositories, so it hears about every one`,
         );
       }
-      const name = [live.tag, String(++repoCount), ...(input.name ? [input.name] : [])].join("-");
+      const name = repoName(input.name);
       let created: WireRepo;
       try {
         created = await client.call<WireRepo>(installation(), "POST /orgs/{org}/repos", {
@@ -456,7 +416,8 @@ export function createLiveGitHubWorld(deps: {
       live.ledger.record({
         channel: "github",
         kind: "repo",
-        ref: { repo: `${org}/${name}`, name },
+        // What GitHub made, which may differ from what was asked for (it rewrites some characters).
+        ref: { repo: `${created.owner.login}/${created.name}`, name: created.name },
         workspace: org,
         by: "app",
         session,

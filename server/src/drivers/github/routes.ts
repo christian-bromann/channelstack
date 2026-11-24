@@ -14,8 +14,9 @@ import {
   transcriptSchema,
 } from "../../core/router/inspect.ts";
 import type { GitHubDeliveryView, GitHubWorld } from "./backend.ts";
-import { fakeGitHubWorld } from "./fake/actions.ts";
+import { fakeGitHubWorld, mayChange } from "./fake/actions.ts";
 import type { FakeGitHubWorld } from "./fake/world.ts";
+import { GITHUB_API } from "./live/client.ts";
 import { githubTime } from "./payloads.ts";
 import { renderTranscript } from "./transcript.ts";
 import {
@@ -221,13 +222,11 @@ const RERUN: LiveSupport = {
 };
 /** The requested-action buttons on a check run send their webhook only when a person clicks them. */
 const IN_THE_UI: LiveSupport = { requires: "browser", reason: "GitHub sends this only when a person clicks in the UI" };
-/** What only the App's own calls show: live, proxy mode sees them. */
 /** Pull requests, reviews, pushes, checks and installs aren't built live yet. */
 const NOT_YET: LiveSupport = {
   unsupported: "not yet: pull requests, reviews, pushes, checks and installs aren't built live",
 };
-/** Real GitHub's REST API, where a live agent reaches GitHub. */
-const GITHUB_API = "https://api.github.com";
+/** What only the App's own calls show: live, proxy mode sees them. */
 const AGENT_SIDE: LiveSupport = {
   requires: "proxy",
   reason: "GitHub doesn't report the App's calls; proxy mode sees them",
@@ -825,10 +824,6 @@ export function registerGitHubRoutes(
     },
   });
 
-  /** May this person change an issue someone else opened? Its author always may. */
-  const mayChange = (issue: GitHubIssueRecord, actor: number) =>
-    kit.allow(store.repo(issue.repo), actor, issue.author === actor ? "read" : "triage");
-
   router.route({
     method: "post",
     path: "/users/{user}/edit-issue",
@@ -1192,7 +1187,7 @@ export function registerGitHubRoutes(
     handler: ({ session, params, body }) => {
       const pull = pullOf(session.id, body.pr);
       const actor = person(session.id, params.user);
-      mayChange(pull, actor);
+      mayChange(kit, pull, actor);
       kit.action(store.repo(pull.repo), "requestReview", { user: actor, number: pull.number });
       const sent = pulls.requestReviewers(pull, actor, people(session.id, body.reviewers, "GitHubUser.requestReview"));
       return caused(

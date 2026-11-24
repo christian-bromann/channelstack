@@ -2,6 +2,9 @@ import { describe, expect, test } from "vitest";
 
 import { harness } from "../../../../test/app-harness.ts";
 import { type GitHubStub, githubStub } from "../../../../test/github-live-stub.ts";
+import { systemTimers } from "../../../core/clock/index.ts";
+import type { LedgerEntry } from "../../../core/ledger/index.ts";
+import { githubMaintenance } from "./maintenance.ts";
 
 /** A server whose GitHub driver is live against the stub: the App's credentials and the allowlist set, as in CI. */
 function liveGitHub(stub: GitHubStub, allowlist = stub.org, extra: Record<string, string> = {}) {
@@ -57,6 +60,32 @@ describe("exit check 5.3: GitHub's allowlist holds", () => {
     const wrong = await session.github("POST", "/users", { login: "ana-channelstack", token: ben.token });
     expect(wrong.body.error).toBe("live_misconfigured");
     expect(wrong.body.message).toContain("ana-channelstack's token is ben-channelstack's");
+  });
+});
+
+describe("R4.1: one person of the pool in parallel sessions", () => {
+  test("the same person in two open sessions acts in both, and stays when one closes", async () => {
+    const stub = githubStub();
+    const ana = stub.person("ana-channelstack");
+    const server = liveGitHub(stub);
+    const [one, two] = [await server.open(), await server.open()];
+    const fixture = await one.github("GET", "");
+    const people = [];
+    for (const session of [one, two]) {
+      people.push(await session.github("POST", "/users", { login: "ana-channelstack", token: ana.token }));
+    }
+    expect(people.map((person) => person.body.id)).toEqual([String(ana.id), String(ana.id)]);
+    const repo = await one.github("POST", "/repos", {
+      collaborators: [{ user: String(ana.id) }],
+      apps: [fixture.body.app.id],
+    });
+    await server.call("DELETE", `/sessions/${two.id}`);
+    const issue = await one.github("POST", `/users/${ana.id}/issues`, {
+      issue: { title: "Still here" },
+      repo: repo.body.id,
+    });
+    expect(issue.status).toBe(200);
+    expect(issue.body.author).toMatchObject({ login: "ana-channelstack" });
   });
 });
 
@@ -208,7 +237,9 @@ describe("exit check 5.2: GitHub cleanup", () => {
     const server = liveGitHub(stub);
     const session = await server.open();
     const fixture = await session.github("GET", "");
-    const repo = await session.github("POST", "/repos", { apps: [fixture.body.app.id] });
+    // A name GitHub rewrites (a space): the one it made is what gets deleted.
+    const repo = await session.github("POST", "/repos", { apps: [fixture.body.app.id], name: "web app" });
+    expect(repo.body.name).toBe("channelstack-run-unit4-1-web-app");
     await server.call("DELETE", `/sessions/${session.id}`);
     expect(stub.repo(repo.body.name)?.deleted).toBe(true);
     expect(stub.calls.at(-1)).toEqual({
@@ -216,5 +247,99 @@ describe("exit check 5.2: GitHub cleanup", () => {
       path: `/repos/${stub.org}/${repo.body.name}`,
       as: "installation",
     });
+  });
+});
+
+describe("R4.5: a rate limit on GitHub's first check passes", () => {
+  test("the App's check is asked again after a rate limit, and after GitHub's own failure", async () => {
+    const stub = githubStub();
+    const ana = stub.person("ana-channelstack");
+    const session = await liveGitHub(stub).open();
+    stub.failOnce("GET /app", 403, "API rate limit exceeded for installation");
+    const limited = await session.github("POST", "/users", { login: "ana-channelstack", token: ana.token });
+    expect(limited.body.error).toBe("forbidden");
+    stub.failOnce("GET /app", 502, "Server Error");
+    expect((await session.github("POST", "/users", { login: "ana-channelstack", token: ana.token })).status).not.toBe(
+      200,
+    );
+    const again = await session.github("POST", "/users", { login: "ana-channelstack", token: ana.token });
+    expect(again.status).toBe(200);
+  });
+});
+
+describe("exit check 5.2: GitHub's doctor and sweep", () => {
+  const env = (stub: GitHubStub, person: { token: string }, extra: Record<string, string> = {}) => ({
+    CHANNELSTACK_GITHUB_APP_ID: String(stub.app.id),
+    CHANNELSTACK_GITHUB_PRIVATE_KEY: stub.privateKey,
+    CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN: person.token,
+    CHANNELSTACK_LIVE_GITHUB_ORGS: stub.org,
+    ...extra,
+  });
+  const input = (stub: GitHubStub, environment: Record<string, string>) => ({
+    env: environment,
+    fetch: stub.fetch,
+    timers: systemTimers,
+    apiBase: stub.url,
+  });
+
+  test("doctor: the App on the test org and a person, and what isn't", async () => {
+    const stub = githubStub();
+    const ana = stub.person("ana-channelstack");
+    const ok = await githubMaintenance.doctor(input(stub, env(stub, ana)));
+    expect(ok.map((check) => check.ok)).toEqual([true, true]);
+    expect(ok[0]?.text).toContain(`the App my-agent on ${stub.org} (all repositories)`);
+    expect(ok[1]?.text).toContain("ana-channelstack");
+    const elsewhere = await githubMaintenance.doctor(
+      input(stub, env(stub, ana, { CHANNELSTACK_LIVE_GITHUB_ORGS: "nope" })),
+    );
+    expect(elsewhere[0]).toMatchObject({ ok: false });
+    expect(elsewhere[0]?.text).toContain("CHANNELSTACK_LIVE_GITHUB_ORGS");
+    const bot = stub.person("deploy-bot", { type: "Bot" });
+    const notAPerson = await githubMaintenance.doctor(input(stub, env(stub, bot)));
+    expect(notAPerson[1]).toMatchObject({ ok: false });
+    expect(notAPerson[1]?.text).toContain("not a person");
+    const onUser = githubStub();
+    onUser.onUserAccount();
+    const user = await githubMaintenance.doctor(input(onUser, env(onUser, onUser.person("ana-channelstack"))));
+    expect(user[0]?.text).toContain("a user account");
+  });
+
+  test("sweep: a ledgered repository once, a tagged one of the run, and the age cutoff", async () => {
+    const stub = githubStub();
+    const ana = stub.person("ana-channelstack");
+    const session = await liveGitHub(stub).open();
+    const fixture = await session.github("GET", "");
+    const ledgered = await session.github("POST", "/repos", { apps: [fixture.body.app.id] });
+    const stray = await session.github("POST", "/repos", { apps: [fixture.body.app.id], name: "stray" });
+    const entry: LedgerEntry = {
+      id: "unit4-1-1",
+      channel: "github",
+      kind: "repo",
+      ref: { repo: `${stub.org}/${ledgered.body.name}`, name: ledgered.body.name },
+      workspace: stub.org,
+      by: "app",
+      run: "unit4",
+      session: session.id,
+      createdAt: 0,
+    };
+    const sweep = (options: { check: boolean; run?: string; olderThanMs?: number }) =>
+      githubMaintenance.sweep({
+        ...input(stub, env(stub, ana)),
+        entries: [entry],
+        check: options.check,
+        run: options.run,
+        olderThanMs: options.olderThanMs ?? 0,
+        now: Date.now(),
+      });
+    const checked = await sweep({ check: true, run: "unit4" });
+    expect(checked.left).toEqual([
+      `repo ${stub.org}/${ledgered.body.name} (run unit4)`,
+      `repo ${stub.org}/${stray.body.name}`,
+    ]);
+    expect((await sweep({ check: true, olderThanMs: 3_600_000 })).left).toHaveLength(1);
+    const swept = await sweep({ check: false, run: "unit4" });
+    expect(swept.done).toEqual([entry]);
+    expect(stub.repo(ledgered.body.name)?.deleted).toBe(true);
+    expect(stub.repo(stray.body.name)?.deleted).toBe(true);
   });
 });
