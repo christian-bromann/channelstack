@@ -98,6 +98,9 @@ try {
         ...["slack", "github", "linear", "notion"].map((channel) => `api/examples/${channel}.test.ts`),
         "-t",
         "live mode",
+        // A real platform and a real agent take their time: the examples' own waits (60 s) decide, not Vitest's.
+        "--testTimeout",
+        "120000",
         "--reporter",
         "verbose",
         "--reporter",
@@ -155,5 +158,7 @@ try {
     );
   }
 }
+// The sessions as the run left them: a platform renews a session's cookies while it is used.
+if (existsSync(join(home, "browser"))) cpSync(join(home, "browser"), saved, { recursive: true });
 rmSync(home, { recursive: true, force: true });
 process.exitCode = failed ? 1 : 0;
