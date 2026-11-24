@@ -108,6 +108,66 @@ const CASES: Record<string, Case | Case[]> = {
     reason: /batches/,
   },
   "`notion.sendVerification()`": { channel: "notion", method: "POST", path: "/verification", reason: /verification/ },
+  "`repo.installApp` / `uninstallApp`": [
+    { channel: "github", method: "POST", path: "/repos/1/install", body: { app: "1" } },
+    { channel: "github", method: "POST", path: "/repos/1/uninstall", body: { app: "1" } },
+  ],
+  "`ana.push(changes, { repo, branch })`": {
+    channel: "github",
+    method: "POST",
+    path: "/users/1/push",
+    body: { changes: [{ path: "a", content: "YQ==" }], repo: "1", branch: "b" },
+  },
+  "`ana.openPullRequest`": {
+    channel: "github",
+    method: "POST",
+    path: "/users/1/pulls",
+    body: { pr: { from: "b" }, repo: "1" },
+  },
+  "`ana.minimize({ comment })`": { channel: "github", method: "POST", path: "/users/1/minimize", body: { comment: 1 } },
+  "`ana.review({ pr, event, comments })`": {
+    channel: "github",
+    method: "POST",
+    path: "/users/1/review",
+    body: { review: { pr: { repoId: "1", number: 1 }, event: "APPROVE" } },
+  },
+  "`ana.reviewComment(text, { pr, path, line })`": {
+    channel: "github",
+    method: "POST",
+    path: "/users/1/review-comment",
+    body: { body: "x", pr: { repoId: "1", number: 1 }, path: "a", line: 1 },
+  },
+  "`ana.reply(text, { comment })` (review thread)": {
+    channel: "github",
+    method: "POST",
+    path: "/users/1/reply",
+    body: { body: "x", comment: 1 },
+  },
+  "`ana.resolve` / `unresolve`": [
+    { channel: "github", method: "POST", path: "/users/1/resolve", body: { comment: 1 } },
+    { channel: "github", method: "POST", path: "/users/1/unresolve", body: { comment: 1 } },
+  ],
+  "`ana.requestReview([ben], { pr })`": {
+    channel: "github",
+    method: "POST",
+    path: "/users/1/request-review",
+    body: { reviewers: ["2"], pr: { repoId: "1", number: 1 } },
+  },
+  "`ana.markReady({ pr })` / `merge({ pr })`": [
+    { channel: "github", method: "POST", path: "/users/1/mark-ready", body: { pr: { repoId: "1", number: 1 } } },
+    { channel: "github", method: "POST", path: "/users/1/merge", body: { pr: { repoId: "1", number: 1 } } },
+  ],
+  "`pr.checkRuns()`, `commit.statuses()`, `toHaveCheckRun`": [
+    { channel: "github", method: "GET", path: "/repos/1/pulls/1/check-runs" },
+    { channel: "github", method: "GET", path: "/repos/1/commits/abc/check-runs" },
+    { channel: "github", method: "GET", path: "/repos/1/commits/abc/statuses" },
+  ],
+  "`pr.reviews()`, `reviewComments()`, `toHaveReviewComment`, `toBeMerged`, `comment.reactions()`": [
+    { channel: "github", method: "GET", path: "/repos/1/pulls/1/reviews" },
+    { channel: "github", method: "GET", path: "/repos/1/pulls/1/review-comments" },
+    { channel: "github", method: "GET", path: "/repos/1/pulls/1/merged" },
+    { channel: "github", method: "GET", path: "/comments/1/reactions" },
+  ],
   "`notion.createDatabase({ properties, rows })`": {
     channel: "notion",
     method: "POST",
