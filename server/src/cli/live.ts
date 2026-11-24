@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { BrowserActor, type Launch, storageStatePath, writeStorageState } from "../core/browser/index.ts";
-import { delay, systemTimers } from "../core/clock/index.ts";
+import { pollUntil, systemClock, systemTimers } from "../core/clock/index.ts";
 import { readLedgers, rewriteLedger } from "../core/ledger/index.ts";
 import type { DriverDefinition, LiveCheck } from "../core/router/index.ts";
 import { isRunId } from "../core/safety/index.ts";
@@ -249,12 +249,17 @@ export async function runLogin(
     (input.say ?? ((line) => process.stdout.write(`${line}\n`)))(
       `Sign in as ${input.user} in the browser window. channelstack saves the session once you are in.`,
     );
-    const deadline = Date.now() + SIGN_IN_MS;
-    while (!page.signedIn(await actor.url())) {
-      if (Date.now() >= deadline)
-        return { text: `Not signed in after ${SIGN_IN_MS / 60_000} minutes: nothing saved.\n`, ok: false };
-      await delay(systemTimers, SIGN_IN_POLL_MS);
-    }
+    const notYet = new Error("not signed in yet");
+    const signedIn = await pollUntil(
+      { clock: systemClock, timers: systemTimers },
+      { withinMs: SIGN_IN_MS, everyMs: SIGN_IN_POLL_MS },
+      async () => (page.signedIn(await actor.url()) ? true : undefined),
+      () => notYet,
+    ).catch((error: unknown) => {
+      if (error === notYet) return false;
+      throw error;
+    });
+    if (!signedIn) return { text: `Not signed in after ${SIGN_IN_MS / 60_000} minutes: nothing saved.\n`, ok: false };
     const state = await actor.state(page.cookieDomains);
     const paths = [
       storageStatePath(input.home, definition.name, input.user),

@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { pollUntil, systemClock, type Timers } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import { writePrivateFile } from "../home/index.ts";
 import { liveMisconfigured } from "../reality/index.ts";
@@ -92,7 +93,9 @@ export interface BrowserOptions {
 async function launchChrome(headed: boolean): Promise<Driver> {
   const { remote } = await import("webdriverio");
   const args = [
-    "--no-sandbox",
+    // Chrome keeps its sandbox: it shows a real platform's pages. Only as root (a container) does
+    // Chrome refuse to start with it.
+    ...(process.getuid?.() === 0 ? ["--no-sandbox"] : []),
     "--disable-gpu",
     "--window-size=1280,900",
     // macOS: Chrome would ask the login keychain for its cookie key, and a prompt nobody answers
@@ -166,23 +169,32 @@ export class BrowserActor {
    * act on it. A page often has more than one match, and some of them hidden (Slack has two composers).
    */
   async find(selector: string | readonly string[], timeoutMs = 15_000): Promise<ChainablePromiseElement> {
-    const deadline = Date.now() + timeoutMs;
     // Alternatives in order: the first that has an element shown wins.
     const alternatives = typeof selector === "string" ? [selector] : selector;
-    for (;;) {
-      for (const candidate of alternatives) {
-        for (const element of Array.from(await this.#driver.$$(candidate))) {
-          if (await element.isDisplayed().catch(() => false)) return element;
+    // Waiting is the browser's own pause, as a person looks again.
+    const pausing: Timers = {
+      after: (ms, task) => {
+        void this.#driver.pause(ms).then(task);
+        return () => {};
+      },
+    };
+    return pollUntil(
+      { clock: systemClock, timers: pausing },
+      { withinMs: timeoutMs, everyMs: 250 },
+      async () => {
+        for (const candidate of alternatives) {
+          for (const element of Array.from(await this.#driver.$$(candidate))) {
+            if (await element.isDisplayed().catch(() => false)) return element;
+          }
         }
-      }
-      if (Date.now() >= deadline) {
-        throw new ProtocolError(
+        return undefined;
+      },
+      () =>
+        new ProtocolError(
           { platform: "not_shown", status: 409 },
           `Nothing shown for ${alternatives.join(" or ")} in ${timeoutMs / 1000}s`,
-        );
-      }
-      await this.#driver.pause(250);
-    }
+        ),
+    );
   }
 
   async click(selector: string | readonly string[], timeoutMs?: number): Promise<void> {

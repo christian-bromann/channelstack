@@ -48,6 +48,15 @@ export function runTag(run: string): string {
   return `${RUN_TAG_PREFIX}${run}`;
 }
 
+/**
+ * Names for what a live world makes, unique in a real workspace: the run's tag, a number of the
+ * world's own, and the test's name for it when it gave one (`channelstack-run-<run>-<n>[-<name>]`).
+ */
+export function taggedNames(tag: string): (name?: string) => string {
+  let count = 0;
+  return (name) => [tag, String(++count), ...(name ? [name] : [])].join("-");
+}
+
 /** The run a tagged name belongs to, or nothing for a name channelstack didn't make. */
 export function taggedRun(name: string): string | undefined {
   const at = name.indexOf(RUN_TAG_PREFIX);

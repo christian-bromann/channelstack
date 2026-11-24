@@ -135,7 +135,8 @@ describe("exit check 5.2: channelstack sweep", () => {
     });
     expect(checked.ok).toBe(false);
     expect(checked.text).toContain("slack: left channel channelstack-run-crash1-1 (run crash1)");
-    expect(checked.text).toContain("slack: left channel #channelstack-run-crash1-1");
+    // Once: the ledger names it, so the scan for tagged channels doesn't list it again.
+    expect(checked.text).not.toContain("slack: left channel #channelstack-run-crash1-1");
     expect(stub.channel(channel.id)?.archived).toBe(false);
 
     const swept = await runSweep({

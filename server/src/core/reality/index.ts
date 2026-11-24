@@ -75,6 +75,24 @@ export function liveMisconfigured(what: string, fix: string): ProtocolError {
   return new ProtocolError("live_misconfigured", `${what}: ${fix}`, { what, fix });
 }
 
+/**
+ * A real account's roles are the platform's: a test that asks for another one would pass or fail
+ * for the wrong reason (an agent that lets only admins approve refuses a member's click). Refuses
+ * the first role the test asks for that the account doesn't have, or has and the test says it hasn't.
+ */
+export function checkRoles(
+  person: string,
+  roles: ReadonlyArray<{ option: string; wanted: boolean | undefined; has: boolean; role: string }>,
+): void {
+  for (const { option, wanted, has, role } of roles) {
+    if (wanted === undefined || wanted === has) continue;
+    throw liveMisconfigured(
+      `${person}'s account is ${has ? "" : "not "}${role}, but the test asks for ${option}: ${wanted}`,
+      `make the account ${wanted ? "" : "no longer "}${role} in the sandbox workspace, or change the test`,
+    );
+  }
+}
+
 /** Refuse an operation the way its declaration says, on a driver of this reality. Nothing happens in the fake. */
 export async function admitLive(
   reality: DriverReality,
