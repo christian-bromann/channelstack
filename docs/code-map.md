@@ -140,6 +140,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The Bolt app the Bolt agents start from | `shared/bolt.ts` | Configuration from the environment, `listen` |
 | Bolt + AI SDK | `bolt-ai-sdk/agent.ts` | Mentions, DMs, reactions, native streaming |
 | Chat SDK | `chat-sdk-slack/agent.ts` | The same behaviour on Vercel's Chat SDK and its Slack adapter |
+| Go (slack-go) | `go-slack/main.go`, `go-slack/Dockerfile`, `go-slack/agent.ts` | A Go Slack agent with no API URL, for proxy mode in Docker (exit check 6.2); `agent.ts` runs its image with what `env --proxy` prints |
 | What the GitHub agents do | `shared/github.ts` | Triage, duplicates, the typo fix, reviews, thread answers, checks and the autofix, written once against Octokit's REST methods |
 | The HTTP server around a web-standard handler | `shared/serve.ts` | For agents on frameworks that speak Request and Response (the Chat SDK) |
 | Probot | `probot/agent.ts` | A GitHub App as Probot's docs show |

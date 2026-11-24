@@ -2,6 +2,7 @@
  * Runs `api/examples` unchanged against a reference agent and the compiled binary: the acceptance
  * suite. Each phase enables the `describe` blocks it has built.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -156,6 +157,42 @@ export async function runProxyExamples(options: { bin?: string } = {}): Promise<
       { cwd: ROOT, env },
     );
   });
+}
+
+/**
+ * The Go reference agent in Docker, in proxy mode (exit check 6.2): the DM example. It needs Docker,
+ * which CI's Linux runners have; elsewhere it is skipped, and says so, unless `CI` is set.
+ */
+export async function runGoDockerExamples(options: { bin?: string } = {}): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  if (spawnSync("docker", ["info"], { stdio: "ignore" }).status !== 0) {
+    if (process.env.CI) throw new Error("Exit check 6.2 needs Docker, and `docker info` fails");
+    console.log("\nSkipped: the Go agent in Docker (exit check 6.2) needs a running Docker; CI runs it");
+    return;
+  }
+  const dir = join(ROOT, "examples", "agents", "go-slack");
+  run("docker", ["build", "--quiet", "--tag", "channelstack-go-slack:local", dir], { cwd: ROOT });
+  console.log("\napi/examples against the Go agent in Docker, in proxy mode");
+  await withStack(
+    { bin, agent: join(dir, "agent.ts"), webhook: { driver: "slack", path: "/slack/events" }, proxy: true },
+    ({ env }) => {
+      run(
+        "pnpm",
+        [
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "test/acceptance/vitest.config.ts",
+          CHANNELS.slack.examples,
+          "-t",
+          "^direct messages > a DM to the app gets a reply in the DM$",
+        ],
+        { cwd: ROOT, env },
+      );
+    },
+  );
 }
 
 async function runSharedExamples(bin: string): Promise<void> {
