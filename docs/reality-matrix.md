@@ -178,24 +178,28 @@ The live backend is built: people act with their personal API keys, reads go thr
 
 ## Notion
 
-The live backend isn't built yet. With the integration's token set (`CHANNELSTACK_NOTION_TOKEN`), every Notion operation reports `unsupported_in_live` and its test is skipped (the nightly job then fails for it, since its live block passed nothing), until the test workspace exists.
+Built (phase 5) and checked against the sandbox workspace on 2026-11-24. With the integration's token set (`CHANNELSTACK_NOTION_TOKEN`), Notion runs live: people act with their personal access tokens (`CHANNELSTACK_NOTION_USER_<NAME>_TOKEN`). Each session's pages go in a page of its own (`channelstack-run-<run>-<n>`) under the one page the integration is connected to (or `CHANNELSTACK_NOTION_PAGE`), made by the session's first person, and that page goes to the trash when the session closes. A page the integration must not see goes under `CHANNELSTACK_NOTION_UNSEEN_PAGE` (without it, `live_misconfigured`).
+
+Found against the sandbox: every token answers `users/me` as a bot; a personal access token's bot is owned by its person (`bot.owner.user`). A comment made with it is by the person, but a page is by the token's bot. A person's name in Notion can be their email: the live world uses the test's name for them and never returns Notion's. Comments can be anchored to a block (`parent.block_id`), edited and deleted through the API.
 
 Notion now has **personal access tokens** that act as the person who created them, with that person's permissions and no page sharing. That's the "User token" for Notion, and it makes most person actions possible live. The integration's own token (internal or public OAuth) always acts as a bot.
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `notion.createPage({ content, connections })` (seed) | Done | Yes | Seeding credentials (a seeding PAT), under a parent page the agent's integration is connected to once, by hand | Confirmed: sharing a parent gives access to all child pages, which is how `connections: [notion.app]` works live |
-| `notion.createPage({ connections: [] })` (agent not connected) | Done | Yes | Seeding credentials, under a parent the agent can't see | |
-| `notion.createDatabase({ properties, rows })` | Done | Yes | Seeding credentials | |
-| `ana.createPage(...)` (as a person) | Done | Yes | User token (PAT) | |
-| `ana.comment(text, { page, anchor })` | Done | Yes | User token (PAT) | **unverified**: whether `created_by` on a PAT-made comment is the person or a bot. The docs only confirm that the display name is the person's |
-| `ana.reply(text, { discussion })` | Done | Yes | User token (PAT, comment with `discussion_id`) | |
-| `ana.editComment` / `deleteComment` | Done | Yes | User token (PAT) | Content only |
+| `notion.createPage({ content, connections })` (seed) | Done | Built | Seeding credentials (a seeding PAT), under a parent page the agent's integration is connected to once, by hand | Confirmed: sharing a parent gives access to all child pages, which is how `connections: [notion.app]` works live |
+| `notion.createPage({ connections: [] })` (agent not connected) | Done | Built | Seeding credentials, under a parent the agent can't see | |
+| `notion.createDatabase({ properties, rows })` | Done | Not yet | Seeding credentials | |
+| `ana.createPage(...)` (as a person) | Done | Built | User token (PAT) | |
+| `ana.comment(text, { page, anchor })` | Done | Built | User token (PAT) | Confirmed: a PAT-made comment's `created_by` is the person. `anchor` comments on the block with that text (`parent.block_id`) |
+| `ana.reply(text, { discussion })` | Done | Built | User token (PAT, comment with `discussion_id`) | |
+| `ana.editComment` / `deleteComment` | Done | Built | User token (PAT) | Content only |
 | `ana.resolve` / `reopen` (discussion) | Done | Not yet | — | Not in the first release. Confirmed: the REST API has no resolve action, so a person's resolve is a UI click (browser actor later) |
-| `ana.edit({ append }, { page })`, `rename`, `setProperty`, `addRow` | Done | Yes | User token (PAT) | |
-| `ana.mention(notion.app, { page })` | Done | Yes | User token (PAT) | **unverified**: whether an in-body mention of an integration reaches the agent as an event |
-| `ana.connect` / `disconnect(notion.app, { page })` | Done | Yes, with browser | Browser ("Add connections" in the page menu) | Confirmed: no API adds or removes a connection |
-| `page.markdown()`, `blocks()`, `property()`, `discussions()`, `toHaveBlock`, `toHaveCommentFrom`, `toHavePropertyValue` | Done | Yes | User token or seeding credentials (read APIs) | |
+| `ana.edit({ append }, { page })`, `rename` | Done | Built | User token (PAT) | |
+| `ana.setProperty`, `addRow` | Done | Not yet | — | With databases |
+| `ana.mention(notion.app, { page })` | Done | Built | User token (PAT) | **unverified**: whether an in-body mention of an integration reaches the agent as an event |
+| `ana.connect` / `disconnect(notion.app, { page })` | Done | Yes, with browser (not built) | Browser ("Add connections" in the page menu) | Confirmed: no API adds or removes a connection |
+| `page.markdown()`, `blocks()`, `discussions()`, `children()`, `connections()`, `transcript()`, `toHaveBlock`, `toHaveCommentFrom` | Done | Built | The session's first person's token (read APIs) | A page is read again before each read (cached for a second). Discussions are read on the page and on the blocks that have one already: a discussion the agent starts on another block isn't seen |
+| `page.property()`, `database.rows()`, `toHavePropertyValue` | Done | Not yet | — | With databases |
 | `discussion.resolved()` | Done | Not yet | — | No resolved field in the REST API. Follows `resolve` |
 | Webhook deliveries (`comment.created`, `page.*`) | Done | Agent's concern | — | Notion delivers to the agent's own URL. The fake signs `X-Notion-Signature: sha256=<HMAC-SHA256 of the body, keyed with the verification token>`, batches `page.content_updated` the way Notion does, and retries like Notion (up to 8 times over about 24 hours) |
 | `delivery.resend()` / redelivery | Done | No | — | Fake-only. Notion has no redelivery API. A redelivery is the same event with the next `attempt_number`, signed again |

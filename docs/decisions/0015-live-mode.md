@@ -81,6 +81,15 @@ A real browser, driven as a sandbox person, for what only a platform's client do
 - **A real account's role is Slack's.** Live, `createUser` refuses (`live_misconfigured`) an `admin`, `owner` or `guest` option the account doesn't match: an agent that lets only admins approve would refuse the click, and the test would fail for the wrong reason.
 - The first start after Chrome updates can take a minute or two while WebdriverIO fetches the matching Chromedriver; it is cached after that. The actor logs how long it took to start and to type, at debug level.
 
+## Notion: the same mirror, with the read helpers shared
+
+Notion's routes read the fake's records too, so its live world follows Linear's: a `NotionWorld` interface (`backend.ts`) both worlds implement, and a live world that keeps a `NotionStore` mirror, read again before each read. The fake world's read helpers (titles, access through connections, blocks, Markdown, rich text with mentions, the block a text is in) moved to `reads.ts`, so both worlds use the one copy.
+
+- **`@notionhq/client` makes the calls**, one credential per request (`client.request({ auth })`), with its own paging and rate-limit retries. It was the server's dev dependency already (the fake's response types); it is now a runtime one. Its logger is silenced.
+- **Where a session's pages go.** Seed pages are made by the session's first real person (a page needs a person: `action_requires` without one), in a page of the session's own, `channelstack-run-<run>-<n>`, under the one top-level page the integration is connected to (or `CHANNELSTACK_NOTION_PAGE`). That page is the ledger entry: it goes to the trash, with everything in it, when the session closes, and `sweep` finds tagged ones through each token's search. A page the integration must not see goes under `CHANNELSTACK_NOTION_UNSEEN_PAGE`.
+- **Found against the sandbox (2026-11-24):** every token is a bot to `users/me`; a personal access token's bot is owned by its person. Comments made with it are by the person; pages are by the token's bot. A person's Notion name can be their email, so the live world names them as the test does. Comments can be anchored to a block, edited and deleted.
+- **Not yet live:** databases, rows and properties (`unsupported_in_live`). Connecting a page needs the browser actor, which Notion doesn't have yet (`action_requires`).
+
 ## Linear: the live world keeps a mirror in the fake's store shape
 
 The Linear routes read the fake's records directly (issues, comments, sessions, activities), and a `LinearWorld` interface (`backend.ts`) now carries the actions both worlds implement. The live world keeps its own `LinearStore`, with the fake's record shapes, as a mirror of real Linear: actions write to Linear and put what Linear answered into it; a read refreshes what it is about first (an issue with its comments and sessions, or one session). So the routes read the same way from both, and the text helpers (mentions as profile links, a comment's thread, an issue's state) are written once (`text.ts`).
