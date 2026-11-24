@@ -344,6 +344,39 @@ describe("the browser actor: what only Slack's client does", () => {
     expect(kept.cookies).toEqual([{ name: "d", value: SIGNED_OUT, domain: ".slack.com" }]);
   });
 
+  test("one browser for a person across sessions, and Slack's renewed cookies in every copy of their session", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    // The test's own copy of the same session, as `channelstack login --save` writes it.
+    const given = join(server.home, "ana-slack.json");
+    writeStorageState(given, { cookies: [{ name: "d", value: ana.userId, domain: ".slack.com" }] });
+    const sessions = [await server.open(), await server.open()];
+    const channels: string[] = [];
+    for (const session of sessions) {
+      await session.slack("POST", "/users", { name: "Ana", token: ana.token, browser: { storageState: given } });
+      channels.push(
+        (await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] })).body.id,
+      );
+    }
+    // Both at once: one browser takes them one after the other, and neither's typing lands in the other's.
+    const said = await Promise.all(
+      sessions.map((session, at) =>
+        session.slack("POST", `/users/${ana.userId}/say`, { message: { text: `hi ${at}` }, channel: channels[at] }),
+      ),
+    );
+    expect(said.map((reply) => reply.body.text)).toEqual(["hi 0", "hi 1"]);
+    expect(server.client.started.count).toBe(1);
+    for (const session of sessions) await server.call("DELETE", `/sessions/${session.id}`);
+    for (const path of [given, storageStatePath(server.home, "slack", "Ana")]) {
+      expect(JSON.parse(readFileSync(path, "utf8")).cookies.map((cookie: { name: string }) => cookie.name)).toEqual([
+        "d",
+        "d-s",
+      ]);
+    }
+  });
+
   test("the cookies Slack renewed while the session was used are kept when it closes", async () => {
     const stub = slackStub();
     const ana = stub.person("ana");

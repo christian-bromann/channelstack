@@ -61,20 +61,24 @@ export function slackClient(actor: BrowserActor, team: string, person: { name: s
       `${person.name}'s saved Slack session is signed out`,
       `sign in again: channelstack login slack --user ${person.login}`,
     );
-  /** Open a page of the client and act on it: a sign-in page instead of the client is said as such. */
-  const on = async (url: string, act: () => Promise<void>) => {
-    await actor.open(url);
-    if (!signedInToSlack(await actor.url())) throw signedOut();
-    try {
-      await act();
-    } catch (error) {
-      // Slack can send a signed-out person to its sign-in page after the client began to load.
-      if (error instanceof ProtocolError && error.code === "not_shown" && !signedInToSlack(await actor.url())) {
-        throw signedOut();
+  /**
+   * Open a page of the client and act on it, as the person's one thing now: a sign-in page instead
+   * of the client is said as such.
+   */
+  const on = (url: string, act: () => Promise<void>) =>
+    actor.exclusive(async () => {
+      await actor.open(url);
+      if (!signedInToSlack(await actor.url())) throw signedOut();
+      try {
+        await act();
+      } catch (error) {
+        // Slack can send a signed-out person to its sign-in page after the client began to load.
+        if (error instanceof ProtocolError && error.code === "not_shown" && !signedInToSlack(await actor.url())) {
+          throw signedOut();
+        }
+        throw error;
       }
-      throw error;
-    }
-  };
+    });
   return {
     /** Write a message in a conversation, as a person does: in the composer, then Enter. */
     say: (channel: string, typed: Typed) =>

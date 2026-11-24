@@ -102,6 +102,8 @@ async function launchChrome(headed: boolean): Promise<Driver> {
 export class BrowserActor {
   readonly #driver: Driver;
   readonly #origins: readonly string[];
+  /** What the person is doing now: one thing at a time, as a person in one browser does. */
+  #busy: Promise<unknown> = Promise.resolve();
 
   private constructor(driver: Driver, origins: readonly string[]) {
     this.#driver = driver;
@@ -118,6 +120,16 @@ export class BrowserActor {
       await driver.setCookies(options.state.cookies);
     }
     return actor;
+  }
+
+  /**
+   * Do one thing as the person, once what they are doing now is done: tests that share the person
+   * never take turns inside each other's typing.
+   */
+  exclusive<T>(act: () => Promise<T>): Promise<T> {
+    const turn = this.#busy.then(act, act);
+    this.#busy = turn.catch(() => {});
+    return turn;
   }
 
   /** Open a page, which must be on one of the actor's origins. */
@@ -191,29 +203,35 @@ export class BrowserActor {
 /** How a browser is started: Chrome by default, a stand-in in unit tests. */
 export type Launch = (headed: boolean) => Promise<Driver>;
 
-/** The actors of the open test sessions: one per person, started on first use, closed with the session. */
+/**
+ * The people's browsers: one per person for the whole server, as a person has one browser, shared
+ * by every open test session that has them act. A platform renews a session's cookies while it is
+ * used (Slack its `d` cookie), so two browsers on one saved session would each get their own, and
+ * the copies would drift apart. A browser closes with the last session that used it; with `keep`,
+ * its cookies are saved whenever one of them closes.
+ */
 export class BrowserActors {
   readonly #actors = new Map<string, Promise<BrowserActor>>();
   readonly #keep = new Map<string, KeepSession>();
+  /** The open sessions each person's browser acts in. */
+  readonly #users = new Map<string, Set<string>>();
   readonly #launch: Launch | undefined;
 
   constructor(launch?: Launch) {
     this.#launch = launch;
   }
 
-  /**
-   * The person's actor in this session, started (headless, from their saved session) the first
-   * time. With `keep`, the session's cookies are saved again when it closes, as a browser keeps
-   * the ones a platform renews while it is used.
-   */
+  /** The person's browser, started (headless, from their saved session) the first time any session needs it. */
   for(
     session: string,
     person: string,
     options: { origins: readonly string[]; state: () => StorageState; keep?: KeepSession },
   ): Promise<BrowserActor> {
-    const key = `${session}\u0000${person}`;
-    let actor = this.#actors.get(key);
-    if (options.keep) this.#keep.set(key, options.keep);
+    const users = this.#users.get(person) ?? new Set<string>();
+    users.add(session);
+    this.#users.set(person, users);
+    if (options.keep) this.#keep.set(person, options.keep);
+    let actor = this.#actors.get(person);
     if (!actor) {
       actor = (async () =>
         BrowserActor.start({
@@ -221,30 +239,35 @@ export class BrowserActors {
           state: options.state(),
           ...(this.#launch ? { launch: this.#launch } : {}),
         }))();
-      this.#actors.set(key, actor);
+      this.#actors.set(person, actor);
       // A browser that didn't start is tried again next time.
-      actor.catch(() => this.#actors.delete(key));
+      actor.catch(() => this.#actors.delete(person));
     }
     return actor;
   }
 
   async close(session: string): Promise<void> {
-    for (const [key, actor] of this.#actors) {
-      if (!key.startsWith(`${session}\u0000`)) continue;
-      this.#actors.delete(key);
-      const keep = this.#keep.get(key);
-      this.#keep.delete(key);
-      const started = await actor.catch(() => undefined);
-      if (!started) continue;
-      if (keep) {
-        try {
-          // Only a session still signed in is kept: a signed-out one would replace the file with nothing usable.
-          if (keep.signedIn(await started.url())) keep.save(await started.state(keep.domains));
-        } catch {
-          // A browser that went away keeps nothing; the saved session stays as it was.
-        }
+    for (const [person, users] of this.#users) {
+      if (!users.delete(session)) continue;
+      const actor = this.#actors.get(person);
+      const started = actor && (await actor.catch(() => undefined));
+      const keep = this.#keep.get(person);
+      if (started && keep) {
+        // Once the person is done with what they are doing: their cookies as they are now.
+        await started.exclusive(async () => {
+          try {
+            // Only a session still signed in is kept: a signed-out one would replace the file with nothing usable.
+            if (keep.signedIn(await started.url())) keep.save(await started.state(keep.domains));
+          } catch {
+            // A browser that went away keeps nothing; the saved session stays as it was.
+          }
+        });
       }
-      await started.close();
+      if (users.size > 0) continue;
+      this.#users.delete(person);
+      this.#actors.delete(person);
+      this.#keep.delete(person);
+      await started?.close();
     }
   }
 }

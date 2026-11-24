@@ -65,8 +65,14 @@ export class LinearGraphqlClient {
         continue;
       }
       if (code !== undefined || !answer?.data) {
+        // Linear's words for people first, then its own message, then the HTTP status: never the token.
         const said = error?.extensions?.userPresentableMessage;
-        const reason = typeof said === "string" ? said : (code ?? "unexpected");
+        const reason =
+          typeof said === "string"
+            ? said
+            : typeof error?.message === "string"
+              ? error.message
+              : `${code ?? "unexpected"} (HTTP ${response.status})`;
         throw new LinearRefusal(code ?? "unexpected", `Linear refused ${operation}: ${reason}`, { operation });
       }
       return answer.data;

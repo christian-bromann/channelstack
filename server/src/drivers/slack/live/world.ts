@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { readStorageState, storageStatePath, writeStorageState } from "../../../core/browser/index.ts";
@@ -339,17 +339,27 @@ export function createLiveWorld(deps: {
         `${person(session, userId).alias} has no saved browser session: \`channelstack login slack --user ${person(session, userId).alias.toLowerCase()}\`, or createUser({ browser: { storageState } })`,
       );
     }
+    const alias = person(session, userId).alias;
+    // Every copy of the person's one Slack session: the test's, and channelstack login's. They are
+    // one session, so they must stay one: the browser starts from the newest, and Slack's renewed
+    // cookies go to each.
+    const copies = [
+      ...new Set([browser.path, ...(live.home === undefined ? [] : [storageStatePath(live.home, "slack", alias)])]),
+    ].filter((path) => path === browser.path || existsSync(path));
+    const newest = () =>
+      copies.filter((path) => existsSync(path)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0] ??
+      browser.path;
     const started = await live.browsers.for(session, userId, {
       origins: [SLACK_CLIENT],
-      state: () => readStorageState(browser.path),
-      // Slack renews a session's cookies while it is used: they go back where they came from.
+      state: () => readStorageState(newest()),
       keep: {
         domains: SLACK_COOKIE_DOMAINS,
         signedIn: signedInToSlack,
-        save: (state) => writeStorageState(browser.path, state),
+        save: (state) => {
+          for (const path of copies) writeStorageState(path, state);
+        },
       },
     });
-    const alias = person(session, userId).alias;
     return slackClient(started, known().team.id, { name: alias, login: alias.toLowerCase() });
   };
 

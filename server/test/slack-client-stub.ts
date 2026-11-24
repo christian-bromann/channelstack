@@ -13,7 +13,10 @@ export const SIGNED_OUT = "signed-out";
 export function slackClientStub(stub: SlackStub) {
   const clicks: Array<{ user: string; channel: string; thread: string | undefined; label: string }> = [];
   const opened: string[] = [];
+  /** How many browsers were started. */
+  const started = { count: 0 };
   const launch: Launch = async () => {
+    started.count++;
     let user = "";
     let page: { channel: string; thread: string | undefined } | undefined;
     let draft: string | undefined;
@@ -76,5 +79,5 @@ export function slackClientStub(stub: SlackStub) {
       deleteSession: async () => {},
     };
   };
-  return { launch, clicks, opened };
+  return { launch, clicks, opened, started };
 }
