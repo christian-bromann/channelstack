@@ -57,6 +57,7 @@ A driver declares its live credentials (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTA
 
 | Package | Version | Why a library and not our code | License | Maintained |
 |---|---|---|---|---|
+| `@octokit/rest`, `@octokit/auth-app` (server, now runtime dependencies) | 22.0.1, 8.3.1 | GitHub's own client for the live GitHub world: requests as a person, as the App (JWT) and as its installation (token exchange and renewal), paging. Already the repository's dev dependencies for the reference agents and tests | MIT | Yes |
 | `@notionhq/client` (server, now a runtime dependency) | 5.31.1 | Notion's own client for the live Notion world: requests with one credential each, paging and rate-limit retries. It was already the server's dev dependency for the fake's response types, and the reference agents use it | MIT | Yes |
 | `webdriverio` (server) | 10.2.0 | The browser actor: a real browser driven as a person over WebDriver BiDi, for what only a platform's client does. Already the repo's browser for the UI acceptance test | MIT | Yes |
 | `pytest` (Python SDK, dev only) | 8.4.2 | The Python runtime's own tests (`sdks/python/tests`), the counterpart of the TypeScript runtime's Vitest tests (review finding R1.10) | MIT | Yes |

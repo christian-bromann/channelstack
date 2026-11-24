@@ -81,6 +81,16 @@ A real browser, driven as a sandbox person, for what only a platform's client do
 - **A real account's role is Slack's.** Live, `createUser` refuses (`live_misconfigured`) an `admin`, `owner` or `guest` option the account doesn't match: an agent that lets only admins approve would refuse the click, and the test would fail for the wrong reason.
 - The first start after Chrome updates can take a minute or two while WebdriverIO fetches the matching Chromedriver; it is cached after that. The actor logs how long it took to start and to type, at debug level.
 
+## GitHub: the App's installation makes the repositories
+
+GitHub's routes checked permissions and called the fake's parts themselves. What works live now goes through a `GitHubWorld` (`backend.ts`): the fake's implementation (`fake/actions.ts`) keeps the permission checks real GitHub makes itself, and the live world calls GitHub. Pull requests, reviews, pushes, checks and installs aren't live yet: their routes still use the fake's parts, and declare `unsupported_in_live`.
+
+- **Octokit and `@octokit/auth-app` make the calls** (as a person, as the App with its JWT, or as its installation). They were the repository's dev dependencies for the reference agents; they are now the server's. The App's key is checked before anything is sent: one that can't sign is `live_misconfigured`, and nothing reaches GitHub.
+- **The test org is an organization**, allowlisted in `CHANNELSTACK_LIVE_GITHUB_ORGS`, with the App installed on all repositories and given Administration (write). Its installation makes each session's repositories, `channelstack-run-<run>-<n>[-<name>]`, invites the collaborators (each accepts as themselves) and deletes the repositories when the session closes; `sweep` finds tagged ones in the org. A user account can't be the test org: only an org lets the App make and delete repositories without a person's token.
+- **A person is their account.** `createUser({ login })` must name the token's own login, and `id`, `name`, `email` and `role` are refused live.
+- **Deliveries come from the App's delivery log** (`GET /app/hook/deliveries`, with the App's JWT): one per GUID, a redelivery being one more attempt, the payload read once, the status from GitHub's status code. `redeliver()` asks GitHub to send it again.
+- **The skip test needs no network.** `start()` takes stand-in platforms from code only (`platforms`), so `test/acceptance/stand-ins/github-live-server.sh` runs a whole server whose GitHub is live against the stand-in, and the acceptance test sees an example skipped with the reason.
+
 ## Notion: the same mirror, with the read helpers shared
 
 Notion's routes read the fake's records too, so its live world follows Linear's: a `NotionWorld` interface (`backend.ts`) both worlds implement, and a live world that keeps a `NotionStore` mirror, read again before each read. The fake world's read helpers (titles, access through connections, blocks, Markdown, rich text with mentions, the block a text is in) moved to `reads.ts`, so both worlds use the one copy.

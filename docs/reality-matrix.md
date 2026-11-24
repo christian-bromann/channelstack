@@ -116,38 +116,40 @@ Every feature runs in the fake server (in memory). The question this document an
 
 ## GitHub
 
-The live backend isn't built yet. With the App's credentials set (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`), every GitHub operation reports `unsupported_in_live` and its test is skipped (the nightly job then fails for it, since its live block passed nothing), until the test org exists.
+Built (phase 5) against a stand-in for GitHub's API; not yet run against a real org, which needs the App's private key and a test organization (2026-11-24: the App was installed on a user account, and only an organization lets the App make and delete the test repositories). With the App's credentials set (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`), GitHub runs live. The App's installation on the allowlisted org makes each session's repositories (`channelstack-run-<run>-<n>[-<name>]`, deleted when the session closes) and needs the Administration permission; people act with their own tokens (`CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN`), and a person's `login` must be their account's. An installation on selected repositories can't take `apps: [github.app]`, and one on all repositories can't make a repository without it.
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `github.createRepo({ files, collaborators, labels })` | Done | Yes | Seeding credentials (org admin) | Created in the test org, deleted at the end of the session. Collaborator invites are accepted with each user's token |
-| `github.createRepo({ apps: [github.app] })` | Done | Yes | Seeding credentials (`PUT /user/installations/{id}/repositories/{repo}`), or the installation set to "all repositories" | Confirmed: works with a fine-grained PAT that has "GitHub App installation repository access" write permission, or a GitHub App user access token; the user needs admin on the repo. The first install of the App on the org happens once, in a browser |
-| `repo.installApp` / `uninstallApp` | Done | Yes | Same as above; removing the whole installation uses App credentials (`DELETE /app/installations/{id}`) | |
-| `ana.push(changes, { repo, branch })` | Done | Yes | User token (Git Data or Contents API) | Fires real `push` events |
-| `ana.openIssue` / `openPullRequest` | Done | Yes | User token | `openPullRequest({ changes })` pushes the branch first |
-| `ana.editIssue`, `close`, `reopen` | Done | Yes | User token | |
-| `ana.label` / `unlabel` | Done | Yes | User token | |
-| `ana.assign([ben], { issue })` | Done | Yes | User token | |
+| `github.createRepo({ files, collaborators, labels })` | Done | Built | Seeding credentials (org admin) | Created in the test org, deleted at the end of the session. Collaborator invites are accepted with each user's token |
+| `github.createRepo({ apps: [github.app] })` | Done | Built | Seeding credentials (`PUT /user/installations/{id}/repositories/{repo}`), or the installation set to "all repositories" | Confirmed: works with a fine-grained PAT that has "GitHub App installation repository access" write permission, or a GitHub App user access token; the user needs admin on the repo. The first install of the App on the org happens once, in a browser |
+| `repo.installApp` / `uninstallApp` | Done | Not yet | Same as above; removing the whole installation uses App credentials (`DELETE /app/installations/{id}`) | |
+| `ana.push(changes, { repo, branch })` | Done | Not yet | User token (Git Data or Contents API) | Fires real `push` events |
+| `ana.openIssue` | Done | Built | User token | |
+| `ana.openPullRequest` | Done | Not yet | User token | `openPullRequest({ changes })` pushes the branch first |
+| `ana.editIssue`, `close`, `reopen` | Done | Built | User token | |
+| `ana.label` / `unlabel` | Done | Built | User token | |
+| `ana.assign([ben], { issue })` | Done | Built | User token | |
 | `ana.assign(github.app, { issue })` | Done | No | — | The contract takes the app here (`api/github.d.ts`), so the fake accepts it and sends `assigned`. **Unverified live**, likely refused for an ordinary App: the docs don't cover bot assignees, and community reports say it fails. Confirm in the first live spike, then either refuse in the fake or keep it |
-| `ana.comment(text, { issue })` | Done | Yes | User token | `@my-agent` becomes a real mention |
-| `ana.edit` / `delete` (comments) | Done | Yes | User token | |
-| `ana.react(content, { issue \| comment })` | Done | Yes | User token | |
-| `ana.minimize({ comment })` | Done | Yes | User token (GraphQL `minimizeComment`) | |
-| `ana.review({ pr, event, comments })` | Done | Yes | User token | Inline comments become `pull_request_review_comment` |
-| `ana.reviewComment(text, { pr, path, line })` | Done | Yes | User token | |
-| `ana.reply(text, { comment })` (review thread) | Done | Yes | User token | |
-| `ana.resolve` / `unresolve` | Done | Yes | User token (GraphQL `resolveReviewThread`) | |
-| `ana.requestReview([ben], { pr })` | Done | Yes | User token | |
+| `ana.comment(text, { issue })` | Done | Built | User token | `@my-agent` becomes a real mention |
+| `ana.edit` / `delete` (comments) | Done | Built | User token | |
+| `ana.react(content, { issue \| comment })` | Done | Built | User token | |
+| `ana.minimize({ comment })` | Done | Not yet | User token (GraphQL `minimizeComment`) | |
+| `ana.review({ pr, event, comments })` | Done | Not yet | User token | Inline comments become `pull_request_review_comment` |
+| `ana.reviewComment(text, { pr, path, line })` | Done | Not yet | User token | |
+| `ana.reply(text, { comment })` (review thread) | Done | Not yet | User token | |
+| `ana.resolve` / `unresolve` | Done | Not yet | User token (GraphQL `resolveReviewThread`) | |
+| `ana.requestReview([ben], { pr })` | Done | Not yet | User token | |
 | `ana.requestReview(github.app, { pr })` | Done | No | — | As above: the contract takes the app, the fake accepts it and sends `review_requested`. **Unverified live**, likely refused: the endpoint takes user logins and team slugs only |
-| `ana.markReady({ pr })` / `merge({ pr })` | Done | Yes | User token | |
+| `ana.markReady({ pr })` / `merge({ pr })` | Done | Not yet | User token | |
 | `ana.rerun({ checkRun })` | Done | Not yet | — | Not in the first release. Confirmed: `rerequest` returns 403 unless the caller is the App that owns the check run, so a person's Re-run is a UI click. Live runs report `unsupported_in_live` |
 | `ana.requestAction(id, { checkRun })` | Done | Yes, with browser | Browser | Confirmed: no API; clicking only sends the `check_run.requested_action` webhook |
-| `pr.checkRuns()`, `commit.statuses()`, `toHaveCheckRun` | Done | Yes | User token | |
-| `issue.comments()`, `pr.reviews()`, `reviewComments()`, `toHaveCommentsFrom`, `toHaveReviewComment`, `toBeMerged` | Done | Yes | User token | |
-| `repo.readFile(path, { ref })` | Done | Yes | User token | |
+| `pr.checkRuns()`, `commit.statuses()`, `toHaveCheckRun` | Done | Not yet | User token | |
+| `issue.comments()`, `transcript()`, `toHaveCommentFrom`, `toHaveCommentsFrom` | Done | Built | The App's installation (read APIs) | An issue is read again before each read (cached for a second) |
+| `pr.reviews()`, `reviewComments()`, `toHaveReviewComment`, `toBeMerged`, `comment.reactions()` | Done | Not yet | User token | With pull requests |
+| `repo.readFile(path, { ref })` | Done | Built | User token | |
 | `github.appCalls()` | Done | Yes, with proxy | Proxy (sees the App's calls) | The App's calls about no repository: its own endpoints and the token exchange. Fake: the same list for every session |
-| `delivery.redeliver()` | Done | Yes | App credentials (`POST /app/hook/deliveries/{id}/attempts`, App JWT) | Confirmed. GitHub redelivers to the agent's own webhook URL |
-| `delivery.attempts`, `status` for the agent's webhook | Done | Yes | App credentials (`GET /app/hook/deliveries`, App JWT) | Read-only: GitHub's delivery log shows each delivery to the agent, its status code and duration. channelstack stays out of the path |
+| `delivery.redeliver()` | Done | Built | App credentials (`POST /app/hook/deliveries/{id}/attempts`, App JWT) | Confirmed. GitHub redelivers to the agent's own webhook URL |
+| `delivery.attempts`, `status` for the agent's webhook | Done | Built | App credentials (`GET /app/hook/deliveries`, App JWT) | Read-only: GitHub's delivery log shows each delivery to the agent, its status code and duration. channelstack stays out of the path |
 
 ---
 
