@@ -19,7 +19,7 @@ const NOISE =
  * result file or log holds them: normalizing drops them, before anything leaves the run's private
  * work directory (the scenario runner, which uses only the SDK, records what the handles hold).
  */
-export const SECRET_FIELD = /token|secret|privatekey|password/i;
+const SECRET_FIELD = /token|secret|privatekey|password/i;
 /**
  * Fields the contract says only the fake has (`delivery`: live, the platform delivers to the agent
  * itself). Their absence live is the contract, not drift.
