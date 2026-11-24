@@ -85,6 +85,11 @@ function proxyEnv(proxy: ProxyEnv): Record<string, string> {
   };
 }
 
+/** The names `env --proxy` adds, for whatever takes only those from what it prints. */
+export const PROXY_ENV_NAMES: readonly string[] = Object.keys(
+  proxyEnv({ url: "", caFile: "", bundleFile: "", nodePreload: "" }),
+);
+
 export interface AppOptions {
   version: string;
   /** The control API's bearer token. */

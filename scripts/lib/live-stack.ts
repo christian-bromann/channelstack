@@ -11,15 +11,12 @@ import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { PROXY_ENV_NAMES } from "../../server/src/app.ts";
 import { createRecorder } from "../../server/src/core/proxy/record.ts";
 import { runId } from "../../server/src/core/safety/index.ts";
 import { startAgents, writeSessions } from "./live-agents.ts";
 import { capture, run } from "./process.ts";
 import { startBinary } from "./server.ts";
-
-/** What `env --proxy` adds for an agent: the proxy, and the CA it trusts. Live, nothing else is printed. */
-const PROXY_ENV =
-  /^(HTTPS?_PROXY|https?_proxy|NO_PROXY|no_proxy|NODE_USE_ENV_PROXY|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|REQUESTS_CA_BUNDLE)=/;
 
 export interface LiveStack {
   /** The environment for what runs against it: attached to this server, with this run's id. */
@@ -75,7 +72,7 @@ export async function withLiveStack(
       const proxy = Object.fromEntries(
         capture(bin, ["env", "--proxy"], { env: live })
           .split("\n")
-          .filter((line) => PROXY_ENV.test(line))
+          .filter((line) => PROXY_ENV_NAMES.includes(line.slice(0, line.indexOf("="))))
           .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
       );
       await startAgents(env, stops, { proxy, recorder: createRecorder(join(record, "relay")) });

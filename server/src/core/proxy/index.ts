@@ -138,9 +138,14 @@ export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
     const destination = passThrough(to.host, to.port);
     const upstream = track(
       connect(destination.port, destination.host, () => {
-        // The origin sees an ordinary request: its path, not the absolute URL.
-        const line = `${method} ${url.pathname}${url.search} ${version}`;
-        upstream.write(Buffer.concat([Buffer.from(line, "latin1"), head.subarray(text.indexOf("\r\n"))]));
+        // The origin sees an ordinary request: its path, not the absolute URL, no header meant for
+        // the proxy, and one request per connection (a second one on it would still be in proxy form).
+        const headers = text
+          .slice(text.indexOf("\r\n") + 2, text.length - 4)
+          .split("\r\n")
+          .filter((header) => header !== "" && !/^(proxy-[\w-]*|connection|keep-alive)\s*:/i.test(header));
+        const request = [`${method} ${url.pathname}${url.search} ${version}`, ...headers, "connection: close", "", ""];
+        upstream.write(Buffer.from(request.join("\r\n"), "latin1"));
         pipeBoth(client, upstream, rest);
         client.resume();
       }),

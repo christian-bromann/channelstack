@@ -25,6 +25,7 @@ let proxy: RunningProxy;
 let fake: HttpServer;
 let internet: HttpServer;
 const seen: string[] = [];
+const headersSeen: Array<Record<string, string | string[] | undefined>> = [];
 
 beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "channelstack-proxy-"));
@@ -37,6 +38,7 @@ beforeAll(async () => {
   // A stand-in for the rest of the internet.
   internet = createHttpServer((request, response) => {
     seen.push(`${request.method} ${request.url} ${request.headers.host}`);
+    headersSeen.push(request.headers);
     response.end(`internet ${request.url}`);
   });
   const internetPort = await listen(internet);
@@ -119,6 +121,12 @@ describe("the proxy", () => {
       await raw("GET http://example.com/plain?x=1 HTTP/1.1\r\nhost: example.com\r\nconnection: close\r\n\r\n"),
     ).toContain("internet /plain?x=1");
     expect(seen).toContain("GET /plain?x=1 example.com");
+    // Headers for the proxy don't go on, and the origin closes after its answer.
+    await raw(
+      "GET http://example.com/headers HTTP/1.1\r\nhost: example.com\r\nproxy-authorization: Basic eA==\r\nproxy-connection: keep-alive\r\n\r\n",
+    );
+    expect(headersSeen.at(-1)).toMatchObject({ connection: "close" });
+    expect(Object.keys(headersSeen.at(-1) ?? {}).filter((name) => name.startsWith("proxy-"))).toEqual([]);
     expect(await raw("GET http://slack.com/api/auth.test HTTP/1.1\r\nhost: slack.com\r\n\r\n")).toMatch(
       /^HTTP\/1\.1 403/,
     );
