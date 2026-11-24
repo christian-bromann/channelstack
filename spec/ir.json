@@ -1874,8 +1874,11 @@
             }
           ],
           "returns": {
-            "kind": "resource",
-            "name": "SlackDelivery"
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "SlackDelivery"
+            }
           },
           "errors": [
             "unauthorized",

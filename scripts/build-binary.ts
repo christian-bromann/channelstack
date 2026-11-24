@@ -26,9 +26,10 @@ for (const key of keys) {
   mkdirSync(dirname(outfile), { recursive: true });
   // macOS caches a binary's code signature per file: overwriting one in place gets its next launch killed.
   rmSync(outfile, { force: true });
+  // `bun build --compile`, with a plugin that makes WebdriverIO bundle (scripts/bun-compile.ts).
   const build = spawnSync(
     "bun",
-    ["build", "--compile", "--minify", `--target=${target.bun}`, join(ROOT, "server/src/cli.ts"), "--outfile", outfile],
+    [join(ROOT, "scripts/bun-compile.ts"), join(ROOT, "server/src/cli.ts"), target.bun, outfile],
     { cwd: ROOT, stdio: "inherit" },
   );
   if (build.status !== 0) process.exit(build.status ?? 1);

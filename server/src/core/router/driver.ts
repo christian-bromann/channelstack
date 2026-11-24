@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 
+import type { BrowserActors } from "../browser/index.ts";
 import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
@@ -64,6 +65,10 @@ export interface LiveContext {
   /** The tag live objects carry in their names: `channelstack-run-<run>`. */
   readonly tag: string;
   readonly fetch: typeof fetch;
+  /** The browser actors of the open sessions: a person's browser, for what only the platform's client does. */
+  readonly browsers: BrowserActors;
+  /** The state directory, where `channelstack login` saved people's browser sessions. */
+  readonly home: string | undefined;
   /**
    * The platform's API base URL, for unit tests that stand a stub in for the platform. Set only
    * through `createApp`, never from the environment, so a credential can't be sent elsewhere.
@@ -103,9 +108,23 @@ export interface SweepReport {
   done: LedgerEntry[];
 }
 
+/** Where a person signs in to a platform by hand, once, for `channelstack login`, and when they are in. */
+interface LiveSignIn {
+  /** The page sign-in starts at. */
+  start: string;
+  /** The origins the browser may open. */
+  origins: readonly string[];
+  /** The person is signed in once the browser is at a URL like this. */
+  signedIn(url: string): boolean;
+  /** The sites whose cookies are the session. */
+  cookieDomains: readonly string[];
+}
+
 /** What the command line runs for a live driver, outside any server, from the credentials in the environment. */
 export interface LiveMaintenance {
   doctor(input: MaintenanceInput): Promise<LiveCheck[]>;
+  /** For `channelstack login`: where the browser actor's sign-in happens. A driver without it has nothing to sign in to. */
+  signIn?(input: MaintenanceInput): Promise<LiveSignIn>;
   /**
    * Remove what crashed runs left: the ledger's entries, and tagged objects older than `olderThanMs`
    * (any age for one `run`). With `check`, only report what is still there.

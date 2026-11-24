@@ -246,13 +246,13 @@ export interface SlackWorld {
     target: { channel: string; ts: string },
     action: "add" | "remove",
   ): Awaitable<string | undefined>;
-  /** Press a button: found by its label, its `action_id`, or both. Returns the `block_actions` delivery. */
+  /** Press a button: found by its label, its `action_id`, or both. Returns the `block_actions` delivery; none live. */
   clickAsUser(
     session: string,
     user: string,
     button: SlackControlRef & { value?: string | undefined },
     where: SlackControlScope,
-  ): string;
+  ): Awaitable<string | undefined>;
   /** Choose options in a select menu on a message, by their text or value. Returns the `block_actions` delivery. */
   selectAsUser(
     session: string,

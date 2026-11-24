@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
 import { attach, type Attached } from "./cli/attach.ts";
-import { runDoctor, runSweep } from "./cli/live.ts";
+import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runSlack } from "./cli/slack.ts";
 import { runShow, runTail } from "./cli/watch.ts";
 import { homeDir } from "./core/home/index.ts";
@@ -41,6 +41,8 @@ Usage:
   channelstack doctor             Which channels run live, whether their credentials work and are allowlisted,
                                   and whether saved browser sessions are still signed in
       --storage-state <path>      A saved browser session to check, besides those in <home>/browser
+  channelstack login slack --user <name>   Sign a sandbox person in by hand, once, in a browser window, and save the
+                                  session for the browser actor (<home>/browser/slack-<name>.json, 0600)
   channelstack sweep              Remove what crashed live runs left: their ledgers' objects, and tagged channels
       --older-than-hours <n>      Only tagged objects older than this (default 24)
       --run <id>                  Only what this run made, of any age
@@ -165,6 +167,7 @@ async function main() {
       "older-than-hours": { type: "string" },
       run: { type: "string" },
       check: { type: "boolean" },
+      user: { type: "string" },
     },
   });
   if (values.version) return void process.stdout.write(`${pkg.version}\n`);
@@ -173,6 +176,18 @@ async function main() {
   const [command = "start", action, ...rest] = positionals;
   if (command === "start") return runStart(values);
   if (command === "secrets") return runSecrets(action);
+  if (command === "login") {
+    const result = await runLogin({
+      env: process.env,
+      home: homeDir(),
+      drivers: DRIVERS,
+      channel: action,
+      user: values.user,
+    });
+    process.stdout.write(result.text);
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
   if (command === "doctor" || command === "sweep") {
     const live = { env: process.env, home: homeDir(), drivers: DRIVERS };
     const result =

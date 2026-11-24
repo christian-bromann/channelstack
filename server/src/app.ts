@@ -5,6 +5,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
+import { BrowserActors, type Launch } from "./core/browser/index.ts";
 import { type Clock, systemClock, systemTimers, type Timers } from "./core/clock/index.ts";
 import { DeliveryQueue } from "./core/delivery/index.ts";
 import { ProtocolError } from "./core/errors/index.ts";
@@ -74,6 +75,10 @@ export interface LiveOptions {
   env: Readonly<Record<string, string | undefined>>;
   /** The ledger file this server writes; without it the ledger stays in memory. */
   ledgerFile?: string;
+  /** The state directory: where people's saved browser sessions are. */
+  home?: string;
+  /** For unit tests: a stand-in for the browser actor's Chrome. */
+  launchBrowser?: Launch;
   /** For unit tests: how the live backends reach their platforms, and the platforms' base URLs by driver. */
   fetch?: typeof fetch;
   apiBase?: Readonly<Record<string, string>>;
@@ -155,6 +160,7 @@ export function createApp(options: AppOptions): App {
     log,
   });
   const vault = new LiveVault(liveEnv, (secret) => redactor.register(secret));
+  const browsers = new BrowserActors(options.live?.launchBrowser);
 
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
@@ -178,6 +184,8 @@ export function createApp(options: AppOptions): App {
         ledger,
         tag: runTag(run),
         fetch: options.live?.fetch ?? fetch,
+        browsers,
+        home: options.live?.home,
         apiBase: options.live?.apiBase?.[definition.name],
       },
     }),
@@ -190,7 +198,8 @@ export function createApp(options: AppOptions): App {
     ]),
   );
 
-  // What a live session created comes off the real platform first, while its records still exist.
+  // A session's browsers close first; then what it created comes off the real platform, while its records still exist.
+  sessions.onClose((session) => browsers.close(session.id));
   sessions.onClose((session) => ledger.cleanup(session.id).then(() => undefined));
   sessions.onClose((session) => {
     delivery.cancel(session.id);

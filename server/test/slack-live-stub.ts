@@ -22,7 +22,10 @@ export interface SlackStub {
   /** Every call so far: the method, and the handle (or `bot`) whose token made it. */
   readonly calls: Array<{ method: string; as: string; params: Record<string, unknown> }>;
   /** The app answers in a conversation, as the real agent would (Slack delivered the event to it, not channelstack). */
-  botSays(channel: string, text: string, threadTs?: string): string;
+  /** `blocks`: what the app sends with it, e.g. a button. */
+  botSays(channel: string, text: string, threadTs?: string, blocks?: unknown[]): string;
+  /** A person by their handle, as Slack's mention suggestions find them. */
+  userByName(name: string): string | undefined;
   channel(id: string): StubChannel | undefined;
   /** Channels by name, archived ones included. */
   channels(): StubChannel[];
@@ -33,6 +36,7 @@ interface StubMessage {
   user: string;
   bot_id?: string;
   text: string;
+  blocks?: unknown[];
   thread_ts?: string;
   reply_count?: number;
   reactions?: Array<{ name: string; users: string[] }>;
@@ -100,6 +104,7 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
           team: "Stub",
           url: "https://stub.slack.com/",
           user_id: who.userId,
+          user: users.get(who.userId)?.name,
           ...(who.isBot ? { bot_id: bot.botId } : {}),
         });
       case "users.info": {
@@ -284,11 +289,14 @@ export function slackStub(options: { team?: string } = {}): SlackStub {
       users.set(userId, { id: userId, name: handleName });
       return { token, userId };
     },
-    botSays(channelId, text, threadTs) {
+    botSays(channelId, text, threadTs, blocks) {
       const channel = channels.get(channelId);
       if (!channel) throw new Error(`No channel ${channelId}`);
-      return post(channel, bot.userId, text, threadTs, bot.botId).ts;
+      const message = post(channel, bot.userId, text, threadTs, bot.botId);
+      if (blocks) message.blocks = blocks;
+      return message.ts;
     },
+    userByName: (name) => [...users.values()].find((user) => user.name === name)?.id,
     typed(userId, channelId, text, threadTs) {
       const channel = channels.get(channelId);
       if (!channel) throw new Error(`No channel ${channelId}`);

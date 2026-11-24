@@ -79,15 +79,15 @@ Every feature runs in the fake server (in memory). The question this document an
 | `slack.createChannel({ participants, private })` | Done | Built | User token of the first real person in it (`conversations.create`, `conversations.invite`) | Including `slack.app` invites the bot. The app's bot can't create channels, so a person does; no separate seeding token is needed |
 | `slack.createChannel({ shared: true })` (Slack Connect) | Yes | No | — | Needs a second organization and manual approval |
 | `slack.uninstallApp()` | Done | Not yet | App credentials (`apps.uninstall` with the token, `client_id` and `client_secret`) | Revokes every token of the installation. Reinstalling needs the OAuth consent flow in a browser, so it belongs in a dedicated nightly job, not in every run. Live runs report `unsupported_in_live` until that job exists |
-| `ana.say(text, { channel })` | Done | Yes, with browser | Browser (typed in Slack's client) | The platform sends real `message` and `app_mention` events only for a message a person types. Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included (`as_user` too), and agents drop it as a bot's (found against the sandbox, [decision 0015](decisions/0015-live-mode.md)). Live runs report `action_requires` until the browser actor types it in Slack's client |
-| `ana.say(text, { to: slack.app })` (DM) | Done | Yes, with browser | Browser; the DM is opened with the user token (`conversations.open`) | Fires `message.im`. As `say` in a channel |
-| `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Yes, with browser | Browser | As `say` in a channel |
+| `ana.say(text, { channel })` | Done | Built, with browser | Browser (typed in Slack's client) | The platform sends real `message` and `app_mention` events only for a message a person types. Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included (`as_user` too), and agents drop it as a bot's (found against the sandbox, [decision 0015](decisions/0015-live-mode.md)). The browser actor types it in Slack's client, from a session saved with `channelstack login`; without one, live runs report `action_requires` |
+| `ana.say(text, { to: slack.app })` (DM) | Done | Built, with browser | Browser; the DM is opened with the user token (`conversations.open`) | Fires `message.im`. As `say` in a channel |
+| `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Built, with browser | Browser | As `say` in a channel |
 | `ana.say({ files })` | Yes | Yes, with browser | Browser | As `say` in a channel |
-| `ana.reply(text, { thread })` | Done | Yes, with browser | Browser | `alsoSendToChannel` → `reply_broadcast`. As `say` in a channel |
+| `ana.reply(text, { thread })` | Done | Built, with browser | Browser | `alsoSendToChannel` → `reply_broadcast`. As `say` in a channel |
 | `ana.edit(text, { message })` | Done | Built | User token (`chat.update`) | Only the person's own messages, as in Slack. **unverified**: whether an edit through the API carries the posting app's bot as a new message does |
 | `ana.delete({ message })` | Done | Built | User token (`chat.delete`) | |
 | `ana.react` / `unreact` | Done | Built | User token (`reactions.add` / `remove`) | |
-| `ben.click("Approve", { message })` | Done | Yes, with browser | Browser | Confirmed: `block_actions` is only sent when a real person clicks; there's no API to trigger it |
+| `ben.click("Approve", { message })` | Done | Built, with browser | Browser | Confirmed: `block_actions` is only sent when a real person clicks; there's no API to trigger it |
 | `ana.select(option, { menu, message })` | Done | Yes, with browser | Browser | Same as click |
 | `ben.waitForModal()` | Done | Yes, with proxy or browser | Proxy (sees `views.open`) or Browser (sees the modal) | |
 | `modal.submit(values)` / `close()` | Done | Yes, with browser | Browser | Confirmed: no API sends `view_submission` as a user |

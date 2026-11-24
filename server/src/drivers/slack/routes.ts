@@ -199,16 +199,6 @@ const IN_THE_CLIENT: LiveSupport = {
   requires: "browser",
   reason: "Slack sends this only when a person does it in the client; no API does it as a person",
 };
-/**
- * A person's message. Slack marks every message posted through its API with the posting app's bot,
- * a person's user token included (`as_user` too), and agents drop it as a bot's. Only Slack's
- * client posts as a person (found against the real sandbox; decision 0015).
- */
-const TYPED_IN_THE_CLIENT: LiveSupport = {
-  requires: "browser",
-  reason:
-    "a message posted through Slack's API carries the posting app's bot_id, and agents ignore it as a bot's; only Slack's client posts as a person",
-};
 /** What only the app's own calls show (status, suggested prompts, modals, ephemeral messages): live, proxy mode sees them. */
 const AGENT_SIDE: LiveSupport = {
   requires: "proxy",
@@ -467,7 +457,6 @@ export function registerSlackRoutes(
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
     sdkMethod: { on: "SlackUser", name: "say", args: ["message"], options: ["channel", "to"] },
-    live: TYPED_IN_THE_CLIENT,
     stability,
     handler: async ({ session, params, body }) => {
       const where =
@@ -490,7 +479,6 @@ export function registerSlackRoutes(
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
     sdkMethod: { on: "SlackUser", name: "reply", args: ["message"], options: ["thread", "alsoSendToChannel"] },
-    live: TYPED_IN_THE_CLIENT,
     stability,
     handler: async ({ session, params, body }) =>
       messageWire(
@@ -550,7 +538,8 @@ export function registerSlackRoutes(
         channel: conversationRef.optional(),
       })
       .openapi("SlackClickBody"),
-    response: SlackDelivery,
+    // The `block_actions` delivery; none live, where Slack tells the agent itself.
+    response: SlackDelivery.nullable(),
     errors: ["not_found", "not_in_channel", "dispatch_failed"],
     // A person waits for the button to appear before they click it.
     sdkMethod: {
@@ -560,9 +549,8 @@ export function registerSlackRoutes(
       options: ["message", "thread", "channel"],
       retryWhile: ["not_found"],
     },
-    live: IN_THE_CLIENT,
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const scopes = [
         body.message && { message: body.message },
         body.thread && { thread: body.thread },
@@ -575,7 +563,9 @@ export function registerSlackRoutes(
       if (body.button.label === undefined && body.button.actionId === undefined) {
         throw new ProtocolError("invalid_argument", "Say which button: its label or its action_id");
       }
-      return interaction(session.id, fake.clickAsUser(session.id, params.user, body.button, where));
+      const delivery = await world.clickAsUser(session.id, params.user, body.button, where);
+      // Live, Slack tells the agent itself: there is no delivery.
+      return delivery === undefined ? null : interaction(session.id, delivery);
     },
   });
 

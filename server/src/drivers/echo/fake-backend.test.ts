@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
+import { BrowserActors } from "../../core/browser/index.ts";
 import { systemClock, systemTimers } from "../../core/clock/index.ts";
 import { DeliveryQueue } from "../../core/delivery/index.ts";
 import { EventLog } from "../../core/events/index.ts";
@@ -49,6 +50,8 @@ function context(): DriverContext {
       ledger: new Ledger({ file: undefined, run: "test", server: "s1", clock: systemClock, log }),
       tag: "channelstack-run-test",
       fetch,
+      browsers: new BrowserActors(),
+      home: undefined,
       apiBase: undefined,
     },
   };

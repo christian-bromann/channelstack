@@ -78,7 +78,7 @@ export interface InteractionDispatch {
 }
 
 type Interactions = Pick<
-  SlackWorld,
+  Immediate<SlackWorld>,
   | "clickAsUser"
   | "selectAsUser"
   | "shortcutAsUser"

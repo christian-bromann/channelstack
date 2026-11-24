@@ -1299,11 +1299,11 @@ class SlackUser:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/delete", body={"message": {"channel": message.channel, "ts": message.ts}})
 
-    async def click(self, button: str | SlackButtonRef, *, message: SlackMessage | None = None, thread: SlackThread | SlackMessage | None = None, channel: SlackConversation | None = None) -> SlackDelivery:
+    async def click(self, button: str | SlackButtonRef, *, message: SlackMessage | None = None, thread: SlackThread | SlackMessage | None = None, channel: SlackConversation | None = None) -> SlackDelivery | None:
         """Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental."""
         ctx = self._ctx
         data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/click", body={"button": {"label": button} if isinstance(button, str) else button._to_wire(), "message": None if message is None else {"channel": message.channel, "ts": message.ts}, "thread": None if thread is None else {"channel": thread.channel, "ts": thread.ts}, "channel": None if channel is None else channel.id}))
-        return SlackDelivery(ctx, data)
+        return (None if data is None else SlackDelivery(ctx, data))
 
     async def select(self, option: str | list[str], *, menu: str | SlackMenuRef, message: SlackMessage) -> SlackDelivery:
         """Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental."""

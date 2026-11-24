@@ -40,6 +40,7 @@ export const slack: DriverDefinition = {
           live: context.live,
           ids: context.ids,
           clock: context.clock,
+          timers: context.timers,
           appName: fake.store.app.name,
         })
       : undefined;

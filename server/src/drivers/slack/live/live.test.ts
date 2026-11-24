@@ -1,10 +1,18 @@
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, test } from "vitest";
 
 import { harness } from "../../../../test/app-harness.ts";
+import { slackClientStub } from "../../../../test/slack-client-stub.ts";
 import { type SlackStub, slackStub } from "../../../../test/slack-live-stub.ts";
+import { storageStatePath, writeStorageState } from "../../../core/browser/index.ts";
 
 /** A server whose Slack driver is live against the stub: the app's credentials and the allowlist set, as in CI. */
 function liveSlack(stub: SlackStub, allowlist = stub.team, extra: Record<string, string> = {}) {
+  const home = mkdtempSync(join(tmpdir(), "channelstack-live-"));
+  const client = slackClientStub(stub);
   const h = harness(
     {},
     {
@@ -18,9 +26,16 @@ function liveSlack(stub: SlackStub, allowlist = stub.team, extra: Record<string,
         },
         fetch: stub.fetch,
         apiBase: { slack: stub.apiBase },
+        home,
+        launchBrowser: client.launch,
       },
     },
   );
+  /** A person signed in once with `channelstack login`: their saved session, where the browser actor looks. */
+  const signIn = (name: string, userId: string) =>
+    writeStorageState(storageStatePath(home, "slack", name), {
+      cookies: [{ name: "d", value: userId, domain: ".slack.com" }],
+    });
   const open = async () => {
     const { body } = await h.call("POST", "/sessions", {});
     return {
@@ -29,7 +44,7 @@ function liveSlack(stub: SlackStub, allowlist = stub.team, extra: Record<string,
         h.call(method, `/sessions/${body.sessionId}/slack${path}`, payload),
     };
   };
-  return { ...h, open };
+  return { ...h, open, signIn, home, client };
 }
 
 describe("exit check 5.3: allowlists hold", () => {
@@ -116,7 +131,7 @@ describe("live Slack: acting and reading back", () => {
       error: "action_requires",
       data: { operation: "SlackUser.say", requires: "the browser actor" },
     });
-    expect(said.body.message).toContain("carries the posting app's bot_id");
+    expect(said.body.message).toContain("channelstack login slack --user ana");
     expect(stub.calls.filter((call) => call.method === "chat.postMessage")).toEqual([]);
 
     // Here a stand-in types it, and the agent answers the way it would: Slack delivered to it.
@@ -209,14 +224,15 @@ describe("live Slack: acting and reading back", () => {
     await session.slack("POST", "/users", { name: "Ana", token: ana.token });
     const before = stub.calls.length;
 
-    const click = await session.slack("POST", `/users/${ana.userId}/click`, {
-      button: { label: "Approve" },
-      channel: "C0X",
+    const select = await session.slack("POST", `/users/${ana.userId}/select`, {
+      option: ["staging"],
+      menu: { label: "Environment" },
+      message: { channel: "C0X", ts: "1.2" },
     });
-    expect(click.status).toBe(422);
-    expect(click.body).toMatchObject({
+    expect(select.status).toBe(422);
+    expect(select.body).toMatchObject({
       error: "action_requires",
-      data: { operation: "SlackUser.click", requires: "the browser actor" },
+      data: { operation: "SlackUser.select", requires: "the browser actor" },
     });
     const status = await session.slack("GET", "/conversations/C0X/threads/1.2/state");
     expect(status.body).toMatchObject({ error: "action_requires", data: { requires: "proxy mode" } });
@@ -224,6 +240,101 @@ describe("live Slack: acting and reading back", () => {
     expect(retry.status).toBe(501);
     expect(retry.body.error).toBe("unsupported_in_live");
     expect(stub.calls.length).toBe(before);
+  });
+});
+
+describe("the browser actor: what only Slack's client does", () => {
+  test("a person signed in once types a message, with a real mention, and it is read back", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "@my-agent summarize #support today" },
+      channel: channel.body.id,
+    });
+    expect(said.status).toBe(200);
+    expect(said.body).toMatchObject({ author: { kind: "user", name: "ana" } });
+    // Typed in the client, not posted through the API: no app's bot on it, and a real mention.
+    expect(stub.calls.filter((call) => call.method === "chat.postMessage")).toEqual([]);
+    const typed = stub.channel(channel.body.id)?.messages.at(-1);
+    expect(typed).toMatchObject({ user: ana.userId, text: `<@${stub.bot.userId}> summarize #support today` });
+    expect(typed?.bot_id).toBeUndefined();
+    // Its own origin first, to restore the session; then the conversation.
+    expect(server.client.opened).toEqual([
+      "https://app.slack.com",
+      `https://app.slack.com/client/${stub.team}/${channel.body.id}`,
+    ]);
+
+    stub.botSays(channel.body.id, "Here you go", said.body.ts);
+    const reply = await session.slack("POST", `/users/${ana.userId}/reply`, {
+      message: { text: "thanks" },
+      thread: { channel: channel.body.id, ts: said.body.ts },
+    });
+    expect(reply.body).toMatchObject({ text: "thanks", threadTs: said.body.ts });
+  });
+
+  test("a click on the app's button, found by its label in the thread", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+    const asked = stub.typed(ana.userId, channel.body.id, "deploy web to staging");
+    stub.botSays(channel.body.id, "Deploy web to staging?", asked, [
+      {
+        type: "actions",
+        elements: [{ type: "button", action_id: "approve", text: { type: "plain_text", text: "Approve" } }],
+      },
+    ]);
+
+    const clicked = await session.slack("POST", `/users/${ana.userId}/click`, {
+      button: { actionId: "approve" },
+      thread: { channel: channel.body.id, ts: asked },
+    });
+    expect(clicked.status).toBe(200);
+    // Slack tells the agent itself: no delivery here.
+    expect(clicked.body).toBeNull();
+    expect(server.client.clicks).toEqual([
+      { user: ana.userId, channel: channel.body.id, thread: asked, label: "Approve" },
+    ]);
+  });
+
+  test("a saved session others can read, or none where the test said, is refused", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const ben = stub.person("ben");
+    const server = liveSlack(stub);
+    const session = await server.open();
+    const shared = join(server.home, "shared.json");
+    writeFileSync(shared, JSON.stringify({ cookies: [] }));
+    chmodSync(shared, 0o644);
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token, browser: { storageState: shared } });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId] });
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "hi" },
+      channel: channel.body.id,
+    });
+    expect(said.body.error).toBe("live_misconfigured");
+    expect(said.body.message).toContain("can be read by others");
+
+    await session.slack("POST", "/users", {
+      name: "Ben",
+      token: ben.token,
+      browser: { storageState: join(server.home, "nowhere.json") },
+    });
+    const benSays = await session.slack("POST", `/users/${ben.userId}/say`, {
+      message: { text: "hi" },
+      to: [stub.bot.userId],
+    });
+    expect(benSays.body.error).toBe("live_misconfigured");
+    expect(benSays.body.message).toContain("No saved browser session");
   });
 });
 

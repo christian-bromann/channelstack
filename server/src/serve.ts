@@ -111,7 +111,11 @@ export async function start(options: StartOptions): Promise<RunningServer> {
     webhooks: options.webhooks,
     ...(options.ui === undefined ? {} : { ui: options.ui }),
     // One ledger file per server, so a crash leaves what this one created for `channelstack sweep`.
-    live: { env: options.env ?? {}, ledgerFile: join(ledgerDir(options.home), `${process.pid}-${Date.now()}.json`) },
+    live: {
+      env: options.env ?? {},
+      ledgerFile: join(ledgerDir(options.home), `${process.pid}-${Date.now()}.json`),
+      home: options.home,
+    },
     urls: () => {
       if (!urls) throw new Error("The server isn't listening yet");
       return urls;

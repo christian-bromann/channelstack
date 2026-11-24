@@ -66,6 +66,17 @@ Alternative: keep posting through the API and make the reference agent accept a 
 
 What a session writes in a DM is deleted when it closes, with the replies under it (ledger kind `message`). The browser actor will record what it types there. A Slack app configuration token doesn't help either: it only calls the App Manifest APIs.
 
+## The browser actor
+
+A real browser, driven as a sandbox person, for what only a platform's client does: a Slack person's message and reply, a click on the app's button (`core/browser`, `drivers/slack/live/ui.ts`).
+
+- **WebdriverIO, Chrome over WebDriver BiDi, headless.** It runs inside the compiled binary: `bun-compile.ts` builds with a plugin that rewrites WebdriverIO's computed imports (`import(options.automationProtocol || "webdriver")`, `@wdio/utils`' `import(nodeModule)`) to literal ones, so the bundler follows them. Until WebdriverIO makes them literal itself.
+- **It never signs in, and never handles a password.** A person signs in by hand, once: `channelstack login slack --user ana` opens a visible browser at the sandbox's sign-in page and saves the session's cookies to `<home>/browser/slack-ana.json` (0600) once the client loads. The actor restores them; a session file others can read is refused. Unattended sign-in (a test inbox, passkeys) comes later.
+- **It opens only its own origins** (`https://app.slack.com`), one browser per person per test session, closed when the session closes.
+- **What a person types is read back through the API**: the newest message of theirs since they began, within 15 seconds. A mention is typed as `@handle` and picked from Slack's suggestions with Tab, so it is a real mention.
+- **A click finds its button through the API first:** the message that has it, by label or `action_id`, and the label a person sees; then the actor clicks that label there.
+- Slack's selectors are a first guess until checked against the real client. They are in one place (`ui.ts`).
+
 ## Linear: the live world keeps a mirror in the fake's store shape
 
 The Linear routes read the fake's records directly (issues, comments, sessions, activities), and a `LinearWorld` interface (`backend.ts`) now carries the actions both worlds implement. The live world keeps its own `LinearStore`, with the fake's record shapes, as a mirror of real Linear: actions write to Linear and put what Linear answered into it; a read refreshes what it is about first (an issue with its comments and sessions, or one session). So the routes read the same way from both, and the text helpers (mentions as profile links, a comment's thread, an issue's state) are written once (`text.ts`).

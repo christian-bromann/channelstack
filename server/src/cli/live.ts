@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { systemTimers } from "../core/clock/index.ts";
+import { BrowserActor, type Launch, storageStatePath, writeStorageState } from "../core/browser/index.ts";
+import { delay, systemTimers } from "../core/clock/index.ts";
 import { readLedgers, rewriteLedger } from "../core/ledger/index.ts";
 import type { DriverDefinition, LiveCheck } from "../core/router/index.ts";
 import { isRunId } from "../core/safety/index.ts";
@@ -199,4 +200,62 @@ export async function runSweep(
   }
   if (lines.length === 0) lines.push(input.check ? "Nothing left behind." : "Nothing to remove.");
   return { text: `${lines.join("\n")}\n`, ok: left === 0 };
+}
+
+/** How long `channelstack login` waits for a person to finish signing in, and how often it looks. */
+const SIGN_IN_MS = 10 * 60_000;
+const SIGN_IN_POLL_MS = 1_000;
+
+/**
+ * `channelstack login <channel> --user <name>`: a person signs in by hand, once, in a browser
+ * window channelstack opens at the sandbox's sign-in page. Once they are in, the session's cookies
+ * are saved, private (0600), where the browser actor looks for them. channelstack never types or
+ * sees a password; the file never leaves the machine.
+ */
+export async function runLogin(
+  input: LiveCommandInput & {
+    channel: string | undefined;
+    user: string | undefined;
+    launch?: Launch;
+    say?: (line: string) => void;
+  },
+): Promise<{ text: string; ok: boolean }> {
+  const definition = input.drivers.find((candidate) => candidate.name === input.channel);
+  const signIn = definition?.live?.maintenance?.signIn;
+  if (!definition || !signIn) {
+    const can = input.drivers
+      .filter((candidate) => candidate.live?.maintenance?.signIn)
+      .map((candidate) => candidate.name);
+    throw new CliError(`channelstack login takes one of ${can.join(", ")}, got "${input.channel ?? ""}"`);
+  }
+  if (!input.user || !/^[A-Za-z][\w.-]*$/.test(input.user))
+    throw new CliError("--user takes the person's name, e.g. --user ana");
+  const page = await signIn({
+    env: input.env,
+    fetch: input.fetch ?? fetch,
+    timers: systemTimers,
+    ...(input.apiBase?.[definition.name] ? { apiBase: input.apiBase[definition.name] } : {}),
+  });
+  const actor = await BrowserActor.start({
+    headed: true,
+    origins: page.origins,
+    ...(input.launch ? { launch: input.launch } : {}),
+  });
+  try {
+    await actor.open(page.start);
+    (input.say ?? ((line) => process.stdout.write(`${line}\n`)))(
+      `Sign in as ${input.user} in the browser window. channelstack saves the session once you are in.`,
+    );
+    const deadline = Date.now() + SIGN_IN_MS;
+    while (!page.signedIn(await actor.url())) {
+      if (Date.now() >= deadline)
+        return { text: `Not signed in after ${SIGN_IN_MS / 60_000} minutes: nothing saved.\n`, ok: false };
+      await delay(systemTimers, SIGN_IN_POLL_MS);
+    }
+    const path = storageStatePath(input.home, definition.name, input.user);
+    writeStorageState(path, await actor.state(page.cookieDomains));
+    return { text: `Saved ${input.user}'s ${definition.name} session to ${path} (only you can read it).\n`, ok: true };
+  } finally {
+    await actor.close();
+  }
 }

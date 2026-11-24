@@ -1,4 +1,8 @@
-import type { Clock } from "../../../core/clock/index.ts";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { readStorageState, storageStatePath } from "../../../core/browser/index.ts";
+import { type Clock, delay, type Timers } from "../../../core/clock/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
 import {
@@ -7,13 +11,16 @@ import {
   liveMisconfigured,
   unsupportedInLive,
 } from "../../../core/reality/index.ts";
+import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
+import { findButton, plain } from "../blocks.ts";
 import { mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
   type SlackAppRecord,
   type SlackConversationKind,
   type SlackConversationRecord,
+  type SlackMessageInput,
   type SlackMessageRecord,
   SlackRefusal,
   type SlackTeam,
@@ -23,11 +30,15 @@ import {
 import type { SlackCredentials } from "./cleanup.ts";
 import type { SlackWebClient } from "./client.ts";
 import { checkSlackCredential, identify } from "./identity.ts";
+import { SLACK_CLIENT, slackClient, type Typed } from "./ui.ts";
 
 /** How long a read of real Slack is reused: matchers poll every 50ms, and Slack's read methods allow about one call a second. */
 const READ_TTL_MS = 1000;
 /** Slack's limit for a channel name. */
 const MAX_CHANNEL_NAME = 80;
+/** How long a message a person typed in the client may take to show up in the API, and how often to look. */
+const READ_BACK_MS = 15_000;
+const READ_BACK_POLL_MS = 1_000;
 
 /** A message as Slack's read methods and `chat.postMessage` return it: the fields the transcript needs. */
 interface WireMessage {
@@ -63,6 +74,12 @@ interface LivePerson {
   /** The name the test gave them (`createUser({ name: "Ana" })`), which `@Ana` resolves against too. */
   readonly alias: string;
   readonly credential: LiveCredential | undefined;
+  /**
+   * Their saved browser session, for what only Slack's client does: the path the test gave
+   * (`createUser({ browser: { storageState } })`, which must exist), or where `channelstack login`
+   * saves one (used when it is there).
+   */
+  readonly browser: { path: string; given: boolean } | undefined;
 }
 
 export interface LiveSlackWorld extends SlackWorld {
@@ -91,10 +108,13 @@ export function createLiveWorld(deps: {
   live: LiveContext;
   ids: IdGenerator;
   clock: Clock;
+  timers: Timers;
   /** The app's name as tests write it (`@my-agent`), whatever its bot is called in the workspace. */
   appName: string;
 }): LiveSlackWorld {
-  const { client, live, ids, clock } = deps;
+  const { client, live, ids, clock, timers } = deps;
+  /** The app's bot's handle, what a person types after `@` to mention it. */
+  let appHandle = "";
   const bot = live.vault.fromEnv("CHANNELSTACK_SLACK_BOT_TOKEN");
   // An id, not a secret: read as it is, not held as a credential.
   const appId = live.vault.setting("CHANNELSTACK_SLACK_APP_ID") ?? "";
@@ -295,16 +315,115 @@ export function createLiveWorld(deps: {
     });
   };
 
+  /** Where a person's saved browser session is: the test's path, or `channelstack login`'s for them. */
+  const browserOf = (options: { name: string; browser?: { storageState: string } | undefined }) => {
+    if (options.browser) return { path: resolve(options.browser.storageState), given: true };
+    return live.home === undefined
+      ? undefined
+      : { path: storageStatePath(live.home, "slack", options.name), given: false };
+  };
+
+  /** The person in Slack's client, signed in from their saved session. */
+  const clientFor = async (session: string, userId: string, operation: string) => {
+    actor(session, userId);
+    const browser = person(session, userId).browser;
+    if (!browser || (!browser.given && !existsSync(browser.path))) {
+      throw actionRequires(
+        operation,
+        "the browser actor",
+        `${person(session, userId).alias} has no saved browser session: \`channelstack login slack --user ${person(session, userId).alias.toLowerCase()}\`, or createUser({ browser: { storageState } })`,
+      );
+    }
+    const started = await live.browsers.for(session, userId, {
+      origins: [SLACK_CLIENT],
+      state: () => readStorageState(browser.path),
+    });
+    return slackClient(started, known().team.id);
+  };
+
+  /** What a person types for a test's text: its text, and each mention as the handle Slack suggests. */
+  const typedOf = (session: string, input: SlackMessageInput): Typed =>
+    richTextPieces(input.text ?? "", (name) => resolveName(session, name)).map((piece) => {
+      if ("text" in piece) return { text: piece.text };
+      const handle = piece.mention === known().app.botUserId ? appHandle : person(session, piece.mention).record.name;
+      return { mention: handle };
+    });
+
+  /**
+   * A person types a message in Slack's client; then it is read back through the API: the newest
+   * message of theirs there since they began.
+   */
+  const typedMessage = async (
+    session: string,
+    userId: string,
+    target: SlackConversationRecord,
+    thread: string | undefined,
+    operation: string,
+    send: (ui: Awaited<ReturnType<typeof clientFor>>, typed: Typed) => Promise<void>,
+    input: SlackMessageInput,
+  ): Promise<SlackMessageRecord> => {
+    if (input.blocks !== undefined || input.metadata !== undefined) {
+      throw unsupportedInLive(operation, "a person types text in Slack's client: blocks and metadata are the app's");
+    }
+    const ui = await clientFor(session, userId, operation);
+    const since = (clock() / 1000).toFixed(6);
+    await send(ui, typedOf(session, input));
+    const deadline = clock() + READ_BACK_MS;
+    for (;;) {
+      changed(target.id);
+      const written =
+        thread === undefined ? await history(session, target.id) : await threadOf(session, target.id, thread);
+      const mine = written
+        .filter((message) => message.user === userId && message.ts > since && message.ts !== thread)
+        .sort((a, b) => b.ts.localeCompare(a.ts))[0];
+      if (mine) {
+        if (target.kind === "im" || target.kind === "mpim")
+          recordDm(session, target, actor(session, userId), mine.ts, thread);
+        const [record] = await records(session, target.id, [mine]);
+        return record as SlackMessageRecord;
+      }
+      if (clock() >= deadline) {
+        throw new ProtocolError(
+          { platform: "not_sent", status: 409 },
+          `What ${person(session, userId).alias} typed in Slack's client didn't arrive in ${READ_BACK_MS / 1000}s`,
+        );
+      }
+      await delay(timers, READ_BACK_POLL_MS);
+    }
+  };
+
+  /**
+   * A DM can't be archived, and other sessions may write in the same one: the ledger lists each
+   * message this session wrote there, and cleanup deletes those and the replies under them.
+   */
+  const recordDm = (
+    session: string,
+    record: SlackConversationRecord,
+    by: LiveCredential,
+    ts: string,
+    thread: string | undefined,
+  ) => {
+    live.ledger.record({
+      channel: "slack",
+      kind: "message",
+      ref: { channel: record.id, ts, ...(thread === undefined ? {} : { thread }) },
+      workspace: known().team.id,
+      by: by.owner,
+      session,
+    });
+  };
+
   const notHere = (operation: string, requires: "the browser actor" | "proxy mode") => () => {
     throw actionRequires(operation, requires, "the router refuses it live before it gets here");
   };
 
-  return {
+  const world: LiveSlackWorld = {
     async ready() {
       checked ??= (async () => {
         const who = await identify(client, botCredential());
         checkSlackCredential(who, { role: "app", who: "CHANNELSTACK_SLACK_BOT_TOKEN", allowlist: live.allowlist });
         const domain = /^https:\/\/([^.]+)\./.exec(who.url)?.[1] ?? "";
+        appHandle = who.handle;
         identity = {
           team: { id: who.team, name: who.teamName, domain },
           app: {
@@ -387,7 +506,7 @@ export function createLiveWorld(deps: {
           botId: undefined,
           fixedId: false,
         };
-        map.set(id, { record, alias: options.name, credential: undefined });
+        map.set(id, { record, alias: options.name, credential: undefined, browser: undefined });
         return record;
       }
       const credential = live.vault.person(options.name, options.token);
@@ -400,7 +519,7 @@ export function createLiveWorld(deps: {
       });
       const info = await client.call("users.info", botCredential(), { user: who.user });
       const record = userRecord(info.user as WireUser);
-      map.set(record.id, { record, alias: options.name, credential });
+      map.set(record.id, { record, alias: options.name, credential, browser: browserOf(options) });
       return record;
     },
 
@@ -454,10 +573,35 @@ export function createLiveWorld(deps: {
 
     openConversation: (session, user, withParticipants) => open(session, user, withParticipants),
 
-    // A person's message is typed in Slack's client (the router refuses these live until the
-    // browser actor exists): through the API, Slack marks it with the posting app's bot.
-    postAsUser: notHere("SlackUser.say", "the browser actor"),
-    replyAsUser: notHere("SlackUser.reply", "the browser actor"),
+    // A person's message is typed in Slack's client by the browser actor: through the API, Slack
+    // marks it with the posting app's bot, and agents ignore it (decision 0015).
+    async postAsUser(session, user, message, where) {
+      const target = "channel" in where ? conversation(session, where.channel) : await open(session, user, where.to);
+      return typedMessage(
+        session,
+        user,
+        target,
+        undefined,
+        "SlackUser.say",
+        (ui, typed) => ui.say(target.id, typed),
+        message,
+      );
+    },
+
+    async replyAsUser(session, user, message, thread) {
+      const root = await messageAt(session, thread.channel, thread.ts);
+      const rootTs = root.threadTs ?? root.ts;
+      const target = conversation(session, thread.channel);
+      return typedMessage(
+        session,
+        user,
+        target,
+        rootTs,
+        "SlackUser.reply",
+        (ui, typed) => ui.reply(target.id, rootTs, typed),
+        message,
+      );
+    },
 
     async editAsUser(session, user, message, target) {
       const credential = actor(session, user);
@@ -552,7 +696,29 @@ export function createLiveWorld(deps: {
     },
 
     // The router refuses these live (`live` on their routes): they are UI-only or need proxy mode.
-    clickAsUser: notHere("SlackUser.click", "the browser actor"),
+    async clickAsUser(session, user, button, where) {
+      // The message with the button, read through the API: the label a person sees, and where it is.
+      const channel =
+        "channel" in where ? where.channel : "message" in where ? where.message.channel : where.thread.channel;
+      const candidates =
+        "message" in where
+          ? [await messageAt(session, channel, where.message.ts)]
+          : "thread" in where
+            ? (await world.thread(session, channel, where.thread.ts)).reverse()
+            : (await world.messages(session, channel)).reverse();
+      const holder = candidates.find((candidate) => findButton(candidate.blocks, button));
+      const found = holder ? findButton(holder.blocks, button) : undefined;
+      if (!holder || !found) {
+        throw new ProtocolError("not_found", `No button ${button.label ?? button.actionId} there yet`, {
+          button: button.label ?? button.actionId,
+        });
+      }
+      const ui = await clientFor(session, user, "SlackUser.click");
+      await ui.click(plain(found.element.text), { channel, thread: holder.threadTs });
+      changed(channel);
+      // Slack tells the agent itself; there is no delivery here.
+      return undefined;
+    },
     selectAsUser: notHere("SlackUser.select", "the browser actor"),
     shortcutAsUser: notHere("SlackUser.shortcut", "the browser actor"),
     commandAsUser: notHere("SlackUser.runCommand", "the browser actor"),
@@ -568,4 +734,5 @@ export function createLiveWorld(deps: {
     threadState: notHere("SlackThread.status", "proxy mode"),
     ephemeral: notHere("SlackUser.ephemeral", "proxy mode"),
   };
+  return world;
 }

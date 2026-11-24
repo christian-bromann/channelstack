@@ -1224,10 +1224,10 @@ export class SlackUser {
   }
 
   /** Click a button, found by its label or action_id: on a message, or on the app's latest message that has it in a thread or a conversation. Experimental. */
-  async click(button: string | SlackButtonRef, options: { message?: SlackMessage; thread?: SlackThread | SlackMessage; channel?: SlackConversation } = {}): Promise<SlackDelivery> {
+  async click(button: string | SlackButtonRef, options: { message?: SlackMessage; thread?: SlackThread | SlackMessage; channel?: SlackConversation } = {}): Promise<SlackDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as SlackDeliveryData;
-    return new SlackDelivery(ctx, data);
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/click`, { body: { button: typeof button === "string" ? { label: button } : button, message: options.message === undefined ? undefined : { channel: options.message.channel, ts: options.message.ts }, thread: options.thread === undefined ? undefined : { channel: options.thread.channel, ts: options.thread.ts }, channel: options.channel === undefined ? undefined : options.channel.id } }))) as SlackDeliveryData | null;
+    return (data === null ? undefined : new SlackDelivery(ctx, data));
   }
 
   /** Choose from a select menu on a message: options by their text or value, the menu by its placeholder or action_id. Experimental. */

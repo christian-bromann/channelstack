@@ -117,7 +117,8 @@ export interface SlackUser extends User {
    * the latest agent message in `thread` (or in `channel`) that has the button.
    * Sends `block_actions`.
    */
-  click(button: string | { actionId: string; value?: string }, where: { message: SlackMessage } | { thread: SlackThread } | { channel: SlackConversation }): Promise<SlackDelivery>;
+  /** Resolves with the `block_actions` delivery; none live, where Slack tells the agent itself. */
+  click(button: string | { actionId: string; value?: string }, where: { message: SlackMessage } | { thread: SlackThread } | { channel: SlackConversation }): Promise<SlackDelivery | undefined>;
   /** Choose an option in a select menu, found by placeholder or `action_id`. */
   select(option: string | string[], where: { menu: string | { actionId: string }; message: SlackMessage }): Promise<SlackDelivery>;
   /** Run a message shortcut on a message. */

@@ -461,6 +461,7 @@ const ana = await slack.createUser({ name: "Ana" });
   channelstack doctor                      # per channel: fake or live, credentials, allowlist, saved browser sessions
   channelstack sweep                       # what crashed runs left: their ledgers, and tagged objects older than 24h
   channelstack sweep --check --run <id>    # remove nothing; exit 1 if that run left anything (the nightly job's check)
+  channelstack login slack --user ana      # sign Ana in by hand, once; the browser actor uses the saved session
   ```
 
   `CHANNELSTACK_RUN_ID` names the run (CI sets it per job); without it, each server makes one up.

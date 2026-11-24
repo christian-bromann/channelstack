@@ -7,6 +7,8 @@ import type { SlackWebClient } from "./client.ts";
 /** Who a Slack token is, by `auth.test`. */
 export interface SlackIdentity {
   readonly user: string;
+  /** The user's handle (`ana`, or a bot's `robin`): what a person types after `@` to mention them. */
+  readonly handle: string;
   readonly team: string;
   readonly teamName: string;
   readonly url: string;
@@ -20,6 +22,7 @@ export async function identify(client: SlackWebClient, credential: LiveCredentia
   const answer = await client.call("auth.test", credential);
   return {
     user: String(answer.user_id),
+    handle: String(answer.user ?? ""),
     team: String(answer.team_id),
     teamName: String(answer.team ?? ""),
     url: String(answer.url ?? ""),

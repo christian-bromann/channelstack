@@ -5,6 +5,7 @@ import { SlackRefusal } from "../world.ts";
 import { archiveTagged, removeSlackEntry, taggedChannels } from "./cleanup.ts";
 import { SlackWebClient } from "./client.ts";
 import { checkSlackCredential, identify, type SlackIdentity } from "./identity.ts";
+import { SLACK_CLIENT } from "./ui.ts";
 
 const PERSON = /^CHANNELSTACK_SLACK_USER_([A-Z0-9_]+)_TOKEN$/;
 
@@ -31,8 +32,27 @@ async function identities(client: SlackWebClient, env: Readonly<Record<string, s
   return found;
 }
 
-/** `channelstack doctor` and `channelstack sweep` for Slack, from the credentials in the environment. */
+/** `channelstack doctor`, `sweep` and `login` for Slack, from the credentials in the environment. */
 export const slackMaintenance: LiveMaintenance = {
+  async signIn({ env, fetch, timers, apiBase }) {
+    // The sandbox workspace's own sign-in page, from the app's bot token: a person signs in there by hand.
+    const client = new SlackWebClient({ base: apiBase, fetch, timers });
+    const bot = new LiveVault(env, () => {}).fromEnv("CHANNELSTACK_SLACK_BOT_TOKEN");
+    if (!bot) throw new Error("CHANNELSTACK_SLACK_BOT_TOKEN isn't set: it says which workspace to sign in to");
+    const who = await identify(client, bot);
+    checkSlackCredential(who, {
+      role: "app",
+      who: "CHANNELSTACK_SLACK_BOT_TOKEN",
+      allowlist: new Allowlist("CHANNELSTACK_LIVE_SLACK_TEAMS", env),
+    });
+    return {
+      start: who.url,
+      origins: [new URL(who.url).origin, SLACK_CLIENT],
+      signedIn: (url) => url.startsWith(`${SLACK_CLIENT}/client/`),
+      cookieDomains: ["slack.com"],
+    };
+  },
+
   async doctor({ env, fetch, timers, apiBase }) {
     const client = new SlackWebClient({ base: apiBase, fetch, timers });
     const allowlist = new Allowlist("CHANNELSTACK_LIVE_SLACK_TEAMS", env);
