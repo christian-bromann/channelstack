@@ -191,6 +191,21 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       delivery: undefined,
     } satisfies LinearSessionRecord);
     if (comment) comment.session = record.id;
+    // Delegating is the person's first turn: Linear records it as a prompt, "Work on [ENG-1](url)",
+    // before the agent says anything (the differential run found it against the real workspace).
+    if (!comment) {
+      store.add(store.activities, session, {
+        id: ids.next("linear.uuid"),
+        session: record.id,
+        user: creator,
+        content: { type: "prompt", body: `Work on [${issue.identifier}](${links.issue(issue)})` },
+        ephemeral: false,
+        signal: null,
+        signalMetadata: null,
+        sourceComment: null,
+        createdAt: now,
+      } satisfies LinearActivityRecord);
+    }
     const previous = comment
       ? store
           .commentsOn(issue)

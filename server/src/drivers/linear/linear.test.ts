@@ -69,7 +69,7 @@ describe("agent sessions", () => {
     expect(await get(`/agent-sessions/${session.id}/state`)).toBe("complete");
     expect(
       (await get(`/agent-sessions/${session.id}/activities`)).map((activity: { type: string }) => activity.type),
-    ).toEqual(["thought", "elicitation", "response", "response"]);
+    ).toEqual(["prompt", "thought", "elicitation", "response", "response"]);
     expect(await get(`/issues/${created.id}/delegate`)).toMatchObject({ id: app.id, kind: "app" });
   });
 
@@ -90,7 +90,10 @@ describe("agent sessions", () => {
     expect(await publish({ type: "thought", body: "x" }, { signal: "continue" })).toBe(
       "Use continue only with a response",
     );
-    expect(await get(`/agent-sessions/${session.id}/activities`)).toEqual([]);
+    // Only the person's opening prompt: none of the refused ones was recorded.
+    expect(
+      (await get(`/agent-sessions/${session.id}/activities`)).map((activity: { type: string }) => activity.type),
+    ).toEqual(["prompt"]);
     expect(await get(`/agent-sessions/${session.id}/state`)).toBe("pending");
     // An id the app chose is the activity's; a retry with it is refused instead of making or replacing one.
     const id = "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f";
@@ -99,7 +102,8 @@ describe("agent sessions", () => {
     expect(await publish({ type: "thought", body: "x" }, { id: session.id })).toBe("Entity already exists");
     expect(await publish({ type: "thought", body: "x" }, { id: "not-a-uuid" })).toBe("id must be a UUID");
     const activities = await get(`/agent-sessions/${session.id}/activities`);
-    expect(activities.map((activity: { id: string; body: string }) => [activity.id, activity.body])).toEqual([
+    // After the person's opening prompt, the app's one activity, with the id it chose.
+    expect(activities.slice(1).map((activity: { id: string; body: string }) => [activity.id, activity.body])).toEqual([
       [id, "Done"],
     ]);
   });
@@ -166,6 +170,8 @@ describe("agent sessions", () => {
     expect((await get(`/issues/${created.id}/transcript`)).text).toBe(
       [
         "Ana: Checkout fails on Safari",
+        // Delegating is Ana's first turn, as Linear records it.
+        "Ana: Work on [ENG-1](http://127.0.0.1:4500/linear/acme/issue/ENG-1/checkout-fails-on-safari)",
         "my-agent: (thought) Reading the code",
         "my-agent: Which browser?",
         "  Ana: Safari 18",
@@ -191,7 +197,13 @@ describe("agent sessions", () => {
     expect(sent).toMatchObject({ action: "prompted", payload: { agentActivity: { content: { body: "Safari 18" } } } });
     expect(sent.payload.agentActivity.sourceCommentId).toBeDefined();
     expect((await get(`/issues/${created.id}/transcript`)).text).toBe(
-      ["Ana: Checkout fails on Safari", "Ana: it's urgent", "my-agent: Which browser?", "  Ana: Safari 18"].join("\n"),
+      [
+        "Ana: Checkout fails on Safari",
+        "Ana: Work on [ENG-1](http://127.0.0.1:4500/linear/acme/issue/ENG-1/checkout-fails-on-safari)",
+        "Ana: it's urgent",
+        "my-agent: Which browser?",
+        "  Ana: Safari 18",
+      ].join("\n"),
     );
   });
 
