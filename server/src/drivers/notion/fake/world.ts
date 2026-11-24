@@ -1,14 +1,14 @@
 import type { RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
-import { richTextPieces } from "../../../core/rich-text/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signNotionWebhook } from "../../../core/signing/notion.ts";
 import { NotionApiError } from "../errors.ts";
 import { notionLinks } from "../links.ts";
-import { type BlockDraft, blockToMarkdown, markdownToBlocks } from "../markdown.ts";
+import { type BlockDraft, markdownToBlocks } from "../markdown.ts";
 import { notionObjects } from "../objects.ts";
 import { type Author, type EventParent, notionPayloads, stampAttempt } from "../payloads.ts";
+import { notionReads, type TextPattern } from "../reads.ts";
 import { plainText, type RichTextItem, textItem, userMention } from "../rich-text.ts";
 import type {
   NotionBlockRecord,
@@ -49,9 +49,6 @@ const unseen = (kind: string, id: string) =>
 /** A property's value as a test gives it (`NotionPropertyValue`): plain values, option names, ids. */
 export type PlainValue = string | number | boolean | null | string[] | { start: string; end?: string | undefined };
 
-/** Text to find in a page: a string it contains, or a pattern. */
-type TextPattern = string | { source: string; flags: string };
-
 export interface PageInput {
   title: string;
   parent?: string | undefined;
@@ -88,24 +85,9 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
   // --- Reading the workspace ------------------------------------------------------------------
 
-  /** A page's title: its title property, whatever the database calls it. */
-  const titleOf = (page: NotionPageRecord): string => {
-    const title = Object.values(page.properties).find((value) => value.type === "title");
-    return title?.type === "title" ? plainText(title.rich) : "";
-  };
-
-  const isBot = (id: string) => id === store.bot.id;
+  const reads = notionReads(store);
+  const { titleOf, isBot, accessible, childrenOf, blockText, blockWith } = reads;
   const author = (id: string): Author => ({ id, type: isBot(id) ? "bot" : "person" });
-
-  /** Is the integration connected to this page or database, itself or through a parent? */
-  const accessible = (id: string): boolean => {
-    const page = store.pages.find(id);
-    const database = page ? undefined : store.databases.find(id);
-    const record = page ?? database;
-    if (!record || record.inTrash) return false;
-    if (record.connections.includes(store.bot.id)) return true;
-    return record.parent.type === "workspace" ? false : accessible(record.parent.id);
-  };
 
   /** The page or database an id names, if the integration may see it; Notion's 404 otherwise. */
   const visiblePage = (id: string): NotionPageRecord => {
@@ -127,27 +109,6 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     if (block && !block.inTrash && block.type !== "child_page" && accessible(block.page))
       return { block, page: store.page(block.page) };
     throw unseen("block", id);
-  };
-
-  const childrenOf = (ids: readonly string[]) => ids.map((id) => store.block(id)).filter((block) => !block.inTrash);
-
-  /** Every block on a page, depth first. */
-  const allBlocks = (page: NotionPageRecord): NotionBlockRecord[] => {
-    const walk = (ids: readonly string[]): NotionBlockRecord[] =>
-      childrenOf(ids).flatMap((block) => [block, ...walk(block.children)]);
-    return walk(page.children);
-  };
-
-  const blockText = (block: NotionBlockRecord) => plainText((block.data.rich_text as RichTextItem[] | undefined) ?? []);
-
-  /** A block's object as it is now: a `child_page` carries its page's current title. */
-  const dataOf = (block: NotionBlockRecord): Record<string, unknown> =>
-    block.type === "child_page" ? { title: titleOf(store.page(block.id)) } : block.data;
-
-  const markdownOf = (page: NotionPageRecord): string => {
-    const render = (ids: readonly string[]): string[] =>
-      childrenOf(ids).map((block) => blockToMarkdown(block.type, dataOf(block), render(block.children)));
-    return render(page.children).join("\n");
   };
 
   /** Where a page is, as an event names it. */
@@ -695,17 +656,6 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
   // --- Comments -------------------------------------------------------------------------------
 
-  /** `RichText` (`"@my-agent summarize"`) → Notion rich text, with mentions of people and the bot. */
-  const richText = (session: string, text: string): RichTextItem[] =>
-    richTextPieces(text, (name) => {
-      if (name.toLowerCase() === store.bot.name.toLowerCase()) return store.bot.id;
-      return store.users.list(session).find((user) => user.name.toLowerCase() === name.toLowerCase())?.id;
-    }).map((piece) =>
-      "text" in piece
-        ? textItem(piece.text)
-        : userMention(piece.mention, store.user(piece.mention)?.name ?? piece.name),
-    );
-
   const addComment = (session: string, discussion: NotionDiscussionRecord, rich: RichTextItem[], actor: string) => {
     if (rich.length === 0 || plainText(rich).trim() === "")
       throw invalid("body failed validation: rich_text should not be empty");
@@ -785,48 +735,20 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     );
   };
 
-  /** The block of a page whose text has this in it: where a comment is anchored, or a mention goes. */
-  const blockWith = (page: NotionPageRecord, text: TextPattern): NotionBlockRecord => {
-    let has: (block: string) => boolean;
-    if (typeof text === "string") has = (block) => block.includes(text);
-    else {
-      let pattern: RegExp;
-      try {
-        // `g` and `y` make a pattern remember where it stopped; finding a block needs neither.
-        pattern = new RegExp(text.source, text.flags.replace(/[gy]/g, ""));
-      } catch {
-        throw new ProtocolError("invalid_argument", `/${text.source}/${text.flags} is not a pattern`);
-      }
-      has = (block) => pattern.test(block);
-    }
-    const found = allBlocks(page).find((block) => has(blockText(block)));
-    const named = typeof text === "string" ? `"${text}"` : `/${text.source}/${text.flags}`;
-    if (!found) throw new ProtocolError("not_found", `"${titleOf(page)}" has no block with ${named} in it`);
-    return found;
-  };
-
   return {
+    ...reads,
     store,
     objects,
     links,
-    titleOf,
-    accessible,
     visiblePage,
     visibleDatabase,
     visibleBlock,
-    childrenOf,
-    dataOf,
-    allBlocks,
-    blockText,
-    markdownOf,
     toPlain,
     fromRequest,
     propertyNamed,
     schemaOf,
-    richText,
     richFromRequest,
     rows,
-    isBot,
     pendingContent: (session: string) =>
       [...pendingContent.entries()].filter(([, batch]) => batch.session === session).map(([page]) => store.page(page)),
     setContentDelay: (session: string, ms: number) => contentDelay.set(session, ms),
@@ -985,8 +907,9 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       store.comments.remove(comment.id);
       return sent;
     },
-    discussionsOf: (page: NotionPageRecord) => store.discussionsOn(page.id),
-    commentsOf: (discussion: NotionDiscussionRecord) => store.commentsIn(discussion.id),
+
+    /** The fake holds the truth already: there is nothing to read again. */
+    refresh: (_session: string, _about: { page: string } | { discussion: string }) => {},
 
     // Deliveries
     resend(session: string, id: string, options: { badSignature: boolean }) {

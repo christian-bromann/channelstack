@@ -3212,9 +3212,9 @@ export class NotionFixture {
   }
 
   /** Create a person in the workspace. Experimental. */
-  async createUser(options: { name: string; id?: string; email?: string; avatarUrl?: string }): Promise<NotionUser> {
+  async createUser(options: { name: string; id?: string; email?: string; avatarUrl?: string; token?: string }): Promise<NotionUser> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users`, { body: { name: options.name, id: options.id, email: options.email, avatarUrl: options.avatarUrl } })) as NotionUserData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/users`, { body: { name: options.name, id: options.id, email: options.email, avatarUrl: options.avatarUrl, token: options.token ?? credential("CHANNELSTACK_NOTION_USER_{name}_TOKEN", { name: options.name }) } })) as NotionUserData;
     return new NotionUser(ctx, data);
   }
 

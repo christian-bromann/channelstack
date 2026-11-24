@@ -5112,6 +5112,12 @@
           },
           "avatarUrl": {
             "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real person's personal access token in the live workspace, which acts as them. Read from CHANNELSTACK_NOTION_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_NOTION_USER_{name}_TOKEN"
           }
         },
         "required": [
@@ -19348,7 +19354,8 @@
             "name",
             "id",
             "email",
-            "avatarUrl"
+            "avatarUrl",
+            "token"
           ]
         },
         "x-channelstack-error-codes": [
@@ -19521,6 +19528,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -20635,6 +20645,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -20727,6 +20740,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -20812,6 +20828,10 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "no API connects a page to an integration; Notion's UI does (… → Connections)"
+        },
         "parameters": [
           {
             "schema": {
@@ -20890,6 +20910,10 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "browser",
+          "reason": "no API connects a page to an integration; Notion's UI does (… → Connections)"
+        },
         "parameters": [
           {
             "schema": {
@@ -21173,6 +21197,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -21460,6 +21487,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: Notion databases, rows and properties aren't built live"
+        },
         "parameters": [
           {
             "schema": {

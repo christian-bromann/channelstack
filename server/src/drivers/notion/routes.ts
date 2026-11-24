@@ -15,6 +15,7 @@ import {
   readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
+import type { NotionWorld } from "./backend.ts";
 import { NotionApiError } from "./errors.ts";
 import type { FakeNotionWorld, PlainValue } from "./fake/world.ts";
 import { plainText } from "./rich-text.ts";
@@ -177,6 +178,15 @@ const FAKE_VERIFICATION: LiveSupport = {
 };
 /** Notion has no redelivery API. */
 const NO_REDELIVERY: LiveSupport = { unsupported: "Notion has no API to redeliver a webhook" };
+/** Databases, their rows and properties aren't built live yet. */
+const DATABASES: LiveSupport = { unsupported: "not yet: Notion databases, rows and properties aren't built live" };
+/** No API adds or removes a connection: a person does it in Notion's UI (… → Connections). */
+const CONNECTIONS: LiveSupport = {
+  requires: "browser",
+  reason: "no API connects a page to an integration; Notion's UI does (… → Connections)",
+};
+/** Real Notion's REST API, where a live agent reaches Notion. */
+const NOTION_API = "https://api.notion.com";
 /** What only the integration's own calls show: live, proxy mode sees them. */
 const AGENT_SIDE: LiveSupport = {
   requires: "proxy",
@@ -186,9 +196,19 @@ const AGENT_SIDE: LiveSupport = {
 /** The Notion driver's control API: what a test's people do, and what a test reads back. */
 export function registerNotionRoutes(
   router: DriverRouter,
-  deps: { world: FakeNotionWorld; events: EventLog; apiUrl: () => string; secret: (name: string) => string },
+  deps: {
+    fake: FakeNotionWorld;
+    /** The live world, on a live driver. */
+    live: NotionWorld | undefined;
+    events: EventLog;
+    apiUrl: () => string;
+    secret: (name: string) => string;
+  },
 ): void {
-  const { world } = deps;
+  const { fake } = deps;
+  /** The world a route that works live acts in. Routes that don't are refused live by the router, and use the fake. */
+  const world: NotionWorld = deps.live ?? fake;
+  const isLive = deps.live !== undefined;
   const { store } = world;
   const stability = "experimental";
 
@@ -210,15 +230,17 @@ export function registerNotionRoutes(
     kind: "app" as const,
     channel: "notion" as const,
     botUserId: store.bot.id,
-    token: deps.secret("token"),
-    webhookSecret: deps.secret("verificationToken"),
+    // A live integration's credentials stay on the server: the control API never returns them.
+    token: isLive ? "" : deps.secret("token"),
+    webhookSecret: isLive ? "" : deps.secret("verificationToken"),
   });
   const userWire = (user: NotionUserRecord) => ({
     id: user.id,
     name: user.name,
     kind: "user" as const,
     channel: "notion" as const,
-    email: user.email,
+    // A live person's email never leaves the server: the live world keeps none.
+    ...(user.email ? { email: user.email } : {}),
   });
   const authorWire = (id: string) => {
     if (world.isBot(id)) return integrationWire();
@@ -251,7 +273,7 @@ export function registerNotionRoutes(
     status: attempts.at(-1)?.status ?? ("pending" as const),
   });
   const caused = (session: string, id: string | undefined) =>
-    id === undefined ? undefined : deliveryWire(world.delivery(session, id));
+    id === undefined ? undefined : deliveryWire(fake.delivery(session, id));
   const discussionWire = (discussion: NotionDiscussionRecord) => ({
     id: discussion.id,
     page: pageWire(store.page(discussion.page)),
@@ -291,7 +313,7 @@ export function registerNotionRoutes(
     response: NotionFixture,
     factory: { on: "Session", name: "notion" },
     stability,
-    handler: () => ({ app: integrationWire(), apiUrl: deps.apiUrl() }),
+    handler: () => ({ app: integrationWire(), apiUrl: isLive ? NOTION_API : deps.apiUrl() }),
   });
 
   router.route({
@@ -304,12 +326,17 @@ export function registerNotionRoutes(
         id: z.string().optional(),
         email: z.string().optional(),
         avatarUrl: z.string().optional(),
+        token: z.string().min(1).optional().openapi({
+          description:
+            "A real person's personal access token in the live workspace, which acts as them. Read from CHANNELSTACK_NOTION_USER_<NAME>_TOKEN when left out.",
+          "x-channelstack-credential": "CHANNELSTACK_NOTION_USER_{name}_TOKEN",
+        }),
       })
       .openapi("NotionUserOptions"),
     response: NotionUser,
-    factory: { on: "NotionFixture", name: "createUser", options: ["name", "id", "email", "avatarUrl"] },
+    factory: { on: "NotionFixture", name: "createUser", options: ["name", "id", "email", "avatarUrl", "token"] },
     stability,
-    handler: ({ session, body }) => userWire(world.createUser(session.id, body)),
+    handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
 
   router.route({
@@ -326,11 +353,11 @@ export function registerNotionRoutes(
       options: ["title", "parent", "content", "icon", "connections", "createdBy"],
     },
     stability,
-    handler: ({ session, body }) => {
+    handler: async ({ session, body }) => {
       if (body.parent) pageOf(session.id, body.parent);
       if (body.createdBy) person(session.id, body.createdBy);
       for (const id of body.connections ?? []) integration(id);
-      return pageWire(asProtocol(() => world.createPage(session.id, body, { announce: false })).page);
+      return pageWire((await asProtocol(() => world.createPage(session.id, body, { announce: false }))).page);
     },
   });
 
@@ -354,13 +381,14 @@ export function registerNotionRoutes(
       name: "createDatabase",
       options: ["title", "parent", "properties", "rows", "connections"],
     },
+    live: DATABASES,
     stability,
     handler: ({ session, body }) => {
       if (body.parent) pageOf(session.id, body.parent);
       for (const id of body.connections ?? []) integration(id);
       for (const schema of Object.values(body.properties))
         if (typeof schema === "object" && "relation" in schema) databaseOf(session.id, schema.relation);
-      return databaseWire(asProtocol(() => world.createDatabase(session.id, body as never)));
+      return databaseWire(asProtocol(() => fake.createDatabase(session.id, body as never)));
     },
   });
 
@@ -376,7 +404,7 @@ export function registerNotionRoutes(
     live: FAKE_BATCHING,
     stability,
     handler: ({ session, body }) => {
-      world.setContentDelay(session.id, body.delay);
+      fake.setContentDelay(session.id, body.delay);
     },
   });
 
@@ -389,7 +417,7 @@ export function registerNotionRoutes(
     sdkMethod: { on: "NotionFixture", name: "sendVerification" },
     live: FAKE_VERIFICATION,
     stability,
-    handler: ({ session }) => caused(session.id, world.verify(session.id)) ?? null,
+    handler: ({ session }) => caused(session.id, fake.verify(session.id)) ?? null,
   });
 
   // --- What people do: comments ---------------------------------------------------------------
@@ -407,13 +435,15 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionUser", name: "comment", args: ["text"], options: ["page", "anchor"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
       const page = live(pageOf(session.id, body.page));
+      // An anchor is found in the page as it is now.
+      if (body.anchor !== undefined) await world.refresh(session.id, { page: page.id });
       const rich = world.richText(session.id, body.text);
       return commentWire(
         session.id,
-        asProtocol(() => world.comment(session.id, page, rich, user.id, body.anchor)),
+        await asProtocol(() => world.comment(session.id, page, rich, user.id, body.anchor)),
       );
     },
   });
@@ -428,14 +458,11 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionUser", name: "reply", args: ["text"], options: ["discussion"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
       const discussion = discussionOf(session.id, body.discussion);
       const rich = world.richText(session.id, body.text);
-      return commentWire(
-        session.id,
-        asProtocol(() => world.reply(session.id, discussion, rich, user.id)),
-      );
+      return commentWire(session.id, await asProtocol(() => world.reply(session.id, discussion, rich, user.id)));
     },
   });
 
@@ -449,13 +476,11 @@ export function registerNotionRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "NotionUser", name: "editComment", args: ["text"], options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
       const comment = mine(session.id, user, body.comment);
-      return (
-        caused(session.id, world.editComment(session.id, comment, world.richText(session.id, body.text), user.id)) ??
-        null
-      );
+      const rich = world.richText(session.id, body.text);
+      return caused(session.id, await world.editComment(session.id, comment, rich, user.id)) ?? null;
     },
   });
 
@@ -469,9 +494,10 @@ export function registerNotionRoutes(
     errors: ["not_found", "forbidden"],
     sdkMethod: { on: "NotionUser", name: "deleteComment", options: ["comment"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
-      return caused(session.id, world.deleteComment(session.id, mine(session.id, user, body.comment), user.id)) ?? null;
+      const comment = mine(session.id, user, body.comment);
+      return caused(session.id, await world.deleteComment(session.id, comment, user.id)) ?? null;
     },
   });
   const mine = (session: string, user: NotionUserRecord, id: string) => {
@@ -520,13 +546,14 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionUser", name: "createPage", args: ["page"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
       if (body.page.parent) live(pageOf(session.id, body.page.parent));
       for (const id of body.page.connections ?? []) integration(id);
-      return pageWire(
-        asProtocol(() => world.createPage(session.id, { ...body.page, createdBy: user.id }, { announce: true })).page,
+      const created = await asProtocol(() =>
+        world.createPage(session.id, { ...body.page, createdBy: user.id }, { announce: true }),
       );
+      return pageWire(created.page);
     },
   });
 
@@ -543,9 +570,12 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionUser", name: "edit", args: ["change"], options: ["page"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
-      asProtocol(() => world.edit(session.id, live(pageOf(session.id, body.page)), body.change, user.id));
+      const page = live(pageOf(session.id, body.page));
+      // A replace removes what the page has now.
+      if (body.change.replace !== undefined) await world.refresh(session.id, { page: page.id });
+      await asProtocol(() => world.edit(session.id, page, body.change, user.id));
       // The event goes out when the batch does.
       return null;
     },
@@ -561,11 +591,10 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionUser", name: "rename", args: ["title"], options: ["page"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
-      return (
-        caused(session.id, world.rename(session.id, live(pageOf(session.id, body.page)), body.title, user.id)) ?? null
-      );
+      const page = live(pageOf(session.id, body.page));
+      return caused(session.id, await world.rename(session.id, page, body.title, user.id)) ?? null;
     },
   });
 
@@ -582,10 +611,12 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionUser", name: "mention", args: ["integration"], options: ["page", "inBlock"] },
     stability,
-    handler: ({ session, params, body }) => {
+    handler: async ({ session, params, body }) => {
       const user = person(session.id, params.user);
       integration(body.integration);
-      world.mention(session.id, live(pageOf(session.id, body.page)), body.inBlock, user.id);
+      const page = live(pageOf(session.id, body.page));
+      if (body.inBlock !== undefined) await world.refresh(session.id, { page: page.id });
+      await world.mention(session.id, page, body.inBlock, user.id);
       return null;
     },
   });
@@ -599,13 +630,14 @@ export function registerNotionRoutes(
     response: NotionDelivery.nullable(),
     errors: ["not_found", "invalid_argument"],
     sdkMethod: { on: "NotionUser", name: "setProperty", args: ["name", "value"], options: ["page"] },
+    live: DATABASES,
     stability,
     handler: ({ session, params, body }) => {
       const user = person(session.id, params.user);
       const page = live(pageOf(session.id, body.page));
-      const property = asProtocol(() => world.propertyNamed(page, body.name));
-      const value = world.fromPlain(property, body.value as PlainValue);
-      return caused(session.id, world.setProperties(session.id, page, { [property.name]: value }, user.id)) ?? null;
+      const property = asProtocol(() => fake.propertyNamed(page, body.name));
+      const value = fake.fromPlain(property, body.value as PlainValue);
+      return caused(session.id, fake.setProperties(session.id, page, { [property.name]: value }, user.id)) ?? null;
     },
   });
 
@@ -618,12 +650,13 @@ export function registerNotionRoutes(
     response: NotionPage,
     errors: ["not_found", "invalid_argument"],
     sdkMethod: { on: "NotionUser", name: "addRow", args: ["values"], options: ["database"] },
+    live: DATABASES,
     stability,
     handler: ({ session, params, body }) => {
       const user = person(session.id, params.user);
       const database = databaseOf(session.id, body.database);
       return pageWire(
-        world.addRow(session.id, database, body.values as Record<string, PlainValue>, user.id, { announce: true }).page,
+        fake.addRow(session.id, database, body.values as Record<string, PlainValue>, user.id, { announce: true }).page,
       );
     },
   });
@@ -644,13 +677,14 @@ export function registerNotionRoutes(
         .openapi(`Notion${connected ? "Connect" : "Disconnect"}Body`),
       errors: ["not_found"],
       sdkMethod: { on: "NotionUser", name, args: ["integration"], options: ["page"] },
+      live: CONNECTIONS,
       stability,
       handler: ({ session, params, body }) => {
         person(session.id, params.user);
         integration(body.integration);
         const page = pageOf(session.id, body.page);
-        if (connected) world.connect(page);
-        else world.disconnect(page);
+        if (connected) fake.connect(page);
+        else fake.disconnect(page);
       },
     });
 
@@ -662,7 +696,7 @@ export function registerNotionRoutes(
     summary: string,
     response: R,
     read: (page: NotionPageRecord, session: string, query: Record<string, string | undefined>) => z.input<R>,
-    extra: { query?: z.ZodObject<z.ZodRawShape>; args?: string[]; onceQuiet?: boolean } = {},
+    extra: { query?: z.ZodObject<z.ZodRawShape>; args?: string[]; onceQuiet?: boolean; live?: LiveSupport } = {},
   ) =>
     router.route({
       method: "get",
@@ -678,9 +712,13 @@ export function registerNotionRoutes(
         ...(extra.args ? { args: extra.args } : {}),
         ...(extra.onceQuiet ? { onceQuiet: true } : {}),
       },
+      ...(extra.live ? { live: extra.live } : {}),
       stability,
-      handler: ({ session, params, query }) =>
-        read(pageOf(session.id, params.page), session.id, (query ?? {}) as Record<string, string | undefined>) as never,
+      handler: async ({ session, params, query }) => {
+        await world.refresh(session.id, { page: pageOf(session.id, params.page).id });
+        const page = pageOf(session.id, params.page);
+        return read(page, session.id, (query ?? {}) as Record<string, string | undefined>) as never;
+      },
     });
 
   pageRead(
@@ -720,12 +758,13 @@ export function registerNotionRoutes(
     "A property's value as a person reads it: text, a number, option names, ids",
     PropertyValue,
     (page, _session, query) => {
-      const property = asProtocol(() => world.propertyNamed(page, query.name ?? ""));
-      return world.toPlain(page.properties[property.name]);
+      const property = asProtocol(() => fake.propertyNamed(page, query.name ?? ""));
+      return fake.toPlain(page.properties[property.name]);
     },
     {
       query: z.object({ name: z.string().openapi({ param: { name: "name", in: "query", required: true } }) }),
       args: ["name"],
+      live: DATABASES,
     },
   );
   pageRead(
@@ -759,9 +798,10 @@ export function registerNotionRoutes(
     response: z.array(NotionPage).openapi("NotionRows"),
     errors: ["not_found"],
     sdkMethod: { on: "NotionDatabase", name: "rows", args: ["filter"] },
+    live: DATABASES,
     stability,
     handler: ({ session, params, body }) =>
-      world
+      fake
         .rows(databaseOf(session.id, params.database), (body.filter ?? {}) as Record<string, PlainValue>)
         .map(pageWire),
   });
@@ -781,8 +821,11 @@ export function registerNotionRoutes(
       { name: "latestComment", mode: "latest", from: "author", what: "a comment" },
     ],
     stability,
-    handler: ({ session, params }) =>
-      world.commentsOf(discussionOf(session.id, params.discussion)).map((comment) => commentWire(session.id, comment)),
+    handler: async ({ session, params }) => {
+      await world.refresh(session.id, { discussion: discussionOf(session.id, params.discussion).id });
+      const discussion = discussionOf(session.id, params.discussion);
+      return world.commentsOf(discussion).map((comment) => commentWire(session.id, comment));
+    },
   });
 
   router.route({
@@ -807,7 +850,10 @@ export function registerNotionRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "NotionDiscussion", name: "transcript" },
     stability,
-    handler: ({ session, params }) => renderDiscussion(world, discussionOf(session.id, params.discussion), principal),
+    handler: async ({ session, params }) => {
+      await world.refresh(session.id, { discussion: discussionOf(session.id, params.discussion).id });
+      return renderDiscussion(world, discussionOf(session.id, params.discussion), principal);
+    },
   });
 
   // --- Deliveries and calls ---------------------------------------------------------------------
@@ -838,7 +884,7 @@ export function registerNotionRoutes(
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
     handler: ({ session, query }) =>
-      world
+      fake
         .deliveries(session.id)
         .filter(({ request }) => query.type === undefined || request.type === query.type)
         .filter(({ request }) => query.resource === undefined || request.meta?.page === query.resource)
@@ -856,7 +902,7 @@ export function registerNotionRoutes(
     waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params }) => deliveryWire(world.delivery(session.id, params.delivery)),
+    handler: ({ session, params }) => deliveryWire(fake.delivery(session.id, params.delivery)),
   });
 
   router.route({
@@ -869,7 +915,7 @@ export function registerNotionRoutes(
     sdkMethod: { on: "NotionDelivery", name: "redeliver" },
     live: NO_REDELIVERY,
     stability,
-    handler: ({ session, params }) => world.redeliver(session.id, params.delivery),
+    handler: ({ session, params }) => fake.redeliver(session.id, params.delivery),
   });
 
   router.route({
@@ -883,7 +929,7 @@ export function registerNotionRoutes(
     sdkMethod: { on: "NotionDelivery", name: "resend", options: ["badSignature"] },
     live: DELIVERY_IS_THE_PLATFORMS,
     stability,
-    handler: ({ session, params, body }) => world.resend(session.id, params.delivery, body),
+    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
   });
 
   router.route({

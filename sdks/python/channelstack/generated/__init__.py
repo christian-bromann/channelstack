@@ -2472,10 +2472,10 @@ class NotionFixture:
         self.app: NotionIntegration = NotionIntegration(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
 
-    async def create_user(self, *, name: str, id: str | None = None, email: str | None = None, avatar_url: str | None = None) -> NotionUser:
+    async def create_user(self, *, name: str, id: str | None = None, email: str | None = None, avatar_url: str | None = None, token: str | None = None) -> NotionUser:
         """Create a person in the workspace. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users", body={"name": name, "id": id, "email": email, "avatarUrl": avatar_url})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users", body={"name": name, "id": id, "email": email, "avatarUrl": avatar_url, "token": credential("CHANNELSTACK_NOTION_USER_{name}_TOKEN", {"name": name}) if token is None else token})
         return NotionUser(ctx, data)
 
     async def create_page(self, *, title: str, parent: NotionPage | None = None, content: DocumentInput | None = None, icon: str | None = None, connections: list[NotionIntegration] | None = None, created_by: NotionUser | None = None) -> NotionPage:
