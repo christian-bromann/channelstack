@@ -17,6 +17,7 @@ import type {
   GitHubRepoRecord,
   GitHubUserRecord,
 } from "../world.ts";
+import { PRIVATE_BY_DEFAULT } from "../world.ts";
 import { type GitHubCaller, type GitHubLiveClient, passing } from "./client.ts";
 import { checkGitHubPerson, identifyApp, identifyPerson, testOrg } from "./identity.ts";
 
@@ -400,7 +401,7 @@ export function createLiveGitHubWorld(deps: {
         created = await client.call<WireRepo>(installation(), "POST /orgs/{org}/repos", {
           org,
           name,
-          private: input.private ?? false,
+          private: input.private ?? PRIVATE_BY_DEFAULT,
           auto_init: true,
           description: "A channelstack test repository: it goes away when its test session closes",
         });

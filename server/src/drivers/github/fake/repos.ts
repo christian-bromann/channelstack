@@ -9,6 +9,7 @@ import type {
   GitHubRepoRecord,
   GitHubUserRecord,
 } from "../world.ts";
+import { PRIVATE_BY_DEFAULT } from "../world.ts";
 import { type GitHubKit, GitHubRefusal } from "./kit.ts";
 
 /** The labels GitHub gives a new repository. */
@@ -238,7 +239,7 @@ export function createRepos(kit: GitHubKit) {
         id,
         owner: store.org.login,
         name,
-        private: input.private ?? true,
+        private: input.private ?? PRIVATE_BY_DEFAULT,
         defaultBranch: input.defaultBranch ?? "main",
         collaborators: new Map(
           (input.collaborators ?? []).map(({ user, permission }) => [store.actor(user).login, permission]),

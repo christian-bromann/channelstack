@@ -46,6 +46,7 @@ export interface GitHubUserOptions {
 export interface GitHubRepoOptions {
   /** Repository name without owner. Generated (`test-<id>`) if omitted. */
   name?: string;
+  /** Default `true`, fake and live: what a test writes in a real org isn't public. */
   private?: boolean;
   defaultBranch?: string;
   /** Initial contents of the default branch: a fixture directory or a list of files. */
