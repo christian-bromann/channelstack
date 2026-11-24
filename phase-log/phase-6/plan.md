@@ -50,7 +50,9 @@ Proxy mode, the CA, the Go agent and the conformance tooling need no new credent
 
 | Package | Version | Why a library and not our code | License | Maintained |
 |---|---|---|---|---|
-| `@peculiar/x509` (server) | to pin on install | X.509 certificates over WebCrypto: the CA, its name constraints, and the leaf certificates. Pure TypeScript, no native code, so it compiles into the binary | MIT | Yes |
+| `@peculiar/x509` (server) | 3.1.0 | X.509 certificates over WebCrypto: the CA, its name constraints, and the leaf certificates. Pure TypeScript, no native code, so it compiles into the binary | MIT | Yes |
+| `@peculiar/asn1-x509`, `@peculiar/asn1-schema` (server) | 3.1.0, 3.1.0 | The name constraints extension's ASN.1 (`NameConstraints`, `GeneralSubtree`) and its DER encoding; `@peculiar/x509` has no class for that extension. Already its own dependencies | MIT | Yes |
+| `reflect-metadata` (server) | 0.2.2 | The Reflect metadata API that `@peculiar/x509`'s tsyringe needs before it loads. Microsoft's own, the polyfill tsyringe names | Apache-2.0 | Stable (last release 2024-03) |
 | `github.com/slack-go/slack` (Go reference agent) | to pin in `go.mod` | The Go community's Slack client, so the Go agent is what a Go team would write | BSD-2-Clause | Yes |
 
 ## Docs to update
