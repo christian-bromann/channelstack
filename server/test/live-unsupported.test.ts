@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 import { harness } from "./app-harness.ts";
+import { githubStub } from "./github-live-stub.ts";
 import { slackStub } from "./slack-live-stub.ts";
 
 /**
@@ -63,12 +64,13 @@ const CASES: Record<string, Case | Case[]> = {
   },
   "`slack.uninstallApp()`": { channel: "slack", method: "POST", path: "/uninstall", reason: /OAuth consent/ },
   '`delivery.retry({ after: "3s" })`': { channel: "slack", method: "POST", path: "/deliveries/E0X/retry", body: {} },
-  // GitHub's live backend isn't built: every GitHub operation is refused, these among them.
+  // The App's bot as an assignee is refused before anything else (the stub's App has id 1).
   "`ana.assign(github.app, { issue })`": {
     channel: "github",
     method: "POST",
     path: "/users/1/assign",
     body: { assignees: ["1"], issue: { repoId: "1", number: 1 } },
+    reason: /App's bot/,
   },
   "`ana.requestReview(github.app, { pr })`": {
     channel: "github",
@@ -106,11 +108,43 @@ const CASES: Record<string, Case | Case[]> = {
     reason: /batches/,
   },
   "`notion.sendVerification()`": { channel: "notion", method: "POST", path: "/verification", reason: /verification/ },
+  "`notion.createDatabase({ properties, rows })`": {
+    channel: "notion",
+    method: "POST",
+    path: "/databases",
+    body: { title: "Tasks", properties: { Name: "title" } },
+    reason: /databases/,
+  },
+  "`ana.setProperty`, `addRow`": [
+    {
+      channel: "notion",
+      method: "POST",
+      path: "/users/x/set-property",
+      body: { name: "Status", value: "Done", page: "p" },
+      reason: /databases/,
+    },
+    {
+      channel: "notion",
+      method: "POST",
+      path: "/users/x/rows",
+      body: { values: {}, database: "d" },
+      reason: /databases/,
+    },
+  ],
+  "`page.property()`, `database.rows()`, `toHavePropertyValue`": [
+    { channel: "notion", method: "GET", path: "/pages/p/property?name=Status", reason: /databases/ },
+    { channel: "notion", method: "POST", path: "/databases/d/rows", body: {}, reason: /databases/ },
+  ],
 };
 
-/** Every driver live: Slack against the stub, the others with credentials set and no live backend yet. */
+/** Every driver live: Slack and GitHub against their stubs, Linear and Notion with stand-in credentials. */
 function liveEverywhere() {
   const stub = slackStub();
+  const github = githubStub();
+  const fetch = ((input: string | URL | Request, init?: RequestInit) =>
+    String(input instanceof Request ? input.url : input).startsWith(github.url)
+      ? github.fetch(input, init)
+      : stub.fetch(input, init)) as typeof globalThis.fetch;
   const server = harness(
     {},
     {
@@ -119,13 +153,14 @@ function liveEverywhere() {
           CHANNELSTACK_SLACK_APP_ID: "A0STUBAPP1",
           CHANNELSTACK_SLACK_BOT_TOKEN: stub.bot.token,
           CHANNELSTACK_LIVE_SLACK_TEAMS: stub.team,
-          CHANNELSTACK_GITHUB_APP_ID: "1",
-          CHANNELSTACK_GITHUB_PRIVATE_KEY: "not-a-key",
+          CHANNELSTACK_GITHUB_APP_ID: String(github.app.id),
+          CHANNELSTACK_GITHUB_PRIVATE_KEY: github.privateKey,
+          CHANNELSTACK_LIVE_GITHUB_ORGS: github.org,
           CHANNELSTACK_LINEAR_APP_TOKEN: "not-a-token",
           CHANNELSTACK_NOTION_TOKEN: "not-a-token",
         },
-        fetch: stub.fetch,
-        apiBase: { slack: stub.apiBase },
+        fetch,
+        apiBase: { slack: stub.apiBase, github: github.url },
       },
     },
   );

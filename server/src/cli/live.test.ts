@@ -36,7 +36,7 @@ describe("exit check 5.6: channelstack doctor", () => {
     expect(text).not.toContain(ana.token);
   });
 
-  test("a workspace outside the allowlist, and a channel without its live backend, fail", async () => {
+  test("a workspace outside the allowlist, and an App whose credentials don't work, fail", async () => {
     const { env, live } = sandbox({ allowlist: "T0SOMEWHERE" });
     const { text, ok } = await runDoctor({
       ...live,
@@ -49,7 +49,7 @@ describe("exit check 5.6: channelstack doctor", () => {
       /FAIL {2}CHANNELSTACK_SLACK_BOT_TOKEN \(xoxb-…\): Slack workspace T0STUB0001 isn't in CHANNELSTACK_LIVE_SLACK_TEAMS/,
     );
     expect(text).toContain("FAIL  CHANNELSTACK_LIVE_GITHUB_ORGS is empty");
-    expect(text).toContain("FAIL  live github isn't built yet");
+    expect(text).toMatch(/FAIL {2}the GitHub App: ./);
   });
 
   test("CHANNELSTACK_REALITY=fake: every channel is fake, and that is no failure", async () => {

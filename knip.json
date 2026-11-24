@@ -8,7 +8,8 @@
         "scenarios/runners/typescript/*.ts",
         "integrations/vitest/*.ts",
         "examples/agents/*/agent.ts",
-        "test/acceptance/*.ts"
+        "test/acceptance/*.ts",
+        "test/acceptance/stand-ins/*.ts"
       ],
       "project": ["scripts/**/*.ts", "scenarios/**/*.ts", "integrations/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
     },

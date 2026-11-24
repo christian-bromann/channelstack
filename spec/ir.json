@@ -4319,6 +4319,15 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_GITHUB_USER_{login}_TOKEN"
             }
           ],
           "returns": {

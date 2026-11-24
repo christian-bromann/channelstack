@@ -2181,6 +2181,12 @@
               "admin",
               "outside_collaborator"
             ]
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A real machine user's token (a fine-grained or classic PAT) in the live org. Read from CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_GITHUB_USER_{login}_TOKEN"
           }
         },
         "required": [
@@ -10983,7 +10989,8 @@
             "id",
             "name",
             "email",
-            "role"
+            "role",
+            "token"
           ]
         },
         "x-channelstack-error-codes": [
@@ -11227,6 +11234,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11317,6 +11327,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11486,6 +11499,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11665,6 +11681,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11746,6 +11765,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11827,6 +11849,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -11913,6 +11938,9 @@
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -12087,6 +12115,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13054,6 +13085,9 @@
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13131,6 +13165,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13221,6 +13258,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13307,6 +13347,9 @@
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13390,6 +13433,9 @@
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13480,6 +13526,9 @@
           "forbidden"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13574,6 +13623,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13665,6 +13717,9 @@
           "validation_failed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -13757,6 +13812,9 @@
           "not_allowed"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14644,6 +14702,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14726,6 +14787,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14807,6 +14871,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14888,6 +14955,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -14969,6 +15039,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -15050,6 +15123,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -15196,6 +15272,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -15266,6 +15345,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -15335,6 +15417,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {
@@ -15404,6 +15489,9 @@
           "not_found"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: pull requests, reviews, pushes, checks and installs aren't built live"
+        },
         "parameters": [
           {
             "schema": {

@@ -9,17 +9,14 @@ import { startBinary } from "../../scripts/lib/server.ts";
 import { withStack } from "../../scripts/lib/stack.ts";
 
 // Exit check 5.4: what live mode can't do skips the test with the reason, and doesn't fail it. The
-// server gets GitHub App credentials (stand-ins: nothing is ever sent to GitHub), so GitHub is live,
-// and live GitHub isn't built yet: every GitHub step is refused with unsupported_in_live. The same
-// GitHub example then runs through the Vitest integration, unchanged, and must come back skipped.
+// server's GitHub is live against a stand-in for GitHub's API (nothing is sent to GitHub), with the
+// App installed on all of the org's repositories, so a repository without it can't exist live. The
+// GitHub example that needs one then runs through the Vitest integration, unchanged, and must come
+// back skipped.
 test("a GitHub example on a live server is skipped with the reason", async () => {
   const server = await startBinary({
-    bin: process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath(),
-    env: {
-      CHANNELSTACK_GITHUB_APP_ID: "1",
-      CHANNELSTACK_GITHUB_PRIVATE_KEY: "a stand-in, never sent anywhere",
-      CHANNELSTACK_LOG_LEVEL: "warn",
-    },
+    bin: join(ROOT, "test", "acceptance", "stand-ins", "github-live-server.sh"),
+    env: { CHANNELSTACK_LOG_LEVEL: "warn" },
   });
   try {
     const run = spawnSync(
@@ -32,7 +29,7 @@ test("a GitHub example on a live server is skipped with the reason", async () =>
         "test/acceptance/vitest.config.ts",
         "api/examples/github.test.ts",
         "-t",
-        "a mention in an issue gets one comment",
+        "no install, no events",
         "--reporter",
         "verbose",
       ],
@@ -48,7 +45,7 @@ test("a GitHub example on a live server is skipped with the reason", async () =>
     // Skipped once it started (the others are filtered out), with the reason in the report, where a
     // person reading the run sees it.
     expect(output).toMatch(
-      /↓ .*a mention in an issue gets one comment.* \d+ms \[live: Session\.github isn't supported live: live github isn't built yet\]/,
+      /↓ .*no install, no events.* \d+ms \[live: GitHubFixture\.createRepo without apps isn't supported live: the App's installation covers all of acme-tests's repositories, so it hears about every one\]/,
     );
   } finally {
     await server.stop();
@@ -94,7 +91,8 @@ test("a Slack example on a server with Slack's credentials set in part fails", a
 }, 60_000);
 
 // Every test has all four channels' fixtures. A channel refused live must not touch the others':
-// with GitHub live and not built, a Slack example (fake, against its reference agent) still passes.
+// with GitHub live and its App's key a stand-in that signs nothing, a Slack example (fake, against
+// its reference agent) still passes.
 test("a channel refused live doesn't skip the tests of the others", async () => {
   let run: { status: number | null; output: string } | undefined;
   await withStack(

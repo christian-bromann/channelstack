@@ -1634,10 +1634,10 @@ class GitHubFixture:
         self.api_url: str = data["apiUrl"]
         self.org: str = data["org"]
 
-    async def create_user(self, *, login: str, id: int | None = None, name: str | None = None, email: str | None = None, role: Literal["member", "admin", "outside_collaborator"] | None = None) -> GitHubUser:
+    async def create_user(self, *, login: str, id: int | None = None, name: str | None = None, email: str | None = None, role: Literal["member", "admin", "outside_collaborator"] | None = None, token: str | None = None) -> GitHubUser:
         """Create a person in the org. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users", body={"login": login, "id": id, "name": name, "email": email, "role": role})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/users", body={"login": login, "id": id, "name": name, "email": email, "role": role, "token": credential("CHANNELSTACK_GITHUB_USER_{login}_TOKEN", {"login": login}) if token is None else token})
         return GitHubUser(ctx, data)
 
     async def create_repo(self, *, name: str | None = None, private: bool | None = None, default_branch: str | None = None, files: TreeInput | None = None, collaborators: list[GitHubUser | dict[str, Any]] | None = None, apps: list[GitHubApp] | None = None, labels: list[str | dict[str, Any]] | None = None) -> GitHubRepo:

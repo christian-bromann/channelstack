@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { type App, type AppOptions, CONTROL_PREFIX, createApp, type ServerUrls } from "./app.ts";
+import { type App, type AppOptions, CONTROL_PREFIX, createApp, type LiveOptions, type ServerUrls } from "./app.ts";
 import { createBearerToken } from "./core/auth/index.ts";
 import { readPrivateJsonFile, removeFile, writePrivateFile } from "./core/home/index.ts";
 import { ledgerDir } from "./core/ledger/index.ts";
@@ -31,6 +31,11 @@ export interface StartOptions {
   ui?: string;
   /** The environment live mode reads: credentials, allowlists, `CHANNELSTACK_REALITY`, `CHANNELSTACK_RUN_ID`. */
   env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * For tests that start a whole server: stand-ins for the platforms live mode calls. Only code
+   * can pass it, never a flag or the environment, so a token can't be sent elsewhere.
+   */
+  platforms?: Pick<LiveOptions, "fetch" | "apiBase">;
 }
 
 export interface RunningServer {
@@ -115,6 +120,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
       env: options.env ?? {},
       ledgerFile: join(ledgerDir(options.home), `${process.pid}-${Date.now()}.json`),
       home: options.home,
+      ...options.platforms,
     },
     urls: () => {
       if (!urls) throw new Error("The server isn't listening yet");

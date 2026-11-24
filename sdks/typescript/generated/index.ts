@@ -1784,9 +1784,9 @@ export class GitHubFixture {
   }
 
   /** Create a person in the org. Experimental. */
-  async createUser(options: { login: string; id?: number; name?: string; email?: string; role?: "member" | "admin" | "outside_collaborator" }): Promise<GitHubUser> {
+  async createUser(options: { login: string; id?: number; name?: string; email?: string; role?: "member" | "admin" | "outside_collaborator"; token?: string }): Promise<GitHubUser> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users`, { body: { login: options.login, id: options.id, name: options.name, email: options.email, role: options.role } })) as GitHubUserData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/users`, { body: { login: options.login, id: options.id, name: options.name, email: options.email, role: options.role, token: options.token ?? credential("CHANNELSTACK_GITHUB_USER_{login}_TOKEN", { login: options.login }) } })) as GitHubUserData;
     return new GitHubUser(ctx, data);
   }
 
