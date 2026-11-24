@@ -67,18 +67,17 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
       return;
     }
     if (/\brefactor\b/i.test(title)) {
-      // Stop may come while the issue is still being started: then the job ends here.
-      if (stopRequested.delete(sessionId)) {
-        await answer(sessionId, "Stopped, as asked. Nothing was changed.");
-        return;
-      }
-      await publish(sessionId, { type: "action", action: "Refactoring", parameter: title });
-      const stopped = await new Promise<boolean>((resolve) => {
+      // The long job is stoppable before its first request goes out, and a Stop that came while
+      // the issue was still being started stops it at once.
+      const stopped = new Promise<boolean>((resolve) => {
         stoppable.set(sessionId, () => resolve(true));
+        if (stopRequested.delete(sessionId)) resolve(true);
         setTimeout(() => resolve(false), LONG_JOB_MS);
       });
+      await publish(sessionId, { type: "action", action: "Refactoring", parameter: title });
+      const wasStopped = await stopped;
       stoppable.delete(sessionId);
-      await answer(sessionId, stopped ? "Stopped, as asked. Nothing was changed." : answerFor(title));
+      await answer(sessionId, wasStopped ? "Stopped, as asked. Nothing was changed." : answerFor(title));
       return;
     }
     if (/\brate limit/i.test(title)) {
@@ -114,7 +113,13 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
       if (started.has(sessionId)) return;
       started.add(sessionId);
       working.add(sessionId);
-      inBackground(sessionId, () => work(sessionId, issueId).finally(() => working.delete(sessionId)));
+      // A Stop the job never reached (a short one answers anyway) is forgotten with it.
+      inBackground(sessionId, () =>
+        work(sessionId, issueId).finally(() => {
+          working.delete(sessionId);
+          stopRequested.delete(sessionId);
+        }),
+      );
     },
 
     /** A person wrote in the session: Stop, or a prompt (an answer to a question, or a follow-up). */
