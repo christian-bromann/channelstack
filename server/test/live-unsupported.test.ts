@@ -54,7 +54,7 @@ const CASES: Record<string, Case | Case[]> = {
     { channel: "slack", method: "POST", path: "/deliveries/E0X/resend", body: { badSignature: true } },
     { channel: "linear", method: "POST", path: "/deliveries/x/resend", body: { stale: true } },
   ],
-  "`channelstack reset`": { channel: "", method: "POST", path: "/reset", reason: /never wiped/ },
+  "`channelstack.reset()`": { channel: "", method: "POST", path: "/reset", reason: /never wiped/ },
   "`slack.createChannel({ shared: true })` (Slack Connect)": {
     channel: "slack",
     method: "POST",
