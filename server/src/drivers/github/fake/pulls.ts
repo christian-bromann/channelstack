@@ -413,10 +413,10 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       let sha: string;
       if (method === "rebase") {
         // Each commit of the branch again, on top of the base, with the merger as committer.
+        const steps = await git.replay(dir, start, baseSha, headSha);
+        if (!steps) throw new GitHubRefusal(405, "Pull Request is not mergeable");
         sha = baseSha;
-        for (const commit of await git.ahead(dir, baseSha, headSha)) {
-          const replayed = await git.merged(dir, commit.parents[0] ?? start, sha, commit.sha);
-          if (!replayed) throw new GitHubRefusal(405, "Pull Request is not mergeable");
+        for (const { commit, files: replayed } of steps) {
           sha = await git.writeCommit(dir, {
             message: commit.message,
             tree: await git.treeOf(dir, replayed),

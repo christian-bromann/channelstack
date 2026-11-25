@@ -29,8 +29,12 @@ export class CursorList<T> {
     return item;
   }
 
-  /** Everything after `since` (all that is kept without one), and the cursor for the next read. */
-  read(since?: string): { items: T[]; cursor: string } {
+  /**
+   * Everything after `since` (all that is kept without one), the cursor for the next read, and
+   * `first`: the position of the first item among every item ever appended, so an item's number
+   * stays the same when older ones are dropped.
+   */
+  read(since?: string): { items: T[]; cursor: string; first: number } {
     const end = this.#dropped + this.#items.length;
     let from = this.#dropped;
     if (since !== undefined) {
@@ -38,7 +42,7 @@ export class CursorList<T> {
       if (!match?.[1]) throw new ProtocolError("invalid_argument", "Not a cursor from this server", { since });
       from = Math.min(Math.max(Number.parseInt(match[1], 36), this.#dropped), end);
     }
-    return { items: this.#items.slice(from - this.#dropped), cursor: `c_${end.toString(36)}` };
+    return { items: this.#items.slice(from - this.#dropped), cursor: `c_${end.toString(36)}`, first: from };
   }
 }
 
@@ -139,9 +143,10 @@ export class EventLog {
     this.#listeners.push(listener);
   }
 
-  read(session: string, since?: string): { events: LogEvent[]; cursor: string } {
-    const { items, cursor } = (this.#logs.get(session) ?? new CursorList<LogEvent>()).read(since);
-    return { events: items, cursor };
+  /** A session's events after `since`, and `first`: the number of events before them, kept or dropped. */
+  read(session: string, since?: string): { events: LogEvent[]; cursor: string; first: number } {
+    const { items, cursor, first } = (this.#logs.get(session) ?? new CursorList<LogEvent>()).read(since);
+    return { events: items, cursor, first };
   }
 
   drop(session: string): void {

@@ -65,9 +65,10 @@ export function readCalls<Channel extends string>(
   channel: Channel,
   query: z.infer<typeof CallsQuery>,
 ) {
-  return events
-    .read(session)
-    .events.map((event, index) => ({ event, id: `call_${index + 1}` }))
+  // A call's id is its place in the session's log: the same in every read, older events dropped or not.
+  const { events: read, first } = events.read(session);
+  return read
+    .map((event, index) => ({ event, id: `call_${first + index + 1}` }))
     .filter(({ event }) => event.kind === "api_call" && event.driver === channel)
     .map(({ event, id }) => ({
       ...(event.data as {

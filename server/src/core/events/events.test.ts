@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { Redactor } from "../redact/index.ts";
+import { readCalls } from "../router/inspect.ts";
 import { CursorList, EventLog, WORLD_SCOPE } from "./index.ts";
 
 describe("the event log", () => {
@@ -55,6 +56,7 @@ describe("a cursor list with a limit", () => {
     // A reader that fell behind (its place was dropped) gets what is left, and goes on from there.
     const behind = list.read(first.cursor);
     expect(behind.items).toEqual([3, 4, 5]);
+    expect(behind.first).toBe(2);
     list.append(6);
     expect(list.read(behind.cursor).items).toEqual([6]);
   });
@@ -65,9 +67,14 @@ describe("a cursor list with a limit", () => {
       log.append(WORLD_SCOPE, "github", "api_call", { operation: `call ${n}`, responseStatus: 200 });
       log.append("ses_a", "github", "api_call", { operation: `call ${n}`, responseStatus: 200 });
     }
-    const world = log.read(WORLD_SCOPE).events;
-    expect(world).toHaveLength(10_000);
-    expect(world[0]?.data.operation).toBe("call 5");
+    const world = log.read(WORLD_SCOPE);
+    expect(world.events).toHaveLength(10_000);
+    expect(world.events[0]?.data.operation).toBe("call 5");
+    // What was dropped still counts: the first event kept is the sixth ever recorded.
+    expect(world.first).toBe(5);
+    // And the calls read from it keep their ids: the oldest kept is the sixth call ever made.
+    const calls = readCalls(log, WORLD_SCOPE, "github", {});
+    expect([calls[0]?.id, calls.at(-1)?.id]).toEqual(["call_6", "call_10005"]);
     expect(log.read("ses_a").events).toHaveLength(10_005);
   });
 });

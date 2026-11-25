@@ -400,10 +400,18 @@ export function githubObjects(lookups: GitHubLookups) {
       auto_merge: null,
       active_lock_reason: null,
       merged: pull.merged,
-      // What GitHub computed from the branches (`refreshPull`): `dirty` when they conflict.
+      // What GitHub computed from the branches (`refreshPull`): `dirty` when they conflict, `unknown` until computed.
       mergeable: open ? (pull.mergeable ?? null) : null,
-      rebaseable: open ? (pull.mergeable ?? null) : null,
-      mergeable_state: open ? (pull.draft ? "draft" : pull.mergeable === false ? "dirty" : "clean") : "unknown",
+      rebaseable: open ? (pull.rebaseable ?? null) : null,
+      mergeable_state: !open
+        ? "unknown"
+        : pull.draft
+          ? "draft"
+          : pull.mergeable === undefined
+            ? "unknown"
+            : pull.mergeable
+              ? "clean"
+              : "dirty",
       merged_by: pull.mergedBy === undefined ? null : actor(pull.mergedBy),
       comments: lookups.commentCount(record),
       review_comments: lookups.reviewCommentCount(record),

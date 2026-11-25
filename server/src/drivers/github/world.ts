@@ -102,6 +102,8 @@ interface GitHubPullRecord {
    * it the same way; until the first computation it is unknown (`null` in its payloads).
    */
   mergeable?: boolean;
+  /** Whether each of head's commits replays onto base without a conflict, the way a rebase merge does. */
+  rebaseable?: boolean;
 }
 
 /** An issue. A pull request is an issue too, with `pull` set. */
