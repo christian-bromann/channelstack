@@ -214,6 +214,29 @@ async def test_text_a_person_sees_once_or_exactly_n_times() -> None:
         await expect(conversation).to_contain_text("Deploying", count=2, timeout="300ms")
 
 
+class WithEphemeral:
+    """A conversation with one message only Ana sees: read as no one, it's left out."""
+
+    _ctx = None
+
+    def __init__(self) -> None:
+        self.viewers: list[object] = []
+
+    async def transcript(self, *, as_: object = None) -> Transcript:
+        self.viewers.append(as_)
+        shown = [Entry("1", PERSON, "deploy web")]
+        return Transcript([*shown, Entry("2", BOT, "Only you can see this")] if as_ is PERSON else shown)
+
+
+async def test_text_as_a_person_sees_it_includes_their_ephemeral_messages() -> None:
+    conversation = WithEphemeral()
+    await expect(conversation).to_contain_text("Only you", as_=PERSON, timeout="300ms")
+    await expect(conversation).not_to_contain_text("Only you", timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected text matching 'Only you', found 0"):
+        await expect(conversation).to_contain_text("Only you", timeout="300ms")
+    assert conversation.viewers[0] is PERSON
+
+
 async def test_a_button_on_the_apps_latest_message() -> None:
     conversation = Conversation(Entry("1", PERSON, "deploy"), Entry("2", BOT, "Approve?", ("Approve", "Cancel")))
     await expect(conversation).to_have_button("Approve", timeout="300ms")

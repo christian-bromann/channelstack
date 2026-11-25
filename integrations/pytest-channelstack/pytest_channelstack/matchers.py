@@ -462,38 +462,42 @@ class Expectation:
         *,
         count: int | None = None,
         from_: AuthorRef | None = None,
+        as_: Author | None = None,
         timeout: Duration | None = None,
         quiet_for: Duration | None = None,
     ) -> None:
-        """Some entry a person would see contains this text. `count` makes it exact, checked once quiet."""
-        await self._contains_text(text, count, from_, timeout, quiet_for, negate=False)
+        """Some entry a person would see contains this text. `count` makes it exact, checked once quiet.
+
+        `as_` reads the transcript as that person or app sees it, their ephemeral messages included.
+        """
+        await self._contains_text(text, count, from_, as_, timeout, quiet_for, negate=False)
 
     async def not_to_contain_text(
         self,
         text: Text,
         *,
         from_: AuthorRef | None = None,
+        as_: Author | None = None,
         timeout: Duration | None = None,
         quiet_for: Duration | None = None,
     ) -> None:
-        """Once the agent is quiet, no entry a person would see contains this text."""
-        await self._contains_text(text, None, from_, timeout, quiet_for, negate=True)
+        """Once the agent is quiet, no entry a person would see contains this text (as `as_` sees it, if given)."""
+        await self._contains_text(text, None, from_, as_, timeout, quiet_for, negate=True)
 
     async def _contains_text(
         self,
         text: Text,
         count: int | None,
         from_: AuthorRef | None,
+        as_: Author | None,
         timeout: Duration | None,
         quiet_for: Duration | None,
         negate: bool,
     ) -> None:
         async def read() -> tuple[list[Any], list[Any]]:
-            entries = [
-                entry
-                for entry in (await self._subject.transcript()).entries
-                if from_ is None or from_matches(entry.author, from_)
-            ]
+            # Only a subject that has viewers takes `as_`, as in matchers-core: pass it only when given.
+            transcript = await (self._subject.transcript(as_=as_) if as_ is not None else self._subject.transcript())
+            entries = [entry for entry in transcript.entries if from_ is None or from_matches(entry.author, from_)]
             return entries, [entry for entry in entries if text_matches(entry.text, text)]
 
         def described(value: tuple[list[Any], list[Any]]) -> str:
