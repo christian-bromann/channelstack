@@ -502,3 +502,134 @@ async def test_a_delivery_not_retried() -> None:
     ).not_to_be_retried(timeout="300ms")
     with pytest.raises(AssertionError, match="Expected delivery dlv_1 not to be retried, it was retried 1 times"):
         await expect(Delivery([Attempt("timed_out"), Attempt("acknowledged", 200)])).not_to_be_retried(timeout="300ms")
+
+
+@dataclass(frozen=True)
+class ReviewComment:
+    author: Person
+    path: str
+    line: int
+    body: str
+
+
+@dataclass(frozen=True)
+class Review:
+    author: Person
+    state: str
+    body: str = ""
+
+
+@dataclass(frozen=True)
+class CheckRun:
+    name: str
+    status: str
+    conclusion: str | None = None
+
+
+@dataclass
+class PullRequest:
+    _ctx: object = None
+    comments_on_diff: list[ReviewComment] = field(default_factory=lambda: [])
+    review_list: list[Review] = field(default_factory=lambda: [])
+    runs: list[CheckRun] = field(default_factory=lambda: [])
+    label_list: list[str] = field(default_factory=lambda: [])
+    is_merged: bool = False
+
+    async def review_comments(self) -> list[ReviewComment]:
+        return self.comments_on_diff
+
+    async def reviews(self) -> list[Review]:
+        return self.review_list
+
+    async def check_runs(self) -> list[CheckRun]:
+        return self.runs
+
+    async def labels(self) -> list[str]:
+        return self.label_list
+
+    async def merged(self) -> bool:
+        return self.is_merged
+
+
+DIFF = PullRequest(comments_on_diff=[ReviewComment(AGENT, "src/login.ts", 12, "Safari drops the cookie here")])
+
+
+async def test_a_comment_on_the_diff() -> None:
+    await expect(DIFF).to_have_review_comment(path="src/login.ts", line=12, from_=AGENT, text="Safari", timeout="300ms")
+    with pytest.raises(
+        AssertionError,
+        match=r"Expected a comment on the diff on src/login.ts:13 from my-agent\. The diff has:\n"
+        r"  my-agent on src/login.ts:12: Safari drops the cookie here",
+    ):
+        await expect(DIFF).to_have_review_comment(path="src/login.ts", line=13, from_="my-agent", timeout="300ms")
+
+
+async def test_no_comment_on_the_diff() -> None:
+    await expect(DIFF).not_to_have_review_comment(path="README.md", timeout="300ms")
+    with pytest.raises(AssertionError, match=r'Expected no comment on the diff matching "cookie"\. The diff has'):
+        await expect(DIFF).not_to_have_review_comment(text="cookie", timeout="300ms")
+
+
+REVIEWED = PullRequest(review_list=[Review(AGENT, "CHANGES_REQUESTED", "Needs a test")])
+
+
+async def test_a_review_from_someone() -> None:
+    await expect(REVIEWED).to_have_review_from(AGENT, state="CHANGES_REQUESTED", timeout="300ms")
+    with pytest.raises(
+        AssertionError,
+        match=r"Expected a review from my-agent with state APPROVED\. Reviews there:\n"
+        r'  my-agent: CHANGES_REQUESTED "Needs a test"',
+    ):
+        await expect(REVIEWED).to_have_review_from("my-agent", state="APPROVED", timeout="300ms")
+
+
+async def test_no_review_from_someone() -> None:
+    await expect(REVIEWED).not_to_have_review_from(ANA, timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected no review from my-agent. Reviews there"):
+        await expect(REVIEWED).not_to_have_review_from("my-agent", timeout="300ms")
+
+
+CHECKED = PullRequest(runs=[CheckRun("ci / test", "completed", "failure"), CheckRun("lint", "in_progress")])
+
+
+async def test_a_check_run() -> None:
+    await expect(CHECKED).to_have_check_run("ci / test", conclusion="failure", timeout="300ms")
+    await expect(CHECKED).to_have_check_run(re.compile("^li"), status="in_progress", timeout="300ms")
+    with pytest.raises(
+        AssertionError,
+        match=r'Expected a check run "ci" \(completed, success\)\. Check runs there:\n'
+        r"  ci / test: completed, failure\n  lint: in_progress",
+    ):
+        # A string must equal the name.
+        await expect(CHECKED).to_have_check_run("ci", status="completed", conclusion="success", timeout="300ms")
+
+
+async def test_no_check_run() -> None:
+    await expect(CHECKED).not_to_have_check_run("ci / test", conclusion="success", timeout="300ms")
+    with pytest.raises(AssertionError, match=r"Expected no check run /test/ \(failure\)"):
+        await expect(CHECKED).not_to_have_check_run(re.compile("test"), conclusion="failure", timeout="300ms")
+
+
+async def test_a_label_in_any_case() -> None:
+    labelled = PullRequest(label_list=["Bug"])
+    await expect(labelled).to_have_label("bug", timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected the label "triage". Labels there: Bug'):
+        await expect(labelled).to_have_label("triage", timeout="300ms")
+
+
+async def test_no_label() -> None:
+    await expect(PullRequest()).not_to_have_label("bug", timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected no label "BUG". Labels there: Bug'):
+        await expect(PullRequest(label_list=["Bug"])).not_to_have_label("BUG", timeout="300ms")
+
+
+async def test_a_merged_pull_request() -> None:
+    await expect(PullRequest(is_merged=True)).to_be_merged(timeout="300ms")
+    with pytest.raises(AssertionError, match="^Expected the pull request to be merged$"):
+        await expect(PullRequest()).to_be_merged(timeout="300ms")
+
+
+async def test_a_pull_request_not_merged() -> None:
+    await expect(PullRequest()).not_to_be_merged(timeout="300ms")
+    with pytest.raises(AssertionError, match="^Expected the pull request not to be merged$"):
+        await expect(PullRequest(is_merged=True)).not_to_be_merged(timeout="300ms")

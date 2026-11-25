@@ -891,6 +891,202 @@ class Expectation:
         """Once the agent is quiet, the delivery needed no retries (or any number but `times`, if given)."""
         await self._retried(times, timeout, quiet_for, negate=True)
 
+    # GitHub: reviews, check runs, labels, merging
+
+    async def _review_comment(
+        self,
+        path: str | None,
+        line: int | None,
+        from_: AuthorRef | None,
+        text: Text | None,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        wanted = "" if path is None else f" on {path}{'' if line is None else f':{line}'}"
+        wanted += "" if from_ is None else f" from {_name(from_)}"
+        wanted += "" if text is None else f" matching {_show(text)}"
+
+        def matches(comment: Any) -> bool:
+            return (
+                (path is None or comment.path == path)
+                and (line is None or comment.line == line)
+                and (from_ is None or from_matches(comment.author, from_))
+                and text_matches(_comment_text(comment), text)
+            )
+
+        await self._settle(
+            read=self._subject.review_comments,
+            holds=lambda comments: any(map(matches, comments)),
+            describe=lambda comments: (
+                f"Expected {'no' if negate else 'a'} comment on the diff{wanted}. The diff has:\n"
+                + _listing([f"{c.author.name} on {c.path}:{c.line}: {c.body}" for c in comments])
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_review_comment(
+        self,
+        *,
+        path: str | None = None,
+        line: int | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+    ) -> None:
+        """Subject: a pull request. A comment on the diff, matched by every field that is given."""
+        await self._review_comment(path, line, from_, text, timeout, None, negate=False)
+
+    async def not_to_have_review_comment(
+        self,
+        *,
+        path: str | None = None,
+        line: int | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no comment on the diff matches every field that is given."""
+        await self._review_comment(path, line, from_, text, timeout, quiet_for, negate=True)
+
+    async def _review_from(
+        self, author: AuthorRef, state: str | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        def described(reviews: Sequence[Any]) -> str:
+            lines = [f"{r.author.name}: {r.state}{'' if r.body == '' else f' {_show(r.body)}'}" for r in reviews]
+            return (
+                f"Expected {'no' if negate else 'a'} review from {_name(author)}"
+                f"{'' if state is None else f' with state {state}'}. Reviews there:\n{_listing(lines)}"
+            )
+
+        await self._settle(
+            read=self._subject.reviews,
+            holds=lambda reviews: any(
+                from_matches(review.author, author) and (state is None or review.state == state) for review in reviews
+            ),
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_review_from(
+        self, author: AuthorRef, *, state: str | None = None, timeout: Duration | None = None
+    ) -> None:
+        """Subject: a pull request. A review from this author, with this verdict (`APPROVED`, …) if given."""
+        await self._review_from(author, state, timeout, None, negate=False)
+
+    async def not_to_have_review_from(
+        self,
+        author: AuthorRef,
+        *,
+        state: str | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no review from this author (with this verdict, if given)."""
+        await self._review_from(author, state, timeout, quiet_for, negate=True)
+
+    async def _check_run(
+        self,
+        name: Text,
+        status: str | None,
+        conclusion: str | None,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        wanted = ", ".join(part for part in (status, conclusion) if part is not None)
+
+        def described(runs: Sequence[Any]) -> str:
+            lines = [
+                f"{run.name}: {run.status}{'' if run.conclusion is None else f', {run.conclusion}'}" for run in runs
+            ]
+            return (
+                f"Expected {'no' if negate else 'a'} check run {_show(name)}{f' ({wanted})' if wanted else ''}. "
+                f"Check runs there:\n{_listing(lines)}"
+            )
+
+        await self._settle(
+            read=self._subject.check_runs,
+            holds=lambda runs: any(
+                _named(run.name, name)
+                and (status is None or run.status == status)
+                and (conclusion is None or run.conclusion == conclusion)
+                for run in runs
+            ),
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_check_run(
+        self,
+        name: Text,
+        *,
+        status: str | None = None,
+        conclusion: str | None = None,
+        timeout: Duration | None = None,
+    ) -> None:
+        """Subject: a pull request or a commit. A check run of this name, in this status and conclusion if given."""
+        await self._check_run(name, status, conclusion, timeout, None, negate=False)
+
+    async def not_to_have_check_run(
+        self,
+        name: Text,
+        *,
+        status: str | None = None,
+        conclusion: str | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no such check run (in this status and conclusion, if given)."""
+        await self._check_run(name, status, conclusion, timeout, quiet_for, negate=True)
+
+    async def _label(self, name: str, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        await self._settle(
+            read=self._subject.labels,
+            holds=lambda labels: any(label.lower() == name.lower() for label in labels),
+            describe=lambda labels: (
+                f"Expected {'no' if negate else 'the'} label {_show(name)}. Labels there: {', '.join(labels) or 'none'}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_label(self, name: str, *, timeout: Duration | None = None) -> None:
+        """Subject: an issue or a pull request. It has this label, compared case-insensitively."""
+        await self._label(name, timeout, None, negate=False)
+
+    async def not_to_have_label(
+        self, name: str, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue or pull request doesn't have this label."""
+        await self._label(name, timeout, quiet_for, negate=True)
+
+    async def _merged(self, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        await self._settle(
+            read=self._subject.merged,
+            holds=bool,
+            describe=lambda _: f"Expected the pull request {'not ' if negate else ''}to be merged",
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_be_merged(self, *, timeout: Duration | None = None) -> None:
+        """Subject: a pull request. It has been merged."""
+        await self._merged(timeout, None, negate=False)
+
+    async def not_to_be_merged(self, *, timeout: Duration | None = None, quiet_for: Duration | None = None) -> None:
+        """Once the agent is quiet, the pull request isn't merged."""
+        await self._merged(timeout, quiet_for, negate=True)
+
 
 def expect(subject: Any) -> Expectation:
     """The checks on a subject: `await expect(msg.thread).to_have_reply_from("my-agent")`."""
