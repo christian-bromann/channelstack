@@ -277,6 +277,10 @@ export function emitPython(ir: Ir): Map<string, string> {
     const conditions = [
       ...(fromField ? [`from_matches(item.${snakeCase(w.from ?? "")}, from_)`] : []),
       ...(w.text ? [`text_matches(item.${snakeCase(w.text)}, ${snakeCase(w.text)})`] : []),
+      ...Object.entries(w.where ?? {}).map(
+        ([field, value]) =>
+          `item.${snakeCase(field)} == ${typeof value === "boolean" ? (value ? "True" : "False") : JSON.stringify(value)}`,
+      ),
     ];
     const matches = `lambda item: ${conditions.length > 0 ? conditions.join(" and ") : "True"}`;
     const what = fromField ? `describe_wait(${JSON.stringify(w.what)}, from_)` : JSON.stringify(w.what);

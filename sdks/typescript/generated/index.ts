@@ -1327,9 +1327,9 @@ export class SlackUser {
     return decodeSlackEphemeralMessages(ctx, data);
   }
 
-  /** Wait for the next new modal from the agent, after the last one this handle saw. */
+  /** Wait for the next new open modal from the agent, after the last one this handle saw. */
   async waitForModal(options: { title?: string | RegExp } & WaitOptions = {}): Promise<SlackModal> {
-    return waitForNext(this.#seen, "waitForModal", () => this.modals(), (item) => textMatches(item.title, options.title), "a modal from the agent", options);
+    return waitForNext(this.#seen, "waitForModal", () => this.modals(), (item) => textMatches(item.title, options.title) && item.open === true, "an open modal from the agent", options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

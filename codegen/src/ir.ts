@@ -57,6 +57,8 @@ export interface IrWait {
   text?: string;
   /** The wait's first argument is the read's own options, passed through to it. */
   filter?: true;
+  /** Only items whose fields have these values count: `{ open: true }`. */
+  where?: Record<string, string | number | boolean>;
   /** What is waited for, for the timeout message. */
   what: string;
 }
@@ -422,6 +424,12 @@ export function buildIr(openapi: Json): Ir {
             "an `until` wait needs a response, and either a `field` and the values it must leave (`not`), or `in`",
           );
         }
+        if (wait.mode === "until" && wait.where) {
+          throw new SpecError(
+            where,
+            "`where` narrows the items of a list wait (`next`, `latest`), not an `until` wait",
+          );
+        }
         const item = wait.mode === "until" && returned ? returned : itemOf(returned, where);
         owner.waits = [
           ...(owner.waits ?? []),
@@ -433,6 +441,7 @@ export function buildIr(openapi: Json): Ir {
             ...(wait.from ? { from: wait.from } : {}),
             ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
+            ...(wait.where ? { where: { ...wait.where } } : {}),
             ...(wait.mode === "next" && wait.turn ? { turn: { field: wait.turn.field, value: wait.turn.value } } : {}),
             ...(wait.mode === "until" && wait.in !== true ? { field: wait.field, not: wait.not } : {}),
             ...(wait.mode === "until" && wait.in === true
