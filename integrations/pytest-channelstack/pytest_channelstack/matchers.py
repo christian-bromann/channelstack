@@ -116,6 +116,18 @@ async def _comments_of(subject: Any, check: str) -> list[Any]:
     )
 
 
+def _block_texts(blocks: Sequence[Any]) -> list[str]:
+    """The text of each block of a Notion page, nested ones included: its rich text, or a child page's title."""
+    texts: list[str] = []
+    for block in blocks:
+        kind = block.get("type")
+        data: dict[str, Any] = (block.get(kind) if kind else None) or {}
+        rich_text = data.get("rich_text")
+        text = "".join(item.get("plain_text") or "" for item in rich_text) if rich_text else data.get("title") or ""
+        texts += [str(text), *_block_texts(block.get("children") or [])]
+    return texts
+
+
 async def _session_of(subject: Any) -> Any | None:
     """A Linear agent session, or the latest one of an issue."""
     if hasattr(subject, "state") and hasattr(subject, "activities"):
@@ -1086,6 +1098,137 @@ class Expectation:
     async def not_to_be_merged(self, *, timeout: Duration | None = None, quiet_for: Duration | None = None) -> None:
         """Once the agent is quiet, the pull request isn't merged."""
         await self._merged(timeout, quiet_for, negate=True)
+
+    # Linear issues: delegation, assignment, workflow state
+
+    async def _principal(
+        self,
+        read: Callable[[], Awaitable[Any]],
+        expected: Author | None,
+        verb: str,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        """Who the issue is delegated or assigned to, compared by id; `None` asks for no one."""
+        await self._settle(
+            read=read,
+            holds=lambda current: (
+                current is None if expected is None else current is not None and current.id == expected.id
+            ),
+            describe=lambda current: (
+                f"Expected the issue {'not ' if negate else ''}to be {verb} to "
+                f"{'no one' if expected is None else expected.name}, it is {verb} to "
+                f"{'no one' if current is None else current.name}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_be_delegated_to(self, app: Author | None, *, timeout: Duration | None = None) -> None:
+        """Subject: a Linear issue. It is delegated to this app, or (with `None`) to none."""
+        await self._principal(self._subject.delegated_to, app, "delegated", timeout, None, negate=False)
+
+    async def not_to_be_delegated_to(
+        self, app: Author | None, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue isn't delegated to this app (or, with `None`, it is to one)."""
+        await self._principal(self._subject.delegated_to, app, "delegated", timeout, quiet_for, negate=True)
+
+    async def to_be_assigned_to(self, user: Author | None, *, timeout: Duration | None = None) -> None:
+        """Subject: a Linear issue. It is assigned to this person, or (with `None`) to no one."""
+        await self._principal(self._subject.assignee, user, "assigned", timeout, None, negate=False)
+
+    async def not_to_be_assigned_to(
+        self, user: Author | None, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue isn't assigned to this person (or, with `None`, it is to someone)."""
+        await self._principal(self._subject.assignee, user, "assigned", timeout, quiet_for, negate=True)
+
+    async def _state(self, name: str, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        async def read() -> str:
+            return str((await self._subject.state()).name)
+
+        await self._settle(
+            read=read,
+            holds=lambda current: current.lower() == name.lower(),
+            describe=lambda current: (
+                f"Expected the issue {'not ' if negate else ''}to be in {_show(name)}, it is in {_show(current)}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_state(self, name: str, *, timeout: Duration | None = None) -> None:
+        """Subject: a Linear issue. Its workflow state, by name, compared case-insensitively."""
+        await self._state(name, timeout, None, negate=False)
+
+    async def not_to_have_state(
+        self, name: str, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue is in another workflow state."""
+        await self._state(name, timeout, quiet_for, negate=True)
+
+    # Notion pages: blocks and properties
+
+    async def _block(self, text: Text, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        async def read() -> list[str]:
+            return _block_texts(await self._subject.blocks())
+
+        await self._settle(
+            read=read,
+            holds=lambda texts: any(text_matches(line, text) for line in texts),
+            describe=lambda texts: (
+                f"Expected the page {'not ' if negate else ''}to have a block matching {_show(text)}. "
+                f"Its blocks:\n{_listing(texts)}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_block(self, text: Text, *, timeout: Duration | None = None) -> None:
+        """Subject: a Notion page. A block (at any depth) whose text matches; a child page's title counts."""
+        await self._block(text, timeout, None, negate=False)
+
+    async def not_to_have_block(
+        self, text: Text, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, no block of the page (at any depth) matches."""
+        await self._block(text, timeout, quiet_for, negate=True)
+
+    async def _property_value(
+        self, name: str, expected: object, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        async def read() -> object:
+            return await self._subject.property(name)
+
+        await self._settle(
+            read=read,
+            holds=lambda value: value == expected,
+            describe=lambda value: (
+                f"Expected {name} {'not ' if negate else ''}to be {expected}, "
+                f"it is {json.dumps(value, ensure_ascii=False, default=str)}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_property_value(self, name: str, expected: object, *, timeout: Duration | None = None) -> None:
+        """Subject: a Notion page (a database row). A property has this value, compared with `==`.
+
+        So `unittest.mock.ANY`, or any object with its own `__eq__`, works as TypeScript's asymmetric matchers do.
+        """
+        await self._property_value(name, expected, timeout, None, negate=False)
+
+    async def not_to_have_property_value(
+        self, name: str, expected: object, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the property has another value."""
+        await self._property_value(name, expected, timeout, quiet_for, negate=True)
 
 
 def expect(subject: Any) -> Expectation:

@@ -5,6 +5,7 @@ import secrets
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, cast
+from unittest.mock import ANY
 
 import httpx
 import pytest
@@ -633,3 +634,118 @@ async def test_a_pull_request_not_merged() -> None:
     await expect(PullRequest()).not_to_be_merged(timeout="300ms")
     with pytest.raises(AssertionError, match="^Expected the pull request not to be merged$"):
         await expect(PullRequest(is_merged=True)).not_to_be_merged(timeout="300ms")
+
+
+@dataclass(frozen=True)
+class WorkflowState:
+    name: str
+
+
+@dataclass
+class TrackedIssue:
+    """A Linear issue: who it is delegated and assigned to, and its workflow state."""
+
+    _ctx: object = None
+    delegate: Person | None = None
+    owner: Person | None = None
+    workflow: str = "Todo"
+
+    async def delegated_to(self) -> Person | None:
+        return self.delegate
+
+    async def assignee(self) -> Person | None:
+        return self.owner
+
+    async def state(self) -> WorkflowState:
+        return WorkflowState(self.workflow)
+
+
+async def test_an_issue_delegated_to_an_app() -> None:
+    await expect(TrackedIssue(delegate=AGENT)).to_be_delegated_to(AGENT, timeout="300ms")
+    await expect(TrackedIssue()).to_be_delegated_to(None, timeout="300ms")
+    with pytest.raises(
+        AssertionError, match="Expected the issue to be delegated to my-agent, it is delegated to no one"
+    ):
+        await expect(TrackedIssue()).to_be_delegated_to(AGENT, timeout="300ms")
+
+
+async def test_an_issue_not_delegated_to_an_app() -> None:
+    await expect(TrackedIssue()).not_to_be_delegated_to(AGENT, timeout="300ms")
+    with pytest.raises(AssertionError, match="not to be delegated to no one, it is delegated to no one"):
+        await expect(TrackedIssue()).not_to_be_delegated_to(None, timeout="300ms")
+
+
+async def test_an_issue_assigned_to_someone() -> None:
+    await expect(TrackedIssue(owner=ANA)).to_be_assigned_to(ANA, timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected the issue to be assigned to no one, it is assigned to Ana"):
+        await expect(TrackedIssue(owner=ANA)).to_be_assigned_to(None, timeout="300ms")
+
+
+async def test_an_issue_not_assigned_to_someone() -> None:
+    await expect(TrackedIssue(owner=ANA)).not_to_be_assigned_to(AGENT, timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected the issue not to be assigned to Ana, it is assigned to Ana"):
+        await expect(TrackedIssue(owner=ANA)).not_to_be_assigned_to(ANA, timeout="300ms")
+
+
+async def test_an_issue_in_a_workflow_state() -> None:
+    await expect(TrackedIssue(workflow="In Progress")).to_have_state("in progress", timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected the issue to be in "Done", it is in "Todo"'):
+        await expect(TrackedIssue()).to_have_state("Done", timeout="300ms")
+
+
+async def test_an_issue_not_in_a_workflow_state() -> None:
+    await expect(TrackedIssue()).not_to_have_state("Done", timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected the issue not to be in "todo", it is in "Todo"'):
+        await expect(TrackedIssue()).not_to_have_state("todo", timeout="300ms")
+
+
+def rich(kind: str, text: str, *children: dict[str, Any]) -> dict[str, Any]:
+    return {"type": kind, kind: {"rich_text": [{"plain_text": text}]}, "children": list(children)}
+
+
+class NotionPage:
+    _ctx = None
+
+    def __init__(self, **properties: object) -> None:
+        self.properties = properties
+
+    async def blocks(self) -> list[dict[str, Any]]:
+        return [
+            rich("heading_1", "Incident 42", rich("paragraph", "Root cause: a stale cache")),
+            {"type": "child_page", "child_page": {"title": "Timeline"}},
+        ]
+
+    async def property(self, name: str) -> object:
+        return self.properties.get(name)
+
+
+async def test_a_block_at_any_depth() -> None:
+    await expect(NotionPage()).to_have_block(re.compile("root cause", re.I), timeout="300ms")
+    await expect(NotionPage()).to_have_block("Timeline", timeout="300ms")
+    with pytest.raises(
+        AssertionError,
+        match=r'Expected the page to have a block matching "Fix"\. Its blocks:\n'
+        r"  Incident 42\n  Root cause: a stale cache\n  Timeline",
+    ):
+        await expect(NotionPage()).to_have_block("Fix", timeout="300ms")
+
+
+async def test_no_block() -> None:
+    await expect(NotionPage()).not_to_have_block("Fix", timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected the page not to have a block matching "stale"'):
+        await expect(NotionPage()).not_to_have_block("stale", timeout="300ms")
+
+
+async def test_a_property_value() -> None:
+    row = NotionPage(Status="Done", Points=3)
+    await expect(row).to_have_property_value("Status", "Done", timeout="300ms")
+    await expect(row).to_have_property_value("Points", ANY, timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected Status to be Open, it is "Done"'):
+        await expect(row).to_have_property_value("Status", "Open", timeout="300ms")
+
+
+async def test_not_a_property_value() -> None:
+    row = NotionPage(Points=3)
+    await expect(row).not_to_have_property_value("Points", 5, timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected Points not to be 3, it is 3"):
+        await expect(row).not_to_have_property_value("Points", 3, timeout="300ms")
