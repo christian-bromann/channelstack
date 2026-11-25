@@ -237,15 +237,15 @@ Handles passed as arguments or options are sent by id (`kind: "ref"`). In respon
 | Part | Job |
 |---|---|
 | Transport | HTTP client with the bearer token from `~/.channelstack/server.json`, retries while the server starts, error code → typed exception |
-| Launcher | `auto` / `attach` / `start`: attaches to a running server at `https://channelstack.localhost` (or `CHANNELSTACK_URL`), otherwise starts the bundled binary and stops it on exit |
-| Waiting and polling | The one polling loop behind every `waitFor…`, `latest…` and matcher: cursor reads, timeouts, quiet checks |
+| Launcher | `auto` / `attach` / `start`: attaches to a running server at `https://channelstack.localhost` (or `CHANNELSTACK_URL`), otherwise starts the server binary and stops it on exit. TypeScript finds the binary at `CHANNELSTACK_SERVER_BIN` or in its `@channelstack/server-<platform>` optional dependency; Python and Rust at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH` |
+| Waiting and polling | The one polling loop behind every `waitFor…`, `latest…` and matcher: cursor reads, timeouts, quiet checks. It holds the one default timeout (10 s) and quiet window (750 ms) every wait method uses; the test integrations set it from their options (Vitest's `timeout` and `quietFor`, pytest's `channelstack_timeout` and `channelstack_quiet_for`) |
 | Durations | Parsing `"3s"`, `"750ms"` |
 | Credentials | Reads `CHANNELSTACK_<CHANNEL>_*` env vars for live mode and sends them once; the server never returns them (phase 5) |
 | Disposal | Created resources clean up at the end of the session: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust. Generated from routes marked `dispose` |
 
 The modules have the same names in every language ([code-map.md](code-map.md)).
 
-In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed getters for its fields, and every method returns a builder: option setters, then `.send().await` or `.await` directly (`IntoFuture`). Waits are builders too (`thread.wait_for_reply().from("my-agent").timeout("5s").await`). Arguments that take a handle take any `&impl Handle`; errors are one `channelstack::Error` with the protocol's `code()`. What isn't a handle (a transcript, a page of messages, a status) comes back as `serde_json::Value`, so a transcript's text is `transcript["text"]`, and printing the value prints JSON, not the text that `str()` and `toString()` give in Python and TypeScript. The launcher finds the binary at `CHANNELSTACK_SERVER_BIN` or on the `PATH` for now; downloading the release binary comes with distribution (section 6, phase 8). The smoke runner (`scenarios/runners/rust`) calls methods by their API names through the generated `call_by_name`.
+In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed getters for its fields, and every method returns a builder: option setters, then `.send().await` or `.await` directly (`IntoFuture`). Waits are builders too (`thread.wait_for_reply().from("my-agent").timeout("5s").await`). Arguments that take a handle take any `&impl Handle`; errors are one `channelstack::Error` with the protocol's `code()`. What isn't a handle (a transcript, a page of messages, a status) comes back as `serde_json::Value`, so a transcript's text is `transcript["text"]`, and printing the value prints JSON, not the text that `str()` and `toString()` give in Python and TypeScript. The smoke runner (`scenarios/runners/rust`) calls methods by their API names through the generated `call_by_name`.
 
 ### 5.4 Keeping the SDKs honest
 
@@ -260,8 +260,8 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 |---|---|
 | Server | `bun build --compile` per platform (darwin-arm64/x64, linux-x64/arm64, windows-x64) |
 | npm | `channelstack` (CLI, UI, `channelstack/vitest`, `channelstack/checks`) with `@channelstack/server-<platform>` as optional dependencies |
-| PyPI | Per-platform wheels with the binary bundled; `pytest-channelstack` for fixtures and matchers |
-| Rust | Downloads the release binary on first use, with checksum verification, or uses `CHANNELSTACK_SERVER_BIN` |
+| PyPI | `channelstack`, without the binary: the launcher finds it at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH` (for example from the npm package); `pytest-channelstack` for fixtures and matchers |
+| Rust | The crate `channelstack`, without the binary and without downloading one: it finds it at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH` |
 | Docker | `ghcr.io/<org>/channelstack` for CI and for proxy mode with Go or Linux agents |
 
 ## 7. Repository layout
