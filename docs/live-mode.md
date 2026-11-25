@@ -89,7 +89,7 @@ The nightly differential run (implementation plan 9) compares fake and real beha
   | Platform | How the payloads are received |
   |---|---|
   | GitHub | Read from the App's delivery log |
-  | Slack | Socket Mode on channelstack's test app |
+  | Slack | The reference agent's own Socket Mode connection, tapped in its process |
   | Linear, Notion | One named tunnel owned by the maintainers |
 
 - **UI-only payloads** (`block_actions`, Stop, modal submit) are produced by the browser actor and received the same way.
@@ -97,7 +97,7 @@ The nightly differential run (implementation plan 9) compares fake and real beha
 Built in phase 6 ([decisions/0016](decisions/0016-proxy-mode-and-conformance.md)): `pnpm conformance` runs each scenario of `scenarios/<channel>/` against the fake and against the sandbox. Both runs go through the proxy with the recorder, so the platforms' real API answers are written as shapes. The webhooks arrive like this:
 
 - **GitHub, Linear and Notion:** received from the relay channel each platform's webhook points at. A tap in front of the agent writes each one's shape, then hands it on unchanged.
-- **Slack:** not received. Socket Mode spreads an app's events over its connections, so a second one would take events from the agent; its webhooks aren't compared yet ([#28](https://github.com/christian-bromann/channelstack/issues/28)).
+- **Slack:** the reference agent receives in Socket Mode. A second connection would take events from it, because Slack spreads an app's events over its connections. So the run starts the agent through `scripts/lib/slack-event-tap.ts` instead, which hands each event's body to the recorder before Bolt handles it, unchanged ([decisions/0020](decisions/0020-slack-event-tap.md)). Events are recorded as `event_callback <event type> [<subtype>]`, in both worlds, and interactions by their type; slash commands, which carry no JSON, are recorded in neither. A channel whose scenarios passed live with none of its webhooks recorded fails the run, so a tap or relay that stops recording doesn't go unnoticed.
 
 ## 7. Work breakdown
 

@@ -218,8 +218,19 @@ try {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
 
+  // A channel whose scenarios passed live sent webhooks; none recorded means the tap or relay
+  // recording them stopped working, and the shape differ would compare nothing for it, quietly.
+  const unrecorded = liveChannels.filter(
+    (channel) =>
+      report.scenarios.some((result) => result.channel === channel && result.live === "passed") &&
+      ![...liveShapes.keys()].some((key) => key.startsWith(`webhook ${channel} `)),
+  );
+
   // What fails the run: a scenario that failed either way, a difference nothing allows, an expired divergence, leftovers.
   const problems = [
+    ...unrecorded.map(
+      (channel) => `shapes/${channel}: its scenarios passed live, but none of its webhooks was recorded live`,
+    ),
     ...report.scenarios
       .filter((result) => result.fake === "failed")
       .map((result) => `${result.scenario}: ${result.note}`),
