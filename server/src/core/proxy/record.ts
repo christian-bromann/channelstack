@@ -55,6 +55,30 @@ export function mergeShapes(a: Shape, b: Shape): Shape {
 }
 
 /**
+ * A shape with Slack's `state.values` keyed by nothing an app made: those keys are block and action
+ * ids, which an app can build from what a person typed (`deploy:checkout`). Each becomes one
+ * `{block_id}` and one `{action_id}`, what they hold merged.
+ */
+function collapseStateValues(shape: Shape): Shape {
+  if (Array.isArray(shape)) return shape.map(collapseStateValues);
+  if (typeof shape !== "object") return shape;
+  const isObject = (value: Shape | undefined): value is { [key: string]: Shape } =>
+    typeof value === "object" && !Array.isArray(value);
+  return Object.fromEntries(
+    Object.entries(shape).map(([key, item]) => {
+      const inner = collapseStateValues(item);
+      if (key !== "state" || !isObject(inner) || !isObject(inner.values)) return [key, inner];
+      const actions = Object.values(inner.values).flatMap((block) => (isObject(block) ? Object.values(block) : []));
+      const values = actions.length === 0 ? {} : { "{block_id}": { "{action_id}": actions.reduce(mergeShapes) } };
+      return [key, { ...inner, values }];
+    }),
+  );
+}
+
+/** What the recorder writes of a value: its shape, with nothing an app built from input as a key. */
+const recordedShape = (value: unknown): Shape => collapseStateValues(shapeOf(value));
+
+/**
  * The operation an exchange is: a path with its ids taken out (`GET /repos/{owner}/{repo}/issues/{n}`),
  * or for GraphQL the operation's name (`POST /graphql IssueCreate`).
  */
@@ -107,6 +131,12 @@ const json = (text: string): unknown => {
   }
 };
 
+/** A form's `payload` field, parsed: how Slack sends an interaction. */
+const formPayload = (body: string): unknown => {
+  const payload = new URLSearchParams(body).get("payload");
+  return payload === null ? undefined : json(payload);
+};
+
 /** A recorder writing to `<dir>/shapes.jsonl`, private (0600). */
 export function createRecorder(dir: string): Recorder {
   const file = join(dir, "shapes.jsonl");
@@ -124,18 +154,27 @@ export function createRecorder(dir: string): Recorder {
           channel,
           operation: operationOf(request.method, new URL(request.url).pathname, body),
           status: response.status,
-          shape: shapeOf(parsed),
+          shape: recordedShape(parsed),
         });
       }
       return response;
     },
     webhook(channel, type, body) {
-      const parsed = json(body);
+      // JSON, or a form whose `payload` is JSON (Slack's interactions).
+      const parsed = json(body) ?? formPayload(body);
       if (parsed === undefined) return;
-      // By type and action: `issues opened` and `issues closed` are shaped differently.
-      const action = (parsed as { action?: unknown } | null)?.action;
-      const operation = typeof action === "string" && action.length <= 64 ? `${type} ${action}` : type;
-      write({ kind: "webhook", channel, operation, shape: shapeOf(parsed) });
+      // By type and action: `issues opened` and `issues closed` are shaped differently, and so are
+      // Slack's events by the event's type and subtype (`event_callback message channel_join`).
+      const fields = parsed as { action?: unknown; event?: { type?: unknown; subtype?: unknown } } | null;
+      const event = fields?.event;
+      const detail =
+        typeof fields?.action === "string"
+          ? fields.action
+          : typeof event?.type === "string"
+            ? [event.type, ...(typeof event.subtype === "string" ? [event.subtype] : [])].join(" ")
+            : undefined;
+      const operation = typeof detail === "string" && detail.length <= 64 ? `${type} ${detail}` : type;
+      write({ kind: "webhook", channel, operation, shape: recordedShape(parsed) });
     },
   };
 }

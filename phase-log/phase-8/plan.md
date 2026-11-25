@@ -1,6 +1,6 @@
 # Phase 8 plan
 
-The channel kit, the email core and Resend ([phases.md](../../docs/phases.md#phase-8-the-channel-kit-the-email-core-and-resend), [decision 0020](../../docs/decisions/0020-email-channels.md)). Phase 9 (Google) is a pull request stacked on this one.
+The channel kit, the email core and Resend ([phases.md](../../docs/phases.md#phase-8-the-channel-kit-the-email-core-and-resend), [decision 0021](../../docs/decisions/0021-email-channels.md)). Phase 9 (Google) is a pull request stacked on this one.
 
 ## Exit checks → work
 

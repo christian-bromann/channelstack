@@ -281,7 +281,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## Phase 8: the channel kit, the email core and Resend
 
-[Decision 0020](decisions/0020-email-channels.md): email channels, and why Resend and Gmail. Phases 8 and 9 are two stacked pull requests, at the maintainer's request: phase 9's branches from phase 8's and is retargeted to `main` once phase 8 merges.
+[Decision 0021](decisions/0021-email-channels.md): email channels, and why Resend and Gmail. Phases 8 and 9 are two stacked pull requests, at the maintainer's request: phase 9's branches from phase 8's and is retargeted to `main` once phase 8 merges.
 
 **Build:**
 - **The channel kit** ([adding-a-channel.md](adding-a-channel.md)): what every driver repeated moves into core, and Slack, GitHub, Linear and Notion move onto it in the same commits, with their own copies deleted. The kit holds:

@@ -1,4 +1,4 @@
-# 0020: Email channels: Resend and Google (Gmail)
+# 0021: Email channels: Resend and Google (Gmail)
 
 Status: accepted, 2026-11-25, on the maintainer's instruction. It reopens the settled "Channels" row in AGENTS.md.
 

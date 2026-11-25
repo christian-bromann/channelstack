@@ -35,18 +35,24 @@ let proxied: Record<string, string> = {};
 /** With `record`: where each relay's webhooks are written as shapes before the agent gets them. */
 let tap: Recorder | undefined;
 
-/** A reference agent with only its own configuration: none of channelstack's environment reaches it. */
+/**
+ * A reference agent with only its own configuration: none of channelstack's environment reaches it.
+ * With `onMessage`, it is started through `entry` with an IPC channel, and what it sends goes there.
+ */
 function spawnAgent(
   dir: string,
   agentEnv: Record<string, string>,
   stops: Stop[],
   output: "pipe" | "ignore" = "ignore",
+  through?: { entry: string; onMessage: (message: unknown) => void },
 ): ChildProcess {
+  const file = join(ROOT, "examples", "agents", dir, "agent.ts");
   // Its output is read only where it says it is ready; a pipe nobody reads would fill and stall it.
-  const agent = spawn(process.execPath, [join(ROOT, "examples", "agents", dir, "agent.ts")], {
+  const agent = spawn(process.execPath, through ? [through.entry, file] : [file], {
     env: { PATH: process.env.PATH, HOME: process.env.HOME, ...proxied, ...agentEnv },
-    stdio: ["ignore", output, "inherit"],
+    stdio: through ? ["ignore", output, "inherit", "ipc"] : ["ignore", output, "inherit"],
   });
+  if (through) agent.on("message", through.onMessage);
   const exited = new Promise<void>((resolve) => agent.once("exit", () => resolve()));
   stops.push(async () => {
     if (agent.exitCode === null) agent.kill("SIGTERM");
@@ -160,12 +166,14 @@ type LiveAgent = (env: Env, stops: Stop[], agent: { dir: string; path: string })
 
 /** Each channel's way to its reference agent live. A channel without one has no agent in the live run. */
 const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
-  // Slack: the reference agent connects to real Slack itself, in Socket Mode.
+  // Slack: the reference agent connects to real Slack itself, in Socket Mode. When recording, it
+  // hands each event Slack sends it to the recorder first (`slack-event-tap.ts`).
   async slack(env, stops, { dir }) {
     if (!(env.CHANNELSTACK_SLACK_BOT_TOKEN && env.CHANNELSTACK_SLACK_APP_TOKEN)) {
       say("Slack: no CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_APP_TOKEN, so no agent runs here");
       return;
     }
+    const recorder = tap;
     const agent = spawnAgent(
       dir,
       {
@@ -175,6 +183,14 @@ const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
       },
       stops,
       "pipe",
+      recorder && {
+        entry: join(ROOT, "scripts", "lib", "slack-event-tap.ts"),
+        onMessage: (message) => {
+          const body = (message as { slackEvent?: unknown } | null)?.slackEvent;
+          const type = (body as { type?: unknown } | null)?.type;
+          if (typeof type === "string") recorder.webhook("slack", type, JSON.stringify(body));
+        },
+      },
     );
     // The agent says when its socket to Slack is up.
     await new Promise<void>((resolve, reject) => {

@@ -73,6 +73,34 @@ describe("the recorder", () => {
     );
     expect(await response.json()).toEqual({ ok: true, ts: "1.2", message: { text: "hello" } });
     recorder.webhook("github", "issue_comment", JSON.stringify({ action: "created", comment: { body: "hi" } }));
+    // Slack's events by the event's type, and its interactions from the form they come in.
+    recorder.webhook(
+      "slack",
+      "event_callback",
+      JSON.stringify({ type: "event_callback", event: { type: "app_mention", text: "hi" } }),
+    );
+    recorder.webhook(
+      "slack",
+      "event_callback",
+      JSON.stringify({ type: "event_callback", event: { type: "message", subtype: "channel_join", text: "hi" } }),
+    );
+    recorder.webhook(
+      "slack",
+      "block_actions",
+      new URLSearchParams({
+        payload: JSON.stringify({
+          type: "block_actions",
+          actions: [{ value: "hi" }],
+          // Block ids an app built from what a person typed: never written.
+          state: {
+            values: {
+              "deploy:checkout": { approve: { type: "button", value: "yes" } },
+              "deploy:billing": { reason: { type: "plain_text_input", value: "late" } },
+            },
+          },
+        }),
+      }).toString(),
+    );
     const file = join(dir, "shapes.jsonl");
     expect(statSync(file).mode & 0o777).toBe(0o600);
     const lines = readFileSync(file, "utf8")
@@ -93,8 +121,32 @@ describe("the recorder", () => {
         operation: "issue_comment created",
         shape: { action: "=created", comment: { body: "string" } },
       },
+      {
+        kind: "webhook",
+        channel: "slack",
+        operation: "event_callback app_mention",
+        shape: { type: "=event_callback", event: { type: "=app_mention", text: "string" } },
+      },
+      {
+        kind: "webhook",
+        channel: "slack",
+        operation: "event_callback message channel_join",
+        shape: { type: "=event_callback", event: { type: "=message", subtype: "=channel_join", text: "string" } },
+      },
+      {
+        kind: "webhook",
+        channel: "slack",
+        operation: "block_actions",
+        shape: {
+          type: "=block_actions",
+          actions: [{ value: "string" }],
+          state: {
+            values: { "{block_id}": { "{action_id}": { type: "=button|=plain_text_input", value: "string" } } },
+          },
+        },
+      },
     ]);
-    expect(readFileSync(file, "utf8")).not.toMatch(/xoxb-secret|hello|"hi"/);
+    expect(readFileSync(file, "utf8")).not.toMatch(/xoxb-secret|hello|"hi"|deploy:|approve|reason|late/);
   });
 
   test("forwarding passes the request on to the platform's own host, as it was", async () => {
