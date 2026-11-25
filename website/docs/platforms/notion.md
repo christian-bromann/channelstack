@@ -223,8 +223,8 @@ The matchers read pages and discussions as the agent last left them. Positive ma
 
 | Matcher | Subject | Reads |
 |---|---|---|
-| `toHaveCommentFrom(author, { text })` | discussion, page | `discussion.comments()` |
-| `toHaveCommentsFrom(author, { count })` | discussion, page | `discussion.comments()`, once quiet |
+| `toHaveCommentFrom(author, { text })` | discussion | `discussion.comments()` |
+| `toHaveCommentsFrom(author, { count })` | discussion | `discussion.comments()`, once quiet |
 | `toHaveBlock(text)` | page | `page.markdown()`, `page.blocks()` |
 | `toHavePropertyValue(name, value)` | page (a row) | `page.property(name)` |
 | `toContainText(text)` | page, discussion | `transcript()` |
