@@ -130,7 +130,17 @@ export class DeliveryQueue {
   /** Per session: its deliveries, and the switch that aborts the ones in flight when it closes. */
   readonly #sessions = new Map<string, { canceller: AbortController; records: Map<string, DeliveryRecord> }>();
 
-  constructor(deps: { events: EventLog; clock: Clock; timers: Timers; log: Logger }) {
+  readonly #observe: ((request: DeliveryRequest) => void) | undefined;
+
+  /** `observe` sees every delivery as it is made: the recorder writes its shape (proxy mode's `--record`). */
+  constructor(deps: {
+    events: EventLog;
+    clock: Clock;
+    timers: Timers;
+    log: Logger;
+    observe?: (request: DeliveryRequest) => void;
+  }) {
+    this.#observe = deps.observe;
     this.#events = deps.events;
     this.#clock = deps.clock;
     this.#timers = deps.timers;
@@ -141,6 +151,7 @@ export class DeliveryQueue {
   enqueue(request: DeliveryRequest): DeliveryRecord {
     const { id, session, driver, type, url } = request;
     const record: DeliveryRecord = { request, attempts: [] };
+    this.#observe?.(request);
     this.#session(session).records.set(id, record);
     this.#events.append(session, driver, "delivery", { id, type, url, ...(request.meta ?? {}) });
     this.#track(this.#chain(record, {}, 0));

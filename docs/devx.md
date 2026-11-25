@@ -430,12 +430,18 @@ Without portless, `npx channelstack start --no-portless --port 4500` serves `htt
 Some agents hard-code `slack.com` or `api.github.com`, or run on stacks you don't control (MDA's Trigger Server, Go services). For those:
 
 ```bash
+npx channelstack start --proxy                 # also an HTTP proxy on 127.0.0.1:7464
 npx channelstack env --proxy >> .env.local     # HTTPS_PROXY plus a CA trusted only by the agent
 ```
 
-- **Routing:** the proxy sends `slack.com`, `api.github.com`, `api.linear.app` and `api.notion.com` to the same fakes that `*.localhost` serves, and passes every other host through.
-- **Trust:** it uses channelstack's own CA, which is name-constrained to those hosts and never added to the system trust store. Only the agent's environment trusts it.
-- **Go on macOS** ignores `SSL_CERT_FILE`, so run Go agents in Docker or on Linux for proxy mode.
+- **Routing:** the proxy sends `slack.com`, `api.github.com`, `api.linear.app` and `api.notion.com` to the same fakes that `*.localhost` serves, and passes every other host through. With `--proxy` the fakes' own URLs (Socket Mode's WebSocket, upload URLs) are the providers' too, so the agent needs no channelstack URL at all.
+- **What `env --proxy` prints:** the fake tokens and signing secrets, without the API URLs, and:
+  - `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` (loopback and `*.localhost` stay direct);
+  - `NODE_USE_ENV_PROXY=1`, `NODE_EXTRA_CA_CERTS`, and `NODE_OPTIONS` with a preload that keeps Node's proxy-aware `fetch` when the agent loads undici (Bolt does). It replaces an agent's own `NODE_OPTIONS`: an agent that sets some puts them on the same line, after the `--import`;
+  - `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE`: the public roots plus channelstack's CA.
+- **Trust:** it uses channelstack's own CA (`~/.channelstack/ca/`, 0600). The CA is name-constrained to those hosts (not their subdomains) and to no IP address, and never added to the system trust store. Only the agent's environment trusts it. `channelstack ca rotate` replaces it.
+- **Go on macOS** ignores `SSL_CERT_FILE`, so run Go agents in Docker or on Linux for proxy mode. Use `docker run --network host`, mount the bundle file alone (`-v ~/.channelstack/ca/bundle.pem:/etc/channelstack/bundle.pem:ro`, never the whole directory: the CA's key is next to it), and point `SSL_CERT_FILE` at it inside the container (`examples/agents/go-slack` does this).
+- **Live:** in proxy mode a live channel's agent still talks to the real platform; the proxy passes its calls on. Reading those calls back live (`calls()`, Slack's status) isn't built yet.
 
 ## 10. Live mode: the same tests against the real platforms
 

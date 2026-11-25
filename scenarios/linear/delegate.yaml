@@ -1,0 +1,36 @@
+name: linear/delegate
+description: A person delegates an issue to the app and the agent's session shows its thought. Runs against the fake and against the test workspace (the differential run).
+requires: [linear-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers:
+  [
+    LinearFixture.createUser,
+    LinearFixture.createTeam,
+    LinearUser.createIssue,
+    LinearUser.delegate,
+    LinearAgentSession.activities,
+  ]
+steps:
+  - call: session.linear
+    as: linear
+  - call: linear.createUser
+    options: { name: Ana }
+    as: ana
+  - call: linear.createTeam
+    options: { members: [$ana] }
+    as: team
+  - call: ana.createIssue
+    args: [{ title: Conformance smoke test }]
+    options: { team: $team }
+    as: issue
+  - call: ana.delegate
+    args: [$linear.app]
+    options: { issue: $issue }
+    as: agentSession
+  - call: agentSession.waitForActivity
+    options: { type: response, timeout: 60s }
+    as: response
+  - call: agentSession.activities
+    as: activities
+  - record:
+      activities: $activities

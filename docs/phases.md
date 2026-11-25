@@ -14,7 +14,7 @@
 | 3 | done | 2026-11-22, [#14](https://github.com/christian-bromann/channelstack/pull/14) |
 | 4 | done | 2026-11-23, [#17](https://github.com/christian-bromann/channelstack/pull/17) |
 | 5 | done | 2026-11-24, [#18](https://github.com/christian-bromann/channelstack/pull/18) (5.1, 5.2, 5.5 and 5.6 tracked in #19–#22) |
-| 6 | not started | |
+| 6 | done | 2026-11-25, [#23](https://github.com/christian-bromann/channelstack/pull/23) (the nightly half of 6.4 and 6.5 tracked in #31) |
 | 7 | not started | |
 | 8 | not started | |
 

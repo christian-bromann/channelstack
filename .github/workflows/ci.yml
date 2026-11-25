@@ -14,7 +14,7 @@ concurrency:
 
 env:
   # The phase being built. `verify:phase` runs the gates of phase 0..n, so a later phase can't break an earlier one.
-  PHASE: 5
+  PHASE: 6
   NODE_VERSION: 24.12.0
   BUN_VERSION: 1.4.5
   UV_VERSION: 0.13.1
@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [slack, github-linear, notion-shared-own, broken-slack, broken-others]
+        part: [slack, github-linear, notion-shared-own, proxy, conformance, broken-slack, broken-others]
         run: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -54,6 +54,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm verify:phase "$PHASE" --group accept --part "${{ matrix.part }}" --repeat 1
+
+  coverage:
+    # Exit check 6.5: the coverage page, from the capabilities and the divergences (the nightly job
+    # adds that night's results), on the job's summary and as an artifact.
+    name: coverage page
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          python: "false"
+      - run: pnpm coverage --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: build/coverage/index.html
 
   packaging:
     # Exit check 0.3: npm pack, install into an empty project, `npx channelstack --version`, the TS smoke scenario.

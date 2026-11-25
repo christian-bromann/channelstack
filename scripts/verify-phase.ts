@@ -82,6 +82,14 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // 5.1 and 5.2 against the real sandboxes run nightly (`.github/workflows/live.yml`, `pnpm live`),
   // since they need the `live` environment's secrets.
   5: [],
+  // Phase 6: 6.3 is a unit test (`core/ca/ca.test.ts`, a real TLS handshake against the name
+  // constraints), and so are the differential run's comparison, the shape differ and the coverage
+  // page (`conformance/*.test.ts`, 6.4 and 6.5). The acceptance run covers 6.1 and 6.2 (its `proxy`
+  // part: the phase 1 Slack examples against the Bolt agent with only what `channelstack env
+  // --proxy` prints, and the Go agent in Docker) and 6.4's scenarios against the fakes (its
+  // `conformance` part). CI's `coverage page` job publishes the page (6.5); the differential run
+  // against the sandboxes is nightly (`.github/workflows/live.yml`, `pnpm conformance`).
+  6: [],
 };
 
 const phase = Number(process.argv[2]);

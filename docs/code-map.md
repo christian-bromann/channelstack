@@ -16,9 +16,9 @@
 
 | Concern | Module | Use it for | Don't |
 |---|---|---|---|
-| Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, quiet, reset, env; mounting each driver's fake; serving the UI page and its login link | Build services or mount routes anywhere else |
-| Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration, upgrading a WebSocket a fake expects (`app.socket`) | Call `Bun.serve` anywhere else (everything else also runs under Node) |
-| The command line | `cli.ts` | Parsing arguments and dispatching: `start`, `secrets rotate`, `doctor`, `sweep`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
+| Wiring core and drivers, the control API's own routes, host and path routing | `app.ts` | `createApp`: sessions, status, events, quiet, reset, env (and `proxyEnv`, what `env --proxy` adds); mounting each driver's fake, by its `*.localhost` name and by the provider hosts it declares (`hosts`); serving the UI page and its login link | Build services or mount routes anywhere else |
+| Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration, upgrading a WebSocket a fake expects (`app.socket`); in proxy mode, the TLS listener the proxy routes the provider hosts to, with the CA's certificate, and the provider origins as the drivers' URLs | Call `Bun.serve` anywhere else (everything else also runs under Node) |
+| The command line | `cli.ts` | Parsing arguments and dispatching: `start` (and `--proxy`), `secrets rotate`, `ca rotate`, `doctor`, `sweep`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
 | Live mode from the terminal | `cli/live.ts` | `doctor` (which channels run live, whether their credentials work and are allowlisted, saved browser sessions), `sweep` (what crashed runs left, `--check` for the nightly job) and `login` (a person signs in by hand, once; the session is saved for the browser actor), over each driver's `live.maintenance` | Call a platform from the CLI without the driver's maintenance |
 | Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError` | Read `server.json` or call the control API from another CLI module |
 | Acting from the terminal | `cli/slack.ts` | `slack say`, `reply`, `react`, `click`, `stop`; people and channels by name, created on first use; what `last` means | Resolve names or `last` anywhere else |
@@ -54,7 +54,8 @@
 | State directory | `home/` | `CHANNELSTACK_HOME`, writing 0600 files atomically, reading JSON state | Write a file with a secret any other way |
 | Time | `clock/` | The injected clock, and injected timers (`Timers`, `delay`) for anything that happens later: a platform's retry, a pause, a fault's latency; the server's one polling loop (`pollUntil`: ask until there is an answer or the time is up) | Call `Date.now()` or `setTimeout` in core or a driver; write a deadline-and-poll loop |
 | portless | `portless/` | Registering and removing `*.localhost` names through the `portless` CLI | Spawn `portless` anywhere else |
-| Proxy and CA | `proxy/`, `ca/` *(planned, phase 6)* | Host routing to fakes, the name-constrained CA | — |
+| Proxy mode's CA | `ca/` | channelstack's own CA in `<home>/ca/` (0600), name-constrained to the routed provider hosts and to no IP address (`loadCa`, `rotateCa`); the certificates it issues, only for those hosts (`ProxyCa.issue`); the bundle of the public roots and the CA for `SSL_CERT_FILE` | Make a certificate or a key pair anywhere else; write to a system trust store |
+| Proxy | `proxy/` | Proxy mode's HTTP proxy on loopback (`startProxy`): a `CONNECT` to a routed host goes to the server's TLS listener, any other is a plain tunnel; plain HTTP for a routed host is refused. `node.ts`: the preload that keeps Node's proxy-aware `fetch` in an agent that loads undici (`writeNodePreload`, `nodeOptions`). `record.ts`: a value's shape (`shapeOf`, `mergeShapes`), an exchange's operation (`operationOf`), the recorder for `--record` (`createRecorder`, shapes only, 0600), and passing a live driver's call on to the platform (`forward`) | Open a listener for agents anywhere else |
 
 ## Server: drivers (`server/src/drivers/<channel>/`)
 
@@ -125,7 +126,8 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 | Concern | Module | Notes |
 |---|---|---|
 | Protocol parity scenarios | `smoke/*.yaml` | The format is [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md) |
-| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module |
+| Conformance scenarios | `<channel>/*.yaml` | The differential run's scenarios: the same format, with `record` steps and `covers`; each runs against the fake and against the sandbox (decision 0016) |
+| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`, 0600), as plain data with no secret field (`runners/typescript/secrets.ts`, the one rule, which `conformance/lib.ts` uses too) |
 | Reference agents | `agents/` | Plain programs with no channelstack code in them, configured from `channelstack env` |
 
 ## Examples (`examples/agents/`)
@@ -139,6 +141,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The Bolt app the Bolt agents start from | `shared/bolt.ts` | Configuration from the environment, `listen` |
 | Bolt + AI SDK | `bolt-ai-sdk/agent.ts` | Mentions, DMs, reactions, native streaming |
 | Chat SDK | `chat-sdk-slack/agent.ts` | The same behaviour on Vercel's Chat SDK and its Slack adapter |
+| Go (slack-go) | `go-slack/main.go`, `go-slack/Dockerfile`, `go-slack/agent.ts` | A Go Slack agent with no API URL, for proxy mode in Docker (exit check 6.2); `agent.ts` runs its image with what `env --proxy` prints |
 | What the GitHub agents do | `shared/github.ts` | Triage, duplicates, the typo fix, reviews, thread answers, checks and the autofix, written once against Octokit's REST methods |
 | The HTTP server around a web-standard handler | `shared/serve.ts` | For agents on frameworks that speak Request and Response (the Chat SDK) |
 | Probot | `probot/agent.ts` | A GitHub App as Probot's docs show |
@@ -184,11 +187,23 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |
 | A whole server against a stand-in platform | `test/acceptance/stand-ins/` | `github-live-server.sh`: the server from source with GitHub live against `githubStub`, through `start({ platforms })`, which only code can set |
 | Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) or their own server (`live-skip`, a live server whose refusals skip) |
-| The live run | `live.ts` (`pnpm live`) | Every "live mode" block against the real sandboxes, Slack's agent in Socket Mode, then `sweep --check` for the run; nightly in `.github/workflows/live.yml` |
+| The live run | `live.ts` (`pnpm live`) | Every "live mode" block against the real sandboxes; nightly in `.github/workflows/live.yml` |
+| A live server with every agent | `lib/live-stack.ts` | `withLiveStack`: the live server, each channel's agent, the saved browser sessions, then `sweep --check` for the run and the removal of what is left; for `pnpm live` and `pnpm conformance` |
+| The differential run | `conformance.ts` (`pnpm conformance`) | Each conformance scenario against the fake (`withStack`) and, for the channels with credentials, the sandbox (`withLiveStack`); the comparison is `conformance/lib.ts`; `--fake-only` in CI |
+| The coverage page | `coverage.ts` (`pnpm coverage`) | The page from `conformance/coverage.ts`, with a summary for a CI job |
 | The nightly job's credentials | `live-secrets.ts` (`pnpm live:secrets`) | Every secret and variable `live.yml` names, from `live.env` into the repository's `live` environment through `gh`, values on standard input, names only in its output; the saved browser sessions as `CHANNELSTACK_BROWSER_SESSIONS` |
-| The live run's agents | `lib/live-agents.ts` | Each channel's reference agent against its real platform: Slack's in Socket Mode, the others behind the smee.io channel their webhook points at (`smee-client`); the people's saved browser sessions from `CHANNELSTACK_BROWSER_SESSIONS` |
+| The live run's agents | `lib/live-agents.ts` | Each channel's reference agent against its real platform: Slack's in Socket Mode, the others behind the smee.io channel their webhook points at (`smee-client`); the people's saved browser sessions from `CHANNELSTACK_BROWSER_SESSIONS`; for the differential run, every agent behind the proxy and each relay tapped into the recorder |
 | Packaging check | `pack-test.ts` | `npm pack` into an empty project |
 | Stale-check self-test | `selftest-stale.ts` | Proves `spec:check` and `sdk:check` fail on drift |
+
+## Conformance (`conformance/`)
+
+| Concern | Module | Notes |
+|---|---|---|
+| Comparing a fake with its platform | `lib.ts` | `normalize` (ids, times, links, mentions, account names and secrets out), `diff` (by path), `loadDivergences` and `classify` (a difference a divergence allows until it expires); the results' shape |
+| Known divergences | `divergences.yaml` | Each with a reason and a date it expires; a unit test fails on an expired one |
+| The coverage page | `coverage.ts` | `coverageRows`, `coveragePage`, `coverageSummary`: from the spec's `x-channelstack-live`, the divergences and a run's results |
+| The shape differ | `shapes.ts` | `readShapes` (a recording's operations, merged, each refusal its own `… refused` operation) and `compareShapes` (what the platform sends that the fake doesn't, types with nothing in common, codes the fake never sends) |
 
 ## Test integrations (`integrations/`)
 

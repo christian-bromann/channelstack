@@ -128,6 +128,8 @@ try {
   // The scenario runner is copied in, so its `channelstack/client` import resolves to the installed package.
   const runner = join(project, "run.ts");
   cpSync(join(ROOT, "scenarios/runners/typescript/run.ts"), runner);
+  // The one module the runner has beside it: the rule for what a recording leaves out.
+  cpSync(join(ROOT, "scenarios/runners/typescript/secrets.ts"), join(project, "secrets.ts"));
   const installed = join(
     project,
     "node_modules",

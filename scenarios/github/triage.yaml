@@ -1,0 +1,31 @@
+name: github/triage
+description: A person asks the App to triage an issue in a comment and the App answers. Runs against the fake and against the test org (the differential run).
+requires: [github-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers:
+  [GitHubFixture.createUser, GitHubFixture.createRepo, GitHubUser.openIssue, GitHubUser.comment, GitHubIssue.comments]
+steps:
+  - call: session.github
+    as: github
+  - call: github.createUser
+    options: { login: ana-channelstack }
+    as: ana
+  - call: github.createRepo
+    options: { collaborators: [$ana], apps: [$github.app] }
+    as: repo
+  - call: ana.openIssue
+    args: [{ title: Conformance smoke test }]
+    options: { repo: $repo }
+    as: issue
+  - call: ana.comment
+    args: ["@my-agent please triage"]
+    options: { issue: $issue }
+    as: question
+  - call: issue.waitForComment
+    options: { from: $github.app, timeout: 60s }
+    as: answer
+  - call: issue.comments
+    as: comments
+  - record:
+      issue: $issue
+      comments: $comments

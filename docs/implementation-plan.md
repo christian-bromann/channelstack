@@ -293,7 +293,7 @@ For agents that hard-code hosts, or that run on stacks you don't control, there'
    | `SSL_CERT_FILE` | Go on Linux. **Go on macOS ignores it**, so the docs say "use Docker or Linux for Go agents in proxy mode" |
 
 3. **Route by host.** `slack.com`, `api.github.com`, `api.linear.app` and `api.notion.com` go to the same fakes that `*.localhost` serves. Every other host passes through untouched. There's one world, so the proxy doesn't need to tell sessions apart.
-4. **Record in live mode.** The same proxy, in pass-through, records agent↔platform traffic as cassettes. Section 9 uses those cassettes.
+4. **Record.** With `--record`, the same proxy writes the shape of each agent↔platform exchange (structure and codes, never a value), in the fake and, passing a live driver's calls on to the platform, live. Section 9's shape differ compares them ([decisions/0016](decisions/0016-proxy-mode-and-conformance.md)).
 
 ### 6.3 Inbound delivery
 
@@ -412,14 +412,14 @@ await ana.click("Approve", { message: msg })   // live: drives app.slack.com via
 ### 9.1 Differential scenario runs
 
 - **Scenario suite.** `scenarios/` is a suite of scenarios per driver, written once against the TypeScript SDK and run against reference agents.
-- **Fake vs live.** CI runs each scenario twice, fake and live (nightly, and on demand with a label), and diffs the **normalized transcripts** and the **event sequences**.
+- **Fake vs live.** The nightly job runs each scenario twice, fake and live (`pnpm conformance`; every pull request runs them against the fake), and diffs the **normalized recordings**: what the scenario's `record` steps saved, as a person would read it. The event sequences are compared through the shape differ below: live, channelstack sees the agent's exchanges and the platforms' webhooks, not a session's event log.
 - **Normalization.** It drops ids, timestamps and URLs, keeps structure and order, and compares LLM-free text exactly, which is why the reference agents use deterministic models.
-- **Classifying differences.** Any difference fails the nightly and opens a tracking issue with both transcripts. Each difference is then either fixed in the fake, or marked a known divergence in `conformance/divergences.yaml` with a reason and an expiry date.
+- **Classifying differences.** Any difference fails the nightly job, whose results (`build/conformance/results.json`, with both normalized recordings) are its artifact. Each difference is then either fixed in the fake, or marked a known divergence in `conformance/divergences.yaml` with a reason, an expiry date and, where the fake is to change, an issue.
 
 ### 9.2 Record, then diff shapes
 
-- In live runs, the proxy records every agent↔platform exchange and redacts tokens, emails and names.
-- A shape differ replays each recorded request against the fake and compares the response *shape*: keys, types, enum values and error codes.
+- In the differential run, the proxy's recorder writes the shape of every agent↔platform exchange, fake and live, and a tap on each live relay the shape of every webhook the platform sent. A shape keeps keys, types and codes (`ok`, `error`, `type`), never a value, so nothing needs redacting.
+- A shape differ compares the fake's and the platform's shapes for each operation both saw, side by side rather than by replaying a request against a fake that doesn't have its objects: a key the platform sends that the fake doesn't, types with nothing in common, and codes the fake never sends.
 - This catches drift in endpoints that no scenario asserts on directly.
 
 ### 9.3 Spec validation of the fake's own output

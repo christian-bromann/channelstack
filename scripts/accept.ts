@@ -6,7 +6,9 @@
  * `--part` runs one part of it, so CI can run the parts side by side (`.github/workflows/ci.yml`);
  * every part, run once each, is the whole suite once.
  */
-import { runExamples } from "./examples.ts";
+import { join } from "node:path";
+
+import { runExamples, runGoDockerExamples, runProxyExamples } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";
 import { runSmoke, SDKS } from "./smoke.ts";
@@ -28,6 +30,14 @@ const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
     await runExamples({ agents: ["notion-sdk"], shared: true });
     run("pnpm", [...vitest, "--exclude", BROKEN], { cwd: ROOT });
   },
+  // Proxy mode: the Slack examples against an agent that only knows slack.com (exit check 6.1), and
+  // the Go agent in Docker (6.2).
+  proxy: async () => {
+    await runProxyExamples();
+    await runGoDockerExamples();
+  },
+  // Each conformance scenario against the fake (exit check 6.4); the nightly job runs them live too.
+  conformance: () => run(process.execPath, [join(ROOT, "scripts", "conformance.ts"), "--fake-only"], { cwd: ROOT }),
   "broken-slack": broken("slack"),
   "broken-others": broken("github,linear,notion"),
 };

@@ -514,7 +514,11 @@ export const matchers = {
     });
   },
 
-  /** Subject: a Linear agent session, or an issue (its latest session). An activity matching every field that is given. */
+  /**
+   * Subject: a Linear agent session, or an issue (its latest session). An activity of the agent's
+   * matching every field that is given: a person's turns (`prompt`, delegating's first among them)
+   * aren't what it published.
+   */
   toHaveActivity(
     state: MatcherState,
     subject: unknown,
@@ -528,7 +532,8 @@ export const matchers = {
     ].join("");
     return settle(subject, state, options, {
       onceQuiet: false,
-      read: async () => (await (await sessionOf(subject))?.activities()) ?? [],
+      read: async () =>
+        ((await (await sessionOf(subject))?.activities()) ?? []).filter((activity) => activity.type !== "prompt"),
       holds: (activities) =>
         activities.some(
           (activity) =>

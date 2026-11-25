@@ -9,6 +9,7 @@ import { registerLinearRoutes } from "./routes.ts";
 /** The Linear driver: the fake GraphQL API and agent webhooks, and the control actions a test's people take. */
 export const linear: DriverDefinition = {
   name: "linear",
+  hosts: ["api.linear.app"],
   secrets: {
     oauthToken: "linear.oauthToken",
     webhookSecret: "linear.webhookSecret",

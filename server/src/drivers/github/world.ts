@@ -27,6 +27,12 @@ export interface GitHubAppRecord {
 export type GitHubOrgRole = "member" | "admin" | "outside_collaborator";
 /** What someone may do on a repository, from least to most. */
 export const PERMISSIONS = ["read", "triage", "write", "maintain", "admin"] as const;
+
+/**
+ * A test repository is private unless the test asks otherwise, fake and live: in a real org, what a
+ * test writes isn't public. (The differential run found the two worlds disagreeing.)
+ */
+export const PRIVATE_BY_DEFAULT = true;
 export type GitHubPermission = (typeof PERMISSIONS)[number];
 
 export interface GitHubUserRecord {

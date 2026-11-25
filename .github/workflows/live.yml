@@ -36,8 +36,7 @@ jobs:
           python: "false"
       - run: pnpm build
       - run: pnpm live
-        env:
-          # The tag every object of this run carries, so the sweep check looks for exactly that.
+        env: &sandboxes # The tag every object of this run carries, so the sweep check looks for exactly that.
           CHANNELSTACK_RUN_ID: gh${{ github.run_id }}
           CHANNELSTACK_LIVE_SLACK_TEAMS: ${{ vars.CHANNELSTACK_LIVE_SLACK_TEAMS }}
           CHANNELSTACK_SLACK_APP_ID: ${{ secrets.CHANNELSTACK_SLACK_APP_ID }}
@@ -63,3 +62,18 @@ jobs:
           CHANNELSTACK_NOTION_USER_ANA_TOKEN: ${{ secrets.CHANNELSTACK_NOTION_USER_ANA_TOKEN }}
           CHANNELSTACK_NOTION_RELAY_URL: ${{ secrets.CHANNELSTACK_NOTION_RELAY_URL }}
           CHANNELSTACK_NOTION_VERIFICATION_TOKEN: ${{ secrets.CHANNELSTACK_NOTION_VERIFICATION_TOKEN }}
+      # Exit check 6.4: the differential run, each scenario against the fake and the sandbox, and
+      # 6.5: the coverage page with tonight's results.
+      - run: pnpm conformance
+        if: ${{ !cancelled() }}
+        env: *sandboxes
+      - run: pnpm coverage --results build/conformance/results.json --summary "$GITHUB_STEP_SUMMARY"
+        if: ${{ !cancelled() && hashFiles('build/conformance/results.json') != '' }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage
+          path: |
+            build/coverage/index.html
+            build/conformance/results.json
+          if-no-files-found: ignore

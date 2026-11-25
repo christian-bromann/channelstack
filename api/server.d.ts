@@ -4,8 +4,12 @@ import type { ApiCall, ApiCallFilter, Delivery, DeliveryFilter, Duration } from 
 export interface ChannelstackFixture {
   /** Control API and UI base, e.g. `https://channelstack.localhost`. */
   readonly url: string;
-  /** Env vars for the agent: tokens, secrets, API URLs, CA settings (what `channelstack env` prints). */
-  env(): Promise<Record<string, string>>;
+  /**
+   * Env vars for the agent: tokens, secrets, API URLs, CA settings (what `channelstack env` prints).
+   * With `proxy`, for an agent with hard-coded hosts: the proxy and the CA it trusts instead of the
+   * API URLs (`channelstack env --proxy`; the server must run with `--proxy`).
+   */
+  env(options?: { proxy?: boolean }): Promise<Record<string, string>>;
   deliveries(filter?: DeliveryFilter): Promise<Delivery[]>;
   calls(filter?: ApiCallFilter): Promise<ApiCall[]>;
   /** Resolve when the agent is quiet: no open stream, no call in flight, for `quietFor`. */

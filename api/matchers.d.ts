@@ -102,7 +102,7 @@ export interface ChannelstackMatchers<R = unknown> {
   // ---------------------------------------------------------------- Linear
   /** Subject: an issue (latest session) or a session. */
   toHaveSessionState(state: "pending" | "active" | "awaitingInput" | "complete" | "error" | "stale", options?: WaitOptions): Promise<R>;
-  /** Subject: an issue (latest session) or a session. An activity matching all given fields. */
+  /** Subject: an issue (latest session) or a session. An activity of the agent's matching all given fields: a person's prompts (delegating's first among them) don't count. */
   toHaveActivity(expected: { type?: "thought" | "action" | "elicitation" | "response" | "error"; from?: AuthorRef; text?: string | RegExp }, options?: WaitOptions): Promise<R>;
   toBeAssignedTo(user: Principal | undefined, options?: WaitOptions): Promise<R>;
   toBeDelegatedTo(app: Principal | undefined, options?: WaitOptions): Promise<R>;

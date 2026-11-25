@@ -35,6 +35,9 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
   const started = new Set<string>();
   /** Jobs that run until Stop, by session: Stop calls the function. */
   const stoppable = new Map<string, () => void>();
+  /** Sessions whose job is running, and those a person stopped before it reached the part Stop ends. */
+  const working = new Set<string>();
+  const stopRequested = new Set<string>();
 
   /** Move the issue into the team's first started state, unless it is started or done already. */
   async function startIssue(issueId: string): Promise<void> {
@@ -64,13 +67,24 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
       return;
     }
     if (/\brefactor\b/i.test(title)) {
-      await publish(sessionId, { type: "action", action: "Refactoring", parameter: title });
-      const stopped = await new Promise<boolean>((resolve) => {
+      // The long job is stoppable before its first request goes out, and a Stop that came while
+      // the issue was still being started stops it at once.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stopped = new Promise<boolean>((resolve) => {
         stoppable.set(sessionId, () => resolve(true));
-        setTimeout(() => resolve(false), LONG_JOB_MS);
+        if (stopRequested.delete(sessionId)) resolve(true);
+        timer = setTimeout(() => resolve(false), LONG_JOB_MS);
       });
-      stoppable.delete(sessionId);
-      await answer(sessionId, stopped ? "Stopped, as asked. Nothing was changed." : answerFor(title));
+      let wasStopped: boolean;
+      try {
+        await publish(sessionId, { type: "action", action: "Refactoring", parameter: title });
+        wasStopped = await stopped;
+      } finally {
+        // However the job ends, even with a failed request, it is no longer there to stop.
+        stoppable.delete(sessionId);
+        clearTimeout(timer);
+      }
+      await answer(sessionId, wasStopped ? "Stopped, as asked. Nothing was changed." : answerFor(title));
       return;
     }
     if (/\brate limit/i.test(title)) {
@@ -105,7 +119,14 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
     created(sessionId: string, issueId: string): void {
       if (started.has(sessionId)) return;
       started.add(sessionId);
-      inBackground(sessionId, () => work(sessionId, issueId));
+      working.add(sessionId);
+      // A Stop the job never reached (a short one answers anyway) is forgotten with it.
+      inBackground(sessionId, () =>
+        work(sessionId, issueId).finally(() => {
+          working.delete(sessionId);
+          stopRequested.delete(sessionId);
+        }),
+      );
     },
 
     /** A person wrote in the session: Stop, or a prompt (an answer to a question, or a follow-up). */
@@ -114,6 +135,11 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
         if (prompt.stop) {
           const stop = stoppable.get(sessionId);
           if (stop) return stop();
+          // The job hasn't reached the part Stop ends: it stops when it does, and answers then.
+          if (working.has(sessionId)) {
+            stopRequested.add(sessionId);
+            return;
+          }
           await answer(sessionId, "Stopped, as asked.");
           return;
         }

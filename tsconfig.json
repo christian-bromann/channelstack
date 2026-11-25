@@ -15,6 +15,7 @@
     "integrations",
     "examples",
     "scenarios",
+    "conformance",
     "scripts",
     "test",
     "vitest.config.ts"

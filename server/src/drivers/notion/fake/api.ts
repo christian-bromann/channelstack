@@ -120,6 +120,10 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
         answer = { body: errorBody(error.status, error.code, error.message), sessions: [], status: error.status };
       }
       const status = answer.status ?? 200;
+      // Every answer of Notion's has its request's id, not only an error (found by the shape differ).
+      if (status < 400 && typeof answer.body === "object" && answer.body !== null && !Array.isArray(answer.body)) {
+        answer = { ...answer, body: { ...(answer.body as object), request_id: requestId() } };
+      }
       const url = new URL(c.req.url);
       recordCall(
         context.events,

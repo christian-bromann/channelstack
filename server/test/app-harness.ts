@@ -1,7 +1,7 @@
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { type App, createApp, type LiveOptions } from "../src/app.ts";
+import { type App, createApp, type LiveOptions, type ServerUrls } from "../src/app.ts";
 import type { Timers } from "../src/core/clock/index.ts";
 import { createLogger } from "../src/core/log/index.ts";
 import { Redactor } from "../src/core/redact/index.ts";
@@ -77,7 +77,7 @@ export interface Harness {
  */
 export function harness(
   webhooks: Readonly<Record<string, string | undefined>> = {},
-  options: { live?: LiveOptions } = {},
+  options: { live?: LiveOptions; urls?: () => ServerUrls } = {},
 ): Harness {
   const secrets = Secrets.ephemeral(secretSpecs());
   const redactor = new Redactor();
@@ -92,7 +92,8 @@ export function harness(
     secrets,
     redactor,
     log: createLogger({ level: "debug", redactor, write: (line) => logs.push(line) }),
-    urls: () => ({ control: "http://127.0.0.1:4500", driver: (name) => `http://127.0.0.1:4500/${name}` }),
+    urls:
+      options.urls ?? (() => ({ control: "http://127.0.0.1:4500", driver: (name) => `http://127.0.0.1:4500/${name}` })),
     webhooks,
     ui: UI_PAGE,
     timers,

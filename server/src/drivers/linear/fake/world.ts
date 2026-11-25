@@ -168,6 +168,26 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     return lines.join("\n");
   };
 
+  /** A person's turn in a session, as Linear records it: a `prompt` activity. */
+  const addPrompt = (
+    session: string,
+    record: LinearSessionRecord,
+    user: string,
+    body: string,
+    options: { signal?: "stop"; comment?: LinearCommentRecord } = {},
+  ) =>
+    store.add(store.activities, session, {
+      id: ids.next("linear.uuid"),
+      session: record.id,
+      user,
+      content: { type: "prompt", body },
+      ephemeral: false,
+      signal: options.signal ?? null,
+      signalMetadata: null,
+      sourceComment: options.comment?.id ?? null,
+      createdAt: clock(),
+    } satisfies LinearActivityRecord);
+
   /** Open an agent session on an issue for the app, and tell it. */
   const startSession = (issue: LinearIssueRecord, creator: string, comment: LinearCommentRecord | undefined) => {
     const session = store.sessionOf(issue);
@@ -191,6 +211,9 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       delivery: undefined,
     } satisfies LinearSessionRecord);
     if (comment) comment.session = record.id;
+    // Delegating is the person's first turn: Linear records it as a prompt, "Work on [ENG-1](url)",
+    // before the agent says anything (the differential run found it against the real workspace).
+    if (!comment) addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`);
     const previous = comment
       ? store
           .commentsOn(issue)
@@ -233,17 +256,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
   ) => {
     const session = store.sessions.owner(record.id);
     if (session === undefined) throw new Error("A session belongs to a test session");
-    const activity = store.add(store.activities, session, {
-      id: ids.next("linear.uuid"),
-      session: record.id,
-      user,
-      content: { type: "prompt", body },
-      ephemeral: false,
-      signal: options.signal ?? null,
-      signalMetadata: null,
-      sourceComment: options.comment?.id ?? null,
-      createdAt: clock(),
-    } satisfies LinearActivityRecord);
+    const activity = addPrompt(session, record, user, body, options);
     // A new turn makes the session wait for the agent again; Stop asks it to stop.
     moveTo(record, options.signal === "stop" ? "stopping" : "pending");
     return emit(session, "AgentSessionEvent", {

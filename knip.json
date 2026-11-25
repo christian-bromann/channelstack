@@ -9,9 +9,17 @@
         "integrations/vitest/*.ts",
         "examples/agents/*/agent.ts",
         "test/acceptance/*.ts",
-        "test/acceptance/stand-ins/*.ts"
+        "test/acceptance/stand-ins/*.ts",
+        "conformance/*.test.ts"
       ],
-      "project": ["scripts/**/*.ts", "scenarios/**/*.ts", "integrations/**/*.ts", "examples/**/*.ts", "test/**/*.ts"]
+      "project": [
+        "scripts/**/*.ts",
+        "scenarios/**/*.ts",
+        "conformance/**/*.ts",
+        "integrations/**/*.ts",
+        "examples/**/*.ts",
+        "test/**/*.ts"
+      ]
     },
     "server": {
       "entry": ["src/cli.ts", "src/**/*.test.ts", "test/**/*.test.ts"],

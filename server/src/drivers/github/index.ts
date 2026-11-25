@@ -9,6 +9,7 @@ import { registerGitHubRoutes } from "./routes.ts";
 /** The GitHub driver: the fake REST API and App webhooks, and the control actions a test's people take. */
 export const github: DriverDefinition = {
   name: "github",
+  hosts: ["api.github.com"],
   secrets: {
     webhookSecret: "github.webhookSecret",
     privateKey: "github.privateKey",

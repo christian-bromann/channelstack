@@ -19,7 +19,7 @@ Every feature runs in the fake server (in memory). The question this document an
 |---|---|
 | **Built** | Works live with the credentials in "How", built and covered by the unit tests against a stand-in for the platform; the nightly live job runs it against the sandbox |
 | **Yes** | Works live with the credentials listed in "How"; not built yet. On a driver whose credentials are set, live runs report `unsupported_in_live` and the framework skips the step |
-| **Yes, with proxy / browser** | Works live, but only with that extra piece (below). Until the browser actor and proxy mode (phase 6) exist, live runs report `action_requires` and the framework skips the step |
+| **Yes, with proxy / browser** | Works live, but only with that extra piece (below). The browser actor is built (phase 5). Proxy mode is built (phase 6, `start --proxy`) and passes a live agent's calls on to the platform, but doesn't read them back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)): until it does, those steps report `action_requires` live, and the framework skips them |
 | **Agent's concern** | Live, the platform delivers to the agent directly. channelstack never relays events to an agent; how the agent is reachable (public URL, Socket Mode, a deployed staging agent) is up to the agent |
 | **Partial** | Works live with a visible difference, explained in "Notes" |
 | **Not yet** | Possible on the real platform, but not in the first release. Live runs report `unsupported_in_live`, like **No** |
