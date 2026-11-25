@@ -138,7 +138,7 @@ AssertionError: Expected exactly 1 reply from my-agent, found 2:
 
 ## Which checks exist
 
-The Python port covers the conversation checks:
+The Python port covers the conversation checks, text and buttons, comments and Linear agent sessions:
 
 | Python                                             | Vitest                     | Subject                      |
 | -------------------------------------------------- | -------------------------- | ---------------------------- |
@@ -150,10 +150,16 @@ The Python port covers the conversation checks:
 | `to_have_status_text(text)`                        | `toHaveStatusText`         | A thread                     |
 | `to_have_reaction(emoji, by=)`                     | `toHaveReaction`           | A message                    |
 | `to_have_received_call(operation, error=, times=)` | `toHaveReceivedCall`       | A platform fixture (`slack`) |
+| `to_contain_text(text, count=, from_=)`            | `toContainText`            | Anything with a transcript   |
+| `to_have_button(label)`                            | `toHaveButton`             | A Slack message or thread    |
+| `to_have_comment_from(author, text=)`              | `toHaveCommentFrom`        | An issue, a PR, a discussion |
+| `to_have_comments_from(author, count=)`            | `toHaveCommentsFrom`       | An issue, a PR, a discussion |
+| `to_have_session_state(state)`                     | `toHaveSessionState`       | A Linear session or issue    |
+| `to_have_activity(type=, from_=, text=)`           | `toHaveActivity`           | A Linear session or issue    |
 
-Each has a `not_to_…` twin. `text` takes a string to look for or a compiled `re.Pattern`, and an author is a handle (`slack.app`, `ana`) or a name.
+The conversation checks and `to_contain_text` each have a `not_to_…` twin. `text` takes a string to look for or a compiled `re.Pattern`, and an author is a handle (`slack.app`, `ana`) or a name.
 
-The other matchers, for GitHub, Linear, Notion, deliveries and `toContainText`, follow the same pattern later. Until then, read the value with the SDK's waiting methods and `assert` on it:
+The rest (deliveries, modals and ephemeral messages, reviews, check runs and labels, delegation and assignment, Notion blocks and properties) aren't in Python yet. For those, read the value with the SDK's waiting methods and `assert` on it:
 
 ```python title="tests/test_reads.py"
 import re

@@ -1,7 +1,8 @@
+from channelstack import SlackFixture
 from pytest_channelstack import expect
 
 
-async def test_ships_a_pr_from_a_slack_dm(slack):
+async def test_ships_a_pr_from_a_slack_dm(slack: SlackFixture):
     ana = await slack.create_user(name="ana")
     # [!step 1]
     msg = await ana.say("@robin ship #812 to staging",

@@ -1,6 +1,6 @@
 {
   // Type-checks the TypeScript samples shown on the site against the public API in ../api/*.d.ts.
-  // The Python samples are only syntax-checked: see samples/python/README.md.
+  // The Python samples are type-checked with pyright at the repository root: see samples/python/README.md.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

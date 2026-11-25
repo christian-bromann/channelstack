@@ -1,7 +1,8 @@
+from channelstack import NotionFixture
 from pytest_channelstack import expect
 
 
-async def test_answers_a_comment_mention_in_the_same_discussion(notion):
+async def test_answers_a_comment_mention_in_the_same_discussion(notion: NotionFixture):
     ana = await notion.create_user(name="Ana")
     # [!step 1]
     page = await notion.create_page(

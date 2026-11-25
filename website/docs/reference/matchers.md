@@ -43,7 +43,7 @@ Text matchers read the transcript (for example [`SlackTranscript`](/docs/referen
 
 | Matcher | Subject | Arguments and options | Waits | Fails with | pytest |
 |---|---|---|---|---|---|
-| `toContainText(text, options?)` | Anything with `transcript()`: a conversation, thread, message, issue, PR, review comment, Linear comment or session, Notion page or discussion | `text: string \| RegExp`; `from?: AuthorRef`, `as?: Principal` (read as this person: their ephemeral messages included), `count?: number`, `timeout`, `quietFor` | Polls; with `count`, quiet then once | `Expected text matching "…", found <n>. A person sees:` and every entry as `author: text` | — |
+| `toContainText(text, options?)` | Anything with `transcript()`: a conversation, thread, message, issue, PR, review comment, Linear comment or session, Notion page or discussion | `text: string \| RegExp`; `from?: AuthorRef`, `as?: Principal` (read as this person: their ephemeral messages included), `count?: number`, `timeout`, `quietFor` | Polls; with `count`, quiet then once | `Expected text matching "…", found <n>. A person sees:` and every entry as `author: text` | `to_contain_text`, `not_to_contain_text` |
 
 ## Slack
 
@@ -55,7 +55,7 @@ Text matchers read the transcript (for example [`SlackTranscript`](/docs/referen
 | `toHaveStreamingReplyFrom(author?, options?)` | `SlackThread` or `SlackConversation` | `author?: AuthorRef` (anyone if left out); `timeout` | Polls | `Expected a reply being streamed by <name>. The thread has:` and each message with its stream state | `to_have_streaming_reply_from(author=None, *, timeout=)`, `not_to_have_streaming_reply_from(…, quiet_for=)` |
 | `toHaveStatus(state, options?)` | `SlackThread` | `state: "working" \| "streaming" \| "stopped" \| "idle"`; `timeout` | Polls | `Expected the thread to be <state>, it is <state> ("<status line>")` | `to_have_status(expected, *, timeout=)`, `not_to_have_status(…, quiet_for=)` |
 | `toHaveStatusText(text, options?)` | `SlackThread` | `text: string \| RegExp` (the `assistant.threads.setStatus` line); `timeout` | Polls | `Expected the status line to match "…", it is "…"` or `there is none` | `to_have_status_text(text, *, timeout=)`, `not_to_have_status_text(…, quiet_for=)` |
-| `toHaveButton(label, options?)` | `SlackMessage`; or a `SlackThread` or `SlackConversation` (the app's latest message there) | `label: string \| RegExp`; `timeout` | Polls | `Expected a button matching "…". Buttons there:` and the labels, or `none` | — |
+| `toHaveButton(label, options?)` | `SlackMessage`; or a `SlackThread` or `SlackConversation` (the app's latest message there) | `label: string \| RegExp`; `timeout` | Polls | `Expected a button matching "…". Buttons there:` and the labels, or `none` | `to_have_button` |
 | `toHaveReaction(emoji, options?)` | `SlackMessage` | `emoji: string` (`":eyes:"` or `"eyes"`); `by?: AuthorRef`, `timeout` | Polls | `Expected a :eyes: reaction by <name>. Reactions there:` and each with who added it | `to_have_reaction(emoji, *, by=, timeout=)`, `not_to_have_reaction(…, quiet_for=)` |
 | `toHaveOpenedModal(title?, options?)` | `SlackUser` | `title?: string \| RegExp`; `timeout`. A modal opened for this person, submitted or not | Polls | `Expected a modal titled "…" to have been opened. Opened:` and the titles, or `none` | — |
 | `toBeEphemeralFor(user)` | `SlackMessage` | `user: SlackUser` | Doesn't wait: reads `visibleTo` once | `Expected the message to be visible only to <name>, everyone can see it` (or `only <name> can`) | — |
@@ -66,8 +66,8 @@ Live, `toHaveStatus`, `toHaveStatusText` and `toHaveOpenedModal` read what needs
 
 | Matcher | Subject | Arguments and options | Waits | Fails with | pytest |
 |---|---|---|---|---|---|
-| `toHaveCommentFrom(author, options?)` | Anything with `comments()`: `GitHubIssue`, `GitHubPullRequest`, `LinearIssue`, `NotionDiscussion` | `author: AuthorRef`; `text?: string \| RegExp`, `timeout` | Polls | `Expected a comment from <name> matching "…". The conversation has:` and every comment | — |
-| `toHaveCommentsFrom(author, options)` | The same | `author: AuthorRef`; `count: number` (required), `timeout`, `quietFor` | Quiet, then once | `Expected exactly <n> comments from <name>, found <m>:` and every comment | — |
+| `toHaveCommentFrom(author, options?)` | Anything with `comments()`: `GitHubIssue`, `GitHubPullRequest`, `LinearIssue`, `NotionDiscussion` | `author: AuthorRef`; `text?: string \| RegExp`, `timeout` | Polls | `Expected a comment from <name> matching "…". The conversation has:` and every comment | `to_have_comment_from` |
+| `toHaveCommentsFrom(author, options)` | The same | `author: AuthorRef`; `count: number` (required), `timeout`, `quietFor` | Quiet, then once | `Expected exactly <n> comments from <name>, found <m>:` and every comment | `to_have_comments_from` |
 
 A `NotionPage` has no `comments()`: check one of its `discussions()`.
 
@@ -87,8 +87,8 @@ Live, the reads behind `toHaveReviewComment`, `toHaveReviewFrom`, `toHaveCheckRu
 
 | Matcher | Subject | Arguments and options | Waits | Fails with | pytest |
 |---|---|---|---|---|---|
-| `toHaveSessionState(state, options?)` | `LinearAgentSession`, or a `LinearIssue` (its latest session) | `state: "pending" \| "active" \| "awaitingInput" \| "complete" \| "error" \| "stale"`; `timeout` | Polls | `Expected the agent session to be <state>, it is <state>` (`no session` when the issue has none) | — |
-| `toHaveActivity(expected, options?)` | `LinearAgentSession` or `LinearIssue` (its latest session) | `expected: { type?: "thought" \| "action" \| "elicitation" \| "response" \| "error"; from?: AuthorRef; text?: string \| RegExp }`, every given field must match; `timeout`. People's prompts don't count | Polls | `Expected a <type> from <name> matching "…". The session has:` and each as `author (type): body` | — |
+| `toHaveSessionState(state, options?)` | `LinearAgentSession`, or a `LinearIssue` (its latest session) | `state: "pending" \| "active" \| "awaitingInput" \| "complete" \| "error" \| "stale"`; `timeout` | Polls | `Expected the agent session to be <state>, it is <state>` (`no session` when the issue has none) | `to_have_session_state` |
+| `toHaveActivity(expected, options?)` | `LinearAgentSession` or `LinearIssue` (its latest session) | `expected: { type?: "thought" \| "action" \| "elicitation" \| "response" \| "error"; from?: AuthorRef; text?: string \| RegExp }`, every given field must match; `timeout`. People's prompts don't count | Polls | `Expected a <type> from <name> matching "…". The session has:` and each as `author (type): body` | `to_have_activity` |
 | `toBeAssignedTo(user, options?)` | `LinearIssue` | `user: Principal \| undefined` (`undefined`: no one), compared by `id`; `timeout` | Polls | `Expected the issue to be assigned to <name>, it is assigned to <name>` (or `no one`) | — |
 | `toBeDelegatedTo(app, options?)` | `LinearIssue` | `app: Principal \| undefined` (`undefined`: none), compared by `id`; `timeout` | Polls | `Expected the issue to be delegated to <name>, it is delegated to <name>` (or `no one`) | — |
 | `toHaveState(name, options?)` | `LinearIssue` | `name: string`, the workflow state's name, compared case-insensitively; `timeout` | Polls | `Expected the issue to be in "…", it is in "…"` | — |
