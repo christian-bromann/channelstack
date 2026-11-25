@@ -2833,7 +2833,10 @@
             "name": "SlackModal"
           },
           "text": "title",
-          "what": "a modal from the agent"
+          "where": {
+            "open": true
+          },
+          "what": "an open modal from the agent"
         }
       ]
     },

@@ -52,6 +52,8 @@ interface WaitBinding {
   text?: string;
   /** The wait takes the read's own options as its first argument: `waitForCall({ operation }, { timeout })`. */
   filter?: true;
+  /** For `next` and `latest`: only items whose fields have these values count (a modal that is still `open`). */
+  where?: Readonly<Record<string, string | number | boolean>>;
   /** What is being waited for, for the timeout message: "a reply". */
   what: string;
 }

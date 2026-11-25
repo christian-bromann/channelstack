@@ -283,16 +283,33 @@ export class GitStore {
       this.files(dir, ours),
       this.files(dir, theirs),
     ]);
-    const result = new Map(mine);
-    for (const path of new Set([...start.keys(), ...other.keys()])) {
-      const [was, here, there] = [start.get(path)?.sha, mine.get(path)?.sha, other.get(path)?.sha];
-      if (there === was || there === here) continue;
-      if (here !== was) return undefined;
-      const file = other.get(path);
-      if (file) result.set(path, file);
-      else result.delete(path);
+    return mergeFiles(start, mine, other);
+  }
+
+  /**
+   * Each commit `head` has that `base` hasn't, merged in turn onto `base`: what a rebase makes,
+   * one step per commit, before anything is written. Undefined when a step conflicts. Rebasing a
+   * pull request writes a commit per step; asking whether it would rebase only runs this.
+   */
+  async replay(
+    dir: string,
+    start: string,
+    base: string,
+    head: string,
+  ): Promise<Array<{ commit: GitHubCommitInfo; files: Map<string, GitFile> }> | undefined> {
+    let files = await this.files(dir, base);
+    const steps: Array<{ commit: GitHubCommitInfo; files: Map<string, GitFile> }> = [];
+    for (const commit of await this.ahead(dir, base, head)) {
+      const [parent, theirs] = await Promise.all([
+        this.files(dir, commit.parents[0] ?? start),
+        this.files(dir, commit.sha),
+      ]);
+      const next = mergeFiles(parent, files, theirs);
+      if (!next) return undefined;
+      steps.push({ commit, files: next });
+      files = next;
     }
-    return result;
+    return steps;
   }
 
   /** What changed between two commits, with patches. Without `from`, everything in `to` is new. */
@@ -346,4 +363,25 @@ export class GitStore {
     }
     return out;
   }
+}
+
+/**
+ * Three-way merge of file sets: what `other` changed since `start`, applied to `mine`. Undefined
+ * when both changed the same file differently: a conflict the fake doesn't resolve.
+ */
+function mergeFiles(
+  start: Map<string, GitFile>,
+  mine: Map<string, GitFile>,
+  other: Map<string, GitFile>,
+): Map<string, GitFile> | undefined {
+  const result = new Map(mine);
+  for (const path of new Set([...start.keys(), ...other.keys()])) {
+    const [was, here, there] = [start.get(path)?.sha, mine.get(path)?.sha, other.get(path)?.sha];
+    if (there === was || there === here) continue;
+    if (here !== was) return undefined;
+    const file = other.get(path);
+    if (file) result.set(path, file);
+    else result.delete(path);
+  }
+  return result;
 }

@@ -847,11 +847,54 @@ describe("pull requests", () => {
     });
     const one = await post(`/users/${ana.id}/pulls`, change("one", "# one\n"));
     const two = await post(`/users/${ana.id}/pulls`, change("two", "# two\n"));
+    // What the agent reads: GitHub computes whether a pull request merges, and says `dirty` when it can't.
+    const mergeability = async (number: number) => {
+      const { mergeable, rebaseable, mergeable_state } = (await api("GET", `${path}/pulls/${number}`)).body;
+      return { mergeable, rebaseable, mergeable_state };
+    };
+    expect(await mergeability(two.number)).toEqual({ mergeable: true, rebaseable: true, mergeable_state: "clean" });
     await post(`/users/${ana.id}/merge`, { pr: { repoId: repo.id, number: one.number } });
+    expect(await mergeability(two.number)).toEqual({ mergeable: false, rebaseable: false, mergeable_state: "dirty" });
     const [mergeCommit] = await get(`/repos/${repo.id}/commits`);
     expect((await api("GET", `${path}/git/commits/${mergeCommit.sha}`)).body.parents).toHaveLength(2);
     expect((await api("PUT", `${path}/pulls/${two.number}/merge`, {})).status).toBe(405);
     expect(await get(`/repos/${repo.id}/pulls/${two.number}/merged`)).toBe(false);
+  });
+
+  test("mergeability: computed again when a closed pull request reopens, and a rebase replays each commit (#16)", async () => {
+    const { ana, repo, post, api, path } = await workspace();
+    const readme = (branch: string, text: string) => ({
+      pr: { from: branch, title: branch, changes: [{ path: "README.md", content: b64(text) }] },
+      repo: repo.id,
+    });
+    const mergeability = async (number: number) => {
+      const { mergeable, rebaseable, mergeable_state } = (await api("GET", `${path}/pulls/${number}`)).body;
+      return { mergeable, rebaseable, mergeable_state };
+    };
+    const ref = (number: number) => ({ repoId: repo.id, number });
+
+    // A branch that changes the README and changes it back: started before the base changes it.
+    const original = (await api("GET", `${path}/contents/README.md`)).body.content as string;
+    const z = await post(`/users/${ana.id}/pulls`, readme("z", "# z\n"));
+    await post(`/users/${ana.id}/push`, {
+      changes: [{ path: "README.md", content: original.replace(/\n/g, "") }],
+      repo: repo.id,
+      branch: "z",
+    });
+
+    // Closed, then the base moves under it: reopened, it reads what a merge would answer now.
+    const x = await post(`/users/${ana.id}/pulls`, readme("x", "# x\n"));
+    const y = await post(`/users/${ana.id}/pulls`, readme("y", "# y\n"));
+    await post(`/users/${ana.id}/close`, { issue: ref(x.number) });
+    await post(`/users/${ana.id}/merge`, { pr: ref(y.number) });
+    await post(`/users/${ana.id}/reopen`, { issue: ref(x.number) });
+    expect(await mergeability(x.number)).toEqual({ mergeable: false, rebaseable: false, mergeable_state: "dirty" });
+    expect((await api("PUT", `${path}/pulls/${x.number}/merge`, {})).status).toBe(405);
+
+    // z merges (nothing is left for it to change), but its first commit doesn't replay onto the new README.
+    expect(await mergeability(z.number)).toEqual({ mergeable: true, rebaseable: false, mergeable_state: "clean" });
+    expect((await api("PUT", `${path}/pulls/${z.number}/merge`, { merge_method: "rebase" })).status).toBe(405);
+    expect((await api("PUT", `${path}/pulls/${z.number}/merge`, { merge_method: "merge" })).status).toBe(200);
   });
 });
 

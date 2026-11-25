@@ -265,6 +265,7 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const conditions = [
       ...(from ? [`fromMatches(item.${w.from}, options.from)`] : []),
       ...(w.text ? [`textMatches(item.${w.text}, options.${w.text})`] : []),
+      ...Object.entries(w.where ?? {}).map(([field, value]) => `item.${field} === ${JSON.stringify(value)}`),
     ];
     const matches = conditions.length > 0 ? `(item) => ${conditions.join(" && ")}` : "() => true";
     const what = from ? `describeWait(${JSON.stringify(w.what)}, options.from)` : JSON.stringify(w.what);

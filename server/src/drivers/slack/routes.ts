@@ -741,7 +741,16 @@ export function registerSlackRoutes(
     response: z.array(SlackModal).openapi("SlackModals"),
     errors: ["not_found"],
     sdkMethod: { on: "SlackUser", name: "modals" },
-    waits: [{ name: "waitForModal", mode: "next", text: "title", what: "a modal from the agent" }],
+    // A modal that was submitted or closed stays in the list (`open: false`), so a second wait finds a second modal; it never matches.
+    waits: [
+      {
+        name: "waitForModal",
+        mode: "next",
+        text: "title",
+        where: { open: true },
+        what: "an open modal from the agent",
+      },
+    ],
     live: AGENT_SIDE,
     stability,
     handler: ({ session, params }) => fake.modals(session.id, params.user).map((view) => modalWire(session.id, view)),

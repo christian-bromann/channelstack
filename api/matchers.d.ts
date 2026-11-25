@@ -28,7 +28,7 @@ import type { SlackUser } from "./slack";
  *   | toHaveStatus, toHaveStatusText                  | `thread.status()`                             |
  *   | toHaveButton                                    | `message.blocks`, transcript `controls`       |
  *   | toHaveReaction                                  | `message.reactions()`                         |
- *   | toHaveOpenedModal                               | `user.waitForModal()`                         |
+ *   | toHaveOpenedModal                               | `user.modals()`                               |
  *   | toBeEphemeralFor                                | `message.visibleTo`                           |
  *   | toHaveCommentFrom, toHaveCommentsFrom           | `comments()`, `latestComment()`               |
  *   | toHaveReviewComment, toHaveReviewFrom           | `pr.reviewComments()`, `pr.reviews()`         |
