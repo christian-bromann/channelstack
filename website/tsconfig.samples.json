@@ -1,5 +1,5 @@
 {
-  // Type-checks the TypeScript samples shown on the site against the public API in ../api/*.d.ts.
+  // Type-checks the TypeScript samples and docs examples shown on the site against the public API in ../api/*.d.ts.
   // The Python samples are type-checked with pyright at the repository root: see samples/python/README.md.
   "compilerOptions": {
     "target": "ES2022",
@@ -18,5 +18,5 @@
       "vitest/*": ["./node_modules/vitest/*"]
     }
   },
-  "include": ["samples/**/*.ts"]
+  "include": ["samples/**/*.ts", "examples/**/*.ts"]
 }

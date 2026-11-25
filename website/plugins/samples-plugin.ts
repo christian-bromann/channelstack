@@ -18,7 +18,14 @@ import { highlightLines } from "./highlight";
 
 const QUERY = "?sample";
 const STEP = /^(\s*)(?:\/\/|#)\s*\[!step (\d+)\]\s*$/;
-const LANG: Record<string, string> = { ".ts": "ts", ".tsx": "tsx", ".py": "python", ".sh": "bash", ".json": "json" };
+const LANG: Record<string, string> = {
+  ".ts": "ts",
+  ".tsx": "tsx",
+  ".py": "python",
+  ".rs": "rust",
+  ".sh": "bash",
+  ".json": "json",
+};
 
 export interface Sample {
   /** The code as shown, without markers. This is what the copy button copies. */

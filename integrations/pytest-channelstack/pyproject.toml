@@ -33,7 +33,7 @@ ignore = ["ASYNC109", "S101"]
 known-first-party = ["channelstack", "pytest_channelstack"]
 
 [tool.pyright]
-include = ["pytest_channelstack", "tests", "../../test/acceptance/pytest", "../../website/samples/python"]
+include = ["pytest_channelstack", "tests", "../../test/acceptance/pytest", "../../website/samples/python", "../../website/examples/python"]
 typeCheckingMode = "strict"
 pythonVersion = "3.12"
 

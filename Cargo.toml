@@ -1,4 +1,4 @@
-# The Rust crates: the SDK and its smoke scenario runner. One lock file and one target directory.
+# The Rust crates: the SDK, its smoke scenario runner and the docs' examples. One lock file and one target directory.
 [workspace]
-members = ["sdks/rust", "scenarios/runners/rust"]
+members = ["sdks/rust", "scenarios/runners/rust", "website/examples/rust"]
 resolver = "3"
