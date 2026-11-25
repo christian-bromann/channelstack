@@ -20,8 +20,6 @@ from channelstack.runtime.duration import Duration
 from channelstack.runtime.transport import unreported_refusals
 from channelstack.runtime.wait import WaitTimeoutError, from_matches, text_matches, until_quiet, wait_for
 
-from .options import defaults
-
 Text = str | re.Pattern[str]
 
 
@@ -103,13 +101,12 @@ class Expectation:
         quiet_for: Duration | None = None,
     ) -> None:
         """Run a check the way its kind needs, and fail with what was expected and what was there."""
-        timeout = defaults.timeout if timeout is None else timeout
         if once_quiet or negate:
             # The check watches for the whole quiet window: what arrives while it looks counts.
             await until_quiet(
                 lambda: quiet_of(self._subject._ctx),
                 timeout=timeout,
-                quiet_for=defaults.quiet_for if quiet_for is None else quiet_for,
+                quiet_for=quiet_for,
                 watching=True,
             )
             value = await read()

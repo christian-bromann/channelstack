@@ -12,9 +12,12 @@ export {
   fromMatches,
   type QuietOptions,
   type QuietState,
+  setWaitDefaults,
   textMatches,
   untilQuiet,
+  type WaitDefaults,
   type WaitOptions,
   WaitTimeoutError,
+  waitDefaults,
   waitFor,
 } from "./runtime/wait.ts";

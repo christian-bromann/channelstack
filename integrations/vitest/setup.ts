@@ -9,6 +9,7 @@ import {
   onRefusal,
   type Session,
   setFilesRoot,
+  setWaitDefaults,
   untilQuiet,
 } from "../../sdks/typescript/client.ts";
 import { type MatcherName, matchers, type MatcherState } from "../matchers-core/index.ts";
@@ -16,6 +17,9 @@ import { refusedFixture, SKIPS_LIVE, unskipped } from "./refused.ts";
 
 /** Runs in every test worker: one client per worker, one session per test, and the matchers. */
 const server = inject("channelstack");
+// The plugin's `timeout` and `quietFor` are every SDK wait's defaults, not only the matchers':
+// `thread.waitForReply()`, `latestReply()`, `delivery.settled()`, …
+setWaitDefaults({ timeout: server.timeout, quietFor: server.quietFor });
 
 let client: Promise<Channelstack> | undefined;
 const connected = () => {
@@ -105,8 +109,7 @@ const auto = { auto: true } as const;
       await use({
         url: server.url,
         env: () => channelstack.env(),
-        quiet: (options = {}) =>
-          untilQuiet(() => session.quiet(), { quietFor: server.quietFor, timeout: server.timeout, ...options }),
+        quiet: (options = {}) => untilQuiet(() => session.quiet(), options),
         reset: () => channelstack.reset(),
       });
     },

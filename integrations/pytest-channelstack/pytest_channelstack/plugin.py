@@ -30,6 +30,7 @@ from channelstack import (
 from channelstack.runtime.files import set_files_root
 from channelstack.runtime.launcher import Mode
 from channelstack.runtime.transport import on_refusal
+from channelstack.runtime.wait import set_wait_defaults
 
 from .options import defaults
 
@@ -66,8 +67,11 @@ def pytest_configure(config: pytest.Config) -> None:
     if mode not in get_args(Mode):
         raise pytest.UsageError(f"channelstack_mode must be one of {', '.join(get_args(Mode))}, got {mode!r}")
     defaults.mode = cast(Mode, mode)
-    defaults.timeout = cast(str, config.getini("channelstack_timeout"))
-    defaults.quiet_for = cast(str, config.getini("channelstack_quiet_for"))
+    # Every SDK wait reads these, not only the checks: `wait_for_reply`, `latest_reply`, `settled`, …
+    set_wait_defaults(
+        timeout=cast(str, config.getini("channelstack_timeout")),
+        quiet_for=cast(str, config.getini("channelstack_quiet_for")),
+    )
     on_refusal(_skip_live_refusal)
 
 

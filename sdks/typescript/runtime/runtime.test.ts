@@ -12,7 +12,16 @@ import { parseDuration } from "./duration.ts";
 import { readChanges, readDocument, readTree, setFilesRoot } from "./files.ts";
 import { resolveServerBinary, serverBinaryName, serverPackageName } from "./launcher.ts";
 import { ChannelstackError, onRefusal, segment, Transport, unreportedRefusals } from "./transport.ts";
-import { patternOnWire, untilQuiet, waitFor, waitForNext, WaitTimeoutError } from "./wait.ts";
+import {
+  patternOnWire,
+  retryWhile,
+  setWaitDefaults,
+  untilQuiet,
+  waitDefaults,
+  waitFor,
+  waitForNext,
+  WaitTimeoutError,
+} from "./wait.ts";
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -130,6 +139,41 @@ describe("waiting", () => {
 
   test("an error from the read is not swallowed", async () => {
     await expect(waitFor("x", () => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
+  });
+
+  test("the defaults a test framework sets apply to every wait that isn't given its own", async () => {
+    const before = waitDefaults();
+    expect(before).toEqual({ timeout: "10s", quietFor: "750ms" });
+    setWaitDefaults({ timeout: "40ms", quietFor: "30ms" });
+    try {
+      await expect(waitFor("a reply", async () => undefined, { interval: "10ms" })).rejects.toThrow(
+        new WaitTimeoutError("a reply", 40),
+      );
+      // A generated `waitFor…` goes through `waitForNext`, a call the server refuses for now through `retryWhile`.
+      await expect(
+        waitForNext(
+          new Map(),
+          "w",
+          async () => [],
+          () => true,
+          "a reply",
+        ),
+      ).rejects.toThrow(new WaitTimeoutError("a reply", 40));
+      const refused = Object.assign(new Error("not yet"), { code: "not_found" });
+      await expect(retryWhile(["not_found"], () => Promise.reject(refused))).rejects.toBe(refused);
+      // `latest…` reads and the reads that wait for quiet take the quiet window too.
+      await expect(untilQuiet(async () => ({ busy: false, quietForMs: 30, open: [] }))).resolves.toBeUndefined();
+      await expect(untilQuiet(async () => ({ busy: false, quietForMs: 10, open: [] }))).rejects.toThrow(
+        new WaitTimeoutError("the agent to be quiet for 30ms", 40),
+      );
+      // What a call gives still wins.
+      await expect(untilQuiet(async () => ({ busy: false, quietForMs: 10, open: [] }), { quietFor: 5 })).resolves.toBe(
+        undefined,
+      );
+      expect(() => setWaitDefaults({ timeout: "soon" as never })).toThrow("Not a duration");
+    } finally {
+      setWaitDefaults(before);
+    }
   });
 });
 
