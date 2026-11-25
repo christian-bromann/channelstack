@@ -32,7 +32,7 @@ function path(d: string): ElementContent {
 }
 
 function circle(cx: number, cy: number, r: number): ElementContent {
-  return { type: "element", tagName: "circle", properties: { cx, cy, r }, children: [] };
+  return { type: "element", tagName: "circle", properties: { cx: String(cx), cy: String(cy), r: String(r) }, children: [] };
 }
 
 export default function remarkCallouts() {
