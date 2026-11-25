@@ -40,6 +40,13 @@ export function checkResendCredential(
       "verify a domain in Resend (Domains) that sends and receives, and allowlist it in CHANNELSTACK_LIVE_RESEND_DOMAINS",
     );
   }
+  // People email the agent's address, and the agent's answers reach the people's: both domains receive.
+  if (!found.receiving) {
+    throw liveMisconfigured(
+      `${expected.who}'s domain ${found.name} doesn't receive email`,
+      "turn on Receiving for the domain in Resend (Domains), and add the MX record it shows",
+    );
+  }
   expected.allowlist.assert(found.name, `Resend domain ${found.name}`);
   return found.name;
 }
