@@ -42,7 +42,7 @@ ana: @my-agent what broke last night?
   my-agent: Here's what I found about "what broke last night?".
 ```
 
-`show` prints the most recently active conversation the way a person reads it. Replies in a thread are indented. Buttons show as `[Approve]`, and edits, streams and ephemeral messages are marked. The agent works asynchronously, so if its reply isn't there yet, run `show` again.
+`show` prints the most recently active conversation the way a person reads it. Replies in a thread are indented. Buttons show as `[Approve]`, and edits and streams are marked. Ephemeral messages aren't shown: `show` reads as no one in particular, and an ephemeral message is for one person only. The agent works asynchronously, so if its reply isn't there yet, run `show` again.
 
 | Flag | What it does |
 |---|---|
@@ -141,7 +141,7 @@ The UI shows the dev session in three panes, refreshed every second:
 | Pane | What it shows |
 |---|---|
 | Conversations | The session's Slack conversations, most recent first. Click one to read it |
-| Transcript | The same transcript `show` prints and the matchers read: who said what, threads indented, edits, streams and messages only one person sees marked. Buttons are shown, but can't be clicked from the UI yet: use `slack click` |
+| Transcript | The same transcript `show` prints and the matchers read: who said what, threads indented, edits and streams marked. Messages only one person sees (ephemeral) are left out. Buttons are shown, but can't be clicked from the UI yet: use `slack click` |
 | Inspector | Every delivery to the agent and every API call it made, one line each. Click a line to see its JSON |
 
 The UI uses one plain design rather than copying Slack's, and shows only what a person could see, so it can't show anything the matchers wouldn't.
