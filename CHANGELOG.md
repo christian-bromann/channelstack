@@ -54,3 +54,4 @@ The first version of channelstack, a test harness for the apps and agents you bu
 ### Docs
 
 - The docs at channelstack.dev/docs: quickstarts for Chat SDK, AI SDK and Pi, a guide, a page per platform, and a reference generated from the spec.
+- **Docs for agents:** every page as Markdown (its URL plus `.md`, or `Accept: text/markdown`), `llms.txt` and `llms-full.txt`, an MCP server for the docs at `https://channelstack.dev/mcp`, and a **Copy page** menu on every page that opens it in ChatGPT, Claude, Codex or Cursor.

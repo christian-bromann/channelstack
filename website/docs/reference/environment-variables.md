@@ -1,7 +1,8 @@
 ---
 title: "Environment variables"
-order: 6
+order: 2
 description: "Every environment variable channelstack reads or prints: the server's settings, the clients', the live credentials and allowlists, and what the app gets."
+section: "Tools"
 ---
 
 # Environment variables

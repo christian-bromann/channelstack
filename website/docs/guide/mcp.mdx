@@ -87,3 +87,22 @@ channelstack's repository has a skill for coding agents in [`skills/channelstack
 ## Slack only
 
 The tools that act as a person are Slack's. `list_deliveries` and `redeliver` take every channel, but nothing acts on GitHub, Linear or Notion in the dev session: drive those from a test.
+
+## The docs, for your coding agent
+
+The docs themselves are served for agents too, so a coding agent can look up the API while it writes your tests:
+
+- **An MCP server for the docs** at `https://channelstack.dev/mcp` (Streamable HTTP, no sign-in) with three read-only tools: `search_docs` finds the sections that answer a question, `read_doc` reads a page, and `list_docs` lists them all. Add it to an agent as a remote server:
+
+  ```json title=".mcp.json"
+  {
+    "mcpServers": {
+      "channelstack-docs": { "type": "http", "url": "https://channelstack.dev/mcp" }
+    }
+  }
+  ```
+
+  In Claude Code, `claude mcp add --transport http channelstack-docs https://channelstack.dev/mcp` does the same. The menu next to **Copy page** at the top of every docs page installs it in Cursor or VS Code in one click.
+- **Every page as Markdown:** add `.md` to its URL (`/docs/guide/live-mode.md`), or ask for it with `Accept: text/markdown`. Every example comes with all three languages.
+- **[llms.txt](https://channelstack.dev/llms.txt)** lists every page by section, and **[llms-full.txt](https://channelstack.dev/llms-full.txt)** has all of them in one file.
+- **Copy page** copies the page's Markdown for a chat, and its menu opens the page in ChatGPT, Claude, Codex or Cursor.

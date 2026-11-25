@@ -19,7 +19,7 @@ A page that starts teaching in the middle of a how-to links to the explanation i
 
 The docs have two areas, each with its own sidebar and its own link in the top navigation: the **Guide** (Introduction, Quickstarts, Guide and Platforms) and the **Reference**. A platform has a page in each, a guide and an API page, and they link to each other; neither sidebar lists a platform twice.
 
-The folder is the section and the frontmatter's `order` is the position in it. A page can name another section of its area in its frontmatter (`section: "Platform APIs"`, which the generated platform pages do).
+The folder is the section and the frontmatter's `order` is the position in it. The Reference's pages each name their section in the frontmatter: **Tools** (CLI, environment variables, SDKs), **Platform APIs** (one generated page per platform) and **Test API** (the Vitest plugin, the client, the matchers and errors), in that order below its Overview.
 
 **Introduction** (`docs/`)
 
@@ -91,6 +91,10 @@ The reference is generated wherever there's one source for it, so it can't drift
 - **Plain words, short sentences,** the way the rest of the repository is written. Name things the way the API does.
 - **Describe what's built.** A feature that isn't built yet isn't documented as if it were; at most a sentence says it's coming, with its issue.
 - **Link across kinds** instead of mixing them: a how-to links to the explanation of why, and to the reference for every option.
+
+### For agents
+
+Every page is also served as Markdown at its path plus `.md`, and listed in `/llms.txt` (plugins/agent-docs.ts builds them from the source, and the docs' MCP server at `/mcp` searches them). A page needs nothing for that, but a new component in MDX needs a Markdown form there: the build fails until it has one. A new animated figure puts its caption in `src/components/docs/figure-captions.ts`, which both the page and the Markdown read.
 
 ### Frontmatter
 

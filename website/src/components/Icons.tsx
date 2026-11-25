@@ -32,6 +32,11 @@ export const Check = (p: P) => (
     <path d="M5 12.5l4.5 4.5L19 7" />
   </Icon>
 );
+export const ChevronDown = (p: P) => (
+  <Icon {...p}>
+    <path d="M6 9l6 6 6-6" />
+  </Icon>
+);
 export const Clipboard = (p: P) => (
   <Icon {...p}>
     <rect x="8" y="8" width="12" height="12" rx="2.5" />

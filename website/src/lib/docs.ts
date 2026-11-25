@@ -4,6 +4,7 @@
  * there, so adding a page never needs a code change. website/docs/README.md is the plan.
  *
  * The sections belong to two areas, the Guide and the Reference, each with its own sidebar.
+ * Nothing here is Vite-only: plugins/agent-docs.ts uses it at build time, in Node.
  */
 import type { ComponentType } from "react";
 
@@ -12,7 +13,7 @@ export interface Frontmatter {
   /** Position within its section, ascending. Pages without it sort last, by title. */
   order?: number;
   description?: string;
-  /** A section other than the folder's: the generated platform APIs say `Platform APIs`. */
+  /** A section other than the folder's: the Reference's pages say `Tools`, `Platform APIs` or `Test API`. */
   section?: string;
 }
 
@@ -45,7 +46,9 @@ export const SECTIONS: ReadonlyArray<{ folder?: string; title: string; area: Doc
   { folder: "guide", title: "Guide", area: "guide" },
   { folder: "platforms", title: "Platforms", area: "guide" },
   { folder: "reference", title: "Reference", area: "reference" },
+  { title: "Tools", area: "reference" },
   { title: "Platform APIs", area: "reference" },
+  { title: "Test API", area: "reference" },
 ];
 
 /** `../../docs/guide/live-mode.mdx` → `guide/live-mode`; `index` → `` (the docs landing page). */
@@ -58,8 +61,6 @@ export function slugOf(file: string): string {
 export function sourceOf(file: string): string {
   return `website/docs/${file.replace(/^.*\/docs\//, "")}`;
 }
-
-export const docLoaders = import.meta.glob<DocModule>(["../../docs/**/*.{md,mdx}", "!**/README.md"]);
 
 export interface DocEntry extends Frontmatter {
   slug: string;

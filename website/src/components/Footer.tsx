@@ -5,12 +5,12 @@ import { Mark } from "./Mark";
 
 const DOCS = [
   ["Getting started", "/docs/getting-started"],
-  ["Slack", "/docs/slack"],
-  ["GitHub", "/docs/github"],
-  ["Linear", "/docs/linear"],
-  ["Notion", "/docs/notion"],
-  ["Live mode", "/docs/live-mode"],
-  ["API reference", "/docs/api-reference"],
+  ["Slack", "/docs/platforms/slack"],
+  ["GitHub", "/docs/platforms/github"],
+  ["Linear", "/docs/platforms/linear"],
+  ["Notion", "/docs/platforms/notion"],
+  ["Live mode", "/docs/guide/live-mode"],
+  ["Reference", "/docs/reference"],
 ] as const;
 
 export function Footer() {
@@ -25,7 +25,10 @@ export function Footer() {
           <p className="legal">
             MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub,
             Linear or Notion. All names and logos shown, including TypeScript and Python, are trademarks of their
-            owners.
+            owners. The docs' assistant and editor icons are from{" "}
+            <a href="https://github.com/lobehub/lobe-icons">Lobe Icons</a> (MIT) and Microsoft's{" "}
+            <a href="https://github.com/microsoft/vscode-codicons">Codicons</a> (
+            <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>).
           </p>
         </div>
         <nav aria-labelledby="footer-docs">

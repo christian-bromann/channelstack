@@ -16,8 +16,8 @@ const DIR = "website/docs/reference/api";
 const ROUTE = "/docs/reference/api";
 
 /**
- * The pages, in sidebar order. The client's and the errors page sit in the Reference section; the
- * platforms' in "Platform APIs", each linked to its guide under /docs/platforms.
+ * The pages, in sidebar order. The client's and the errors page sit in "Test API"; the platforms'
+ * in "Platform APIs", each linked to its guide under /docs/platforms.
  */
 const PAGES = [
   { slug: "client", title: "Client and sessions", prefix: undefined, fixture: undefined, order: 2 },
@@ -28,6 +28,7 @@ const PAGES = [
 ] as const;
 const ERRORS_ORDER = 4;
 const PLATFORM_SECTION = "Platform APIs";
+const TEST_SECTION = "Test API";
 
 type Page = (typeof PAGES)[number];
 
@@ -451,7 +452,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
         "---",
         `title: ${JSON.stringify(page.title)}`,
         `order: ${page.order}`,
-        ...(page.prefix === undefined ? [] : [`section: ${JSON.stringify(PLATFORM_SECTION)}`]),
+        `section: ${JSON.stringify(page.prefix === undefined ? TEST_SECTION : PLATFORM_SECTION)}`,
         `description: ${JSON.stringify(page.prefix === undefined ? "The channelstack client and sessions: every method, in every SDK's language." : `Every handle, method and wait of the ${page.prefix} fake, in every SDK's language.`)}`,
         "---",
         "",
@@ -518,6 +519,7 @@ function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: Re
     "---",
     'title: "Errors"',
     `order: ${ERRORS_ORDER}`,
+    `section: ${JSON.stringify(TEST_SECTION)}`,
     "description: \"Every error code the control API returns: channelstack's own, and the platforms' codes the fakes refuse with.\"",
     "---",
     "",

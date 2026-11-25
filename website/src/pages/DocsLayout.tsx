@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Head } from "vite-react-ssg";
 
 import { CodeGroup } from "../components/docs/CodeGroup";
 import { Example } from "../components/docs/Example";
@@ -11,6 +12,7 @@ import {
   SessionScopes,
   TerminalSession,
 } from "../components/docs/Figures";
+import { PageActions } from "../components/docs/PageActions";
 import { Toc } from "../components/docs/Toc";
 import { Footer } from "../components/Footer";
 import { ArrowRight } from "../components/Icons";
@@ -104,7 +106,13 @@ export function DocPage({ slug, mod }: { slug: string; mod: DocModule }) {
         description={entry?.description}
         path={entry?.path ?? "/docs"}
       />
-      {entry && entry.section !== "Introduction" ? <p className="doc-eyebrow">{entry.section}</p> : null}
+      <Head>
+        <link rel="alternate" type="text/markdown" href={`${entry?.path ?? "/docs"}.md`} />
+      </Head>
+      <div className="doc-head">
+        {entry && entry.section !== "Introduction" ? <p className="doc-eyebrow">{entry.section}</p> : null}
+        <PageActions path={entry?.path ?? "/docs"} />
+      </div>
       <article className="prose">
         <Content components={MDX_COMPONENTS} />
       </article>
