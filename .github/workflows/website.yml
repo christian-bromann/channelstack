@@ -73,6 +73,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm typecheck:samples
+      - run: pnpm test
       - run: pnpm build
 
       - name: Upload a preview version
@@ -142,6 +143,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm typecheck:samples
+      - run: pnpm test
       - run: pnpm build
       - name: Deploy to channelstack.dev
         env:

@@ -92,6 +92,10 @@ The reference is generated wherever there's one source for it, so it can't drift
 - **Describe what's built.** A feature that isn't built yet isn't documented as if it were; at most a sentence says it's coming, with its issue.
 - **Link across kinds** instead of mixing them: a how-to links to the explanation of why, and to the reference for every option.
 
+### For agents
+
+Every page is also served as Markdown at its path plus `.md`, and listed in `/llms.txt` (plugins/agent-docs.ts builds them from the source, and the docs' MCP server at `/mcp` searches them). A page needs nothing for that, but a new component in MDX needs a Markdown form there: the build fails until it has one. A new animated figure puts its caption in `src/components/docs/figure-captions.ts`, which both the page and the Markdown read.
+
 ### Frontmatter
 
 ```yaml

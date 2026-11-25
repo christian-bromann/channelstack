@@ -371,7 +371,10 @@ export default function agentDocs(): Plugin {
     // `vite dev` serves the same files, built on each request, so the page menu works there too.
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const path = decodeURIComponent((req.url ?? "").split(/[?#]/)[0] ?? "");
+        // A `.md` page under website/docs is also a source module at the same URL: Vite's own
+        // requests for it (`?import`, or as a script) go on to Vite.
+        if ((req.url ?? "").includes("?") || req.headers["sec-fetch-dest"] === "script") return next();
+        const path = decodeURIComponent(req.url ?? "");
         if (!/^\/(docs.*\.md|llms(-full)?\.txt|docs-search\.json)$/.test(path)) return next();
         try {
           const body = (await agentFiles()).get(path);

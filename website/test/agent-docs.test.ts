@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest";
 
 import { type AgentPage, llmsFullTxt, llmsTxt, loadAgentDocs, searchFile } from "../plugins/agent-docs";
-import worker, { type Env, pagePath } from "../worker/index";
+import worker, { type Env, pagePath, wantsMarkdown } from "../worker/index";
 
 let pages: AgentPage[];
 let files: Map<string, string>;
@@ -142,8 +142,32 @@ describe("the MCP server", () => {
     expect(response.status).toBe(405);
   });
 
+  test("a docs page asked for as Markdown is its Markdown", async () => {
+    const asMarkdown = await worker.fetch(
+      new Request("https://channelstack.dev/docs/guide/ci", { headers: { Accept: "text/markdown" } }),
+      env,
+    );
+    expect(await asMarkdown.text()).toBe(files.get("/docs/guide/ci.md"));
+    expect(asMarkdown.headers.get("Vary")).toBe("Accept");
+  });
+
   test("other paths are the static assets", async () => {
     const response = await worker.fetch(new Request("https://channelstack.dev/llms.txt"), env);
     expect(await response.text()).toBe(files.get("/llms.txt"));
+  });
+});
+
+describe("wantsMarkdown", () => {
+  test("a request that names Markdown at least as high as HTML", () => {
+    expect(wantsMarkdown("text/markdown")).toBe(true);
+    expect(wantsMarkdown("text/markdown, text/html;q=0.9")).toBe(true);
+    expect(wantsMarkdown("text/markdown, */*")).toBe(true);
+  });
+
+  test("a browser, or a request that prefers HTML", () => {
+    expect(wantsMarkdown("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")).toBe(false);
+    expect(wantsMarkdown("text/html, text/markdown;q=0.5")).toBe(false);
+    expect(wantsMarkdown("text/markdown;q=0")).toBe(false);
+    expect(wantsMarkdown(null)).toBe(false);
   });
 });

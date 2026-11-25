@@ -1,6 +1,9 @@
 /**
- * channelstack.dev's Worker. Everything is static assets except /mcp: an MCP server over
- * Streamable HTTP that searches and reads the docs, for coding agents.
+ * channelstack.dev's Worker. Everything is static assets except two things, both for agents:
+ *
+ * - /mcp: an MCP server over Streamable HTTP that searches and reads the docs.
+ * - A docs page asked for with `Accept: text/markdown` gets its Markdown instead of its HTML, as
+ *   if `.md` had been added to the URL.
  *
  * It's stateless and read-only: each POST gets a fresh server, answers with JSON and keeps no
  * session. It only ever reads what the build wrote (plugins/agent-docs.ts): /llms.txt,
@@ -165,10 +168,55 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+/** A media type's weight in an Accept header (`text/markdown;q=0.9`): 0 when it isn't there. */
+function weight(accept: string, type: string): number {
+  let best = 0;
+  for (const part of accept.toLowerCase().split(",")) {
+    const [range = "", ...params] = part.split(";").map((piece) => piece.trim());
+    const [major] = type.split("/");
+    if (range !== type && range !== `${major}/*` && range !== "*/*") continue;
+    // The type named exactly wins; otherwise the heaviest wildcard that covers it.
+    const q = Number(params.find((param) => param.startsWith("q="))?.slice(2) ?? 1);
+    if (range === type) return Number.isFinite(q) ? q : 0;
+    best = Math.max(best, Number.isFinite(q) ? q : 0);
+  }
+  return best;
+}
+
+/**
+ * Whether the request wants Markdown: it names `text/markdown` and weighs it at least as much as
+ * HTML. Browsers never name it, so they always get HTML.
+ */
+export function wantsMarkdown(accept: string | null): boolean {
+  if (!accept || !/text\/markdown/i.test(accept)) return false;
+  const markdown = weight(accept, "text/markdown");
+  return markdown > 0 && markdown >= weight(accept, "text/html");
+}
+
+/** A docs page's HTML, or its Markdown when that's what the request asks for. Both vary by Accept. */
+async function docsPage(request: Request, env: Env, pathname: string): Promise<Response> {
+  const isPage = (request.method === "GET" || request.method === "HEAD") && !/\.[a-z0-9]+$/i.test(pathname);
+  if (isPage && wantsMarkdown(request.headers.get("Accept"))) {
+    const markdown = await env.ASSETS.fetch(
+      new Request(new URL(`${pathname.replace(/\/+$/, "")}.md`, request.url), { method: request.method }),
+    );
+    if (markdown.ok) return withHeader(markdown, "Vary", "Accept");
+  }
+  const response = await env.ASSETS.fetch(request);
+  return isPage ? withHeader(response, "Vary", "Accept") : response;
+}
+
+function withHeader(response: Response, name: string, value: string): Response {
+  const headers = new Headers(response.headers);
+  headers.append(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
     if (pathname === MCP_PATH || pathname === `${MCP_PATH}/`) return handleMcp(request, env);
+    if (pathname === "/docs" || pathname.startsWith("/docs/")) return docsPage(request, env, pathname);
     return env.ASSETS.fetch(request);
   },
 };
