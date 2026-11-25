@@ -140,6 +140,9 @@ export function linearPayloads(lookups: LinearLookups) {
       issue: issueChild(issueRecord, true),
       commentId: record.comment,
       ...(root ? { comment: commentChild(root) } : {}),
+      // Only for a session spawned from another thread, which the fake has no way to start.
+      sourceCommentId: null,
+      archivedAt: null,
       summary: record.summary,
       url: links.session(issueRecord, record.slugId),
     };
@@ -150,6 +153,7 @@ export function linearPayloads(lookups: LinearLookups) {
     createdAt: iso(record.createdAt),
     updatedAt: iso(record.createdAt),
     agentSessionId: record.session,
+    archivedAt: null,
     content: record.content,
     signal: record.signal,
     ...(record.signalMetadata ? { signalMetadata: record.signalMetadata } : {}),

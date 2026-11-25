@@ -213,11 +213,16 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     if (comment) comment.session = record.id;
     // Delegating is the person's first turn: Linear records it as a prompt, "Work on [ENG-1](url)",
     // before the agent says anything (the differential run found it against the real workspace).
-    if (!comment) addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`);
+    const opening = comment
+      ? undefined
+      : addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`);
+    // The thread's comments before the mention, in the order they were written (two can share a millisecond).
+    const thread = comment ? store.commentsOn(issue).filter((other) => rootOf(other).id === rootOf(comment).id) : [];
     const previous = comment
-      ? store
-          .commentsOn(issue)
-          .filter((other) => rootOf(other).id === rootOf(comment).id && other.createdAt < comment.createdAt)
+      ? thread.slice(
+          0,
+          thread.findIndex((other) => other.id === comment.id),
+        )
       : [];
     record.delivery = emit(session, "AgentSessionEvent", {
       action: "created",
@@ -226,8 +231,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       oauthClientId: context.secret("clientId"),
       agentSession: payloads.session(record, store.org.id),
       promptContext: promptContext(issue, comment),
-      previousComments: previous.map(payloads.commentChild),
-      guidance: [],
+      // Real Linear sends the delegation's prompt as the event's activity. Earlier comments come
+      // only with a mention in a reply (Linear's schema: "in a child comment of a thread"), and
+      // guidance only when a workspace or team configured some.
+      ...(opening ? { agentActivity: payloads.activity(opening) } : {}),
+      previousComments: comment?.parent ? previous.map(payloads.commentChild) : null,
+      guidance: null,
     });
     return record;
   };
