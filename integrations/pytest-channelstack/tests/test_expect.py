@@ -261,7 +261,7 @@ class Issue:
 
 
 async def test_comments_from_someone_and_exactly_how_many() -> None:
-    issue = Issue(Comment(ANA, "@robin look"), Comment(AGENT, "Safari breaks on the redirect"))
+    issue = Issue(Comment(ANA, "@my-agent look"), Comment(AGENT, "Safari breaks on the redirect"))
     await expect(issue).to_have_comment_from("my-agent", text=re.compile("Safari"), timeout="300ms")
     await expect(issue).to_have_comments_from("my-agent", count=1, timeout="300ms")
     with pytest.raises(AssertionError, match="Expected exactly 2 comments from my-agent, found 1"):
