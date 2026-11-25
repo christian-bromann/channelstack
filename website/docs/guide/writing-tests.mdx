@@ -29,7 +29,7 @@ The plugin adds a global setup that finds the server, a setup file that gives ea
 | ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `mode`     | `"auto"`                           | `"attach"` fails when no server is running. `"start"` always starts a private one. `"auto"` attaches if it can, and starts one otherwise |
 | `server`   | from `~/.channelstack/server.json` | The server to attach to. Also `CHANNELSTACK_URL`, with `CHANNELSTACK_TOKEN`                                                              |
-| `timeout`  | `"10s"`                            | How long a matcher and `channelstack.quiet()` give up after. The SDK's waits (`waitForReply`, `settled`, …) take their own `timeout`        |
+| `timeout`  | `"10s"`                            | How long a matcher and `channelstack.quiet()` give up after. The SDK's waits (`waitForReply`, `settled`, …) take their own `timeout`     |
 | `quietFor` | `"750ms"`                          | How long the agent must be quiet before a negative or exact-count matcher checks                                                         |
 
 Your agent is configured from the server you started yourself (`npx channelstack`), so attaching to that server is the usual setup. A server the plugin starts on its own has no agent connected to it. In CI, `mode: "attach"` makes a missing server fail at once instead of later. The [plugin reference](/docs/reference/vitest-plugin) lists every option.

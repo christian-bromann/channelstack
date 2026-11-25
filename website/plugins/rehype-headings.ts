@@ -5,6 +5,7 @@
  */
 import type { Element, ElementContent, Root } from "hast";
 import { visit } from "unist-util-visit";
+
 import { headingIds } from "./slug";
 
 const textOf = (node: ElementContent): string =>
