@@ -487,7 +487,8 @@ export function buildIr(openapi: Json): Ir {
   // A `where` names fields of the item it narrows: a typo would be a wait that never matches.
   for (const resource of resources.values()) {
     for (const wait of resource.waits ?? []) {
-      const item = wait.item.kind === "named" ? types.find((type) => type.name === wait.item.name)?.type : wait.item;
+      const { item: waited } = wait;
+      const item = waited.kind === "named" ? types.find((type) => type.name === waited.name)?.type : waited;
       const fields =
         item?.kind === "resource"
           ? resources.get(item.name)?.fields
