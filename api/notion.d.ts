@@ -181,6 +181,9 @@ export interface NotionDelivery extends Delivery {
   /** e.g. `comment.created`, `page.content_updated`, `page.properties_updated`. */
   readonly type: string;
   readonly entity: { type: "page" | "database" | "comment" | "block"; id: string };
+
+  /** Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. */
+  redeliver(): Promise<DeliveryAttempt>;
 }
 
 export type { DeliveryAttempt };

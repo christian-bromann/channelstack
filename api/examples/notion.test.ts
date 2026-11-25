@@ -149,6 +149,18 @@ describe("delivery and failures (fake only)", () => {
     await expect(comment.delivery!).toBeRejected();
   });
 
+  test("a redelivered comment doesn't produce a second answer", async ({ notion }) => {
+    const ana = await notion.createUser({ name: "Ana" });
+    const page = await notion.createPage({ title: "Anything", connections: [notion.app] });
+    const comment = await ana.comment("@my-agent hi", { page });
+    await expect(comment.discussion).toHaveCommentFrom(notion.app);
+
+    // Notion retries with the same event id.
+    await comment.delivery!.redeliver();
+
+    await expect(comment.discussion).toHaveCommentsFrom(notion.app, { count: 1 });
+  });
+
   test("resolving a discussion (not yet supported live)", async ({ notion }) => {
     const ana = await notion.createUser({ name: "Ana" });
     const page = await notion.createPage({ title: "Review", connections: [notion.app] });
