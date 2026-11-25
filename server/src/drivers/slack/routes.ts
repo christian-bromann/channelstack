@@ -890,6 +890,15 @@ export function registerSlackRoutes(
       [...world.conversation(session.id, params.channel).members].map((id) => participantWire(session.id, id)),
   });
 
+  /** A message as it is now: what `SlackMessage.refresh` and `SlackThread.root` read. */
+  const readMessage = async ({
+    session,
+    params,
+  }: {
+    session: { id: string };
+    params: { channel: string; ts: string };
+  }) => messageWire(session.id, await world.message(session.id, params.channel, params.ts));
+
   router.route({
     method: "get",
     path: "/conversations/{channel}/messages/{ts}",
@@ -899,8 +908,19 @@ export function registerSlackRoutes(
     errors: ["not_found"],
     sdkMethod: { on: "SlackMessage", name: "refresh", bind: messageBinding },
     stability,
-    handler: async ({ session, params }) =>
-      messageWire(session.id, await world.message(session.id, params.channel, params.ts)),
+    handler: readMessage,
+  });
+
+  router.route({
+    method: "get",
+    path: "/conversations/{channel}/threads/{ts}",
+    summary: "The message that starts a thread, as it is now",
+    params: MessageParams,
+    response: SlackMessage,
+    errors: ["not_found"],
+    sdkMethod: { on: "SlackThread", name: "root", bind: messageBinding },
+    stability,
+    handler: readMessage,
   });
 
   router.route({

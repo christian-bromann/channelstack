@@ -236,7 +236,7 @@ describe("messages and the events they send", () => {
   });
 
   test("replies stay in the thread, and reads separate them from the channel", async () => {
-    const { h, agent, app, user, post, get } = await workspace();
+    const { h, agent, app, user, post, get, base } = await workspace();
     const ana = await user({ name: "Ana" });
     const channel = await post("/channels", { participants: [ana.id, app.id] });
     const root = await post(`/users/${ana.id}/say`, { message: { text: "status?" }, channel: channel.id });
@@ -259,6 +259,11 @@ describe("messages and the events they send", () => {
     expect(
       (await get(`/conversations/${channel.id}/threads/${root.ts}/replies`)).map((m: { text: string }) => m.text),
     ).toEqual(["and the API?", "anyone?"]);
+    // Every message in the thread names the same thread, and the thread reads back its root.
+    expect(nested.thread).toMatchObject({ channel: channel.id, ts: root.ts });
+    const started = await get(`/conversations/${nested.thread.channel}/threads/${nested.thread.ts}`);
+    expect(started).toMatchObject({ ts: root.ts, text: "status?", author: { id: ana.id } });
+    expect((await h.call("GET", `${base}/conversations/${channel.id}/threads/1.2`)).body.error).toBe("not_found");
     expect(events(agent as RecordingAgent)[1].event).toMatchObject({
       type: "message",
       thread_ts: root.ts,

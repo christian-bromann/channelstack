@@ -1514,6 +1514,13 @@ export class SlackThread {
     return data;
   }
 
+  /** The message that starts a thread, as it is now. Experimental. */
+  async root(): Promise<SlackMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/slack/conversations/${segment(this.channel)}/threads/${segment(this.ts)}`)) as SlackMessageData;
+    return new SlackMessage(ctx, data);
+  }
+
   /** Replies in a thread, oldest first, without the message that starts it. Experimental. */
   async replies(): Promise<SlackReplies> {
     const ctx = this.#ctx;
