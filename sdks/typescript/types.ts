@@ -67,3 +67,12 @@ export type LinearActivityType = G.LinearAgentActivity["type"];
 export type NotionUserOptions = Option<G.NotionFixture["createUser"]>;
 export type NotionPageOptions = Option<G.NotionFixture["createPage"]>;
 export type NotionDatabaseOptions = Option<G.NotionFixture["createDatabase"]>;
+export type ResendUserOptions = Option<G.ResendFixture["createUser"]>;
+export type ResendEventType = G.ResendDelivery["type"];
+export type ResendDeliveryResendOptions = Option<G.ResendDelivery["resend"]>;
+/** An email a person sends, with the channel's own people and app as its recipients. */
+export type EmailSendOptions<TRecipient = unknown> = Omit<Option<G.ResendUser["send"]>, "to" | "cc"> & {
+  to: readonly TRecipient[];
+  cc?: readonly TRecipient[];
+};
+export type EmailReplyOptions = NonNullable<Parameters<G.ResendUser["reply"]>[1]>;

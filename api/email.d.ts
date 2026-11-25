@@ -4,7 +4,7 @@
  */
 
 /** An email a person sends: who it goes to, its subject, and its body (text, HTML, or both). */
-export interface EmailSendOptions<TRecipient> {
+export interface EmailSendOptions<TRecipient = unknown> {
   /** Who it goes to: the agent's app, other people. */
   to: readonly TRecipient[];
   /** Who gets a copy. */

@@ -33,8 +33,6 @@ export interface ResendUserOptions {
 // People and the app
 // ---------------------------------------------------------------------------
 
-export type ResendPrincipal = ResendUser | ResendApp;
-
 /** The agent's team. */
 export interface ResendApp extends App {
   readonly channel: "resend";
@@ -48,7 +46,7 @@ export interface ResendUser extends User {
   readonly address: string;
 
   /** Email someone: the agent (`resend.app`), or other people. To the agent, it arrives as `email.received`. */
-  send(options: EmailSendOptions<ResendPrincipal>): Promise<ResendEmail>;
+  send(options: EmailSendOptions<ResendUser | ResendApp>): Promise<ResendEmail>;
   /** Reply to an email, in its thread. */
   reply(email: ResendEmail, options?: EmailReplyOptions): Promise<ResendEmail>;
   /** What reached the person's mailbox, oldest first: the agent's answers among it. */
