@@ -272,7 +272,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 | # | Check | How |
 |---|---|---|
 | 7.1 | Smoke parity | All `scenarios/smoke/*.yaml` pass through the TypeScript, Python and Rust SDKs against the same binary |
-| 7.2 | Jest | `api/examples/jest.usage.test.ts` and a Jest port of the Slack conversation tests pass |
+| 7.2 | Jest | `api/examples/jest.usage.test.ts` passes with the `channelstack/jest` preset. (No Jest port of the Slack conversation tests: the maintainer's decision during phase 7, since the matchers are shared with Vitest's) |
 | 7.3 | pytest | A pytest port of the Slack conversation tests passes |
 | 7.4 | MCP | A scripted MCP client lists the tools, creates a user, sends a message and reads the agent's reply |
 

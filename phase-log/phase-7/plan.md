@@ -7,7 +7,7 @@ SDK breadth and MCP ([phases.md](../../docs/phases.md#phase-7-sdk-breadth-and-mc
 | Exit check | Test file(s) that prove it | Modules touched or created |
 |---|---|---|
 | 7.1 Smoke parity | `pnpm test:smoke` runs every `scenarios/smoke/*.yaml` through the TypeScript, Python and Rust runners against the same binary | new `codegen/src/emit/rust.ts`, `sdks/rust/` (runtime and generated), `scenarios/runners/rust/`, `scripts/smoke.ts` (`SDKS` gains `rust`) |
-| 7.2 Jest | `api/examples/jest.usage.test.ts`, and `test/acceptance/jest/slack.test.ts` (a Jest port of the Slack conversation tests), run by Jest with the preset against the Bolt agent | new `integrations/jest/` (preset, globals, `channelstackGlobalSetup`), on `integrations/matchers-core` |
+| 7.2 Jest | `api/examples/jest.usage.test.ts`, run by Jest with the preset against the Bolt agent. No Jest port of the Slack conversation tests (the maintainer's decision; phases.md 7.2 now says so) | new `integrations/jest/` (preset, globals, `channelstackGlobalSetup`), on `integrations/matchers-core` |
 | 7.3 pytest | `test/acceptance/pytest/test_slack.py` (a pytest port of the Slack conversation tests) against the Bolt agent | new `integrations/pytest-channelstack/` (fixtures, assertion helpers), on the Python SDK; the Python SDK's handles for every route |
 | 7.4 MCP | `server/src/cli/mcp.test.ts`: a scripted MCP client over stdio lists the tools, creates a user, sends a message and reads the agent's reply | new `server/src/cli/mcp.ts` (`channelstack mcp`), `skills/channelstack/SKILL.md` |
 
