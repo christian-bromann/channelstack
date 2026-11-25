@@ -17,6 +17,8 @@ import { signResendWebhook } from "../signing.ts";
 import type { ResendEmailRecord, ResendLastEvent, ResendUserRecord } from "../world.ts";
 import type { ResendStore } from "./store.ts";
 
+/** Where Resend's email comes from: it sends through Amazon SES, which names each `Message-ID` there. */
+const SES_DOMAIN = "email.amazonses.com";
 /** Svix waits 15 seconds for the endpoint's answer. */
 const ACK_WINDOW_MS = 15_000;
 /** Resend's retries after the first attempt: 5 seconds, 5 minutes, 30 minutes, 2, 5, 10 and 10 hours. */
@@ -168,7 +170,8 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         html: input.html,
         headers: {},
         tags: {},
-        messageId: messageId(ids.next(RESEND_IDS.messageLocal), domainOf(person.address)),
+        // A person's mail goes out through Resend too, in the sandbox, so it has an SES id as well.
+        messageId: messageId(ids.next(RESEND_IDS.messageLocal), SES_DOMAIN),
         inReplyTo: input.inReplyTo,
         references: input.references ?? [],
         thread: threadFor({ id, inReplyTo: input.inReplyTo, references: input.references ?? [] }),
@@ -246,11 +249,10 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         subject: input.subject,
         text: input.text,
         html: input.html,
-        headers: Object.fromEntries(
-          Object.entries(input.headers).filter(([name]) => !/^(in-reply-to|references)$/i.test(name)),
-        ),
+        // Every header the agent set, `In-Reply-To` and `References` too: the webhooks list them.
+        headers: input.headers,
         tags: input.tags,
-        messageId: messageId(ids.next(RESEND_IDS.messageLocal), store.app.domain),
+        messageId: messageId(ids.next(RESEND_IDS.messageLocal), SES_DOMAIN),
         inReplyTo,
         references,
         thread,

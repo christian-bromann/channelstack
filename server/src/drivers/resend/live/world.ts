@@ -58,6 +58,19 @@ export function createLiveResendWorld(deps: {
    * on its way, and an answer names it in `In-Reply-To`. By the email's id, with whose key sent it.
    */
   const unnamed = new Map<string, LiveCredential>();
+  /**
+   * A sent email's `Message-ID`, or undefined while Resend hasn't one to give: right after a send
+   * it answers `not_found` for the email, then an email without one, as found against Resend.
+   */
+  const messageIdOf = async (credential: LiveCredential, id: string): Promise<string | undefined> => {
+    try {
+      const sent = await client.call<{ message_id?: string | null }>(credential, "GET", `/emails/${id}`);
+      return sent.message_id ?? undefined;
+    } catch (error) {
+      if (error instanceof ProtocolError && error.code === "not_found") return undefined;
+      throw error;
+    }
+  };
   let app: LiveCredential | undefined;
 
   /** Everyone an email goes to must be at an allowlisted domain (or a Resend test address): sent mail can't be taken back. */
@@ -124,8 +137,8 @@ export function createLiveResendWorld(deps: {
       },
     });
     // Its `Message-ID`, which the agent's answer will name in `In-Reply-To`.
-    const sent = await client.call<{ message_id?: string | null }>(credential, "GET", `/emails/${id}`);
-    if (!sent.message_id) unnamed.set(id, credential);
+    const messageId = await messageIdOf(credential, id);
+    if (messageId === undefined) unnamed.set(id, credential);
     return keep(session, {
       id,
       direction: "outside",
@@ -140,7 +153,7 @@ export function createLiveResendWorld(deps: {
       html: input.html,
       headers: {},
       tags: {},
-      messageId: sent.message_id ?? `<${id}@resend.dev>`,
+      messageId: messageId ?? `<${id}@resend.dev>`,
       inReplyTo: headers.inReplyTo,
       references: headers.references ?? [],
       createdAt: clock(),
@@ -203,10 +216,10 @@ export function createLiveResendWorld(deps: {
       for (const [id, credential] of unnamed) {
         const record = store.emails.find(id);
         if (store.emails.owner(id) !== session || !record) continue;
-        const sent = await client.call<{ message_id?: string | null }>(credential, "GET", `/emails/${id}`);
-        if (!sent.message_id) continue;
+        const messageId = await messageIdOf(credential, id);
+        if (messageId === undefined) continue;
         unnamed.delete(id);
-        store.emails.add(id, { ...record, messageId: sent.message_id }, session);
+        store.emails.add(id, { ...record, messageId }, session);
       }
       for (const { id: address, credential } of people.of(session)) {
         const list = await client.call<{ data: Array<{ id: string }> }>(

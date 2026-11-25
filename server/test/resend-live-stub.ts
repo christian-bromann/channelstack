@@ -46,8 +46,8 @@ export function resendStub(): ResendStub {
   const teams: Team[] = [];
   const sent: Email[] = [];
   const calls: ResendStub["calls"] = [];
-  /** The sent emails read once already: the first read has no Message-ID. */
-  const asked = new Set<string>();
+  /** How often each sent email was read: Resend has it only after a moment. */
+  const asked = new Map<string, number>();
   const team = (name: string, domain: string) => {
     const made = { name, key: key(), domain, domainId: uuid() };
     teams.push(made);
@@ -117,11 +117,12 @@ export function resendStub(): ResendStub {
       const own = /^\/emails\/([^/]+)$/.exec(path);
       if (own && own[1] !== "receiving") {
         const email = sent.find((each) => each.id === own[1] && each.team === by.name);
-        if (!email) return json({ name: "not_found" }, 404);
-        // As found against Resend: right after sending, the email has no Message-ID yet (SES gives it one).
-        const named = asked.has(email.id);
-        asked.add(email.id);
-        return json({ object: "email", id: email.id, message_id: named ? email.messageId : null });
+        // As found against Resend: right after sending, the email isn't found yet (it may also come
+        // back without a Message-ID for a moment, which the live world reads the same way).
+        const reads = asked.get(own[1] ?? "") ?? 0;
+        asked.set(own[1] ?? "", reads + 1);
+        if (!email || reads === 0) return json({ statusCode: 404, name: "not_found", message: "Email not found" }, 404);
+        return json({ object: "email", id: email.id, message_id: email.messageId });
       }
       const reached = (email: Email) => email.to.some((to) => to.endsWith(`@${by.domain}`));
       if (path === "/emails/receiving")
