@@ -8541,7 +8541,10 @@
             "name": "waitForModal",
             "mode": "next",
             "text": "title",
-            "what": "a modal from the agent"
+            "where": {
+              "open": true
+            },
+            "what": "an open modal from the agent"
           }
         ],
         "x-channelstack-error-codes": [

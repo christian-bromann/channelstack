@@ -314,6 +314,9 @@ export function emitRust(ir: Ir): Map<string, string> {
     const conditions = [
       ...(w.from ? [`from_matches(item.get(${str(w.from)}).unwrap_or(&Value::Null), &from)`] : []),
       ...(w.text ? [`text_matches(item.get(${str(w.text)}).and_then(Value::as_str).unwrap_or(""), &text)`] : []),
+      ...Object.entries(w.where ?? {}).map(
+        ([field, value]) => `item.get(${str(field)}) == Some(&Value::from(${JSON.stringify(value)}))`,
+      ),
     ];
     const what = w.from
       ? `&match &from { Value::Null => ${str(w.what)}.to_owned(), Value::String(name) => format!("{} from {}", ${str(w.what)}, name), other => format!("{} from {}", ${str(w.what)}, other.get("name").and_then(Value::as_str).unwrap_or("")) }`

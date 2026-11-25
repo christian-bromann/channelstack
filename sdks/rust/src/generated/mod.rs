@@ -7559,7 +7559,7 @@ impl SlackUser {
         )
     }
 
-    /// Wait for a modal from the agent. Set its options on what this returns, then `.send().await` (or `.await`).
+    /// Wait for an open modal from the agent. Set its options on what this returns, then `.send().await` (or `.await`).
     pub fn wait_for_modal(&self) -> SlackUserWaitForModal {
         SlackUserWaitForModal {
             ctx: self.ctx.clone(),
@@ -7989,10 +7989,10 @@ impl SlackUserWaitForModal {
                 text_matches(
                     item.get("title").and_then(Value::as_str).unwrap_or(""),
                     &text,
-                )
+                ) && item.get("open") == Some(&Value::from(true))
             },
             None,
-            "a modal from the agent",
+            "an open modal from the agent",
             &timeout,
         )
         .await?;
