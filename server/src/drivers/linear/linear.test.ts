@@ -58,6 +58,7 @@ describe("agent sessions", () => {
     expect(event?.payload).toMatchObject({
       agentActivity: {
         agentSessionId: session.id,
+        archivedAt: null,
         content: { type: "prompt", body: expect.stringMatching(/^Work on \[ENG-1\]\(/) },
       },
       previousComments: null,
@@ -130,14 +131,14 @@ describe("agent sessions", () => {
     });
     expect(comment.body).toBe("@my-agent can you take a look?");
     expect(comment.session).toBeDefined();
-    // A mention opens the session from its comment: that is the event's source, there is no prompt
-    // activity of its own, and the thread had nothing before it.
+    // A mention at the top of an issue opens a session on its own thread: no earlier comments
+    // (those come with a mention in a reply), no source in another thread, no prompt activity.
     await h.app.settled();
     const opened = webhooks().find((hook) => hook.payload.action === "created")?.payload;
     expect(opened).toMatchObject({
-      previousComments: [],
+      previousComments: null,
       guidance: null,
-      agentSession: { sourceCommentId: comment.id },
+      agentSession: { commentId: comment.id, sourceCommentId: null },
     });
     expect(opened).not.toHaveProperty("agentActivity");
     expect(linearWebhookProblems("AgentSessionEvent", opened)).toEqual([]);
@@ -164,6 +165,24 @@ describe("agent sessions", () => {
         "  Ana: and the docs too",
       ].join("\n"),
     );
+  });
+
+  test("a mention in a reply opens a session that carries the thread's earlier comments", async () => {
+    const { h, ana, post, webhooks, issue } = await workspace();
+    const created = await issue();
+    const first = await post(`/users/${ana.id}/comment`, { body: "Checkout fails on Safari 17", issue: created.id });
+    await post(`/users/${ana.id}/reply`, { body: "only with Apple Pay", comment: first.id });
+    const mention = await post(`/users/${ana.id}/reply`, { body: "@my-agent can you look?", comment: first.id });
+    await h.app.settled();
+    expect(mention.session).toBeDefined();
+    const opened = webhooks().find((hook) => hook.payload.action === "created")?.payload;
+    // Linear's schema: present only for a session started by a mention in a child comment of a thread.
+    expect(opened?.previousComments.map((comment: { body: string }) => comment.body)).toEqual([
+      "Checkout fails on Safari 17",
+      "only with Apple Pay",
+    ]);
+    expect(opened?.agentSession).toMatchObject({ commentId: first.id, sourceCommentId: null });
+    expect(linearWebhookProblems("AgentSessionEvent", opened)).toEqual([]);
   });
 
   test("what the person has to read is also a comment of the app, in the session's thread", async () => {
