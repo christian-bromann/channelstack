@@ -2,7 +2,7 @@ import { z } from "@hono/zod-openapi";
 
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
-import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts";
+import { type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts";
 import {
   type DeliveryView,
   type DriverRouter,

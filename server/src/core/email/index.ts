@@ -82,7 +82,7 @@ export function threadOf(
  * The text a person reads of a message: what they wrote, without the quoted history a reply carries
  * (`> …` lines, and the `On …, … wrote:` line that introduces them), trimmed.
  */
-export function ownText(text: string): string {
+function ownText(text: string): string {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const kept: string[] = [];
   for (let at = 0; at < lines.length; at++) {
@@ -96,7 +96,7 @@ export function ownText(text: string): string {
 }
 
 /** The plain text of an HTML body, for an email sent with HTML only: tags out, entities decoded, blocks as lines. */
-export function htmlText(html: string): string {
+function htmlText(html: string): string {
   return html
     .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n")

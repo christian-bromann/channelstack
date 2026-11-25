@@ -43,6 +43,11 @@ for (const channel of CHANNELS) {
   }
   need(Array.isArray(checkExports[`${upper}_CHECKS`]), `${of}: integrations/checks exports no ${upper}_CHECKS`);
   need(typeof checkExports[`${name}Checks`] === "function", `${of}: integrations/checks exports no ${name}Checks()`);
+  // Vitest reads a test's fixtures from how it destructures its context: the checks name every channel's.
+  need(
+    new RegExp(`\\n\\s+${name},\\n`).test(read("integrations/checks/index.ts") ?? ""),
+    `${of}: the checks' registrar (integrations/checks/index.ts) doesn't destructure the ${name} fixture`,
+  );
   need(
     existsSync(join(ROOT, `test/acceptance/checks/${name}-checks.test.ts`)),
     `${of}: no test/acceptance/checks/${name}-checks.test.ts`,

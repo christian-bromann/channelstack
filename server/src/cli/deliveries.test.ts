@@ -12,7 +12,9 @@ function recording(answers: Record<string, unknown> = {}) {
     devSession: async () => "ses_dev",
     request: async <T>(method: string, path: string) => {
       asked.push(`${method} ${path}`);
-      return answers[`${method} ${path}`] as T;
+      // A channel the test doesn't list has delivered nothing.
+      const key = `${method} ${path}`;
+      return (key in answers ? answers[key] : key.endsWith("/deliveries") ? [] : undefined) as T;
     },
   };
   return { server, asked };
@@ -136,7 +138,7 @@ describe("channelstack redeliver", () => {
     );
     await expect(runRedeliver(server, ["slack", "9c1d"])).rejects.toThrow("no delivery 9c1d on slack.");
     await expect(runRedeliver(server, ["teams", "x"])).rejects.toThrow(
-      'say which channel: slack, github, linear, notion, not "teams".',
+      `say which channel: ${CHANNEL_NAMES.join(", ")}, not "teams".`,
     );
     const { server: empty } = recording({ "GET /sessions/ses_dev/slack/deliveries": [] });
     await expect(runRedeliver(empty, ["slack"])).rejects.toThrow("nothing was delivered to the agent on slack yet.");

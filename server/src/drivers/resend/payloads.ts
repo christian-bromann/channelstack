@@ -5,7 +5,7 @@ import type { ResendEmailRecord } from "./world.ts";
 type Json = Record<string, unknown>;
 
 /** A time as `GET /emails` writes it, Postgres's way: `2023-04-03 22:13:42.674981+00`. */
-export const resendTime = (ms: number): string => `${iso(ms).replace("T", " ").replace("Z", "")}000+00`;
+const resendTime = (ms: number): string => `${iso(ms).replace("T", " ").replace("Z", "")}000+00`;
 
 /** The webhook events the agent's team is subscribed to, as a new webhook in Resend's dashboard is. */
 export const EMAIL_EVENTS = [

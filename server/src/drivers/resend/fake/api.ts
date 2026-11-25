@@ -151,12 +151,12 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
 
   const sentEmail = (id: string) => {
     const email = store.emails.find(id);
-    if (!email || email.direction !== "sent") throw new ResendApiError(404, "not_found", "Email not found");
+    if (email?.direction !== "sent") throw new ResendApiError(404, "not_found", "Email not found");
     return email;
   };
   const receivedEmail = (id: string) => {
     const email = store.emails.find(id);
-    if (!email || email.direction !== "received") throw new ResendApiError(404, "not_found", "Email not found");
+    if (email?.direction !== "received") throw new ResendApiError(404, "not_found", "Email not found");
     return email;
   };
 

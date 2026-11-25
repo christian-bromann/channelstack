@@ -5,15 +5,13 @@ import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
-import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
+import type { LiveSupport } from "../../core/reality/index.ts";
 import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
-  CallsQuery,
   DeliveryAttempt,
   DeliveryStatus,
   principalSchema,
-  readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
 import type { LinearWorld } from "./backend.ts";

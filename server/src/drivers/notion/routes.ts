@@ -4,16 +4,14 @@ import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
-import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
+import type { LiveSupport } from "../../core/reality/index.ts";
 import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
-  CallsQuery,
   DeliveryAttempt,
   DeliveryStatus,
   duration,
   principalSchema,
-  readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
 import type { NotionWorld } from "./backend.ts";
@@ -152,7 +150,6 @@ const TextPattern = z
 const UserParams = z.object({ user: pathParam("user") });
 const PageParams = z.object({ page: pathParam("page") });
 const DiscussionParams = z.object({ discussion: pathParam("discussion") });
-const DeliveryParams = z.object({ delivery: pathParam("delivery") });
 
 const PageOptions = z.object({
   title: z.string().min(1),

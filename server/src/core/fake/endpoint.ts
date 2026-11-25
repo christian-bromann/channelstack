@@ -80,7 +80,8 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
         {
           operation,
           method: method.toUpperCase(),
-          path: url.pathname,
+          // The platform's own path: without the prefix the fake is mounted at (`/resend`), when it is.
+          path: url.pathname.replace(new RegExp(`^/${platform.driver}(?=/)`), ""),
           request: method === "get" || method === "delete" ? Object.fromEntries(url.searchParams) : await requestOf(c),
           responseStatus: status,
           response: result.body,

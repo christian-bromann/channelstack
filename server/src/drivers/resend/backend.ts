@@ -6,7 +6,7 @@ import type { FakeResendWorld } from "./fake/world.ts";
 import type { ResendEmailRecord, ResendUserRecord } from "./world.ts";
 
 /** What a person writes in an email. */
-export interface ResendMessageInput {
+interface ResendMessageInput {
   readonly to: readonly Mailbox[];
   readonly cc: readonly Mailbox[];
   readonly subject: string;

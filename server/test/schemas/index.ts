@@ -6,6 +6,7 @@
  */
 import { restProblems, webhookProblems } from "./github.ts";
 import { linearResponseProblems, linearWebhookProblems } from "./linear.ts";
+import { resendResponseProblems, resendWebhookProblems } from "./resend.ts";
 
 /** An API call as a fixture's `calls()` reads it. */
 export interface CheckedCall {
@@ -38,5 +39,9 @@ export const SCHEMAS: Readonly<Record<string, ChannelSchemas>> = {
   linear: {
     call: (call) => linearResponseProblems(call.request as { query: string }, call.responseStatus, call.response),
     webhook: linearWebhookProblems,
+  },
+  resend: {
+    call: (call) => resendResponseProblems(call.method, call.path, call.responseStatus, call.response),
+    webhook: resendWebhookProblems,
   },
 };

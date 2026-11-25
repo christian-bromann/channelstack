@@ -12,12 +12,10 @@ import {
 import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
-  CallsQuery,
   DeliveryAttempt,
   DeliveryStatus,
   duration,
   principalSchema,
-  readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
 import { plain } from "./blocks.ts";

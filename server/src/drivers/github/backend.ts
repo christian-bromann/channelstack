@@ -1,4 +1,4 @@
-import type { DeliveryAttempt, DeliveryRecord } from "../../core/delivery/index.ts";
+import type { DeliveryAttempt } from "../../core/delivery/index.ts";
 import type { Awaitable, DeliveryView } from "../../core/router/index.ts";
 import type { GitHubIssueChanges, GitHubIssueInput } from "./fake/issues.ts";
 import type { GitHubRepoInput, GitHubUserInput } from "./fake/repos.ts";
