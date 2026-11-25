@@ -868,7 +868,7 @@ let ephemeral_messages = user.ephemeral().await?;
 
 ### waitForModal()
 
-Waits for the next modal from the agent after the last one this handle returned: it polls `modals()` and never sleeps longer than it must.
+Waits for the next open modal from the agent after the last one this handle returned: it polls `modals()` and never sleeps longer than it must.
 
 <CodeGroup>
 
