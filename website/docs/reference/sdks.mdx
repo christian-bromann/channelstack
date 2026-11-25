@@ -1,0 +1,244 @@
+---
+title: SDKs
+order: 7
+description: "The TypeScript, Python and Rust SDKs: installing, connecting, modes, naming in each language, errors, waits, disposal and the control API underneath."
+---
+
+# SDKs
+
+The three SDKs that drive channelstack without a test framework, and the control API they share. The Vitest plugin and pytest-channelstack are built on the TypeScript and Python SDKs; in a test, use them instead ([Vitest plugin](/docs/reference/vitest-plugin), [pytest](/docs/guide/pytest)).
+
+## The same scenario in each
+
+A person mentions the agent in a channel, and the script reads the agent's reply in the thread.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+import { connect } from "channelstack/client";
+
+await using client = await connect({ mode: "auto" });
+await using session = await client.openSession({ name: "example" });
+
+const slack = await session.slack();
+const ana = await slack.createUser({ name: "Ana" });
+const channel = await slack.createChannel({ participants: [ana, slack.app] });
+
+const msg = await ana.say("@my-agent hi", { channel });
+const reply = await msg.thread.waitForReply({ from: "my-agent" });
+console.log(reply.text);
+```
+
+```python title="Python"
+import asyncio
+
+from channelstack import connect
+
+
+async def main() -> None:
+    async with await connect(mode="auto") as client:
+        async with await client.open_session(name="example") as session:
+            slack = await session.slack()
+            ana = await slack.create_user(name="Ana")
+            channel = await slack.create_channel(participants=[ana, slack.app])
+
+            msg = await ana.say("@my-agent hi", channel=channel)
+            reply = await msg.thread.wait_for_reply(from_="my-agent")
+            print(reply.text)
+
+
+asyncio.run(main())
+```
+
+```rust title="Rust"
+use channelstack::{connect, Handle, Mode};
+
+#[tokio::main]
+async fn main() -> channelstack::Result<()> {
+    let client = connect(Mode::Auto).await?;
+    let session = client.open_session().name("example").send().await?;
+
+    let slack = session.slack().await?;
+    let ana = slack.create_user().name("Ana").await?;
+    let channel = slack
+        .create_channel()
+        .participants(vec![&ana as &dyn Handle, &slack.app()])
+        .await?;
+
+    let msg = ana.say("@my-agent hi").channel(&channel).await?;
+    let reply = msg.thread().wait_for_reply().from("my-agent").await?;
+    println!("{}", reply.text());
+
+    session.close().await?;
+    client.close().await;
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+## Install
+
+| Language   | Package                                      | Install                    | Needs                                                                               |
+| ---------- | -------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------- |
+| TypeScript | `channelstack`, import `channelstack/client` | `npm i -D channelstack`    | Node 22 or later                                                                    |
+| Python     | `channelstack`                               | `pip install channelstack` | Python 3.12 or later                                                                |
+| Rust       | `channelstack` crate                         | `cargo add channelstack`   | Edition 2024, a Tokio runtime (`cargo add tokio --features macros,rt-multi-thread`) |
+
+To start a server (modes `auto` and `start`), an SDK needs the server binary:
+
+| Language     | Binary                                                                                                                                                |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeScript   | `CHANNELSTACK_SERVER_BIN`, else the platform package installed with `channelstack` (`@channelstack/server-<platform>-<arch>`, an optional dependency) |
+| Python, Rust | `CHANNELSTACK_SERVER_BIN`, else `channelstack` on the `PATH`                                                                                          |
+
+To only attach to a running server (mode `attach`), no binary is needed.
+
+## Connecting
+
+| Language   | Signature                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TypeScript | `connect(options?: { mode?: "auto" \| "attach" \| "start"; server?: string; token?: string }): Promise<Channelstack>`                                              |
+| Python     | `async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str \| None = None, token: str \| None = None) -> Channelstack`                   |
+| Rust       | `async fn connect(mode: Mode) -> Result<Channelstack>`, and `async fn connect_with(mode: Mode, server: Option<&str>, token: Option<&str>) -> Result<Channelstack>` |
+
+| Option   | Default                                                                   | Meaning                                                                |
+| -------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `mode`   | `auto`                                                                    | See [Modes](#modes). Rust: `Mode::Auto`, `Mode::Attach`, `Mode::Start` |
+| `server` | `CHANNELSTACK_URL`, else the URL in `<home>/server.json`                  | The server to attach to                                                |
+| `token`  | `CHANNELSTACK_TOKEN`, else `server.json`'s token when its URL is `server` | The control API token. Passing it keeps it out of the environment      |
+
+On connect, the SDK reads the server's `/status` and refuses a server whose major version differs from its own.
+
+### Modes
+
+| Mode     | Server running              | No server running    |
+| -------- | --------------------------- | -------------------- |
+| `auto`   | Attaches                    | Starts a private one |
+| `attach` | Attaches                    | Fails                |
+| `start`  | Starts a private one anyway | Starts a private one |
+
+A server is running when it answers `GET /_channelstack/status` with the token within 2 seconds. A private server runs as `channelstack start --no-portless --port 0 --server-file <temporary file>`: a free loopback port, its token in a private file, never the shared `server.json`. It inherits the process's environment, and stops when the client closes.
+
+## The client and the session
+
+Everything a script does happens in a session: a scope in the server's one shared world that owns what it creates. Closing the session removes it all.
+
+| `Channelstack` (the client) | Does                                                                  |
+| --------------------------- | --------------------------------------------------------------------- |
+| `openSession({ name? })`    | Opens a session                                                       |
+| `env({ proxy? })`           | The agent's env vars, as `channelstack env` prints them               |
+| `status()`                  | `{ ready, version, drivers }`                                         |
+| `reset()`                   | Drops all state on every channel. Avoid in parallel use               |
+| `uiLoginLink()`             | A one-time UI link, as `channelstack ui` prints                       |
+| `close()`                   | Closes the connection, and stops the server if this client started it |
+
+| `Session`                                     | Does                                                                                                                                                                                                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessionId`                                   | The session's id                                                                                                                                                                                                                                    |
+| `slack()`, `github()`, `linear()`, `notion()` | The channel fixtures for this session ([Slack](/docs/reference/api/slack#slackfixture), [GitHub](/docs/reference/api/github#githubfixture), [Linear](/docs/reference/api/linear#linearfixture), [Notion](/docs/reference/api/notion#notionfixture)) |
+| `quiet()`                                     | `{ busy, quietForMs, open }`: what negative checks wait on                                                                                                                                                                                          |
+| `events({ since? })`                          | The session's event log: actions, deliveries with every attempt, the agent's API calls                                                                                                                                                              |
+| `close()`                                     | Closes the session and removes everything it created                                                                                                                                                                                                |
+
+## Naming
+
+The handles and their methods are generated from the same routes, so the names match across languages, in each language's own style.
+
+|                                             | TypeScript                             | Python                                   | Rust                                                                      |
+| ------------------------------------------- | -------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
+| Methods                                     | camelCase: `waitForReply`              | snake_case: `wait_for_reply`             | snake_case: `wait_for_reply`                                              |
+| Fields                                      | properties: `msg.text`, `msg.postedAt` | attributes: `msg.text`, `msg.posted_at`  | getters: `msg.text()`, `msg.posted_at()`                                  |
+| Positional arguments                        | `ana.say("hi", …)`                     | `ana.say("hi", …)`                       | `ana.say("hi")`                                                           |
+| Options                                     | a trailing object: `{ channel }`       | keyword arguments: `channel=channel`     | builder methods: `.channel(&channel)`                                     |
+| The `from` option                           | `{ from: "my-agent" }`                 | `from_="my-agent"` (`from` is a keyword) | `.from("my-agent")`                                                       |
+| Running a call                              | `await`                                | `await`                                  | `.await`, or `.send().await`                                              |
+| Handles as arguments                        | the handle                             | the handle                               | `&impl Handle`; a mixed list as `vec![&ana as &dyn Handle, &slack.app()]` |
+| Fields that are one of several handle types | the handle                             | the handle                               | JSON (`serde_json::Value`): `msg.author()["kind"]`                        |
+| Durations                                   | `"3s"` or milliseconds                 | `"3s"` or milliseconds                   | `"3s"`                                                                    |
+| Options objects (`createUser`)              | `{ name: "Ana", displayName: "…" }`    | `name="Ana", display_name="…"`           | `.name("Ana").display_name("…")`                                          |
+
+The API reference ([client](/docs/reference/api/client), [Slack](/docs/reference/api/slack), [GitHub](/docs/reference/api/github), [Linear](/docs/reference/api/linear), [Notion](/docs/reference/api/notion)) lists every member, with each call in TypeScript and Python.
+
+## Waits
+
+The SDKs never sleep a fixed time: every wait polls until its condition holds, and fails after a timeout.
+
+| Wait                                                                  | Returns                                                                        |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `waitForReply`, `waitForMessage`, `waitForComment`, `waitForActivity` | The next new item matching the filter, after the last one this handle returned |
+| `latestReply`, `latestComment`                                        | Waits for one, then for the agent to be quiet, then returns the latest         |
+| `waitForModal`, `waitForState`, `waitForCall`, `settled`, `ended`     | The first state that matches                                                   |
+
+| Setting                          | Default |
+| -------------------------------- | ------- |
+| `timeout`                        | `10s`   |
+| Poll interval                    | `50ms`  |
+| `quietFor` (the `latest…` waits) | `750ms` |
+
+A wait that runs out of time raises `WaitTimeoutError` (TypeScript, Python) or `Error::Timeout` (Rust): `Timed out after 10000ms waiting for a reply from my-agent`.
+
+## Errors
+
+A refusal of the control API carries a stable error code.
+
+| Language   | Base                                                         | Specific                                                             |
+| ---------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| TypeScript | `ChannelstackError`: `code`, `status`, `message`, `data`     | One class per code: `NotInChannelError`, `UnsupportedInLiveError`, … |
+| Python     | `ChannelstackError`: `code`, `status`, `message`, `data`     | The same class names                                                 |
+| Rust       | `Error::Api { code, status, message, data }`, `error.code()` | `channelstack::codes::NOT_IN_CHANNEL`, …                             |
+
+Rust's `Error` also has `Http` (the server couldn't be reached), `Launch` (finding or starting the server failed), `Timeout` and `Invalid` (an argument it can't send). A connection that is refused while the server starts is retried for 5 seconds. Every code is listed in [Errors](/docs/reference/api/errors).
+
+## Disposal
+
+|              | TypeScript                                                        | Python                                                            | Rust                     |
+| ------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------ |
+| Client       | `await using client = await connect()`, or `await client.close()` | `async with await connect() as client`, or `await client.close()` | `client.close().await`   |
+| Session      | `await using session = …`, or `await session.close()`             | `async with await client.open_session() as session`               | `session.close().await?` |
+| `SlackFault` | `await using fault = …`, or `await fault.undo()`                  | `async with await slack.fault(…)`                                 | `fault.undo().await?`    |
+
+Disposing never raises for a handle that is already gone. Everything else a session created is removed with it.
+
+## Live credentials
+
+When a script leaves `token` out of `createUser`, every SDK reads it from `CHANNELSTACK_<CHANNEL>_USER_<NAME>_TOKEN` (GitHub: `<LOGIN>`) and sends it to the server once. Unset, the person is fake. See [Environment variables](/docs/reference/environment-variables#peoples-live-tokens).
+
+## The control API
+
+The SDKs are thin: each is generated from the server's routes, over a small hand-written runtime (transport, launcher, waits, durations, credentials). Anything that speaks HTTP can use the same API.
+
+|        |                                                                                         |
+| ------ | --------------------------------------------------------------------------------------- |
+| Base   | `<server URL>/_channelstack`, e.g. `https://channelstack.localhost/_channelstack`       |
+| Auth   | `Authorization: Bearer <token>`, the token from `server.json` (or `CHANNELSTACK_TOKEN`) |
+| Bodies | JSON in, JSON out                                                                       |
+| Errors | `{ "error": "<code>", "message": "…", "data": { … } }` with the code's HTTP status      |
+| Spec   | OpenAPI 3.1 at `spec/openapi.json` in the repository                                    |
+
+```bash
+curl -s -H "Authorization: Bearer $CHANNELSTACK_TOKEN" \
+  https://channelstack.localhost/_channelstack/status
+```
+
+Session routes live under `/sessions/{session}`, a channel's under `/sessions/{session}/<channel>`. For example, `ana.say("hi", { channel })` is:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $CHANNELSTACK_TOKEN" -H "content-type: application/json" \
+  -d '{"message":{"text":"hi"},"channel":"C08E1F2G3H4"}' \
+  https://channelstack.localhost/_channelstack/sessions/$SESSION/slack/users/U08B5K2M9QX/say
+```
+
+The spec carries `x-channelstack-*` extensions the generators read:
+
+| Extension                                         | Says                                                                                            |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `x-channelstack-resource`                         | A schema whose values are handles (`SlackUser`, `Session`)                                      |
+| `x-channelstack-factory`, `x-channelstack-method` | The SDK method an operation becomes, and on which handle                                        |
+| `x-channelstack-ref`                              | A field that takes a handle and sends its id                                                    |
+| `x-channelstack-error-codes`                      | The error codes an operation can return                                                         |
+| `x-channelstack-stability`                        | `stable` (the server and session routes) or `experimental` (the channel routes and the UI link) |
+| `x-channelstack-live`                             | How it behaves on a live channel: `unsupported`, or `requires` the browser actor or proxy mode  |
+| `x-channelstack-credential`                       | An optional credential the SDKs read from the environment when it is left out                   |
+
+One tag releases the server, the spec and every SDK at the same version.

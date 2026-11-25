@@ -335,7 +335,7 @@
       <div class="card-head"><i></i><i></i><i></i><span>deploy.test.ts</span></div>
       <pre><span class="k">const</span> ana = <span class="k">await</span> slack
   .<span class="f">createUser</span>({ name: <span class="s">"ana"</span> });
-<span class="hot"><span class="k">await</span> ana.<span class="f">say</span>(<span class="s">"@robin ship</span>
+<span class="hot"><span class="k">await</span> ana.<span class="f">say</span>(<span class="s">"@my-agent ship</span>
 <span class="s">  #812 to staging"</span>, dm);</span>
 <span class="k">await</span> <span class="f">expect</span>(ask)
   .<span class="f">toHaveButton</span>(<span class="s">"Approve"</span>);
@@ -347,12 +347,14 @@
       <div class="thread">
         <div class="msg">
           <span class="avatar">A</span>
-          <div><b>ana</b><br /><span class="at">@robin</span> ship #812 to staging</div>
+          <div><b>ana</b><br /><span class="at">@my-agent</span> ship #812 to staging</div>
         </div>
         <div class="msg">
-          <span class="avatar bot">R</span>
+          <span class="avatar bot">M</span>
           <div>
-            <b>robin</b> <span class="app">APP</span><br />Deploy #812 to staging?<br /><span class="btn">Approve</span>
+            <b>my-agent</b> <span class="app">APP</span><br />Deploy #812 to staging?<br /><span class="btn"
+              >Approve</span
+            >
           </div>
         </div>
       </div>

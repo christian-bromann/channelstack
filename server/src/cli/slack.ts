@@ -64,7 +64,7 @@ export async function slackDev(server: Attached) {
     return get<Message>(`/conversations/${segment(recent.id)}/latest`);
   };
 
-  /** `last`, or `<channel id>:<ts>` as `channelstack show --json` prints them. */
+  /** `last`, or `<channel id>:<ts>` as `channelstack slack say` and the other commands print them. */
   const message = async (reference: string | undefined, flag: string): Promise<Message> => {
     if (reference === undefined || reference === "last") return last();
     const [channelId, ts] = reference.split(":");

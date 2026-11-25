@@ -19,6 +19,8 @@ export interface GitHubFixture extends Inspectable<GitHubDelivery> {
    * The app's REST calls about no repository of any session: its own endpoints (`GET /app`) and
    * the token exchange. They belong to no session, so every session reads the same list; only
    * calls that authenticated as the app are on it. `calls()` has the calls about repositories.
+   * No session's close ends this list, so it keeps the newest 10,000 calls; a call's `id` keeps its
+   * number when older ones go, so tell calls apart by `id`, not by their place in the list.
    */
   appCalls(filter?: { operation?: string; error?: true | string }): Promise<ApiCall[]>;
 

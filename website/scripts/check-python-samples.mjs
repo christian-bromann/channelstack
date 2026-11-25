@@ -1,4 +1,5 @@
-// Checks that the Python samples parse. It can't check them against the API: see samples/python/README.md.
+// Checks that the Python samples parse. The repository's `pnpm typecheck` checks them against the API
+// with pyright: see samples/python/README.md.
 import { execFileSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 

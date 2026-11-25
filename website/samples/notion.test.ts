@@ -11,10 +11,10 @@ test("answers a comment mention in the same discussion", async ({ notion }) => {
   });
 
   // [!step 2]
-  const comment = await ana.comment("@robin summarize this page", { page });
+  const comment = await ana.comment("@my-agent summarize this page", { page });
   // [!step 3]
-  await expect(comment.discussion).toHaveCommentFrom("robin", { text: /search/ });
+  await expect(comment.discussion).toHaveCommentFrom("my-agent", { text: /search/ });
   // [!step 4]
-  await expect(comment.discussion).toHaveCommentsFrom("robin", { count: 1 });
+  await expect(comment.discussion).toHaveCommentsFrom("my-agent", { count: 1 });
 });
 // @show:end

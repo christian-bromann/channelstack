@@ -45,7 +45,7 @@ Every REST response and every webhook is validated in tests against `@octokit/op
 - A 409 from the contents API is described as exactly one of two errors, and a plain error fits both; it is read as either.
 - Status codes the description doesn't list for a route, where GitHub answers with its usual error object: 422 from creating a check run or a status, and 404 from the App's delivery log. The validator refuses an exception for a status the description does list.
 
-The App's own endpoints are about no repository and so belong to no session. The core event log keeps such calls in a scope of their own (`WORLD_SCOPE`), redacted and numbered like a session's, for every session to read (`github.appCalls()`). Only calls that authenticated as the App or its installation are recorded at all; reading or redelivering one delivery is on the record of that delivery's session. The acceptance run checks the calls made there since each test began.
+The App's own endpoints are about no repository and so belong to no session. The core event log keeps such calls in a scope of their own (`WORLD_SCOPE`), redacted and numbered like a session's, for every session to read (`github.appCalls()`). No session's close ends that scope, so it keeps its newest 10,000 events (#16); a reset empties it. Only calls that authenticated as the App or its installation are recorded at all; reading or redelivering one delivery is on the record of that delivery's session. The acceptance run checks the calls made there since each test began.
 
 ## Dependencies
 

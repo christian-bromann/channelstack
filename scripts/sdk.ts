@@ -7,12 +7,19 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { emitDocs } from "../codegen/src/emit/docs.ts";
 import { emitPython } from "../codegen/src/emit/python.ts";
 import { emitRust } from "../codegen/src/emit/rust.ts";
 import { emitTypeScript } from "../codegen/src/emit/typescript.ts";
 import { filesBelow, ROOT, specFromRoutes, staleFiles } from "./lib/generate.ts";
 
-const GENERATED = ["sdks/typescript/generated", "sdks/python/channelstack/generated", "sdks/rust/src/generated"];
+// The API reference on the website is generated from the same IR (codegen/src/emit/docs.ts).
+const GENERATED = [
+  "sdks/typescript/generated",
+  "sdks/python/channelstack/generated",
+  "sdks/rust/src/generated",
+  "website/docs/reference/api",
+];
 
 const { ir } = specFromRoutes();
 /**
@@ -36,7 +43,7 @@ function rustfmt(source: string): string {
   }
 }
 const rust = [...emitRust(ir)].map(([path, contents]) => [path, rustfmt(contents)] as const);
-const files = new Map([...emitTypeScript(ir), ...emitPython(ir), ...rust]);
+const files = new Map([...emitTypeScript(ir), ...emitPython(ir), ...rust, ...emitDocs(ir)]);
 const strays = () => GENERATED.flatMap(filesBelow).filter((path) => !files.has(path) && !path.includes("__pycache__"));
 
 if (process.argv.includes("--check")) {

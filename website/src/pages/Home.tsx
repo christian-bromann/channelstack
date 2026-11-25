@@ -324,16 +324,16 @@ export default function Home() {
                 <p className="step-n">Step 2</p>
                 <h3>Point your agent at it</h3>
                 <p>
-                  Each fake comes with an app named <code>my-agent</code>. Tell channelstack where your agent takes
-                  events, then start the agent the way you always do, with channelstack’s environment.
+                  Start channelstack with where your agent takes events, then start the agent the way you always do,
+                  with channelstack’s environment.
                 </p>
                 <div className="snippet">
                   <Terminal
-                    label="Commands to start your agent"
+                    label="Commands to start channelstack and your agent"
                     lines={[
-                      "$ CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &",
+                      "$ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelstack",
                       "$ npx channelstack env >> .env.local",
-                      "$ portless run my-agent pnpm dev",
+                      "$ pnpm dev",
                     ]}
                   />
                 </div>

@@ -8,7 +8,7 @@ import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
 import { type Clock, systemClock, systemTimers, type Timers } from "./core/clock/index.ts";
 import { DeliveryQueue } from "./core/delivery/index.ts";
-import { ProtocolError } from "./core/errors/index.ts";
+import { CORE_ERRORS, ProtocolError } from "./core/errors/index.ts";
 import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
 import { Ledger } from "./core/ledger/index.ts";
@@ -509,12 +509,15 @@ export function createApp(options: AppOptions): App {
       const fromAgent = !new URL(request.url).pathname.startsWith(CONTROL_PREFIX);
       return fromAgent ? quiet.during(() => root.fetch(request)) : root.fetch(request);
     },
-    openapi: () =>
-      control.getOpenAPI31Document({
+    openapi: () => ({
+      ...control.getOpenAPI31Document({
         openapi: "3.1.0",
         info: { title: "channelstack control API", version: options.version },
         servers: [{ url: CONTROL_PREFIX }],
       }),
+      // What channelstack's own error codes mean; a fake's codes are the platform's.
+      "x-channelstack-errors": CORE_ERRORS,
+    }),
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),
     close: () => sessions.closeAll(),
