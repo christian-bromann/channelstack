@@ -5,10 +5,11 @@ TypeScript samples one to one, in the snake_case shape `docs/architecture.md` de
 generated Python SDK.
 
 `pnpm typecheck:samples` only checks that these files parse as Python (`scripts/check-python-samples.mjs`).
-Unlike the `.ts` samples they are **not** checked against `api/*.d.ts`, because the Python SDK
-doesn't exist yet: the `pytest_channelstack` import, the `expect(...)` matchers and their names are
-the planned shape, not a tested one. Update them by hand when the API changes, and replace this
-check with a real one once the Python SDK ships.
+Unlike the `.ts` samples they are **not** checked against the API yet. `pytest-channelstack` exists
+(`integrations/pytest-channelstack`, with `expect(...)` as [decision 0018](../../../docs/decisions/0018-pytest-expect.md)
+describes), but it has only the conversation matchers so far; `to_have_button`, `to_contain_text`,
+`to_have_comment_from` and the Linear ones the samples use come with the rest of the matcher set.
+Update the samples by hand when the API changes, and check them against the real package once it has them.
 
 `pytest_channelstack.pyi` in this folder is a stand-in for the plugin, so the repository's Python
 type-checker can resolve the samples' import. It is not the real API.

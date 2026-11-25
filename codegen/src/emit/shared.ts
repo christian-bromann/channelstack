@@ -10,9 +10,12 @@ export function errorClassName(code: string): string {
     .join("")}Error`;
 }
 
-/** `botUserId` → `bot_user_id`. */
+/** `botUserId` → `bot_user_id`; a run of capitals is one word: `openDM` → `open_dm`. */
 export function snakeCase(name: string): string {
-  return name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  return name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase();
 }
 
 /** Lookups every emitter needs over the IR. */

@@ -8,7 +8,7 @@
  */
 import { join } from "node:path";
 
-import { runExamples, runGoDockerExamples, runProxyExamples } from "./examples.ts";
+import { runExamples, runGoDockerExamples, runProxyExamples, runPytestExamples } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";
 import { runSmoke, SDKS } from "./smoke.ts";
@@ -21,7 +21,11 @@ const broken = (channels: string) => () =>
 
 /** The parts, each well under five minutes on CI, and together the whole suite. */
 const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
-  slack: () => runExamples({ agents: ["bolt-ai-sdk", "chat-sdk-slack"], shared: false }),
+  // The Slack examples against both Slack agents, then their pytest port against Bolt (exit check 7.3).
+  slack: async () => {
+    await runExamples({ agents: ["bolt-ai-sdk", "chat-sdk-slack"], shared: false });
+    await runPytestExamples();
+  },
   "github-linear": () =>
     runExamples({ agents: ["probot", "chat-sdk-github", "linear-sdk", "chat-sdk-linear"], shared: false }),
   // The smoke scenarios through every SDK, Notion, every channel in one run, and the tests that bring their own agent.

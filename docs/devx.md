@@ -345,7 +345,39 @@ await using channel = await slack.createChannel();   // archived when the scope 
 | Vitest | `channelstack/vitest` plugin | test context (`({ slack }) =>`) | `expect.extend` |
 | Playwright Test | `channelstack/playwright` | `test.extend` fixtures | `expect.extend` |
 | WebdriverIO | `@channelstack/wdio-service` | `browser.channelstack` or a service handle | `expect-webdriverio` matchers |
-| pytest | `pytest-channelstack` plugin | `slack`, `github`, `linear`, `notion` fixtures | assertion helpers (`assert_shows_once(thread, "my-agent")`) |
+| pytest | `pytest-channelstack` plugin | `channelstack` (the client), `channelstack_session`, `slack`, `github`, `linear`, `notion` | `expect(thread).to_have_reply_from("my-agent")`, `not_to_…` for negations ([decision 0018](decisions/0018-pytest-expect.md)) |
+
+### pytest
+
+`pip install pytest-channelstack` registers the plugin. A test asks for the fixtures it needs, and awaits `expect(...)`:
+
+```python
+import re
+from pytest_channelstack import expect
+
+async def test_a_mention_gets_one_reply(slack):
+    ana = await slack.create_user(name="Ana")
+    channel = await slack.create_channel(participants=[ana, slack.app])
+
+    msg = await ana.say("@my-agent summarize yesterday's incidents", channel=channel)
+
+    await expect(msg.thread).to_have_reply_from("my-agent", text=re.compile("incident", re.I))
+    await expect(msg.thread).to_have_replies_from(slack.app, count=1)
+    await expect(channel).not_to_have_channel_message_from("my-agent")
+```
+
+- **Fixtures:** `channelstack` is the client for the whole run (`env()`, `reset()`); `channelstack_session` is the test's session, closed after it; `slack`, `github`, `linear` and `notion` are the channels' fixtures in it.
+- **One event loop.** The client outlives each test, so tests and fixtures run on the run's loop. With pytest-asyncio, set it once:
+
+  ```ini
+  [pytest]
+  asyncio_mode = auto
+  asyncio_default_fixture_loop_scope = session
+  asyncio_default_test_loop_scope = session
+  ```
+
+- **Settings:** `--channelstack-mode attach|start|auto` (or `channelstack_mode` in the ini file), `channelstack_timeout` (10s) and `channelstack_quiet_for` (750ms).
+- **Live mode:** a test that does something live mode can't do is skipped with the reason, as with Vitest.
 
 ### The matchers
 

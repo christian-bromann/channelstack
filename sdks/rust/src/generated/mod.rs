@@ -63,7 +63,7 @@ pub mod codes {
     pub const VALIDATION_FAILED: &str = "validation_failed";
 }
 
-fn run__channelstack_status<'a>(
+fn run_channelstack_status<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -77,7 +77,7 @@ fn run__channelstack_status<'a>(
     })
 }
 
-fn run__channelstack_open_session<'a>(
+fn run_channelstack_open_session<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -105,7 +105,7 @@ fn run__channelstack_open_session<'a>(
     })
 }
 
-fn run__channelstack_reset<'a>(
+fn run_channelstack_reset<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -119,7 +119,7 @@ fn run__channelstack_reset<'a>(
     })
 }
 
-fn run__channelstack_env<'a>(
+fn run_channelstack_env<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -147,7 +147,7 @@ fn run__channelstack_env<'a>(
     })
 }
 
-fn run__channelstack_ui_login_link<'a>(
+fn run_channelstack_ui_login_link<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -161,7 +161,7 @@ fn run__channelstack_ui_login_link<'a>(
     })
 }
 
-fn run__session_close<'a>(
+fn run_session_close<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -175,7 +175,7 @@ fn run__session_close<'a>(
     })
 }
 
-fn run__session_events<'a>(
+fn run_session_events<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -203,7 +203,7 @@ fn run__session_events<'a>(
     })
 }
 
-fn run__session_quiet<'a>(
+fn run_session_quiet<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -217,7 +217,7 @@ fn run__session_quiet<'a>(
     })
 }
 
-fn run__session_echo<'a>(
+fn run_session_echo<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -231,7 +231,7 @@ fn run__session_echo<'a>(
     })
 }
 
-fn run__session_slack<'a>(
+fn run_session_slack<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -245,7 +245,7 @@ fn run__session_slack<'a>(
     })
 }
 
-fn run__session_github<'a>(
+fn run_session_github<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -259,7 +259,7 @@ fn run__session_github<'a>(
     })
 }
 
-fn run__session_linear<'a>(
+fn run_session_linear<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -273,7 +273,7 @@ fn run__session_linear<'a>(
     })
 }
 
-fn run__session_notion<'a>(
+fn run_session_notion<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -287,7 +287,7 @@ fn run__session_notion<'a>(
     })
 }
 
-fn run__echo_fixture_create_user<'a>(
+fn run_echo_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -315,7 +315,7 @@ fn run__echo_fixture_create_user<'a>(
     })
 }
 
-fn run__echo_fixture_create_room<'a>(
+fn run_echo_fixture_create_room<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -350,7 +350,7 @@ fn run__echo_fixture_create_room<'a>(
     })
 }
 
-fn run__echo_fixture_capabilities<'a>(
+fn run_echo_fixture_capabilities<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -367,7 +367,7 @@ fn run__echo_fixture_capabilities<'a>(
     })
 }
 
-fn run__echo_user_say<'a>(
+fn run_echo_user_say<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -404,7 +404,7 @@ fn run__echo_user_say<'a>(
     })
 }
 
-fn run__echo_room_messages<'a>(
+fn run_echo_room_messages<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -436,7 +436,7 @@ fn run__echo_room_messages<'a>(
     })
 }
 
-fn run__echo_room_transcript<'a>(
+fn run_echo_room_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -454,7 +454,7 @@ fn run__echo_room_transcript<'a>(
     })
 }
 
-fn run__slack_fixture_create_user<'a>(
+fn run_slack_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -527,7 +527,7 @@ fn run__slack_fixture_create_user<'a>(
     })
 }
 
-fn run__slack_fixture_users<'a>(
+fn run_slack_fixture_users<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -541,7 +541,7 @@ fn run__slack_fixture_users<'a>(
     })
 }
 
-fn run__slack_fixture_conversations<'a>(
+fn run_slack_fixture_conversations<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -558,7 +558,7 @@ fn run__slack_fixture_conversations<'a>(
     })
 }
 
-fn run__slack_fixture_create_channel<'a>(
+fn run_slack_fixture_create_channel<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -604,7 +604,7 @@ fn run__slack_fixture_create_channel<'a>(
     })
 }
 
-fn run__slack_fixture_deliveries<'a>(
+fn run_slack_fixture_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -621,7 +621,7 @@ fn run__slack_fixture_deliveries<'a>(
     })
 }
 
-fn run__slack_fixture_calls<'a>(
+fn run_slack_fixture_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -651,7 +651,7 @@ fn run__slack_fixture_calls<'a>(
     })
 }
 
-fn run__slack_fixture_uninstall_app<'a>(
+fn run_slack_fixture_uninstall_app<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -668,7 +668,7 @@ fn run__slack_fixture_uninstall_app<'a>(
     })
 }
 
-fn run__slack_fixture_fault<'a>(
+fn run_slack_fixture_fault<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -711,7 +711,7 @@ fn run__slack_fixture_fault<'a>(
     })
 }
 
-fn run__slack_user_say<'a>(
+fn run_slack_user_say<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -758,7 +758,7 @@ fn run__slack_user_say<'a>(
     })
 }
 
-fn run__slack_user_reply<'a>(
+fn run_slack_user_reply<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -803,7 +803,7 @@ fn run__slack_user_reply<'a>(
     })
 }
 
-fn run__slack_user_edit<'a>(
+fn run_slack_user_edit<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -843,7 +843,7 @@ fn run__slack_user_edit<'a>(
     })
 }
 
-fn run__slack_user_delete<'a>(
+fn run_slack_user_delete<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -878,7 +878,7 @@ fn run__slack_user_delete<'a>(
     })
 }
 
-fn run__slack_user_click<'a>(
+fn run_slack_user_click<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -928,7 +928,7 @@ fn run__slack_user_click<'a>(
     })
 }
 
-fn run__slack_user_select<'a>(
+fn run_slack_user_select<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -973,7 +973,7 @@ fn run__slack_user_select<'a>(
     })
 }
 
-fn run__slack_user_shortcut<'a>(
+fn run_slack_user_shortcut<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1010,7 +1010,7 @@ fn run__slack_user_shortcut<'a>(
     })
 }
 
-fn run__slack_user_run_command<'a>(
+fn run_slack_user_run_command<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1047,7 +1047,7 @@ fn run__slack_user_run_command<'a>(
     })
 }
 
-fn run__slack_user_stop<'a>(
+fn run_slack_user_stop<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1082,7 +1082,7 @@ fn run__slack_user_stop<'a>(
     })
 }
 
-fn run__slack_user_open_agent_thread<'a>(
+fn run_slack_user_open_agent_thread<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1117,7 +1117,7 @@ fn run__slack_user_open_agent_thread<'a>(
     })
 }
 
-fn run__slack_user_pick_prompt<'a>(
+fn run_slack_user_pick_prompt<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1154,7 +1154,7 @@ fn run__slack_user_pick_prompt<'a>(
     })
 }
 
-fn run__slack_user_switch_context<'a>(
+fn run_slack_user_switch_context<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1194,7 +1194,7 @@ fn run__slack_user_switch_context<'a>(
     })
 }
 
-fn run__slack_user_modals<'a>(
+fn run_slack_user_modals<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1212,7 +1212,7 @@ fn run__slack_user_modals<'a>(
     })
 }
 
-fn run__slack_user_react<'a>(
+fn run_slack_user_react<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1249,7 +1249,7 @@ fn run__slack_user_react<'a>(
     })
 }
 
-fn run__slack_user_unreact<'a>(
+fn run_slack_user_unreact<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1286,7 +1286,7 @@ fn run__slack_user_unreact<'a>(
     })
 }
 
-fn run__slack_user_open_d_m<'a>(
+fn run_slack_user_open_dm<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1323,7 +1323,7 @@ fn run__slack_user_open_d_m<'a>(
     })
 }
 
-fn run__slack_user_invite<'a>(
+fn run_slack_user_invite<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1365,7 +1365,7 @@ fn run__slack_user_invite<'a>(
     })
 }
 
-fn run__slack_user_kick<'a>(
+fn run_slack_user_kick<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1405,7 +1405,7 @@ fn run__slack_user_kick<'a>(
     })
 }
 
-fn run__slack_user_ephemeral<'a>(
+fn run_slack_user_ephemeral<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1423,7 +1423,7 @@ fn run__slack_user_ephemeral<'a>(
     })
 }
 
-fn run__slack_conversation_latest_message<'a>(
+fn run_slack_conversation_latest_message<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1441,7 +1441,7 @@ fn run__slack_conversation_latest_message<'a>(
     })
 }
 
-fn run__slack_conversation_messages<'a>(
+fn run_slack_conversation_messages<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1459,7 +1459,7 @@ fn run__slack_conversation_messages<'a>(
     })
 }
 
-fn run__slack_conversation_members<'a>(
+fn run_slack_conversation_members<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1477,7 +1477,7 @@ fn run__slack_conversation_members<'a>(
     })
 }
 
-fn run__slack_conversation_transcript<'a>(
+fn run_slack_conversation_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1509,7 +1509,7 @@ fn run__slack_conversation_transcript<'a>(
     })
 }
 
-fn run__slack_message_refresh<'a>(
+fn run_slack_message_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1528,7 +1528,7 @@ fn run__slack_message_refresh<'a>(
     })
 }
 
-fn run__slack_message_reactions<'a>(
+fn run_slack_message_reactions<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1547,7 +1547,7 @@ fn run__slack_message_reactions<'a>(
     })
 }
 
-fn run__slack_message_transcript<'a>(
+fn run_slack_message_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1580,7 +1580,7 @@ fn run__slack_message_transcript<'a>(
     })
 }
 
-fn run__slack_message_deliveries<'a>(
+fn run_slack_message_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1599,7 +1599,7 @@ fn run__slack_message_deliveries<'a>(
     })
 }
 
-fn run__slack_thread_suggested_prompts<'a>(
+fn run_slack_thread_suggested_prompts<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1618,7 +1618,7 @@ fn run__slack_thread_suggested_prompts<'a>(
     })
 }
 
-fn run__slack_thread_replies<'a>(
+fn run_slack_thread_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1637,7 +1637,7 @@ fn run__slack_thread_replies<'a>(
     })
 }
 
-fn run__slack_thread_status<'a>(
+fn run_slack_thread_status<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1656,7 +1656,7 @@ fn run__slack_thread_status<'a>(
     })
 }
 
-fn run__slack_thread_transcript<'a>(
+fn run_slack_thread_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1689,7 +1689,7 @@ fn run__slack_thread_transcript<'a>(
     })
 }
 
-fn run__slack_delivery_refresh<'a>(
+fn run_slack_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1707,7 +1707,7 @@ fn run__slack_delivery_refresh<'a>(
     })
 }
 
-fn run__slack_delivery_retry<'a>(
+fn run_slack_delivery_retry<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1741,7 +1741,7 @@ fn run__slack_delivery_retry<'a>(
     })
 }
 
-fn run__slack_delivery_resend<'a>(
+fn run_slack_delivery_resend<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1777,7 +1777,7 @@ fn run__slack_delivery_resend<'a>(
     })
 }
 
-fn run__slack_stream_refresh<'a>(
+fn run_slack_stream_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1796,7 +1796,7 @@ fn run__slack_stream_refresh<'a>(
     })
 }
 
-fn run__slack_modal_values<'a>(
+fn run_slack_modal_values<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1814,7 +1814,7 @@ fn run__slack_modal_values<'a>(
     })
 }
 
-fn run__slack_modal_submit<'a>(
+fn run_slack_modal_submit<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1846,7 +1846,7 @@ fn run__slack_modal_submit<'a>(
     })
 }
 
-fn run__slack_modal_close<'a>(
+fn run_slack_modal_close<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1864,7 +1864,7 @@ fn run__slack_modal_close<'a>(
     })
 }
 
-fn run__slack_fault_undo<'a>(
+fn run_slack_fault_undo<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1882,7 +1882,7 @@ fn run__slack_fault_undo<'a>(
     })
 }
 
-fn run__git_hub_fixture_create_user<'a>(
+fn run_git_hub_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -1937,7 +1937,7 @@ fn run__git_hub_fixture_create_user<'a>(
     })
 }
 
-fn run__git_hub_fixture_create_repo<'a>(
+fn run_git_hub_fixture_create_repo<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2000,7 +2000,7 @@ fn run__git_hub_fixture_create_repo<'a>(
     })
 }
 
-fn run__git_hub_fixture_deliveries<'a>(
+fn run_git_hub_fixture_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2036,7 +2036,7 @@ fn run__git_hub_fixture_deliveries<'a>(
     })
 }
 
-fn run__git_hub_fixture_app_calls<'a>(
+fn run_git_hub_fixture_app_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2069,7 +2069,7 @@ fn run__git_hub_fixture_app_calls<'a>(
     })
 }
 
-fn run__git_hub_fixture_calls<'a>(
+fn run_git_hub_fixture_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2099,7 +2099,7 @@ fn run__git_hub_fixture_calls<'a>(
     })
 }
 
-fn run__git_hub_app_installation_id<'a>(
+fn run_git_hub_app_installation_id<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2133,7 +2133,7 @@ fn run__git_hub_app_installation_id<'a>(
     })
 }
 
-fn run__git_hub_user_push<'a>(
+fn run_git_hub_user_push<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2174,7 +2174,7 @@ fn run__git_hub_user_push<'a>(
     })
 }
 
-fn run__git_hub_user_open_issue<'a>(
+fn run_git_hub_user_open_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2222,7 +2222,7 @@ fn run__git_hub_user_open_issue<'a>(
     })
 }
 
-fn run__git_hub_user_open_pull_request<'a>(
+fn run_git_hub_user_open_pull_request<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2270,7 +2270,7 @@ fn run__git_hub_user_open_pull_request<'a>(
     })
 }
 
-fn run__git_hub_user_edit_issue<'a>(
+fn run_git_hub_user_edit_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2307,7 +2307,7 @@ fn run__git_hub_user_edit_issue<'a>(
     })
 }
 
-fn run__git_hub_user_close<'a>(
+fn run_git_hub_user_close<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2342,7 +2342,7 @@ fn run__git_hub_user_close<'a>(
     })
 }
 
-fn run__git_hub_user_reopen<'a>(
+fn run_git_hub_user_reopen<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2377,7 +2377,7 @@ fn run__git_hub_user_reopen<'a>(
     })
 }
 
-fn run__git_hub_user_label<'a>(
+fn run_git_hub_user_label<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2417,7 +2417,7 @@ fn run__git_hub_user_label<'a>(
     })
 }
 
-fn run__git_hub_user_unlabel<'a>(
+fn run_git_hub_user_unlabel<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2457,7 +2457,7 @@ fn run__git_hub_user_unlabel<'a>(
     })
 }
 
-fn run__git_hub_user_assign<'a>(
+fn run_git_hub_user_assign<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2499,7 +2499,7 @@ fn run__git_hub_user_assign<'a>(
     })
 }
 
-fn run__git_hub_user_comment<'a>(
+fn run_git_hub_user_comment<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2536,7 +2536,7 @@ fn run__git_hub_user_comment<'a>(
     })
 }
 
-fn run__git_hub_user_edit<'a>(
+fn run_git_hub_user_edit<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2573,7 +2573,7 @@ fn run__git_hub_user_edit<'a>(
     })
 }
 
-fn run__git_hub_user_delete<'a>(
+fn run_git_hub_user_delete<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2608,7 +2608,7 @@ fn run__git_hub_user_delete<'a>(
     })
 }
 
-fn run__git_hub_user_react<'a>(
+fn run_git_hub_user_react<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2650,7 +2650,7 @@ fn run__git_hub_user_react<'a>(
     })
 }
 
-fn run__git_hub_user_minimize<'a>(
+fn run_git_hub_user_minimize<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2687,7 +2687,7 @@ fn run__git_hub_user_minimize<'a>(
     })
 }
 
-fn run__git_hub_user_review<'a>(
+fn run_git_hub_user_review<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2728,7 +2728,7 @@ fn run__git_hub_user_review<'a>(
     })
 }
 
-fn run__git_hub_user_review_comment<'a>(
+fn run_git_hub_user_review_comment<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2771,7 +2771,7 @@ fn run__git_hub_user_review_comment<'a>(
     })
 }
 
-fn run__git_hub_user_reply<'a>(
+fn run_git_hub_user_reply<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2808,7 +2808,7 @@ fn run__git_hub_user_reply<'a>(
     })
 }
 
-fn run__git_hub_user_resolve<'a>(
+fn run_git_hub_user_resolve<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2843,7 +2843,7 @@ fn run__git_hub_user_resolve<'a>(
     })
 }
 
-fn run__git_hub_user_unresolve<'a>(
+fn run_git_hub_user_unresolve<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2878,7 +2878,7 @@ fn run__git_hub_user_unresolve<'a>(
     })
 }
 
-fn run__git_hub_user_request_review<'a>(
+fn run_git_hub_user_request_review<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2920,7 +2920,7 @@ fn run__git_hub_user_request_review<'a>(
     })
 }
 
-fn run__git_hub_user_mark_ready<'a>(
+fn run_git_hub_user_mark_ready<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2955,7 +2955,7 @@ fn run__git_hub_user_mark_ready<'a>(
     })
 }
 
-fn run__git_hub_user_merge<'a>(
+fn run_git_hub_user_merge<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2992,7 +2992,7 @@ fn run__git_hub_user_merge<'a>(
     })
 }
 
-fn run__git_hub_user_rerun<'a>(
+fn run_git_hub_user_rerun<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3027,7 +3027,7 @@ fn run__git_hub_user_rerun<'a>(
     })
 }
 
-fn run__git_hub_user_request_action<'a>(
+fn run_git_hub_user_request_action<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3064,7 +3064,7 @@ fn run__git_hub_user_request_action<'a>(
     })
 }
 
-fn run__git_hub_repo_install_app<'a>(
+fn run_git_hub_repo_install_app<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3099,7 +3099,7 @@ fn run__git_hub_repo_install_app<'a>(
     })
 }
 
-fn run__git_hub_repo_uninstall_app<'a>(
+fn run_git_hub_repo_uninstall_app<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3134,7 +3134,7 @@ fn run__git_hub_repo_uninstall_app<'a>(
     })
 }
 
-fn run__git_hub_repo_issue<'a>(
+fn run_git_hub_repo_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3166,7 +3166,7 @@ fn run__git_hub_repo_issue<'a>(
     })
 }
 
-fn run__git_hub_repo_pull_request<'a>(
+fn run_git_hub_repo_pull_request<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3198,7 +3198,7 @@ fn run__git_hub_repo_pull_request<'a>(
     })
 }
 
-fn run__git_hub_repo_read_file<'a>(
+fn run_git_hub_repo_read_file<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3232,7 +3232,7 @@ fn run__git_hub_repo_read_file<'a>(
     })
 }
 
-fn run__git_hub_repo_commits<'a>(
+fn run_git_hub_repo_commits<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3264,7 +3264,7 @@ fn run__git_hub_repo_commits<'a>(
     })
 }
 
-fn run__git_hub_delivery_refresh<'a>(
+fn run_git_hub_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3282,7 +3282,7 @@ fn run__git_hub_delivery_refresh<'a>(
     })
 }
 
-fn run__git_hub_delivery_redeliver<'a>(
+fn run_git_hub_delivery_redeliver<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3300,7 +3300,7 @@ fn run__git_hub_delivery_redeliver<'a>(
     })
 }
 
-fn run__git_hub_delivery_resend<'a>(
+fn run_git_hub_delivery_resend<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3332,7 +3332,7 @@ fn run__git_hub_delivery_resend<'a>(
     })
 }
 
-fn run__git_hub_issue_refresh<'a>(
+fn run_git_hub_issue_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3351,7 +3351,7 @@ fn run__git_hub_issue_refresh<'a>(
     })
 }
 
-fn run__git_hub_issue_title<'a>(
+fn run_git_hub_issue_title<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3370,7 +3370,7 @@ fn run__git_hub_issue_title<'a>(
     })
 }
 
-fn run__git_hub_issue_state<'a>(
+fn run_git_hub_issue_state<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3389,7 +3389,7 @@ fn run__git_hub_issue_state<'a>(
     })
 }
 
-fn run__git_hub_issue_labels<'a>(
+fn run_git_hub_issue_labels<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3408,7 +3408,7 @@ fn run__git_hub_issue_labels<'a>(
     })
 }
 
-fn run__git_hub_issue_assignees<'a>(
+fn run_git_hub_issue_assignees<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3427,7 +3427,7 @@ fn run__git_hub_issue_assignees<'a>(
     })
 }
 
-fn run__git_hub_issue_comments<'a>(
+fn run_git_hub_issue_comments<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3446,7 +3446,7 @@ fn run__git_hub_issue_comments<'a>(
     })
 }
 
-fn run__git_hub_issue_transcript<'a>(
+fn run_git_hub_issue_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3465,7 +3465,7 @@ fn run__git_hub_issue_transcript<'a>(
     })
 }
 
-fn run__git_hub_commit_check_runs<'a>(
+fn run_git_hub_commit_check_runs<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3484,7 +3484,7 @@ fn run__git_hub_commit_check_runs<'a>(
     })
 }
 
-fn run__git_hub_commit_statuses<'a>(
+fn run_git_hub_commit_statuses<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3503,7 +3503,7 @@ fn run__git_hub_commit_statuses<'a>(
     })
 }
 
-fn run__git_hub_comment_refresh<'a>(
+fn run_git_hub_comment_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3521,7 +3521,7 @@ fn run__git_hub_comment_refresh<'a>(
     })
 }
 
-fn run__git_hub_comment_reactions<'a>(
+fn run_git_hub_comment_reactions<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3539,7 +3539,7 @@ fn run__git_hub_comment_reactions<'a>(
     })
 }
 
-fn run__git_hub_review_comment_replies<'a>(
+fn run_git_hub_review_comment_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3557,7 +3557,7 @@ fn run__git_hub_review_comment_replies<'a>(
     })
 }
 
-fn run__git_hub_review_comment_resolved<'a>(
+fn run_git_hub_review_comment_resolved<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3575,7 +3575,7 @@ fn run__git_hub_review_comment_resolved<'a>(
     })
 }
 
-fn run__git_hub_review_comment_transcript<'a>(
+fn run_git_hub_review_comment_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3593,7 +3593,7 @@ fn run__git_hub_review_comment_transcript<'a>(
     })
 }
 
-fn run__linear_fixture_create_user<'a>(
+fn run_linear_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3651,7 +3651,7 @@ fn run__linear_fixture_create_user<'a>(
     })
 }
 
-fn run__linear_fixture_create_team<'a>(
+fn run_linear_fixture_create_team<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3692,7 +3692,7 @@ fn run__linear_fixture_create_team<'a>(
     })
 }
 
-fn run__linear_fixture_deliveries<'a>(
+fn run_linear_fixture_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3728,7 +3728,7 @@ fn run__linear_fixture_deliveries<'a>(
     })
 }
 
-fn run__linear_fixture_calls<'a>(
+fn run_linear_fixture_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3758,7 +3758,7 @@ fn run__linear_fixture_calls<'a>(
     })
 }
 
-fn run__linear_user_create_issue<'a>(
+fn run_linear_user_create_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3808,7 +3808,7 @@ fn run__linear_user_create_issue<'a>(
     })
 }
 
-fn run__linear_user_edit_issue<'a>(
+fn run_linear_user_edit_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3845,7 +3845,7 @@ fn run__linear_user_edit_issue<'a>(
     })
 }
 
-fn run__linear_user_undelegate<'a>(
+fn run_linear_user_undelegate<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3880,7 +3880,7 @@ fn run__linear_user_undelegate<'a>(
     })
 }
 
-fn run__linear_user_assign<'a>(
+fn run_linear_user_assign<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3920,7 +3920,7 @@ fn run__linear_user_assign<'a>(
     })
 }
 
-fn run__linear_user_set_state<'a>(
+fn run_linear_user_set_state<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3957,7 +3957,7 @@ fn run__linear_user_set_state<'a>(
     })
 }
 
-fn run__linear_user_label<'a>(
+fn run_linear_user_label<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -3997,7 +3997,7 @@ fn run__linear_user_label<'a>(
     })
 }
 
-fn run__linear_user_delegate<'a>(
+fn run_linear_user_delegate<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4037,7 +4037,7 @@ fn run__linear_user_delegate<'a>(
     })
 }
 
-fn run__linear_user_comment<'a>(
+fn run_linear_user_comment<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4074,7 +4074,7 @@ fn run__linear_user_comment<'a>(
     })
 }
 
-fn run__linear_user_reply<'a>(
+fn run_linear_user_reply<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4111,7 +4111,7 @@ fn run__linear_user_reply<'a>(
     })
 }
 
-fn run__linear_user_edit<'a>(
+fn run_linear_user_edit<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4148,7 +4148,7 @@ fn run__linear_user_edit<'a>(
     })
 }
 
-fn run__linear_user_delete<'a>(
+fn run_linear_user_delete<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4183,7 +4183,7 @@ fn run__linear_user_delete<'a>(
     })
 }
 
-fn run__linear_user_react<'a>(
+fn run_linear_user_react<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4220,7 +4220,7 @@ fn run__linear_user_react<'a>(
     })
 }
 
-fn run__linear_user_prompt<'a>(
+fn run_linear_user_prompt<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4257,7 +4257,7 @@ fn run__linear_user_prompt<'a>(
     })
 }
 
-fn run__linear_user_answer<'a>(
+fn run_linear_user_answer<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4294,7 +4294,7 @@ fn run__linear_user_answer<'a>(
     })
 }
 
-fn run__linear_user_stop<'a>(
+fn run_linear_user_stop<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4329,7 +4329,7 @@ fn run__linear_user_stop<'a>(
     })
 }
 
-fn run__linear_team_issue<'a>(
+fn run_linear_team_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4361,7 +4361,7 @@ fn run__linear_team_issue<'a>(
     })
 }
 
-fn run__linear_issue_refresh<'a>(
+fn run_linear_issue_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4379,7 +4379,7 @@ fn run__linear_issue_refresh<'a>(
     })
 }
 
-fn run__linear_issue_title<'a>(
+fn run_linear_issue_title<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4397,7 +4397,7 @@ fn run__linear_issue_title<'a>(
     })
 }
 
-fn run__linear_issue_state<'a>(
+fn run_linear_issue_state<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4415,7 +4415,7 @@ fn run__linear_issue_state<'a>(
     })
 }
 
-fn run__linear_issue_assignee<'a>(
+fn run_linear_issue_assignee<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4433,7 +4433,7 @@ fn run__linear_issue_assignee<'a>(
     })
 }
 
-fn run__linear_issue_delegated_to<'a>(
+fn run_linear_issue_delegated_to<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4451,7 +4451,7 @@ fn run__linear_issue_delegated_to<'a>(
     })
 }
 
-fn run__linear_issue_labels<'a>(
+fn run_linear_issue_labels<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4469,7 +4469,7 @@ fn run__linear_issue_labels<'a>(
     })
 }
 
-fn run__linear_issue_comments<'a>(
+fn run_linear_issue_comments<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4487,7 +4487,7 @@ fn run__linear_issue_comments<'a>(
     })
 }
 
-fn run__linear_issue_sessions<'a>(
+fn run_linear_issue_sessions<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4505,7 +4505,7 @@ fn run__linear_issue_sessions<'a>(
     })
 }
 
-fn run__linear_issue_session<'a>(
+fn run_linear_issue_session<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4523,7 +4523,7 @@ fn run__linear_issue_session<'a>(
     })
 }
 
-fn run__linear_issue_transcript<'a>(
+fn run_linear_issue_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4541,7 +4541,7 @@ fn run__linear_issue_transcript<'a>(
     })
 }
 
-fn run__linear_delivery_refresh<'a>(
+fn run_linear_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4559,7 +4559,7 @@ fn run__linear_delivery_refresh<'a>(
     })
 }
 
-fn run__linear_delivery_redeliver<'a>(
+fn run_linear_delivery_redeliver<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4577,7 +4577,7 @@ fn run__linear_delivery_redeliver<'a>(
     })
 }
 
-fn run__linear_delivery_resend<'a>(
+fn run_linear_delivery_resend<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4611,7 +4611,7 @@ fn run__linear_delivery_resend<'a>(
     })
 }
 
-fn run__linear_agent_session_state<'a>(
+fn run_linear_agent_session_state<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4629,7 +4629,7 @@ fn run__linear_agent_session_state<'a>(
     })
 }
 
-fn run__linear_agent_session_activities<'a>(
+fn run_linear_agent_session_activities<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4647,7 +4647,7 @@ fn run__linear_agent_session_activities<'a>(
     })
 }
 
-fn run__linear_agent_session_external_urls<'a>(
+fn run_linear_agent_session_external_urls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4665,7 +4665,7 @@ fn run__linear_agent_session_external_urls<'a>(
     })
 }
 
-fn run__linear_agent_session_plan<'a>(
+fn run_linear_agent_session_plan<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4683,7 +4683,7 @@ fn run__linear_agent_session_plan<'a>(
     })
 }
 
-fn run__linear_agent_session_transcript<'a>(
+fn run_linear_agent_session_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4701,7 +4701,7 @@ fn run__linear_agent_session_transcript<'a>(
     })
 }
 
-fn run__linear_comment_replies<'a>(
+fn run_linear_comment_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4719,7 +4719,7 @@ fn run__linear_comment_replies<'a>(
     })
 }
 
-fn run__linear_comment_transcript<'a>(
+fn run_linear_comment_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4737,7 +4737,7 @@ fn run__linear_comment_transcript<'a>(
     })
 }
 
-fn run__notion_fixture_create_user<'a>(
+fn run_notion_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4789,7 +4789,7 @@ fn run__notion_fixture_create_user<'a>(
     })
 }
 
-fn run__notion_fixture_create_page<'a>(
+fn run_notion_fixture_create_page<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4838,7 +4838,7 @@ fn run__notion_fixture_create_page<'a>(
     })
 }
 
-fn run__notion_fixture_create_database<'a>(
+fn run_notion_fixture_create_database<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4885,7 +4885,7 @@ fn run__notion_fixture_create_database<'a>(
     })
 }
 
-fn run__notion_fixture_set_content_update_delay<'a>(
+fn run_notion_fixture_set_content_update_delay<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4916,7 +4916,7 @@ fn run__notion_fixture_set_content_update_delay<'a>(
     })
 }
 
-fn run__notion_fixture_send_verification<'a>(
+fn run_notion_fixture_send_verification<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4933,7 +4933,7 @@ fn run__notion_fixture_send_verification<'a>(
     })
 }
 
-fn run__notion_fixture_deliveries<'a>(
+fn run_notion_fixture_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4969,7 +4969,7 @@ fn run__notion_fixture_deliveries<'a>(
     })
 }
 
-fn run__notion_fixture_calls<'a>(
+fn run_notion_fixture_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4999,7 +4999,7 @@ fn run__notion_fixture_calls<'a>(
     })
 }
 
-fn run__notion_user_comment<'a>(
+fn run_notion_user_comment<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5038,7 +5038,7 @@ fn run__notion_user_comment<'a>(
     })
 }
 
-fn run__notion_user_reply<'a>(
+fn run_notion_user_reply<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5075,7 +5075,7 @@ fn run__notion_user_reply<'a>(
     })
 }
 
-fn run__notion_user_edit_comment<'a>(
+fn run_notion_user_edit_comment<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5112,7 +5112,7 @@ fn run__notion_user_edit_comment<'a>(
     })
 }
 
-fn run__notion_user_delete_comment<'a>(
+fn run_notion_user_delete_comment<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5147,7 +5147,7 @@ fn run__notion_user_delete_comment<'a>(
     })
 }
 
-fn run__notion_user_resolve<'a>(
+fn run_notion_user_resolve<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5182,7 +5182,7 @@ fn run__notion_user_resolve<'a>(
     })
 }
 
-fn run__notion_user_reopen<'a>(
+fn run_notion_user_reopen<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5217,7 +5217,7 @@ fn run__notion_user_reopen<'a>(
     })
 }
 
-fn run__notion_user_create_page<'a>(
+fn run_notion_user_create_page<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5263,7 +5263,7 @@ fn run__notion_user_create_page<'a>(
     })
 }
 
-fn run__notion_user_edit<'a>(
+fn run_notion_user_edit<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5300,7 +5300,7 @@ fn run__notion_user_edit<'a>(
     })
 }
 
-fn run__notion_user_rename<'a>(
+fn run_notion_user_rename<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5337,7 +5337,7 @@ fn run__notion_user_rename<'a>(
     })
 }
 
-fn run__notion_user_mention<'a>(
+fn run_notion_user_mention<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5379,7 +5379,7 @@ fn run__notion_user_mention<'a>(
     })
 }
 
-fn run__notion_user_set_property<'a>(
+fn run_notion_user_set_property<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5418,7 +5418,7 @@ fn run__notion_user_set_property<'a>(
     })
 }
 
-fn run__notion_user_add_row<'a>(
+fn run_notion_user_add_row<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5455,7 +5455,7 @@ fn run__notion_user_add_row<'a>(
     })
 }
 
-fn run__notion_user_connect<'a>(
+fn run_notion_user_connect<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5495,7 +5495,7 @@ fn run__notion_user_connect<'a>(
     })
 }
 
-fn run__notion_user_disconnect<'a>(
+fn run_notion_user_disconnect<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5535,7 +5535,7 @@ fn run__notion_user_disconnect<'a>(
     })
 }
 
-fn run__notion_page_discussions<'a>(
+fn run_notion_page_discussions<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5553,7 +5553,7 @@ fn run__notion_page_discussions<'a>(
     })
 }
 
-fn run__notion_page_markdown<'a>(
+fn run_notion_page_markdown<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5571,7 +5571,7 @@ fn run__notion_page_markdown<'a>(
     })
 }
 
-fn run__notion_page_blocks<'a>(
+fn run_notion_page_blocks<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5589,7 +5589,7 @@ fn run__notion_page_blocks<'a>(
     })
 }
 
-fn run__notion_page_property<'a>(
+fn run_notion_page_property<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5621,7 +5621,7 @@ fn run__notion_page_property<'a>(
     })
 }
 
-fn run__notion_page_children<'a>(
+fn run_notion_page_children<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5639,7 +5639,7 @@ fn run__notion_page_children<'a>(
     })
 }
 
-fn run__notion_page_connections<'a>(
+fn run_notion_page_connections<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5657,7 +5657,7 @@ fn run__notion_page_connections<'a>(
     })
 }
 
-fn run__notion_page_transcript<'a>(
+fn run_notion_page_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5675,7 +5675,7 @@ fn run__notion_page_transcript<'a>(
     })
 }
 
-fn run__notion_database_rows<'a>(
+fn run_notion_database_rows<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5707,7 +5707,7 @@ fn run__notion_database_rows<'a>(
     })
 }
 
-fn run__notion_delivery_refresh<'a>(
+fn run_notion_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5725,7 +5725,7 @@ fn run__notion_delivery_refresh<'a>(
     })
 }
 
-fn run__notion_delivery_redeliver<'a>(
+fn run_notion_delivery_redeliver<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5743,7 +5743,7 @@ fn run__notion_delivery_redeliver<'a>(
     })
 }
 
-fn run__notion_delivery_resend<'a>(
+fn run_notion_delivery_resend<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5775,7 +5775,7 @@ fn run__notion_delivery_resend<'a>(
     })
 }
 
-fn run__notion_discussion_comments<'a>(
+fn run_notion_discussion_comments<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5793,7 +5793,7 @@ fn run__notion_discussion_comments<'a>(
     })
 }
 
-fn run__notion_discussion_resolved<'a>(
+fn run_notion_discussion_resolved<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5811,7 +5811,7 @@ fn run__notion_discussion_resolved<'a>(
     })
 }
 
-fn run__notion_discussion_transcript<'a>(
+fn run_notion_discussion_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5829,7 +5829,7 @@ fn run__notion_discussion_transcript<'a>(
     })
 }
 
-fn run__git_hub_pull_request_refresh<'a>(
+fn run_git_hub_pull_request_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5848,7 +5848,7 @@ fn run__git_hub_pull_request_refresh<'a>(
     })
 }
 
-fn run__git_hub_pull_request_head_commit<'a>(
+fn run_git_hub_pull_request_head_commit<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5867,7 +5867,7 @@ fn run__git_hub_pull_request_head_commit<'a>(
     })
 }
 
-fn run__git_hub_pull_request_reviews<'a>(
+fn run_git_hub_pull_request_reviews<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5886,7 +5886,7 @@ fn run__git_hub_pull_request_reviews<'a>(
     })
 }
 
-fn run__git_hub_pull_request_review_comments<'a>(
+fn run_git_hub_pull_request_review_comments<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5905,7 +5905,7 @@ fn run__git_hub_pull_request_review_comments<'a>(
     })
 }
 
-fn run__git_hub_pull_request_check_runs<'a>(
+fn run_git_hub_pull_request_check_runs<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5924,7 +5924,7 @@ fn run__git_hub_pull_request_check_runs<'a>(
     })
 }
 
-fn run__git_hub_pull_request_merged<'a>(
+fn run_git_hub_pull_request_merged<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5997,7 +5997,7 @@ impl Channelstack {
             &self.ctx,
             &self.data,
             vec![],
-            run__channelstack_status,
+            run_channelstack_status,
             as_value,
         )
     }
@@ -6008,7 +6008,7 @@ impl Channelstack {
             &self.ctx,
             &self.data,
             vec![],
-            run__channelstack_open_session,
+            run_channelstack_open_session,
             Session::wrap,
         ))
     }
@@ -6019,7 +6019,7 @@ impl Channelstack {
             &self.ctx,
             &self.data,
             vec![],
-            run__channelstack_reset,
+            run_channelstack_reset,
             as_unit,
         )
     }
@@ -6030,7 +6030,7 @@ impl Channelstack {
             &self.ctx,
             &self.data,
             vec![],
-            run__channelstack_env,
+            run_channelstack_env,
             as_value,
         ))
     }
@@ -6041,7 +6041,7 @@ impl Channelstack {
             &self.ctx,
             &self.data,
             vec![],
-            run__channelstack_ui_login_link,
+            run_channelstack_ui_login_link,
             as_value,
         )
     }
@@ -6164,7 +6164,7 @@ impl Session {
 
     /// Close a session and remove everything it created.
     pub fn close(&self) -> Call<()> {
-        Call::new(&self.ctx, &self.data, vec![], run__session_close, as_unit)
+        Call::new(&self.ctx, &self.data, vec![], run_session_close, as_unit)
     }
 
     /// The session's event log: actions, deliveries with every attempt, and the agent's API calls.
@@ -6173,14 +6173,14 @@ impl Session {
             &self.ctx,
             &self.data,
             vec![],
-            run__session_events,
+            run_session_events,
             as_value,
         ))
     }
 
     /// Is the agent idle in this session, and for how long? Negative and exact-count matchers wait for this.
     pub fn quiet(&self) -> Call<Value> {
-        Call::new(&self.ctx, &self.data, vec![], run__session_quiet, as_value)
+        Call::new(&self.ctx, &self.data, vec![], run_session_quiet, as_value)
     }
 
     /// The echo fixture: the agent's app and where it reaches the fake. Experimental.
@@ -6189,7 +6189,7 @@ impl Session {
             &self.ctx,
             &self.data,
             vec![],
-            run__session_echo,
+            run_session_echo,
             EchoFixture::wrap,
         )
     }
@@ -6200,7 +6200,7 @@ impl Session {
             &self.ctx,
             &self.data,
             vec![],
-            run__session_slack,
+            run_session_slack,
             SlackFixture::wrap,
         )
     }
@@ -6211,7 +6211,7 @@ impl Session {
             &self.ctx,
             &self.data,
             vec![],
-            run__session_github,
+            run_session_github,
             GitHubFixture::wrap,
         )
     }
@@ -6222,7 +6222,7 @@ impl Session {
             &self.ctx,
             &self.data,
             vec![],
-            run__session_linear,
+            run_session_linear,
             LinearFixture::wrap,
         )
     }
@@ -6233,7 +6233,7 @@ impl Session {
             &self.ctx,
             &self.data,
             vec![],
-            run__session_notion,
+            run_session_notion,
             NotionFixture::wrap,
         )
     }
@@ -6329,7 +6329,7 @@ impl EchoFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__echo_fixture_create_user,
+            run_echo_fixture_create_user,
             EchoUser::wrap,
         ))
     }
@@ -6340,7 +6340,7 @@ impl EchoFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__echo_fixture_create_room,
+            run_echo_fixture_create_room,
             EchoRoom::wrap,
         ))
     }
@@ -6351,7 +6351,7 @@ impl EchoFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__echo_fixture_capabilities,
+            run_echo_fixture_capabilities,
             as_value,
         )
     }
@@ -6550,7 +6550,7 @@ impl EchoUser {
             &self.ctx,
             &self.data,
             vec![text.into_arg()],
-            run__echo_user_say,
+            run_echo_user_say,
             as_value,
         ))
     }
@@ -6650,7 +6650,7 @@ impl EchoRoom {
             &self.ctx,
             &self.data,
             vec![],
-            run__echo_room_messages,
+            run_echo_room_messages,
             as_value,
         ))
     }
@@ -6661,7 +6661,7 @@ impl EchoRoom {
             &self.ctx,
             &self.data,
             vec![],
-            run__echo_room_transcript,
+            run_echo_room_transcript,
             as_value,
         )
     }
@@ -6768,7 +6768,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_create_user,
+            run_slack_fixture_create_user,
             SlackUser::wrap,
         ))
     }
@@ -6779,7 +6779,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_users,
+            run_slack_fixture_users,
             as_value,
         )
     }
@@ -6790,7 +6790,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_conversations,
+            run_slack_fixture_conversations,
             as_value,
         )
     }
@@ -6801,7 +6801,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_create_channel,
+            run_slack_fixture_create_channel,
             SlackConversation::wrap,
         ))
     }
@@ -6812,7 +6812,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_deliveries,
+            run_slack_fixture_deliveries,
             as_value,
         )
     }
@@ -6823,7 +6823,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_calls,
+            run_slack_fixture_calls,
             as_value,
         ))
     }
@@ -6834,7 +6834,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_uninstall_app,
+            run_slack_fixture_uninstall_app,
             as_value,
         )
     }
@@ -6845,7 +6845,7 @@ impl SlackFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_fixture_fault,
+            run_slack_fixture_fault,
             SlackFault::wrap,
         ))
     }
@@ -7086,7 +7086,7 @@ impl SlackFixtureWaitForCall {
         let item = wait_for_next(
             &seen,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
-            || run__slack_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            || run_slack_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 let _ = item;
                 true
@@ -7326,7 +7326,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![message.into_arg()],
-            run__slack_user_say,
+            run_slack_user_say,
             SlackMessage::wrap,
         ))
     }
@@ -7337,7 +7337,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![message.into_arg()],
-            run__slack_user_reply,
+            run_slack_user_reply,
             SlackMessage::wrap,
         ))
     }
@@ -7348,7 +7348,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![text.into_arg()],
-            run__slack_user_edit,
+            run_slack_user_edit,
             SlackMessage::wrap,
         ))
     }
@@ -7359,7 +7359,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_user_delete,
+            run_slack_user_delete,
             as_unit,
         ))
     }
@@ -7370,7 +7370,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![button.into_arg()],
-            run__slack_user_click,
+            run_slack_user_click,
             SlackDelivery::wrap_opt,
         ))
     }
@@ -7381,7 +7381,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![option.into_arg()],
-            run__slack_user_select,
+            run_slack_user_select,
             SlackDelivery::wrap,
         ))
     }
@@ -7392,7 +7392,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![callback_id.into_arg()],
-            run__slack_user_shortcut,
+            run_slack_user_shortcut,
             SlackDelivery::wrap,
         ))
     }
@@ -7403,7 +7403,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![command.into_arg()],
-            run__slack_user_run_command,
+            run_slack_user_run_command,
             SlackDelivery::wrap,
         ))
     }
@@ -7414,7 +7414,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_user_stop,
+            run_slack_user_stop,
             SlackDelivery::wrap,
         ))
     }
@@ -7425,7 +7425,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_user_open_agent_thread,
+            run_slack_user_open_agent_thread,
             SlackThread::wrap,
         ))
     }
@@ -7436,7 +7436,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![title.into_arg()],
-            run__slack_user_pick_prompt,
+            run_slack_user_pick_prompt,
             SlackMessage::wrap,
         ))
     }
@@ -7447,7 +7447,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![channel.into_arg()],
-            run__slack_user_switch_context,
+            run_slack_user_switch_context,
             SlackDelivery::wrap,
         ))
     }
@@ -7458,7 +7458,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_user_modals,
+            run_slack_user_modals,
             as_value,
         )
     }
@@ -7469,7 +7469,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![emoji.into_arg()],
-            run__slack_user_react,
+            run_slack_user_react,
             SlackDelivery::wrap_opt,
         ))
     }
@@ -7480,18 +7480,18 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![emoji.into_arg()],
-            run__slack_user_unreact,
+            run_slack_user_unreact,
             SlackDelivery::wrap_opt,
         ))
     }
 
     /// Open (or reuse) a DM with the app, another person, or several. Experimental.
-    pub fn open_d_m(&self, participants: impl IntoArg) -> Call<SlackConversation> {
+    pub fn open_dm(&self, participants: impl IntoArg) -> Call<SlackConversation> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![participants.into_arg()],
-            run__slack_user_open_d_m,
+            run_slack_user_open_dm,
             SlackConversation::wrap,
         )
     }
@@ -7502,7 +7502,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![participants.into_arg()],
-            run__slack_user_invite,
+            run_slack_user_invite,
             as_unit,
         ))
     }
@@ -7513,7 +7513,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![participant.into_arg()],
-            run__slack_user_kick,
+            run_slack_user_kick,
             as_unit,
         ))
     }
@@ -7524,7 +7524,7 @@ impl SlackUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_user_ephemeral,
+            run_slack_user_ephemeral,
             as_value,
         )
     }
@@ -7953,7 +7953,7 @@ impl SlackUserWaitForModal {
         let item = wait_for_next(
             &seen,
             "waitForModal",
-            || run__slack_user_modals(&ctx, &me, vec![], filters.clone()),
+            || run_slack_user_modals(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 text_matches(
                     item.get("title").and_then(Value::as_str).unwrap_or(""),
@@ -8051,7 +8051,7 @@ impl SlackConversation {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_conversation_latest_message,
+            run_slack_conversation_latest_message,
             SlackMessage::wrap,
         )
     }
@@ -8062,7 +8062,7 @@ impl SlackConversation {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_conversation_messages,
+            run_slack_conversation_messages,
             as_value,
         )
     }
@@ -8073,7 +8073,7 @@ impl SlackConversation {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_conversation_members,
+            run_slack_conversation_members,
             as_value,
         )
     }
@@ -8084,7 +8084,7 @@ impl SlackConversation {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_conversation_transcript,
+            run_slack_conversation_transcript,
             as_value,
         ))
     }
@@ -8163,7 +8163,7 @@ impl SlackConversationWaitForMessage {
         let item = wait_for_next(
             &seen,
             "waitForMessage",
-            || run__slack_conversation_messages(&ctx, &me, vec![], filters.clone()),
+            || run_slack_conversation_messages(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             None,
             &match &from {
@@ -8331,7 +8331,7 @@ impl SlackMessage {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_message_refresh,
+            run_slack_message_refresh,
             SlackMessage::wrap,
         )
     }
@@ -8342,7 +8342,7 @@ impl SlackMessage {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_message_reactions,
+            run_slack_message_reactions,
             as_value,
         )
     }
@@ -8353,7 +8353,7 @@ impl SlackMessage {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_message_transcript,
+            run_slack_message_transcript,
             as_value,
         ))
     }
@@ -8364,7 +8364,7 @@ impl SlackMessage {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_message_deliveries,
+            run_slack_message_deliveries,
             as_value,
         )
     }
@@ -8470,7 +8470,7 @@ impl SlackThread {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_thread_suggested_prompts,
+            run_slack_thread_suggested_prompts,
             as_value,
         )
     }
@@ -8481,7 +8481,7 @@ impl SlackThread {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_thread_replies,
+            run_slack_thread_replies,
             as_value,
         )
     }
@@ -8492,7 +8492,7 @@ impl SlackThread {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_thread_status,
+            run_slack_thread_status,
             as_value,
         )
     }
@@ -8503,7 +8503,7 @@ impl SlackThread {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_thread_transcript,
+            run_slack_thread_transcript,
             as_value,
         ))
     }
@@ -8592,7 +8592,7 @@ impl SlackThreadWaitForReply {
         let item = wait_for_next(
             &seen,
             "waitForReply",
-            || run__slack_thread_replies(&ctx, &me, vec![], filters.clone()),
+            || run_slack_thread_replies(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             None,
             &match &from {
@@ -8667,7 +8667,7 @@ impl SlackThreadLatestReply {
             .unwrap_or_else(|| Value::from("750ms"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
-            || run__slack_thread_replies(&ctx, &me, vec![], filters.clone()),
+            || run_slack_thread_replies(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             || ctx.quiet(),
             &match &from {
@@ -8797,7 +8797,7 @@ impl SlackDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_delivery_refresh,
+            run_slack_delivery_refresh,
             SlackDelivery::wrap,
         )
     }
@@ -8808,7 +8808,7 @@ impl SlackDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_delivery_retry,
+            run_slack_delivery_retry,
             as_value,
         ))
     }
@@ -8819,7 +8819,7 @@ impl SlackDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_delivery_resend,
+            run_slack_delivery_resend,
             as_value,
         ))
     }
@@ -8924,7 +8924,7 @@ impl SlackDeliverySettled {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run__slack_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            let read = run_slack_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
                 let value = read.await?;
                 Ok((!["pending"]
@@ -9037,7 +9037,7 @@ impl SlackStream {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_stream_refresh,
+            run_slack_stream_refresh,
             SlackStream::wrap,
         )
     }
@@ -9086,7 +9086,7 @@ impl SlackStreamEnded {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let value = wait_for("the stream to end", &timeout, || {
-            let read = run__slack_stream_refresh(&ctx, &me, vec![], filters.clone());
+            let read = run_slack_stream_refresh(&ctx, &me, vec![], filters.clone());
             async move {
                 let value = read.await?;
                 Ok(
@@ -9198,7 +9198,7 @@ impl SlackModal {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_modal_values,
+            run_slack_modal_values,
             as_value,
         )
     }
@@ -9209,7 +9209,7 @@ impl SlackModal {
             &self.ctx,
             &self.data,
             vec![values.into_arg()],
-            run__slack_modal_submit,
+            run_slack_modal_submit,
             SlackDelivery::wrap,
         )
     }
@@ -9220,7 +9220,7 @@ impl SlackModal {
             &self.ctx,
             &self.data,
             vec![],
-            run__slack_modal_close,
+            run_slack_modal_close,
             SlackDelivery::wrap_opt,
         )
     }
@@ -9283,13 +9283,7 @@ impl SlackFault {
 
     /// Remove a fault. Experimental.
     pub fn undo(&self) -> Call<()> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run__slack_fault_undo,
-            as_unit,
-        )
+        Call::new(&self.ctx, &self.data, vec![], run_slack_fault_undo, as_unit)
     }
 }
 
@@ -9368,7 +9362,7 @@ impl GitHubFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_fixture_create_user,
+            run_git_hub_fixture_create_user,
             GitHubUser::wrap,
         ))
     }
@@ -9379,7 +9373,7 @@ impl GitHubFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_fixture_create_repo,
+            run_git_hub_fixture_create_repo,
             GitHubRepo::wrap,
         ))
     }
@@ -9390,7 +9384,7 @@ impl GitHubFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_fixture_deliveries,
+            run_git_hub_fixture_deliveries,
             as_value,
         ))
     }
@@ -9401,7 +9395,7 @@ impl GitHubFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_fixture_app_calls,
+            run_git_hub_fixture_app_calls,
             as_value,
         ))
     }
@@ -9412,7 +9406,7 @@ impl GitHubFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_fixture_calls,
+            run_git_hub_fixture_calls,
             as_value,
         ))
     }
@@ -9639,7 +9633,7 @@ impl GitHubFixtureWaitForCall {
         let item = wait_for_next(
             &seen,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
-            || run__git_hub_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            || run_git_hub_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 let _ = item;
                 true
@@ -9775,7 +9769,7 @@ impl GitHubApp {
             &self.ctx,
             &self.data,
             vec![repo.into_arg()],
-            run__git_hub_app_installation_id,
+            run_git_hub_app_installation_id,
             as_value,
         )
     }
@@ -9889,7 +9883,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![changes.into_arg()],
-            run__git_hub_user_push,
+            run_git_hub_user_push,
             GitHubCommit::wrap,
         ))
     }
@@ -9900,7 +9894,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![issue.into_arg()],
-            run__git_hub_user_open_issue,
+            run_git_hub_user_open_issue,
             GitHubIssue::wrap,
         ))
     }
@@ -9911,7 +9905,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![pr.into_arg()],
-            run__git_hub_user_open_pull_request,
+            run_git_hub_user_open_pull_request,
             GitHubPullRequest::wrap,
         ))
     }
@@ -9922,7 +9916,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![changes.into_arg()],
-            run__git_hub_user_edit_issue,
+            run_git_hub_user_edit_issue,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -9933,7 +9927,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_close,
+            run_git_hub_user_close,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -9944,7 +9938,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_reopen,
+            run_git_hub_user_reopen,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -9955,7 +9949,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![labels.into_arg()],
-            run__git_hub_user_label,
+            run_git_hub_user_label,
             as_value,
         ))
     }
@@ -9966,7 +9960,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![labels.into_arg()],
-            run__git_hub_user_unlabel,
+            run_git_hub_user_unlabel,
             as_value,
         ))
     }
@@ -9977,7 +9971,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![assignees.into_arg()],
-            run__git_hub_user_assign,
+            run_git_hub_user_assign,
             as_value,
         ))
     }
@@ -9988,7 +9982,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__git_hub_user_comment,
+            run_git_hub_user_comment,
             GitHubComment::wrap,
         ))
     }
@@ -9999,7 +9993,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__git_hub_user_edit,
+            run_git_hub_user_edit,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10010,7 +10004,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_delete,
+            run_git_hub_user_delete,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10021,7 +10015,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![content.into_arg()],
-            run__git_hub_user_react,
+            run_git_hub_user_react,
             as_unit,
         ))
     }
@@ -10032,7 +10026,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_minimize,
+            run_git_hub_user_minimize,
             as_unit,
         ))
     }
@@ -10043,7 +10037,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![review.into_arg()],
-            run__git_hub_user_review,
+            run_git_hub_user_review,
             as_value,
         )
     }
@@ -10054,7 +10048,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__git_hub_user_review_comment,
+            run_git_hub_user_review_comment,
             GitHubReviewComment::wrap,
         ))
     }
@@ -10065,7 +10059,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__git_hub_user_reply,
+            run_git_hub_user_reply,
             GitHubReviewComment::wrap,
         ))
     }
@@ -10076,7 +10070,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_resolve,
+            run_git_hub_user_resolve,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10087,7 +10081,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_unresolve,
+            run_git_hub_user_unresolve,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10098,7 +10092,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![reviewers.into_arg()],
-            run__git_hub_user_request_review,
+            run_git_hub_user_request_review,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10109,7 +10103,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_mark_ready,
+            run_git_hub_user_mark_ready,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10120,7 +10114,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_merge,
+            run_git_hub_user_merge,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10131,7 +10125,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_user_rerun,
+            run_git_hub_user_rerun,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10142,7 +10136,7 @@ impl GitHubUser {
             &self.ctx,
             &self.data,
             vec![identifier.into_arg()],
-            run__git_hub_user_request_action,
+            run_git_hub_user_request_action,
             GitHubDelivery::wrap_opt,
         ))
     }
@@ -10782,7 +10776,7 @@ impl GitHubRepo {
             &self.ctx,
             &self.data,
             vec![app.into_arg()],
-            run__git_hub_repo_install_app,
+            run_git_hub_repo_install_app,
             GitHubDelivery::wrap_opt,
         )
     }
@@ -10793,7 +10787,7 @@ impl GitHubRepo {
             &self.ctx,
             &self.data,
             vec![app.into_arg()],
-            run__git_hub_repo_uninstall_app,
+            run_git_hub_repo_uninstall_app,
             GitHubDelivery::wrap_opt,
         )
     }
@@ -10804,7 +10798,7 @@ impl GitHubRepo {
             &self.ctx,
             &self.data,
             vec![number.into_arg()],
-            run__git_hub_repo_issue,
+            run_git_hub_repo_issue,
             GitHubIssue::wrap,
         )
     }
@@ -10815,7 +10809,7 @@ impl GitHubRepo {
             &self.ctx,
             &self.data,
             vec![number.into_arg()],
-            run__git_hub_repo_pull_request,
+            run_git_hub_repo_pull_request,
             GitHubPullRequest::wrap,
         )
     }
@@ -10826,7 +10820,7 @@ impl GitHubRepo {
             &self.ctx,
             &self.data,
             vec![path.into_arg()],
-            run__git_hub_repo_read_file,
+            run_git_hub_repo_read_file,
             as_value,
         ))
     }
@@ -10837,7 +10831,7 @@ impl GitHubRepo {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_repo_commits,
+            run_git_hub_repo_commits,
             as_value,
         ))
     }
@@ -10990,7 +10984,7 @@ impl GitHubDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_delivery_refresh,
+            run_git_hub_delivery_refresh,
             GitHubDelivery::wrap,
         )
     }
@@ -11001,7 +10995,7 @@ impl GitHubDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_delivery_redeliver,
+            run_git_hub_delivery_redeliver,
             as_value,
         )
     }
@@ -11012,7 +11006,7 @@ impl GitHubDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_delivery_resend,
+            run_git_hub_delivery_resend,
             as_value,
         ))
     }
@@ -11083,7 +11077,7 @@ impl GitHubDeliverySettled {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run__git_hub_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            let read = run_git_hub_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
                 let value = read.await?;
                 Ok((!["pending"]
@@ -11187,7 +11181,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_refresh,
+            run_git_hub_issue_refresh,
             GitHubIssue::wrap,
         )
     }
@@ -11198,7 +11192,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_title,
+            run_git_hub_issue_title,
             as_value,
         )
     }
@@ -11209,7 +11203,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_state,
+            run_git_hub_issue_state,
             as_value,
         )
     }
@@ -11220,7 +11214,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_labels,
+            run_git_hub_issue_labels,
             as_value,
         )
     }
@@ -11231,7 +11225,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_assignees,
+            run_git_hub_issue_assignees,
             as_value,
         )
     }
@@ -11242,7 +11236,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_comments,
+            run_git_hub_issue_comments,
             as_value,
         )
     }
@@ -11253,7 +11247,7 @@ impl GitHubIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_transcript,
+            run_git_hub_issue_transcript,
             as_value,
         )
     }
@@ -11326,7 +11320,7 @@ impl GitHubIssueWaitForComment {
         let item = wait_for_next(
             &seen,
             "waitForComment",
-            || run__git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
+            || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 from_matches(item.get("author").unwrap_or(&Value::Null), &from)
                     && text_matches(
@@ -11407,7 +11401,7 @@ impl GitHubIssueLatestComment {
             .unwrap_or_else(|| Value::from("750ms"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
-            || run__git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
+            || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             || ctx.quiet(),
             &match &from {
@@ -11528,7 +11522,7 @@ impl GitHubCommit {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_commit_check_runs,
+            run_git_hub_commit_check_runs,
             as_value,
         )
     }
@@ -11539,7 +11533,7 @@ impl GitHubCommit {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_commit_statuses,
+            run_git_hub_commit_statuses,
             as_value,
         )
     }
@@ -11746,7 +11740,7 @@ impl GitHubComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_comment_refresh,
+            run_git_hub_comment_refresh,
             GitHubComment::wrap,
         )
     }
@@ -11757,7 +11751,7 @@ impl GitHubComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_comment_reactions,
+            run_git_hub_comment_reactions,
             as_value,
         )
     }
@@ -11864,7 +11858,7 @@ impl GitHubReviewComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_review_comment_replies,
+            run_git_hub_review_comment_replies,
             as_value,
         )
     }
@@ -11875,7 +11869,7 @@ impl GitHubReviewComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_review_comment_resolved,
+            run_git_hub_review_comment_resolved,
             as_value,
         )
     }
@@ -11886,7 +11880,7 @@ impl GitHubReviewComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_review_comment_transcript,
+            run_git_hub_review_comment_transcript,
             as_value,
         )
     }
@@ -11960,7 +11954,7 @@ impl LinearFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_fixture_create_user,
+            run_linear_fixture_create_user,
             LinearUser::wrap,
         ))
     }
@@ -11971,7 +11965,7 @@ impl LinearFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_fixture_create_team,
+            run_linear_fixture_create_team,
             LinearTeam::wrap,
         ))
     }
@@ -11982,7 +11976,7 @@ impl LinearFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_fixture_deliveries,
+            run_linear_fixture_deliveries,
             as_value,
         ))
     }
@@ -11993,7 +11987,7 @@ impl LinearFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_fixture_calls,
+            run_linear_fixture_calls,
             as_value,
         ))
     }
@@ -12190,7 +12184,7 @@ impl LinearFixtureWaitForCall {
         let item = wait_for_next(
             &seen,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
-            || run__linear_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            || run_linear_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 let _ = item;
                 true
@@ -12419,7 +12413,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![issue.into_arg()],
-            run__linear_user_create_issue,
+            run_linear_user_create_issue,
             LinearIssue::wrap,
         ))
     }
@@ -12430,7 +12424,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![changes.into_arg()],
-            run__linear_user_edit_issue,
+            run_linear_user_edit_issue,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12441,7 +12435,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_user_undelegate,
+            run_linear_user_undelegate,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12452,7 +12446,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![assignee.into_arg()],
-            run__linear_user_assign,
+            run_linear_user_assign,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12463,7 +12457,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![state.into_arg()],
-            run__linear_user_set_state,
+            run_linear_user_set_state,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12474,7 +12468,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![labels.into_arg()],
-            run__linear_user_label,
+            run_linear_user_label,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12485,7 +12479,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![app.into_arg()],
-            run__linear_user_delegate,
+            run_linear_user_delegate,
             LinearAgentSession::wrap,
         ))
     }
@@ -12496,7 +12490,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__linear_user_comment,
+            run_linear_user_comment,
             LinearComment::wrap,
         ))
     }
@@ -12507,7 +12501,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__linear_user_reply,
+            run_linear_user_reply,
             LinearComment::wrap,
         ))
     }
@@ -12518,7 +12512,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__linear_user_edit,
+            run_linear_user_edit,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12529,7 +12523,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_user_delete,
+            run_linear_user_delete,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12540,7 +12534,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![emoji.into_arg()],
-            run__linear_user_react,
+            run_linear_user_react,
             as_unit,
         ))
     }
@@ -12551,7 +12545,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__linear_user_prompt,
+            run_linear_user_prompt,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12562,7 +12556,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![body.into_arg()],
-            run__linear_user_answer,
+            run_linear_user_answer,
             LinearDelivery::wrap_opt,
         ))
     }
@@ -12573,7 +12567,7 @@ impl LinearUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_user_stop,
+            run_linear_user_stop,
             LinearDelivery::wrap,
         ))
     }
@@ -12984,7 +12978,7 @@ impl LinearTeam {
             &self.ctx,
             &self.data,
             vec![identifier.into_arg()],
-            run__linear_team_issue,
+            run_linear_team_issue,
             LinearIssue::wrap,
         )
     }
@@ -13076,7 +13070,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_refresh,
+            run_linear_issue_refresh,
             LinearIssue::wrap,
         )
     }
@@ -13087,7 +13081,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_title,
+            run_linear_issue_title,
             as_value,
         )
     }
@@ -13098,7 +13092,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_state,
+            run_linear_issue_state,
             as_value,
         )
     }
@@ -13109,7 +13103,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_assignee,
+            run_linear_issue_assignee,
             LinearUser::wrap_opt,
         )
     }
@@ -13120,7 +13114,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_delegated_to,
+            run_linear_issue_delegated_to,
             LinearApp::wrap_opt,
         )
     }
@@ -13131,7 +13125,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_labels,
+            run_linear_issue_labels,
             as_value,
         )
     }
@@ -13142,7 +13136,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_comments,
+            run_linear_issue_comments,
             as_value,
         )
     }
@@ -13153,7 +13147,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_sessions,
+            run_linear_issue_sessions,
             as_value,
         )
     }
@@ -13164,7 +13158,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_session,
+            run_linear_issue_session,
             LinearAgentSession::wrap,
         )
     }
@@ -13175,7 +13169,7 @@ impl LinearIssue {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_issue_transcript,
+            run_linear_issue_transcript,
             as_value,
         )
     }
@@ -13248,7 +13242,7 @@ impl LinearIssueWaitForComment {
         let item = wait_for_next(
             &seen,
             "waitForComment",
-            || run__linear_issue_comments(&ctx, &me, vec![], filters.clone()),
+            || run_linear_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 from_matches(item.get("author").unwrap_or(&Value::Null), &from)
                     && text_matches(
@@ -13329,7 +13323,7 @@ impl LinearIssueLatestComment {
             .unwrap_or_else(|| Value::from("750ms"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
-            || run__linear_issue_comments(&ctx, &me, vec![], filters.clone()),
+            || run_linear_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             || ctx.quiet(),
             &match &from {
@@ -13461,7 +13455,7 @@ impl LinearDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_delivery_refresh,
+            run_linear_delivery_refresh,
             LinearDelivery::wrap,
         )
     }
@@ -13472,7 +13466,7 @@ impl LinearDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_delivery_redeliver,
+            run_linear_delivery_redeliver,
             as_value,
         )
     }
@@ -13483,7 +13477,7 @@ impl LinearDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_delivery_resend,
+            run_linear_delivery_resend,
             as_value,
         ))
     }
@@ -13558,7 +13552,7 @@ impl LinearDeliverySettled {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run__linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            let read = run_linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
                 let value = read.await?;
                 Ok((!["pending"]
@@ -13668,7 +13662,7 @@ impl LinearAgentSession {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_agent_session_state,
+            run_linear_agent_session_state,
             as_value,
         )
     }
@@ -13679,7 +13673,7 @@ impl LinearAgentSession {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_agent_session_activities,
+            run_linear_agent_session_activities,
             as_value,
         )
     }
@@ -13690,7 +13684,7 @@ impl LinearAgentSession {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_agent_session_external_urls,
+            run_linear_agent_session_external_urls,
             as_value,
         )
     }
@@ -13701,7 +13695,7 @@ impl LinearAgentSession {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_agent_session_plan,
+            run_linear_agent_session_plan,
             as_value,
         )
     }
@@ -13712,7 +13706,7 @@ impl LinearAgentSession {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_agent_session_transcript,
+            run_linear_agent_session_transcript,
             as_value,
         )
     }
@@ -13779,7 +13773,7 @@ impl LinearAgentSessionWaitForState {
         };
         let value = wait_for("the agent session to reach that state", &timeout, || {
             let values = &values;
-            let read = run__linear_agent_session_state(&ctx, &me, vec![], filters.clone());
+            let read = run_linear_agent_session_state(&ctx, &me, vec![], filters.clone());
             async move {
                 let value = read.await?;
                 Ok(values.contains(&value).then(|| value.clone()))
@@ -13839,7 +13833,7 @@ impl LinearAgentSessionWaitForActivity {
         let item = wait_for_next(
             &seen,
             "waitForActivity",
-            || run__linear_agent_session_activities(&ctx, &me, vec![], filters.clone()),
+            || run_linear_agent_session_activities(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 text_matches(
                     item.get("type").and_then(Value::as_str).unwrap_or(""),
@@ -13970,7 +13964,7 @@ impl LinearComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_comment_replies,
+            run_linear_comment_replies,
             as_value,
         )
     }
@@ -13981,7 +13975,7 @@ impl LinearComment {
             &self.ctx,
             &self.data,
             vec![],
-            run__linear_comment_transcript,
+            run_linear_comment_transcript,
             as_value,
         )
     }
@@ -14153,7 +14147,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_fixture_create_user,
+            run_notion_fixture_create_user,
             NotionUser::wrap,
         ))
     }
@@ -14164,7 +14158,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_fixture_create_page,
+            run_notion_fixture_create_page,
             NotionPage::wrap,
         ))
     }
@@ -14175,7 +14169,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_fixture_create_database,
+            run_notion_fixture_create_database,
             NotionDatabase::wrap,
         ))
     }
@@ -14186,7 +14180,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![delay.into_arg()],
-            run__notion_fixture_set_content_update_delay,
+            run_notion_fixture_set_content_update_delay,
             as_unit,
         )
     }
@@ -14197,7 +14191,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_fixture_send_verification,
+            run_notion_fixture_send_verification,
             NotionDelivery::wrap_opt,
         )
     }
@@ -14208,7 +14202,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_fixture_deliveries,
+            run_notion_fixture_deliveries,
             as_value,
         ))
     }
@@ -14219,7 +14213,7 @@ impl NotionFixture {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_fixture_calls,
+            run_notion_fixture_calls,
             as_value,
         ))
     }
@@ -14450,7 +14444,7 @@ impl NotionFixtureWaitForCall {
         let item = wait_for_next(
             &seen,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
-            || run__notion_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            || run_notion_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 let _ = item;
                 true
@@ -14658,7 +14652,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![text.into_arg()],
-            run__notion_user_comment,
+            run_notion_user_comment,
             NotionComment::wrap,
         ))
     }
@@ -14669,7 +14663,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![text.into_arg()],
-            run__notion_user_reply,
+            run_notion_user_reply,
             NotionComment::wrap,
         ))
     }
@@ -14680,7 +14674,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![text.into_arg()],
-            run__notion_user_edit_comment,
+            run_notion_user_edit_comment,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14691,7 +14685,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_user_delete_comment,
+            run_notion_user_delete_comment,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14702,7 +14696,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_user_resolve,
+            run_notion_user_resolve,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14713,7 +14707,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_user_reopen,
+            run_notion_user_reopen,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14724,7 +14718,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![page.into_arg()],
-            run__notion_user_create_page,
+            run_notion_user_create_page,
             NotionPage::wrap,
         )
     }
@@ -14735,7 +14729,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![change.into_arg()],
-            run__notion_user_edit,
+            run_notion_user_edit,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14746,7 +14740,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![title.into_arg()],
-            run__notion_user_rename,
+            run_notion_user_rename,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14757,7 +14751,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![integration.into_arg()],
-            run__notion_user_mention,
+            run_notion_user_mention,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14768,7 +14762,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![name.into_arg(), value.into_arg()],
-            run__notion_user_set_property,
+            run_notion_user_set_property,
             NotionDelivery::wrap_opt,
         ))
     }
@@ -14779,7 +14773,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![values.into_arg()],
-            run__notion_user_add_row,
+            run_notion_user_add_row,
             NotionPage::wrap,
         ))
     }
@@ -14790,7 +14784,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![integration.into_arg()],
-            run__notion_user_connect,
+            run_notion_user_connect,
             as_unit,
         ))
     }
@@ -14801,7 +14795,7 @@ impl NotionUser {
             &self.ctx,
             &self.data,
             vec![integration.into_arg()],
-            run__notion_user_disconnect,
+            run_notion_user_disconnect,
             as_unit,
         ))
     }
@@ -15183,7 +15177,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_page_discussions,
+            run_notion_page_discussions,
             as_value,
         )
     }
@@ -15194,7 +15188,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_page_markdown,
+            run_notion_page_markdown,
             as_value,
         )
     }
@@ -15205,7 +15199,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_page_blocks,
+            run_notion_page_blocks,
             as_value,
         )
     }
@@ -15216,7 +15210,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![name.into_arg()],
-            run__notion_page_property,
+            run_notion_page_property,
             as_value,
         )
     }
@@ -15227,7 +15221,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_page_children,
+            run_notion_page_children,
             as_value,
         )
     }
@@ -15238,7 +15232,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_page_connections,
+            run_notion_page_connections,
             as_value,
         )
     }
@@ -15249,7 +15243,7 @@ impl NotionPage {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_page_transcript,
+            run_notion_page_transcript,
             as_value,
         )
     }
@@ -15337,7 +15331,7 @@ impl NotionDatabase {
             &self.ctx,
             &self.data,
             vec![filter.into_arg()],
-            run__notion_database_rows,
+            run_notion_database_rows,
             as_value,
         )
     }
@@ -15437,7 +15431,7 @@ impl NotionDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_delivery_refresh,
+            run_notion_delivery_refresh,
             NotionDelivery::wrap,
         )
     }
@@ -15448,7 +15442,7 @@ impl NotionDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_delivery_redeliver,
+            run_notion_delivery_redeliver,
             as_value,
         )
     }
@@ -15459,7 +15453,7 @@ impl NotionDelivery {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_delivery_resend,
+            run_notion_delivery_resend,
             as_value,
         ))
     }
@@ -15530,7 +15524,7 @@ impl NotionDeliverySettled {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run__notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            let read = run_notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
                 let value = read.await?;
                 Ok((!["pending"]
@@ -15713,7 +15707,7 @@ impl NotionDiscussion {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_discussion_comments,
+            run_notion_discussion_comments,
             as_value,
         )
     }
@@ -15724,7 +15718,7 @@ impl NotionDiscussion {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_discussion_resolved,
+            run_notion_discussion_resolved,
             as_value,
         )
     }
@@ -15735,7 +15729,7 @@ impl NotionDiscussion {
             &self.ctx,
             &self.data,
             vec![],
-            run__notion_discussion_transcript,
+            run_notion_discussion_transcript,
             as_value,
         )
     }
@@ -15802,7 +15796,7 @@ impl NotionDiscussionWaitForComment {
         let item = wait_for_next(
             &seen,
             "waitForComment",
-            || run__notion_discussion_comments(&ctx, &me, vec![], filters.clone()),
+            || run_notion_discussion_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             None,
             &match &from {
@@ -15877,7 +15871,7 @@ impl NotionDiscussionLatestComment {
             .unwrap_or_else(|| Value::from("750ms"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
-            || run__notion_discussion_comments(&ctx, &me, vec![], filters.clone()),
+            || run_notion_discussion_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             || ctx.quiet(),
             &match &from {
@@ -15953,7 +15947,7 @@ impl GitHubPullRequest {
             .unwrap_or_default())
     }
     /// This handle as the `GitHubIssue` it is a kind of.
-    pub fn as__git_hub_issue(&self) -> GitHubIssue {
+    pub fn as_git_hub_issue(&self) -> GitHubIssue {
         GitHubIssue::from_wire(&self.ctx, self.data.clone())
     }
     /// `repoId`.
@@ -16006,7 +16000,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_pull_request_refresh,
+            run_git_hub_pull_request_refresh,
             GitHubPullRequest::wrap,
         )
     }
@@ -16017,7 +16011,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_pull_request_head_commit,
+            run_git_hub_pull_request_head_commit,
             GitHubCommit::wrap,
         )
     }
@@ -16028,7 +16022,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_pull_request_reviews,
+            run_git_hub_pull_request_reviews,
             as_value,
         )
     }
@@ -16039,7 +16033,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_pull_request_review_comments,
+            run_git_hub_pull_request_review_comments,
             as_value,
         )
     }
@@ -16050,7 +16044,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_pull_request_check_runs,
+            run_git_hub_pull_request_check_runs,
             as_value,
         )
     }
@@ -16061,7 +16055,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_pull_request_merged,
+            run_git_hub_pull_request_merged,
             as_value,
         )
     }
@@ -16072,7 +16066,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_title,
+            run_git_hub_issue_title,
             as_value,
         )
     }
@@ -16083,7 +16077,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_state,
+            run_git_hub_issue_state,
             as_value,
         )
     }
@@ -16094,7 +16088,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_labels,
+            run_git_hub_issue_labels,
             as_value,
         )
     }
@@ -16105,7 +16099,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_assignees,
+            run_git_hub_issue_assignees,
             as_value,
         )
     }
@@ -16116,7 +16110,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_comments,
+            run_git_hub_issue_comments,
             as_value,
         )
     }
@@ -16127,7 +16121,7 @@ impl GitHubPullRequest {
             &self.ctx,
             &self.data,
             vec![],
-            run__git_hub_issue_transcript,
+            run_git_hub_issue_transcript,
             as_value,
         )
     }
@@ -16200,7 +16194,7 @@ impl GitHubPullRequestWaitForComment {
         let item = wait_for_next(
             &seen,
             "waitForComment",
-            || run__git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
+            || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
                 from_matches(item.get("author").unwrap_or(&Value::Null), &from)
                     && text_matches(
@@ -16281,7 +16275,7 @@ impl GitHubPullRequestLatestComment {
             .unwrap_or_else(|| Value::from("750ms"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
-            || run__git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
+            || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
             || ctx.quiet(),
             &match &from {
@@ -16322,621 +16316,614 @@ pub async fn call_by_name(
         .ok_or_else(|| Error::Invalid(format!("{method}: not a handle")))?;
     let data = match (resource, method) {
         ("Channelstack", "status") => {
-            run__channelstack_status(&target.ctx, &target.data, args, options).await?
+            run_channelstack_status(&target.ctx, &target.data, args, options).await?
         }
         ("Channelstack", "openSession") => {
-            run__channelstack_open_session(&target.ctx, &target.data, args, options).await?
+            run_channelstack_open_session(&target.ctx, &target.data, args, options).await?
         }
         ("Channelstack", "reset") => {
-            run__channelstack_reset(&target.ctx, &target.data, args, options).await?
+            run_channelstack_reset(&target.ctx, &target.data, args, options).await?
         }
         ("Channelstack", "env") => {
-            run__channelstack_env(&target.ctx, &target.data, args, options).await?
+            run_channelstack_env(&target.ctx, &target.data, args, options).await?
         }
         ("Channelstack", "uiLoginLink") => {
-            run__channelstack_ui_login_link(&target.ctx, &target.data, args, options).await?
+            run_channelstack_ui_login_link(&target.ctx, &target.data, args, options).await?
         }
-        ("Session", "close") => {
-            run__session_close(&target.ctx, &target.data, args, options).await?
-        }
+        ("Session", "close") => run_session_close(&target.ctx, &target.data, args, options).await?,
         ("Session", "events") => {
-            run__session_events(&target.ctx, &target.data, args, options).await?
+            run_session_events(&target.ctx, &target.data, args, options).await?
         }
-        ("Session", "quiet") => {
-            run__session_quiet(&target.ctx, &target.data, args, options).await?
-        }
-        ("Session", "echo") => run__session_echo(&target.ctx, &target.data, args, options).await?,
-        ("Session", "slack") => {
-            run__session_slack(&target.ctx, &target.data, args, options).await?
-        }
+        ("Session", "quiet") => run_session_quiet(&target.ctx, &target.data, args, options).await?,
+        ("Session", "echo") => run_session_echo(&target.ctx, &target.data, args, options).await?,
+        ("Session", "slack") => run_session_slack(&target.ctx, &target.data, args, options).await?,
         ("Session", "github") => {
-            run__session_github(&target.ctx, &target.data, args, options).await?
+            run_session_github(&target.ctx, &target.data, args, options).await?
         }
         ("Session", "linear") => {
-            run__session_linear(&target.ctx, &target.data, args, options).await?
+            run_session_linear(&target.ctx, &target.data, args, options).await?
         }
         ("Session", "notion") => {
-            run__session_notion(&target.ctx, &target.data, args, options).await?
+            run_session_notion(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "createUser") => {
-            run__echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
+            run_echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "createRoom") => {
-            run__echo_fixture_create_room(&target.ctx, &target.data, args, options).await?
+            run_echo_fixture_create_room(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "capabilities") => {
-            run__echo_fixture_capabilities(&target.ctx, &target.data, args, options).await?
+            run_echo_fixture_capabilities(&target.ctx, &target.data, args, options).await?
         }
-        ("EchoUser", "say") => run__echo_user_say(&target.ctx, &target.data, args, options).await?,
+        ("EchoUser", "say") => run_echo_user_say(&target.ctx, &target.data, args, options).await?,
         ("EchoRoom", "messages") => {
-            run__echo_room_messages(&target.ctx, &target.data, args, options).await?
+            run_echo_room_messages(&target.ctx, &target.data, args, options).await?
         }
         ("EchoRoom", "transcript") => {
-            run__echo_room_transcript(&target.ctx, &target.data, args, options).await?
+            run_echo_room_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "createUser") => {
-            run__slack_fixture_create_user(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "users") => {
-            run__slack_fixture_users(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_users(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "conversations") => {
-            run__slack_fixture_conversations(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_conversations(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "createChannel") => {
-            run__slack_fixture_create_channel(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_create_channel(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "deliveries") => {
-            run__slack_fixture_deliveries(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "calls") => {
-            run__slack_fixture_calls(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_calls(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "uninstallApp") => {
-            run__slack_fixture_uninstall_app(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_uninstall_app(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFixture", "fault") => {
-            run__slack_fixture_fault(&target.ctx, &target.data, args, options).await?
+            run_slack_fixture_fault(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "say") => {
-            run__slack_user_say(&target.ctx, &target.data, args, options).await?
+            run_slack_user_say(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "reply") => {
-            run__slack_user_reply(&target.ctx, &target.data, args, options).await?
+            run_slack_user_reply(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "edit") => {
-            run__slack_user_edit(&target.ctx, &target.data, args, options).await?
+            run_slack_user_edit(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "delete") => {
-            run__slack_user_delete(&target.ctx, &target.data, args, options).await?
+            run_slack_user_delete(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "click") => {
-            run__slack_user_click(&target.ctx, &target.data, args, options).await?
+            run_slack_user_click(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "select") => {
-            run__slack_user_select(&target.ctx, &target.data, args, options).await?
+            run_slack_user_select(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "shortcut") => {
-            run__slack_user_shortcut(&target.ctx, &target.data, args, options).await?
+            run_slack_user_shortcut(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "runCommand") => {
-            run__slack_user_run_command(&target.ctx, &target.data, args, options).await?
+            run_slack_user_run_command(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "stop") => {
-            run__slack_user_stop(&target.ctx, &target.data, args, options).await?
+            run_slack_user_stop(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "openAgentThread") => {
-            run__slack_user_open_agent_thread(&target.ctx, &target.data, args, options).await?
+            run_slack_user_open_agent_thread(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "pickPrompt") => {
-            run__slack_user_pick_prompt(&target.ctx, &target.data, args, options).await?
+            run_slack_user_pick_prompt(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "switchContext") => {
-            run__slack_user_switch_context(&target.ctx, &target.data, args, options).await?
+            run_slack_user_switch_context(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "modals") => {
-            run__slack_user_modals(&target.ctx, &target.data, args, options).await?
+            run_slack_user_modals(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "react") => {
-            run__slack_user_react(&target.ctx, &target.data, args, options).await?
+            run_slack_user_react(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "unreact") => {
-            run__slack_user_unreact(&target.ctx, &target.data, args, options).await?
+            run_slack_user_unreact(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "openDM") => {
-            run__slack_user_open_d_m(&target.ctx, &target.data, args, options).await?
+            run_slack_user_open_dm(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "invite") => {
-            run__slack_user_invite(&target.ctx, &target.data, args, options).await?
+            run_slack_user_invite(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "kick") => {
-            run__slack_user_kick(&target.ctx, &target.data, args, options).await?
+            run_slack_user_kick(&target.ctx, &target.data, args, options).await?
         }
         ("SlackUser", "ephemeral") => {
-            run__slack_user_ephemeral(&target.ctx, &target.data, args, options).await?
+            run_slack_user_ephemeral(&target.ctx, &target.data, args, options).await?
         }
         ("SlackConversation", "latestMessage") => {
-            run__slack_conversation_latest_message(&target.ctx, &target.data, args, options).await?
+            run_slack_conversation_latest_message(&target.ctx, &target.data, args, options).await?
         }
         ("SlackConversation", "messages") => {
-            run__slack_conversation_messages(&target.ctx, &target.data, args, options).await?
+            run_slack_conversation_messages(&target.ctx, &target.data, args, options).await?
         }
         ("SlackConversation", "members") => {
-            run__slack_conversation_members(&target.ctx, &target.data, args, options).await?
+            run_slack_conversation_members(&target.ctx, &target.data, args, options).await?
         }
         ("SlackConversation", "transcript") => {
-            run__slack_conversation_transcript(&target.ctx, &target.data, args, options).await?
+            run_slack_conversation_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("SlackMessage", "refresh") => {
-            run__slack_message_refresh(&target.ctx, &target.data, args, options).await?
+            run_slack_message_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("SlackMessage", "reactions") => {
-            run__slack_message_reactions(&target.ctx, &target.data, args, options).await?
+            run_slack_message_reactions(&target.ctx, &target.data, args, options).await?
         }
         ("SlackMessage", "transcript") => {
-            run__slack_message_transcript(&target.ctx, &target.data, args, options).await?
+            run_slack_message_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("SlackMessage", "deliveries") => {
-            run__slack_message_deliveries(&target.ctx, &target.data, args, options).await?
+            run_slack_message_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("SlackThread", "suggestedPrompts") => {
-            run__slack_thread_suggested_prompts(&target.ctx, &target.data, args, options).await?
+            run_slack_thread_suggested_prompts(&target.ctx, &target.data, args, options).await?
         }
         ("SlackThread", "replies") => {
-            run__slack_thread_replies(&target.ctx, &target.data, args, options).await?
+            run_slack_thread_replies(&target.ctx, &target.data, args, options).await?
         }
         ("SlackThread", "status") => {
-            run__slack_thread_status(&target.ctx, &target.data, args, options).await?
+            run_slack_thread_status(&target.ctx, &target.data, args, options).await?
         }
         ("SlackThread", "transcript") => {
-            run__slack_thread_transcript(&target.ctx, &target.data, args, options).await?
+            run_slack_thread_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("SlackDelivery", "refresh") => {
-            run__slack_delivery_refresh(&target.ctx, &target.data, args, options).await?
+            run_slack_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("SlackDelivery", "retry") => {
-            run__slack_delivery_retry(&target.ctx, &target.data, args, options).await?
+            run_slack_delivery_retry(&target.ctx, &target.data, args, options).await?
         }
         ("SlackDelivery", "resend") => {
-            run__slack_delivery_resend(&target.ctx, &target.data, args, options).await?
+            run_slack_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
         ("SlackStream", "refresh") => {
-            run__slack_stream_refresh(&target.ctx, &target.data, args, options).await?
+            run_slack_stream_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("SlackModal", "values") => {
-            run__slack_modal_values(&target.ctx, &target.data, args, options).await?
+            run_slack_modal_values(&target.ctx, &target.data, args, options).await?
         }
         ("SlackModal", "submit") => {
-            run__slack_modal_submit(&target.ctx, &target.data, args, options).await?
+            run_slack_modal_submit(&target.ctx, &target.data, args, options).await?
         }
         ("SlackModal", "close") => {
-            run__slack_modal_close(&target.ctx, &target.data, args, options).await?
+            run_slack_modal_close(&target.ctx, &target.data, args, options).await?
         }
         ("SlackFault", "undo") => {
-            run__slack_fault_undo(&target.ctx, &target.data, args, options).await?
+            run_slack_fault_undo(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubFixture", "createUser") => {
-            run__git_hub_fixture_create_user(&target.ctx, &target.data, args, options).await?
+            run_git_hub_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubFixture", "createRepo") => {
-            run__git_hub_fixture_create_repo(&target.ctx, &target.data, args, options).await?
+            run_git_hub_fixture_create_repo(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubFixture", "deliveries") => {
-            run__git_hub_fixture_deliveries(&target.ctx, &target.data, args, options).await?
+            run_git_hub_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubFixture", "appCalls") => {
-            run__git_hub_fixture_app_calls(&target.ctx, &target.data, args, options).await?
+            run_git_hub_fixture_app_calls(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubFixture", "calls") => {
-            run__git_hub_fixture_calls(&target.ctx, &target.data, args, options).await?
+            run_git_hub_fixture_calls(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubApp", "installationId") => {
-            run__git_hub_app_installation_id(&target.ctx, &target.data, args, options).await?
+            run_git_hub_app_installation_id(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "push") => {
-            run__git_hub_user_push(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_push(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "openIssue") => {
-            run__git_hub_user_open_issue(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_open_issue(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "openPullRequest") => {
-            run__git_hub_user_open_pull_request(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_open_pull_request(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "editIssue") => {
-            run__git_hub_user_edit_issue(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_edit_issue(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "close") => {
-            run__git_hub_user_close(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_close(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "reopen") => {
-            run__git_hub_user_reopen(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_reopen(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "label") => {
-            run__git_hub_user_label(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_label(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "unlabel") => {
-            run__git_hub_user_unlabel(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_unlabel(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "assign") => {
-            run__git_hub_user_assign(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_assign(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "comment") => {
-            run__git_hub_user_comment(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_comment(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "edit") => {
-            run__git_hub_user_edit(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_edit(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "delete") => {
-            run__git_hub_user_delete(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_delete(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "react") => {
-            run__git_hub_user_react(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_react(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "minimize") => {
-            run__git_hub_user_minimize(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_minimize(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "review") => {
-            run__git_hub_user_review(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_review(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "reviewComment") => {
-            run__git_hub_user_review_comment(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_review_comment(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "reply") => {
-            run__git_hub_user_reply(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_reply(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "resolve") => {
-            run__git_hub_user_resolve(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_resolve(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "unresolve") => {
-            run__git_hub_user_unresolve(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_unresolve(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "requestReview") => {
-            run__git_hub_user_request_review(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_request_review(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "markReady") => {
-            run__git_hub_user_mark_ready(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_mark_ready(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "merge") => {
-            run__git_hub_user_merge(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_merge(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "rerun") => {
-            run__git_hub_user_rerun(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_rerun(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "requestAction") => {
-            run__git_hub_user_request_action(&target.ctx, &target.data, args, options).await?
+            run_git_hub_user_request_action(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubRepo", "installApp") => {
-            run__git_hub_repo_install_app(&target.ctx, &target.data, args, options).await?
+            run_git_hub_repo_install_app(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubRepo", "uninstallApp") => {
-            run__git_hub_repo_uninstall_app(&target.ctx, &target.data, args, options).await?
+            run_git_hub_repo_uninstall_app(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubRepo", "issue") => {
-            run__git_hub_repo_issue(&target.ctx, &target.data, args, options).await?
+            run_git_hub_repo_issue(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubRepo", "pullRequest") => {
-            run__git_hub_repo_pull_request(&target.ctx, &target.data, args, options).await?
+            run_git_hub_repo_pull_request(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubRepo", "readFile") => {
-            run__git_hub_repo_read_file(&target.ctx, &target.data, args, options).await?
+            run_git_hub_repo_read_file(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubRepo", "commits") => {
-            run__git_hub_repo_commits(&target.ctx, &target.data, args, options).await?
+            run_git_hub_repo_commits(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubDelivery", "refresh") => {
-            run__git_hub_delivery_refresh(&target.ctx, &target.data, args, options).await?
+            run_git_hub_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubDelivery", "redeliver") => {
-            run__git_hub_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+            run_git_hub_delivery_redeliver(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubDelivery", "resend") => {
-            run__git_hub_delivery_resend(&target.ctx, &target.data, args, options).await?
+            run_git_hub_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "refresh") => {
-            run__git_hub_issue_refresh(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "title") => {
-            run__git_hub_issue_title(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_title(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "state") => {
-            run__git_hub_issue_state(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_state(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "labels") => {
-            run__git_hub_issue_labels(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_labels(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "assignees") => {
-            run__git_hub_issue_assignees(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_assignees(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "comments") => {
-            run__git_hub_issue_comments(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_comments(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubIssue", "transcript") => {
-            run__git_hub_issue_transcript(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubCommit", "checkRuns") => {
-            run__git_hub_commit_check_runs(&target.ctx, &target.data, args, options).await?
+            run_git_hub_commit_check_runs(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubCommit", "statuses") => {
-            run__git_hub_commit_statuses(&target.ctx, &target.data, args, options).await?
+            run_git_hub_commit_statuses(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubComment", "refresh") => {
-            run__git_hub_comment_refresh(&target.ctx, &target.data, args, options).await?
+            run_git_hub_comment_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubComment", "reactions") => {
-            run__git_hub_comment_reactions(&target.ctx, &target.data, args, options).await?
+            run_git_hub_comment_reactions(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubReviewComment", "replies") => {
-            run__git_hub_review_comment_replies(&target.ctx, &target.data, args, options).await?
+            run_git_hub_review_comment_replies(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubReviewComment", "resolved") => {
-            run__git_hub_review_comment_resolved(&target.ctx, &target.data, args, options).await?
+            run_git_hub_review_comment_resolved(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubReviewComment", "transcript") => {
-            run__git_hub_review_comment_transcript(&target.ctx, &target.data, args, options).await?
+            run_git_hub_review_comment_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("LinearFixture", "createUser") => {
-            run__linear_fixture_create_user(&target.ctx, &target.data, args, options).await?
+            run_linear_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("LinearFixture", "createTeam") => {
-            run__linear_fixture_create_team(&target.ctx, &target.data, args, options).await?
+            run_linear_fixture_create_team(&target.ctx, &target.data, args, options).await?
         }
         ("LinearFixture", "deliveries") => {
-            run__linear_fixture_deliveries(&target.ctx, &target.data, args, options).await?
+            run_linear_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("LinearFixture", "calls") => {
-            run__linear_fixture_calls(&target.ctx, &target.data, args, options).await?
+            run_linear_fixture_calls(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "createIssue") => {
-            run__linear_user_create_issue(&target.ctx, &target.data, args, options).await?
+            run_linear_user_create_issue(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "editIssue") => {
-            run__linear_user_edit_issue(&target.ctx, &target.data, args, options).await?
+            run_linear_user_edit_issue(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "undelegate") => {
-            run__linear_user_undelegate(&target.ctx, &target.data, args, options).await?
+            run_linear_user_undelegate(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "assign") => {
-            run__linear_user_assign(&target.ctx, &target.data, args, options).await?
+            run_linear_user_assign(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "setState") => {
-            run__linear_user_set_state(&target.ctx, &target.data, args, options).await?
+            run_linear_user_set_state(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "label") => {
-            run__linear_user_label(&target.ctx, &target.data, args, options).await?
+            run_linear_user_label(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "delegate") => {
-            run__linear_user_delegate(&target.ctx, &target.data, args, options).await?
+            run_linear_user_delegate(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "comment") => {
-            run__linear_user_comment(&target.ctx, &target.data, args, options).await?
+            run_linear_user_comment(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "reply") => {
-            run__linear_user_reply(&target.ctx, &target.data, args, options).await?
+            run_linear_user_reply(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "edit") => {
-            run__linear_user_edit(&target.ctx, &target.data, args, options).await?
+            run_linear_user_edit(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "delete") => {
-            run__linear_user_delete(&target.ctx, &target.data, args, options).await?
+            run_linear_user_delete(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "react") => {
-            run__linear_user_react(&target.ctx, &target.data, args, options).await?
+            run_linear_user_react(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "prompt") => {
-            run__linear_user_prompt(&target.ctx, &target.data, args, options).await?
+            run_linear_user_prompt(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "answer") => {
-            run__linear_user_answer(&target.ctx, &target.data, args, options).await?
+            run_linear_user_answer(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "stop") => {
-            run__linear_user_stop(&target.ctx, &target.data, args, options).await?
+            run_linear_user_stop(&target.ctx, &target.data, args, options).await?
         }
         ("LinearTeam", "issue") => {
-            run__linear_team_issue(&target.ctx, &target.data, args, options).await?
+            run_linear_team_issue(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "refresh") => {
-            run__linear_issue_refresh(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "title") => {
-            run__linear_issue_title(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_title(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "state") => {
-            run__linear_issue_state(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_state(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "assignee") => {
-            run__linear_issue_assignee(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_assignee(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "delegatedTo") => {
-            run__linear_issue_delegated_to(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_delegated_to(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "labels") => {
-            run__linear_issue_labels(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_labels(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "comments") => {
-            run__linear_issue_comments(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_comments(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "sessions") => {
-            run__linear_issue_sessions(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_sessions(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "session") => {
-            run__linear_issue_session(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_session(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "transcript") => {
-            run__linear_issue_transcript(&target.ctx, &target.data, args, options).await?
+            run_linear_issue_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("LinearDelivery", "refresh") => {
-            run__linear_delivery_refresh(&target.ctx, &target.data, args, options).await?
+            run_linear_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("LinearDelivery", "redeliver") => {
-            run__linear_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+            run_linear_delivery_redeliver(&target.ctx, &target.data, args, options).await?
         }
         ("LinearDelivery", "resend") => {
-            run__linear_delivery_resend(&target.ctx, &target.data, args, options).await?
+            run_linear_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "state") => {
-            run__linear_agent_session_state(&target.ctx, &target.data, args, options).await?
+            run_linear_agent_session_state(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "activities") => {
-            run__linear_agent_session_activities(&target.ctx, &target.data, args, options).await?
+            run_linear_agent_session_activities(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "externalUrls") => {
-            run__linear_agent_session_external_urls(&target.ctx, &target.data, args, options)
-                .await?
+            run_linear_agent_session_external_urls(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "plan") => {
-            run__linear_agent_session_plan(&target.ctx, &target.data, args, options).await?
+            run_linear_agent_session_plan(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "transcript") => {
-            run__linear_agent_session_transcript(&target.ctx, &target.data, args, options).await?
+            run_linear_agent_session_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("LinearComment", "replies") => {
-            run__linear_comment_replies(&target.ctx, &target.data, args, options).await?
+            run_linear_comment_replies(&target.ctx, &target.data, args, options).await?
         }
         ("LinearComment", "transcript") => {
-            run__linear_comment_transcript(&target.ctx, &target.data, args, options).await?
+            run_linear_comment_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "createUser") => {
-            run__notion_fixture_create_user(&target.ctx, &target.data, args, options).await?
+            run_notion_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "createPage") => {
-            run__notion_fixture_create_page(&target.ctx, &target.data, args, options).await?
+            run_notion_fixture_create_page(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "createDatabase") => {
-            run__notion_fixture_create_database(&target.ctx, &target.data, args, options).await?
+            run_notion_fixture_create_database(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "setContentUpdateDelay") => {
-            run__notion_fixture_set_content_update_delay(&target.ctx, &target.data, args, options)
+            run_notion_fixture_set_content_update_delay(&target.ctx, &target.data, args, options)
                 .await?
         }
         ("NotionFixture", "sendVerification") => {
-            run__notion_fixture_send_verification(&target.ctx, &target.data, args, options).await?
+            run_notion_fixture_send_verification(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "deliveries") => {
-            run__notion_fixture_deliveries(&target.ctx, &target.data, args, options).await?
+            run_notion_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "calls") => {
-            run__notion_fixture_calls(&target.ctx, &target.data, args, options).await?
+            run_notion_fixture_calls(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "comment") => {
-            run__notion_user_comment(&target.ctx, &target.data, args, options).await?
+            run_notion_user_comment(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "reply") => {
-            run__notion_user_reply(&target.ctx, &target.data, args, options).await?
+            run_notion_user_reply(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "editComment") => {
-            run__notion_user_edit_comment(&target.ctx, &target.data, args, options).await?
+            run_notion_user_edit_comment(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "deleteComment") => {
-            run__notion_user_delete_comment(&target.ctx, &target.data, args, options).await?
+            run_notion_user_delete_comment(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "resolve") => {
-            run__notion_user_resolve(&target.ctx, &target.data, args, options).await?
+            run_notion_user_resolve(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "reopen") => {
-            run__notion_user_reopen(&target.ctx, &target.data, args, options).await?
+            run_notion_user_reopen(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "createPage") => {
-            run__notion_user_create_page(&target.ctx, &target.data, args, options).await?
+            run_notion_user_create_page(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "edit") => {
-            run__notion_user_edit(&target.ctx, &target.data, args, options).await?
+            run_notion_user_edit(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "rename") => {
-            run__notion_user_rename(&target.ctx, &target.data, args, options).await?
+            run_notion_user_rename(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "mention") => {
-            run__notion_user_mention(&target.ctx, &target.data, args, options).await?
+            run_notion_user_mention(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "setProperty") => {
-            run__notion_user_set_property(&target.ctx, &target.data, args, options).await?
+            run_notion_user_set_property(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "addRow") => {
-            run__notion_user_add_row(&target.ctx, &target.data, args, options).await?
+            run_notion_user_add_row(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "connect") => {
-            run__notion_user_connect(&target.ctx, &target.data, args, options).await?
+            run_notion_user_connect(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "disconnect") => {
-            run__notion_user_disconnect(&target.ctx, &target.data, args, options).await?
+            run_notion_user_disconnect(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "discussions") => {
-            run__notion_page_discussions(&target.ctx, &target.data, args, options).await?
+            run_notion_page_discussions(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "markdown") => {
-            run__notion_page_markdown(&target.ctx, &target.data, args, options).await?
+            run_notion_page_markdown(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "blocks") => {
-            run__notion_page_blocks(&target.ctx, &target.data, args, options).await?
+            run_notion_page_blocks(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "property") => {
-            run__notion_page_property(&target.ctx, &target.data, args, options).await?
+            run_notion_page_property(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "children") => {
-            run__notion_page_children(&target.ctx, &target.data, args, options).await?
+            run_notion_page_children(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "connections") => {
-            run__notion_page_connections(&target.ctx, &target.data, args, options).await?
+            run_notion_page_connections(&target.ctx, &target.data, args, options).await?
         }
         ("NotionPage", "transcript") => {
-            run__notion_page_transcript(&target.ctx, &target.data, args, options).await?
+            run_notion_page_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDatabase", "rows") => {
-            run__notion_database_rows(&target.ctx, &target.data, args, options).await?
+            run_notion_database_rows(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDelivery", "refresh") => {
-            run__notion_delivery_refresh(&target.ctx, &target.data, args, options).await?
+            run_notion_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDelivery", "redeliver") => {
-            run__notion_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+            run_notion_delivery_redeliver(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDelivery", "resend") => {
-            run__notion_delivery_resend(&target.ctx, &target.data, args, options).await?
+            run_notion_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDiscussion", "comments") => {
-            run__notion_discussion_comments(&target.ctx, &target.data, args, options).await?
+            run_notion_discussion_comments(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDiscussion", "resolved") => {
-            run__notion_discussion_resolved(&target.ctx, &target.data, args, options).await?
+            run_notion_discussion_resolved(&target.ctx, &target.data, args, options).await?
         }
         ("NotionDiscussion", "transcript") => {
-            run__notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
+            run_notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "refresh") => {
-            run__git_hub_pull_request_refresh(&target.ctx, &target.data, args, options).await?
+            run_git_hub_pull_request_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "headCommit") => {
-            run__git_hub_pull_request_head_commit(&target.ctx, &target.data, args, options).await?
+            run_git_hub_pull_request_head_commit(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "reviews") => {
-            run__git_hub_pull_request_reviews(&target.ctx, &target.data, args, options).await?
+            run_git_hub_pull_request_reviews(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "reviewComments") => {
-            run__git_hub_pull_request_review_comments(&target.ctx, &target.data, args, options)
+            run_git_hub_pull_request_review_comments(&target.ctx, &target.data, args, options)
                 .await?
         }
         ("GitHubPullRequest", "checkRuns") => {
-            run__git_hub_pull_request_check_runs(&target.ctx, &target.data, args, options).await?
+            run_git_hub_pull_request_check_runs(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "merged") => {
-            run__git_hub_pull_request_merged(&target.ctx, &target.data, args, options).await?
+            run_git_hub_pull_request_merged(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "title") => {
-            run__git_hub_issue_title(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_title(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "state") => {
-            run__git_hub_issue_state(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_state(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "labels") => {
-            run__git_hub_issue_labels(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_labels(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "assignees") => {
-            run__git_hub_issue_assignees(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_assignees(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "comments") => {
-            run__git_hub_issue_comments(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_comments(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "transcript") => {
-            run__git_hub_issue_transcript(&target.ctx, &target.data, args, options).await?
+            run_git_hub_issue_transcript(&target.ctx, &target.data, args, options).await?
         }
         _ => {
             return Err(Error::Invalid(format!(

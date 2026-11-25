@@ -3,7 +3,7 @@
 import asyncio
 import time
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -63,7 +63,7 @@ class Transport:
             raise ChannelstackError("internal", status, f"HTTP {status}: the response is not JSON") from None
         if response.is_success:
             return payload
-        error: dict[str, Any] = payload if isinstance(payload, dict) else {}
+        error = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
         code = str(error.get("error", "internal"))
         error_class = self._errors.get(code, ChannelstackError)
         refusal = error_class(

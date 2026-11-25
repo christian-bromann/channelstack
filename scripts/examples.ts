@@ -209,3 +209,19 @@ async function runSharedExamples(bin: string): Promise<void> {
     });
   });
 }
+
+/**
+ * The pytest port of the Slack conversation tests (exit check 7.3), against the Bolt reference
+ * agent: the same stack the Vitest examples run on, driven from Python through pytest-channelstack.
+ */
+export async function runPytestExamples(options: { bin?: string } = {}): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  const { channel, path } = AGENTS["bolt-ai-sdk"];
+  console.log("\ntest/acceptance/pytest against bolt-ai-sdk");
+  const agent = join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts");
+  await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
+    const project = join(ROOT, "integrations", "pytest-channelstack");
+    run("uv", ["run", "--project", project, "--frozen", "pytest", "test/acceptance/pytest"], { cwd: ROOT, env });
+  });
+}
