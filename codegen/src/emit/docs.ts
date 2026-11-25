@@ -290,12 +290,6 @@ export function emitDocs(ir: Ir): Map<string, string> {
     const fromField = item?.fields.find((field) => field.name === wait.from);
     const read = resource.methods.find((method) => method.name === wait.read);
     const filters = wait.filter && read ? read.options : [];
-    const options = [
-      ...(fromField ? ["from"] : []),
-      ...(wait.text ? [wait.text] : []),
-      "timeout",
-      ...(wait.mode === "latest" ? ["quietFor"] : []),
-    ];
     const what =
       wait.mode === "next"
         ? `Waits for the next ${wait.what.replace(/^an? /, "")} after the last one this handle returned`
@@ -424,6 +418,12 @@ export function emitDocs(ir: Ir): Map<string, string> {
   }
   ids.clear();
 
+  /** The "Types" heading, given its id first like every other heading. */
+  const typesHeading = (page: Page) => {
+    anchor(page, "types", "Types");
+    return "## Types";
+  };
+
   const files = new Map<string, string>();
   for (const { page, resources, types } of plan) {
     const intro =
@@ -437,7 +437,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
       }),
       ...(types.length > 0
         ? [
-            (anchor(page, "types", "Types"), "## Types"),
+            typesHeading(page),
             "",
             "Plain values the handles return and take.",
             "",

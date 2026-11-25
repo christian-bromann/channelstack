@@ -138,5 +138,6 @@ Most checks are about delivery: retries, redeliveries, forged signatures, acknow
 | `slack.retry`, `slack.redelivery`, `github.redelivery`, `notion.redelivery` | Step over the delivery, then skip at their exact count, because waiting for quiet needs proxy mode live ([Live mode](/docs/guide/live-mode#what-skips-and-what-fails)) |
 | `linear.redelivery`, `linear.stale`, `linear.bad-signature` | Skip, with the reason |
 | `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason |
+| `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop`, `github.check-run` | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet |
 
-The rest run against the real platform. Making every delivery check skip live with its own reason is [#46](https://github.com/christian-bromann/channelstack/issues/46). The fake run on every pull request runs them all.
+Four run against the real platform: `github.review-thread`, `linear.first-activity`, `linear.ends-turn` and `notion.reply-in-discussion`. Making every delivery check skip live with its own reason is [#46](https://github.com/christian-bromann/channelstack/issues/46). The fake run on every pull request runs them all.

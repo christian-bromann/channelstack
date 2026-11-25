@@ -265,7 +265,7 @@ The matchers read what a person would see: edits applied, deleted messages gone,
 | `toHaveStatus(state)`, `toHaveStatusText(text)` | thread | `thread.status()` |
 | `toHaveButton(label)` | message, thread | `message.blocks` |
 | `toHaveReaction(emoji, { by })` | message | `message.reactions()` |
-| `toHaveOpenedModal(title)` | person | `user.waitForModal()` |
+| `toHaveOpenedModal(title)` | person | `user.modals()` |
 | `toBeEphemeralFor(user)` | message | `message.visibleTo` |
 | `toBeAccepted`, `toBeRejected`, `toBeRetried` | delivery | `delivery.attempts` |
 | `toHaveReceivedCall(operation, { times, error })` | `slack` | `slack.calls()` |
