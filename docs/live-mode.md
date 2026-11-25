@@ -97,7 +97,7 @@ The nightly differential run (implementation plan 9) compares fake and real beha
 Built in phase 6 ([decisions/0016](decisions/0016-proxy-mode-and-conformance.md)): `pnpm conformance` runs each scenario of `scenarios/<channel>/` against the fake and against the sandbox. Both runs go through the proxy with the recorder, so the platforms' real API answers are written as shapes. The webhooks arrive like this:
 
 - **GitHub, Linear and Notion:** received from the relay channel each platform's webhook points at. A tap in front of the agent writes each one's shape, then hands it on unchanged.
-- **Slack:** the reference agent receives in Socket Mode. A second connection would take events from it, because Slack spreads an app's events over its connections. So the run starts the agent through `scripts/lib/slack-event-tap.ts` instead, which hands each event's body to the recorder before Bolt handles it, unchanged ([decisions/0020](decisions/0020-slack-event-tap.md)). Events are recorded as `event_callback <event type>`, in both worlds.
+- **Slack:** the reference agent receives in Socket Mode. A second connection would take events from it, because Slack spreads an app's events over its connections. So the run starts the agent through `scripts/lib/slack-event-tap.ts` instead, which hands each event's body to the recorder before Bolt handles it, unchanged ([decisions/0020](decisions/0020-slack-event-tap.md)). Events are recorded as `event_callback <event type> [<subtype>]`, in both worlds.
 
 ## 7. Work breakdown
 

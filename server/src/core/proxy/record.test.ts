@@ -81,6 +81,11 @@ describe("the recorder", () => {
     );
     recorder.webhook(
       "slack",
+      "event_callback",
+      JSON.stringify({ type: "event_callback", event: { type: "message", subtype: "channel_join", text: "hi" } }),
+    );
+    recorder.webhook(
+      "slack",
       "block_actions",
       new URLSearchParams({
         payload: JSON.stringify({ type: "block_actions", actions: [{ value: "hi" }] }),
@@ -111,6 +116,12 @@ describe("the recorder", () => {
         channel: "slack",
         operation: "event_callback app_mention",
         shape: { type: "=event_callback", event: { type: "=app_mention", text: "string" } },
+      },
+      {
+        kind: "webhook",
+        channel: "slack",
+        operation: "event_callback message channel_join",
+        shape: { type: "=event_callback", event: { type: "=message", subtype: "=channel_join", text: "string" } },
       },
       {
         kind: "webhook",

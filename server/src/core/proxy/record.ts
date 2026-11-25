@@ -140,9 +140,15 @@ export function createRecorder(dir: string): Recorder {
       const parsed = json(body) ?? formPayload(body);
       if (parsed === undefined) return;
       // By type and action: `issues opened` and `issues closed` are shaped differently, and so are
-      // Slack's events by the event's type (`event_callback app_mention`).
-      const fields = parsed as { action?: unknown; event?: { type?: unknown } } | null;
-      const detail = typeof fields?.action === "string" ? fields.action : fields?.event?.type;
+      // Slack's events by the event's type and subtype (`event_callback message channel_join`).
+      const fields = parsed as { action?: unknown; event?: { type?: unknown; subtype?: unknown } } | null;
+      const event = fields?.event;
+      const detail =
+        typeof fields?.action === "string"
+          ? fields.action
+          : typeof event?.type === "string"
+            ? [event.type, ...(typeof event.subtype === "string" ? [event.subtype] : [])].join(" ")
+            : undefined;
       const operation = typeof detail === "string" && detail.length <= 64 ? `${type} ${detail}` : type;
       write({ kind: "webhook", channel, operation, shape: shapeOf(parsed) });
     },

@@ -13,7 +13,8 @@ That entry wraps Bolt's `App.prototype.processEvent` in the agent's own process.
 (the `event_callback`, or an interaction's payload) goes to the live run over Node's IPC channel,
 and the recorder writes its shape. Bolt then handles the event, unchanged.
 
-The recorder keys Slack's events by the event's type (`event_callback app_mention`), as it keys
+The recorder keys Slack's events by the event's type and subtype (`event_callback app_mention`,
+`event_callback message channel_join`), as it keys
 GitHub's and Linear's by `action`. It also reads Slack's form-encoded interactions (`payload=`), so
 the fake's `block_actions` are recorded too.
 
