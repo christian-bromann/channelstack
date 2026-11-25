@@ -72,7 +72,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 4 | Linear and Notion fakes | All fake Linear and Notion examples pass; Linear responses match its GraphQL schema |
 | 5 | Live mode | Every "live mode" example passes nightly in the sandboxes, and cleanup leaves nothing behind |
 | 6 | Proxy mode and fake-vs-real conformance | An unmodified agent with hard-coded hosts passes; the nightly differential run works |
-| 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; Jest and pytest integrations; MCP drives a conversation |
+| 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; the pytest integration; MCP drives a conversation |
 | 8 | MDA port, docs and 0.1.0 | Three MDA scenarios pass in an MDA PR; the quickstart works from scratch; 0.1.0 is published |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
@@ -264,7 +264,6 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 **Build:**
 - Python: the full SDK and `pytest-channelstack` (fixtures and assertion helpers).
 - Rust: the generated SDK.
-- `channelstack/jest`.
 - `channelstack mcp` and the skill for coding agents.
 
 **Exit checks:**
@@ -272,7 +271,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 | # | Check | How |
 |---|---|---|
 | 7.1 | Smoke parity | All `scenarios/smoke/*.yaml` pass through the TypeScript, Python and Rust SDKs against the same binary |
-| 7.2 | Jest | `api/examples/jest.usage.test.ts` passes with the `channelstack/jest` preset. (No Jest port of the Slack conversation tests: the maintainer's decision during phase 7, since the matchers are shared with Vitest's) |
+| 7.2 | ~~Jest~~ | Dropped: no Jest support ([decision 0017](decisions/0017-no-jest.md)). The number stays, so 7.3 and 7.4 keep theirs |
 | 7.3 | pytest | A pytest port of the Slack conversation tests passes |
 | 7.4 | MCP | A scripted MCP client lists the tools, creates a user, sends a message and reads the agent's reply |
 
@@ -302,7 +301,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## After 0.1
 
-The full matcher set for Jest and pytest, Discord, Stripe and email drivers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned.
+The full matcher set for pytest, Discord, Stripe and email drivers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned.
 
 ## Appendix: delivery cases
 

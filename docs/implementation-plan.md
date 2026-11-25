@@ -38,7 +38,7 @@ The architecture copies WebDriver:
 ### Non-goals (for now)
 
 - **Faking the LLM.** Agents bring their own deterministic model: the AI SDK mock models, emulate's AI service, or MDA's scripted directive fixtures. Section 10 shows the recipes.
-- **Waits and assertions in the protocol.** The server only serves reads (transcripts, event logs). The waiting matchers (`toHaveRepliesFrom`, `toHaveCommentsFrom`, …) live client-side in the test-framework integrations (`channelstack/vitest`, `channelstack/jest`, `pytest-channelstack`), which poll those reads.
+- **Waits and assertions in the protocol.** The server only serves reads (transcripts, event logs). The waiting matchers (`toHaveRepliesFrom`, `toHaveCommentsFrom`, …) live client-side in the test-framework integrations (`channelstack/vitest`, `pytest-channelstack`), which poll those reads.
 - **Hosting or a cloud product.**
 - **A unified "message" abstraction across platforms.** Each driver defines its own nouns: a Slack thread, a GitHub timeline, a Linear agent session, a Notion page with comments.
 
@@ -53,7 +53,7 @@ This plan and `docs/devx.md` describe the same product. Where they used to diffe
 | Sessions | A session is a **scope inside that world**, not a world of its own. It owns the users, channels, repos and pages it created, filters the event log to deliveries its actions caused, and cleans everything up on `DELETE`. Each test-framework fixture opens one session per test, and the CLI and UI share a long-lived `dev` session |
 | Starting the agent | channelstack never starts or wraps the agent. `channelstack exec` is dropped; you run `channelstack env` and then `portless run my-agent pnpm dev` |
 | Config | `channelstack.config.ts` describes only the agent's app on each channel (fake by default, real with credentials). People and places are created per test |
-| Test API | Actor-first and per-framework (`api/*.d.ts`): `ana.say(text, { channel })`, with fixtures and matchers in `channelstack/vitest`, `channelstack/jest` and `pytest-channelstack` |
+| Test API | Actor-first and per-framework (`api/*.d.ts`): `ana.say(text, { channel })`, with fixtures and matchers in `channelstack/vitest` and `pytest-channelstack` |
 | Secrets | Fake tokens and signing secrets are generated with a CSPRNG **once per install** and kept in `~/.channelstack/secrets.json` (mode 0600). They stay stable across restarts so `.env.local` stays valid. `channelstack secrets rotate` replaces them |
 | State | In memory. A restart starts a fresh world |
 | Scope | Slack, GitHub, Linear and Notion. No Teams for now |
@@ -501,7 +501,7 @@ The exact shapes, with the IR they produce, are in [architecture.md](architectur
 
 | Language | Style |
 |---|---|
-| TypeScript | `async` methods; ESM and CJS builds; types from the IR (checked against the hand-designed `api/*.d.ts`); fixtures and matchers through `channelstack/vitest` and `channelstack/jest`; created resources implement `AsyncDisposable` for use outside fixtures |
+| TypeScript | `async` methods; ESM and CJS builds; types from the IR (checked against the hand-designed `api/*.d.ts`); fixtures and matchers through `channelstack/vitest`; created resources implement `AsyncDisposable` for use outside fixtures |
 | Python | Async-first (`httpx`) with a sync facade; Pydantic models; `pytest-channelstack` fixtures (`slack`, `github`, `linear`, `notion`); `await ana.say("hi", channel=channel)`; snake_case |
 | Rust | `reqwest` + `serde` + `tokio`; builder structs for optional arguments; `Drop` handles cleanup best-effort, plus an explicit `close().await` |
 
@@ -546,7 +546,7 @@ channelstack/
   codegen/                   ir builder + emitters/{ts,python,rust}
   api/                       hand-designed public types (*.d.ts) + examples; the generated TS SDK must satisfy them
   sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/ (Python: inside the `channelstack` package)
-  integrations/              vitest, jest (TS) · pytest-channelstack (Python) · checks (standard behaviour checks)
+  integrations/              vitest (TS) · pytest-channelstack (Python) · checks (standard behaviour checks)
   scenarios/                 smoke/*.yaml (protocol parity), runners/, agents/ + <driver>/*.test.ts (differential suite)
   scripts/                   the gate, spec and SDK generation, the binary build, packaging and smoke runs
   conformance/               schema validators, shape differ, divergences.yaml, coverage page generator

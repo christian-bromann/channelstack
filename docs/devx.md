@@ -108,7 +108,7 @@ export default defineConfig({
 });
 ```
 
-- **The config describes only your agent's app**: its manifest or permissions, where to deliver events, and the workspace or org name. It contains **no users, channels, repos or pages**. Tests create those themselves (see [section 5](#5-tests-plug-into-vitest-jest-playwright-webdriverio-and-pytest)), so every test states exactly the world it needs and shares nothing with other tests.
+- **The config describes only your agent's app**: its manifest or permissions, where to deliver events, and the workspace or org name. It contains **no users, channels, repos or pages**. Tests create those themselves (see [section 5](#5-tests-plug-into-vitest-playwright-webdriverio-and-pytest)), so every test states exactly the world it needs and shares nothing with other tests.
 - A real Slack manifest supplies scopes, events and interactivity URLs. channelstack then rejects calls outside the granted scopes (`missing_scope`), just as Slack does. GitHub App permissions work the same way.
 
 ## 4. Driving it from the outside
@@ -181,7 +181,7 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 
 The MCP tools mirror the CLI: `slack_say`, `slack_click`, `slack_stop`, `github_comment`, `linear_delegate`, `notion_comment`, `show_thread`, `list_deliveries`, `redeliver`, `tail`. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. A `channelstack` skill on skills.sh comes with it, the same way portless and emulate ship theirs.
 
-## 5. Tests: plug into Vitest, Jest, Playwright, WebdriverIO and pytest
+## 5. Tests: plug into Vitest, Playwright, WebdriverIO and pytest
 
 channelstack has no test package of its own to import. It integrates into the test framework you already use. Each integration does three things:
 1. starts channelstack, or attaches to one that's running;
@@ -343,7 +343,6 @@ await using channel = await slack.createChannel();   // archived when the scope 
 | Framework | Integration | Fixtures | Matchers |
 |---|---|---|---|
 | Vitest | `channelstack/vitest` plugin | test context (`({ slack }) =>`) | `expect.extend` |
-| Jest | `channelstack/jest` preset | `globalThis` handles | `expect.extend` |
 | Playwright Test | `channelstack/playwright` | `test.extend` fixtures | `expect.extend` |
 | WebdriverIO | `@channelstack/wdio-service` | `browser.channelstack` or a service handle | `expect-webdriverio` matchers |
 | pytest | `pytest-channelstack` plugin | `slack`, `github`, `linear`, `notion` fixtures | assertion helpers (`assert_shows_once(thread, "my-agent")`) |
@@ -490,11 +489,11 @@ portless trusts its CA in the system store, but not every runtime reads that sto
 
 | Package | Purpose |
 |---|---|
-| `channelstack` | CLI, UI and the test integrations, as subpath exports: `channelstack/vitest`, `channelstack/jest`, `channelstack/playwright`, `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
+| `channelstack` | CLI, UI and the test integrations, as subpath exports: `channelstack/vitest`, `channelstack/playwright`, `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
 | `@channelstack/wdio-service` | WebdriverIO service and `expect-webdriverio` matchers |
 | `pytest-channelstack` | pytest plugin: fixtures and assertion helpers over the control API |
 
-> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5 and Jest 30. Examples are in `api/examples/`.
+> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5. Examples are in `api/examples/`.
 
 ## 13. Settled since the first draft
 

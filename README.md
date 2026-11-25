@@ -93,7 +93,7 @@ import channelstack from "channelstack/vitest";
 export default defineConfig({ plugins: [channelstack()] });
 ```
 
-[docs/devx.md](docs/devx.md) covers the CLI, the config file, Jest and pytest, proxy mode and CI.
+[docs/devx.md](docs/devx.md) covers the CLI, the config file, Vitest and pytest, proxy mode and CI.
 
 ## Status
 

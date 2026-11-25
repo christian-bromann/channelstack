@@ -43,7 +43,7 @@ import type { SlackUser } from "./slack";
  *   | toBeAccepted, toBeRejected, toBeRetried         | `delivery.attempts`, `delivery.status`        |
  *   | toHaveReceivedCall                              | `calls()`                                     |
  *
- * `R` is the framework's return type (`void` in Vitest/Jest, wrapped in a Promise here).
+ * `R` is the framework's return type (`void` in Vitest, wrapped in a Promise here).
  */
 export interface ChannelstackMatchers<R = unknown> {
   // ---------------------------------------------------------------- any transcript

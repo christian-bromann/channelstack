@@ -7,7 +7,7 @@
 One server process fakes Slack, GitHub, Linear and Notion in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
- Vitest / Jest / pytest / Rust tests      channelstack CLI      MCP (coding agents)      UI (browser)
+ Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)
               │ generated SDK                  │                 │                     │
               └────────────────────────────────┴───── control API ┴─────────────────────┘
                                                         │  https://channelstack.localhost/_channelstack
@@ -143,7 +143,7 @@ That keeps the fake and the real platform from drifting apart in code. The night
 | Public TypeScript API (the design contract) | `api/*.d.ts` | Hand-designed; the generated TS SDK must satisfy it |
 | SDK resource classes and methods | `sdks/<lang>/generated/` | **Generated** |
 | SDK transport, launcher, credential lookup | `sdks/<lang>/runtime/` | Hand-written, small |
-| Fixtures and matchers | `integrations/` (`channelstack/vitest`, `channelstack/jest`, `pytest-channelstack`) | Hand-written on top of the generated read methods |
+| Fixtures and matchers | `integrations/` (`channelstack/vitest`, `pytest-channelstack`) | Hand-written on top of the generated read methods |
 
 **Matchers run in the test process, not the server.** Each matcher polls a plain read method until the condition holds or the timeout passes, for example `toHaveReaction` → `message.reactions()`. Negative and exact-count matchers first wait for the server's quiet signal. That keeps the server free of assertion logic and lets each language use its own `expect`.
 
@@ -257,7 +257,7 @@ The modules have the same names in every language ([code-map.md](code-map.md)).
 | Target | How |
 |---|---|
 | Server | `bun build --compile` per platform (darwin-arm64/x64, linux-x64/arm64, windows-x64) |
-| npm | `channelstack` (CLI, UI, `channelstack/vitest`, `channelstack/jest`, `channelstack/checks`) with `@channelstack/server-<platform>` as optional dependencies |
+| npm | `channelstack` (CLI, UI, `channelstack/vitest`, `channelstack/checks`) with `@channelstack/server-<platform>` as optional dependencies |
 | PyPI | Per-platform wheels with the binary bundled; `pytest-channelstack` for fixtures and matchers |
 | Rust | Downloads the release binary on first use, with checksum verification, or uses `CHANNELSTACK_SERVER_BIN` |
 | Docker | `ghcr.io/<org>/channelstack` for CI and for proxy mode with Go or Linux agents |
@@ -274,7 +274,7 @@ channelstack/
   sdks/typescript/   the npm package `channelstack`: runtime/ (hand-written), generated/, bin/ (runs the platform binary)
   sdks/python/       channelstack/runtime/ (hand-written) + channelstack/generated/
   sdks/rust/         runtime/ + generated/
-  integrations/      vitest, jest, pytest-channelstack, checks
+  integrations/      vitest, pytest-channelstack, checks
   scenarios/         smoke/*.yaml (protocol parity), runners/<language>/, agents/ (reference agents for the scenarios) + per-driver differential suites
   scripts/           the gate (verify-phase), spec and SDK generation, the binary build, packaging and smoke runs
   conformance/       schema validators, shape differ, coverage page

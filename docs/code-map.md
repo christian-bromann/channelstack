@@ -209,9 +209,8 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 
 | Concern | Module | Notes |
 |---|---|---|
-| Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
+| Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest's integration (and pytest's, in Python) adapts it; it doesn't reimplement matchers |
 | Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test, registered with `test.override` so a suite's `test.extend` builds on them, the `expect.extend` adapter, and skipping a test live mode can't run, with the reason (`setup.ts`); a channel's fixture refused live becomes a stand-in that refuses on first use, so only that channel's tests skip (`refused.ts`, `refusedLive` for channelstack's own per-test checks) |
-| Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
 | Checks | `integrations/checks/` | `slackChecks()`, `githubChecks()`, `linearChecks()`, `notionChecks()`: the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS` and `NOTION_CHECKS` list their ids |
 | pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |
 
