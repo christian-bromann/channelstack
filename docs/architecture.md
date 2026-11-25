@@ -241,7 +241,7 @@ Handles passed as arguments or options are sent by id (`kind: "ref"`). In respon
 | Waiting and polling | The one polling loop behind every `waitFor…`, `latest…` and matcher: cursor reads, timeouts, quiet checks. It holds the one default timeout (10 s) and quiet window (750 ms) every wait method uses; the test integrations set it from their options (Vitest's `timeout` and `quietFor`, pytest's `channelstack_timeout` and `channelstack_quiet_for`) |
 | Durations | Parsing `"3s"`, `"750ms"` |
 | Credentials | Reads `CHANNELSTACK_<CHANNEL>_*` env vars for live mode and sends them once; the server never returns them (phase 5) |
-| Disposal | Created resources clean up at the end of the session: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust. Generated from routes marked `dispose` |
+| Disposal | What a test created is cleaned up when its session closes. Outside fixtures, the client, the session and a Slack fault are disposable: `AsyncDisposable` in TS, context managers in Python, `close().await` in Rust. Generated from routes marked `dispose` |
 
 The modules have the same names in every language ([code-map.md](code-map.md)).
 
