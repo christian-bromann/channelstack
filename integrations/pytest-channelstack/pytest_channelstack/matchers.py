@@ -75,6 +75,40 @@ def _calls_matching(operation: Text, calls: Sequence[Any]) -> list[Any]:
     ]
 
 
+def _listing(lines: Sequence[str]) -> str:
+    return "\n".join(f"  {line}" for line in lines) if lines else "  (nothing)"
+
+
+def _comment_text(comment: Any) -> str:
+    """GitHub and Linear call a comment's text `body`, Notion calls it `text`."""
+    return str(getattr(comment, "body", None) or getattr(comment, "text", None) or "")
+
+
+def _comment_from(author: AuthorRef, text: Text | None = None) -> Callable[[Any], bool]:
+    return lambda comment: from_matches(comment.author, author) and text_matches(_comment_text(comment), text)
+
+
+def _written(comments: Sequence[Any]) -> str:
+    return _listing([f"{comment.author.name}: {_comment_text(comment)}" for comment in comments])
+
+
+async def _comments_of(subject: Any) -> list[Any]:
+    """The comments of a subject that has a conversation: an issue, a pull request, a discussion."""
+    if not hasattr(subject, "comments"):
+        raise TypeError("This check needs something with comments: an issue, a pull request or a discussion")
+    return list(await subject.comments())
+
+
+async def _session_of(subject: Any) -> Any | None:
+    """A Linear agent session, or the latest one of an issue."""
+    if hasattr(subject, "state") and hasattr(subject, "activities"):
+        return subject
+    if hasattr(subject, "sessions"):
+        sessions = list(await subject.sessions())
+        return sessions[-1] if sessions else None
+    raise TypeError("This check needs an agent session or an issue")
+
+
 class Expectation:
     """The checks on one subject: a thread, a conversation, a message, or a channel's fixture."""
 
@@ -419,6 +453,176 @@ class Expectation:
     ) -> None:
         """Once the agent is quiet, it made no such call (with this error, if given)."""
         await self._received_call(operation, error, None, timeout, quiet_for, negate=True)
+
+    # What a person reads: text and buttons
+
+    async def to_contain_text(
+        self,
+        text: Text,
+        *,
+        count: int | None = None,
+        from_: AuthorRef | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Some entry a person would see contains this text. `count` makes it exact, checked once quiet."""
+        await self._contains_text(text, count, from_, timeout, quiet_for, negate=False)
+
+    async def not_to_contain_text(
+        self,
+        text: Text,
+        *,
+        from_: AuthorRef | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no entry a person would see contains this text."""
+        await self._contains_text(text, None, from_, timeout, quiet_for, negate=True)
+
+    async def _contains_text(
+        self,
+        text: Text,
+        count: int | None,
+        from_: AuthorRef | None,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        async def read() -> tuple[list[Any], list[Any]]:
+            entries = [
+                entry
+                for entry in (await self._subject.transcript()).entries
+                if from_ is None or from_matches(entry.author, from_)
+            ]
+            return entries, [entry for entry in entries if text_matches(entry.text, text)]
+
+        def described(value: tuple[list[Any], list[Any]]) -> str:
+            entries, matching = value
+            wanted = "no text" if negate else "text" if count is None else f"exactly {count} entries with text"
+            return f"Expected {wanted} matching {_show(text)}, found {len(matching)}. A person sees:\n{_says(entries)}"
+
+        await self._settle(
+            read=read,
+            holds=lambda value: len(value[1]) > 0 if count is None else len(value[1]) == count,
+            describe=described,
+            negate=negate,
+            once_quiet=count is not None,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_button(self, label: Text, *, timeout: Duration | None = None) -> None:
+        """A message (or the app's latest message in a thread or conversation) has a button with this label."""
+
+        async def read() -> list[str]:
+            subject = self._subject
+            # A message is one entry of its thread's transcript.
+            if hasattr(subject, "thread") and hasattr(subject, "ts"):
+                entries = (await subject.thread.transcript()).entries
+                return [control for entry in entries if entry.id == subject.ts for control in entry.controls]
+            entries = [entry for entry in (await subject.transcript()).entries if entry.author.kind == "app"]
+            return list(entries[-1].controls) if entries else []
+
+        await self._settle(
+            read=read,
+            holds=lambda controls: any(text_matches(control, label) for control in controls),
+            describe=lambda controls: (
+                f"Expected a button matching {_show(label)}. Buttons there: {', '.join(controls) or 'none'}"
+            ),
+            negate=False,
+            timeout=timeout,
+        )
+
+    # Comments: GitHub issues and pull requests, Linear issues, Notion discussions
+
+    async def to_have_comment_from(
+        self, author: AuthorRef, *, text: Text | None = None, timeout: Duration | None = None
+    ) -> None:
+        """A comment from this author, matching `text` if given."""
+        wanted = f"a comment from {_name(author)}{'' if text is None else f' matching {_show(text)}'}"
+        await self._settle(
+            read=lambda: _comments_of(self._subject),
+            holds=lambda comments: any(map(_comment_from(author, text), comments)),
+            describe=lambda comments: f"Expected {wanted}. The conversation has:\n{_written(comments)}",
+            negate=False,
+            timeout=timeout,
+        )
+
+    async def to_have_comments_from(
+        self,
+        author: AuthorRef,
+        *,
+        count: int,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Exactly `count` comments from this author, checked once the agent is quiet."""
+        await self._settle(
+            read=lambda: _comments_of(self._subject),
+            holds=lambda comments: len(list(filter(_comment_from(author), comments))) == count,
+            describe=lambda comments: (
+                f"Expected exactly {count} comments from {_name(author)}, "
+                f"found {len(list(filter(_comment_from(author), comments)))}:\n{_written(comments)}"
+            ),
+            negate=False,
+            once_quiet=True,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    # Linear agent sessions
+
+    async def to_have_session_state(self, wanted: str, *, timeout: Duration | None = None) -> None:
+        """The agent session (or an issue's latest one) is in this state: `active`, `complete`, …"""
+
+        async def read() -> str:
+            session = await _session_of(self._subject)
+            return "no session" if session is None else str(await session.state())
+
+        await self._settle(
+            read=read,
+            holds=lambda current: current == wanted,
+            describe=lambda current: f"Expected the agent session to be {wanted}, it is {current}",
+            negate=False,
+            timeout=timeout,
+        )
+
+    async def to_have_activity(
+        self,
+        *,
+        type: str | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+    ) -> None:
+        """The session has an activity of this type (from this author, matching `text`), people's prompts aside."""
+        wanted = (
+            f"{type or 'activity'}{'' if from_ is None else f' from {_name(from_)}'}"
+            f"{'' if text is None else f' matching {_show(text)}'}"
+        )
+
+        async def read() -> list[Any]:
+            session = await _session_of(self._subject)
+            activities = [] if session is None else list(await session.activities())
+            return [activity for activity in activities if activity.type != "prompt"]
+
+        def matches(activity: Any) -> bool:
+            return (
+                (type is None or activity.type == type)
+                and (from_ is None or from_matches(activity.author, from_))
+                and text_matches(getattr(activity, "body", None) or "", text)
+            )
+
+        await self._settle(
+            read=read,
+            holds=lambda activities: any(map(matches, activities)),
+            describe=lambda activities: (
+                f"Expected a {wanted}. The session has:\n"
+                + _listing([f"{a.author.name} ({a.type}): {getattr(a, 'body', None) or ''}" for a in activities])
+            ),
+            negate=False,
+            timeout=timeout,
+        )
 
 
 def expect(subject: Any) -> Expectation:

@@ -80,9 +80,9 @@ async def test_a_negative_check_fails_on_a_reply() -> None:
 
 async def test_an_exact_count_is_checked_once_quiet() -> None:
     thread = Thread(messages=[Message(AGENT, "one"), Message(AGENT, "two")])
-    await expect(thread).to_have_replies_from("my-agent", count=2, **FAST)
+    await expect(thread).to_have_replies_from("my-agent", count=2, timeout="300ms")
     with pytest.raises(AssertionError, match="Expected exactly 1 reply from my-agent, found 2"):
-        await expect(thread).to_have_replies_from("my-agent", count=1, **FAST)
+        await expect(thread).to_have_replies_from("my-agent", count=1, timeout="300ms")
 
 
 async def test_a_failure_says_what_the_agent_left_open(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -169,3 +169,119 @@ async def test_a_live_refusal_while_describing_a_failure_keeps_it_a_failure(monk
     finally:
         on_refusal(None)
         await transport.close()
+
+
+@dataclass(frozen=True)
+class Speaker:
+    id: str
+    name: str
+    kind: str = "user"
+
+
+@dataclass(frozen=True)
+class Entry:
+    id: str
+    author: Speaker
+    text: str
+    controls: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Transcript:
+    entries: list[Entry]
+
+
+BOT = Speaker("B01", "my-agent", "app")
+PERSON = Speaker("U01", "Ana")
+
+
+class Conversation:
+    _ctx = None
+
+    def __init__(self, *entries: Entry) -> None:
+        self.entries = list(entries)
+
+    async def transcript(self) -> Transcript:
+        return Transcript(self.entries)
+
+
+async def test_text_a_person_sees_once_or_exactly_n_times() -> None:
+    conversation = Conversation(Entry("1", PERSON, "deploy web"), Entry("2", BOT, "Deploying web"))
+    await expect(conversation).to_contain_text("Deploying", timeout="300ms")
+    await expect(conversation).to_contain_text("Deploying", count=1, timeout="300ms")
+    await expect(conversation).not_to_contain_text("Thinking…", timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected exactly 2 entries with text matching 'Deploying', found 1"):
+        await expect(conversation).to_contain_text("Deploying", count=2, timeout="300ms")
+
+
+async def test_a_button_on_the_apps_latest_message() -> None:
+    conversation = Conversation(Entry("1", PERSON, "deploy"), Entry("2", BOT, "Approve?", ("Approve", "Cancel")))
+    await expect(conversation).to_have_button("Approve", timeout="300ms")
+    with pytest.raises(AssertionError, match="Buttons there: Approve, Cancel"):
+        await expect(conversation).to_have_button("Reject", timeout="300ms")
+
+
+@dataclass(frozen=True)
+class Comment:
+    author: Person
+    body: str
+
+
+class Issue:
+    _ctx = None
+
+    def __init__(self, *comments: Comment) -> None:
+        self.list = list(comments)
+
+    async def comments(self) -> list[Comment]:
+        return self.list
+
+
+async def test_comments_from_someone_and_exactly_how_many() -> None:
+    issue = Issue(Comment(ANA, "@robin look"), Comment(AGENT, "Safari breaks on the redirect"))
+    await expect(issue).to_have_comment_from("my-agent", text=re.compile("Safari"), timeout="300ms")
+    await expect(issue).to_have_comments_from("my-agent", count=1, timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected exactly 2 comments from my-agent, found 1"):
+        await expect(issue).to_have_comments_from("my-agent", count=2, timeout="300ms")
+
+
+@dataclass(frozen=True)
+class Activity:
+    type: str
+    author: Person
+    body: str | None = None
+
+
+class AgentSession:
+    _ctx = None
+
+    def __init__(self, state: str, *activities: Activity) -> None:
+        self.current = state
+        self.list = list(activities)
+
+    async def state(self) -> str:
+        return self.current
+
+    async def activities(self) -> list[Activity]:
+        return self.list
+
+
+class LinearIssue:
+    _ctx = None
+
+    def __init__(self, *sessions: AgentSession) -> None:
+        self.list = list(sessions)
+
+    async def sessions(self) -> list[AgentSession]:
+        return self.list
+
+
+async def test_an_agent_session_its_state_and_activities() -> None:
+    session = AgentSession("complete", Activity("prompt", ANA, "fix it"), Activity("thought", AGENT, "Looking"))
+    await expect(session).to_have_session_state("complete", timeout="300ms")
+    await expect(LinearIssue(session)).to_have_activity(type="thought", from_="my-agent", timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected the agent session to be active, it is complete"):
+        await expect(session).to_have_session_state("active", timeout="300ms")
+    # People's prompts aren't the agent's activities.
+    with pytest.raises(AssertionError, match="Expected a prompt"):
+        await expect(session).to_have_activity(type="prompt", timeout="300ms")
