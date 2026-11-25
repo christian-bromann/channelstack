@@ -254,7 +254,12 @@ pub async fn send(
     retry: &[&str],
 ) -> Result<Value> {
     if once_quiet {
-        until_quiet(|| ctx.quiet(), &Value::from(DEFAULT_TIMEOUT), &Value::from(DEFAULT_QUIET_FOR)).await?;
+        until_quiet(
+            || ctx.quiet(),
+            &Value::from(DEFAULT_TIMEOUT),
+            &Value::from(DEFAULT_QUIET_FOR),
+        )
+        .await?;
     }
     if retry.is_empty() {
         return ctx.transport.request(verb, &path, body, query).await;

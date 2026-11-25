@@ -48,20 +48,24 @@ where
     Fut: Future<Output = Result<Value>>,
 {
     let refusal = std::sync::Mutex::new(None::<Error>);
-    let accepted = wait_for("the call to be accepted", &Value::from(DEFAULT_TIMEOUT), || {
-        let attempt = call();
-        let refusal = &refusal;
-        async move {
-            match attempt.await {
-                Ok(value) => Ok(Some(value)),
-                Err(error) if error.code().is_some_and(|code| codes.contains(&code)) => {
-                    *refusal.lock().expect("the last refusal") = Some(error);
-                    Ok(None)
+    let accepted = wait_for(
+        "the call to be accepted",
+        &Value::from(DEFAULT_TIMEOUT),
+        || {
+            let attempt = call();
+            let refusal = &refusal;
+            async move {
+                match attempt.await {
+                    Ok(value) => Ok(Some(value)),
+                    Err(error) if error.code().is_some_and(|code| codes.contains(&code)) => {
+                        *refusal.lock().expect("the last refusal") = Some(error);
+                        Ok(None)
+                    }
+                    Err(error) => Err(error),
                 }
-                Err(error) => Err(error),
             }
-        }
-    })
+        },
+    )
     .await;
     match accepted {
         Err(Error::Timeout { .. }) => match refusal.lock().expect("the last refusal").take() {
