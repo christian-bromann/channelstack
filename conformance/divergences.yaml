@@ -106,34 +106,3 @@ divergences:
       session), and their parent is a page; in the fake, a page without a parent is at the
       workspace's top level. Where live mode puts pages, not drift.
     expires: 2027-02-28
-  - scenario: slack/mention
-    path: replies.0.blocks.length
-    reason: >-
-      Real Slack gives a message the agent posted with text a generated rich_text block; the
-      fake's message has none. To add to the fake: #30.
-    expires: 2027-02-28
-  - scenario: shapes/slack
-    path:
-      - "api POST /api/chat.postMessage message.bot_profile"
-      - "api POST /api/chat.postMessage message.parent_user_id"
-      - "api POST /api/conversations.info channel.context_team_id"
-      - "api POST /api/conversations.info channel.is_ext_shared"
-      - "api POST /api/conversations.info channel.is_general"
-      - "api POST /api/conversations.info channel.is_org_shared"
-      - "api POST /api/conversations.info channel.is_pending_ext_shared"
-      - "api POST /api/conversations.info channel.is_shared"
-      - "api POST /api/conversations.info channel.last_read"
-      - "api POST /api/conversations.info channel.name_normalized"
-      - "api POST /api/conversations.info channel.parent_conversation"
-      - "api POST /api/conversations.info channel.pending_connected_team_ids"
-      - "api POST /api/conversations.info channel.pending_shared"
-      - "api POST /api/conversations.info channel.previous_names"
-      - "api POST /api/conversations.info channel.properties"
-      - "api POST /api/conversations.info channel.shared_team_ids"
-      - "api POST /api/conversations.info channel.unlinked"
-      - "api POST /api/conversations.info channel.updated"
-    reason: >-
-      Real Slack's conversations.info and chat.postMessage answers carry fields the fake doesn't
-      send yet (sharing and naming fields of a channel, the message's bot_profile and
-      parent_user_id). To add to the fake: #30.
-    expires: 2027-02-28

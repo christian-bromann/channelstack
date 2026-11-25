@@ -37,6 +37,8 @@ export interface SlackAppRecord {
   readonly botEvents: readonly string[];
   /** False after `uninstallApp`, until the session that did it closes. */
   installed: boolean;
+  /** When the app was last changed, in seconds: its messages' `bot_profile.updated`. */
+  readonly updated?: number;
 }
 
 export type SlackConversationKind = "channel" | "private_channel" | "im" | "mpim";
@@ -67,6 +69,8 @@ export interface SlackMessageRecord {
   blocks: unknown[];
   /** The root message's `ts`, for a reply in a thread. */
   readonly threadTs: string | undefined;
+  /** For a reply: who wrote the message that starts its thread (Slack's `parent_user_id`). */
+  readonly parentUser?: string | undefined;
   /** When the message was last edited, as a `ts`. */
   edited: string | undefined;
   readonly reactions: SlackReaction[];

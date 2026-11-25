@@ -19,12 +19,30 @@ export function messageSubscription(conversation: SlackConversationRecord): stri
   ];
 }
 
-/** Slack's `rich_text` block for a message a person typed: text, with mentions as their own elements. */
+/**
+ * Slack's `rich_text` block of a message's text, for a message sent without blocks (a person's, or
+ * the app's): the text, with user mentions as their own elements. Slack also turns mrkdwn styles,
+ * links, channel and special mentions and emoji into elements; the fake doesn't yet (#45).
+ */
 export function richTextBlock(text: string, blockId: string): unknown {
   const elements = splitAtMentions(text).map((piece) =>
     "user" in piece ? { type: "user", user_id: piece.user } : { type: "text", text: piece.text },
   );
   return { type: "rich_text", block_id: blockId, elements: [{ type: "rich_text_section", elements }] };
+}
+
+/** The app's bot as Slack describes it on each message the app posted. */
+function botProfile(app: SlackAppRecord, team: SlackTeam): Record<string, unknown> {
+  const icon = (size: number) => `https://a.slack-edge.com/80588/img/plugins/app/bot_${size}.png`;
+  return {
+    id: app.botId,
+    deleted: false,
+    name: app.name,
+    updated: app.updated ?? 0,
+    app_id: app.id,
+    icons: { image_36: icon(36), image_48: icon(48), image_72: icon(72) },
+    team_id: team.id,
+  };
 }
 
 /** A message as it appears in events and in `conversations.history`. */
@@ -44,7 +62,12 @@ export function messageObject(
     blocks: message.blocks,
     ...(message.threadTs === undefined ? {} : { thread_ts: message.threadTs }),
     ...(message.edited === undefined ? {} : { edited: { user: message.user, ts: message.edited } }),
-    ...(fromApp ? { bot_id: app.botId, app_id: app.id } : author?.botId ? { bot_id: author.botId } : {}),
+    ...(fromApp
+      ? { bot_id: app.botId, app_id: app.id, bot_profile: botProfile(app, team) }
+      : author?.botId
+        ? { bot_id: author.botId }
+        : {}),
+    ...(message.parentUser === undefined ? {} : { parent_user_id: message.parentUser }),
     ...(message.reactions.length === 0
       ? {}
       : { reactions: message.reactions.map(({ name, users }) => ({ name, users, count: users.length })) }),

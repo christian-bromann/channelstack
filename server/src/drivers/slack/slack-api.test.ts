@@ -85,6 +85,19 @@ describe("chat", () => {
     });
     expect(top.ts).toMatch(/^\d{10}\.\d{6}$/);
     expect(reply.message.thread_ts).toBe(question.ts);
+    // What real Slack adds to a message the app posts (#30): its bot's profile, a rich_text block of
+    // its text, and in a thread, who wrote the message the thread starts with.
+    expect(top.message.bot_profile).toMatchObject({ id: app.botId, app_id: app.id, name: "my-agent", deleted: false });
+    expect(top.message.bot_profile.updated).toEqual(expect.any(Number));
+    expect(top.message.blocks).toEqual([
+      {
+        type: "rich_text",
+        block_id: expect.any(String),
+        elements: [{ type: "rich_text_section", elements: [{ type: "text", text: "Looking into it" }] }],
+      },
+    ]);
+    expect(top.message).not.toHaveProperty("parent_user_id");
+    expect(reply.message.parent_user_id).toBe(question.author.id);
     expect((await get(`/conversations/${channel.id}/messages`)).map((m: { text: string }) => m.text)).toEqual([
       question.text,
       "Looking into it",
@@ -95,6 +108,13 @@ describe("chat", () => {
       author: { kind: "app", id: app.id, name: "my-agent" },
       threadTs: question.ts,
     });
+    // A message the app posts with blocks keeps its own.
+    const withBlocks = await api("chat.postMessage", {
+      channel: channel.id,
+      text: "fallback",
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "*Deploy*" } }],
+    });
+    expect(withBlocks.message.blocks.map((block: { type: string }) => block.type)).toEqual(["section"]);
   });
 
   test("posting to a user id opens the DM with that person", async () => {
@@ -343,7 +363,7 @@ describe("reactions, conversations and users", () => {
   });
 
   test("history is newest first, replies oldest first with the root", async () => {
-    const { api, channel, say, post, ana } = await workspace();
+    const { h, agent, api, app, channel, say, post, get, ana } = await workspace();
     const first = await say("one");
     await say("two");
     await post(`/users/${ana.id}/reply`, { message: { text: "one-a" }, thread: { channel: channel.id, ts: first.ts } });
@@ -357,6 +377,32 @@ describe("reactions, conversations and users", () => {
       ),
     ).toEqual(["one", "one-a"]);
     expect((await api("conversations.members", { channel: channel.id })).members).toHaveLength(2);
+
+    // A reply says who wrote the message its thread starts with, wherever it is read (#30); the
+    // app's own messages carry their bot's profile, and the rich_text block of their text.
+    const answer = await api("chat.postMessage", { channel: channel.id, thread_ts: first.ts, text: "on it" });
+    await h.app.settled();
+    const replies = (await api("conversations.replies", { channel: channel.id, ts: first.ts })).messages;
+    expect(replies.map((m: { parent_user_id?: string }) => m.parent_user_id)).toEqual([undefined, ana.id, ana.id]);
+    expect(replies.at(-1)).toMatchObject({
+      bot_id: app.botId,
+      bot_profile: { id: app.botId, team_id: expect.any(String) },
+    });
+    const delivered = agent.received.map((delivery) => JSON.parse(delivery.body).event);
+    expect(delivered.find((event: { text?: string }) => event.text === "one-a")).toMatchObject({
+      parent_user_id: ana.id,
+    });
+    const history = (await api("conversations.history", { channel: channel.id })).messages;
+    expect(history.every((m: { parent_user_id?: string }) => m.parent_user_id === undefined)).toBe(true);
+    // What a test reads of the app's message through the control API: the same block.
+    const read = await get(`/conversations/${channel.id}/messages/${answer.ts}`);
+    expect(read.blocks).toEqual([
+      {
+        type: "rich_text",
+        block_id: expect.any(String),
+        elements: [{ type: "rich_text_section", elements: [{ type: "text", text: "on it" }] }],
+      },
+    ]);
   });
 
   test("conversations.info, join, open and list follow Slack's visibility rules", async () => {
@@ -370,7 +416,30 @@ describe("reactions, conversations and users", () => {
       is_private: false,
       is_member: true,
       num_members: 2,
+      // What real Slack says of a channel of one workspace (#30).
+      is_shared: false,
+      is_ext_shared: false,
+      is_org_shared: false,
+      is_pending_ext_shared: false,
+      is_general: false,
+      name_normalized: channel.name,
+      previous_names: [],
+      parent_conversation: null,
+      unlinked: 0,
+      last_read: "0000000000.000000",
+      pending_shared: [],
+      pending_connected_team_ids: [],
+      properties: {},
     });
+    const info = (await api("conversations.info", { channel: channel.id })).channel;
+    expect(info.context_team_id).toMatch(/^T/);
+    expect(info.shared_team_ids).toEqual([info.context_team_id]);
+    // `updated` is in milliseconds, `created` in seconds.
+    expect(info.updated).toBe(info.created * 1000);
+    // Only conversations.info says what the app last read.
+    const [listed] = (await api("conversations.list")).channels;
+    expect(listed).toMatchObject({ is_shared: false, name_normalized: listed.name });
+    expect(listed).not.toHaveProperty("last_read");
     expect((await api("conversations.info", { channel: open.id })).error).toBe("not_in_channel");
     expect((await api("conversations.list")).channels.map((c: { id: string }) => c.id)).toEqual([channel.id, open.id]);
     expect((await api("conversations.list", { types: "public_channel,private_channel" })).channels).toHaveLength(2);

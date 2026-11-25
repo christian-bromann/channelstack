@@ -220,10 +220,14 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       throw refuse("msg_too_long", `A message's text is limited to ${MAX_TEXT_LENGTH} characters`);
   };
 
+  /** A message's blocks: its own, or, for text without blocks, the `rich_text` block Slack makes of the text. */
+  const blocksOf = (text: string, blocks: unknown[] | undefined): unknown[] =>
+    blocks ?? (text === "" ? [] : [richTextBlock(text, ids.next("slack.block"))]);
+
   const content = (session: string, input: SlackMessageInput): { text: string; blocks: unknown[] } => {
     const text = resolveMentions(input.text ?? "", (name) => resolveName(session, name));
     checkContent(text, input.blocks);
-    return { text, blocks: input.blocks ?? [richTextBlock(text, ids.next("slack.block"))] };
+    return { text, blocks: blocksOf(text, input.blocks) };
   };
 
   /** Write a message and tell the app: `message`, and `app_mention` when the text mentions it. */
@@ -246,6 +250,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       text: body.text,
       blocks: identified(body.blocks, () => ids.next("slack.block")),
       threadTs: options.threadTs,
+      parentUser:
+        options.threadTs === undefined ? undefined : store.findMessage(conversation.id, options.threadTs)?.user,
       edited: undefined,
       reactions: [],
       ephemeralFor: options.ephemeralFor,
@@ -425,7 +431,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       return post(
         conversation,
         store.app.botUserId,
-        { text, blocks: input.blocks ?? [] },
+        // Slack gives what the app posts as text a `rich_text` block of it, as it does a person's message.
+        { text, blocks: blocksOf(text, input.blocks) },
         { ...options, metadata: input.metadata },
       );
     },
