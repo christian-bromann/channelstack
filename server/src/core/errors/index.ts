@@ -1,31 +1,49 @@
 import { z } from "@hono/zod-openapi";
 
-/** The protocol's own error codes and their HTTP status. Codes are part of the spec; SDKs map them to typed exceptions. */
-const CORE_ERRORS = {
-  unauthorized: 401,
-  invalid_argument: 400,
-  not_found: 404,
-  session_not_found: 404,
-  internal: 500,
+/**
+ * The protocol's own error codes: their HTTP status, and what they mean. Codes are part of the spec
+ * (`x-channelstack-errors`), where SDKs map them to typed exceptions and the docs explain them.
+ */
+export const CORE_ERRORS = {
+  unauthorized: {
+    status: 401,
+    description: "The request has no valid bearer token: the one in `server.json`, or `CHANNELSTACK_TOKEN`.",
+  },
+  invalid_argument: { status: 400, description: "An argument is missing, or has the wrong type or shape." },
+  not_found: {
+    status: 404,
+    description: "The handle isn't there: it was removed, or belongs to another session.",
+  },
+  session_not_found: { status: 404, description: "The session was closed, or never existed." },
+  internal: { status: 500, description: "Something failed inside channelstack. The message says what." },
   // Live mode (implementation plan 4.4).
-  /** The operation isn't built in the fake yet. */
-  unsupported_in_fake: 501,
-  /** The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. */
-  unsupported_in_live: 501,
-  /** A live action needs a piece this run doesn't have: the browser actor, proxy mode. A test is skipped for it. */
-  action_requires: 422,
-  /**
-   * Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person without
-   * a token under `CHANNELSTACK_REALITY=live`. A test fails for it, so a broken nightly run goes red.
-   */
-  live_misconfigured: 412,
-  /** The live workspace, org, team or Notion workspace isn't in its `CHANNELSTACK_LIVE_*` allowlist. */
-  live_not_allowlisted: 403,
-  /** A fake person acts in a live workspace. */
-  fake_actor_in_live_world: 409,
-  /** A person's token belongs to a different workspace than the app. */
-  cross_workspace_credential: 400,
-} as const;
+  unsupported_in_fake: { status: 501, description: "The operation isn't built in the fake yet." },
+  unsupported_in_live: {
+    status: 501,
+    description:
+      "The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. A test is skipped for it.",
+  },
+  action_requires: {
+    status: 422,
+    description:
+      "A live action needs a piece this run doesn't have: the browser actor, or proxy mode. A test is skipped for it.",
+  },
+  live_misconfigured: {
+    status: 412,
+    description:
+      "Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person without a token under `CHANNELSTACK_REALITY=live`. A test fails for it, so a broken nightly run goes red.",
+  },
+  live_not_allowlisted: {
+    status: 403,
+    description:
+      "The live workspace, org or team isn't in its `CHANNELSTACK_LIVE_*` allowlist. Nothing was done there.",
+  },
+  fake_actor_in_live_world: { status: 409, description: "A fake person acts in a live workspace." },
+  cross_workspace_credential: {
+    status: 400,
+    description: "A person's token belongs to a different workspace than the app's.",
+  },
+} as const satisfies Record<string, { status: number; description: string }>;
 
 export type CoreErrorCode = keyof typeof CORE_ERRORS;
 
@@ -58,7 +76,7 @@ export class ProtocolError extends Error {
     super(message);
     this.name = "ProtocolError";
     this.code = typeof code === "string" ? code : code.platform;
-    this.status = typeof code === "string" ? CORE_ERRORS[code] : code.status;
+    this.status = typeof code === "string" ? CORE_ERRORS[code].status : code.status;
     this.data = data;
   }
 

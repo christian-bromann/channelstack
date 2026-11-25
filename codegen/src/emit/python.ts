@@ -8,11 +8,13 @@ const KEYWORDS = new Set(
   ),
 );
 
-/** A Python identifier for an IR name: snake_case, and never a keyword. */
-function snakeCase(name: string): string {
+/** A Python identifier for an IR name: snake_case, and never a keyword. The docs name things with it too. */
+export function pythonName(name: string): string {
   const snake = toSnakeCase(name);
   return KEYWORDS.has(snake) ? `${snake}_` : snake;
 }
+
+const snakeCase = pythonName;
 
 const OUT = "sdks/python/channelstack/generated/__init__.py";
 

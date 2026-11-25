@@ -13,6 +13,8 @@ export interface Ir {
   types: IrNamedType[];
   /** Every error code an operation can return. */
   errors: string[];
+  /** What channelstack's own codes mean, and their HTTP status (`x-channelstack-errors`). A fake's codes are the platform's own. */
+  errorDocs: Record<string, { status: number; description: string }>;
 }
 
 /** A handle: an object with an identity on the server, and methods. */
@@ -144,7 +146,12 @@ export interface IrMethod {
   retryWhile?: string[];
   /** Wait until the agent is quiet before reading. */
   onceQuiet?: true;
+  /** How it works on a live driver, when not as it does in the fake (`x-channelstack-live`). Left out, it works live. */
+  live?: IrLive;
 }
+
+/** Live, the method is refused with `unsupported_in_live`, or needs a piece the run may lack (`action_requires`). */
+type IrLive = { unsupported: string } | { requires: "browser" | "proxy"; reason: string };
 
 // ---------------------------------------------------------------------------------------------
 // OpenAPI → IR
@@ -160,6 +167,17 @@ class SpecError extends Error {
     super(`${where}: ${problem}`);
     this.name = "SpecError";
   }
+}
+
+/** `x-channelstack-live` as the IR has it: `{ live }`, or nothing when the method works live. */
+function liveOf(extension: unknown, where: string): { live: IrLive } | undefined {
+  if (extension === undefined) return undefined;
+  const value = extension as Json;
+  if (typeof value.unsupported === "string") return { live: { unsupported: value.unsupported } };
+  if ((value.requires === "browser" || value.requires === "proxy") && typeof value.reason === "string") {
+    return { live: { requires: value.requires, reason: value.reason } };
+  }
+  throw new SpecError(where, "x-channelstack-live needs `unsupported`, or `requires` (browser or proxy) and `reason`");
 }
 
 export function buildIr(openapi: Json): Ir {
@@ -457,6 +475,7 @@ export function buildIr(openapi: Json): Ir {
           ? { retryWhile: binding.retryWhile }
           : {}),
         ...(binding.onceQuiet === true ? { onceQuiet: true as const } : {}),
+        ...(liveOf(operation["x-channelstack-live"], where) ?? {}),
       });
     }
   }
@@ -494,6 +513,7 @@ export function buildIr(openapi: Json): Ir {
     ),
     types: types.filter((type) => reachable.has(type.name)),
     errors: [...errors].sort(),
+    errorDocs: openapi["x-channelstack-errors"] ?? {},
   };
 }
 

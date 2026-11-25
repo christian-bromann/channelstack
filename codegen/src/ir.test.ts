@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { emitDocs } from "./emit/docs.ts";
 import { emitPython } from "./emit/python.ts";
 import { emitTypeScript } from "./emit/typescript.ts";
 import { buildIr } from "./ir.ts";
@@ -137,6 +138,21 @@ describe("OpenAPI → IR", () => {
     });
   });
 
+  test("what a method needs live, and what channelstack's own error codes mean, come along", () => {
+    const live = { requires: "browser", reason: "no API does it as a person" };
+    const document = {
+      ...spec({ operation: { "x-channelstack-live": live } }),
+      "x-channelstack-errors": { not_found: { status: 404, description: "It isn't there." } },
+    };
+    const ir = buildIr(document);
+    expect(ir.resources[2]?.methods[0]?.live).toEqual(live);
+    expect(ir.resources[0]?.methods[0]?.live).toBeUndefined();
+    expect(ir.errorDocs).toEqual({ not_found: { status: 404, description: "It isn't there." } });
+    expect(() => buildIr(spec({ operation: { "x-channelstack-live": { requires: "magic" } } }))).toThrow(
+      /x-channelstack-live needs/,
+    );
+  });
+
   test.each([
     [
       "an operation with no SDK binding",
@@ -240,6 +256,32 @@ describe("emitters", () => {
     expect(code).toContain('Session(HandleContext(ctx.transport, data["sessionId"]), data)');
     expect(code).toContain("async def open_session(self) -> Session:");
     expect(code).toContain("class NotFoundError(ChannelstackError):");
+  });
+
+  test("Docs: each call in every SDK's language, its parameters, and the error codes explained", () => {
+    const documented = buildIr({
+      ...spec(),
+      "x-channelstack-errors": { not_found: { status: 404, description: "It isn't there." } },
+    });
+    const pages = emitDocs(documented);
+    expect([...pages.keys()]).toEqual([
+      "website/docs/reference/api/client.mdx",
+      "website/docs/reference/api/slack.mdx",
+      "website/docs/reference/api/github.mdx",
+      "website/docs/reference/api/linear.mdx",
+      "website/docs/reference/api/notion.mdx",
+      "website/docs/reference/api/errors.mdx",
+    ]);
+    const client = pages.get("website/docs/reference/api/client.mdx") ?? "";
+    expect(client).toContain("## Widget");
+    // The result is an object, so it's `result`; the first option shows, the table lists them all.
+    expect(client).toContain('const result = await widget.update("…", { parent });');
+    expect(client).toContain('result = await widget.update("…", parent=parent)');
+    expect(client).toContain("| `label` | `label` | `string` | yes | positional |");
+    expect(client).toContain('| `mode` | `mode` | `"a" \\| "b"` | no | option |');
+    const errors = pages.get("website/docs/reference/api/errors.mdx") ?? "";
+    expect(errors).toContain("### not_found\n\nHTTP 404. It isn't there.");
+    expect(errors).toContain("SDK class: `NotFoundError`");
   });
 });
 

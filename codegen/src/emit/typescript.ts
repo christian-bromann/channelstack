@@ -3,10 +3,11 @@ import { BANNER, errorClassName, IrIndex, pathParts } from "./shared.ts";
 
 const OUT = "sdks/typescript/generated/index.ts";
 
-/** The TypeScript SDK's generated half: one file of handle classes, data types and typed errors. */
-export function emitTypeScript(ir: Ir): Map<string, string> {
-  const index = new IrIndex(ir);
-
+/**
+ * How the TypeScript SDK spells types: as its users see them (`public`: handles, `Duration`) or as
+ * they are on the wire (ids, milliseconds). The docs show the public side.
+ */
+export function typeScriptTypes(index: IrIndex) {
   /** A type as SDK users see it (handles), or as it is on the wire (handle data, ids). */
   const typeOf = (type: IrType, side: "public" | "wire"): string => {
     switch (type.kind) {
@@ -62,6 +63,14 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
 
   const fields = (list: readonly IrField[], side: "public" | "wire") =>
     list.map((field) => `${field.name}${field.optional ? "?" : ""}: ${typeOf(field.type, side)}`);
+
+  return { typeOf, fields };
+}
+
+/** The TypeScript SDK's generated half: one file of handle classes, data types and typed errors. */
+export function emitTypeScript(ir: Ir): Map<string, string> {
+  const index = new IrIndex(ir);
+  const { typeOf, fields } = typeScriptTypes(index);
 
   /** An expression as the body of an arrow function: an object literal needs parentheses there. */
   const returned = (expr: string): string => (expr.startsWith("{") ? `(${expr})` : expr);
