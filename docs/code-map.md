@@ -203,7 +203,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Comparing a fake with its platform | `lib.ts` | `normalize` (ids, times, links, mentions, account names and secrets out), `diff` (by path), `loadDivergences` and `classify` (a difference a divergence allows until it expires); the results' shape |
 | Known divergences | `divergences.yaml` | Each with a reason and a date it expires; a unit test fails on an expired one |
 | The coverage page | `coverage.ts` | `coverageRows`, `coveragePage`, `coverageSummary`: from the spec's `x-channelstack-live`, the divergences and a run's results |
-| The shape differ | `shapes.ts` | `readShapes` (a recording's operations, merged, refusals left out) and `compareShapes` (what the platform sends that the fake doesn't, types with nothing in common, codes the fake never sends); a refusal is its own operation |
+| The shape differ | `shapes.ts` | `readShapes` (a recording's operations, merged, each refusal its own `… refused` operation) and `compareShapes` (what the platform sends that the fake doesn't, types with nothing in common, codes the fake never sends) |
 
 ## Test integrations (`integrations/`)
 

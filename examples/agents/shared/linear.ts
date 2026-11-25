@@ -69,14 +69,21 @@ export function linearAgent(linear: LinearClient, respond?: Respond) {
     if (/\brefactor\b/i.test(title)) {
       // The long job is stoppable before its first request goes out, and a Stop that came while
       // the issue was still being started stops it at once.
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const stopped = new Promise<boolean>((resolve) => {
         stoppable.set(sessionId, () => resolve(true));
         if (stopRequested.delete(sessionId)) resolve(true);
-        setTimeout(() => resolve(false), LONG_JOB_MS);
+        timer = setTimeout(() => resolve(false), LONG_JOB_MS);
       });
-      await publish(sessionId, { type: "action", action: "Refactoring", parameter: title });
-      const wasStopped = await stopped;
-      stoppable.delete(sessionId);
+      let wasStopped: boolean;
+      try {
+        await publish(sessionId, { type: "action", action: "Refactoring", parameter: title });
+        wasStopped = await stopped;
+      } finally {
+        // However the job ends, even with a failed request, it is no longer there to stop.
+        stoppable.delete(sessionId);
+        clearTimeout(timer);
+      }
       await answer(sessionId, wasStopped ? "Stopped, as asked. Nothing was changed." : answerFor(title));
       return;
     }
