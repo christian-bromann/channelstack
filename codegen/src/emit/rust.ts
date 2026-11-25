@@ -379,7 +379,9 @@ export function emitRust(ir: Ir): Map<string, string> {
         `        let filters: Map<String, Value> = options.iter().filter(|(name, _)| [${filters.map(str).join(", ")}].contains(&name.as_str())).map(|(name, value)| (name.clone(), value.clone())).collect();`,
         `        let timeout = options.get("timeout").cloned().unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));`,
         ...(w.mode === "latest"
-          ? [`        let quiet_for = options.get("quietFor").cloned().unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));`]
+          ? [
+              `        let quiet_for = options.get("quietFor").cloned().unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));`,
+            ]
           : []),
         ...(w.from ? [`        let from = options.get("from").cloned().unwrap_or(Value::Null);`] : []),
         ...(w.text

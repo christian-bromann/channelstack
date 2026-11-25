@@ -341,7 +341,10 @@ export default function Home() {
               <li className="step reveal">
                 <p className="step-n">Step 3</p>
                 <h3>Run</h3>
-                <p>Add the plugin and run your tests as usual. A failure says what a person sees, and what the agent left open.</p>
+                <p>
+                  Add the plugin and run your tests as usual. A failure says what a person sees, and what the agent left
+                  open.
+                </p>
                 <div className="snippet">
                   <p className="snippet-file">vitest.config.ts</p>
                   <Code plain sample={vitestConfig} label="vitest.config.ts" />
