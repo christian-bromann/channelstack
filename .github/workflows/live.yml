@@ -35,9 +35,15 @@ jobs:
         with:
           python: "false"
       - run: pnpm build
+      # The tag every object of this run carries, so the sweep check looks for exactly that: the
+      # run's number in base 36, since Linear takes a name with 7 digits in a row for a phone number.
+      - name: The run's tag
+        run: echo "CHANNELSTACK_RUN_ID=gh$(node -p "(${RUN_ID}).toString(36)")a${RUN_ATTEMPT}" >> "$GITHUB_ENV"
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
       - run: pnpm live
-        env: &sandboxes # The tag every object of this run carries, so the sweep check looks for exactly that.
-          CHANNELSTACK_RUN_ID: gh${{ github.run_id }}
+        env: &sandboxes
           CHANNELSTACK_LIVE_SLACK_TEAMS: ${{ vars.CHANNELSTACK_LIVE_SLACK_TEAMS }}
           CHANNELSTACK_SLACK_APP_ID: ${{ secrets.CHANNELSTACK_SLACK_APP_ID }}
           CHANNELSTACK_SLACK_BOT_TOKEN: ${{ secrets.CHANNELSTACK_SLACK_BOT_TOKEN }}

@@ -115,7 +115,7 @@ describe("live Slack: acting and reading back", () => {
     });
     expect(channel.status).toBe(200);
     // Real names are unique in a workspace: the run's tag, a number, then the name the test asked for.
-    expect(channel.body.name).toBe("channelstack-run-unit1-1-support");
+    expect(channel.body.name).toMatch(/^channelstack-run-unit1-[a-z]{4}-1-support$/);
     const created = stub.channel(channel.body.id);
     expect(created?.creator).toBe(ana.userId);
     expect([...(created?.members ?? [])].sort()).toEqual([ana.userId, stub.bot.userId].sort());

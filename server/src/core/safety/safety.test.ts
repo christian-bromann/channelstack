@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { ProtocolError } from "../errors/index.ts";
-import { Allowlist, isRunId, runId, runTag, taggedRun } from "./index.ts";
+import { Allowlist, isRunId, runId, runTag, taggedNames, taggedRun } from "./index.ts";
 
 describe("safety", () => {
   test("an allowlist holds the ids its variable lists, and refuses the rest", () => {
@@ -35,5 +35,18 @@ describe("safety", () => {
     expect(isRunId(made)).toBe(true);
     expect(runId({})).not.toBe(made);
     expect(isRunId("a".repeat(25))).toBe(false);
+    // What CI's run ids looked like: Linear refused a team named with one as a phone number.
+    expect(isRunId("gh45602242231")).toBe(false);
+    expect(() => runId({ CHANNELSTACK_RUN_ID: "gh45602242231" })).toThrow(/phone number/);
+    expect(isRunId("gh123456")).toBe(true);
+  });
+
+  test("two worlds of one run never make the same name", () => {
+    const [first, second] = [taggedNames(runTag("gh1")), taggedNames(runTag("gh1"))];
+    const [a, b] = [first(), second()];
+    expect(a).toMatch(/^channelstack-run-gh1-[a-z]{4}-1$/);
+    expect(a).not.toBe(b);
+    expect(first("support")).toMatch(/^channelstack-run-gh1-[a-z]{4}-2-support$/);
+    expect([a, b].map(taggedRun)).toEqual(["gh1", "gh1"]);
   });
 });

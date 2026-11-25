@@ -48,13 +48,19 @@ export function runTag(run: string): string {
   return `${RUN_TAG_PREFIX}${run}`;
 }
 
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
 /**
- * Names for what a live world makes, unique in a real workspace: the run's tag, a number of the
- * world's own, and the test's name for it when it gave one (`channelstack-run-<run>-<n>[-<name>]`).
+ * Names for what a live world makes, unique in a real workspace: the run's tag, a mark of this
+ * world's own, a number, and the test's name for it when it gave one
+ * (`channelstack-run-<run>-<world>-<n>[-<name>]`). The mark keeps two processes of one run (the
+ * live examples, then the differential run) apart: Slack keeps an archived channel's name, so a
+ * second `-1` of the same run would be `name_taken`.
  */
 export function taggedNames(tag: string): (name?: string) => string {
+  const world = randomString(4, LETTERS);
   let count = 0;
-  return (name) => [tag, String(++count), ...(name ? [name] : [])].join("-");
+  return (name) => [tag, world, String(++count), ...(name ? [name] : [])].join("-");
 }
 
 /** The run a tagged name belongs to, or nothing for a name channelstack didn't make. */
@@ -64,17 +70,24 @@ export function taggedRun(name: string): string | undefined {
   return /^[a-z0-9]+/.exec(name.slice(at + RUN_TAG_PREFIX.length))?.[0];
 }
 
-/** A run id: 1 to 24 lowercase letters and digits, so it fits every platform's names. */
+/**
+ * A run id: 1 to 24 lowercase letters and digits, so it fits every platform's names, and never 7
+ * digits in a row: Linear refuses a team name that looks like a phone number.
+ */
 export function isRunId(value: string): boolean {
-  return /^[a-z0-9]{1,24}$/.test(value);
+  return /^[a-z0-9]{1,24}$/.test(value) && !/\d{7}/.test(value);
 }
 
 /** The run id: from `CHANNELSTACK_RUN_ID` (CI sets it to the job's), else made up from the CSPRNG. */
 export function runId(env: Readonly<Record<string, string | undefined>>): string {
   const given = env.CHANNELSTACK_RUN_ID?.trim().toLowerCase();
   if (given) {
-    if (!isRunId(given)) throw new Error(`CHANNELSTACK_RUN_ID must be 1-24 letters and digits, got "${given}"`);
+    if (!isRunId(given)) {
+      throw new Error(
+        `CHANNELSTACK_RUN_ID must be 1-24 letters and digits, with no 7 digits in a row (Linear takes those for a phone number), got "${given}"`,
+      );
+    }
     return given;
   }
-  return randomString(10, "abcdefghijklmnopqrstuvwxyz0123456789");
+  return randomString(10, LETTERS);
 }
