@@ -758,6 +758,9 @@ async fn a_pull_request_its_reviews_checks_and_labels() -> Result<()> {
             .await,
     );
     assert_eq!(failed, "Expected no label \"BUG\". Labels there: Bug");
+    // Every letter folds, not only ASCII ones, as in TypeScript and Python.
+    let sized = StandIn::with(json!({ "labels": ["Größe"] }));
+    expect(&sized).to_have_label("GRÖßE").await?;
 
     expect(&pull).not_to_be_merged().quiet_for(QUIET).await?;
     let failed = failure(expect(&pull).to_be_merged().timeout(FAST).await);
@@ -875,6 +878,8 @@ async fn a_linear_issue_its_session_and_who_has_it() -> Result<()> {
         failed,
         "Expected the issue to be in \"Done\", it is in \"In Review\""
     );
+    let swedish = StandIn::with(json!({ "state": { "name": "Ärende", "type": "started" } }));
+    expect(&swedish).to_have_state("ärende").await?;
     expect(&issue)
         .not_to_have_state("Done")
         .quiet_for(QUIET)

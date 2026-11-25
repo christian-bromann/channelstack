@@ -384,6 +384,11 @@ fn author_name(item: &Value) -> &str {
     text_of(&item["author"], "name")
 }
 
+/// Is this the name, in any case? Every letter folds, as `toLowerCase()` and Python's `lower()` do.
+fn same_name(found: &str, name: &str) -> bool {
+    found.to_lowercase() == name.to_lowercase()
+}
+
 /// An author as a check was given it: a name, or a handle's name.
 fn name_of(author: &Value) -> &str {
     author.as_str().unwrap_or_else(|| text_of(author, "name"))
@@ -1333,7 +1338,7 @@ impl<'a, S: Labels + ?Sized> Expectation<'a, S> {
                 false,
                 &options,
                 labels,
-                |labels| labels.iter().any(|label| label.eq_ignore_ascii_case(&name)),
+                |labels| labels.iter().any(|label| same_name(label, &name)),
                 |labels| {
                     format!(
                         "Expected {} label {}. Labels there: {}",
@@ -1517,7 +1522,7 @@ impl<'a, S: Issue + ?Sized> Expectation<'a, S> {
                 false,
                 &options,
                 || async { Ok(text_of(&subject.read_workflow_state().await?, "name").to_owned()) },
-                |current| current.eq_ignore_ascii_case(&name),
+                |current| same_name(current, &name),
                 |current| {
                     format!(
                         "Expected the issue {}to be in {}, it is in {}",
