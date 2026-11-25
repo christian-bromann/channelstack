@@ -10,72 +10,9 @@ The three SDKs that drive channelstack without a test framework, and the control
 
 ## The same scenario in each
 
-A person mentions the agent in a channel, and the script reads the agent's reply in the thread.
+A person mentions the app in a channel, and the script reads the app's reply in the thread.
 
-<CodeGroup>
-
-```ts title="TypeScript"
-import { connect } from "channelstack/client";
-
-await using client = await connect({ mode: "auto" });
-await using session = await client.openSession({ name: "example" });
-
-const slack = await session.slack();
-const ana = await slack.createUser({ name: "Ana" });
-const channel = await slack.createChannel({ participants: [ana, slack.app] });
-
-const msg = await ana.say("@my-agent hi", { channel });
-const reply = await msg.thread.waitForReply({ from: "my-agent" });
-console.log(reply.text);
-```
-
-```python title="Python"
-import asyncio
-
-from channelstack import connect
-
-
-async def main() -> None:
-    async with await connect(mode="auto") as client:
-        async with await client.open_session(name="example") as session:
-            slack = await session.slack()
-            ana = await slack.create_user(name="Ana")
-            channel = await slack.create_channel(participants=[ana, slack.app])
-
-            msg = await ana.say("@my-agent hi", channel=channel)
-            reply = await msg.thread.wait_for_reply(from_="my-agent")
-            print(reply.text)
-
-
-asyncio.run(main())
-```
-
-```rust title="Rust"
-use channelstack::{connect, Handle, Mode};
-
-#[tokio::main]
-async fn main() -> channelstack::Result<()> {
-    let client = connect(Mode::Auto).await?;
-    let session = client.open_session().name("example").send().await?;
-
-    let slack = session.slack().await?;
-    let ana = slack.create_user().name("Ana").await?;
-    let channel = slack
-        .create_channel()
-        .participants(vec![&ana as &dyn Handle, &slack.app()])
-        .await?;
-
-    let msg = ana.say("@my-agent hi").channel(&channel).await?;
-    let reply = msg.thread().wait_for_reply().from("my-agent").await?;
-    println!("{}", reply.text());
-
-    session.close().await?;
-    client.close().await;
-    Ok(())
-}
-```
-
-</CodeGroup>
+<Example id="sdks-connect" />
 
 ## Install
 
@@ -127,7 +64,7 @@ Everything a script does happens in a session: a scope in the server's one share
 | `Channelstack` (the client) | Does                                                                  |
 | --------------------------- | --------------------------------------------------------------------- |
 | `openSession({ name? })`    | Opens a session                                                       |
-| `env({ proxy? })`           | The agent's env vars, as `channelstack env` prints them               |
+| `env({ proxy? })`           | The app's env vars, as `channelstack env` prints them                 |
 | `status()`                  | `{ ready, version, drivers }`                                         |
 | `reset()`                   | Drops all state on every channel. Avoid in parallel use               |
 | `uiLoginLink()`             | A one-time UI link, as `channelstack ui` prints                       |
@@ -138,7 +75,7 @@ Everything a script does happens in a session: a scope in the server's one share
 | `sessionId`                                   | The session's id                                                                                                                                                                                                                                    |
 | `slack()`, `github()`, `linear()`, `notion()` | The channel fixtures for this session ([Slack](/docs/reference/api/slack#slackfixture), [GitHub](/docs/reference/api/github#githubfixture), [Linear](/docs/reference/api/linear#linearfixture), [Notion](/docs/reference/api/notion#notionfixture)) |
 | `quiet()`                                     | `{ busy, quietForMs, open }`: what negative checks wait on                                                                                                                                                                                          |
-| `events({ since? })`                          | The session's event log: actions, deliveries with every attempt, the agent's API calls                                                                                                                                                              |
+| `events({ since? })`                          | The session's event log: actions, deliveries with every attempt, the app's API calls                                                                                                                                                                |
 | `close()`                                     | Closes the session and removes everything it created                                                                                                                                                                                                |
 
 ## Naming
@@ -167,7 +104,7 @@ The SDKs never sleep a fixed time: every wait polls until its condition holds, a
 | Wait                                                                  | Returns                                                                        |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `waitForReply`, `waitForMessage`, `waitForComment`, `waitForActivity` | The next new item matching the filter, after the last one this handle returned |
-| `latestReply`, `latestComment`                                        | Waits for one, then for the agent to be quiet, then returns the latest         |
+| `latestReply`, `latestComment`                                        | Waits for one, then for the app to be quiet, then returns the latest           |
 | `waitForModal`, `waitForState`, `waitForCall`, `settled`, `ended`     | The first state that matches                                                   |
 
 | Setting                          | Default |

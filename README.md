@@ -1,11 +1,11 @@
 <p align="center">
   <a href="https://channelstack.dev">
-    <img src=".github/assets/banner.png" alt="channelstack: your agent's whole world, on localhost." width="100%">
+    <img src=".github/assets/banner.png" alt="channelstack: your app's whole world, on localhost." width="100%">
   </a>
 </p>
 
 <p align="center">
-  A test harness for AI agents that live in Slack, GitHub, Linear and Notion.
+  A test harness for the apps and agents you build for Slack, GitHub, Linear and Notion.
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
 > [!NOTE]
 > channelstack is under construction and not on npm yet. See [Status](#status).
 
-channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. Tests script the people, your agent answers through its real code path, and you assert on the conversation a person would see:
+channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
 
 ```ts
 test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
@@ -34,26 +34,26 @@ test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
 });
 ```
 
-There are no hand-built webhook payloads and no mocked SDK calls. Ana posts, the fake Slack delivers a signed event to your agent, your agent replies through the Slack SDK it already uses, and the matcher waits for what Ana would see in the thread.
+There are no hand-built webhook payloads and no mocked SDK calls. Ana posts, the fake Slack delivers a signed event to your app, your app replies through the Slack SDK it already uses, and the matcher waits for what Ana would see in the thread.
 
 ## Why
 
-Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on.
+Apps that live in these platforms break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on.
 
-- **Your agent's real code path.** `channelstack env` prints the URLs and tokens that point your agent's own SDKs at `slack.localhost`, `github.localhost`, `linear.localhost` and `notion.localhost`. Agents that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
+- **Your app's real code path.** `channelstack env` prints the URLs and tokens that point your app's own SDKs at `slack.localhost`, `github.localhost`, `linear.localhost` and `notion.localhost`. Apps that can't change their base URL send their traffic through channelstack's proxy instead ([proxy mode](docs/devx.md#9-proxy-mode-for-agents-that-cant-change-their-base-url)).
 - **Shapes checked against the real platforms.** channelstack's own tests validate what the fakes send against the platforms' published schemas (GitHub, Linear) and against recorded real traffic where no usable schema exists (Slack). When a platform changes, channelstack's build goes red, instead of your tests passing against a stale fake.
 - **People, not payloads.** Write `ana.click("Approve", { message })` instead of hand-building a `block_actions` body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery ids.
 - **Assert what people see.** Streams, status lines, edits and ephemeral messages render into one transcript. `toHaveRepliesFrom(…, { count: 1 })` catches the double post.
 
 ## Channels
 
-Each channel is a fixture your test receives by name (`async ({ slack, github }) => …`). Use one, or several when your agent spans them.
+Each channel is a fixture your test receives by name (`async ({ slack, github }) => …`). Use one, or several when your app spans them.
 
 | Channel | In your test | What it fakes                                                                    |
 | ------- | -------- | -------------------------------------------------------------------------------- |
 | Slack   | `slack`  | DMs, mentions, threads, buttons and modals, streaming replies and the agent view |
 | GitHub  | `github` | Apps and installations, issues and pull requests, reviews, check runs            |
-| Linear  | `linear` | Teams and issues, delegation, agent sessions, activities and the Stop signal     |
+| Linear  | `linear` | Teams, issues and comments, delegation, agent sessions, activities and Stop      |
 | Notion  | `notion` | Pages and databases, comments and discussions, connections and webhooks          |
 
 The same tests can also run against the real platforms in sandbox workspaces ([live mode](docs/live-mode.md)).
@@ -70,7 +70,7 @@ flowchart LR
   A -. "API calls" .-> C
 ```
 
-One server process fakes the platforms in memory. Your test drives it through a control API, it delivers what the platform would deliver, and your agent talks to it as if it were the real thing. channelstack never starts or wraps your agent. More in [docs/architecture.md](docs/architecture.md).
+One server process fakes the platforms in memory. Your test drives it through a control API, it delivers what the platform would deliver, and your app talks to it as if it were the real thing. channelstack never starts or wraps your app. More in [docs/architecture.md](docs/architecture.md).
 
 ## Quick start
 

@@ -25,9 +25,9 @@ The folder is the section and the frontmatter's `order` is the position in it. A
 
 | Page | Kind | What it covers |
 |---|---|---|
-| Overview (`index.mdx`) | Explanation | What channelstack is in one screen: a test scripts people, the fake platform delivers to the unchanged agent, the matchers read what a person would see. Animated: the request flow |
-| Why channelstack (`why.md`) | Explanation | Why agents in chat tools are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
-| Getting started (`getting-started.mdx`) | Tutorial | Install, start the server, `channelstack env`, run a reference-style Bolt agent, write and pass a first Vitest test, then break the agent and watch it fail. Animated: the terminal |
+| Overview (`index.mdx`) | Explanation | What channelstack is in one screen, and who it's for (bots, apps, integrations and AI agents on the four platforms): a test scripts people, the fake platform delivers to the unchanged app, the matchers read what a person would see. Animated: the request flow |
+| Why channelstack (`why.md`) | Explanation | Why apps and agents on these platforms are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
+| Getting started (`getting-started.mdx`) | Tutorial | Install, start the server, `channelstack env`, run a small Bolt bot, write and pass a first Vitest test, then break the bot and watch it fail. Animated: the terminal |
 
 **Quickstarts** (`docs/quickstarts/`)
 
@@ -44,7 +44,7 @@ One per agent framework, in the order people use them with channelstack. Each is
 | Page | Kind | What it covers |
 |---|---|---|
 | How it works | Explanation | One server, four fakes, the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
-| Connecting your agent | How-to | `channelstack env`, each SDK's base-URL option, where the server delivers (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`), Socket Mode, TLS trust per runtime, `--no-portless` |
+| Connecting your app | How-to | `channelstack env`, each SDK's base-URL option, where the server delivers (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`), Socket Mode, TLS trust per runtime, `--no-portless` |
 | Writing tests | How-to | The Vitest plugin, fixtures, actor-first calls, giving the app access explicitly, shared people with `test.extend`, files and fixtures paths, cleanup |
 | Waiting and quiet | Explanation | Why matchers wait, positive vs negative and exact-count checks, the quiet window, "Still open:" messages, timeouts. Animated: the quiet window |
 | Delivery and failures | How-to | Retries, bad signatures, stale timestamps, redelivery, faults (rate limits, dropped sockets), what each proves. Animated: Slack's retry |
@@ -52,14 +52,14 @@ One per agent framework, in the order people use them with channelstack. Each is
 | pytest | How-to | `pytest-channelstack`: fixtures, `expect(...)`, the ini settings, modes |
 | The dev loop: CLI and UI | How-to | `channelstack slack say`, `show`, `tail`, `deliveries`, `redeliver`, the UI's login link, the shared `dev` session |
 | MCP for coding agents | How-to | `channelstack mcp`, its tools, the skill, the loop a coding agent runs |
-| Proxy mode | How-to | Agents that hard-code `slack.com`: `--proxy`, `env --proxy`, the CA, Go in Docker. Animated: the routing |
+| Proxy mode | How-to | Apps that hard-code `slack.com`: `--proxy`, `env --proxy`, the CA, Go in Docker. Animated: the routing |
 | Live mode | How-to | The same tests against real sandboxes: credentials, allowlists, the browser actor, what skips and why, `doctor` and `sweep`. Animated: fake and live side by side |
 | Running in CI | How-to | GitHub Actions: start, `env`, the agent, the tests; a nightly live job |
 | Troubleshooting | How-to | Symptoms to fixes: nothing delivered, TLS errors, timeouts, `not_in_channel`, `missing_scope`, flaky negatives |
 
 **Platforms** (`docs/platforms/`)
 
-One page per platform, the same shape on each: what the fake covers, connecting an agent built on that platform's SDKs, the people and objects a test creates, the actions people take, what to check, delivery specifics, and what live needs.
+One page per platform, the same shape on each: what the fake covers, connecting an app built on that platform's SDKs, the people and objects a test creates, the actions people take, what to check, delivery specifics, and what live needs.
 
 | Page | Kind |
 |---|---|
@@ -87,7 +87,7 @@ The reference is generated wherever there's one source for it, so it can't drift
 ## Writing a page
 
 - **Open with what the page is for,** in one or two sentences, before any heading. Then H2 sections; the right-hand outline is built from H2 and H3.
-- **Show, then explain.** A code block early, then what it does. Every example is one that runs against the reference agents (`api/examples/` has the real ones).
+- **Show, then explain.** A code block early, then what it does. Every example is compiled and type-checked in every language it's shown in; the ones that run against the reference agents are in `api/examples/`.
 - **Plain words, short sentences,** the way the rest of the repository is written. Name things the way the API does.
 - **Describe what's built.** A feature that isn't built yet isn't documented as if it were; at most a sentence says it's coming, with its issue.
 - **Link across kinds** instead of mixing them: a how-to links to the explanation of why, and to the reference for every option.
@@ -121,7 +121,15 @@ GitHub's alert syntax, which reads fine on GitHub too:
 
 Fenced blocks are highlighted at build time (`ts`, `tsx`, `js`, `python`, `rust`, `bash`, `json`, `yaml`, `diff`, `ini`). A `title` names the file: ` ```ts title="vitest.config.ts" `.
 
-The same example in several languages or package managers goes in tabs:
+A test, or anything that uses the test API (actors, fixtures, `expect`), is never a fenced block. It's an `<Example id="slack-mention-one-reply" />`: three real files in `website/examples/`, shown as TypeScript, Python and Rust tabs and checked in CI, so they can't rot.
+
+- `ts/<id>.test.ts`, type-checked against `api/*.d.ts` (`pnpm typecheck:samples` here).
+- `python/test_<id_with_underscores>.py`, an `async def test_…(slack: SlackFixture)` checked by pyright, strict (`pnpm typecheck` at the root).
+- `rust/src/<id_with_underscores>.rs`, a `#[tokio::test] #[ignore]` that gets its session from `fixtures::session()`, compiled by clippy (`pnpm test:rust` at the root).
+
+`// @show:start` and `// @show:end` (`#` in Python) mark what the page shows; setup the reader doesn't need stays outside. Where a language can't say something, a one-line comment in that file says so. A missing file fails the build.
+
+Anything else in several languages or package managers goes in tabs by hand:
 
 ````mdx
 <CodeGroup>
@@ -143,11 +151,11 @@ The animated figures are React components in `src/components/docs/`, available i
 
 | Component | Shows | Used on |
 |---|---|---|
-| `<RequestFlow />` | A test's message reaching the agent and its reply coming back | Overview, How it works |
+| `<RequestFlow />` | A test's message reaching the app and its reply coming back | Overview, How it works |
 | `<TerminalSession />` | The getting-started commands and their output, typed out | Getting started |
 | `<SessionScopes />` | Parallel tests, each in its own session of one shared workspace | How it works |
-| `<QuietWindow />` | A negative check watching the agent until it has been quiet long enough | Waiting and quiet |
-| `<RetryTimeline />` | Slack retrying a slow delivery, and an agent answering once | Delivery and failures |
+| `<QuietWindow />` | A negative check watching the app until it has been quiet long enough | Waiting and quiet |
+| `<RetryTimeline />` | Slack retrying a slow delivery, and an app answering once | Delivery and failures |
 | `<ProxyRouting />` | Platform hosts going to the fakes, every other host passing through | Proxy mode |
 | `<FakeOrLive />` | The same test against the fake and against a real sandbox | Live mode |
 

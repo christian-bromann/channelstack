@@ -1,13 +1,14 @@
 /**
  * `import sample from "../samples/slack.test.ts?sample"` gives the highlighted sample.
  *
- * Samples are real files. `pnpm typecheck:samples` checks the TypeScript ones against
- * ../api/*.d.ts; the Python ones with pyright, at the repository root (samples/python/README.md).
+ * Samples are real files (../samples, and the docs' examples in ../examples). `pnpm typecheck:samples`
+ * checks the TypeScript ones against ../api/*.d.ts; the Python ones are checked with pyright and the
+ * Rust ones compiled by clippy, at the repository root (samples/python/README.md).
  * Two comment markers control what the site shows:
  *   // @show:start … // @show:end   show only this region (the whole file otherwise)
  *   // [!step 2]                    on a line of its own: tags the lines below it for playback,
  *                                   up to the next marker, blank line or shallower line. The
- *                                   marker line itself is not shown. (`# [!step 2]` in Python.)
+ *                                   marker line itself is not shown. (`#` instead of `//` in Python.)
  */
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
@@ -18,7 +19,14 @@ import { highlightLines } from "./highlight";
 
 const QUERY = "?sample";
 const STEP = /^(\s*)(?:\/\/|#)\s*\[!step (\d+)\]\s*$/;
-const LANG: Record<string, string> = { ".ts": "ts", ".tsx": "tsx", ".py": "python", ".sh": "bash", ".json": "json" };
+const LANG: Record<string, string> = {
+  ".ts": "ts",
+  ".tsx": "tsx",
+  ".py": "python",
+  ".rs": "rust",
+  ".sh": "bash",
+  ".json": "json",
+};
 
 export interface Sample {
   /** The code as shown, without markers. This is what the copy button copies. */

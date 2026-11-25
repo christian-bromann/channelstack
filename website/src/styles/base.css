@@ -127,6 +127,10 @@ html {
   html {
     scroll-behavior: smooth;
   }
+  /* Moving to another page is a jump, not a scroll (PageChange in DocsLayout.tsx). */
+  html.page-change {
+    scroll-behavior: auto;
+  }
 }
 
 body {

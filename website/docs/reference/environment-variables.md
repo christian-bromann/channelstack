@@ -1,12 +1,12 @@
 ---
 title: "Environment variables"
 order: 6
-description: "Every environment variable channelstack reads or prints: the server's settings, the clients', the live credentials and allowlists, and what the agent gets."
+description: "Every environment variable channelstack reads or prints: the server's settings, the clients', the live credentials and allowlists, and what the app gets."
 ---
 
 # Environment variables
 
-Every variable channelstack reads, and every variable it prints for the agent. Each is marked by who reads it: the **server** (`channelstack start`, or a server an SDK starts), a **client** (the CLI's attach commands, the SDKs, the Vitest plugin, pytest), or the **agent** (your bot, from what `channelstack env` prints).
+Every variable channelstack reads, and every variable it prints for the app. Each is marked by who reads it: the **server** (`channelstack start`, or a server an SDK starts), a **client** (the CLI's attach commands, the SDKs, the Vitest plugin, pytest), or the **app** (your bot, integration or agent, from what `channelstack env` prints).
 
 ```bash title=".env.test"
 CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events
@@ -23,11 +23,11 @@ An empty variable counts as not set everywhere.
 | `CHANNELSTACK_SEED` | random per start | Makes generated ids reproducible. Up to 9 digits is used as the seed; any other string is hashed into one |
 | `CHANNELSTACK_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent`. Any other value means `info`. `--log-level` wins |
 | `CHANNELSTACK_SERVER_FILE` | `<home>/server.json` | Where `start` writes the control API's URL and token (0600). `--server-file` wins. The attach CLI reads it too |
-| `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the agent. Read once, when the server starts |
+| `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the app. Read once, when the server starts |
 
-`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR` or `NOTION`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`. The value is the agent's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`.
+`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR` or `NOTION`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`.
 
-An agent on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. See [Connecting your agent](/docs/guide/connecting-your-agent).
+An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. See [Connecting your app](/docs/guide/connecting-your-agent).
 
 ## Client
 
@@ -46,7 +46,7 @@ The SDKs read a person's token from the environment when a test leaves `token` o
 
 | Variable | For |
 |---|---|
-| `CHANNELSTACK_SLACK_USER_<NAME>_TOKEN` | `slack.createUser({ name })`: a user token (`xoxp-…`) from a Slack app for the sandbox's people, not the agent's own app |
+| `CHANNELSTACK_SLACK_USER_<NAME>_TOKEN` | `slack.createUser({ name })`: a user token (`xoxp-…`) from a Slack app for the sandbox's people, not the app's own app |
 | `CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN` | `github.createUser({ login })`: a machine user's fine-grained PAT |
 | `CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN` | `linear.createUser({ name })`: a personal API key |
 | `CHANNELSTACK_NOTION_USER_<NAME>_TOKEN` | `notion.createUser({ name })`: a personal access token |
@@ -80,7 +80,7 @@ Live credentials stay in the server's memory. They are never logged, never retur
 
 ## What `channelstack env` prints
 
-Read by the **agent**. `channelstack env` (and the `channelstack.env()` fixture) prints the fake channels' settings as `KEY=value` lines. The values come from the running server: the URLs follow how it was started (portless names, or `--no-portless` paths), and the secrets are this install's, from `<home>/secrets.json`.
+Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) prints the fake channels' settings as `KEY=value` lines. The values come from the running server: the URLs follow how it was started (portless names, or `--no-portless` paths), and the secrets are this install's, from `<home>/secrets.json`.
 
 | Variable | Channel | Value |
 |---|---|---|
@@ -105,20 +105,20 @@ Read by the **agent**. `channelstack env` (and the `channelstack.env()` fixture)
 | `NOTION_VERIFICATION_TOKEN` | Notion | What webhook deliveries are signed with |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
-The names are the ones the platforms' SDKs and examples use; map them to your agent's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.
+The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.
 
 ### `channelstack env --proxy`
 
-For an agent that hard-codes the platforms' hosts. The server must run with `--proxy`. It prints the same lines without the API URLs (the agent keeps `slack.com` and the others), plus:
+For an app that hard-codes the platforms' hosts. The server must run with `--proxy`. It prints the same lines without the API URLs (the app keeps `slack.com` and the others), plus:
 
 | Variable | Value |
 |---|---|
 | `HTTPS_PROXY`, `HTTP_PROXY`, `https_proxy`, `http_proxy` | `http://127.0.0.1:<proxy port>` (default port `7464`) |
 | `NO_PROXY`, `no_proxy` | `localhost,127.0.0.1,::1,.localhost` |
 | `NODE_USE_ENV_PROXY` | `1`: Node 24 routes its own `http`, `https` and `fetch` through the proxy only with it |
-| `NODE_OPTIONS` | `--import="<home>/proxy/node-env-proxy.mjs"`: keeps Node's proxy-aware `fetch` in an agent that loads undici 7 or later |
+| `NODE_OPTIONS` | `--import="<home>/proxy/node-env-proxy.mjs"`: keeps Node's proxy-aware `fetch` in an app that loads undici 7 or later |
 | `NODE_EXTRA_CA_CERTS` | `<home>/ca/ca.pem`: channelstack's CA alone |
 | `SSL_CERT_FILE` | `<home>/ca/bundle.pem`: the public roots plus the CA, for runtimes that replace their bundle |
 | `REQUESTS_CA_BUNDLE` | `<home>/ca/bundle.pem`, for Python's `requests` |
 
-The CA is trusted only by the agent that gets these variables. See [Proxy mode](/docs/guide/proxy-mode).
+The CA is trusted only by the app that gets these variables. See [Proxy mode](/docs/guide/proxy-mode).

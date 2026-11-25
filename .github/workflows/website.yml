@@ -8,12 +8,22 @@ on:
     branches: ["**"]
     paths:
       - "website/**"
+      # The examples are type-checked against these (website/tsconfig.samples.json), so a change to
+      # them runs `typecheck:samples` too.
+      - "api/**"
+      - "sdks/**"
+      - "integrations/**"
       - ".github/workflows/website.yml"
   # A pull request opened after the branch's last push still gets its preview comment.
   pull_request:
     types: [opened, reopened]
     paths:
       - "website/**"
+      # The examples are type-checked against these (website/tsconfig.samples.json), so a change to
+      # them runs `typecheck:samples` too.
+      - "api/**"
+      - "sdks/**"
+      - "integrations/**"
       - ".github/workflows/website.yml"
 
 permissions:

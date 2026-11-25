@@ -113,6 +113,17 @@ impl<T: IntoArg> IntoArg for Option<T> {
         self.map_or(Value::Null, IntoArg::into_arg)
     }
 }
+/// A pattern, as it goes on the wire (`{ "source": …, "flags": … }`): see `pattern_on_wire`.
+impl IntoArg for &regex::Regex {
+    fn into_arg(self) -> Value {
+        crate::runtime::wait::pattern_on_wire(self)
+    }
+}
+impl IntoArg for regex::Regex {
+    fn into_arg(self) -> Value {
+        (&self).into_arg()
+    }
+}
 impl<H: Handle + ?Sized> IntoArg for &H {
     fn into_arg(self) -> Value {
         self.data().clone()
@@ -258,6 +269,7 @@ pub async fn send(
             || ctx.quiet(),
             &Value::from(DEFAULT_TIMEOUT),
             &Value::from(DEFAULT_QUIET_FOR),
+            false,
         )
         .await?;
     }

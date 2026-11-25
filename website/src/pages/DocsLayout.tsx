@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { CodeGroup } from "../components/docs/CodeGroup";
+import { Example } from "../components/docs/Example";
 import {
   FakeOrLive,
   ProxyRouting,
@@ -25,6 +26,7 @@ const GENERATED = "website/docs/reference/api/";
 /** What every page can use without importing it (website/docs/README.md lists them). */
 const MDX_COMPONENTS = {
   CodeGroup,
+  Example,
   FakeOrLive,
   ProxyRouting,
   QuietWindow,

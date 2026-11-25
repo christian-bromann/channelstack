@@ -119,6 +119,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "channelstack-docs-examples"
+version = "0.0.0"
+dependencies = [
+ "channelstack",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "channelstack-smoke"
 version = "0.0.0"
 dependencies = [

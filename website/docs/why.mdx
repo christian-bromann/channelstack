@@ -1,0 +1,53 @@
+---
+title: "Why channelstack"
+order: 1
+description: "Why apps and agents built on Slack, GitHub, Linear and Notion are hard to test, what mocking the SDK misses, and why channelstack fakes the platform instead."
+---
+
+# Why channelstack
+
+A Slack bot, a GitHub App or Probot app, a Linear or Notion integration, a notification bot and an AI agent have one thing in common: they're mostly glue. Events come in, the app decides what to do, and calls go back out. The deciding is the part everyone tests. The glue is where it breaks.
+
+channelstack is for anyone who writes that glue: code that talks to these platforms' APIs and reacts to their events, and that should be tested without a real workspace.
+
+## Where the glue breaks
+
+The bugs that reach users are rarely in the business logic, or in what a model said. They're about how the app behaved on the platform:
+
+- It answers twice, because Slack retried an event the app acknowledged a second too late.
+- It answers in the channel instead of the thread, or answers its own message and loops.
+- An agent keeps streaming after someone pressed Stop.
+- A double click on "Approve" deploys twice.
+- It runs the same task again when GitHub redelivers a webhook.
+- It fails on a channel it was never invited to, because it didn't handle `not_in_channel`.
+- It accepts a webhook with a forged signature.
+
+None of these show up in a unit test of your app's logic, and few show up in a manual test on a real workspace, because the real platform rarely misbehaves on cue.
+
+## Why the usual approaches fall short
+
+**Mocking the SDK** (`vi.mock("@slack/web-api")`) tests that your code calls a function. It can't tell you that Slack would have refused the call, that the payload you built has the wrong shape, or what happens when an event arrives twice. The mock only knows what you told it, and it agrees with you.
+
+**A real sandbox workspace** is honest, but slow and hard to control. Tests share state, need cleanup, depend on the network (and, for an agent, a model), and can't make Slack retry or send a bad signature. You can't run it on every pull request.
+
+**Recording and replaying traffic** freezes one conversation. Change a prompt or a code path and the recording no longer matches.
+
+## What channelstack does instead
+
+channelstack fakes the platform, not your code. Your app keeps its real SDKs and talks HTTP to fakes that behave like the real thing: the same endpoints, payloads, signatures, ids and error codes, refusing what the platform refuses. The fakes are checked against the platforms' own schemas, and the same tests run against the real platforms at night, so the fakes stay honest.
+
+Because the fake is the platform, a test can do what the platform does to your app: retry a delivery, redeliver a webhook, send a stale timestamp, rate-limit a call, drop a socket. And because the fake knows everything that happened, the checks can wait for your app instead of sleeping, and fail with what was there instead of a timeout.
+
+## The design choices
+
+- **Act as people, read as people.** A test is a script of people (`ana.say(…)`, `ben.click(…)`) and checks about what they would see. Resources are only read and waited on. That keeps tests close to the bug reports they prevent.
+- **Every test builds its own world.** People, channels, repositories and pages are created in the test, not in a config file. Tests run in parallel against one server, each in its own session, and clean up after themselves.
+- **Your app's access is explicit.** A bot only hears channels it's in, a GitHub App only sees repositories it's installed on, a Notion integration only sees pages connected to it, as on the real platforms. Leaving the app out is how you test the uninvited case.
+- **No model mocking.** If your app is an AI agent, the model belongs to its framework. The matchers check behaviour (one reply, in the thread, stopped in time), so they hold with a real model or a fake one.
+- **Fake by default, live with credentials.** The same test runs against the fakes on every pull request and against real sandboxes nightly. Live mode acts on the real platform and reads back; it never relays or forges events to your app.
+
+## When it isn't the right tool
+
+channelstack is for apps and agents that talk to these platforms over their APIs. If you're testing the quality of a model's answers, use an eval tool; channelstack can feed it transcripts, but doesn't grade them. If your app lives in a platform channelstack doesn't fake yet (Teams, Discord, email), it can't help there today.
+
+Ready to try it? [Getting started](/docs/getting-started) takes about ten minutes.

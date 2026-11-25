@@ -4,7 +4,7 @@ All notable changes to channelstack. The format follows [Keep a Changelog](https
 
 ## Unreleased
 
-The first version: everything below is new.
+The first version of channelstack, a test harness for the apps and agents you build for Slack, GitHub, Linear and Notion. Everything below is new.
 
 ### The fakes
 
@@ -25,17 +25,18 @@ The first version: everything below is new.
 
 - **`channelstack/vitest`:** a plugin that attaches to a running server or starts one, gives every test its own session and the `slack`, `github`, `linear` and `notion` fixtures, and adds the matchers.
 - **Actor-first tests:** `ana.say("@my-agent hi", { channel })`, `ben.click("Approve", { message })`, `mo.comment("…", { issue })`. Each test creates its own people and places, and its session cleans them up.
-- **Matchers that wait for the agent:**
+- **Matchers that wait for your app:**
   - Positive checks poll.
-  - Negative and exact-count checks wait until the agent has been quiet for a window they watch from start to end.
-  - A failure says what the agent left open.
+  - Negative and exact-count checks wait until the app has been quiet for a window they watch from start to end.
+  - A failure says what the app left open.
 - **Delivery and failures:** Slack's retry, redelivery, bad signatures and stale timestamps, rate limits and dropped sockets.
 - **`channelstack/checks`:** `slackChecks()`, `githubChecks()`, `linearChecks()` and `notionChecks()` register standard behaviour checks, each named after a bug class.
-- **`pytest-channelstack`:** pytest fixtures, and `expect(...)` with the matchers' semantics for conversations, text and buttons, comments and Linear sessions.
+- **`pytest-channelstack`:** pytest fixtures, and `expect(...)` with every matcher, its semantics and its `not_to_…` form.
+- **Rust:** `channelstack::expect` in the SDK crate, with every matcher and its `not_to_…` form, each awaited to a `Result` (`Error::Expectation` when it fails).
 
 ### Live mode
 
-- With sandbox credentials in the environment, the same tests act on real Slack, GitHub, Linear and Notion workspaces and read the results back. channelstack never relays events to the agent.
+- With sandbox credentials in the environment, the same tests act on real Slack, GitHub, Linear and Notion workspaces and read the results back. channelstack never relays events to your app.
 - Workspace allowlists, run tags and cleanup.
 - A browser actor that types and clicks as a person in Slack (`say`, `reply`, `click`), using a session saved with `channelstack login slack`. Slack's Stop, select menus, shortcuts, slash commands, modal submit and close, and the agent-thread steps aren't done live yet, and skip.
 - `channelstack doctor` and `channelstack sweep`.

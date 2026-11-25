@@ -1,7 +1,7 @@
 ---
 title: "pytest"
 order: 7
-description: "Test your agent from Python with pytest-channelstack: install, configure, use the fixtures and check with expect(...)."
+description: "Test your app from Python with pytest-channelstack: install, configure, use the fixtures and check with expect(...)."
 ---
 
 # pytest
@@ -17,7 +17,7 @@ npm i -g channelstack
 
 `pytest-channelstack` needs Python 3.12 or later. It installs the `channelstack` Python SDK, pytest and pytest-asyncio with it, and registers itself as a pytest plugin, so there is nothing to import in `conftest.py`.
 
-The server is the same binary for every language, and it comes from npm. Start it, and your agent, as in [connecting your agent](/docs/guide/connecting-your-agent):
+The server is the same binary for every language, and it comes from npm. Start it, and your app, as in [connecting your app](/docs/guide/connecting-your-agent):
 
 ```bash
 npx channelstack
@@ -55,7 +55,7 @@ The plugin adds three settings of its own:
 | ----------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `channelstack_mode`, or `--channelstack-mode` on the command line | `auto`  | `attach` fails when no server is running, `start` starts a private one, `auto` attaches if it can and starts one otherwise |
 | `channelstack_timeout`                                            | `10s`   | How long an `expect(...)` check, and every SDK wait, waits                                                                 |
-| `channelstack_quiet_for`                                          | `750ms` | How long the agent must be quiet before a negative or exact-count check, or a `latest_…` read, reads                       |
+| `channelstack_quiet_for`                                          | `750ms` | How long the app must be quiet before a negative or exact-count check, or a `latest_…` read, reads                         |
 
 The command-line flag wins over the ini file. The client finds the server the way every channelstack client does: `CHANNELSTACK_URL` with `CHANNELSTACK_TOKEN`, or else the `server.json` in `~/.channelstack` (or `CHANNELSTACK_HOME`). In `start` mode it runs `CHANNELSTACK_SERVER_BIN`, or `channelstack` from your `PATH`. A server started that way has no agent connected to it, so `attach` is the usual choice, and in CI it fails at once when the server isn't up.
 
@@ -126,7 +126,7 @@ await expect(msg.thread).to_have_reply_from("my-agent")
 await expect(first.thread).not_to_have_reply_from("my-agent")
 ```
 
-The checks follow the matchers' rules. A positive check polls until it holds and fails after the timeout. A negative or exact-count check waits until the agent has been quiet for the whole window, then checks once. A failure raises `AssertionError` with what was expected, what the thread had, and what the agent left open:
+The checks follow the matchers' rules. A positive check polls until it holds and fails after the timeout. A negative or exact-count check waits until the app has been quiet for the whole window, then checks once. A failure raises `AssertionError` with what was expected, what the thread had, and what the app left open:
 
 ```
 AssertionError: Expected exactly 1 reply from my-agent, found 2:
@@ -138,44 +138,45 @@ AssertionError: Expected exactly 1 reply from my-agent, found 2:
 
 ## Which checks exist
 
-The Python port covers the conversation checks, text and buttons, comments and Linear agent sessions:
+Every Vitest matcher has a Python check, with the same semantics, options and failure messages:
 
-| Python                                             | Vitest                     | Subject                      |
-| -------------------------------------------------- | -------------------------- | ---------------------------- |
-| `to_have_reply_from(author, text=)`                | `toHaveReplyFrom`          | A thread or a DM             |
-| `to_have_replies_from(author, count=, text=)`      | `toHaveRepliesFrom`        | A thread or a DM             |
-| `to_have_channel_message_from(author)`             | `toHaveChannelMessageFrom` | A channel                    |
-| `to_have_streaming_reply_from(author)`             | `toHaveStreamingReplyFrom` | A thread                     |
-| `to_have_status(state)`                            | `toHaveStatus`             | A thread                     |
-| `to_have_status_text(text)`                        | `toHaveStatusText`         | A thread                     |
-| `to_have_reaction(emoji, by=)`                     | `toHaveReaction`           | A message                    |
-| `to_have_received_call(operation, error=, times=)` | `toHaveReceivedCall`       | A platform fixture (`slack`) |
-| `to_contain_text(text, count=, from_=, as_=)`      | `toContainText`            | Anything with a transcript   |
-| `to_have_button(label)`                            | `toHaveButton`             | A Slack message or thread    |
-| `to_have_comment_from(author, text=)`              | `toHaveCommentFrom`        | An issue, a PR, a discussion |
-| `to_have_comments_from(author, count=)`            | `toHaveCommentsFrom`       | An issue, a PR, a discussion |
-| `to_have_session_state(state)`                     | `toHaveSessionState`       | A Linear session or issue    |
-| `to_have_activity(type=, from_=, text=)`           | `toHaveActivity`           | A Linear session or issue    |
+| Python                                                | Vitest                     | Subject                                 |
+| ----------------------------------------------------- | -------------------------- | --------------------------------------- |
+| `to_have_reply_from(author, text=)`                   | `toHaveReplyFrom`          | A thread or a DM                        |
+| `to_have_replies_from(author, count=, text=)`         | `toHaveRepliesFrom`        | A thread or a DM                        |
+| `to_have_channel_message_from(author)`                | `toHaveChannelMessageFrom` | A channel                               |
+| `to_have_streaming_reply_from(author)`                | `toHaveStreamingReplyFrom` | A thread                                |
+| `to_have_status(state)`                               | `toHaveStatus`             | A thread                                |
+| `to_have_status_text(text)`                           | `toHaveStatusText`         | A thread                                |
+| `to_have_reaction(emoji, by=)`                        | `toHaveReaction`           | A message                               |
+| `to_have_button(label)`                               | `toHaveButton`             | A Slack message, thread or conversation |
+| `to_have_opened_modal(title=None)`                    | `toHaveOpenedModal`        | A Slack person                          |
+| `to_be_ephemeral_for(user)`                           | `toBeEphemeralFor`         | A Slack message                         |
+| `to_contain_text(text, count=, from_=, as_=)`         | `toContainText`            | Anything with a transcript              |
+| `to_have_comment_from(author, text=)`                 | `toHaveCommentFrom`        | An issue, a PR, a discussion            |
+| `to_have_comments_from(author, count=)`               | `toHaveCommentsFrom`       | An issue, a PR, a discussion            |
+| `to_have_review_comment(path=, line=, from_=, text=)` | `toHaveReviewComment`      | A GitHub pull request                   |
+| `to_have_review_from(author, state=)`                 | `toHaveReviewFrom`         | A GitHub pull request                   |
+| `to_have_check_run(name, status=, conclusion=)`       | `toHaveCheckRun`           | A GitHub pull request or commit         |
+| `to_have_label(name)`                                 | `toHaveLabel`              | A GitHub issue or PR, a Linear issue    |
+| `to_be_merged()`                                      | `toBeMerged`               | A GitHub pull request                   |
+| `to_have_session_state(state)`                        | `toHaveSessionState`       | A Linear session or issue               |
+| `to_have_activity(type=, from_=, text=)`              | `toHaveActivity`           | A Linear session or issue               |
+| `to_be_delegated_to(app)`                             | `toBeDelegatedTo`          | A Linear issue                          |
+| `to_be_assigned_to(user)`                             | `toBeAssignedTo`           | A Linear issue                          |
+| `to_have_state(name)`                                 | `toHaveState`              | A Linear issue                          |
+| `to_have_block(text)`                                 | `toHaveBlock`              | A Notion page                           |
+| `to_have_property_value(name, value)`                 | `toHavePropertyValue`      | A Notion page (a database row)          |
+| `to_be_accepted(within=)`                             | `toBeAccepted`             | A delivery                              |
+| `to_be_rejected()`                                    | `toBeRejected`             | A delivery that was resent forged       |
+| `to_be_retried(times=)`                               | `toBeRetried`              | A delivery                              |
+| `to_have_received_call(operation, error=, times=)`    | `toHaveReceivedCall`       | A platform fixture (`slack`)            |
 
-The conversation checks and `to_contain_text` each have a `not_to_…` twin. `text` takes a string to look for or a compiled `re.Pattern`, and an author is a handle (`slack.app`, `ana`) or a name.
+Each has a `not_to_…` twin. `text` takes a string to look for or a compiled `re.Pattern`, and an author is a handle (`slack.app`, `ana`) or a name. `to_be_delegated_to` and `to_be_assigned_to` take `None` for no one. `to_have_property_value` compares with `==`, so `unittest.mock.ANY` (or any object with its own `__eq__`) stands in where Vitest uses `expect.any(Number)`. A delivery check takes the delivery itself:
 
-The rest (deliveries, modals and ephemeral messages, reviews, check runs and labels, delegation and assignment, Notion blocks and properties) aren't in Python yet. For those, read the value with the SDK's waiting methods and `assert` on it:
-
-```python title="tests/test_reads.py"
-import re
-
-from channelstack import GitHubFixture, SlackFixture
-
-
-async def test_a_mention_in_an_issue_gets_a_comment(github: GitHubFixture) -> None:
-    ana = await github.create_user(login="ana")
-    repo = await github.create_repo(collaborators=[ana], apps=[github.app])
-    issue = await ana.open_issue({"title": "Login fails on Safari"}, repo=repo)
-
-    await ana.comment("@my-agent can you triage this?", issue=issue)
-
-    answer = await issue.wait_for_comment(from_=github.app)
-    assert re.search("triage", answer.body, re.I)
+```python title="tests/test_signatures.py"
+from channelstack import SlackFixture
+from pytest_channelstack import expect
 
 
 async def test_rejects_a_bad_signature(slack: SlackFixture) -> None:
@@ -185,12 +186,10 @@ async def test_rejects_a_bad_signature(slack: SlackFixture) -> None:
 
     await msg.delivery.resend(bad_signature=True)
 
-    delivery = await msg.delivery.settled()
-    forged = [attempt for attempt in delivery.attempts if attempt.forged_signature][-1]
-    assert forged.response_status is not None and 400 <= forged.response_status < 500
+    await expect(msg.delivery).to_be_rejected()
 ```
 
-Unlike `expect(...)`, a plain read doesn't wait for quiet, so use it for positive facts, or call it after a `wait_for_…` or `latest_…` method.
+Each check is built on a plain SDK read (`delivery.refresh()`, `pull.reviews()`, `page.property(name)`, …), so a test can also read the value itself and `assert` on it. Unlike `expect(...)`, a plain read doesn't wait for quiet, so use it for positive facts, or call it after a `wait_for_…` or `latest_…` method.
 
 ## Options
 

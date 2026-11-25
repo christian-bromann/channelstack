@@ -1,6 +1,6 @@
 /**
  * How it works: the test scripts channelstack, channelstack sends signed webhooks to the
- * agent, and the agent's API calls come back to the same fake workspace. The moving dots
+ * app, and the app's API calls come back to the same fake workspace. The moving dots
  * are decoration; the text carries the meaning.
  */
 export function Flow() {
@@ -53,7 +53,7 @@ export function Flow() {
         </div>
 
         <div className="node">
-          <h3>Your agent</h3>
+          <h3>Your app</h3>
           <ul>
             <li>unchanged code</li>
             <li>real SDKs</li>
@@ -64,8 +64,8 @@ export function Flow() {
       </div>
       <figcaption>
         <span className="sr-only">
-          Your test scripts people and asserts through channelstack. channelstack sends signed webhooks to your agent,
-          and your agent’s API calls go back to channelstack’s fake platform APIs.{" "}
+          Your test scripts people and asserts through channelstack. channelstack sends signed webhooks to your app, and
+          your app’s API calls go back to channelstack’s fake platform APIs.{" "}
         </span>
         In proxy mode, requests to hosts channelstack doesn’t emulate pass through untouched.
       </figcaption>

@@ -9,7 +9,7 @@ description: "Every handle, method and wait of the Notion fake, in every SDK's l
 
 # Notion API
 
-Every handle of the Notion fake: the `notion` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a Notion agent, step by step, is in the [Notion guide](/docs/platforms/notion).
+Every handle of the Notion fake: the `notion` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a Notion app or agent, step by step, is in the [Notion guide](/docs/platforms/notion).
 
 Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object, Python's keyword arguments and Rust's builder setters. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `NotionUser` handle.
 
@@ -225,7 +225,7 @@ let api_calls = notion.calls().operation("…").await?;
 
 **Returns** [`NotionApiCalls`](/docs/reference/api/notion#notionapicalls).
 
-**Live:** needs proxy mode: Notion doesn't report the integration's calls; proxy mode sees them. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: Notion doesn't report the integration's calls; proxy mode sees them. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForCall()
 
@@ -725,7 +725,7 @@ let result = page.markdown().await?;
 
 </CodeGroup>
 
-**Returns** `string`. It reads once the agent is quiet.
+**Returns** `string`. It reads once the app is quiet.
 
 ### blocks()
 
@@ -1116,7 +1116,7 @@ let comment = discussion.wait_for_comment().from("my-agent").await?;
 
 ### latestComment()
 
-The latest comment, once the agent is quiet. Waits for at least one: it polls `comments()` and never sleeps longer than it must.
+The latest comment, once the app is quiet. Waits for at least one: it polls `comments()` and never sleeps longer than it must.
 
 <CodeGroup>
 

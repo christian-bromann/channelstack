@@ -12,9 +12,9 @@ Live mode runs your existing tests against real sandbox workspaces, with no edit
 
 ## What live means
 
-Live, channelstack **acts** on the real platform, as the app or as a sandbox person, and **reads the results back** for the matchers. It never relays, forwards or makes up events for your agent: the platform delivers to the agent itself, the way it does in production.
+Live, channelstack **acts** on the real platform, as the app or as a sandbox person, and **reads the results back** for the matchers. It never relays, forwards or makes up events for your app: the platform delivers to the app itself, the way it does in production.
 
-So your agent has to be reachable by the real platform. How is up to the agent: Slack's Socket Mode (no public URL needed), a public URL or tunnel, or a deployed staging agent. It runs with its real app's configuration; `channelstack env` prints nothing for a live channel.
+So your app has to be reachable by the real platform. How is up to the app: Slack's Socket Mode (no public URL needed), a public URL or tunnel, or a deployed staging app. It runs with its real app's configuration; `channelstack env` prints nothing for a live channel.
 
 What follows from that:
 
@@ -25,16 +25,7 @@ What follows from that:
 
 Here is a test from channelstack's Slack examples. It runs fake by default, and live once Ana has a token:
 
-```ts title="slack.test.ts"
-test("a real person asks the real agent", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-
-  const msg = await ana.say("@my-agent summarize #support today", { channel });
-
-  await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
-});
-```
+<Example id="live-mode-real-person" />
 
 A channel is live when **all** of its app credentials are set in the server's environment, and its allowlist names the sandbox:
 
@@ -47,7 +38,7 @@ A channel is live when **all** of its app credentials are set in the server's en
 
 - **App credentials and allowlists** are read by the server when it starts. Allowlists are comma-separated workspace, org or team ids.
 - **People's tokens** are read by the SDK in the test process: `createUser({ name: "Ana" })` reads `CHANNELSTACK_SLACK_USER_ANA_TOKEN` when the test passes no `token`. The name is upper-cased with every other character turned into `_`, so `ana-smith` reads `..._USER_ANA_SMITH_TOKEN`. On GitHub it's the account's login.
-- **On Slack,** a person's token comes from a separate Slack app for the sandbox's people, never from your agent's own app.
+- **On Slack,** a person's token comes from a separate Slack app for the sandbox's people, never from your app's own app.
 - **On Notion,** a session's pages go under the one top-level page the integration is connected to, or under `CHANNELSTACK_NOTION_PAGE`.
 
 Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack), [GitHub](/docs/platforms/github), [Linear](/docs/platforms/linear), [Notion](/docs/platforms/notion).
@@ -67,7 +58,7 @@ Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack),
 
 No platform lets an API create real people, so live tests use a fixed set of sandbox accounts, created once by hand. `createUser` maps to them by token. A few things follow:
 
-- **Roles are the account's.** `createUser({ name: "Ana", admin: true })` fails with `live_misconfigured` if Ana's account isn't an admin. An agent that lets only admins approve would otherwise fail for the wrong reason.
+- **Roles are the account's.** `createUser({ name: "Ana", admin: true })` fails with `live_misconfigured` if Ana's account isn't an admin. An app that lets only admins approve would otherwise fail for the wrong reason.
 - **Fixed ids** (`createUser({ id })`) are fake only.
 - **A person without a token** can exist next to a live workspace, but acting in it fails with `fake_actor_in_live_world`: `Ana is a fake person and slack is live: give them a token (CHANNELSTACK_SLACK_USER_<NAME>_TOKEN)`.
 
@@ -98,7 +89,7 @@ Each server keeps its ledger in `<home>/ledger/`, so a crash leaves a list behin
 
 ## The browser actor
 
-Some things a person does have no public API: on Slack, a person's message (one posted through the API is marked as the posting app's and agents ignore it), and a button click. Live, the **browser actor** does them: a headless Chrome, driven through WebdriverIO, signed in as that person and typing or clicking in the platform's own client. What it types is read back through the API.
+Some things a person does have no public API: on Slack, a person's message (one posted through the API is marked as the posting app's and apps ignore it), and a button click. Live, the **browser actor** does them: a headless Chrome, driven through WebdriverIO, signed in as that person and typing or clicking in the platform's own client. What it types is read back through the API.
 
 Today it does `say`, `reply` and `click`. Slack's Stop, select menus, shortcuts, slash commands, modal submit and close, and the agent-thread steps need it too, and are refused live for now with `action_requires`, so their tests skip ([#47](https://github.com/christian-bromann/channelstack/issues/47)).
 
@@ -115,9 +106,7 @@ Saved ana's slack session to /Users/you/.channelstack/browser/slack-ana.json (on
 
 A visible browser opens at the sandbox's sign-in page and waits up to ten minutes. The actor finds the file by the person's name. To keep a copy for a test that names its own path, add `--save .auth/ana-slack.json` and pass it to `createUser`:
 
-```ts
-const ana = await slack.createUser({ name: "Ana", browser: { storageState: ".auth/ana-slack.json" } });
-```
+<Example id="live-mode-browser-user" />
 
 - The file signs a person in: it must be private (`chmod 600`), and an `.auth/` folder belongs in `.gitignore`.
 - When Slack ends the saved session, the next action fails with `live_misconfigured` and the `channelstack login` command to run.
@@ -144,7 +133,7 @@ live: SlackUser.stop live needs the browser actor: Slack sends this only when a 
 
 Only the test that hit the refusal skips, even when tests run concurrently. pytest skips the same way ([pytest](/docs/guide/pytest)).
 
-**Negative and exact-count matchers skip live.** They wait until the agent is quiet ([Waiting and quiet](/docs/guide/waiting-and-quiet)), and live nothing tells channelstack when the agent is done: proxy mode will, once it reads the agent's calls back live ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Positive matchers such as `toHaveReplyFrom` poll the real platform and work. Give them a longer `timeout` live: a real model and real rate limits are slower than the fake.
+**Negative and exact-count matchers skip live.** They wait until the app is quiet ([Waiting and quiet](/docs/guide/waiting-and-quiet)), and live nothing tells channelstack when the app is done: proxy mode will, once it reads the app's calls back live ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Positive matchers such as `toHaveReplyFrom` poll the real platform and work. Give them a longer `timeout` live: a real model and real rate limits are slower than the fake.
 
 ## Check the setup: `doctor`
 
