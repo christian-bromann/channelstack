@@ -1,11 +1,11 @@
 /**
  * `channelstack/checks`: the standard behaviour checks. Each call registers ordinary tests
- * in the current suite of whichever framework is running (Vitest, Playwright).
+ * in the current Vitest suite.
  */
 import type { Duration } from "./common";
 
 export interface ChecksOptions {
-  /** The app name from `channelstack.config.ts`. */
+  /** The agent's app name: `my-agent`, the fakes' built-in app. */
   app: string;
   /** Text that makes the agent reply, e.g. "@my-agent hello". Default: `@<app> hello`. */
   prompt?: string;
