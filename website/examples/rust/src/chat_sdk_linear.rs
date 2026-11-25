@@ -18,7 +18,10 @@ async fn delegating_an_issue_gets_a_response_in_its_session() -> Result<()> {
 
     let session = ana.delegate(&linear.app()).issue(&issue).await?;
 
-    expect(&session).to_have_activity().r#type("response").await?;
+    expect(&session)
+        .to_have_activity()
+        .r#type("response")
+        .await?;
     expect(&issue).to_be_delegated_to(&linear.app()).await?;
     // @show:end
     test_session.close().await

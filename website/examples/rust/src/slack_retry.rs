@@ -11,11 +11,7 @@ async fn slacks_retry_is_answered_once() -> Result<()> {
     let msg = ana.say("@my-agent hi").to(&slack.app()).await?;
     // @show:start
     let delivery = msg.delivery().expect("the fake delivered the message");
-    delivery
-        .retry()
-        .after("3s")
-        .reason("http_timeout")
-        .await?;
+    delivery.retry().after("3s").reason("http_timeout").await?;
     expect(&msg.thread())
         .to_have_replies_from("my-agent", 1)
         .await?;

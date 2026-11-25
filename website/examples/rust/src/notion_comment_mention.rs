@@ -1,4 +1,4 @@
-use channelstack::{Result, expect, Regex};
+use channelstack::{Regex, Result, expect};
 
 use crate::fixtures;
 

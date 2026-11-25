@@ -14,10 +14,7 @@ async fn a_channel_the_app_isnt_in_stays_silent_until_its_invited() -> Result<()
         .participants(vec![&ana as &dyn Handle])
         .await?;
 
-    let first = ana
-        .say("@my-agent are you here?")
-        .channel(&channel)
-        .await?;
+    let first = ana.say("@my-agent are you here?").channel(&channel).await?;
     expect(&first.thread())
         .not_to_have_reply_from("my-agent")
         .await?;

@@ -16,7 +16,10 @@ async fn a_redelivered_webhook_doesnt_duplicate_activities() -> Result<()> {
         .team(&team)
         .await?;
     let session = ana.delegate(&linear.app()).issue(&issue).await?;
-    expect(&session).to_have_activity().r#type("thought").await?;
+    expect(&session)
+        .to_have_activity()
+        .r#type("thought")
+        .await?;
     // The Rust SDK returns the activities as JSON.
     let before = session.activities().await?.as_array().map_or(0, Vec::len);
 

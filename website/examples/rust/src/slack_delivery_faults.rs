@@ -19,11 +19,7 @@ async fn slacks_delivery_specifics() -> Result<()> {
         .times(1)
         .await?;
     let delivery = msg.delivery().expect("the fake delivered the message");
-    delivery
-        .retry()
-        .after("3s")
-        .reason("http_timeout")
-        .await?;
+    delivery.retry().after("3s").reason("http_timeout").await?;
     // @show:end
     session.close().await
 }

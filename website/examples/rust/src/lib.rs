@@ -4,6 +4,7 @@
 //! (clippy over all targets) compiles them all. They are `#[ignore]`d: they need a running
 //! channelstack and agent (`cargo test -- --ignored`). What the page shows is the part between the
 //! `// @show:start` and `// @show:end` markers; the connection and session come from `fixtures`.
+//! `cargo fmt` doesn't reach a module made by `include!`, so `pnpm lint` runs rustfmt over `src/`.
 #![cfg(test)]
 
 mod fixtures;
