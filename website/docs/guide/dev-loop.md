@@ -1,0 +1,167 @@
+---
+title: "The dev loop: CLI and UI"
+order: 8
+description: "Talk to your agent by hand while you build it, read what it answered, watch what it called, and redeliver events, from the terminal or the UI."
+---
+
+# The dev loop: CLI and UI
+
+While you work on an agent, you want to poke it before you write a test: say something as a person, read the answer, change the code, say it again. The attach CLI and the UI do that against the running server, with no seed data and no ids to copy.
+
+## Before you start
+
+Start the server, telling it where your agent takes events, and point the agent at it. This is the same setup the tests use ([Connecting your agent](/docs/guide/connecting-your-agent) has the details):
+
+```bash
+CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelstack start
+npx channelstack env > .env.local    # in a second terminal; then start the agent with it
+```
+
+Every command below attaches to that server. It finds it through `<home>/server.json` (`~/.channelstack/server.json` by default), which the server writes when it starts. To attach to another one, pass `--server <url>` or set `CHANNELSTACK_URL`, together with `CHANNELSTACK_TOKEN`.
+
+## Talk to the agent
+
+```bash
+npx channelstack slack say --as ana --in "#support" "@my-agent what broke last night?"
+```
+
+```
+ana said it in #support (C0A1B2C3D4E:1732451234.000100)
+```
+
+Ana didn't exist and neither did `#support`: the CLI created both on first use, with Ana and the app in the channel. The next time you name them, it uses the same ones. A person who isn't in a conversation yet is invited by someone who is, as on Slack.
+
+Now read what the agent answered:
+
+```bash
+npx channelstack show
+```
+
+```
+ana: @my-agent what broke last night?
+  my-agent: Here's what I found about "what broke last night?".
+```
+
+`show` prints the most recently active conversation the way a person reads it. Replies in a thread are indented. Buttons show as `[Approve]`, and edits, streams and ephemeral messages are marked. The agent works asynchronously, so if its reply isn't there yet, run `show` again.
+
+| Flag | What it does |
+|---|---|
+| `--thread last` | Only the thread of the newest message |
+| `--thread <channel id>:<ts>` | Only that message's thread |
+| `--json` | The transcript entries as JSON, with their ids |
+
+## Keep the conversation going
+
+```bash
+npx channelstack slack reply --as ben --thread last "and the one before?"
+npx channelstack slack react --as ben :eyes: --on last
+npx channelstack slack click --as ana "Approve"
+npx channelstack slack stop --thread last
+```
+
+| Command | What the person does |
+|---|---|
+| `slack say --as <name> --in "#channel" "<text>"` | Posts a message in a channel |
+| `slack reply --as <name> [--thread last] "<text>"` | Replies in a thread |
+| `slack react --as <name> <:emoji:> [--on last]` | Reacts to a message. `:eyes:` and `eyes` are the same reaction |
+| `slack click --as <name> "<button>"` | Clicks the button with that label in the latest message that has it |
+| `slack stop [--as <name>] [--thread last]` | Presses Stop on the agent's work in a thread. Without `--as`, the person who started the thread presses it |
+
+A person who isn't in the conversation yet joins it first, so Ben can reply in Ana's thread without any setup.
+
+### `last` and message references
+
+`--thread`, `--on` and `show --thread` take `last` (the default) or a reference to one message:
+
+- **`last`** is the newest message of the most recently active conversation. For `--thread last`, it's the thread that message is in.
+- **`<channel id>:<ts>`** names one message, as every `say` and `reply` prints it in parentheses, for example `C0A1B2C3D4E:1732451234.000100`.
+
+So a loop of "say, look, fix the code, say again" needs no ids, and you can still go back to an older thread when you need to.
+
+## Watch what went back and forth
+
+```bash
+npx channelstack tail
+```
+
+```
+14:02:11.503 → slack app_mention  200
+14:02:12.020 ← slack chat.postMessage  200
+14:02:31.877 → slack reaction_added  200
+```
+
+`tail` streams what happens as it happens: each event delivered to the agent (`→`) with the status the agent answered, and each API call the agent made (`←`) with its status and, when the platform refused it, the error code (`← slack chat.postMessage  200 not_in_channel`). A retried delivery says which attempt it was. `--once` prints what is there and exits.
+
+A delivery that failed, or a call refused with an error code, is usually the bug.
+
+## Redeliver an event
+
+```bash
+npx channelstack deliveries slack
+```
+
+```
+Ev0A1B2C3D4E  event_callback app_mention  acknowledged  (attempts: 200)
+```
+
+Each line is one delivery: its id, what it carried, how it ended (`acknowledged`, `failed`, `timed_out`, `unreachable`) and the status of each attempt. Send one again with its id:
+
+```bash
+npx channelstack redeliver slack Ev0A1B2C3D4E
+```
+
+```
+Retried Ev0A1B2C3D4E
+```
+
+On Slack this is Slack's own retry, with its retry headers, so an agent that answers twice doesn't handle retries. GitHub, Linear and Notion redeliver the event instead (`Redelivered …`). `deliveries` and `redeliver` take `slack`, `github`, `linear` or `notion`, but only Slack has commands that act in the dev session so far, so the other lists stay empty there. For delivery failures in tests, see [Delivery and failures](/docs/guide/delivery-and-failures).
+
+## The shared `dev` session
+
+Everything the CLI does happens in one long-lived session called `dev`. The UI shows the same session, and [`channelstack mcp`](/docs/guide/mcp) acts in it too, so a person at the terminal, a browser and a coding agent all see one conversation. It lives until the server stops; state is in memory, so a restart starts from nothing.
+
+Tests don't use it. Each test gets a fresh session and creates its own people, so nothing you do by hand leaks into a test run, and `show`, `tail` and the UI don't show what tests do ([How it works](/docs/guide/how-it-works) explains sessions).
+
+## Open the UI
+
+The server prints a UI link when it starts. That link works once. For a fresh one:
+
+```bash
+npx channelstack ui
+```
+
+```
+https://channelstack.localhost/?login=…
+```
+
+Opening it signs this browser in with a session cookie and takes the code out of the address bar. Opening the UI without a link shows "Open the UI with a login link". The cookie lasts until the server stops.
+
+The UI shows the dev session in three panes, refreshed every second:
+
+| Pane | What it shows |
+|---|---|
+| Conversations | The session's Slack conversations, most recent first. Click one to read it |
+| Transcript | The same transcript `show` prints and the matchers read: who said what, threads indented, edits, streams and messages only one person sees marked. Buttons are shown, but can't be clicked from the UI yet: use `slack click` |
+| Inspector | Every delivery to the agent and every API call it made, one line each. Click a line to see its JSON |
+
+The UI uses one plain design rather than copying Slack's, and shows only what a person could see, so it can't show anything the matchers wouldn't.
+
+A signed-in browser can only read what the UI shows. It can't read `channelstack env`, can't change anything, and tokens and signing secrets are scrubbed from what it receives. The agent's tokens stay behind the bearer token that only local programs read from `server.json`.
+
+## When a command is wrong
+
+A mistake is answered in one sentence on stderr, with exit code 1:
+
+```bash
+npx channelstack slack say --in "#support" "hi"
+```
+
+```
+channelstack: say who is acting with `--as <name>`, e.g. `--as ana`.
+```
+
+If no server is running, every attach command says `no running server found` and how to start one. See [Troubleshooting](/docs/guide/troubleshooting) for the others.
+
+## Then write the test
+
+Once the agent behaves, pin it down in a test, which gets its own session and people: see [Writing tests](/docs/guide/writing-tests). Every command and flag is in the [CLI reference](/docs/reference/cli).

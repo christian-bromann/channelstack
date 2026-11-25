@@ -1,0 +1,187 @@
+---
+title: "Live mode"
+order: 11
+description: "Run the same tests against real sandbox workspaces: set credentials, allowlist the sandboxes, sign people in for the browser actor, and clean up."
+---
+
+# Live mode
+
+Live mode runs your existing tests against real sandbox workspaces, with no edits. Credentials turn a channel live; without them it stays fake. This page shows how to set a channel up, what skips live and why, and how to check and clean up.
+
+<FakeOrLive />
+
+## What live means
+
+Live, channelstack **acts** on the real platform, as the app or as a sandbox person, and **reads the results back** for the matchers. It never relays, forwards or makes up events for your agent: the platform delivers to the agent itself, the way it does in production.
+
+So your agent has to be reachable by the real platform. How is up to the agent: Slack's Socket Mode (no public URL needed), a public URL or tunnel, or a deployed staging agent. It runs with its real app's configuration; `channelstack env` prints nothing for a live channel.
+
+What follows from that:
+
+- **Delivery chaos is fake only.** Retries, bad signatures, stale timestamps and redelivery need channelstack in the delivery path. GitHub is the exception for reading: its delivery log is readable through the API, so `deliveries()` works live there.
+- **The fake run is the full run.** A test that uses a fake-only feature skips live with the reason, and still runs in full against the fake on every pull request.
+
+## Turn a channel live
+
+Here is a test from channelstack's Slack examples. It runs fake by default, and live once Ana has a token:
+
+```ts title="slack.test.ts"
+test("a real person asks the real agent", async ({ slack }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const channel = await slack.createChannel({ participants: [ana, slack.app] });
+
+  const msg = await ana.say("@my-agent summarize #support today", { channel });
+
+  await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
+});
+```
+
+A channel is live when **all** of its app credentials are set in the server's environment, and its allowlist names the sandbox:
+
+| Channel | App credentials (server)                                              | Allowlist (server)                    | A person (test process)                                      |
+| ------- | --------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------ |
+| Slack   | `CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN` (`xoxb-`) | `CHANNELSTACK_LIVE_SLACK_TEAMS`       | `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (`xoxp-`)                |
+| GitHub  | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`       | `CHANNELSTACK_LIVE_GITHUB_ORGS`       | `CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN` (fine-grained PAT)  |
+| Linear  | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token)               | `CHANNELSTACK_LIVE_LINEAR_WORKSPACES` | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key)      |
+| Notion  | `CHANNELSTACK_NOTION_TOKEN` (the integration's token)                 | `CHANNELSTACK_LIVE_NOTION_WORKSPACES` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) |
+
+- **App credentials and allowlists** are read by the server when it starts. Allowlists are comma-separated workspace, org or team ids.
+- **People's tokens** are read by the SDK in the test process: `createUser({ name: "Ana" })` reads `CHANNELSTACK_SLACK_USER_ANA_TOKEN` when the test passes no `token`. The name is upper-cased with every other character turned into `_`, so `ana-smith` reads `..._USER_ANA_SMITH_TOKEN`. On GitHub it's the account's login.
+- **On Slack,** a person's token comes from a separate Slack app for the sandbox's people, never from your agent's own app.
+- **On Notion,** a session's pages go under the one top-level page the integration is connected to, or under `CHANNELSTACK_NOTION_PAGE`.
+
+Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack), [GitHub](/docs/platforms/github), [Linear](/docs/platforms/linear), [Notion](/docs/platforms/notion).
+
+> [!WARNING]
+> Some of a channel's app credentials set and not all is an error, not a fallback: every action on that channel fails with `live_misconfigured`, naming what is missing. A typo in a variable name must not run silently fake.
+
+### Force it: `CHANNELSTACK_REALITY`
+
+| Value  | What happens                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| unset  | Each channel is live if its credentials are set, fake otherwise                                                             |
+| `fake` | Every channel runs fake, credentials or not. Use it locally when your shell has live credentials                            |
+| `live` | Nothing falls back to fake: a channel without its credentials, or a person without a token, fails with `live_misconfigured` |
+
+## People are sandbox accounts
+
+No platform lets an API create real people, so live tests use a fixed set of sandbox accounts, created once by hand. `createUser` maps to them by token. A few things follow:
+
+- **Roles are the account's.** `createUser({ name: "Ana", admin: true })` fails with `live_misconfigured` if Ana's account isn't an admin. An agent that lets only admins approve would otherwise fail for the wrong reason.
+- **Fixed ids** (`createUser({ id })`) are fake only.
+- **A person without a token** can exist next to a live workspace, but acting in it fails with `fake_actor_in_live_world`: `Ana is a fake person and slack is live: give them a token (CHANNELSTACK_SLACK_USER_<NAME>_TOKEN)`.
+
+## Allowlists: live mode acts nowhere else
+
+Before its first action, a live channel checks which workspace its app's token is for. If that workspace isn't in the allowlist, every action fails with `live_not_allowlisted`, before anything is done there:
+
+```
+Slack workspace T0A1B2C3D4E isn't in CHANNELSTACK_LIVE_SLACK_TEAMS, so live mode won't act there
+```
+
+Finding out the workspace (Slack's `auth.test`) is the only call made before the check. A person's token must be for the app's workspace too (`cross_workspace_credential` otherwise).
+
+## Run tags and cleanup
+
+Everything a test creates live is named with the run's tag, `channelstack-run-<run>-<n>`, plus the name the test gave it, so names stay unique in a shared workspace. Each object goes into a cleanup ledger and is removed when its session closes, newest first:
+
+| Platform | What cleanup does                                                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Slack    | Archives the channel (Slack can't delete one outside Enterprise Grid). In a DM, deletes each message the session wrote and the replies under it |
+| GitHub   | Deletes the session's repositories, through the App's installation                                                                              |
+| Linear   | Deletes the session's team, with its issues, comments and agent sessions                                                                        |
+| Notion   | Moves the session's page to the trash, with everything in it                                                                                    |
+
+`CHANNELSTACK_RUN_ID` names the run: 1 to 24 letters and digits. CI should set it per job (`gh${{ github.run_id }}`), so a re-run keeps it. Without it, each server makes one up.
+
+Each server keeps its ledger in `<home>/ledger/`, so a crash leaves a list behind for `channelstack sweep`.
+
+## The browser actor
+
+Some things a person does have no public API: on Slack, a person's message (one posted through the API is marked as the posting app's and agents ignore it), and a button click. Live, the **browser actor** does them: a headless Chrome, driven through WebdriverIO, signed in as that person and typing or clicking in the platform's own client. What it types is read back through the API.
+
+It never signs in by itself and never handles a password. A person signs in by hand, once, and the session is saved:
+
+```bash
+npx channelstack login slack --user ana
+```
+
+```
+Sign in as ana in the browser window. channelstack saves the session once you are in.
+Saved ana's slack session to /Users/you/.channelstack/browser/slack-ana.json (only you can read it).
+```
+
+A visible browser opens at the sandbox's sign-in page and waits up to ten minutes. The actor finds the file by the person's name. To keep a copy for a test that names its own path, add `--save .auth/ana-slack.json` and pass it to `createUser`:
+
+```ts
+const ana = await slack.createUser({ name: "Ana", browser: { storageState: ".auth/ana-slack.json" } });
+```
+
+- The file signs a person in: it must be private (`chmod 600`), and an `.auth/` folder belongs in `.gitignore`.
+- When Slack ends the saved session, the next action fails with `live_misconfigured` and the `channelstack login` command to run.
+- `channelstack login` takes `slack` today. Signing in with no one at the keyboard (a test inbox, passkeys) is coming.
+- The first start after Chrome updates can take a minute or two while the matching driver is fetched.
+
+## What skips, and what fails
+
+A test that hits something live can't do is **skipped**, with the reason in the report. A setup that can't work **fails**, so a broken nightly run goes red instead of skipping everything and passing.
+
+| Code                       | Means                                                                                                                                                                                                              | The test |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `unsupported_in_live`      | A fake-only feature (delivery chaos, faults, fixed ids, `reset`), or one not built live yet                                                                                                                        | Skips    |
+| `action_requires`          | Works live only with a piece this run doesn't have: the browser actor (a person with no saved session; Slack's Stop, menus, modals and slash commands) or proxy mode (`calls()`, the status line, negative checks) | Skips    |
+| `live_misconfigured`       | Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token, a role the account doesn't have, a saved session that is signed out or readable by others          | Fails    |
+| `fake_actor_in_live_world` | A person without a token acting in a live workspace                                                                                                                                                                | Fails    |
+| `live_not_allowlisted`     | The workspace isn't in the allowlist                                                                                                                                                                               | Fails    |
+
+Vitest reports the test as skipped, with a note that starts with `live:` and names the operation and the reason, for example:
+
+```
+live: SlackUser.stop live needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person
+```
+
+Only the test that hit the refusal skips, even when tests run concurrently. pytest skips the same way ([pytest](/docs/guide/pytest)).
+
+**Negative and exact-count matchers skip live.** They wait until the agent is quiet ([Waiting and quiet](/docs/guide/waiting-and-quiet)), and live, without proxy mode, nothing tells channelstack when the agent is done. Positive matchers such as `toHaveReplyFrom` poll the real platform and work. Give them a longer `timeout` live: a real model and real rate limits are slower than the fake.
+
+## Check the setup: `doctor`
+
+```bash
+npx channelstack doctor
+```
+
+```
+slack
+  ok    CHANNELSTACK_SLACK_BOT_TOKEN (xoxb-…): the app's bot in workspace T0A1B2C3D4E
+  ok    CHANNELSTACK_SLACK_USER_ANA_TOKEN (xoxp-…): a person in workspace T0A1B2C3D4E
+github
+  fake  set CHANNELSTACK_GITHUB_APP_ID and CHANNELSTACK_GITHUB_PRIVATE_KEY to run it live
+linear
+  fake  set CHANNELSTACK_LINEAR_APP_TOKEN to run it live
+notion
+  fake  set CHANNELSTACK_NOTION_TOKEN to run it live
+browser sessions
+  ok    /Users/you/.channelstack/browser/slack-ana.json: signed in, the first cookie expires 2026-12-24T09:12:00.000Z
+```
+
+For each channel it says whether it runs fake or live, checks each credential against the platform and the allowlist, and checks every saved browser session in `<home>/browser` (and any you name with `--storage-state <path>`). It prints variable names and token prefixes, never a credential, and exits with 1 when something live is wrong.
+
+## Clean up after a crash: `sweep`
+
+A session removes what it made when it closes, and so does the server when it stops. When a run crashes, `sweep` removes the rest: what the dead servers' ledgers still list, and tagged objects nobody removed.
+
+```bash
+npx channelstack sweep                             # tagged objects older than 24 hours, and crashed runs' ledgers
+npx channelstack sweep --run gh1234567             # only what that run made, of any age
+npx channelstack sweep --check --run gh1234567     # remove nothing; exit 1 if that run left anything
+```
+
+| Flag                     | What it does                                                 |
+| ------------------------ | ------------------------------------------------------------ |
+| `--older-than-hours <n>` | Only tagged objects older than this. Default 24              |
+| `--run <id>`             | Only what this run made, of any age                          |
+| `--check`                | Remove nothing, list what is left, and exit 1 if anything is |
+
+It acts only in allowlisted workspaces, with the credentials in its environment. Something a ledger lists that it can't look at (no credentials here, a workspace outside the allowlist) counts as left. A ledger of a server that is still running is left alone, since that server's sessions clean up after themselves.
+
+For a nightly job that runs all this, see [Running in CI](/docs/guide/ci#a-nightly-live-job).

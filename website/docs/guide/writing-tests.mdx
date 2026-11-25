@@ -1,0 +1,289 @@
+---
+title: "Writing tests"
+order: 3
+description: "Add the Vitest plugin, create people and places per test, act as those people, give the app access, and read what the agent did."
+---
+
+# Writing tests
+
+This page shows how to write channelstack tests in Vitest: the plugin, the fixtures each test gets, how people act, how the agent gets access, and how tests clean up. It assumes the server and your agent are running and connected, as in [connecting your agent](/docs/guide/connecting-your-agent).
+
+## Add the plugin
+
+```bash
+npm i -D channelstack vitest
+```
+
+```ts title="vitest.config.ts"
+import channelstack from "channelstack/vitest";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [channelstack()],
+});
+```
+
+The plugin adds a global setup that finds the server, a setup file that gives each test its session and fixtures and registers the matchers on `expect`, and the types for both. You keep importing `test` and `expect` from `vitest`.
+
+| Option     | Default                            | What it does                                                                                                                             |
+| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`     | `"auto"`                           | `"attach"` fails when no server is running. `"start"` always starts a private one. `"auto"` attaches if it can, and starts one otherwise |
+| `server`   | from `~/.channelstack/server.json` | The server to attach to. Also `CHANNELSTACK_URL`, with `CHANNELSTACK_TOKEN`                                                              |
+| `timeout`  | `"10s"`                            | How long a matcher or wait gives up after                                                                                                |
+| `quietFor` | `"750ms"`                          | How long the agent must be quiet before a negative or exact-count matcher checks                                                         |
+
+Your agent is configured from the server you started yourself (`npx channelstack`), so attaching to that server is the usual setup. A server the plugin starts on its own has no agent connected to it. In CI, `mode: "attach"` makes a missing server fail at once instead of later. The [plugin reference](/docs/reference/vitest-plugin) lists every option.
+
+## A first test
+
+<CodeGroup>
+
+```ts title="TypeScript"
+import { expect, test } from "vitest";
+
+test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const channel = await slack.createChannel({ participants: [ana, slack.app] });
+
+  const msg = await ana.say("@my-agent summarize yesterday's incidents", { channel });
+
+  await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /incident/i });
+  await expect(msg.thread).toHaveRepliesFrom(slack.app, { count: 1 });
+  await expect(channel).not.toHaveChannelMessageFrom("my-agent");
+});
+```
+
+```python title="Python"
+import re
+
+from channelstack import SlackFixture
+from pytest_channelstack import expect
+
+
+async def test_a_mention_gets_exactly_one_reply_in_the_thread(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    channel = await slack.create_channel(participants=[ana, slack.app])
+
+    msg = await ana.say("@my-agent summarize yesterday's incidents", channel=channel)
+
+    await expect(msg.thread).to_have_reply_from("my-agent", text=re.compile("incident", re.I))
+    await expect(msg.thread).to_have_replies_from(slack.app, count=1)
+    await expect(channel).not_to_have_channel_message_from("my-agent")
+```
+
+</CodeGroup>
+
+The test creates a person and a channel, has the person mention the agent, and checks three things a person would notice: there is an answer, there is only one, and it's in the thread rather than in the channel. Each matcher waits for the agent; nothing in the test sleeps. The Python version runs under [pytest](/docs/guide/pytest); the rest of this page shows TypeScript.
+
+## The fixtures
+
+Every test gets these fixtures from its context:
+
+| Fixture        | What it is                                                                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slack`        | The fake Slack workspace: `createUser`, `createChannel`, the agent's `app`, `calls`, `deliveries`, `fault`                                         |
+| `github`       | The fake GitHub org: `createUser`, `createRepo`, the agent's `app` (a GitHub App)                                                                  |
+| `linear`       | The fake Linear workspace: `createUser`, `createTeam`, the agent's `app`                                                                           |
+| `notion`       | The fake Notion workspace: `createUser`, `createPage`, `createDatabase`, the agent's integration as `app`                                          |
+| `channelstack` | The server itself: `url`, `env()` (what `channelstack env` prints), `quiet()` (resolves when the agent is quiet in this test's session), `reset()` |
+
+The fixtures are scoped to the test's own [session](/docs/guide/how-it-works#sessions-scopes-in-one-shared-world), which opens before the test's hooks and closes after them, whether the test names a fixture or not. Two tests that run at the same moment never see each other's people, channels or deliveries.
+
+Each fixture's `app` is the agent's app on that platform, named `my-agent`. Matchers take it, or its name as a string, wherever they take an author: `toHaveReplyFrom(slack.app)` and `toHaveReplyFrom("my-agent")` mean the same.
+
+## People act, resources are read
+
+Every action is a method on the person who takes it. The content comes first, and where it happens is an option named after the resource:
+
+```ts
+await ana.say("@my-agent deploy web", { channel });
+await ben.click("Approve", { message: reply });
+await ana.comment("@my-agent fix this", { issue: pr });
+await ana.delegate(linear.app, { issue });
+await ana.reply("thanks!", { discussion });
+```
+
+The people of each platform have that platform's actions, and only those: a Slack user can `say`, `reply`, `react`, `click` and `stop`; a GitHub user can `openIssue`, `openPullRequest`, `comment`, `review` and `push`; a Linear user can `createIssue`, `delegate`, `prompt` and `stop`; a Notion user can `comment`, `reply`, `edit` and `setProperty`. A Slack user has no `comment`, so mixing them up is a type error. The [platform pages](/docs/platforms/slack) list every action.
+
+Every action resolves to what it created, so the next step needs no lookup. `say` gives you the message, with its `thread`, its `conversation` and the `delivery` it caused; `comment` on Linear gives you the comment and the agent `session` it opened.
+
+Text is rich: `@name` becomes a real mention of that person or app on the platform (`<@U…>` in Slack, `@login` on GitHub, a mention node in Linear and Notion). Write `@@` for a literal `@`.
+
+Actions with no person behind them live on the fixture or the object they concern: `slack.createChannel(…)`, `repo.installApp(github.app)`, `msg.delivery.retry()`, `modal.submit(…)`.
+
+## Give the app access explicitly
+
+Nothing grants your agent access behind your back. Each platform's real rule applies, and you state the access in the test:
+
+| Platform | The platform's rule                                                                                      | In a test                                                                                          |
+| -------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Slack    | A bot gets events from, and can post in, only the channels it's a member of (`not_in_channel` otherwise) | `createChannel({ participants: [ana, slack.app] })`, or later `ana.invite(slack.app, { channel })` |
+| GitHub   | An App gets webhooks only for repositories it's installed on                                             | `createRepo({ apps: [github.app] })`, or later `repo.installApp(github.app)`                       |
+| Notion   | An integration sees only pages connected to it, and their children                                       | `createPage({ connections: [notion.app] })`, or later `ana.connect(notion.app, { page })`          |
+| Linear   | An app is installed for the whole workspace                                                              | Nothing to do                                                                                      |
+
+Leaving the app out is how you test the uninvited case:
+
+```ts
+test("a channel the app isn't in stays silent until it's invited", async ({ slack }) => {
+  const ana = await slack.createUser({ name: "Ana", admin: true });
+  const channel = await slack.createChannel({ participants: [ana] });
+
+  const first = await ana.say("@my-agent are you here?", { channel });
+  await expect(first.thread).not.toHaveReplyFrom("my-agent");
+
+  await ana.invite(slack.app, { channel });
+  const second = await ana.say("@my-agent now?", { channel });
+  await expect(second.thread).toHaveReplyFrom("my-agent");
+});
+```
+
+On GitHub and Notion, an action that reaches no app causes no delivery, so `comment.delivery` is `undefined` there.
+
+## Read what happened
+
+Resources are only read and waited on. For a check, use a matcher; when you need a value to work with, read it:
+
+```ts
+const msg = await ana.say("@my-agent what's the status of the web deploy?", { channel });
+await msg.thread.waitForReply({ from: "my-agent" });
+
+await ana.reply("and the API?", { thread: msg });
+
+const answer = await msg.thread.waitForReply({ from: "my-agent" });
+expect(answer.text).toMatch(/api/i);
+```
+
+| To get                                  | Use                                                                                                                                                                                    |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The next new message from someone       | `thread.waitForReply({ from })`, `conversation.waitForMessage({ from })`, `issue.waitForComment({ from })`, `discussion.waitForComment({ from })`, `session.waitForActivity({ type })` |
+| The latest one, once the agent is quiet | `thread.latestReply({ from })`, `issue.latestComment({ from })`, `discussion.latestComment({ from })`                                                                                  |
+| Everything so far                       | `thread.replies()`, `conversation.messages()`, `issue.comments()`, `session.activities()`, `page.markdown()`                                                                           |
+| What a person would read                | `transcript()`, with `toString()` for snapshots                                                                                                                                        |
+| What the agent called                   | `slack.calls({ operation, error })`, `slack.waitForCall({ operation })`                                                                                                                |
+| What the server sent the agent          | `msg.delivery`, `github.deliveries({ type, resource })`                                                                                                                                |
+
+[Waiting and quiet](/docs/guide/waiting-and-quiet) explains how the `waitFor…` and `latest…` methods differ, and the API reference ([Slack](/docs/reference/api/slack), [GitHub](/docs/reference/api/github), [Linear](/docs/reference/api/linear), [Notion](/docs/reference/api/notion)) lists every read.
+
+## Shared people with `test.extend`
+
+People and places you use in many tests belong in a fixtures file of your own. That's plain Vitest `test.extend`, built on channelstack's fixtures:
+
+```ts title="test/fixtures.ts"
+import type { SlackConversation, SlackUser } from "channelstack/client";
+import { test as base } from "vitest";
+
+export const test = base.extend<{ ana: SlackUser; ben: SlackUser; support: SlackConversation }>({
+  ana: async ({ slack }, use) => use(await slack.createUser({ name: "Ana" })),
+  ben: async ({ slack }, use) => use(await slack.createUser({ name: "Ben", admin: true })),
+  support: async ({ slack, ana, ben }, use) =>
+    use(await slack.createChannel({ name: "support", participants: [ana, ben, slack.app] })),
+});
+```
+
+```ts title="test/support.test.ts"
+import { expect } from "vitest";
+
+import { test } from "./fixtures";
+
+test("an admin and a regular member see the same answer", async ({ support, ana, ben }) => {
+  const question = await ana.say("@my-agent who's on call?", { channel: support });
+  await ben.reply("+1, also need this", { thread: question });
+
+  await expect(question.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+});
+```
+
+Each test still gets a fresh Ana, Ben and `#support`, because Vitest creates fixtures per test. The name `support` is unique per session, so parallel tests can all have their own `#support`. Fixtures compose: `support` depends on `ana` and `ben`.
+
+People are never declared in a config file. Every test states the world it needs, and nothing is shared between tests by accident.
+
+## Fixed ids
+
+Generated ids are realistic and unique. When your agent allowlists people by id, fix one:
+
+```ts
+test("allowlisted people by fixed id", async ({ slack }) => {
+  const admin = await slack.createUser({ name: "Cara", id: "U0ADMIN01" });
+  const stranger = await slack.createUser({ name: "Dev" });
+  const channel = await slack.createChannel({ participants: [admin, stranger, slack.app] });
+
+  const allowed = await admin.say("@my-agent rotate the API keys", { channel });
+  const refused = await stranger.say("@my-agent rotate the API keys", { channel });
+
+  await expect(allowed.thread).toHaveReplyFrom("my-agent", { text: /rotating/i });
+  await expect(refused.thread).toHaveReplyFrom("my-agent", { text: /not allowed/i });
+});
+```
+
+GitHub takes a numeric `id`, and Linear and Notion take a UUID. The id must have the platform's format.
+
+A fixed id is unique in the whole world, not only in the test, because the agent can't tell two `U0ADMIN01` apart. While one session holds it, another session that asks for it is refused with `invalid_argument`, and the id is free again when the first session closes. Tests that fix the same id must not run at the same time.
+
+## Files and fixture directories
+
+A GitHub repository can start from a directory of files, and a Notion page from a Markdown file. Relative paths start from the test file, like an import:
+
+```ts
+const repo = await github.createRepo({
+  files: "./fixtures/web",
+  collaborators: [ana],
+  apps: [github.app],
+});
+
+const pr = await ana.openPullRequest(
+  { from: "fix-login", title: "Fix login redirect", changes: { "src/login.ts": "export const redirect = '/home';\n" } },
+  { repo },
+);
+
+const spec = await notion.createPage({
+  title: "Spec",
+  content: { path: "./fixtures/spec.md" },
+  connections: [notion.app],
+});
+```
+
+`files` takes a directory path or a list of files. Each file is either inline, `{ name, content }`, or on disk, `{ path }`. `changes` on a pull request or a push maps paths to new contents, and `null` deletes a file.
+
+## Cleanup
+
+You don't clean up. When a test ends, the plugin closes its session, and closing removes everything the test created: people, channels, repositories, issues, pages. A fault the test injected is undone with it, and an app the test uninstalled is installed again. Cleanup never fails a test.
+
+Inside a test, `await using` ends something early. A fault, for example, lasts until the end of its scope:
+
+```ts
+test("still answers when Slack refuses a message as too long", async ({ slack }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const channel = await slack.createChannel({ participants: [ana, slack.app] });
+  await using _fault = await slack.fault({
+    type: "error",
+    operation: "chat.postMessage",
+    error: "msg_too_long",
+    times: 1,
+  });
+
+  const msg = await ana.say("@my-agent hello", { channel });
+
+  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+});
+```
+
+Outside Vitest, in a script or a `beforeAll` that needs its own scope, connect to the server and open a session yourself. Both are disposable:
+
+```ts title="scripts/smoke.ts"
+import { connect } from "channelstack/client";
+
+await using client = await connect({ mode: "attach" });
+await using session = await client.openSession();
+
+const slack = await session.slack();
+const ana = await slack.createUser({ name: "Ana" });
+const msg = await ana.say("hi", { to: slack.app });
+const reply = await msg.thread.waitForReply({ from: "my-agent" });
+console.log(reply.text);
+// The session closes here, and removes Ana and the DM.
+```
+
+`await using` needs TypeScript 5.2 or later with the `esnext.disposable` lib, or a runtime that supports it natively.
+
+Avoid `channelstack.reset()` in tests. It drops the whole world, including every other test's session, so it breaks a parallel suite. Fresh resources per test do the same job without the side effects.

@@ -1,0 +1,249 @@
+---
+title: "pytest"
+order: 7
+description: "Test your agent from Python with pytest-channelstack: install, configure, use the fixtures and check with expect(...)."
+---
+
+# pytest
+
+`pytest-channelstack` brings channelstack to pytest: a fixture per platform, one session per test, and `expect(...)` checks with the same waiting rules as the Vitest matchers. This page shows how to set it up and write tests with it.
+
+## Install
+
+```bash
+pip install pytest-channelstack
+npm i -g channelstack
+```
+
+`pytest-channelstack` needs Python 3.12 or later. It installs the `channelstack` Python SDK, pytest and pytest-asyncio with it, and registers itself as a pytest plugin, so there is nothing to import in `conftest.py`.
+
+The server is the same binary for every language, and it comes from npm. Start it, and your agent, as in [connecting your agent](/docs/guide/connecting-your-agent):
+
+```bash
+npx channelstack
+```
+
+## Configure pytest
+
+The client outlives each test, so every test and fixture must run on one event loop for the whole run. Set that once, with pytest-asyncio's own settings:
+
+<CodeGroup>
+
+```ini title="pytest.ini"
+[pytest]
+asyncio_mode = auto
+asyncio_default_fixture_loop_scope = session
+asyncio_default_test_loop_scope = session
+channelstack_mode = attach
+```
+
+```toml title="pyproject.toml"
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+channelstack_mode = "attach"
+```
+
+</CodeGroup>
+
+With `asyncio_mode = auto`, every `async def test_…` runs without a marker. Without the two loop-scope settings, the second test fails, because the client was made on the first test's loop.
+
+The plugin adds three settings of its own:
+
+| Setting                                                           | Default | What it does                                                                                                               |
+| ----------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `channelstack_mode`, or `--channelstack-mode` on the command line | `auto`  | `attach` fails when no server is running, `start` starts a private one, `auto` attaches if it can and starts one otherwise |
+| `channelstack_timeout`                                            | `10s`   | How long an `expect(...)` check waits                                                                                      |
+| `channelstack_quiet_for`                                          | `750ms` | How long the agent must be quiet before a negative or exact-count check reads                                              |
+
+The command-line flag wins over the ini file. The client finds the server the way every channelstack client does: `CHANNELSTACK_URL` with `CHANNELSTACK_TOKEN`, or else the `server.json` in `~/.channelstack` (or `CHANNELSTACK_HOME`). In `start` mode it runs `CHANNELSTACK_SERVER_BIN`, or `channelstack` from your `PATH`. A server started that way has no agent connected to it, so `attach` is the usual choice, and in CI it fails at once when the server isn't up.
+
+## The fixtures
+
+| Fixture                | Scope    | What it is                                                                        |
+| ---------------------- | -------- | --------------------------------------------------------------------------------- |
+| `channelstack`         | the run  | The client: `env()`, `reset()`, `open_session()`                                  |
+| `channelstack_session` | the test | The test's session. Closing it after the test removes everything the test created |
+| `slack`                | the test | The fake Slack workspace in the test's session                                    |
+| `github`               | the test | The fake GitHub org                                                               |
+| `linear`               | the test | The fake Linear workspace                                                         |
+| `notion`               | the test | The fake Notion workspace                                                         |
+
+A test asks for the fixtures it uses by name. Asking for `slack` opens the test's session on the way, so most tests name only the platform.
+
+## A full test
+
+```python title="tests/test_slack.py"
+import re
+
+from channelstack import SlackFixture
+from pytest_channelstack import expect
+
+
+async def test_a_mention_gets_exactly_one_reply_in_the_thread(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    channel = await slack.create_channel(participants=[ana, slack.app])
+
+    msg = await ana.say("@my-agent summarize yesterday's incidents", channel=channel)
+
+    await expect(msg.thread).to_have_reply_from("my-agent", text=re.compile("incident", re.I))
+    await expect(msg.thread).to_have_replies_from(slack.app, count=1)
+    await expect(channel).not_to_have_channel_message_from("my-agent")
+
+
+async def test_follow_ups_in_the_thread_are_answered_without_a_new_mention(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    channel = await slack.create_channel(participants=[ana, slack.app])
+    msg = await ana.say("@my-agent what's the status of the web deploy?", channel=channel)
+    await msg.thread.wait_for_reply(from_="my-agent")
+
+    await ana.reply("and the API?", thread=msg)
+
+    answer = await msg.thread.wait_for_reply(from_="my-agent")
+    assert re.search("api", answer.text, re.I)
+
+
+async def test_stop_ends_the_stream_and_the_agent_stays_quiet(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    msg = await ana.say("write a long report on Q3", to=slack.app)
+    await expect(msg.thread).to_have_streaming_reply_from("my-agent")
+
+    await ana.stop(thread=msg)
+
+    await expect(msg.thread).to_have_status("stopped")
+    await expect(msg.thread).to_have_replies_from("my-agent", count=1)
+```
+
+The API is the same as in TypeScript, in Python's spelling: methods and options in snake case (`create_user`, `wait_for_reply`, `bad_signature=True`), options as keyword arguments, and `from_` where TypeScript says `from`. People act and resources are read, exactly as [writing tests](/docs/guide/writing-tests) describes.
+
+## `expect(...)` and `not_to_…`
+
+Each check is an awaitable method on `expect(subject)`. The Vitest matcher `toHaveReplyFrom` is `to_have_reply_from`, and Vitest's `.not.` is a `not_to_…` method of its own:
+
+```python
+await expect(msg.thread).to_have_reply_from("my-agent")
+await expect(first.thread).not_to_have_reply_from("my-agent")
+```
+
+The checks follow the matchers' rules. A positive check polls until it holds and fails after the timeout. A negative or exact-count check waits until the agent has been quiet for the whole window, then checks once. A failure raises `AssertionError` with what was expected, what the thread had, and what the agent left open:
+
+```
+AssertionError: Expected exactly 1 reply from my-agent, found 2:
+  my-agent: Deploying web to staging
+  my-agent: Deploying web to staging
+```
+
+[Waiting and quiet](/docs/guide/waiting-and-quiet) explains why the checks wait the way they do.
+
+## Which checks exist
+
+The Python port covers the conversation checks:
+
+| Python                                             | Vitest                     | Subject                      |
+| -------------------------------------------------- | -------------------------- | ---------------------------- |
+| `to_have_reply_from(author, text=)`                | `toHaveReplyFrom`          | A thread or a DM             |
+| `to_have_replies_from(author, count=, text=)`      | `toHaveRepliesFrom`        | A thread or a DM             |
+| `to_have_channel_message_from(author)`             | `toHaveChannelMessageFrom` | A channel                    |
+| `to_have_streaming_reply_from(author)`             | `toHaveStreamingReplyFrom` | A thread                     |
+| `to_have_status(state)`                            | `toHaveStatus`             | A thread                     |
+| `to_have_status_text(text)`                        | `toHaveStatusText`         | A thread                     |
+| `to_have_reaction(emoji, by=)`                     | `toHaveReaction`           | A message                    |
+| `to_have_received_call(operation, error=, times=)` | `toHaveReceivedCall`       | A platform fixture (`slack`) |
+
+Each has a `not_to_…` twin. `text` takes a string to look for or a compiled `re.Pattern`, and an author is a handle (`slack.app`, `ana`) or a name.
+
+The other matchers, for GitHub, Linear, Notion, deliveries and `toContainText`, follow the same pattern later. Until then, read the value with the SDK's waiting methods and `assert` on it:
+
+```python title="tests/test_reads.py"
+import re
+
+from channelstack import GitHubFixture, SlackFixture
+
+
+async def test_a_mention_in_an_issue_gets_a_comment(github: GitHubFixture) -> None:
+    ana = await github.create_user(login="ana")
+    repo = await github.create_repo(collaborators=[ana], apps=[github.app])
+    issue = await ana.open_issue({"title": "Login fails on Safari"}, repo=repo)
+
+    await ana.comment("@my-agent can you triage this?", issue=issue)
+
+    answer = await issue.wait_for_comment(from_=github.app)
+    assert re.search("triage", answer.body, re.I)
+
+
+async def test_rejects_a_bad_signature(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    msg = await ana.say("hi", to=slack.app)
+    assert msg.delivery is not None
+
+    await msg.delivery.resend(bad_signature=True)
+
+    delivery = await msg.delivery.settled()
+    forged = [attempt for attempt in delivery.attempts if attempt.forged_signature][-1]
+    assert forged.response_status is not None and 400 <= forged.response_status < 500
+```
+
+Unlike `expect(...)`, a plain read doesn't wait for quiet, so use it for positive facts, or call it after a `wait_for_…` or `latest_…` method.
+
+## Options
+
+Every check takes `timeout=`, and every negative or exact-count check also takes `quiet_for=`:
+
+```python
+await expect(msg.thread).to_have_reply_from("my-agent", timeout="30s")
+await expect(msg.thread).to_have_replies_from("my-agent", count=1, quiet_for="2s")
+```
+
+A duration is a string (`"750ms"`, `"3s"`, `"1m"`) or milliseconds as a number. Without them, a check uses `channelstack_timeout` and `channelstack_quiet_for` from the ini file. The SDK's own waiting methods (`wait_for_reply`, `latest_reply`, `settled`) take `timeout=` too, and default to 10 seconds whatever the ini file says.
+
+## Shared people with fixtures
+
+People you use in many tests are ordinary pytest fixtures, built on `slack`. They're created per test, like the platform fixtures they depend on:
+
+```python title="tests/conftest.py"
+import pytest
+
+from channelstack import SlackConversation, SlackFixture, SlackUser
+
+
+@pytest.fixture
+async def ana(slack: SlackFixture) -> SlackUser:
+    return await slack.create_user(name="Ana")
+
+
+@pytest.fixture
+async def ben(slack: SlackFixture) -> SlackUser:
+    return await slack.create_user(name="Ben", admin=True)
+
+
+@pytest.fixture
+async def support(slack: SlackFixture, ana: SlackUser, ben: SlackUser) -> SlackConversation:
+    return await slack.create_channel(name="support", participants=[ana, ben, slack.app])
+```
+
+```python title="tests/test_support.py"
+from channelstack import SlackConversation, SlackUser
+from pytest_channelstack import expect
+
+
+async def test_an_admin_and_a_member_see_the_same_answer(
+    support: SlackConversation, ana: SlackUser, ben: SlackUser
+) -> None:
+    question = await ana.say("@my-agent who's on call?", channel=support)
+    await ben.reply("+1, also need this", thread=question)
+
+    await expect(question.thread).to_have_replies_from("my-agent", count=1)
+```
+
+A relative fixture path starts from the test file, as in Vitest: `github.create_repo(files="./fixtures/web", …)` reads `tests/fixtures/web`.
+
+## Live mode
+
+With live credentials in the environment, the same tests act on real sandbox workspaces ([live mode](/docs/guide/live-mode)). A step live mode can't do is refused with `unsupported_in_live` (a retry, a forged signature, a fault), or with `action_requires` when it needs a piece the run doesn't have (the browser actor, proxy mode). The plugin turns both into `pytest.skip`, with the reason:
+
+```
+SKIPPED [1] tests/test_slack.py:88: live: SlackDelivery.retry isn't supported live: …
+```
+
+Any other error still fails the test, so a broken live setup turns the run red. The fake run on every pull request runs every test in full.

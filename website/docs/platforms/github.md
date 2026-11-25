@@ -1,0 +1,370 @@
+---
+title: "GitHub"
+order: 2
+description: "Test a GitHub App against channelstack's fake GitHub, from connecting Octokit or Probot to issues, pull requests, reviews, check runs and redelivery."
+---
+
+# GitHub
+
+This page shows how to test a GitHub App: how to point it at the fake, which people and repositories a test creates, what those people do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+
+```ts title="triage.test.ts"
+import { test, expect } from "vitest";
+
+test("a mention in an issue gets one comment, and no self-trigger loop", async ({ github }) => {
+  const ana = await github.createUser({ login: "ana" });
+  const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
+  const issue = await ana.openIssue({ title: "Login fails on Safari", body: "Steps: …" }, { repo });
+
+  await ana.comment("@my-agent can you triage this?", { issue });
+
+  await expect(issue).toHaveCommentFrom(github.app, { text: /triage/i });
+  await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
+});
+```
+
+## What the fake covers
+
+The fake GitHub is one organization (`acme`) with one GitHub App in it, `my-agent`, installed on the repositories you choose. It serves GitHub's REST API and sends the App's webhooks. Repositories hold real git objects, so commits have real SHAs and diffs are real diffs.
+
+| Area | What's there |
+|---|---|
+| The App | `GET /app`, installations, `POST /app/installations/{id}/access_tokens`, `GET /installation/repositories`, `GET /repos/{owner}/{repo}/installation`, the webhook delivery log (`/app/hook/deliveries`) and redelivery |
+| Issues | Issues, comments, labels, assignees, reactions, listing with `state` and `labels` filters |
+| Pull requests | Pull requests, their files and commits, merging, requested reviewers, reviews, review comments and replies |
+| Code | Contents API, Git Data API (blobs, trees, commits, refs), branches, commits, compare |
+| Checks | Check runs with annotations and requested actions, commit statuses |
+| Webhooks | `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, `push`, `check_run`, `installation_repositories` |
+
+The App has `issues`, `pull_requests`, `contents`, `checks` and `statuses` write permissions. Every response and webhook is checked in channelstack's own tests against GitHub's published schemas (`@octokit/openapi` and `@octokit/openapi-webhooks`).
+
+Not covered: the GraphQL API (`POST /graphql` answers 404), Actions and workflow runs, check suites, releases, milestones, discussions, teams and projects. A path the fake doesn't serve answers GitHub's own 404.
+
+## Connecting a GitHub App
+
+Ask the running server for the App's settings:
+
+```bash
+npx channelstack env
+```
+
+```ini
+GITHUB_API_URL=https://github.localhost
+GITHUB_APP_ID=…
+GITHUB_APP_SLUG=my-agent
+GITHUB_INSTALLATION_ID=…
+GITHUB_BOT_USER_ID=…
+GITHUB_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n…\n-----END RSA PRIVATE KEY-----\n
+GITHUB_WEBHOOK_SECRET=…
+```
+
+The private key is an RSA key made once for your machine and kept in `~/.channelstack/secrets.json`. It's printed on one line with `\n` for its line breaks, because an `.env` line is one line; turn them back into line breaks when you read it. The App id, installation id and bot id stay the same over a `reset`, and over a restart when `CHANNELSTACK_SEED` is set. Without it, a restart draws new ids, so read `channelstack env` again.
+
+### The host layout
+
+`GITHUB_API_URL` is the REST API's root: `https://github.localhost` with portless, `http://127.0.0.1:4500/github` with `--no-portless`. The same API also answers under `/api/v3`, the GitHub Enterprise Server layout, for SDKs that take a host and add that path themselves. Octokit takes `GITHUB_API_URL` as it is.
+
+### Octokit
+
+```ts title="octokit.ts"
+import { createAppAuth } from "@octokit/auth-app";
+import { Octokit } from "@octokit/rest";
+
+const privateKey = process.env.GITHUB_PRIVATE_KEY!.replaceAll("\\n", "\n");
+
+export const octokit = new Octokit({
+  authStrategy: createAppAuth,
+  auth: {
+    appId: process.env.GITHUB_APP_ID,
+    privateKey,
+    installationId: Number(process.env.GITHUB_INSTALLATION_ID),
+  },
+  ...(process.env.GITHUB_API_URL ? { baseUrl: process.env.GITHUB_API_URL } : {}),
+});
+```
+
+Authentication works as on GitHub: the App's own endpoints take a JWT signed with the private key (RS256, `iss` the App id or client id, ten minutes at most), and everything else takes the installation token the JWT is exchanged for. Verify webhooks with `@octokit/webhooks` and `GITHUB_WEBHOOK_SECRET`.
+
+### Probot
+
+```ts title="index.ts"
+import { Probot, Server } from "probot";
+
+const server = new Server({
+  Probot: Probot.defaults({
+    appId: process.env.GITHUB_APP_ID,
+    privateKey: process.env.GITHUB_PRIVATE_KEY!.replaceAll("\\n", "\n"),
+    secret: process.env.GITHUB_WEBHOOK_SECRET,
+    ...(process.env.GITHUB_API_URL ? { baseUrl: process.env.GITHUB_API_URL } : {}),
+  }),
+  port: 3000,
+  webhookPath: "/api/github/webhooks",
+});
+await server.load(app);
+await server.start();
+```
+
+### Chat SDK
+
+The Chat SDK's GitHub adapter reads `GITHUB_API_URL` from the environment by itself:
+
+```ts title="agent.ts"
+import { createGitHubAdapter } from "@chat-adapter/github";
+import { createMemoryState } from "@chat-adapter/state-memory";
+import { Chat } from "chat";
+
+const github = createGitHubAdapter({
+  appId: process.env.GITHUB_APP_ID!,
+  privateKey: process.env.GITHUB_PRIVATE_KEY!.replaceAll("\\n", "\n"),
+  webhookSecret: process.env.GITHUB_WEBHOOK_SECRET!,
+  userName: "my-agent",
+});
+const bot = new Chat({ userName: "my-agent", adapters: { github }, state: createMemoryState() });
+
+// Serve bot.webhooks.github(request) at /api/webhooks/github.
+```
+
+### Where webhooks are delivered
+
+channelstack sends the App's webhooks to the URL you give it when the server starts:
+
+```bash
+CHANNELSTACK_GITHUB_WEBHOOK_URL=http://localhost:3000/api/github/webhooks npx channelstack start
+```
+
+`/api/github/webhooks` is Probot's default path; the Chat SDK reference agent serves `/api/webhooks/github`. Without a webhook URL, nothing is delivered. See [Connecting your agent](/docs/guide/connecting-your-agent) for TLS trust and the other runtimes, and [proxy mode](/docs/guide/proxy-mode) for a client that hard-codes `api.github.com`.
+
+## People and repositories in a test
+
+A test creates the people and repositories it needs. Nothing is declared in a config file.
+
+```ts
+const ana = await github.createUser({ login: "ana" });
+const ben = await github.createUser({ login: "ben", role: "admin", name: "Ben Ortiz" });
+```
+
+| Option | What it does |
+|---|---|
+| `login` | Required. Mentions (`@ana`) and matchers find the person by it |
+| `id` | A fixed numeric id, for agents that allowlist by id |
+| `name`, `email` | Profile fields |
+| `role` | `member` (default), `admin` or `outside_collaborator`. An org member can read every repository; writing needs a grant |
+| `token` | Live mode only: see [Live](#live) |
+
+A login is unique within a test session, so parallel tests can each have an `ana`, with different numeric ids.
+
+```ts
+const repo = await github.createRepo({
+  name: "web",
+  files: "./fixtures/web",
+  collaborators: [ana, { user: ben, permission: "maintain" }],
+  labels: ["bug", { name: "agent:fix", color: "5319e7" }],
+  apps: [github.app],
+});
+```
+
+| Option | What it does |
+|---|---|
+| `name` | Without the owner. Generated (`test-<id>`) if omitted. A name is one repository across all open sessions, so a second test asking for `web` at the same time is refused with `invalid_argument` |
+| `files` | The default branch's first commit: a fixture directory, relative to the test file, or a list of files (`{ name, content }` or `{ path }`) |
+| `collaborators` | People, with `write` permission unless you give another (`read`, `triage`, `write`, `maintain`, `admin`) |
+| `labels` | Names, or `{ name, color, description }` |
+| `apps` | The Apps installed on it |
+| `private` | Default `true` |
+| `defaultBranch` | Default `main` |
+
+### Giving the App access
+
+The App hears about a repository only when it's installed there, which is GitHub's rule. Pass `apps: [github.app]` to `createRepo`, or install it later:
+
+```ts
+const repo = await github.createRepo({ collaborators: [ana] }); // not installed
+const issue = await ana.openIssue({ title: "Hello?" }, { repo });
+const comment = await ana.comment("@my-agent ping", { issue });
+expect(comment.delivery).toBeUndefined();
+
+await repo.installApp(github.app);                               // sends installation_repositories
+```
+
+For the App's token, a repository it isn't installed on doesn't exist: every call about it answers 404. `repo.uninstallApp(github.app)` takes it away again.
+
+## What people do
+
+Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery, or to `undefined` when the App isn't installed. A pull request is also an issue, so `{ issue }` accepts either. The [test API reference](/docs/reference/api/github) lists every method and option.
+
+### Issues and comments
+
+```ts
+const issue = await ana.openIssue({ title: "Typo in the README", labels: ["bug"] }, { repo });
+
+await ana.comment("@my-agent is this a duplicate?", { issue });
+await ana.label("agent:fix", { issue });
+await ana.assign([ben], { issue });
+await ana.editIssue({ title: "Typo in README.md" }, { issue });
+await ana.close({ issue });
+```
+
+`@login` in a body becomes a real mention; `@my-agent` mentions the App by its slug. `comment` sends `issue_comment` (`created`) and resolves to the comment, with the delivery on `comment.delivery`. `edit`, `delete`, `react` and `minimize` act on a comment; `unlabel` and `reopen` undo the others.
+
+### Pushes and pull requests
+
+```ts
+const pr = await ana.openPullRequest(
+  { from: "fix-login", title: "Fix login redirect", changes: { "src/login.ts": "export const redirect = '/home';\n" } },
+  { repo },
+);
+
+const commit = await ana.push({ "src/app.ts": "export const broken = ;\n" }, { repo, branch: "fix-login", message: "wip" });
+```
+
+`push` commits file changes (a map of path to new contents, `null` to delete, or a list of files) to a branch, creating it from the default branch if it's missing. It sends `push`, and `pull_request` (`synchronize`) for open pull requests on that branch. `openPullRequest` pushes `changes` to `from` first when you pass them; `draft: true` opens a draft and `reviewers` requests reviews right away.
+
+### Reviews
+
+```ts
+await ana.markReady({ pr });
+await ben.review({
+  pr,
+  event: "REQUEST_CHANGES",
+  body: "@my-agent please address these",
+  comments: [{ path: "src/app.ts", line: 1, body: "name this something clearer" }],
+});
+
+const inline = await ana.reviewComment("@my-agent why is this exported?", { pr, path: "src/app.ts", line: 1 });
+await ana.reply("thanks", { comment: inline });
+await ana.resolve({ comment: inline });
+
+await ana.requestReview([ben], { pr });
+await ana.merge({ pr, method: "squash" });
+```
+
+`review` sends `pull_request_review` and one `pull_request_review_comment` per inline comment. A comment on a line outside the diff is refused with 422, as on GitHub. `resolve` and `unresolve` send `pull_request_review_thread`.
+
+### Check runs
+
+```ts
+await expect(pr).toHaveCheckRun("my-agent", { conclusion: "action_required" });
+const [run] = await pr.checkRuns();
+
+await ana.requestAction("autofix", { checkRun: run! });
+await ana.rerun({ checkRun: run! });
+```
+
+`requestAction` clicks one of the buttons the App put on its check run (`check_run`, action `requested_action`); `run.actions` lists their identifiers. `rerun` clicks Re-run (`check_run`, action `rerequested`).
+
+## What to check
+
+The matchers read what a person would see on the issue or pull request page. Positive matchers resolve as soon as the condition holds; `.not` and exact counts wait until the agent is quiet first, so `toHaveCommentsFrom(github.app, { count: 1 })` catches an App that answers its own comments. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains how. A check run the App started and never completed counts as work in progress, so the agent isn't quiet while one is open.
+
+| Matcher | Subject | Reads |
+|---|---|---|
+| `toHaveCommentFrom(author, { text })` | issue, pull request | `issue.comments()` |
+| `toHaveCommentsFrom(author, { count })` | issue, pull request | `issue.comments()`, once quiet |
+| `toHaveReviewFrom(author, { state })` | pull request | `pr.reviews()` |
+| `toHaveReviewComment({ path, line, from, text })` | pull request | `pr.reviewComments()` |
+| `toHaveCheckRun(name, { status, conclusion })` | pull request, commit | `checkRuns()` |
+| `toHaveLabel(name)` | issue, pull request | `issue.labels()` |
+| `toBeMerged()` | pull request | `pr.merged()` |
+| `toContainText(text)` | issue, pull request, review comment | `transcript()` |
+| `toBeAccepted`, `toBeRejected` | delivery | `delivery.attempts` |
+| `toHaveReceivedCall(operation, { times, error })` | `github` | `github.calls()` |
+
+The reads behind them are there for anything a matcher doesn't cover: `issue.state()`, `issue.assignees()`, `issue.latestComment({ from })`, `pr.headCommit()`, `commit.statuses()`, `comment.reactions()`, `inline.replies()`, `inline.resolved()`, and `repo.readFile(path, { ref })` for a file as the agent left it on a branch. `github.calls()` lists the App's calls about this test's repositories, named like `POST /repos/acme/web/issues/1/comments`; `github.appCalls()` lists its calls about no repository (`GET /app`, the token exchange), which every session shares.
+
+A full test, a review round from a requested change to the merge:
+
+```ts title="review.test.ts"
+import { test, expect } from "vitest";
+
+test("a full review round: changes requested, fixed, approved, merged", async ({ github }) => {
+  const ana = await github.createUser({ login: "ana" });
+  const ben = await github.createUser({ login: "ben" });
+  const repo = await github.createRepo({ files: "./fixtures/web", collaborators: [ana, ben], apps: [github.app] });
+  const pr = await ana.openPullRequest(
+    { from: "feat", draft: true, changes: { "src/app.ts": "export const x = 1\n" } },
+    { repo },
+  );
+
+  await ana.markReady({ pr });
+  await ben.review({
+    pr,
+    event: "REQUEST_CHANGES",
+    body: "@my-agent please address these",
+    comments: [{ path: "src/app.ts", line: 1, body: "name this something clearer" }],
+  });
+
+  const fix = await pr.headCommit();
+  expect(fix.author?.name).toBe(github.app.name);
+  await ben.review({ pr, event: "APPROVE" });
+  await ana.merge({ pr, method: "squash" });
+  await expect(pr).toBeMerged();
+});
+```
+
+`githubChecks()` from `channelstack/checks` adds the checks every GitHub App should pass: one comment per mention, ignores its own comments, redelivery, a bad signature. See [Standard checks](/docs/guide/standard-checks).
+
+## Delivery specifics
+
+### Signatures and headers
+
+Every webhook carries GitHub's headers, signed over the exact bytes sent:
+
+| Header | Value |
+|---|---|
+| `X-GitHub-Event` | The event, e.g. `issue_comment` |
+| `X-GitHub-Delivery` | The delivery's GUID, the same on a redelivery |
+| `X-Hub-Signature-256` | `sha256=` and the hex HMAC-SHA256 of the body, keyed with `GITHUB_WEBHOOK_SECRET` |
+| `X-Hub-Signature` | The older `sha1=` form, which GitHub still sends |
+| `X-GitHub-Hook-ID`, `X-GitHub-Hook-Installation-Target-ID`, `X-GitHub-Hook-Installation-Target-Type` | The App's hook (`integration`) |
+| `User-Agent` | `GitHub-Hookshot/…` |
+
+The payload has `repository`, `organization`, `sender` and `installation`, as on GitHub. The App is told about its own comments, commits and check runs too, so an agent has to ignore them itself (check `sender.type === "Bot"`).
+
+### Acknowledgement and redelivery
+
+The App has ten seconds to answer. GitHub doesn't retry a failed delivery on its own, and neither does the fake: a delivery that failed or timed out stays that way until someone redelivers it from the App's delivery log. In a test, that's `delivery.redeliver()`: the same GUID and payload, a new attempt.
+
+```ts
+const comment = await ana.comment("@my-agent investigate", { issue });
+await expect(issue).toHaveCommentFrom(github.app);
+
+await comment.delivery!.redeliver();
+await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
+```
+
+`delivery.resend({ badSignature: true })` sends it signed with the wrong secret, and `toBeRejected()` checks the agent refused it. GitHub webhooks carry no timestamp, so there's no `stale` option here. The agent can read the same log itself through `GET /app/hook/deliveries` and redeliver with `POST /app/hook/deliveries/{id}/attempts`. [Delivery and failures](/docs/guide/delivery-and-failures) covers what each of these proves.
+
+### What the fake refuses
+
+The fake answers with GitHub's status codes and its error object (`message`, `documentation_url`, and `errors` for a 422):
+
+| Status | Message | When |
+|---|---|---|
+| 401 | `Bad credentials` | No token, a token that isn't the App's, or the App's JWT on an endpoint that needs the installation token |
+| 403 | `Resource not accessible by integration` | A call outside the App's permissions, or `GET /user` as an installation |
+| 403 | `Must have … access to …` | A person writing where they only have read |
+| 404 | `Not Found` | A repository the App isn't installed on, an unknown issue or comment, a path the fake doesn't serve |
+| 404 | `Label does not exist` | Removing a label the issue doesn't have |
+| 405 | `Pull Request is not mergeable` | Merging a closed or conflicting pull request, or a draft |
+| 409 | `<path> does not match <sha>` | A Contents API write with an outdated `sha` |
+| 422 | `Validation Failed` | A missing field, a review comment outside the diff, a check run with more than three actions |
+| 400 | `Problems parsing JSON` | A body that isn't JSON |
+
+GitHub drops, without a word, an assignee who can't be assigned, the App's bot among them. The [errors reference](/docs/reference/api/errors) lists every code.
+
+> [!NOTE]
+> The test API lets a person assign the App's bot or request its review (`ana.assign(github.app, …)`, `ana.requestReview(github.app, …)`), and the fake sends the event. Real GitHub likely refuses both for an ordinary App; this is checked in the first live run, and the fake will follow.
+
+## Live
+
+The same tests can run in a real test organization. Set the App's credentials (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`) and allowlist the org with `CHANNELSTACK_LIVE_GITHUB_ORGS`. The App must be installed on all of the org's repositories, with the Administration permission, because it creates and deletes each session's repositories (`channelstack-run-<run>-<n>`). Each person acts with their own fine-grained token from a machine account, `CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN`, and the `login` you pass must be that account's.
+
+Live, GitHub delivers to your App itself. channelstack acts, reads the results back, and reads the App's delivery log, so `github.deliveries()`, `toBeAccepted()` and `redeliver()` work live too. The log lags a few seconds behind, so poll it:
+
+```ts
+await expect.poll(async () => (await github.deliveries({ type: "issue_comment", resource: repo })).length, {
+  timeout: 30_000,
+}).toBeGreaterThan(0);
+```
+
+Built live today: repositories, collaborators, issues, comments, labels, assignees, reactions, reads and the delivery log. Pushes, pull requests, reviews and check runs aren't live yet; live runs skip those steps and say why. `resend({ badSignature })` stays fake only. See [Live mode](/docs/guide/live-mode) and the [test API reference](/docs/reference/api/github).

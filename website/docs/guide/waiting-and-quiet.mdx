@@ -1,0 +1,141 @@
+---
+title: "Waiting and quiet"
+order: 4
+description: "Why every matcher waits, how negative and exact-count checks decide the agent is done, and what a failure tells you."
+---
+
+# Waiting and quiet
+
+This page explains how channelstack's matchers wait for an agent, and why a negative check takes at least 750 ms. Read it when a check is slower than you expected, or passes when you think it shouldn't.
+
+## Why matchers wait
+
+An agent answers when it's ready. Between a person's message and the agent's reply there is a signed delivery, the agent's own work (often a model call), and one or more API calls back. A test that reads the thread right after `say` sees nothing, and a test that sleeps for a fixed time is either slow or flaky.
+
+So every matcher waits, the way Playwright's web-first assertions do. A test never needs `sleep`:
+
+```ts
+const msg = await ana.say("@my-agent summarize yesterday's incidents", { channel });
+
+await expect(msg.thread).toHaveReplyFrom("my-agent"); // waits for a reply
+await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 }); // waits for quiet, then counts
+await expect(channel).not.toHaveChannelMessageFrom("my-agent"); // waits for quiet, then checks
+```
+
+The three lines wait in two different ways, and the difference is the subject of this page.
+
+## Positive, negative and exact-count checks
+
+A **positive** check asks whether something has happened. It polls the read method behind it (`thread.replies()` for `toHaveReplyFrom`) and passes as soon as the condition holds. If the condition never holds, it fails after the timeout, 10 seconds by default.
+
+A **negative** check asks whether something has _not_ happened. Polling can't answer that: "no reply yet" is true right up to the moment the reply arrives. The only honest answer is "no reply, and the agent is done". So a negative check waits until the agent is quiet, then checks once.
+
+An **exact-count** check has the same problem. "Exactly one reply" is true after the first reply and false after a duplicate that arrives a second later, which is exactly the bug a retry causes. So exact-count checks also wait for quiet and check once.
+
+| Kind        | Examples                                                                                                                                                         | Waits for             | Then                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------- |
+| Positive    | `toHaveReplyFrom`, `toHaveCommentFrom`, `toHaveActivity`, `toHaveBlock`, `toBeAccepted`                                                                          | The condition         | Passes the moment it holds |
+| Negative    | `.not.toHaveReplyFrom`, `.not.toHaveChannelMessageFrom`, any `.not.…`                                                                                            | The agent to be quiet | Checks once                |
+| Exact count | `toHaveRepliesFrom({ count })`, `toHaveCommentsFrom({ count })`, `toContainText(text, { count })`, `toHaveReceivedCall(op, { times })`, `toBeRetried({ times })` | The agent to be quiet | Checks once                |
+
+Positive checks are fast when the agent is fast. Negative and exact-count checks always take at least the quiet window, because that's what it costs to know nothing more is coming.
+
+## The quiet window
+
+<QuietWindow />
+
+The server knows what the agent is doing, because every delivery and every API call goes through it. A session counts as **busy** while any of these is true:
+
+- **A provider API call is in flight.** The agent called `chat.postMessage` and the fake hasn't answered yet. A call isn't tied to a session until it finishes, so a call in flight keeps every session busy.
+- **A delivery is in flight, or about to be retried.** The fake is waiting for the agent to acknowledge an event, or the platform's next retry is due within 5 seconds.
+- **The agent was told to come back.** After a rate limit (a 429 with `Retry-After`), the session stays busy until the agent calls that method again, or until `Retry-After` plus 3 seconds of grace has passed. Slack's own client adds 1 to 2 seconds of backoff, so the grace covers it.
+- **Something the agent started is still open.** Each platform says what that means: a Slack stream the agent started and hasn't stopped, a GitHub check run that hasn't completed, a Linear agent session still `pending`, `active` or `stopping`, a Notion `page.content_updated` event the platform is still batching.
+
+Once nothing is busy, the quiet window starts. Anything the agent does restarts it. When the session has been quiet for `quietFor`, 750 ms by default, the check reads once and passes or fails.
+
+Slack's later retries, a minute and five minutes after a failed delivery, don't count as busy. Otherwise one unacknowledged event would hold every negative check in the session for six minutes. The retries still happen; a test that wants one now asks for it with `delivery.retry()`.
+
+## Watched from start to end
+
+A negative check doesn't only need a quiet session. It needs to have **watched** the session be quiet for the whole window ([decision 0009](https://github.com/christian-bromann/channelstack/blob/main/docs/decisions/0009-quiet-means-watched.md)).
+
+The reason is that a thinking agent makes no sound. Suppose the agent acknowledged a delivery and is now waiting for its model. Nothing is in flight, so the session has been quiet for a while. A check that only asked "has it been quiet for 750 ms?" would pass at once, and the reply that arrives 500 ms later would go unseen. So the window counts from the moment the check starts at the earliest, and anything that arrives while the check is watching counts.
+
+The cost is that every negative and exact-count check takes at least `quietFor`, even when the session went quiet long before. A suite with many negative checks pays it per check. If that adds up, lower `quietFor` where your agent is reliably quick, rather than dropping the checks.
+
+Read methods that need quiet, such as `thread.latestReply()`, don't watch for the whole window. They wait for at least one match and for the session to be quiet, and then return: something has already happened, and the question is only whether more of it is on the way.
+
+## "Still open:" in failures
+
+When a check fails, or a wait gives up, the message says what was expected, what was there instead, and what the agent left open:
+
+```
+Expected the thread to be idle, it is streaming
+Still open: a stream my-agent started and never stopped: "Thinking…"
+```
+
+```
+Timed out after 10000ms waiting for the agent to be quiet for 750ms. Still open: an agent session on ENG-12 that is still active
+```
+
+The first is a positive check that failed after its timeout. The second is a negative or exact-count check whose session never went quiet, so it never got to check.
+
+The "Still open" line is often the bug itself. An agent that starts a stream and crashes before stopping it leaves the person looking at "Thinking…" forever. A Linear agent that never ends its turn leaves the session `active`. A GitHub App that creates a check run and never completes it leaves a pull request waiting. Without the line, the test would only say it timed out.
+
+Each platform describes its own open work:
+
+| Platform | Open work                                                                    |
+| -------- | ---------------------------------------------------------------------------- |
+| Slack    | `a stream my-agent started and never stopped: "…"`                           |
+| GitHub   | `a check run "my-agent" on 1a2b3c4 that never completed`                     |
+| Linear   | `an agent session on ENG-12 that is still active` (or `pending`, `stopping`) |
+| Notion   | `a page.content_updated for "Roadmap" that Notion is still batching`         |
+
+## Timeouts and `quietFor`
+
+Both values have defaults per run, and every matcher and wait takes its own:
+
+```ts title="vitest.config.ts"
+export default defineConfig({
+  plugins: [channelstack({ timeout: "20s", quietFor: "1s" })],
+});
+```
+
+```ts
+await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
+await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
+```
+
+| Setting    | Default   | Meaning                                                                                                                          |
+| ---------- | --------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `timeout`  | `"10s"`   | How long a positive check polls before it fails, and how long a negative or exact-count check waits for quiet before it gives up |
+| `quietFor` | `"750ms"` | How long the session must be quiet, watched, before a negative or exact-count check reads                                        |
+
+Durations are milliseconds as a number, or a string: `"250ms"`, `"3s"`, `"1m"`. In pytest, the run's defaults are the `channelstack_timeout` and `channelstack_quiet_for` ini settings, and each check takes `timeout=` and `quiet_for=` ([pytest](/docs/guide/pytest)).
+
+Raise `quietFor` when your agent pauses between steps longer than 750 ms without anything open, for example a model call between two messages that it makes after acknowledging the event. A pause like that looks like quiet, and a negative check can end inside it. GitHub agents that comment, then label, then comment again often need `quietFor: "2s"`. Raise `timeout` for slow work, and for live runs, where real platforms take seconds to deliver.
+
+Keep the test runner's own timeout above the longest wait in the test. Vitest's default test timeout is 5 seconds, below channelstack's 10-second default; set `testTimeout` in your Vitest config to 30 seconds or so.
+
+## `waitFor…` and `latest…`
+
+Matchers check. When a test needs the value, to read its text or act on it, it uses a read method that waits. There are two kinds:
+
+```ts
+// The next new reply from the agent: returns as soon as one arrives.
+const answer = await msg.thread.waitForReply({ from: "my-agent" });
+
+// The agent's last reply, once it's done: waits for at least one, then for quiet.
+const ask = await msg.thread.latestReply({ from: "my-agent" });
+await ben.click("Approve", { message: ask });
+```
+
+| Method                                                                                                            | Returns                                                                 | Use it when                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `waitFor…` (`waitForReply`, `waitForMessage`, `waitForComment`, `waitForActivity`, `waitForModal`, `waitForCall`) | The next new item that matches, after the last one this handle returned | You expect one more thing, and want it the moment it arrives. A second call waits for the one after            |
+| `latest…` (`latestReply`, `latestComment`)                                                                        | The last item that matches, once the session is quiet                   | The agent may write several messages, and you want the final one: the one with the button, the finished answer |
+| `session.waitForState(states)`, `stream.ended()`, `delivery.settled()`                                            | The object, once it reaches one of the given states                     | You want a state, not a message                                                                                |
+
+`waitFor…` keeps its place per handle and per filter. Two `waitForCall` waits with different operations each find their own call, even if both calls were already there.
+
+Each of these takes `timeout`, and `latest…` takes `quietFor` too. A wait that gives up throws with what it was waiting for, and with the "Still open" line when there is one.
