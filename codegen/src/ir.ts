@@ -38,6 +38,11 @@ export interface IrResource {
   /** This resource is the session: its id is the `{session}` of everything created through it. */
   scope?: "session";
   /**
+   * What the handle is on its channel, for the unions every SDK and test framework has: a person
+   * (`User`), the agent's app (`App`), or a place things happen in (`Resource`).
+   */
+  role?: "user" | "app" | "resource";
+  /**
    * The resource this one is a kind of: a pull request is an issue. It has every field and method
    * of its parent (its own `fields` list them too), and goes wherever the parent is accepted.
    */
@@ -324,6 +329,7 @@ export function buildIr(openapi: Json): Ir {
       name,
       ...(idFields === undefined ? {} : { idFields }),
       ...(marker.scope === undefined ? {} : { scope: marker.scope }),
+      ...(marker.role === undefined ? {} : { role: marker.role }),
       ...(typeof marker.extends === "string" ? { extends: marker.extends } : {}),
       fields,
       methods: [],

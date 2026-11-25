@@ -549,7 +549,8 @@
           "scopes"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "SlackTeam": {
@@ -608,7 +609,8 @@
           "isBot"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "SlackUserOptions": {
@@ -705,7 +707,8 @@
           "kind"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "SlackMessage": {
@@ -2105,7 +2108,8 @@
           "webhookSecret"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "GitHubUser": {
@@ -2154,7 +2158,8 @@
           "role"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "GitHubUserOptions": {
@@ -2224,7 +2229,8 @@
           "private"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "GitHubRepoOptions": {
@@ -4016,7 +4022,8 @@
           "clientSecret"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "LinearUser": {
@@ -4056,7 +4063,8 @@
           "guest"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "LinearUserOptions": {
@@ -4111,7 +4119,8 @@
           "name"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "LinearTeamOptions": {
@@ -5065,7 +5074,8 @@
           "webhookSecret"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "NotionUser": {
@@ -5100,7 +5110,8 @@
           "channel"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "NotionUserOptions": {
@@ -5156,7 +5167,8 @@
           "url"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "NotionPageOptions": {
@@ -5234,7 +5246,8 @@
           "url"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "NotionDatabaseOptions": {

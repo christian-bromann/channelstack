@@ -45,7 +45,7 @@ const SlackUser = z
     isAdmin: z.boolean(),
     isBot: z.boolean(),
   })
-  .openapi("SlackUser", { "x-channelstack-resource": { id: "id" } });
+  .openapi("SlackUser", { "x-channelstack-resource": { id: "id", role: "user" } });
 
 const SlackApp = z
   .object({
@@ -59,7 +59,7 @@ const SlackApp = z
     signingSecret: z.string(),
     scopes: z.array(z.string()),
   })
-  .openapi("SlackApp", { "x-channelstack-resource": { id: "id" } });
+  .openapi("SlackApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
 const SlackParticipant = z.discriminatedUnion("kind", [SlackUser, SlackApp]);
 
@@ -69,7 +69,7 @@ const SlackConversation = z
     kind: z.enum(["channel", "private_channel", "im", "mpim"]),
     name: z.string().optional(),
   })
-  .openapi("SlackConversation", { "x-channelstack-resource": { id: "id" } });
+  .openapi("SlackConversation", { "x-channelstack-resource": { id: "id", role: "resource" } });
 
 /** A thread is identified by the conversation and its root message's `ts`. A message that has no replies yet is a thread too. */
 const SlackThread = z

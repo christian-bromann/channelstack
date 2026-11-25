@@ -1,4 +1,5 @@
 import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
+import { channelGlue } from "./channels.ts";
 import { BANNER, errorClassName, IrIndex, pathParts, snakeCase as toSnakeCase } from "./shared.ts";
 
 /** Words Python reserves. A name that collides gets a trailing underscore, as PEP 8 recommends (`as_`). */
@@ -424,8 +425,10 @@ export function emitPython(ir: Ir): Map<string, string> {
     ];
   };
 
+  const channelNames = channelGlue(ir).channels.map((channel) => JSON.stringify(channel.name));
   const exported = [
     "VERSION",
+    "CHANNEL_NAMES",
     "ChannelstackError",
     "connect",
     ...ir.errors.map(errorClassName),
@@ -490,6 +493,10 @@ export function emitPython(ir: Ir): Map<string, string> {
     "}",
     ...ir.types.flatMap(dataType),
     ...ir.resources.flatMap(resourceClass),
+    "",
+    "",
+    `CHANNEL_NAMES: tuple[str, ...] = (${channelNames.join(", ")}${channelNames.length === 1 ? "," : ""})`,
+    '"""Every channel, by name, in the server\'s order: what pytest-channelstack makes a fixture of."""',
     "",
     "",
     `async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> ${ir.root}:`,

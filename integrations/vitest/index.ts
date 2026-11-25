@@ -11,13 +11,7 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type {
-  Duration,
-  GitHubFixture,
-  LinearFixture,
-  NotionFixture,
-  SlackFixture,
-} from "../../sdks/typescript/client.ts";
+import type { ChannelFixtures, Duration } from "../../sdks/typescript/client.ts";
 import { parseDuration } from "../../sdks/typescript/runtime/duration.ts";
 import { waitDefaults } from "../../sdks/typescript/runtime/wait.ts";
 import type { MatcherName, matchers } from "../matchers-core/index.ts";
@@ -63,12 +57,9 @@ type MatcherArguments<Name extends MatcherName> = (typeof matchers)[Name] extend
 type ChannelstackMatchers = { [Name in MatcherName]: (...args: MatcherArguments<Name>) => Promise<void> };
 
 declare module "vitest" {
-  interface TestContext {
+  // Every channel's fixture by its name (`slack`, `github`, …), generated with the SDK.
+  interface TestContext extends ChannelFixtures {
     channelstack: ChannelstackFixture;
-    slack: SlackFixture;
-    github: GitHubFixture;
-    linear: LinearFixture;
-    notion: NotionFixture;
   }
 
   // The type parameters have to be Vitest 5's own for this to merge with its declaration.

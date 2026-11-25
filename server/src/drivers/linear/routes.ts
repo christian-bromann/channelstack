@@ -38,7 +38,7 @@ const LinearUser = z
     admin: z.boolean(),
     guest: z.boolean(),
   })
-  .openapi("LinearUser", { "x-channelstack-resource": { id: "id" } });
+  .openapi("LinearUser", { "x-channelstack-resource": { id: "id", role: "user" } });
 
 const LinearApp = z
   .object({
@@ -51,13 +51,13 @@ const LinearApp = z
     clientId: z.string(),
     clientSecret: z.string(),
   })
-  .openapi("LinearApp", { "x-channelstack-resource": { id: "id" } });
+  .openapi("LinearApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
 const LinearAuthor = z.discriminatedUnion("kind", [LinearUser, LinearApp]);
 
 const LinearTeam = z
   .object({ id: z.string(), key: z.string(), name: z.string() })
-  .openapi("LinearTeam", { "x-channelstack-resource": { id: "id" } });
+  .openapi("LinearTeam", { "x-channelstack-resource": { id: "id", role: "resource" } });
 
 const LinearDelivery = z
   .object({

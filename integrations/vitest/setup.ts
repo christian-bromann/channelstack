@@ -3,6 +3,8 @@ import { dirname } from "node:path";
 import { expect, inject, test, type TestContext } from "vitest";
 
 import {
+  CHANNEL_NAMES,
+  type ChannelKind,
   type Channelstack,
   ChannelstackError,
   connect,
@@ -78,7 +80,7 @@ function channelFixture(open: (session: Session) => Promise<unknown>) {
  * them (`ana: async ({ slack }, use) => …`). They are automatic: every test has its session,
  * opened before its hooks run and closed after them, whether it names a fixture or not.
  */
-type Fixtures = Pick<TestContext, "channelstack" | "slack" | "github" | "linear" | "notion"> & {
+type Fixtures = Pick<TestContext, "channelstack" | ChannelKind> & {
   channelstackSession: Session;
 };
 const auto = { auto: true } as const;
@@ -115,10 +117,8 @@ const auto = { auto: true } as const;
     },
     auto,
   ],
-  slack: [channelFixture((session) => session.slack()), auto],
-  github: [channelFixture((session) => session.github()), auto],
-  linear: [channelFixture((session) => session.linear()), auto],
-  notion: [channelFixture((session) => session.notion()), auto],
+  // One fixture per channel, by its name: `slack` opens `session.slack()`.
+  ...Object.fromEntries(CHANNEL_NAMES.map((name) => [name, [channelFixture((session) => session[name]()), auto]])),
 });
 
 expect.extend(

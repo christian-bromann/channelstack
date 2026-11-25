@@ -1415,6 +1415,7 @@
       "idFields": [
         "id"
       ],
+      "role": "app",
       "fields": [
         {
           "name": "id",
@@ -1491,6 +1492,7 @@
       "idFields": [
         "id"
       ],
+      "role": "user",
       "fields": [
         {
           "name": "id",
@@ -2845,6 +2847,7 @@
       "idFields": [
         "id"
       ],
+      "role": "resource",
       "fields": [
         {
           "name": "id",
@@ -4858,6 +4861,7 @@
       "idFields": [
         "id"
       ],
+      "role": "app",
       "fields": [
         {
           "name": "id",
@@ -4979,6 +4983,7 @@
       "idFields": [
         "id"
       ],
+      "role": "user",
       "fields": [
         {
           "name": "id",
@@ -6867,6 +6872,7 @@
       "idFields": [
         "id"
       ],
+      "role": "resource",
       "fields": [
         {
           "name": "id",
@@ -8956,6 +8962,7 @@
       "idFields": [
         "id"
       ],
+      "role": "app",
       "fields": [
         {
           "name": "id",
@@ -9022,6 +9029,7 @@
       "idFields": [
         "id"
       ],
+      "role": "user",
       "fields": [
         {
           "name": "id",
@@ -10131,6 +10139,7 @@
       "idFields": [
         "id"
       ],
+      "role": "resource",
       "fields": [
         {
           "name": "id",
@@ -12044,6 +12053,7 @@
       "idFields": [
         "id"
       ],
+      "role": "app",
       "fields": [
         {
           "name": "id",
@@ -12104,6 +12114,7 @@
       "idFields": [
         "id"
       ],
+      "role": "user",
       "fields": [
         {
           "name": "id",
@@ -13123,6 +13134,7 @@
       "idFields": [
         "id"
       ],
+      "role": "resource",
       "fields": [
         {
           "name": "id",
@@ -13461,6 +13473,7 @@
       "idFields": [
         "id"
       ],
+      "role": "resource",
       "fields": [
         {
           "name": "id",

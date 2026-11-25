@@ -54,7 +54,7 @@ const GitHubUser = z
     email: z.string().optional(),
     role: z.enum(["member", "admin", "outside_collaborator"]),
   })
-  .openapi("GitHubUser", { "x-channelstack-resource": { id: "id" } });
+  .openapi("GitHubUser", { "x-channelstack-resource": { id: "id", role: "user" } });
 
 const GitHubApp = z
   .object({
@@ -68,7 +68,7 @@ const GitHubApp = z
     privateKey: z.string(),
     webhookSecret: z.string(),
   })
-  .openapi("GitHubApp", { "x-channelstack-resource": { id: "id" } });
+  .openapi("GitHubApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
 const GitHubAuthor = z.discriminatedUnion("kind", [GitHubUser, GitHubApp]);
 
@@ -81,7 +81,7 @@ const GitHubRepo = z
     defaultBranch: z.string(),
     private: z.boolean(),
   })
-  .openapi("GitHubRepo", { "x-channelstack-resource": { id: "id" } });
+  .openapi("GitHubRepo", { "x-channelstack-resource": { id: "id", role: "resource" } });
 
 const GitHubDelivery = z
   .object({

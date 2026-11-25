@@ -39,7 +39,7 @@ const NotionUser = z
     channel: z.literal("notion"),
     email: z.string().optional(),
   })
-  .openapi("NotionUser", { "x-channelstack-resource": { id: "id" } });
+  .openapi("NotionUser", { "x-channelstack-resource": { id: "id", role: "user" } });
 
 const NotionIntegration = z
   .object({
@@ -55,17 +55,17 @@ const NotionIntegration = z
       .string()
       .openapi({ description: "The subscription's verification token: what webhooks are signed with." }),
   })
-  .openapi("NotionIntegration", { "x-channelstack-resource": { id: "id" } });
+  .openapi("NotionIntegration", { "x-channelstack-resource": { id: "id", role: "app" } });
 
 const NotionAuthor = z.discriminatedUnion("kind", [NotionUser, NotionIntegration]);
 
 const NotionPage = z
   .object({ id: z.string(), channel: z.literal("notion"), title: z.string(), url: z.string() })
-  .openapi("NotionPage", { "x-channelstack-resource": { id: "id" } });
+  .openapi("NotionPage", { "x-channelstack-resource": { id: "id", role: "resource" } });
 
 const NotionDatabase = z
   .object({ id: z.string(), channel: z.literal("notion"), title: z.string(), url: z.string() })
-  .openapi("NotionDatabase", { "x-channelstack-resource": { id: "id" } });
+  .openapi("NotionDatabase", { "x-channelstack-resource": { id: "id", role: "resource" } });
 
 const NotionDelivery = z
   .object({

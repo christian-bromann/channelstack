@@ -18,13 +18,10 @@ import pytest
 import pytest_asyncio
 
 from channelstack import (
+    CHANNEL_NAMES,
     Channelstack,
     ChannelstackError,
-    GitHubFixture,
-    LinearFixture,
-    NotionFixture,
     Session,
-    SlackFixture,
     connect,
 )
 from channelstack.runtime.files import set_files_root
@@ -100,25 +97,17 @@ async def channelstack_session(channelstack: Channelstack, request: pytest.Fixtu
         yield session
 
 
-@pytest_asyncio.fixture(loop_scope="session")
-async def slack(channelstack_session: Session) -> SlackFixture:
-    """The Slack fixture: the agent's app, the workspace, and people and channels to create."""
-    return await channelstack_session.slack()
+def _channel_fixture(name: str) -> object:
+    """The fixture of one channel: the agent's app, and what a test creates on it (`slack`, `github`, …)."""
+
+    async def fixture(channelstack_session: Session) -> object:
+        return await getattr(channelstack_session, name)()
+
+    fixture.__name__ = name
+    fixture.__doc__ = f"The {name} fixture: the agent's app, and the people and places a test creates on it."
+    return pytest_asyncio.fixture(loop_scope="session", name=name)(fixture)
 
 
-@pytest_asyncio.fixture(loop_scope="session")
-async def github(channelstack_session: Session) -> GitHubFixture:
-    """The GitHub fixture: the agent's App, the org, and people and repos to create."""
-    return await channelstack_session.github()
-
-
-@pytest_asyncio.fixture(loop_scope="session")
-async def linear(channelstack_session: Session) -> LinearFixture:
-    """The Linear fixture: the agent's app, and people, teams and issues to create."""
-    return await channelstack_session.linear()
-
-
-@pytest_asyncio.fixture(loop_scope="session")
-async def notion(channelstack_session: Session) -> NotionFixture:
-    """The Notion fixture: the agent's integration, and people, pages and databases to create."""
-    return await channelstack_session.notion()
+# One fixture per channel, by its name, from the SDK's generated list.
+for _name in CHANNEL_NAMES:
+    globals()[f"_{_name}_fixture"] = _channel_fixture(_name)
