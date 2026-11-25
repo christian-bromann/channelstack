@@ -15,8 +15,7 @@
       "channelstack/vitest": ["../api/vitest.d.ts"],
       "vite": ["./node_modules/vite"],
       "vitest": ["./node_modules/vitest"],
-      "vitest/*": ["./node_modules/vitest/*"],
-      "@vitest/runner": ["./node_modules/@vitest/runner"]
+      "vitest/*": ["./node_modules/vitest/*"]
     }
   },
   "include": ["samples/**/*.ts"]

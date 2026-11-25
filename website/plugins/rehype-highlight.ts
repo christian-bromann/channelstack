@@ -17,6 +17,10 @@ export default function rehypeHighlight() {
         .map(String)
         .find((c) => c.startsWith("language-"))
         ?.slice("language-".length);
+      // ```ts title="vitest.config.ts": the title names the file, or the tab in a <CodeGroup>.
+      const meta = (node.data as { meta?: string } | undefined)?.meta ?? "";
+      const title = /title="([^"]*)"/.exec(meta)?.[1];
+      if (title) parent.properties.dataTitle = title;
       if (resolveLang(lang)) blocks.push({ code: node, lang: lang! });
     });
     for (const { code, lang } of blocks) {

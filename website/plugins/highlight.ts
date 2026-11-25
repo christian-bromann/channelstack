@@ -6,7 +6,7 @@ import { createCssVariablesTheme, createHighlighter, type Highlighter } from "sh
 
 const PREFIX = "--t-";
 const theme = createCssVariablesTheme({ name: "channelstack", variablePrefix: PREFIX, fontStyle: false });
-const LANGS = ["ts", "tsx", "js", "python", "bash", "json", "jsonc", "yaml", "diff"] as const;
+const LANGS = ["ts", "tsx", "js", "python", "rust", "bash", "json", "jsonc", "yaml", "diff", "ini", "toml"] as const;
 const ALIASES: Record<string, string> = {
   typescript: "ts",
   javascript: "js",
@@ -14,6 +14,7 @@ const ALIASES: Record<string, string> = {
   sh: "bash",
   shell: "bash",
   yml: "yaml",
+  rs: "rust",
 };
 
 export interface Token {
