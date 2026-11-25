@@ -14,6 +14,7 @@ import { join, relative } from "node:path";
 
 import ts from "typescript";
 
+import { checkContract } from "../codegen/src/contract.ts";
 import { ENABLED_TESTS } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 
@@ -66,21 +67,26 @@ for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
 }
 
 /**
- * Contract types that aren't handles, so the generated SDK has no class of that name: the bases
- * whose members every handle repeats (checked there), configuration, the test integration's own
- * types, and option bags (the examples check them as the methods' parameters).
+ * Contract types nothing implements by that name: the bases whose members every handle repeats
+ * (checked there), configuration (#10), the matchers' own option type, and option bags (the
+ * examples check them as the methods' parameters).
  */
 const NOT_HANDLES = new Set([
   ...["Principal", "User", "App", "Resource", "HasTranscript", "Inspectable", "Delivery", "ResendOptions"],
-  ...["DeliveryFilter", "ApiCall", "ApiCallFilter", "Transcript", "TranscriptEntry"],
+  ...["DeliveryFilter", "ApiCallFilter"],
   ...["ChannelstackConfig", "ServerConfig", "SlackConfig", "SlackLiveApp", "SlackAppUrls", "GitHubConfig"],
   ...["GitHubAppConfig", "LinearConfig", "LinearAppConfig", "NotionConfig", "NotionIntegrationConfig"],
-  ...["ChannelstackFixture", "ChannelstackIntegrationOptions", "ChannelstackMatchers", "TextOptions"],
+  ...["ChannelstackMatchers", "TextOptions"],
   ...["SlackUserOptions", "SlackChannelOptions", "GitHubUserOptions", "GitHubRepoOptions", "LinearUserOptions"],
   ...["LinearTeamOptions", "NotionUserOptions", "NotionPageOptions", "NotionDatabaseOptions"],
 ]);
 
-/** What the contract declares and the generated SDK doesn't have yet, each with the issue that tracks it. */
+/** Value types the SDK has once per channel: each channel's is compared with the contract's. */
+const PER_CHANNEL = Object.fromEntries(
+  ["ApiCall", "Transcript", "TranscriptEntry"].map((name) => [name, ["Slack", "GitHub", "Linear", "Notion"]]),
+);
+
+/** What the contract declares and nothing implements yet, each with the issue that tracks it. */
 const KNOWN_GAPS: Readonly<Record<string, string>> = {
   ...Object.fromEntries(
     [
@@ -94,6 +100,23 @@ const KNOWN_GAPS: Readonly<Record<string, string>> = {
       "#36",
     ]),
   ),
+  ...Object.fromEntries(
+    ["SlackConversation", "GitHubRepo", "LinearTeam", "NotionPage", "NotionDatabase"].map((type) => [
+      `${type}.[Symbol.asyncDispose]`,
+      "#36",
+    ]),
+  ),
+  ...Object.fromEntries(["Slack", "GitHub", "Linear", "Notion"].map((channel) => [`${channel}ApiCall.app`, "#40"])),
+  ...Object.fromEntries(
+    ["GitHub", "Linear", "Notion"].flatMap((channel) => [
+      [`${channel}TranscriptEntry.streaming`, "#40"],
+      [`${channel}TranscriptEntry.visibleTo`, "#40"],
+    ]),
+  ),
+  "ChannelstackFixture.deliveries": "#40",
+  "ChannelstackFixture.calls": "#40",
+  "ChannelstackIntegrationOptions.channels": "#40",
+  "ChannelstackIntegrationOptions.config": "#10",
   "SlackUser.renameChannel": "#37",
   "SlackUser.archiveChannel": "#37",
   SlackChannel: "#37",
@@ -102,61 +125,25 @@ const KNOWN_GAPS: Readonly<Record<string, string>> = {
   SlackInjectedFault: "#37",
 };
 
-/** Each contract handle's members against the generated handle's: what is missing, or not a method where it should be. */
-function memberGaps(): string[] {
-  const contractEntry = join(ROOT, "api", "index.d.ts");
-  const sdkEntry = join(ROOT, "sdks", "typescript", "client.ts");
-  const both = ts.createProgram([contractEntry, sdkEntry], { ...options, noEmit: true });
-  const checker = both.getTypeChecker();
-  const exported = (file: string) => {
-    const source = both.getSourceFile(file);
-    const module = source && checker.getSymbolAtLocation(source);
-    if (!module) throw new Error(`Can't read the exports of ${file}`);
-    return new Map(
-      checker
-        .getExportsOfModule(module)
-        .map((symbol) => [
-          symbol.name,
-          symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol,
-        ]),
-    );
-  };
-  const callable = (symbol: ts.Symbol) =>
-    checker.getNonNullableType(checker.getTypeOfSymbol(symbol)).getCallSignatures().length > 0;
-  const sdk = exported(sdkEntry);
-  const gaps: string[] = [];
-  for (const [name, symbol] of exported(contractEntry)) {
-    if (!(symbol.flags & ts.SymbolFlags.Interface) || NOT_HANDLES.has(name)) continue;
-    const generated = sdk.get(name);
-    if (!generated || !(generated.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface))) {
-      gaps.push(name);
-      continue;
-    }
-    const contractType = checker.getDeclaredTypeOfSymbol(symbol);
-    const generatedType = checker.getDeclaredTypeOfSymbol(generated);
-    for (const member of checker.getPropertiesOfType(contractType)) {
-      // `[Symbol.asyncDispose]` and the like: generated from the routes marked `dispose`.
-      if (member.name.startsWith("__@")) continue;
-      const counterpart = checker.getPropertyOfType(generatedType, member.name);
-      if (!counterpart) gaps.push(`${name}.${member.name}`);
-      else if (callable(member) !== callable(counterpart)) gaps.push(`${name}.${member.name} (method vs property)`);
-    }
-  }
-  return gaps;
-}
-
-const gaps = memberGaps();
-const unknown = gaps.filter((gap) => !(gap in KNOWN_GAPS));
-const closed = Object.keys(KNOWN_GAPS).filter((gap) => !gaps.includes(gap));
-console.log(`api:check: ${gaps.length} contract members or handles not generated yet, each tracked (KNOWN_GAPS)`);
-if (unknown.length > 0) {
+const contract = checkContract({
+  contract: join(ROOT, "api", "index.d.ts"),
+  implementations: [join(ROOT, "sdks", "typescript", "client.ts"), join(ROOT, "integrations", "vitest", "index.ts")],
+  notImplemented: NOT_HANDLES,
+  perChannel: PER_CHANNEL,
+  known: KNOWN_GAPS,
+  options,
+});
+console.log(
+  `api:check: ${contract.gaps.length} contract members or types not implemented yet, each tracked (KNOWN_GAPS)`,
+);
+if (contract.untracked.length > 0) {
   blocking.push(
-    `the generated SDK doesn't have what the contract declares (fix it, or list it in KNOWN_GAPS with its issue):\n${unknown.map((gap) => `      ${gap}`).join("\n")}`,
+    `the generated SDK doesn't have what the contract declares (fix it, or list it in KNOWN_GAPS with its issue):\n${contract.untracked.map((gap) => `      ${gap}`).join("\n")}`,
   );
 }
-if (closed.length > 0) {
+if (contract.closed.length > 0) {
   blocking.push(
-    `KNOWN_GAPS lists what the generated SDK now has; remove it:\n${closed.map((gap) => `      ${gap}`).join("\n")}`,
+    `KNOWN_GAPS lists what the generated SDK now has; remove it:\n${contract.closed.map((gap) => `      ${gap}`).join("\n")}`,
   );
 }
 
@@ -171,5 +158,5 @@ if (blocking.length > 0) {
   process.exit(1);
 }
 console.log(
-  "api:check: every enabled example type-checks against the generated SDK, and every other contract member is generated",
+  "api:check: every enabled example type-checks against the generated SDK, and every contract member is implemented or tracked",
 );
