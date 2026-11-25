@@ -126,7 +126,11 @@ export function resendStub(): ResendStub {
       }
       const reached = (email: Email) => email.to.some((to) => to.endsWith(`@${by.domain}`));
       if (path === "/emails/receiving")
-        return json({ object: "list", has_more: false, data: sent.filter(reached).map(({ id }) => ({ id })) });
+        return json({
+          object: "list",
+          has_more: false,
+          data: sent.filter(reached).map(({ id, at }) => ({ id, created_at: at })),
+        });
       const received = /^\/emails\/receiving\/([^/]+)$/.exec(path);
       const email = received && sent.find((each) => each.id === received[1] && reached(each));
       if (!email) return json({ statusCode: 404, name: "not_found", message: "Email not found" }, 404);

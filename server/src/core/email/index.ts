@@ -40,6 +40,13 @@ export function formatMailbox(mailbox: Mailbox): string {
 /** The domain an address is at: `example.com`. */
 export const domainOf = (address: string): string => address.slice(address.lastIndexOf("@") + 1).toLowerCase();
 
+/** The local part a person's address gets from their name: `Ana María` → `ana.mar.a`, `person` if nothing is left. */
+export const localPartOf = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.|\.$/g, "") || "person";
+
 /** A `Message-ID`, made at the sending domain the way mail servers make them: `<random@domain>`. */
 export const messageId = (local: string, domain: string): string => `<${local}@${domain}>`;
 

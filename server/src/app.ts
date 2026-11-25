@@ -286,7 +286,7 @@ export function createApp(options: AppOptions): App {
     // A message or its data can quote what the caller sent, so both are scrubbed on the way out.
     if (error instanceof ProtocolError) {
       const { error: code, message, data } = error.toBody();
-      return c.json({ error: code, message: redactor.text(message), data: redactor.tokens(data) }, error.status as 400);
+      return c.json({ error: code, message: redactor.text(message), data: redactor.data(data) }, error.status as 400);
     }
     // Hono refuses a body it can't parse before validation runs.
     if (error instanceof HTTPException && error.status === 400) {

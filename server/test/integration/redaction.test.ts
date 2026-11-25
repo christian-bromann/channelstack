@@ -78,6 +78,12 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
     });
   }
 
+  // A Resend person's id is their address: errors that name one must not show it, encoded or not.
+  const resend = `/sessions/${sessionId}/resend`;
+  note(await control("POST", `${resend}/users`, { name: "Ana", address: email }));
+  note(await control("POST", `${resend}/users`, { name: "Ana again", address: email }));
+  note(await control("GET", `${resend}/users/${encodeURIComponent(`nobody.${email}`)}/inbox`));
+
   // Let every delivery attempt finish, so its outcome is in the log too.
   await expect
     .poll(
@@ -104,7 +110,7 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
   await server.stop();
   const logs = server.output();
 
-  expect(errors.length).toBeGreaterThanOrEqual(secrets.length * 5);
+  expect(errors.length).toBeGreaterThanOrEqual(secrets.length * 5 + 2);
   expect(logs).toContain('"message":"request"');
   expect(logs).toContain('"message":"delivery attempt"');
   expect(events).toContain("[redacted]");
@@ -119,4 +125,5 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
   // Emails are scrubbed from logs and errors. The event log keeps message content, which is what tests read.
   expect(logs).not.toContain(email);
   expect(JSON.stringify(errors)).not.toContain(email);
+  expect(JSON.stringify(errors)).not.toContain(encodeURIComponent(email));
 });

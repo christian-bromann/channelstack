@@ -31,12 +31,12 @@ export class Redactor {
    * value. Everything else is kept as it was said, because the event log is what tests read.
    */
   tokens<T>(value: T): T {
-    if (typeof value === "string") return this.#tokensIn(value) as T;
-    if (Array.isArray(value)) return value.map((item) => this.tokens(item)) as T;
-    if (typeof value === "object" && value !== null) {
-      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, this.tokens(item)])) as T;
-    }
-    return value;
+    return eachString(value, (text) => this.#tokensIn(text));
+  }
+
+  /** For error data, which can quote ids and addresses: `text` on every string of a JSON value. */
+  data<T>(value: T): T {
+    return eachString(value, (text) => this.text(text));
   }
 
   #tokensIn(input: string): string {
@@ -45,4 +45,14 @@ export class Redactor {
     for (const pattern of this.#patterns) out = out.replace(pattern, REDACTED);
     return out;
   }
+}
+
+/** `value` with `scrub` applied to each string in it. */
+function eachString<T>(value: T, scrub: (text: string) => string): T {
+  if (typeof value === "string") return scrub(value) as T;
+  if (Array.isArray(value)) return value.map((item) => eachString(item, scrub)) as T;
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, eachString(item, scrub)])) as T;
+  }
+  return value;
 }

@@ -1,3 +1,4 @@
+import { domainOf } from "../../../core/email/index.ts";
 import { liveMisconfigured } from "../../../core/reality/index.ts";
 import type { Allowlist } from "../../../core/safety/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
@@ -30,7 +31,7 @@ export function checkResendCredential(
   identity: ResendIdentity,
   expected: { who: string; allowlist: Allowlist; address?: string | undefined },
 ): string {
-  const domain = expected.address?.slice(expected.address.lastIndexOf("@") + 1).toLowerCase();
+  const domain = expected.address === undefined ? undefined : domainOf(expected.address);
   const found = domain === undefined ? identity.domains[0] : identity.domains.find((each) => each.name === domain);
   if (!found) {
     throw liveMisconfigured(

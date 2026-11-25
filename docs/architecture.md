@@ -80,7 +80,7 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | Tokens | `lin_oauth_…`, `lin_api_…` |
 | Notion | Every object | UUIDs (v4), dashed in the API and as 32 hex characters in URLs |
 | | Tokens | `ntn_…` |
-| Resend | Email, domain, webhook | UUIDs (v4). A webhook message is Svix's `msg_` and 27 base-62 characters (`svix-id`); a `Message-ID` is `<24 lowercase characters@domain>` |
+| Resend | Email, domain, webhook | UUIDs (v4). A webhook message is Svix's `msg_` and 27 base-62 characters (`svix-id`); a `Message-ID` is Amazon SES's, as Resend sends through it: `<0100019a` and 8 hex characters, `-`, a UUID, `-000000@email.amazonses.com>` |
 | | People | A person is their mailbox: their id is their address |
 | | Tokens | `re_<8>_<24>` API keys, `whsec_…` webhook secrets (base64 of 24 bytes) |
 

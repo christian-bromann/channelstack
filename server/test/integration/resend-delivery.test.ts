@@ -108,8 +108,13 @@ describe("the fake signs like Resend", () => {
     await act(`/deliveries/${delivery.id}/redeliver`);
     const retried = (await settled(delivery.id)).attempts.at(-1);
     expect(retried).toMatchObject({ forgedSignature: false, responseStatus: 200 });
-    // The same message id on every attempt: what a receiver deduplicates by.
-    expect(new Set(arrived.filter((entry) => entry.id === delivery.id).map((entry) => entry.id)).size).toBe(1);
+    // Every attempt (the first, the stale copy, the retry) carries the same message id, what a
+    // receiver deduplicates by; the retry is signed again, at its own time.
+    const attempts = arrived.filter((entry) => entry.id === delivery.id);
+    expect(attempts.length).toBeGreaterThanOrEqual(3);
+    const [stale, again] = attempts.slice(-2) as [(typeof attempts)[0], (typeof attempts)[0]];
+    expect(Number(again.timestamp)).toBeGreaterThan(Number(stale.timestamp));
+    expect(again.signature).not.toBe(stale.signature);
   });
 
   test("the receiving API answers what Resend's description says", async () => {

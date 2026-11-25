@@ -38,20 +38,39 @@ describe("exit check 8.7: Resend live", () => {
     expect(stub.calls.map((call) => call.path)).toEqual(["/domains"]);
   });
 
-  test("an address outside the allowlist is refused before Resend is asked to send", async () => {
+  test("a person whose team's domain is outside the allowlist is refused, and nothing is sent", async () => {
     const stub = resendStub();
-    const ana = stub.team("ana", "people.example.org");
     const resend = await liveResend(stub, "agent.example.org,people.example.org").open();
-    const person = (await resend("POST", "/users", { name: "Ana", token: ana.key })).body;
-    const outsider = (await resend("POST", "/users", { name: "Eve", token: stub.team("eve", "elsewhere.example").key }))
-      .body;
-    expect(outsider.error).toBe("live_not_allowlisted");
-    const sent = await resend("POST", `/users/${encodeURIComponent(person.id)}/send`, {
-      to: [outsider.id ?? "eve@elsewhere.example"],
-      subject: "Hi",
-      text: "hello",
-    });
-    expect(sent.body.error).toBeDefined();
+    const eve = stub.team("eve", "elsewhere.example");
+    const outsider = await resend("POST", "/users", { name: "Eve", token: eve.key });
+    expect(outsider.body.error).toBe("live_not_allowlisted");
+    expect(outsider.body.message).toContain("elsewhere.example");
+    // Only who the keys are was asked: no email went out.
+    expect(stub.calls.filter((call) => call.path !== "/domains")).toEqual([]);
+    expect(stub.sent).toEqual([]);
+  });
+
+  test("an agent address outside the allowlist is refused before anything is sent", async () => {
+    const stub = resendStub();
+    const server = harness(
+      {},
+      {
+        live: {
+          env: {
+            CHANNELSTACK_RESEND_API_KEY: stub.agent.key,
+            CHANNELSTACK_RESEND_ADDRESS: "my-agent@elsewhere.example",
+            CHANNELSTACK_LIVE_RESEND_DOMAINS: "agent.example.org",
+            CHANNELSTACK_RUN_ID: "unit8",
+          },
+          fetch: stub.fetch,
+          apiBase: { resend: stub.url },
+        },
+      },
+    );
+    const { body } = await server.call("POST", "/sessions", {});
+    const fixture = await server.call("GET", `/sessions/${body.sessionId}/resend`);
+    // The team hasn't verified that domain, and it isn't allowlisted: either way, nothing is sent.
+    expect(fixture.body.error).toBe("live_misconfigured");
     expect(stub.sent).toEqual([]);
   });
 
@@ -81,6 +100,24 @@ describe("exit check 8.7: Resend live", () => {
     expect(replies).toMatchObject([{ author: { name: "my-agent", kind: "app" }, text: "Your refund was sent today." }]);
     // What a person does live is the platform's to deliver: channelstack's deliveries are the fake's.
     expect((await resend("GET", "/deliveries")).body.error).toBe("unsupported_in_live");
+  });
+
+  test("mail in a person's inbox from before the session is neither read again nor shown", async () => {
+    const stub = resendStub();
+    const ana = stub.team("ana", "people.example.org");
+    // An answer an earlier run left in Ana's inbox, an hour ago.
+    stub.agentReplies(
+      { from: "ana@people.example.org", subject: "Old", messageId: "<old@people.example.org>" } as never,
+      "Old answer.",
+    );
+    const old = stub.sent[0] as NonNullable<(typeof stub.sent)[0]>;
+    old.at = new Date(Date.now() - 3_600_000).toISOString();
+    const resend = await liveResend(stub, "agent.example.org,people.example.org").open();
+    await resend("GET", "");
+    const person = (await resend("POST", "/users", { name: "Ana", token: ana.key })).body;
+    const inbox = (await resend("GET", `/users/${encodeURIComponent(person.id)}/inbox`)).body;
+    expect(inbox).toEqual([]);
+    expect(stub.calls.map((call) => call.path)).not.toContain(`/emails/receiving/${old.id}`);
   });
 
   test("doctor names each team and its domain; a team outside the allowlist fails", async () => {

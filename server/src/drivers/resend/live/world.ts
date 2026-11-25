@@ -2,6 +2,7 @@ import type { Clock } from "../../../core/clock/index.ts";
 import {
   domainOf,
   formatMailbox,
+  localPartOf,
   type Mailbox,
   messageIdsIn,
   parseAddresses,
@@ -22,6 +23,8 @@ import { checkResendCredential, identifyResend } from "./identity.ts";
 
 /** Reading the people's mail again more often than this is a waste: the agent takes seconds to answer. */
 const READ_CACHE_MS = 1_000;
+/** How far Resend's clock may be from ours. */
+const CLOCK_SKEW_MS = 5_000;
 
 interface WireReceived {
   id: string;
@@ -54,6 +57,11 @@ export function createLiveResendWorld(deps: {
   const people = new LivePeople();
   const read = new Map<string, number>();
   /**
+   * When each session's first person joined: older mail in their inboxes is an earlier run's, so it
+   * is neither read again nor shown. A few seconds early, for the clocks' difference with Resend's.
+   */
+  const since = new Map<string, number>();
+  /**
    * What people sent whose `Message-ID` Resend hadn't given yet: it assigns one once the email is
    * on its way, and an answer names it in `In-Reply-To`. By the email's id, with whose key sent it.
    */
@@ -73,7 +81,11 @@ export function createLiveResendWorld(deps: {
   };
   let app: LiveCredential | undefined;
 
-  /** Everyone an email goes to must be at an allowlisted domain (or a Resend test address): sent mail can't be taken back. */
+  /**
+   * Everyone an email goes to must be at an allowlisted domain (or a Resend test address): sent mail
+   * can't be taken back. A second guard: the people and the agent were checked when they joined, and
+   * this catches an address a test names by hand.
+   */
   const allowed = (mailboxes: readonly Mailbox[]) => {
     for (const { address } of mailboxes) {
       if (domainOf(address) !== "resend.dev") live.allowlist.assert(domainOf(address), `the address ${address}`);
@@ -183,15 +195,11 @@ export function createLiveResendWorld(deps: {
         allowlist: live.allowlist,
         address: input.address,
       });
-      const local =
-        input.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, ".")
-          .replace(/^\.|\.$/g, "") || "person";
-      const address = input.address?.toLowerCase() ?? `${local}@${domain}`;
+      const address = input.address?.toLowerCase() ?? `${localPartOf(input.name)}@${domain}`;
       if (address === store.app.address) {
         throw new ProtocolError("invalid_argument", `${address} is the agent's address`);
       }
+      if (!since.has(session)) since.set(session, clock() - CLOCK_SKEW_MS);
       people.join(session, address, input.name, credential);
       return store.users.add(address, { id: address, name: input.name, address, fixedId: false }, session);
     },
@@ -222,13 +230,14 @@ export function createLiveResendWorld(deps: {
         store.emails.add(id, { ...record, messageId }, session);
       }
       for (const { id: address, credential } of people.of(session)) {
-        const list = await client.call<{ data: Array<{ id: string }> }>(
+        const list = await client.call<{ data: Array<{ id: string; created_at?: string }> }>(
           credential,
           "GET",
           `/emails/receiving?to=${encodeURIComponent(address)}&limit=100`,
         );
-        for (const { id } of list.data) {
+        for (const { id, created_at } of list.data) {
           if (store.emails.find(id)) continue;
+          if (created_at !== undefined && Date.parse(created_at) < (since.get(session) ?? 0)) continue;
           const email = await client.call<WireReceived>(credential, "GET", `/emails/receiving/${id}`);
           const [from] = parseAddresses(email.from);
           if (!from) continue;
@@ -263,6 +272,8 @@ export function createLiveResendWorld(deps: {
     release(session) {
       people.leave(session);
       read.delete(session);
+      since.delete(session);
+      for (const id of unnamed.keys()) if (store.emails.owner(id) === session) unnamed.delete(id);
       store.users.release(session);
       store.emails.release(session);
       store.threads.release(session);

@@ -45,7 +45,9 @@ export class ResendRestClient {
       if (!response.ok) {
         const name = typeof answer?.name === "string" ? answer.name : `http_${response.status}`;
         const said = typeof answer?.message === "string" ? answer.message : `HTTP ${response.status}`;
-        throw new ResendRefusal(name, `Resend refused ${method} ${path.split("?")[0]}: ${said}`, { path });
+        // The path without its query: a query names addresses (`?to=`).
+        const where = path.split("?")[0];
+        throw new ResendRefusal(name, `Resend refused ${method} ${where}: ${said}`, { path: where });
       }
       return answer as T;
     }
