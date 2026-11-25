@@ -87,7 +87,13 @@ describe("chat", () => {
     expect(reply.message.thread_ts).toBe(question.ts);
     // What real Slack adds to a message the app posts (#30): its bot's profile, a rich_text block of
     // its text, and in a thread, who wrote the message the thread starts with.
-    expect(top.message.bot_profile).toMatchObject({ id: app.botId, app_id: app.id, name: "my-agent", deleted: false });
+    expect(top.message.bot_profile).toMatchObject({
+      id: app.botId,
+      app_id: app.id,
+      user_id: app.botUserId,
+      name: "my-agent",
+      deleted: false,
+    });
     expect(top.message.bot_profile.updated).toEqual(expect.any(Number));
     expect(top.message.blocks).toEqual([
       {

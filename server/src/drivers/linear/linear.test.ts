@@ -150,7 +150,12 @@ describe("agent sessions", () => {
     expect(reply.session?.id).toBe(comment.session.id);
     const prompted = webhooks().filter((hook) => hook.payload.action === "prompted");
     expect(prompted.at(-1)?.payload).toMatchObject({
-      agentActivity: { content: { type: "prompt", body: "and the docs too" }, sourceCommentId: reply.id },
+      // Real Linear sends a prompt's signalMetadata as null rather than leaving it out.
+      agentActivity: {
+        content: { type: "prompt", body: "and the docs too" },
+        sourceCommentId: reply.id,
+        signalMetadata: null,
+      },
     });
     // The new turn waits for the agent again.
     expect(await get(`/agent-sessions/${comment.session.id}/state`)).toBe("pending");

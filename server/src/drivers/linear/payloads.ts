@@ -156,7 +156,7 @@ export function linearPayloads(lookups: LinearLookups) {
     archivedAt: null,
     content: record.content,
     signal: record.signal,
-    ...(record.signalMetadata ? { signalMetadata: record.signalMetadata } : {}),
+    signalMetadata: record.signalMetadata,
     sourceCommentId: record.sourceComment,
     userId: record.user,
     user: userChild(lookups.user(record.user)),
