@@ -18,7 +18,7 @@
 ---
 
 > [!NOTE]
-> channelstack is under construction and not on npm yet. The server spine and the SDK generator are built; the fake platforms are not. This page describes how it will work. See [Status](#status).
+> channelstack is under construction and not on npm yet. See [Status](#status).
 
 channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. Tests script the people, your agent answers through its real code path, and you assert on the conversation a person would see:
 
@@ -78,7 +78,7 @@ Once the first release is out:
 
 ```bash
 npm i -D channelstack
-npx channelstack                          # first run: starts the local proxy, trusts its CA, writes channelstack.config.ts
+CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &   # the fakes, each with an app named my-agent
 npx channelstack env >> .env.local        # tokens and URLs for your agent
 portless run my-agent pnpm dev            # your usual start command, reachable at https://my-agent.localhost
 ```
@@ -93,11 +93,11 @@ import channelstack from "channelstack/vitest";
 export default defineConfig({ plugins: [channelstack()] });
 ```
 
-[docs/devx.md](docs/devx.md) covers the CLI, the config file, Vitest and pytest, proxy mode and CI.
+There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
 
 ## Status
 
-Under construction, phase by phase. Phase 0 (the server spine, the SDK generator, packaging) is merged ([#3](https://github.com/christian-bromann/channelstack/pull/3), tag `phase-0-done`); the Slack fake is next. [docs/phases.md](docs/phases.md) has the plan and the check that proves each phase is done.
+Under construction, phase by phase. Phases 0 to 7 are merged: the server and the SDK generator, the Slack, GitHub, Linear and Notion fakes, live mode, proxy mode and conformance, and the TypeScript, Python and Rust SDKs with the Vitest and pytest integrations and MCP. [docs/phases.md](docs/phases.md) has each phase and the check that proves it is done.
 
 ## In this repository
 
