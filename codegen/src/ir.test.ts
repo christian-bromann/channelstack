@@ -259,8 +259,34 @@ describe("emitters", () => {
   });
 
   test("Docs: each call in every SDK's language, its parameters, and the error codes explained", () => {
+    const base = spec({
+      schemas: {
+        EchoRoom: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+          "x-channelstack-resource": { id: "id" },
+        },
+      },
+    });
     const documented = buildIr({
-      ...spec(),
+      ...base,
+      paths: {
+        ...base.paths,
+        // Echo is channelstack's own test platform: a code only it raises isn't documented.
+        "/sessions/{session}/rooms/{room}": {
+          post: {
+            summary: "Join a room",
+            parameters: [
+              { name: "session", in: "path", required: true, schema: { type: "string" } },
+              { name: "room", in: "path", required: true, schema: { type: "string" } },
+            ],
+            responses: { 200: json(ref("EchoRoom")) },
+            "x-channelstack-method": { on: "EchoRoom", name: "join" },
+            "x-channelstack-error-codes": ["not_in_room"],
+          },
+        },
+      },
       "x-channelstack-errors": { not_found: { status: 404, description: "It isn't there." } },
     });
     const pages = emitDocs(documented);
@@ -284,6 +310,12 @@ describe("emitters", () => {
     const errors = pages.get("website/docs/reference/api/errors.mdx") ?? "";
     expect(errors).toContain("### not_found\n\nHTTP 404. It isn't there.");
     expect(errors).toContain("SDK class: `NotFoundError`");
+    expect(errors).toContain("Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_FOUND`.");
+    expect(errors).toContain(
+      "### unauthorized\n\nThe fakes refuse with it where the platform refuses the same request.",
+    );
+    expect(documented.errors).toContain("not_in_room");
+    expect(errors).not.toContain("not_in_room");
   });
 });
 

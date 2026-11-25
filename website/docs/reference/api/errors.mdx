@@ -8,7 +8,7 @@ description: "Every error code the control API returns: channelstack's own, and 
 
 # Errors
 
-A refused call raises an error with a stable `code`, the HTTP status, a message and sometimes `data`. Each SDK has one class per code, so a test can catch exactly the refusal it expects. channelstack's own codes are below; after them, the codes the fakes refuse with, which are each platform's own, sent where the real platform sends them.
+A refused call raises an error with a stable `code`, the HTTP status, a message and sometimes `data`. TypeScript and Python have one class per code, so a test can catch exactly the refusal it expects. In Rust a refusal is `Error::Api { code, status, message, data }`, and `channelstack::codes` has each code as a constant to compare `code` with. channelstack's own codes are below; after them, the codes the fakes refuse with where the real platform refuses the same request.
 
 ## channelstack's codes
 
@@ -16,7 +16,7 @@ A refused call raises an error with a stable `code`, the HTTP status, a message 
 
 HTTP 422. A live action needs a piece this run doesn't have: the browser actor, or proxy mode. A test is skipped for it.
 
-SDK class: `ActionRequiresError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `ActionRequiresError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ACTION_REQUIRES`.
 
 Most methods can return it.
 
@@ -24,7 +24,7 @@ Most methods can return it.
 
 HTTP 400. A person's token belongs to a different workspace than the app's.
 
-SDK class: `CrossWorkspaceCredentialError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `CrossWorkspaceCredentialError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CROSS_WORKSPACE_CREDENTIAL`.
 
 Most methods can return it.
 
@@ -32,7 +32,7 @@ Most methods can return it.
 
 HTTP 409. A fake person acts in a live workspace.
 
-SDK class: `FakeActorInLiveWorldError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `FakeActorInLiveWorldError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::FAKE_ACTOR_IN_LIVE_WORLD`.
 
 Most methods can return it.
 
@@ -40,7 +40,7 @@ Most methods can return it.
 
 HTTP 500. Something failed inside channelstack. The message says what.
 
-SDK class: `InternalError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `InternalError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INTERNAL`.
 
 Most methods can return it.
 
@@ -48,7 +48,7 @@ Most methods can return it.
 
 HTTP 400. An argument is missing, or has the wrong type or shape.
 
-SDK class: `InvalidArgumentError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `InvalidArgumentError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INVALID_ARGUMENT`.
 
 Most methods can return it.
 
@@ -56,7 +56,7 @@ Most methods can return it.
 
 HTTP 412. Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person without a token under `CHANNELSTACK_REALITY=live`. A test fails for it, so a broken nightly run goes red.
 
-SDK class: `LiveMisconfiguredError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `LiveMisconfiguredError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::LIVE_MISCONFIGURED`.
 
 Most methods can return it.
 
@@ -64,7 +64,7 @@ Most methods can return it.
 
 HTTP 403. The live workspace, org or team isn't in its `CHANNELSTACK_LIVE_*` allowlist. Nothing was done there.
 
-SDK class: `LiveNotAllowlistedError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `LiveNotAllowlistedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::LIVE_NOT_ALLOWLISTED`.
 
 Most methods can return it.
 
@@ -72,7 +72,7 @@ Most methods can return it.
 
 HTTP 404. The handle isn't there: it was removed, or belongs to another session.
 
-SDK class: `NotFoundError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `NotFoundError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_FOUND`.
 
 Most methods can return it.
 
@@ -80,7 +80,7 @@ Most methods can return it.
 
 HTTP 404. The session was closed, or never existed.
 
-SDK class: `SessionNotFoundError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `SessionNotFoundError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::SESSION_NOT_FOUND`.
 
 Most methods can return it.
 
@@ -88,7 +88,7 @@ Most methods can return it.
 
 HTTP 401. The request has no valid bearer token: the one in `server.json`, or `CHANNELSTACK_TOKEN`.
 
-SDK class: `UnauthorizedError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `UnauthorizedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::UNAUTHORIZED`.
 
 Most methods can return it.
 
@@ -96,7 +96,7 @@ Most methods can return it.
 
 HTTP 501. The operation isn't built in the fake yet.
 
-SDK class: `UnsupportedInFakeError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `UnsupportedInFakeError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::UNSUPPORTED_IN_FAKE`.
 
 Raised by [`SlackFixture.createChannel()`](/docs/reference/api/slack#createchannel).
 
@@ -104,152 +104,146 @@ Raised by [`SlackFixture.createChannel()`](/docs/reference/api/slack#createchann
 
 HTTP 501. The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. A test is skipped for it.
 
-SDK class: `UnsupportedInLiveError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `UnsupportedInLiveError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::UNSUPPORTED_IN_LIVE`.
 
 Most methods can return it.
 
 ## Platform codes
 
-The fakes refuse what the real platform refuses, with the platform's own code.
+The fakes refuse what the real platform refuses. Where the platform has its own error code, such as Slack's `not_in_channel`, the fake refuses with it. Where the platform answers with an HTTP status and no code of its own, such as GitHub's 403 and 422, the code is channelstack's name for the refusal (`forbidden`, `validation_failed`).
 
 ### account_inactive
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `AccountInactiveError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `AccountInactiveError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ACCOUNT_INACTIVE`.
 
 Raised by [`SlackFixture.createUser()`](/docs/reference/api/slack#createuser), [`SlackFixture.uninstallApp()`](/docs/reference/api/slack#uninstallapp).
 
 ### already_in_channel
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `AlreadyInChannelError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `AlreadyInChannelError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ALREADY_IN_CHANNEL`.
 
 Raised by [`SlackUser.invite()`](/docs/reference/api/slack#invite).
 
 ### already_reacted
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `AlreadyReactedError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `AlreadyReactedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ALREADY_REACTED`.
 
 Raised by [`SlackUser.react()`](/docs/reference/api/slack#react).
 
 ### cant_delete_message
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `CantDeleteMessageError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `CantDeleteMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANT_DELETE_MESSAGE`.
 
 Raised by [`SlackUser.delete()`](/docs/reference/api/slack#delete).
 
 ### cant_update_message
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `CantUpdateMessageError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `CantUpdateMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANT_UPDATE_MESSAGE`.
 
 Raised by [`SlackUser.edit()`](/docs/reference/api/slack#edit).
 
 ### dispatch_failed
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `DispatchFailedError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `DispatchFailedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::DISPATCH_FAILED`.
 
 Raised by [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), [`SlackModal.submit()`](/docs/reference/api/slack#submit), [`SlackModal.close()`](/docs/reference/api/slack#close).
 
 ### forbidden
 
-GitHub and Linear and Notion's own code: the fake sends it where GitHub and Linear and Notion would.
+The GitHub, Linear and Notion fakes refuse with it where the platform refuses the same request.
 
-SDK class: `ForbiddenError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `ForbiddenError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::FORBIDDEN`.
 
 Raised by [`GitHubUser.push()`](/docs/reference/api/github#push), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.editIssue()`](/docs/reference/api/github#editissue), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.label()`](/docs/reference/api/github#label), [`GitHubUser.unlabel()`](/docs/reference/api/github#unlabel), [`GitHubUser.assign()`](/docs/reference/api/github#assign), [`GitHubUser.comment()`](/docs/reference/api/github#comment), [`GitHubUser.edit()`](/docs/reference/api/github#edit), [`GitHubUser.delete()`](/docs/reference/api/github#delete), and 29 more.
 
 ### invalid_auth
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `InvalidAuthError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `InvalidAuthError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INVALID_AUTH`.
 
 Raised by [`SlackFixture.createUser()`](/docs/reference/api/slack#createuser).
 
 ### msg_too_long
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `MsgTooLongError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `MsgTooLongError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MSG_TOO_LONG`.
 
 Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply).
 
 ### name_taken
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `NameTakenError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `NameTakenError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NAME_TAKEN`.
 
 Raised by [`SlackFixture.createChannel()`](/docs/reference/api/slack#createchannel).
 
 ### no_reaction
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `NoReactionError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `NoReactionError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NO_REACTION`.
 
 Raised by [`SlackUser.unreact()`](/docs/reference/api/slack#unreact).
 
 ### no_text
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `NoTextError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `NoTextError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NO_TEXT`.
 
 Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit).
 
 ### not_allowed
 
-GitHub's own code: the fake sends it where GitHub would.
+The GitHub fake refuses with it where the platform refuses the same request.
 
-SDK class: `NotAllowedError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `NotAllowedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_ALLOWED`.
 
 Raised by [`GitHubUser.merge()`](/docs/reference/api/github#merge).
 
 ### not_in_channel
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `NotInChannelError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `NotInChannelError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_IN_CHANNEL`.
 
 Raised by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.delete()`](/docs/reference/api/slack#delete), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), [`SlackUser.stop()`](/docs/reference/api/slack#stop), [`SlackUser.pickPrompt()`](/docs/reference/api/slack#pickprompt), [`SlackUser.switchContext()`](/docs/reference/api/slack#switchcontext), [`SlackUser.react()`](/docs/reference/api/slack#react), and 3 more.
 
-### not_in_room
-
-A platform's own code.
-
-SDK class: `NotInRoomError` in TypeScript and Python, a subclass of `ChannelstackError`.
-
 ### split_view_unavailable
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `SplitViewUnavailableError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `SplitViewUnavailableError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::SPLIT_VIEW_UNAVAILABLE`.
 
 Raised by [`SlackUser.openAgentThread()`](/docs/reference/api/slack#openagentthread), [`SlackUser.switchContext()`](/docs/reference/api/slack#switchcontext).
 
 ### stop_unavailable
 
-Slack's own code: the fake sends it where Slack would.
+The Slack fake refuses with it where the platform refuses the same request.
 
-SDK class: `StopUnavailableError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `StopUnavailableError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::STOP_UNAVAILABLE`.
 
 Raised by [`SlackUser.stop()`](/docs/reference/api/slack#stop).
 
 ### validation_failed
 
-GitHub's own code: the fake sends it where GitHub would.
+The GitHub fake refuses with it where the platform refuses the same request.
 
-SDK class: `ValidationFailedError` in TypeScript and Python, a subclass of `ChannelstackError`.
+SDK class: `ValidationFailedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::VALIDATION_FAILED`.
 
 Raised by [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.assign()`](/docs/reference/api/github#assign), [`GitHubUser.review()`](/docs/reference/api/github#review), [`GitHubUser.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubUser.requestReview()`](/docs/reference/api/github#requestreview), [`GitHubUser.markReady()`](/docs/reference/api/github#markready), [`GitHubRepo.installApp()`](/docs/reference/api/github#installapp), [`GitHubRepo.uninstallApp()`](/docs/reference/api/github#uninstallapp).

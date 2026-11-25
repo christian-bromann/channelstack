@@ -8,7 +8,7 @@
 import { headingIds, slugify } from "../../../website/plugins/slug.ts";
 import type { Ir, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
 import { pythonName } from "./python.ts";
-import { rustName } from "./rust.ts";
+import { rustErrorConst, rustName } from "./rust.ts";
 import { BANNER, errorClassName, IrIndex } from "./shared.ts";
 import { typeScriptTypes } from "./typescript.ts";
 
@@ -295,7 +295,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
         ? `Waits for the next ${wait.what.replace(/^an? /, "")} after the last one this handle returned`
         : wait.mode === "latest"
           ? `The latest ${wait.what.replace(/^an? /, "")}, once the agent is quiet. Waits for at least one`
-          : `Waits until ${wait.what}`;
+          : `Waits for ${wait.what}`;
     // A realistic call: who it's from, the filter's first option. The table lists every option.
     const shown: Value[] = fromField ? [{ name: "from", literal: '"my-agent"' }] : [];
     const result = resultName(wait.item, receiver);
@@ -482,9 +482,13 @@ function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: Re
     return target ? `[${shown}](${target})` : shown;
   };
   const own = ir.errors.filter((errorCode) => errorCode in ir.errorDocs);
-  const platforms = ir.errors.filter((errorCode) => !(errorCode in ir.errorDocs));
+  // A platform code that only Echo's resources raise is internal, like Echo.
+  const platforms = ir.errors.filter(
+    (errorCode) =>
+      !(errorCode in ir.errorDocs) && raisedBy(errorCode).some(({ resource }) => !resource.startsWith(INTERNAL)),
+  );
   const classLine = (errorCode: string) =>
-    `SDK class: ${code(errorClassName(errorCode))} in TypeScript and Python, a subclass of ${code("ChannelstackError")}.`;
+    `SDK class: ${code(errorClassName(errorCode))} in TypeScript and Python, a subclass of ${code("ChannelstackError")}. Rust: ${code("Error::Api { code, .. }")} with ${code("code")} equal to ${code(`codes::${rustErrorConst(errorCode)}`)}.`;
   const section = (errorCode: string, lines: string[]) => [`### ${errorCode}`, "", ...lines, ""];
   const where = (errorCode: string) => {
     if (everywhere.has(errorCode)) return "Most methods can return it.";
@@ -501,7 +505,8 @@ function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: Re
         ),
       ),
     );
-    return [...names].join(" and ");
+    const list = [...names];
+    return list.length < 2 ? (list[0] ?? "") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
   };
   return [
     "---",
@@ -514,7 +519,7 @@ function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: Re
     "",
     "# Errors",
     "",
-    "A refused call raises an error with a stable `code`, the HTTP status, a message and sometimes `data`. Each SDK has one class per code, so a test can catch exactly the refusal it expects. channelstack's own codes are below; after them, the codes the fakes refuse with, which are each platform's own, sent where the real platform sends them.",
+    "A refused call raises an error with a stable `code`, the HTTP status, a message and sometimes `data`. TypeScript and Python have one class per code, so a test can catch exactly the refusal it expects. In Rust a refusal is `Error::Api { code, status, message, data }`, and `channelstack::codes` has each code as a constant to compare `code` with. channelstack's own codes are below; after them, the codes the fakes refuse with where the real platform refuses the same request.",
     "",
     "## channelstack's codes",
     "",
@@ -530,12 +535,12 @@ function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: Re
     }),
     "## Platform codes",
     "",
-    "The fakes refuse what the real platform refuses, with the platform's own code.",
+    "The fakes refuse what the real platform refuses. Where the platform has its own error code, such as Slack's `not_in_channel`, the fake refuses with it. Where the platform answers with an HTTP status and no code of its own, such as GitHub's 403 and 422, the code is channelstack's name for the refusal (`forbidden`, `validation_failed`).",
     "",
     ...platforms.flatMap((errorCode) => {
       const platform = platformOf(errorCode);
       return section(errorCode, [
-        platform ? `${platform}'s own code: the fake sends it where ${platform} would.` : "A platform's own code.",
+        `The ${platform ? `${platform} ${platform.includes(" and ") ? "fakes refuse" : "fake refuses"}` : "fakes refuse"} with it where the platform refuses the same request.`,
         "",
         classLine(errorCode),
         "",

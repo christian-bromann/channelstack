@@ -1419,7 +1419,7 @@ let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
 
 ### settled()
 
-Waits until the delivery to settle: it polls `refresh()` and never sleeps longer than it must.
+Waits for the delivery to settle: it polls `refresh()` and never sleeps longer than it must.
 
 <CodeGroup>
 
@@ -1482,7 +1482,7 @@ let updated = stream.refresh().await?;
 
 ### ended()
 
-Waits until the stream to end: it polls `refresh()` and never sleeps longer than it must.
+Waits for the stream to end: it polls `refresh()` and never sleeps longer than it must.
 
 <CodeGroup>
 

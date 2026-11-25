@@ -22,6 +22,11 @@ export function rustName(name: string): string {
 
 const ident = rustName;
 
+/** An error code's constant in the Rust SDK's `codes` module: `not_found` → `NOT_FOUND`. The docs name it with this too. */
+export function rustErrorConst(code: string): string {
+  return code.toUpperCase();
+}
+
 /** `createUser` → `CreateUser`, for builder types. */
 const pascal = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
@@ -567,7 +572,7 @@ export function emitRust(ir: Ir): Map<string, string> {
     "",
     "/// The protocol's error codes, as `Error::Api { code, .. }` carries them.",
     "pub mod codes {",
-    ...ir.errors.map((code) => `    pub const ${code.toUpperCase()}: &str = ${str(code)};`),
+    ...ir.errors.map((code) => `    pub const ${rustErrorConst(code)}: &str = ${str(code)};`),
     "}",
     ...ir.resources.flatMap((resource) =>
       methodsOf(resource)
