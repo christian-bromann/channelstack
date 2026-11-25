@@ -99,20 +99,8 @@ const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
 
 type Cell = [tone: "y" | "n" | "p", text: string];
 const COMPARE: Array<[string, Cell, Cell, Cell, Cell]> = [
-  [
-    "Your code unchanged",
-    ["n", "No"],
-    ["p", "Base URL overrides"],
-    ["y", "Yes"],
-    ["y", "Yes: a base URL, or a proxy"],
-  ],
-  [
-    "Platform calls your app",
-    ["n", "No"],
-    ["p", "Some webhooks"],
-    ["y", "Yes"],
-    ["y", "Signed, retried, replayable"],
-  ],
+  ["Your code unchanged", ["n", "No"], ["p", "Base URL overrides"], ["y", "Yes"], ["y", "Yes: a base URL, or a proxy"]],
+  ["Platform calls your app", ["n", "No"], ["p", "Some webhooks"], ["y", "Yes"], ["y", "Signed, retried, replayable"]],
   ["Scripted people", ["n", "No"], ["n", "No"], ["p", "Manual or second bot"], ["y", "Built in"]],
   ["Payload shapes checked", ["n", "No"], ["n", "No"], ["y", "They’re real"], ["y", "Against provider schemas"]],
   ["Assert on what people see", ["n", "No"], ["n", "Raw state"], ["p", "Screenshots"], ["y", "Rendered transcript"]],
@@ -144,9 +132,9 @@ export default function Home() {
             </h1>
             <p className="lede">
               channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine, for the bots,
-              integrations and AI agents you build on them. Script the people, let your app answer through its real
-              code path, and assert on what a person would see. Signed webhooks, real payload shapes and real ids, with
-              no changes to how your app works.
+              integrations and AI agents you build on them. Script the people, let your app answer through its real code
+              path, and assert on what a person would see. Signed webhooks, real payload shapes and real ids, with no
+              changes to how your app works.
             </p>
             <div className="cta">
               <a className="btn primary" href="#quick-start">
@@ -175,8 +163,8 @@ export default function Home() {
               <p className="kicker">Four platforms, one API</p>
               <h2 id="channels-title">Everywhere your app gets an event.</h2>
               <p className="sec-lede">
-                One package fakes all four, with the people, events and API calls apps actually use. Use one in a
-                test, or several when your app spans them. Discord, Stripe and email come next.
+                One package fakes all four, with the people, events and API calls apps actually use. Use one in a test,
+                or several when your app spans them. Discord, Stripe and email come next.
               </p>
             </div>
             <div className="channels" ref={channels}>
@@ -325,8 +313,8 @@ export default function Home() {
                 <p className="step-n">Step 2</p>
                 <h3>Point your app at it</h3>
                 <p>
-                  Start channelstack with where your app takes events, then start the app the way you always do,
-                  with channelstack’s environment.
+                  Start channelstack with where your app takes events, then start the app the way you always do, with
+                  channelstack’s environment.
                 </p>
                 <div className="snippet">
                   <Terminal
@@ -371,9 +359,9 @@ export default function Home() {
               </div>
             </div>
             <p className="why-name">
-              <strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear,
-              Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the
-              conversation end to end before your users have it.
+              <strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear, Notion.
+              channelstack runs that whole stack on localhost, with the people in it, so you can test the conversation
+              end to end before your users have it.
             </p>
           </div>
           <div className="wrap">
