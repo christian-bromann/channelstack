@@ -9,7 +9,7 @@ description: "Every handle, method and wait of the Slack fake, in every SDK's la
 
 # Slack API
 
-Every handle of the Slack fake: the `slack` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a Slack agent, step by step, is in the [Slack guide](/docs/platforms/slack).
+Every handle of the Slack fake: the `slack` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a Slack app or agent, step by step, is in the [Slack guide](/docs/platforms/slack).
 
 Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object, Python's keyword arguments and Rust's builder setters. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `SlackUser` handle.
 
@@ -193,7 +193,7 @@ let api_calls = slack.calls().operation("…").await?;
 
 **Returns** [`SlackApiCalls`](/docs/reference/api/slack#slackapicalls).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### uninstallApp()
 
@@ -253,7 +253,7 @@ let fault = slack.fault().r#type(r#type).await?;
 
 **Returns** [`SlackFault`](/docs/reference/api/slack#slackfault).
 
-**Live:** needs proxy mode: a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForCall()
 
@@ -698,7 +698,7 @@ let modals = user.modals().await?;
 
 **Returns** [`SlackModals`](/docs/reference/api/slack#slackmodals).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### react()
 
@@ -862,9 +862,9 @@ let ephemeral_messages = user.ephemeral().await?;
 
 </CodeGroup>
 
-**Returns** [`SlackEphemeralMessages`](/docs/reference/api/slack#slackephemeralmessages). It reads once the agent is quiet.
+**Returns** [`SlackEphemeralMessages`](/docs/reference/api/slack#slackephemeralmessages). It reads once the app is quiet.
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForModal()
 
@@ -1166,9 +1166,9 @@ let suggested_prompts = thread.suggested_prompts().await?;
 
 </CodeGroup>
 
-**Returns** [`SlackSuggestedPrompts`](/docs/reference/api/slack#slacksuggestedprompts). It reads once the agent is quiet.
+**Returns** [`SlackSuggestedPrompts`](/docs/reference/api/slack#slacksuggestedprompts). It reads once the app is quiet.
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### root()
 
@@ -1236,7 +1236,7 @@ let thread_status = thread.status().await?;
 
 **Returns** [`SlackThreadStatus`](/docs/reference/api/slack#slackthreadstatus).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### transcript()
 
@@ -1293,7 +1293,7 @@ let message = thread.wait_for_reply().from("my-agent").await?;
 
 ### latestReply()
 
-The latest reply, once the agent is quiet. Waits for at least one: it polls `replies()` and never sleeps longer than it must.
+The latest reply, once the app is quiet. Waits for at least one: it polls `replies()` and never sleeps longer than it must.
 
 <CodeGroup>
 
@@ -1478,7 +1478,7 @@ let updated = stream.refresh().await?;
 
 **Returns** [`SlackStream`](/docs/reference/api/slack#slackstream).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### ended()
 
@@ -1539,7 +1539,7 @@ let modal_values = modal.values().await?;
 
 **Returns** [`SlackModalValues`](/docs/reference/api/slack#slackmodalvalues).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### submit()
 
@@ -1627,7 +1627,7 @@ fault.undo().await?;
 
 **Returns** nothing. Disposing the handle calls it.
 
-**Live:** needs proxy mode: a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ## Types
 
