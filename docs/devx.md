@@ -190,7 +190,7 @@ export default defineConfig({ plugins: [channelstack()] });
 // and types for the test context
 ```
 
-The plugin takes `mode` (`auto`, `attach` or `start`), `server` (a URL to attach to), `timeout` (default 10s) and `quietFor` (default 750ms). The two defaults apply to every matcher and to every wait in the SDK: `waitFor…`, `latest…`, the reads that wait for quiet, and actions that wait for a button to appear.
+The plugin takes `mode` (`auto`, `attach` or `start`), `server` (a URL to attach to), `timeout` (default 10s) and `quietFor` (default 750ms). The two defaults apply to every matcher and to every wait in the SDK: `waitFor…`, `latest…`, the reads that wait for quiet, and actions that wait for a button to appear. A project that sets no `testTimeout` gets one from the plugin: 30s, or three times `timeout` if that's longer, so a failing check reports its own message instead of Vitest's 5s "Test timed out". A project's own `testTimeout` always wins.
 
 ```ts
 import { test, expect } from "vitest";

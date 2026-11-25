@@ -10,6 +10,7 @@
         "examples/agents/*/agent.ts",
         "test/acceptance/*.ts",
         "test/acceptance/stand-ins/*.ts",
+        "test/acceptance/default-timeout/*.ts",
         "conformance/*.test.ts"
       ],
       "project": [
