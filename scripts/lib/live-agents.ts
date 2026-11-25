@@ -18,6 +18,7 @@ import SmeeClient from "smee-client";
 
 import { type StorageState, writeStorageState } from "../../server/src/core/browser/index.ts";
 import type { Recorder } from "../../server/src/core/proxy/record.ts";
+import { AGENTS, HARNESS_CHANNELS, type HarnessChannel, referenceOf } from "./channels.ts";
 import { ROOT } from "./generate.ts";
 import { freePort } from "./process.ts";
 
@@ -154,22 +155,19 @@ async function webhookAgent(
   say(`${name}: the reference agent takes the platform's webhooks through its relay channel`);
 }
 
-/**
- * Every channel's reference agent whose configuration is in the environment. Says why one doesn't
- * run. With `record`, each agent runs behind the server's proxy (`proxy`, from `env --proxy`) and
- * each relay is tapped into `recorder`.
- */
-export async function startAgents(
-  env: Env,
-  stops: Stop[],
-  record?: { proxy: Record<string, string>; recorder: Recorder },
-): Promise<void> {
-  proxied = record?.proxy ?? {};
-  tap = record?.recorder;
+/** How the live run starts one channel's reference agent against the real platform, from the environment. */
+type LiveAgent = (env: Env, stops: Stop[], agent: { dir: string; path: string }) => Promise<void>;
+
+/** Each channel's way to its reference agent live. A channel without one has no agent in the live run. */
+const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
   // Slack: the reference agent connects to real Slack itself, in Socket Mode.
-  if (env.CHANNELSTACK_SLACK_BOT_TOKEN && env.CHANNELSTACK_SLACK_APP_TOKEN) {
+  async slack(env, stops, { dir }) {
+    if (!(env.CHANNELSTACK_SLACK_BOT_TOKEN && env.CHANNELSTACK_SLACK_APP_TOKEN)) {
+      say("Slack: no CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_APP_TOKEN, so no agent runs here");
+      return;
+    }
     const agent = spawnAgent(
-      "bolt-ai-sdk",
+      dir,
       {
         SLACK_BOT_TOKEN: env.CHANNELSTACK_SLACK_BOT_TOKEN,
         SLACK_APP_TOKEN: env.CHANNELSTACK_SLACK_APP_TOKEN,
@@ -189,13 +187,17 @@ export async function startAgents(
       });
       agent.once("exit", (code) => reject(new Error(`The Slack agent exited with ${code}`)));
     });
-  } else say("Slack: no CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_APP_TOKEN, so no agent runs here");
+  },
 
   // GitHub: the App's webhook goes to the relay channel the App names.
-  const appId = env.CHANNELSTACK_GITHUB_APP_ID;
-  const key = env.CHANNELSTACK_GITHUB_PRIVATE_KEY;
-  const secret = env.CHANNELSTACK_GITHUB_WEBHOOK_SECRET;
-  if (appId && key && secret) {
+  async github(env, stops, { dir, path }) {
+    const appId = env.CHANNELSTACK_GITHUB_APP_ID;
+    const key = env.CHANNELSTACK_GITHUB_PRIVATE_KEY;
+    const secret = env.CHANNELSTACK_GITHUB_WEBHOOK_SECRET;
+    if (!(appId && key && secret)) {
+      if (appId && key) say("GitHub: no CHANNELSTACK_GITHUB_WEBHOOK_SECRET, so no agent runs here");
+      return;
+    }
     const app = new Octokit({
       authStrategy: createAppAuth,
       auth: { appId, privateKey: key.replaceAll("\\n", "\n") },
@@ -206,56 +208,87 @@ export async function startAgents(
       say(
         "GitHub: the App's webhook isn't a smee.io channel, so no agent runs here; its live example needs one elsewhere",
       );
-    } else {
-      await webhookAgent(
-        "GitHub",
-        {
-          dir: "probot",
-          path: "/api/github/webhooks",
-          source: url as string,
-          env: { GITHUB_APP_ID: appId, GITHUB_PRIVATE_KEY: key, GITHUB_WEBHOOK_SECRET: secret, LOG_LEVEL: "warn" },
-        },
-        stops,
-      );
+      return;
     }
-  } else if (appId && key) say("GitHub: no CHANNELSTACK_GITHUB_WEBHOOK_SECRET, so no agent runs here");
-
-  // Notion: the integration's webhook subscription goes to CHANNELSTACK_NOTION_RELAY_URL.
-  const notion = env.CHANNELSTACK_NOTION_TOKEN;
-  if (notion && env.CHANNELSTACK_NOTION_VERIFICATION_TOKEN && isRelay(env.CHANNELSTACK_NOTION_RELAY_URL)) {
     await webhookAgent(
-      "Notion",
+      "GitHub",
       {
-        dir: "notion-sdk",
-        path: "/webhooks/notion",
-        source: env.CHANNELSTACK_NOTION_RELAY_URL as string,
-        env: { NOTION_TOKEN: notion, NOTION_VERIFICATION_TOKEN: env.CHANNELSTACK_NOTION_VERIFICATION_TOKEN },
+        dir,
+        path,
+        source: url as string,
+        env: { GITHUB_APP_ID: appId, GITHUB_PRIVATE_KEY: key, GITHUB_WEBHOOK_SECRET: secret, LOG_LEVEL: "warn" },
       },
       stops,
     );
-  } else if (notion) {
-    say(
-      "Notion: no CHANNELSTACK_NOTION_VERIFICATION_TOKEN and smee.io CHANNELSTACK_NOTION_RELAY_URL, so no agent runs here",
-    );
-  }
+  },
 
   // Linear: the app's webhook (agent session events) goes to CHANNELSTACK_LINEAR_RELAY_URL.
-  const linear = env.CHANNELSTACK_LINEAR_APP_TOKEN;
-  if (linear && env.CHANNELSTACK_LINEAR_WEBHOOK_SECRET && isRelay(env.CHANNELSTACK_LINEAR_RELAY_URL)) {
+  async linear(env, stops, { dir, path }) {
+    const linear = env.CHANNELSTACK_LINEAR_APP_TOKEN;
+    if (!(linear && env.CHANNELSTACK_LINEAR_WEBHOOK_SECRET && isRelay(env.CHANNELSTACK_LINEAR_RELAY_URL))) {
+      if (linear) {
+        say(
+          "Linear: no CHANNELSTACK_LINEAR_WEBHOOK_SECRET and smee.io CHANNELSTACK_LINEAR_RELAY_URL, so no agent runs here",
+        );
+      }
+      return;
+    }
     await webhookAgent(
       "Linear",
       {
-        dir: "linear-sdk",
-        path: "/webhooks/linear",
+        dir,
+        path,
         source: env.CHANNELSTACK_LINEAR_RELAY_URL as string,
         env: { LINEAR_ACCESS_TOKEN: linear, LINEAR_WEBHOOK_SECRET: env.CHANNELSTACK_LINEAR_WEBHOOK_SECRET },
       },
       stops,
     );
-  } else if (linear) {
-    say(
-      "Linear: no CHANNELSTACK_LINEAR_WEBHOOK_SECRET and smee.io CHANNELSTACK_LINEAR_RELAY_URL, so no agent runs here",
+  },
+
+  // Notion: the integration's webhook subscription goes to CHANNELSTACK_NOTION_RELAY_URL.
+  async notion(env, stops, { dir, path }) {
+    const notion = env.CHANNELSTACK_NOTION_TOKEN;
+    if (!(notion && env.CHANNELSTACK_NOTION_VERIFICATION_TOKEN && isRelay(env.CHANNELSTACK_NOTION_RELAY_URL))) {
+      if (notion) {
+        say(
+          "Notion: no CHANNELSTACK_NOTION_VERIFICATION_TOKEN and smee.io CHANNELSTACK_NOTION_RELAY_URL, so no agent runs here",
+        );
+      }
+      return;
+    }
+    await webhookAgent(
+      "Notion",
+      {
+        dir,
+        path,
+        source: env.CHANNELSTACK_NOTION_RELAY_URL as string,
+        env: { NOTION_TOKEN: notion, NOTION_VERIFICATION_TOKEN: env.CHANNELSTACK_NOTION_VERIFICATION_TOKEN },
+      },
+      stops,
     );
+  },
+};
+
+/**
+ * Every channel's reference agent whose configuration is in the environment. Says why one doesn't
+ * run. With `record`, each agent runs behind the server's proxy (`proxy`, from `env --proxy`) and
+ * each relay is tapped into `recorder`.
+ */
+export async function startAgents(
+  env: Env,
+  stops: Stop[],
+  record?: { proxy: Record<string, string>; recorder: Recorder },
+): Promise<void> {
+  proxied = record?.proxy ?? {};
+  tap = record?.recorder;
+  for (const channel of HARNESS_CHANNELS) {
+    const start = LIVE_AGENTS[channel];
+    const dir = referenceOf(channel);
+    if (!start) {
+      say(`${channel}: no way to start its reference agent live yet (scripts/lib/live-agents.ts)`);
+      continue;
+    }
+    await start(env, stops, { dir, path: AGENTS[dir]?.path ?? "" });
   }
 }
 

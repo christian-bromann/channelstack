@@ -38,7 +38,7 @@ import {
 import { compareShapes, readShapes } from "../conformance/shapes.ts";
 import { SECRET_FIELD } from "../scenarios/runners/typescript/secrets.ts";
 import { DRIVERS } from "../server/src/drivers/index.ts";
-import { AGENTS } from "./examples.ts";
+import { AGENTS, HARNESS_CHANNELS, type HarnessChannel, referenceOf } from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { withLiveStack } from "./lib/live-stack.ts";
 import { binaryPath } from "./lib/packages.ts";
@@ -46,9 +46,12 @@ import { runAsync } from "./lib/process.ts";
 import { withStack } from "./lib/stack.ts";
 
 /** Each channel's reference agent, the same one fake and live. */
-const REFERENCE = { slack: "bolt-ai-sdk", github: "probot", linear: "linear-sdk", notion: "notion-sdk" } as const;
-type Channel = keyof typeof REFERENCE;
-const CHANNELS = Object.keys(REFERENCE) as Channel[];
+const REFERENCE = Object.fromEntries(HARNESS_CHANNELS.map((channel) => [channel, referenceOf(channel)])) as Record<
+  HarnessChannel,
+  string
+>;
+type Channel = HarnessChannel;
+const CHANNELS = HARNESS_CHANNELS;
 
 const { values } = parseArgs({
   options: {
@@ -130,7 +133,7 @@ try {
       {
         bin,
         agent,
-        webhook: { driver: channel, path: AGENTS[name].path },
+        webhook: { driver: channel, path: AGENTS[name]?.path ?? "" },
         serverEnv: fake,
         proxy: true,
         record: join(work, `fake-${channel}`),
