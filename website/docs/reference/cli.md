@@ -66,7 +66,7 @@ The attach CLI has Slack commands only. GitHub, Linear and Notion are driven fro
 
 The attach commands act in one long-lived session named `dev`, which the CLI, the UI and `mcp` share. People and channels are created there on first use, by name.
 
-Where a command takes a message, `last` means the newest message of the most recently active conversation in the `dev` session. A message can also be named `<channel id>:<ts>`, as `show --json` prints them.
+Where a command takes a message, `last` means the newest message of the most recently active conversation in the `dev` session. A message can also be named `<channel id>:<ts>`, as `slack say` and the other `slack` commands print them.
 
 ## `channelstack start`
 
