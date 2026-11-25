@@ -1,12 +1,12 @@
 ---
 title: "Delivery and failures"
 order: 5
-description: "Test how your agent handles retries, redelivery, bad signatures, stale timestamps, rate limits, dropped sockets and an uninstall."
+description: "Test how your app handles retries, redelivery, bad signatures, stale timestamps, rate limits, dropped sockets and an uninstall."
 ---
 
 # Delivery and failures
 
-This page shows how to test the parts of a platform agents most often get wrong: retried and redelivered events, forged requests, rate limits, dropped connections and an uninstall. Everything here works against the fakes only. In [live mode](/docs/guide/live-mode) an action has no delivery to test, so these tests need a guard to skip there: see [Fake only](#fake-only).
+This page shows how to test the parts of a platform apps most often get wrong: retried and redelivered events, forged requests, rate limits, dropped connections and an uninstall. Everything here works against the fakes only. In [live mode](/docs/guide/live-mode) an action has no delivery to test, so these tests need a guard to skip there: see [Fake only](#fake-only).
 
 ## What the fakes send
 
@@ -23,7 +23,7 @@ Over Slack's Socket Mode there is no signature, because the connection is the ap
 
 ## Deliveries in a test
 
-An action that reaches the agent gives you the delivery it caused:
+An action that reaches the app gives you the delivery it caused:
 
 ```ts
 const msg = await ana.say("@my-agent hi", { channel });
@@ -39,23 +39,23 @@ const command = await ana.runCommand("/deploy web staging", { channel });
 // a slash command, click, shortcut or modal submission resolves to its delivery
 ```
 
-A delivery has its `attempts`, each with the request headers, the agent's response status and body, and how long the agent took. Its `status` is the latest attempt's:
+A delivery has its `attempts`, each with the request headers, the app's response status and body, and how long the app took. Its `status` is the latest attempt's:
 
-| Status         | Meaning                                       |
-| -------------- | --------------------------------------------- |
-| `pending`      | Queued or in flight                           |
-| `acknowledged` | The agent answered 2xx in time                |
-| `failed`       | The agent answered, but not 2xx               |
-| `timed_out`    | The agent didn't answer within the ack window |
-| `unreachable`  | The agent's URL couldn't be reached           |
+| Status         | Meaning                                     |
+| -------------- | ------------------------------------------- |
+| `pending`      | Queued or in flight                         |
+| `acknowledged` | The app answered 2xx in time                |
+| `failed`       | The app answered, but not 2xx               |
+| `timed_out`    | The app didn't answer within the ack window |
+| `unreachable`  | The app's URL couldn't be reached           |
 
-`delivery.settled()` waits until the latest attempt has a final status. `msg.delivery` is `undefined` when nothing was sent: the app isn't in the channel, isn't installed or connected, or the server has no URL for the agent ([connecting your agent](/docs/guide/connecting-your-agent#tell-the-server-where-the-agent-listens)).
+`delivery.settled()` waits until the latest attempt has a final status. `msg.delivery` is `undefined` when nothing was sent: the app isn't in the channel, isn't installed or connected, or the server has no URL for the app ([connecting your app](/docs/guide/connecting-your-agent#tell-the-server-where-the-app-listens)).
 
 ## Slack's retry
 
 <RetryTimeline />
 
-Slack expects an acknowledgement within 3 seconds. An agent that does its work before answering the HTTP request misses that window, and Slack sends the same event again. An agent that doesn't notice answers twice.
+Slack expects an acknowledgement within 3 seconds. An app that does its work before answering the HTTP request misses that window, and Slack sends the same event again. An app that doesn't notice answers twice.
 
 ```ts
 test("survives Slack's 3s retry without answering twice", async ({ slack }) => {
@@ -69,9 +69,9 @@ test("survives Slack's 3s retry without answering twice", async ({ slack }) => {
 });
 ```
 
-`retry()` sends the event again the way Slack does: the same payload and `event_id`, with `X-Slack-Retry-Num` and `X-Slack-Retry-Reason`. `after` defaults to 3 seconds, Slack's first retry, and `reason` to `http_timeout` (`http_error` and `too_many_redirects` are the others). The exact-count check then waits for the agent to be quiet, so a second answer has time to show up.
+`retry()` sends the event again the way Slack does: the same payload and `event_id`, with `X-Slack-Retry-Num` and `X-Slack-Retry-Reason`. `after` defaults to 3 seconds, Slack's first retry, and `reason` to `http_timeout` (`http_error` and `too_many_redirects` are the others). The exact-count check then waits for the app to be quiet, so a second answer has time to show up.
 
-The test proves the agent is idempotent on `event_id`. The usual fix is to acknowledge at once and remember the event ids already handled. Bolt for JavaScript acknowledges events as they arrive unless `processBeforeResponse` is on, which is common on serverless hosts; with it on, a slow handler misses the window.
+The test proves the app is idempotent on `event_id`. The usual fix is to acknowledge at once and remember the event ids already handled. Bolt for JavaScript acknowledges events as they arrive unless `processBeforeResponse` is on, which is common on serverless hosts; with it on, a slow handler misses the window.
 
 ## Redelivery
 
@@ -91,7 +91,7 @@ test("a redelivered comment doesn't produce a second answer", async ({ github })
 });
 ```
 
-| Platform | Call                   | What the agent gets                                                               |
+| Platform | Call                   | What the app gets                                                                 |
 | -------- | ---------------------- | --------------------------------------------------------------------------------- |
 | Slack    | `delivery.resend()`    | The same event, same `event_id`, no retry headers                                 |
 | GitHub   | `delivery.redeliver()` | The same webhook with the same `X-GitHub-Delivery` GUID, as from the delivery log |
@@ -119,7 +119,7 @@ test("a redelivered webhook doesn't duplicate activities", async ({ linear }) =>
 
 ## Bad signatures and stale timestamps
 
-An agent must refuse a request it can't verify. `resend` sends the delivery again with a twist, and `toBeRejected` checks that the agent answered it with a 4xx:
+An app must refuse a request it can't verify. `resend` sends the delivery again with a twist, and `toBeRejected` checks that the app answered it with a 4xx:
 
 ```ts
 test("rejects a bad signature and a stale timestamp", async ({ slack }) => {
@@ -140,13 +140,13 @@ test("rejects a bad signature and a stale timestamp", async ({ slack }) => {
 | `stale: true`        | Signed correctly, but with a time outside the replay window: 6 minutes old on Slack, 2 minutes on Linear | Slack, Linear                 |
 | `headers`            | Extra or replaced headers for this attempt                                                               | Slack                         |
 
-`toBeRejected` reads the latest forged attempt. It fails when the agent answered 2xx, and it tells you to call `resend` first when no forged attempt was sent. A forged attempt never counts toward `toBeAccepted` or `toBeRetried`.
+`toBeRejected` reads the latest forged attempt. It fails when the app answered 2xx, and it tells you to call `resend` first when no forged attempt was sent. A forged attempt never counts toward `toBeAccepted` or `toBeRetried`.
 
-Most SDKs verify signatures for you (Bolt, Probot, `@octokit/webhooks`, `LinearWebhookClient`), so these tests mostly catch an agent that turned verification off, or one that reads the body before the SDK can check it.
+Most SDKs verify signatures for you (Bolt, Probot, `@octokit/webhooks`, `LinearWebhookClient`), so these tests mostly catch an app that turned verification off, or one that reads the body before the SDK can check it.
 
 ## Acknowledging in time
 
-`toBeAccepted` checks that the agent answered 2xx, and with `within`, that it did so that fast:
+`toBeAccepted` checks that the app answered 2xx, and with `within`, that it did so that fast:
 
 ```ts
 test("a slash command is acknowledged within 3 seconds", async ({ slack }) => {
@@ -162,11 +162,11 @@ test("a slash command is acknowledged within 3 seconds", async ({ slack }) => {
 
 It reads the first real attempt. Without `within`, the platform's ack window is the limit, because an attempt answered after it is `timed_out`, not `acknowledged`. The same check works on a modal submission (`await modal.submit(…)`), a click and a shortcut.
 
-`toBeRetried` is the other side: the delivery needed more than one attempt, because the agent didn't acknowledge the first in time. `{ times }` makes it exact, and an exact check waits for quiet. `.not.toBeRetried()` is a short way to say the agent was fast enough that the platform never retried. Retries you sent yourself with `retry()` count as attempts too.
+`toBeRetried` is the other side: the delivery needed more than one attempt, because the app didn't acknowledge the first in time. `{ times }` makes it exact, and an exact check waits for quiet. `.not.toBeRetried()` is a short way to say the app was fast enough that the platform never retried. Retries you sent yourself with `retry()` count as attempts too.
 
 ## Faults
 
-`slack.fault` makes the fake Slack Web API misbehave in a way the agent has to handle:
+`slack.fault` makes the fake Slack Web API misbehave in a way the app has to handle:
 
 ```ts
 test("backs off on rate limits and still answers", async ({ slack }) => {
@@ -181,12 +181,12 @@ test("backs off on rate limits and still answers", async ({ slack }) => {
 });
 ```
 
-| Fault         | Options                                                             | What the agent sees                                                                                                                                                          |
-| ------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rate_limit`  | `operation`, `retryAfter` (default 1 s), `times`                    | HTTP 429 with `Retry-After`. The session stays busy until the agent retries, so the checks wait for it ([waiting and quiet](/docs/guide/waiting-and-quiet#the-quiet-window)) |
-| `error`       | `operation` (required), `error` (default `internal_error`), `times` | The call fails with that Slack error code, for example `msg_too_long`                                                                                                        |
-| `latency`     | `operation`, `delay`                                                | Each call takes `delay` longer                                                                                                                                               |
-| `drop_socket` | `after` (default: now)                                              | The Socket Mode connection drops once. A Socket Mode agent should reconnect                                                                                                  |
+| Fault         | Options                                                             | What the app sees                                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rate_limit`  | `operation`, `retryAfter` (default 1 s), `times`                    | HTTP 429 with `Retry-After`. The session stays busy until the app retries, so the checks wait for it ([waiting and quiet](/docs/guide/waiting-and-quiet#the-quiet-window)) |
+| `error`       | `operation` (required), `error` (default `internal_error`), `times` | The call fails with that Slack error code, for example `msg_too_long`                                                                                                      |
+| `latency`     | `operation`, `delay`                                                | Each call takes `delay` longer                                                                                                                                             |
+| `drop_socket` | `after` (default: now)                                              | The Socket Mode connection drops once. A Socket Mode app should reconnect                                                                                                  |
 
 Without `operation`, a fault applies to every Web API method; without `times`, to every call until it's undone.
 
@@ -204,11 +204,11 @@ test("reconnects after the Socket Mode connection drops", async ({ slack }) => {
 A fault lasts until `fault.undo()`, the end of an `await using` scope, or the end of the test's session, whichever comes first.
 
 > [!WARNING]
-> A fault applies to the whole workspace, not only to the test that set it: there is one agent, and its calls belong to no session until they finish. While a fault is in effect, other tests running at the same time see it too. Put fault tests in a file of their own and run it in a separate `vitest run`, so nothing else runs alongside.
+> A fault applies to the whole workspace, not only to the test that set it: there is one app, and its calls belong to no session until they finish. While a fault is in effect, other tests running at the same time see it too. Put fault tests in a file of their own and run it in a separate `vitest run`, so nothing else runs alongside.
 
 ## The uninstall
 
-When a workspace removes the app, Slack sends `app_uninstalled` and `tokens_revoked`. The agent should acknowledge both and drop what it stored for the workspace:
+When a workspace removes the app, Slack sends `app_uninstalled` and `tokens_revoked`. The app should acknowledge both and drop what it stored for the workspace:
 
 ```ts
 test("the uninstall is handled", async ({ slack }) => {
@@ -221,7 +221,7 @@ The app is installed again, with the same tokens, when the test's session closes
 
 ## Fake only
 
-Live, the real platform delivers to your agent and channelstack isn't in the path. An action has no delivery: `msg.delivery`, `comment.delivery` and `session.delivery` are `undefined`, so nothing is refused and nothing skips on its own. The `!` in the examples above throws a `TypeError` live. A test that must also run live checks first, and skips:
+Live, the real platform delivers to your app and channelstack isn't in the path. An action has no delivery: `msg.delivery`, `comment.delivery` and `session.delivery` are `undefined`, so nothing is refused and nothing skips on its own. The `!` in the examples above throws a `TypeError` live. A test that must also run live checks first, and skips:
 
 ```ts
 test("survives Slack's retry", async ({ slack, skip }) => {
@@ -235,7 +235,7 @@ test("survives Slack's retry", async ({ slack, skip }) => {
 
 The rest is refused, and Vitest and pytest skip the test with the reason:
 
-- `slack.fault()` and `fault.undo()` with `action_requires`: a fault needs proxy mode, which live doesn't read the agent's calls back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)).
+- `slack.fault()` and `fault.undo()` with `action_requires`: a fault needs proxy mode, which live doesn't read the app's calls back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)).
 - `slack.uninstallApp()`, and reading or resending deliveries (`slack.deliveries()`, `linear.deliveries()`, `notion.deliveries()`, `delivery.retry()`, `delivery.resend()`), with `unsupported_in_live`.
 
 The same test runs in full against the fake on every pull request.

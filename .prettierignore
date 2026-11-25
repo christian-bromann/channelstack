@@ -2,6 +2,8 @@
 
 # Design documents and the public contract are written by hand; their tables stay as they are.
 *.md
+# The docs pages too, .mdx included: prose and examples laid out by hand.
+website/docs/
 /docs/
 /api/
 /phase-log/
@@ -11,7 +13,6 @@ index.html
 # Generated: `pnpm spec` and `pnpm sdk` own these, and their checks compare byte for byte.
 spec/
 sdks/typescript/generated/
-website/docs/reference/api/
 sdks/python/
 pnpm-lock.yaml
 

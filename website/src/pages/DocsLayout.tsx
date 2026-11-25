@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { CodeGroup } from "../components/docs/CodeGroup";
@@ -97,6 +98,18 @@ export function DocPage({ slug, mod }: { slug: string; mod: DocModule }) {
   const next = pages[index + 1];
   const Content = mod.default;
   const title = entry?.title ?? "Docs";
+  const { hash } = useLocation();
+  // A new page starts at its top, or at the section its link names; the router would keep the old
+  // page's scroll position. Only when the page changes: a link to a section of the same page
+  // scrolls there smoothly, as the browser does. "instant" here, to skip that smooth scroll.
+  const shownSlug = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (shownSlug.current === slug) return;
+    shownSlug.current = slug;
+    const target = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
+    if (target) target.scrollIntoView({ behavior: "instant", block: "start" });
+    else window.scrollTo({ top: 0, behavior: "instant" });
+  }, [slug, hash]);
   return (
     <>
       <Seo

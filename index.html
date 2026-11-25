@@ -240,9 +240,9 @@ footer a:hover { color: var(--ink); }
 
 <main id="top">
   <div class="wrap hero">
-    <span class="eyebrow"><span class="rec" aria-hidden="true"></span>Test harness for agents that live in chat</span>
-    <h1>Your agent’s whole world, <em>on localhost.</em></h1>
-    <p class="lede">channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine. Script the people, let your agent answer through its real code path, and assert on the conversation a person would see. Signed webhooks, real payload shapes and real ids, with no changes to how your agent works.</p>
+    <span class="eyebrow"><span class="rec" aria-hidden="true"></span>Test harness for Slack, GitHub, Linear and Notion apps</span>
+    <h1>Your app’s whole world, <em>on localhost.</em></h1>
+    <p class="lede">channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine, for the bots, integrations and AI agents you build on them. Script the people, let your app answer through its real code path, and assert on what a person would see. Signed webhooks, real payload shapes and real ids, with no changes to how your app works.</p>
     <div class="cta">
       <a class="btn primary" href="#guide">Get started</a>
       <a class="btn" href="#why">Why channelstack?</a>
@@ -280,13 +280,13 @@ footer a:hover { color: var(--ink); }
     <div class="wrap">
       <div class="sec-head">
         <span class="kicker">Four platforms, one API</span>
-        <h2>Everywhere your agent gets a message.</h2>
-        <p>One package fakes all four, with the people, events and API calls agents actually use. Use one in a test, or several when your agent spans them. Discord, Stripe and email come next.</p>
+        <h2>Everywhere your app gets an event.</h2>
+        <p>One package fakes all four, with the people, events and API calls apps actually use. Use one in a test, or several when your app spans them. Discord, Stripe and email come next.</p>
       </div>
       <div class="platforms">
-        <div class="pf"><div class="pf-top"><h3>Slack</h3><span class="pkg">{ slack }</span></div><p>DMs, mentions, threads and the agent view, with progress streams rendered the way people see them.</p><ul><li>Events API</li><li>block_actions</li><li>chat.startStream</li><li>assistant.threads</li><li>agent_session_stopped</li></ul></div>
+        <div class="pf"><div class="pf-top"><h3>Slack</h3><span class="pkg">{ slack }</span></div><p>DMs, mentions, threads, buttons and the agent view, with progress streams rendered the way people see them.</p><ul><li>Events API</li><li>block_actions</li><li>chat.startStream</li><li>assistant.threads</li><li>agent_session_stopped</li></ul></div>
         <div class="pf"><div class="pf-top"><h3>GitHub</h3><span class="pkg">{ github }</span></div><p>Apps with installations, signed deliveries with real GUIDs, and redelivery for dedupe tests.</p><ul><li>App manifests</li><li>issue_comment</li><li>pull_request</li><li>check_run</li><li>redeliver</li></ul></div>
-        <div class="pf"><div class="pf-top"><h3>Linear</h3><span class="pkg">{ linear }</span></div><p>Agent sessions end to end: delegation, prompts, questions, activities and the Stop signal.</p><ul><li>delegation</li><li>AgentSessionEvent</li><li>agentActivityCreate</li><li>stop signal</li></ul></div>
+        <div class="pf"><div class="pf-top"><h3>Linear</h3><span class="pkg">{ linear }</span></div><p>Issues, comments and their webhooks, and agent sessions end to end: delegation, prompts, activities and Stop.</p><ul><li>delegation</li><li>AgentSessionEvent</li><li>agentActivityCreate</li><li>stop signal</li></ul></div>
         <div class="pf"><div class="pf-top"><h3>Notion</h3><span class="pkg">{ notion }</span></div><p>Pages, databases and comments, with webhooks when someone mentions your integration.</p><ul><li>page webhooks</li><li>comments</li><li>database queries</li><li>blocks</li></ul></div>
       </div>
     </div>
@@ -296,17 +296,17 @@ footer a:hover { color: var(--ink); }
     <div class="wrap">
       <div class="sec-head">
         <span class="kicker">Why channelstack</span>
-        <h2>Mocks test your mock. channelstack tests your agent.</h2>
-        <p>Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on. channelstack closes those gaps.</p>
+        <h2>Mocks test your mock. channelstack tests your app.</h2>
+        <p>Integrations break in the gaps between systems: a webhook signed the wrong way, a payload shape that changed last month, a stray progress message nobody asserted on. channelstack closes those gaps.</p>
       </div>
       <div class="principles">
-        <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M14 6l6 6-6 6"/></svg></div><div><h3>Your agent’s real code path</h3><p><code>channelstack env</code> points your agent’s own SDKs at <code>slack.localhost</code>, <code>github.localhost</code> and friends. Agents with hard-coded hosts use proxy mode instead: set <code>HTTPS_PROXY</code> and trust a CA that only that agent sees.</p></div></div>
+        <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M14 6l6 6-6 6"/></svg></div><div><h3>Your app’s real code path</h3><p><code>channelstack env</code> points your app’s own SDKs at <code>slack.localhost</code>, <code>github.localhost</code> and friends. Apps with hard-coded hosts use proxy mode instead: set <code>HTTPS_PROXY</code> and trust a CA that only that app sees.</p></div></div>
         <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12l4 4L19 6"/></svg></div><div><h3>Shapes that can’t drift</h3><p>Every response and webhook is checked against the providers’ own schemas: OpenAPI descriptions, GraphQL introspection and recorded traffic. When a platform changes, your build goes red instead of quietly wrong.</p></div></div>
         <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 4-5 7-5s5.8 1.4 7 5"/></svg></div><div><h3>People, not payloads</h3><p>Write <code>ana.click("Approve", { message })</code> instead of hand-building a <code>block_actions</code> body. People post, reply, review, delegate and press Stop, with correct signatures, retries and delivery IDs.</p></div></div>
         <div class="pr"><div class="ico" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg></div><div><h3>Assert what people see</h3><p>Streams, status lines, edits and ephemeral messages render into one transcript. <code>toHaveRepliesFrom(…, { count: 1 })</code> catches the double post. <code>not.toContainText</code> catches the leftover “Thinking…” reply.</p></div></div>
       </div>
 
-      <div class="diagram" role="img" aria-label="Signal path: channelstack sends signed webhooks to your agent, and your agent's API calls to platform hosts go through channelstack's proxy back into the same fake workspace.">
+      <div class="diagram" role="img" aria-label="Signal path: channelstack sends signed webhooks to your app, and your app's API calls to platform hosts go through channelstack's proxy back into the same fake workspace.">
         <svg viewBox="0 0 1000 250" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
@@ -329,7 +329,7 @@ footer a:hover { color: var(--ink); }
           <text x="415" y="214" class="lbl">linear.localhost · notion.localhost</text>
 
           <rect x="770" y="40" width="210" height="170" rx="10" class="box"/>
-          <text x="790" y="72" class="ttl">Your agent</text>
+          <text x="790" y="72" class="ttl">Your app</text>
           <text x="790" y="104">unchanged code</text>
           <text x="790" y="128">real SDKs</text>
           <text x="790" y="152">its own config</text>
@@ -396,8 +396,8 @@ footer a:hover { color: var(--ink); }
         <table>
           <thead><tr><th scope="col"></th><th scope="col">Hand-written mocks</th><th scope="col">API emulators</th><th scope="col">Real sandbox workspace</th><th scope="col" class="us">channelstack</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Agent code unchanged</th><td class="n">No</td><td class="p">Base URL overrides</td><td class="y">Yes</td><td class="us y">Yes: a base URL, or a proxy</td></tr>
-            <tr><th scope="row">Platform calls your agent</th><td class="n">No</td><td class="p">Some webhooks</td><td class="y">Yes</td><td class="us y">Signed, retried, replayable</td></tr>
+            <tr><th scope="row">Your code unchanged</th><td class="n">No</td><td class="p">Base URL overrides</td><td class="y">Yes</td><td class="us y">Yes: a base URL, or a proxy</td></tr>
+            <tr><th scope="row">Platform calls your app</th><td class="n">No</td><td class="p">Some webhooks</td><td class="y">Yes</td><td class="us y">Signed, retried, replayable</td></tr>
             <tr><th scope="row">Scripted people</th><td class="n">No</td><td class="n">No</td><td class="p">Manual or second bot</td><td class="us y">Built in</td></tr>
             <tr><th scope="row">Payload shapes checked</th><td class="n">No</td><td class="n">No</td><td class="y">They’re real</td><td class="us y">Against provider schemas</td></tr>
             <tr><th scope="row">Assert on what people see</th><td class="n">No</td><td class="n">Raw state</td><td class="p">Screenshots</td><td class="us y">Rendered transcript</td></tr>
@@ -417,10 +417,10 @@ footer a:hover { color: var(--ink); }
       </div>
       <div class="steps">
         <div class="step"><span class="n2">STEP 1</span><h3>Install</h3><p>One package: the server, the CLI, the UI and the test integrations.</p><div class="mini">npm i -D channelstack</div></div>
-        <div class="step"><span class="n2">STEP 2</span><h3>Point your agent at it</h3><p>Each fake comes with an app named <code>my-agent</code>. Tell channelstack where your agent takes events, then start the agent the way you always do, with channelstack’s environment.</p><div class="mini">$ CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &amp;
+        <div class="step"><span class="n2">STEP 2</span><h3>Point your app at it</h3><p>Each fake comes with an app named <code>my-agent</code>. Tell channelstack where your app takes events, then start the app the way you always do, with channelstack’s environment.</p><div class="mini">$ CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &amp;
 $ npx channelstack env &gt;&gt; .env.local
 $ portless run my-agent pnpm dev</div></div>
-        <div class="step"><span class="n2">STEP 3</span><h3>Run</h3><p>Add the plugin and run your tests as usual. A failure says what a person sees, and what the agent left open.</p><div class="mini">// vitest.config.ts
+        <div class="step"><span class="n2">STEP 3</span><h3>Run</h3><p>Add the plugin and run your tests as usual. A failure says what a person sees, and what the app left open.</p><div class="mini">// vitest.config.ts
 plugins: [channelstack()]
 
 $ npx vitest
@@ -435,7 +435,7 @@ $ npx vitest
         <h2>Test the conversation before your users have it.</h2>
         <div class="cta"><a class="btn primary" href="#guide">Read the guide</a><a class="btn" href="#github">Star on GitHub</a></div>
       </div>
-      <p class="why-name"><strong>Why “channelstack”?</strong> Your agent lives in a stack of channels: Slack, GitHub, Linear, Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the conversation end to end before your users have it.</p>
+      <p class="why-name"><strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear, Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the conversation end to end before your users have it.</p>
     </div>
     <div class="wrap"><canvas class="wave" id="wave" aria-hidden="true"></canvas></div>
   </div>

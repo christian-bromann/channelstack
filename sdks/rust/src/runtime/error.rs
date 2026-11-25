@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 /// An error from the SDK. A refusal of the control API is `Api`, with the protocol's code.
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum Error {
     /// The control API refused: `code` is the stable error code (`not_in_channel`, `session_not_found`).
     #[error("{code}: {message}")]
@@ -25,6 +25,46 @@ pub enum Error {
     /// An argument the SDK can't send: a duration that isn't one, a handle where text is expected.
     #[error("{0}")]
     Invalid(String),
+    /// A check of `expect(…)` failed: what was expected, and what was there instead.
+    #[error("{0}")]
+    Expectation(String),
+}
+
+/// A pattern Rust's regex refuses, so `Regex::new(…)?` works in a test that returns `Result`.
+impl From<regex::Error> for Error {
+    fn from(error: regex::Error) -> Self {
+        Error::Invalid(error.to_string())
+    }
+}
+
+/// As derived, except that a failed check prints its message as it is: a test that returns
+/// `Result` prints its error with `{:?}`, and the message has lines of its own.
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Api {
+                code,
+                status,
+                message,
+                data,
+            } => f
+                .debug_struct("Api")
+                .field("code", code)
+                .field("status", status)
+                .field("message", message)
+                .field("data", data)
+                .finish(),
+            Error::Http(error) => f.debug_tuple("Http").field(error).finish(),
+            Error::Launch(message) => f.debug_tuple("Launch").field(message).finish(),
+            Error::Timeout { what, timeout_ms } => f
+                .debug_struct("Timeout")
+                .field("what", what)
+                .field("timeout_ms", timeout_ms)
+                .finish(),
+            Error::Invalid(message) => f.debug_tuple("Invalid").field(message).finish(),
+            Error::Expectation(message) => f.write_str(message),
+        }
+    }
 }
 
 impl Error {

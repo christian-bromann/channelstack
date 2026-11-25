@@ -1,12 +1,12 @@
 ---
 title: "Linear"
 order: 3
-description: "Test a Linear agent against channelstack's fake Linear, from connecting @linear/sdk to delegation, agent sessions, prompts, elicitations and Stop."
+description: "Test a Linear integration or agent against channelstack's fake Linear, from connecting @linear/sdk to issue and comment webhooks, delegation, agent sessions and Stop."
 ---
 
 # Linear
 
-This page shows how to test an agent built on Linear's agent APIs: how to point it at the fake, which people, teams and issues a test creates, what those people do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+This page shows how to test an integration or agent built on Linear's APIs: how to point it at the fake, which people, teams and issues a test creates, what those people do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
 
 > [!TIP]
 > Every method, option and wait of the Linear fake, with each call in TypeScript, Python and Rust, is in the [Linear API reference](/docs/reference/api/linear).
@@ -29,15 +29,15 @@ test("delegating an issue opens one session with a first thought", async ({ line
 
 ## What the fake covers
 
-The fake Linear is one workspace with one OAuth app installed in it, `my-agent`, acting as itself (`actor=app`). It serves Linear's GraphQL API and sends the app's webhooks. Queries run against Linear's own published schema, so an agent on `@linear/sdk` gets the shapes it gets from Linear, including every scalar the SDK selects.
+The fake Linear is one workspace with one OAuth app installed in it, `my-agent`, acting as itself (`actor=app`). It serves Linear's GraphQL API and sends the app's webhooks. Queries run against Linear's own published schema, so an app on `@linear/sdk` gets the shapes it gets from Linear, including every scalar the SDK selects.
 
-| Area | What's there |
-|---|---|
-| Reads | `viewer`, `organization`, users, teams, issues, comments, workflow states, labels, agent sessions and activities, with Linear's filters and cursors |
-| Agent sessions | `agentActivityCreate` (thoughts, actions, elicitations, responses, errors), `agentSessionUpdate` (plan, external URLs) |
-| Issues | `issueUpdate` (state, assignee, delegate, priority, title, description), `issueAddLabel`, `issueRemoveLabel` |
-| Comments | `commentCreate`, `commentUpdate`, `commentDelete`, `reactionCreate` |
-| Webhooks | `AgentSessionEvent` (`created`, `prompted`), `Issue` and `Comment` (`create`, `update`, `remove`) |
+| Area           | What's there                                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reads          | `viewer`, `organization`, users, teams, issues, comments, workflow states, labels, agent sessions and activities, with Linear's filters and cursors |
+| Agent sessions | `agentActivityCreate` (thoughts, actions, elicitations, responses, errors), `agentSessionUpdate` (plan, external URLs)                              |
+| Issues         | `issueUpdate` (state, assignee, delegate, priority, title, description), `issueAddLabel`, `issueRemoveLabel`                                        |
+| Comments       | `commentCreate`, `commentUpdate`, `commentDelete`, `reactionCreate`                                                                                 |
+| Webhooks       | `AgentSessionEvent` (`created`, `prompted`), `Issue` and `Comment` (`create`, `update`, `remove`)                                                   |
 
 Sessions follow Linear's rules: created as `pending`, `active` after a thought or action, `awaitingInput` after an elicitation, `complete` after a response (or `active` again with the `continue` signal), `error` after an error. A person's prompt starts a new turn, and Stop makes the session `stopping` until the agent's next response or error.
 
@@ -45,7 +45,7 @@ What a person has to read is also a comment. The agent's `response`, `elicitatio
 
 Not covered: creating issues as the app (`issueCreate`), projects, cycles, initiatives, documents, attachments, notifications and the OAuth install flow. A field the fake doesn't model either gets Linear's empty value for its type or, for a required object, an error that names it (`The fake has no Issue.sharedAccess`), so a gap shows up as a failing call, never as an invented value.
 
-## Connecting a Linear agent
+## Connecting a Linear app
 
 Ask the running server for the app's settings:
 
@@ -132,13 +132,13 @@ const ana = await linear.createUser({ name: "Ana" });
 const ben = await linear.createUser({ name: "Ben", admin: true });
 ```
 
-| Option | What it does |
-|---|---|
-| `name` | Required. Mentions (`@Ana`) and matchers find the person by it |
-| `id` | A fixed id (a UUID), for agents that allowlist by id |
-| `displayName`, `email` | Profile fields |
-| `admin`, `guest` | Workspace roles |
-| `token` | Live mode only: see [Live](#live) |
+| Option                 | What it does                                                   |
+| ---------------------- | -------------------------------------------------------------- |
+| `name`                 | Required. Mentions (`@Ana`) and matchers find the person by it |
+| `id`                   | A fixed id (a UUID), for apps that allowlist by id             |
+| `displayName`, `email` | Profile fields                                                 |
+| `admin`, `guest`       | Workspace roles                                                |
+| `token`                | Live mode only: see [Live](#live)                              |
 
 ```ts
 const team = await linear.createTeam({
@@ -153,15 +153,15 @@ const team = await linear.createTeam({
 });
 ```
 
-| Option | What it does |
-|---|---|
-| `key` | The issue prefix, e.g. `OPS`. Generated if omitted, so parallel tests never share one |
-| `name` | The team's name |
-| `members` | People in the team |
-| `states` | Workflow states, each `{ name, type }` with `type` one of `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Default: Backlog, Todo, In Progress, In Review, Done, Canceled |
-| `labels` | Label names |
+| Option    | What it does                                                                                                                                                                                   |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`     | The issue prefix, e.g. `OPS`. Generated if omitted, so parallel tests never share one                                                                                                          |
+| `name`    | The team's name                                                                                                                                                                                |
+| `members` | People in the team                                                                                                                                                                             |
+| `states`  | Workflow states, each `{ name, type }` with `type` one of `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Default: Backlog, Todo, In Progress, In Review, Done, Canceled |
+| `labels`  | Label names                                                                                                                                                                                    |
 
-Issues are created by a person, so the creation reaches the agent as an `Issue` event:
+Issues are created by a person, so the creation reaches the app as an `Issue` event:
 
 ```ts
 const issue = await ana.createIssue(
@@ -234,20 +234,20 @@ await ana.edit("Is this still happening on Safari?", { comment });
 
 ## What to check
 
-The matchers read the session and the issue as a person would see them in Linear. Positive matchers resolve as soon as the condition holds; `.not` and exact counts wait until the agent is quiet first. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains how.
+The matchers read the session and the issue as a person would see them in Linear. Positive matchers resolve as soon as the condition holds; `.not` and exact counts wait until the app is quiet first. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains how.
 
-| Matcher | Subject | Reads |
-|---|---|---|
-| `toHaveSessionState(state)` | session, issue (its latest session) | `session.state()` |
-| `toHaveActivity({ type, from, text })` | session, issue (its latest session) | `session.activities()`, the agent's only |
-| `toBeDelegatedTo(app)` | issue | `issue.delegatedTo()` |
-| `toBeAssignedTo(user)` | issue | `issue.assignee()` |
-| `toHaveState(name)` | issue | `issue.state()` |
-| `toHaveCommentFrom(author, { text })` | issue | `issue.comments()` |
-| `toHaveCommentsFrom(author, { count })` | issue | `issue.comments()`, once quiet |
-| `toContainText(text)` | issue, comment, session | `transcript()` |
-| `toBeAccepted`, `toBeRejected`, `toBeRetried` | delivery | `delivery.attempts` |
-| `toHaveReceivedCall(operation, { times, error })` | `linear` | `linear.calls()` |
+| Matcher                                           | Subject                             | Reads                                    |
+| ------------------------------------------------- | ----------------------------------- | ---------------------------------------- |
+| `toHaveSessionState(state)`                       | session, issue (its latest session) | `session.state()`                        |
+| `toHaveActivity({ type, from, text })`            | session, issue (its latest session) | `session.activities()`, the agent's only |
+| `toBeDelegatedTo(app)`                            | issue                               | `issue.delegatedTo()`                    |
+| `toBeAssignedTo(user)`                            | issue                               | `issue.assignee()`                       |
+| `toHaveState(name)`                               | issue                               | `issue.state()`                          |
+| `toHaveCommentFrom(author, { text })`             | issue                               | `issue.comments()`                       |
+| `toHaveCommentsFrom(author, { count })`           | issue                               | `issue.comments()`, once quiet           |
+| `toContainText(text)`                             | issue, comment, session             | `transcript()`                           |
+| `toBeAccepted`, `toBeRejected`, `toBeRetried`     | delivery                            | `delivery.attempts`                      |
+| `toHaveReceivedCall(operation, { times, error })` | `linear`                            | `linear.calls()`                         |
 
 `toHaveActivity` counts the agent's activities only: a person's prompts, delegation's first among them, don't count. Pass `toBeDelegatedTo(undefined)` to check an issue was taken back.
 
@@ -280,20 +280,20 @@ test("the agent asks a question and continues after the answer", async ({ linear
 
 ### Signatures and headers
 
-| Header or field | Value |
-|---|---|
-| `Linear-Signature` | The hex HMAC-SHA256 of the body, keyed with `LINEAR_WEBHOOK_SECRET` |
-| `Linear-Delivery` | The delivery's id |
-| `Linear-Event` | The resource type: `AgentSessionEvent`, `Issue`, `Comment` |
-| `Linear-Timestamp` | The attempt's time, in milliseconds |
-| `User-Agent` | `Linear-Webhook` |
+| Header or field           | Value                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `Linear-Signature`        | The hex HMAC-SHA256 of the body, keyed with `LINEAR_WEBHOOK_SECRET`                     |
+| `Linear-Delivery`         | The delivery's id                                                                       |
+| `Linear-Event`            | The resource type: `AgentSessionEvent`, `Issue`, `Comment`                              |
+| `Linear-Timestamp`        | The attempt's time, in milliseconds                                                     |
+| `User-Agent`              | `Linear-Webhook`                                                                        |
 | `webhookTimestamp` (body) | The attempt's time, in milliseconds. Receivers refuse a delivery more than a minute off |
 
 The body also has `type`, `action`, `organizationId` and `webhookId`. Because the time is inside the signed body, every attempt (a retry, a redelivery) writes its own `webhookTimestamp` and is signed again over those bytes.
 
 ### Acknowledgement and retries
 
-The agent has five seconds to answer with a 2xx. A delivery that wasn't answered in time is retried on Linear's schedule: after a minute, an hour and six hours. In a test you don't wait for those; you send the delivery again yourself:
+The app has five seconds to answer with a 2xx. A delivery that wasn't answered in time is retried on Linear's schedule: after a minute, an hour and six hours. In a test you don't wait for those; you send the delivery again yourself:
 
 ```ts
 const session = await ana.delegate(linear.app, { issue });
@@ -309,12 +309,12 @@ await expect(session.delivery!).toBeRejected();
 
 Errors have Linear's shape: `errors[].extensions` with `code`, `type`, `statusCode`, `userError` and `userPresentableMessage`. A missing or wrong token answers HTTP 401, and a query that doesn't parse or validate against the schema answers 400 with GraphQL's own message.
 
-| Code | When |
-|---|---|
-| `AUTHENTICATION_ERROR` | No token, or a token that isn't the app's |
-| `BAD_REQUEST` | A request without a query |
-| `FORBIDDEN` | Publishing to another app's session, editing or deleting someone else's comment |
-| `INPUT_ERROR` | An id that names nothing (`Entity not found`), an empty comment body, a priority outside 0 to 4, a `stop` signal from the app, `continue` on anything but a response, an ephemeral activity that isn't a thought or action, an activity on a `stale` session, a plan that isn't 1 to 100 entries, an external URL that isn't HTTP(S), delegating to someone who isn't an agent |
+| Code                   | When                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AUTHENTICATION_ERROR` | No token, or a token that isn't the app's                                                                                                                                                                                                                                                                                                                                      |
+| `BAD_REQUEST`          | A request without a query                                                                                                                                                                                                                                                                                                                                                      |
+| `FORBIDDEN`            | Publishing to another app's session, editing or deleting someone else's comment                                                                                                                                                                                                                                                                                                |
+| `INPUT_ERROR`          | An id that names nothing (`Entity not found`), an empty comment body, a priority outside 0 to 4, a `stop` signal from the app, `continue` on anything but a response, an ephemeral activity that isn't a thought or action, an activity on a `stale` session, a plan that isn't 1 to 100 entries, an external URL that isn't HTTP(S), delegating to someone who isn't an agent |
 
 The [errors reference](/docs/reference/api/errors) lists every code.
 
@@ -322,4 +322,4 @@ The [errors reference](/docs/reference/api/errors) lists every code.
 
 The same tests can run in a real Linear workspace. Set the OAuth app's token (`CHANNELSTACK_LINEAR_APP_TOKEN`), allowlist the workspace with `CHANNELSTACK_LIVE_LINEAR_WORKSPACES`, and give each person their personal API key (`CHANNELSTACK_LINEAR_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`). A person creates each session's teams, which are deleted when the session closes.
 
-Live, Linear delivers to your agent itself, so the agent's webhook must reach a running agent: Linear opens no session otherwise, and the live backend says so (`no_agent_session`) after 15 seconds. Delegation, comments, prompts, answers and every read work with the personal keys. Stop has no API, so it needs the browser actor, which isn't built for Linear yet. Redelivery, `resend` and `session.delivery` are fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/linear).
+Live, Linear delivers to your app itself, so its webhook must reach a running app: Linear opens no session otherwise, and the live backend says so (`no_agent_session`) after 15 seconds. Delegation, comments, prompts, answers and every read work with the personal keys. Stop has no API, so it needs the browser actor, which isn't built for Linear yet. Redelivery, `resend` and `session.delivery` are fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/linear).

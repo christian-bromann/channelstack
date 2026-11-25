@@ -9,7 +9,7 @@ description: "Every handle, method and wait of the Linear fake, in every SDK's l
 
 # Linear API
 
-Every handle of the Linear fake: the `linear` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a Linear agent, step by step, is in the [Linear guide](/docs/platforms/linear).
+Every handle of the Linear fake: the `linear` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a Linear app or agent, step by step, is in the [Linear guide](/docs/platforms/linear).
 
 Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object, Python's keyword arguments and Rust's builder setters. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `LinearUser` handle.
 
@@ -142,7 +142,7 @@ let api_calls = linear.calls().operation("…").await?;
 
 **Returns** [`LinearApiCalls`](/docs/reference/api/linear#linearapicalls).
 
-**Live:** needs proxy mode: Linear doesn't report the app's calls; proxy mode sees them. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: Linear doesn't report the app's calls; proxy mode sees them. Proxy mode doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForCall()
 
@@ -933,7 +933,7 @@ let comment = issue.wait_for_comment().from("my-agent").await?;
 
 ### latestComment()
 
-The latest comment, once the agent is quiet. Waits for at least one: it polls `comments()` and never sleeps longer than it must.
+The latest comment, once the app is quiet. Waits for at least one: it polls `comments()` and never sleeps longer than it must.
 
 <CodeGroup>
 
@@ -1288,7 +1288,7 @@ let comment_replies = comment.replies().await?;
 
 </CodeGroup>
 
-**Returns** [`LinearCommentReplies`](/docs/reference/api/linear#linearcommentreplies). It reads once the agent is quiet.
+**Returns** [`LinearCommentReplies`](/docs/reference/api/linear#linearcommentreplies). It reads once the app is quiet.
 
 ### transcript()
 

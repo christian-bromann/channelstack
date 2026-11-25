@@ -307,6 +307,39 @@
   border-bottom: 0;
 }
 
+/* A reference entry's facts: label and value side by side, set apart by hairlines. */
+.prose dl.facts {
+  display: grid;
+  grid-template-columns: minmax(120px, 11rem) minmax(0, 1fr);
+  margin: 0.9em 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.prose dl.facts dt,
+.prose dl.facts dd {
+  margin: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.prose dl.facts dt {
+  padding-right: 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .prose dl.facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prose dl.facts dt {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+}
+
 /* A code block with a title names its file. */
 .prose pre[data-title] {
   position: relative;
@@ -372,51 +405,81 @@
   display: none;
 }
 
-/* Callouts: > [!TIP], > [!NOTE], > [!WARNING]. */
+/*
+ * Callouts: > [!TIP], > [!NOTE], > [!WARNING]. A quiet panel tinted with the callout's color, a
+ * line icon in a soft disc of the same color, and the label running into the first sentence.
+ */
 .prose .callout {
-  padding: 12px 16px;
-  border: 1px solid var(--line-strong);
-  border-left-width: 3px;
-  border-radius: 10px;
-  background: var(--bg-raise);
+  --kind: var(--code-fn);
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: start;
+  padding: 16px 20px 16px 16px;
+  border: 1px solid color-mix(in srgb, var(--kind) 24%, var(--line));
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--kind) 9%, var(--bg-raise)),
+    color-mix(in srgb, var(--kind) 3%, var(--bg-raise)) 70%
+  );
   color: var(--ink);
   font-size: 15.5px;
+  line-height: 1.65;
+}
+
+.prose .callout.tip {
+  --kind: var(--ok);
+}
+
+.prose .callout.note {
+  --kind: var(--code-fn);
+}
+
+.prose .callout.warning {
+  --kind: var(--rec);
+}
+
+.prose .callout > * {
+  grid-column: 2;
+  margin: 0;
 }
 
 .prose .callout > * + * {
   margin-top: 0.6em;
 }
 
-.prose .callout-title {
+.prose .callout-icon {
+  grid-row: 1 / span 20;
+  grid-column: 1;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  padding: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--kind) 16%, transparent);
+  color: var(--kind);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.prose .callout.tip {
-  border-left-color: var(--ok);
+.prose .callout-label {
+  color: var(--kind);
+  font-weight: 650;
 }
 
-.prose .callout.tip .callout-title {
-  color: var(--ok);
+.prose .callout a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, var(--kind) 60%, transparent);
 }
 
-.prose .callout.note {
-  border-left-color: var(--accent);
-}
-
-.prose .callout.note .callout-title {
-  color: var(--accent);
-}
-
-.prose .callout.warning {
-  border-left-color: var(--rec);
-}
-
-.prose .callout.warning .callout-title {
-  color: var(--rec);
+.prose .callout :not(pre) > code {
+  border-color: color-mix(in srgb, var(--kind) 20%, var(--code-line));
+  background: color-mix(in srgb, var(--kind) 8%, var(--code-raise));
 }
 
 .doc-edit {

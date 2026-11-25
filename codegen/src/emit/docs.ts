@@ -245,7 +245,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
           ]
         : [
             "proxy mode",
-            "doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24))",
+            "doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24))",
           ];
     return [
       `**Live:** needs ${piece}: ${prose(method.live.reason)}. ${piece.charAt(0).toUpperCase()}${piece.slice(1)} ${issue}, so for now the call is refused with ${errorLink("action_requires")} and the test is skipped.`,
@@ -275,7 +275,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
         ...method.args.map((arg) => paramOf(arg, true)),
         ...method.options.map((option) => paramOf(option, false)),
       ]),
-      `**Returns** ${typeLink(method.returns)}.${method.onceQuiet ? " It reads once the agent is quiet." : ""}${method.retryWhile ? ` While refused with ${method.retryWhile.map(errorLink).join(" or ")}, it tries again until the wait's timeout.` : ""}${method.dispose ? " Disposing the handle calls it." : ""}`,
+      `**Returns** ${typeLink(method.returns)}.${method.onceQuiet ? " It reads once the app is quiet." : ""}${method.retryWhile ? ` While refused with ${method.retryWhile.map(errorLink).join(" or ")}, it tries again until the wait's timeout.` : ""}${method.dispose ? " Disposing the handle calls it." : ""}`,
       "",
       ...(specific.length > 0 ? [`**Errors** ${specific.map(errorLink).join(", ")}.`, ""] : []),
       ...liveNote(method),
@@ -294,7 +294,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
       wait.mode === "next"
         ? `Waits for the next ${wait.what.replace(/^an? /, "")} after the last one this handle returned`
         : wait.mode === "latest"
-          ? `The latest ${wait.what.replace(/^an? /, "")}, once the agent is quiet. Waits for at least one`
+          ? `The latest ${wait.what.replace(/^an? /, "")}, once the app is quiet. Waits for at least one`
           : `Waits for ${wait.what}`;
     // A realistic call: who it's from, the filter's first option. The table lists every option.
     const shown: Value[] = fromField ? [{ name: "from", literal: '"my-agent"' }] : [];
@@ -429,7 +429,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
     const intro =
       page.prefix === undefined
         ? "The client you connect with, and the session each test runs in. Every handle on the platform pages is reached from here."
-        : `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a ${page.prefix} agent, step by step, is in the [${page.prefix} guide](/docs/platforms/${page.slug}).`;
+        : `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a ${page.prefix} app or agent, step by step, is in the [${page.prefix} guide](/docs/platforms/${page.slug}).`;
     const body = [
       ...resources.flatMap((resource) => {
         anchor(page, `resource:${resource.name}`, resource.name);

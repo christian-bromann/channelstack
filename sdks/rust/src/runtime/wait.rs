@@ -166,12 +166,22 @@ impl QuietState {
 
 /// Resolve once the agent has been quiet for `quiet_for`. A wait that gives up says what the agent
 /// left open: that is usually the bug.
-pub async fn until_quiet<F, Fut>(quiet: F, timeout: &Value, quiet_for: &Value) -> Result<()>
+///
+/// With `watching`, the quiet time counts from now at the earliest: the caller wants to have looked
+/// for the whole window. An agent that is thinking makes no sound, so a session that went quiet a
+/// while ago says nothing about what arrives next.
+pub async fn until_quiet<F, Fut>(
+    quiet: F,
+    timeout: &Value,
+    quiet_for: &Value,
+    watching: bool,
+) -> Result<()>
 where
     F: Fn() -> Fut,
     Fut: Future<Output = Result<QuietState>>,
 {
     let quiet_for_ms = parse_duration(quiet_for)?;
+    let started = tokio::time::Instant::now();
     let still_open = std::sync::Mutex::new(Vec::<String>::new());
     let settled = wait_for(
         &format!("the agent to be quiet for {quiet_for_ms}ms"),
@@ -182,6 +192,9 @@ where
             async move {
                 let state = state.await?;
                 *still_open.lock().expect("what is still open") = state.open.clone();
+                if watching && started.elapsed().as_secs_f64() * 1000.0 < quiet_for_ms {
+                    return Ok(None);
+                }
                 Ok((!state.busy && state.quiet_for_ms >= quiet_for_ms).then_some(()))
             }
         },
@@ -287,7 +300,7 @@ where
         }
     };
     wait_for(what, timeout, latest).await?;
-    until_quiet(quiet, timeout, quiet_for).await?;
+    until_quiet(quiet, timeout, quiet_for, false).await?;
     // The agent may have said more while it was settling: the answer is what is there now.
     wait_for(what, timeout, latest).await
 }
@@ -374,7 +387,7 @@ mod tests {
                 open: vec!["a stream my-agent never stopped".into()],
             })
         };
-        let gave_up = super::until_quiet(busy, &json!("120ms"), &json!("50ms"))
+        let gave_up = super::until_quiet(busy, &json!("120ms"), &json!("50ms"), false)
             .await
             .unwrap_err()
             .to_string();
@@ -382,5 +395,27 @@ mod tests {
             gave_up.contains("Still open: a stream my-agent never stopped"),
             "{gave_up}"
         );
+    }
+
+    #[tokio::test]
+    async fn a_watching_wait_for_quiet_looks_for_the_whole_window() {
+        let long_quiet = || async {
+            Ok(super::QuietState {
+                busy: false,
+                quiet_for_ms: 60_000.0,
+                open: vec![],
+            })
+        };
+        let started = std::time::Instant::now();
+        super::until_quiet(long_quiet, &json!("1s"), &json!("80ms"), false)
+            .await
+            .unwrap();
+        assert!(started.elapsed() < std::time::Duration::from_millis(60));
+
+        let started = std::time::Instant::now();
+        super::until_quiet(long_quiet, &json!("1s"), &json!("80ms"), true)
+            .await
+            .unwrap();
+        assert!(started.elapsed() >= std::time::Duration::from_millis(80));
     }
 }

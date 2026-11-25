@@ -6,7 +6,7 @@ import ogImage from "../assets/og.png";
 import { SITE } from "../lib/site";
 
 const IMAGE_ALT =
-  "channelstack: your agent's whole world, on localhost. Test AI agents in Slack, GitHub, Linear and Notion.";
+  "channelstack: your app's whole world, on localhost. Test Slack, GitHub, Linear and Notion apps and agents on your machine.";
 
 /**
  * Title, description, canonical URL and link-preview tags for one page. `path` starts with "/".

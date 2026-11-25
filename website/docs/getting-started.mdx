@@ -1,12 +1,12 @@
 ---
 title: "Getting started"
 order: 2
-description: "From an empty folder to a passing test: start channelstack, run a small Slack agent against it, and write a first Vitest test."
+description: "From an empty folder to a passing test: start channelstack, run a small Slack bot against it, and write a first Vitest test."
 ---
 
 # Getting started
 
-In this tutorial you build a tiny Slack agent, run it against channelstack's fake Slack, and write a test that checks it answers once, in the thread. Then you break the agent and watch the test catch it. It takes about ten minutes.
+In this tutorial you build a tiny Slack bot, run it against channelstack's fake Slack, and write a test that checks it answers once, in the thread. Then you break the bot and watch the test catch it. The same steps work for any app or agent built on Slack's SDKs. It takes about ten minutes.
 
 <TerminalSession
   title="~/hello-agent"
@@ -39,7 +39,7 @@ npm i @slack/bolt
 npm i -D channelstack vitest
 ```
 
-`@slack/bolt` is Slack's own framework; the agent uses it exactly as it would against real Slack. `channelstack` brings the server, the CLI and the Vitest plugin.
+`@slack/bolt` is Slack's own framework; the bot uses it exactly as it would against real Slack. `channelstack` brings the server, the CLI and the Vitest plugin.
 
 ## 2. Start channelstack
 
@@ -65,14 +65,14 @@ channelstack 0.0.0 · in-memory
   `channelstack env` prints tokens and URLs as .env lines
 ```
 
-The fake Slack now runs at `http://127.0.0.1:4500/slack`, with a workspace and an app called `my-agent` already installed. (`echo` is a tiny chat platform channelstack uses to test itself; you can ignore it.) `CHANNELSTACK_SLACK_WEBHOOK_URL` tells it where your agent will listen for events: `/slack/events` on port 3000 is Bolt's default.
+The fake Slack now runs at `http://127.0.0.1:4500/slack`, with a workspace and an app called `my-agent` already installed. (`echo` is a tiny chat platform channelstack uses to test itself; you can ignore it.) `CHANNELSTACK_SLACK_WEBHOOK_URL` tells it where your bot will listen for events: `/slack/events` on port 3000 is Bolt's default.
 
 > [!NOTE]
-> `--no-portless` serves everything on one port. Without it, channelstack uses [portless](https://github.com/vercel-labs/portless) to give each fake its own HTTPS name, such as `https://slack.localhost`. That's the default; see [Connecting your agent](/docs/guide/connecting-your-agent).
+> `--no-portless` serves everything on one port. Without it, channelstack uses [portless](https://github.com/vercel-labs/portless) to give each fake its own HTTPS name, such as `https://slack.localhost`. That's the default; see [Connecting your app](/docs/guide/connecting-your-agent).
 
-## 3. Point the agent at the fake
+## 3. Point the bot at the fake
 
-Back in the first terminal, ask the server for the agent's settings:
+Back in the first terminal, ask the server for the bot's settings:
 
 ```bash
 npx channelstack env > .env.local
@@ -80,7 +80,7 @@ npx channelstack env > .env.local
 
 `.env.local` now holds what a Slack app needs: a bot token, a signing secret and `SLACK_API_URL`, pointing at the fake. (It also has lines for the other platforms, which this tutorial doesn't use.) The tokens are random, made once for your machine, and stay the same across restarts.
 
-## 4. Write the agent
+## 4. Write the bot
 
 Create `agent.js`. It answers every mention in the thread of the message that mentioned it:
 
@@ -141,7 +141,7 @@ test("a mention gets one reply, in the thread", async ({ slack }) => {
 });
 ```
 
-Read it as a story: Ana exists, she and the app are in a new channel, she mentions the agent, and then three things should be true of what she sees. The `slack` fixture comes from the plugin, and so do the matchers.
+Read it as a story: Ana exists, she and the app are in a new channel, she mentions the bot, and then three things should be true of what she sees. The `slack` fixture comes from the plugin, and so do the matchers.
 
 Run it:
 
@@ -154,18 +154,18 @@ npx vitest run
       Tests  1 passed (1)
 ```
 
-Here's what happened. The plugin found the running server and opened a session for the test. Ana's message went into the fake workspace, which sent your agent a signed `app_mention` event. Your agent called `chat.postMessage` on the fake, which put the reply in the thread. The first matcher waited for that reply; the other two waited until the agent had gone quiet, then checked that there was exactly one reply and nothing in the channel itself.
+Here's what happened. The plugin found the running server and opened a session for the test. Ana's message went into the fake workspace, which sent your bot a signed `app_mention` event. Your bot called `chat.postMessage` on the fake, which put the reply in the thread. The first matcher waited for that reply; the other two waited until the bot had gone quiet, then checked that there was exactly one reply and nothing in the channel itself.
 
 ## 6. Break it on purpose
 
-A test you have never seen fail isn't proven yet. In `agent.js`, drop `thread_ts`, so the agent answers in the channel instead of the thread:
+A test you have never seen fail isn't proven yet. In `agent.js`, drop `thread_ts`, so the bot answers in the channel instead of the thread:
 
 ```diff title="agent.js"
 -  await say({ text: `On it: ${question}`, thread_ts: event.ts });
 +  await say({ text: `On it: ${question}` });
 ```
 
-Restart the agent and run the test again. After ten seconds of waiting for the reply, it fails, and says why:
+Restart the bot and run the test again. After ten seconds of waiting for the reply, it fails, and says why:
 
 ```
  FAIL  agent.test.ts > a mention gets one reply, in the thread
@@ -173,11 +173,11 @@ Error: Expected a reply from my-agent matching /summarize the incidents/. The th
   (nothing)
 ```
 
-The reply went to the channel, so the thread is empty. Put `thread_ts` back, restart the agent, and the test passes again.
+The reply went to the channel, so the thread is empty. Put `thread_ts` back, restart the bot, and the test passes again.
 
 ## Look around
 
-While the server runs, you can talk to the agent by hand, as any person:
+While the server runs, you can talk to the bot by hand, as any person:
 
 ```bash
 npx channelstack slack say --as ben --in "#support" "@my-agent are you there?"
@@ -195,6 +195,6 @@ The UI link the server printed opens the same conversation in a browser, next to
 ## Next steps
 
 - [How it works](/docs/guide/how-it-works): the server, sessions and the transcript, in one page.
-- [Connecting your agent](/docs/guide/connecting-your-agent): your own agent, on any of the four platforms, with portless and HTTPS.
+- [Connecting your app](/docs/guide/connecting-your-agent): your own app or agent, on any of the four platforms, with portless and HTTPS.
 - [Writing tests](/docs/guide/writing-tests): people, channels, shared fixtures and cleanup.
 - [Slack](/docs/platforms/slack): everything a Slack test can do, from buttons and modals to Stop.

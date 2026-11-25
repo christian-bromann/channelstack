@@ -1,24 +1,24 @@
 ---
 title: "Proxy mode"
 order: 10
-description: "Test an agent that hard-codes slack.com or api.github.com, with no code change, through channelstack's HTTP proxy and its own name-constrained CA."
+description: "Test an app that hard-codes slack.com or api.github.com, with no code change, through channelstack's HTTP proxy and its own name-constrained CA."
 ---
 
 # Proxy mode
 
-Proxy mode is for agents whose platform URL you can't change: an agent that hard-codes `slack.com`, a Go service, a stack you don't control. channelstack also runs an HTTP proxy that sends the platforms' hosts to the fakes and lets everything else through, so the agent runs unchanged.
+Proxy mode is for apps whose platform URL you can't change: an app that hard-codes `slack.com`, a Go service, a stack you don't control. channelstack also runs an HTTP proxy that sends the platforms' hosts to the fakes and lets everything else through, so the app runs unchanged.
 
 <ProxyRouting />
 
 ## When you need it
 
-If your agent's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`), use that instead: it's simpler and needs no CA ([Connecting your agent](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
+If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
 
-- the agent or a library it uses calls `https://slack.com/api/…` (or another platform host) directly;
-- you can set environment variables for the agent, but not its code or config;
-- you want a recording of the shape of what the agent exchanges with a platform (`--record`, below).
+- the app or a library it uses calls `https://slack.com/api/…` (or another platform host) directly;
+- you can set environment variables for the app, but not its code or config;
+- you want a recording of the shape of what the app exchanges with a platform (`--record`, below).
 
-A server runs in one mode or the other, not both: with `--proxy`, the fakes' own URLs (Socket Mode's WebSocket, upload URLs, `response_url`) are the platforms' URLs too, so an agent that only knows `slack.com` reaches all of them.
+A server runs in one mode or the other, not both: with `--proxy`, the fakes' own URLs (Socket Mode's WebSocket, upload URLs, `response_url`) are the platforms' URLs too, so an app that only knows `slack.com` reaches all of them.
 
 ## Start the server with the proxy
 
@@ -32,11 +32,11 @@ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelsta
   `channelstack env --proxy` prints tokens, the proxy and the CA as .env lines
 ```
 
-| Flag               | What it does                                                                                                                                               |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--proxy`          | Also listen on a loopback HTTP proxy                                                                                                                       |
-| `--proxy-port <n>` | The proxy's port. Default `7464`, fixed so the `HTTPS_PROXY` line in the agent's `.env` stays right across restarts. `0` picks a free one. Needs `--proxy` |
-| `--record <dir>`   | Write the shape of every exchange to `<dir>/shapes.jsonl`. Needs `--proxy`                                                                                 |
+| Flag               | What it does                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--proxy`          | Also listen on a loopback HTTP proxy                                                                                                                     |
+| `--proxy-port <n>` | The proxy's port. Default `7464`, fixed so the `HTTPS_PROXY` line in the app's `.env` stays right across restarts. `0` picks a free one. Needs `--proxy` |
+| `--record <dir>`   | Write the shape of every exchange to `<dir>/shapes.jsonl`. Needs `--proxy`                                                                               |
 
 The proxy routes exactly these hosts to the fakes, over HTTPS:
 
@@ -47,35 +47,35 @@ The proxy routes exactly these hosts to the fakes, over HTTPS:
 | `api.linear.app` | The Linear fake |
 | `api.notion.com` | The Notion fake |
 
-Every other host, including subdomains of these such as `app.slack.com`, is a plain tunnel to the real host: your model provider, package registries, anything else the agent calls. Plain `http://` to a routed host is refused with `403`, since the platforms are HTTPS only. The proxy doesn't tell sessions apart: the agent's calls reach the fakes as they would through base-URL mode, so tests and the dev loop work as usual.
+Every other host, including subdomains of these such as `app.slack.com`, is a plain tunnel to the real host: your model provider, package registries, anything else the app calls. Plain `http://` to a routed host is refused with `403`, since the platforms are HTTPS only. The proxy doesn't tell sessions apart: the app's calls reach the fakes as they would through base-URL mode, so tests and the dev loop work as usual.
 
-## Point the agent at the proxy
+## Point the app at the proxy
 
 ```bash
 npx channelstack env --proxy > .env.local
 ```
 
-It prints the fake tokens and signing secrets, without the API URLs (the agent keeps the platforms' own), and these:
+It prints the fake tokens and signing secrets, without the API URLs (the app keeps the platforms' own), and these:
 
 | Variable                                                 | Value                                        | For                                                                                                           |
 | -------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `HTTPS_PROXY`, `HTTP_PROXY`, `https_proxy`, `http_proxy` | `http://127.0.0.1:7464`                      | Every runtime that honours the proxy variables                                                                |
-| `NO_PROXY`, `no_proxy`                                   | `localhost,127.0.0.1,::1,.localhost`         | The agent's own server and anything on `*.localhost` stay direct                                              |
+| `NO_PROXY`, `no_proxy`                                   | `localhost,127.0.0.1,::1,.localhost`         | The app's own server and anything on `*.localhost` stay direct                                                |
 | `NODE_USE_ENV_PROXY`                                     | `1`                                          | Node 24's `http`, `https` and `fetch` use `HTTPS_PROXY` only with this                                        |
-| `NODE_OPTIONS`                                           | `--import="<home>/proxy/node-env-proxy.mjs"` | A preload that keeps Node's proxy-aware `fetch` in an agent that loads undici (below)                         |
+| `NODE_OPTIONS`                                           | `--import="<home>/proxy/node-env-proxy.mjs"` | A preload that keeps Node's proxy-aware `fetch` in an app that loads undici (below)                           |
 | `NODE_EXTRA_CA_CERTS`                                    | `<home>/ca/ca.pem`                           | Node trusts channelstack's CA on top of its own roots                                                         |
 | `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`                    | `<home>/ca/bundle.pem`                       | Runtimes that replace their trust bundle (Python, Go on Linux, curl): the public roots plus channelstack's CA |
 
 `<home>` is `~/.channelstack`, or `CHANNELSTACK_HOME`. On a server started without `--proxy`, the command refuses: `channelstack env --proxy needs proxy mode: start the server with --proxy`.
 
-Then start the agent with that environment, and nothing else changes.
+Then start the app with that environment, and nothing else changes.
 
-### Node agents and undici
+### Node apps and undici
 
 Importing the `undici` package installs its own global dispatcher, which replaces the proxy-aware one `NODE_USE_ENV_PROXY` sets up. Bolt does this through `@slack/socket-mode`, so an unmodified Bolt app would call `slack.com` directly. The preload in `NODE_OPTIONS` defines undici's global first, empty and fixed, so undici keeps its dispatcher to itself and Node's `fetch` keeps the proxy.
 
 > [!WARNING]
-> `NODE_OPTIONS` from `env --proxy` replaces any your agent sets. If it needs its own, put them on the same line after the `--import`.
+> `NODE_OPTIONS` from `env --proxy` replaces any your app sets. If it needs its own, put them on the same line after the `--import`.
 
 ### Other runtimes
 
@@ -92,7 +92,7 @@ channelstack has its own CA for proxy mode, separate from the one portless uses.
 
 - **Where:** made once per install in `<home>/ca/`, private (files 0600, directory 0700). `ca.pem` is the CA alone, `bundle.pem` the public roots plus the CA, and `ca.json` holds its key.
 - **What it may sign:** only the four routed hosts. Not their subdomains and no IP address: a certificate it signs for any other name fails verification, whoever made it. So even a leaked CA can't vouch for another site.
-- **Where it's trusted:** nowhere but the agent's environment. It is never added to a system trust store.
+- **Where it's trusted:** nowhere but the app's environment. It is never added to a system trust store.
 - **How long it lasts:** a year. It's replaced at the next start when it is about to expire or when the routed hosts change. The certificate for the hosts is made at each start and kept in memory.
 
 To replace it now:
@@ -105,11 +105,11 @@ npx channelstack ca rotate
 Replaced proxy mode's CA (/Users/you/.channelstack/ca/ca.pem). Restart the server; agents trust the new one from the same files.
 ```
 
-The files keep their paths, so the `.env` lines stay the same. Restart the server, then the agent, since runtimes read their trust bundle when they start.
+The files keep their paths, so the `.env` lines stay the same. Restart the server, then the app, since runtimes read their trust bundle when they start.
 
 ## Go on macOS: run it in Docker
 
-Go on macOS uses the system keychain and ignores `SSL_CERT_FILE`, so a Go agent runs in a Linux container for proxy mode. Share the host's network, so the proxy's loopback address works as it is, and mount the bundle file alone:
+Go on macOS uses the system keychain and ignores `SSL_CERT_FILE`, so a Go app runs in a Linux container for proxy mode. Share the host's network, so the proxy's loopback address works as it is, and mount the bundle file alone:
 
 ```bash
 set -a; source .env.local; set +a    # what channelstack env --proxy printed
@@ -127,13 +127,13 @@ docker run --rm --network host \
 
 `examples/agents/go-slack` in the channelstack repository is a `slack-go` agent run this way, with its `Dockerfile`.
 
-## Record what the agent exchanges
+## Record what the app exchanges
 
 ```bash
 npx channelstack start --proxy --record ./recordings
 ```
 
-With `--record <dir>`, the server writes `<dir>/shapes.jsonl` (0600): one line for every exchange the agent has with a routed host, and one for every webhook a fake delivers. A line holds the shape of the body, keys and types, never its values:
+With `--record <dir>`, the server writes `<dir>/shapes.jsonl` (0600): one line for every exchange the app has with a routed host, and one for every webhook a fake delivers. A line holds the shape of the body, keys and types, never its values:
 
 ```json
 {
@@ -154,4 +154,4 @@ Only codes and kinds are kept as values (`ok`, `error`, `type`, `subtype`, `kind
 
 ## Live channels in proxy mode
 
-A [live](/docs/guide/live-mode) channel's agent still talks to the real platform: the proxy passes its calls on to it. Reading those calls back live (`calls()`, Slack's status line, ephemeral messages) isn't built yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so those steps still skip live with `action_requires`.
+A [live](/docs/guide/live-mode) channel's app still talks to the real platform: the proxy passes its calls on to it. Reading those calls back live (`calls()`, Slack's status line, ephemeral messages) isn't built yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so those steps still skip live with `action_requires`.

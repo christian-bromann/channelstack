@@ -1,7 +1,7 @@
 {
   "name": "channelstack",
   "short_name": "channelstack",
-  "description": "Test AI agents that live in Slack, GitHub, Linear and Notion, on localhost.",
+  "description": "Test your Slack, GitHub, Linear and Notion apps and agents on localhost.",
   "start_url": "/",
   "display": "browser",
   "background_color": "#090b0f",
