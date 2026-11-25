@@ -1,6 +1,6 @@
 import notionClient from "@notionhq/client";
 
-import { ProtocolError } from "../../../core/errors/index.ts";
+import { LivePlatformRefusal } from "../../../core/errors/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 
 // The package is CommonJS: Node gives it to an ES module as its default export.
@@ -12,11 +12,7 @@ export const NOTION_API = "https://api.notion.com";
 const NOTION_VERSION = "2025-09-03";
 
 /** Notion refusing a call, with its own code (`object_not_found`, `validation_error`, `restricted_resource`, …). */
-export class NotionRefusal extends ProtocolError {
-  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
-    super({ platform: code, status: 409 }, message, data);
-  }
-}
+export class NotionRefusal extends LivePlatformRefusal {}
 
 type Method = "get" | "post" | "patch" | "delete";
 

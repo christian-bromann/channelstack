@@ -84,3 +84,13 @@ export class ProtocolError extends Error {
     return { error: this.code, message: this.message, data: this.data };
   }
 }
+
+/**
+ * A live platform refusing a call, with its own code (`channel_not_found`, `FORBIDDEN`): what
+ * channelstack's routes surface as a 409. Each driver names its own (`class SlackRefusal extends LivePlatformRefusal {}`).
+ */
+export class LivePlatformRefusal extends ProtocolError {
+  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
+    super({ platform: code, status: 409 }, message, data);
+  }
+}

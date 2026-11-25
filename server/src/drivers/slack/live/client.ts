@@ -1,4 +1,4 @@
-import { delay, type Timers } from "../../../core/clock/index.ts";
+import { RATE_LIMIT_RETRIES, type Timers, waitRetryAfter } from "../../../core/clock/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { SlackRefusal } from "../world.ts";
 
@@ -6,8 +6,6 @@ import { SlackRefusal } from "../world.ts";
 const SLACK_API = "https://slack.com/api";
 
 /** How often a call that Slack rate-limited is tried again, after the `Retry-After` Slack asks for. */
-const RATE_LIMIT_RETRIES = 3;
-const MAX_RETRY_AFTER_MS = 30_000;
 
 type Params = Readonly<Record<string, string | number | boolean | undefined | readonly unknown[] | object>>;
 
@@ -47,8 +45,7 @@ export class SlackWebClient {
         body,
       });
       if (response.status === 429 && attempt < RATE_LIMIT_RETRIES) {
-        const seconds = Number(response.headers.get("retry-after") ?? "1");
-        await delay(this.#timers, Math.min(MAX_RETRY_AFTER_MS, (Number.isFinite(seconds) ? seconds : 1) * 1000));
+        await waitRetryAfter(this.#timers, response.headers);
         continue;
       }
       const answer = (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined;

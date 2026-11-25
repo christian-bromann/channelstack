@@ -1,3 +1,4 @@
+import { iso } from "../../../core/clock/index.ts";
 import {
   type LinearActivityRecord,
   type LinearCommentRecord,
@@ -22,7 +23,6 @@ type Args = {
   includeArchived?: boolean | null;
 };
 
-const iso = (ms: number) => new Date(ms).toISOString();
 const maybe = (ms: number | null) => (ms === null ? null : iso(ms));
 
 /** What a GraphQL call needs from its context: which test sessions the objects it reads belong to. */

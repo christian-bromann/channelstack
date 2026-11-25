@@ -11,6 +11,7 @@ import type {
   UserObjectResponse,
 } from "@notionhq/client";
 
+import { iso } from "../../core/clock/index.ts";
 import { NotionApiError } from "./errors.ts";
 import type { NotionLinks } from "./links.ts";
 import { textItem } from "./rich-text.ts";
@@ -28,7 +29,6 @@ import type {
   NotionWorkspaceRecord,
 } from "./world.ts";
 
-const iso = (ms: number) => new Date(ms).toISOString();
 const partialUser = (id: string) => ({ object: "user" as const, id });
 
 type PropertyValue = PageObjectResponse["properties"][string];

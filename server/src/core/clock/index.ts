@@ -41,3 +41,17 @@ export async function pollUntil<T>(
     await delay(on.timers, options.everyMs);
   }
 }
+
+/** A time as the platforms write it: ISO 8601, in UTC, to the millisecond. */
+export const iso = (ms: number): string => new Date(ms).toISOString();
+
+/** How often a live client asks again after a platform's rate limit, before it gives up. */
+export const RATE_LIMIT_RETRIES = 3;
+/** The longest a live client waits on a platform's `Retry-After`. */
+const MAX_RETRY_AFTER_MS = 30_000;
+
+/** Wait as long as a rate-limited answer's `Retry-After` says (seconds; one if it says nothing), at most 30 seconds. */
+export function waitRetryAfter(timers: Timers, headers: Headers): Promise<void> {
+  const seconds = Number(headers.get("retry-after") ?? "1");
+  return delay(timers, Math.min(MAX_RETRY_AFTER_MS, (Number.isFinite(seconds) ? seconds : 1) * 1000));
+}

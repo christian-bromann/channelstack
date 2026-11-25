@@ -1,4 +1,4 @@
-import { ProtocolError } from "../../core/errors/index.ts";
+import { LivePlatformRefusal } from "../../core/errors/index.ts";
 import type { Awaitable } from "../../core/router/index.ts";
 
 /** The Slack fake's nouns, as the control API and the transcript see them. */
@@ -319,8 +319,4 @@ export interface SlackWorld {
 }
 
 /** Slack refusing what a person or the app tried, with Slack's own error code (`not_in_channel`). The fake and live both throw it. */
-export class SlackRefusal extends ProtocolError {
-  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
-    super({ platform: code, status: 409 }, message, data);
-  }
-}
+export class SlackRefusal extends LivePlatformRefusal {}

@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { GraphQLError } from "graphql";
 
+import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
@@ -26,8 +27,6 @@ import type {
   LinearTeamRecord,
   LinearUserRecord,
 } from "./world.ts";
-
-const iso = (ms: number) => new Date(ms).toISOString();
 
 const LinearUser = z
   .object({
