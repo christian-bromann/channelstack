@@ -45,7 +45,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | Unit tests | `pnpm test` | Green |
 | Spec is current | `pnpm spec:check` | Regenerating `spec/openapi.json` and `spec/ir.json` from the routes gives no diff |
 | SDKs are current | `pnpm sdk:check` | Regenerating every SDK gives no diff |
-| API contract | `pnpm api:check` (from phase 1) | `api/examples/*.test.ts` type-checks against the **generated** TypeScript SDK, not just against `api/*.d.ts` |
+| API contract | `pnpm api:check` (from phase 1) | `api/examples/*.test.ts` type-checks against the **generated** TypeScript SDK, not just against `api/*.d.ts`; and every member of every contract handle exists on the generated handle, except the gaps listed with their issues |
 | No secrets in output | `pnpm test:redaction` | A test run with known fake and live-shaped tokens finds none of them in logs, errors, recordings or the UI |
 | No duplicate code | `pnpm check:dupes` | jscpd finds no copy-pasted block over 15 lines (generated code excluded) |
 | Architecture boundaries | `pnpm check:deps` | dependency-cruiser: drivers don't import each other, core doesn't import drivers, nothing imports `generated/` except its SDK |

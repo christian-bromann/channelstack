@@ -130,7 +130,7 @@ export interface SlackUser extends User {
   runCommand(command: `/${string}`, where: { channel: SlackConversation }): Promise<SlackDelivery>;
   /** Press Stop on the agent's work in a thread. */
   stop(target: { thread: SlackThread | SlackMessage }): Promise<SlackDelivery>;
-  /** Wait for the agent to open a modal for this person (via `views.open`). */
+  /** Wait for the agent to open a modal for this person (via `views.open`). Only a modal still open counts. */
   waitForModal(options?: WaitOptions & { title?: string | RegExp }): Promise<SlackModal>;
   /** Every modal the agent opened for this person, in the order it opened them. `open` says which are still up. */
   modals(): Promise<SlackModal[]>;

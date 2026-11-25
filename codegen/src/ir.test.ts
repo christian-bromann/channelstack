@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { emitPython } from "./emit/python.ts";
+import { emitRust } from "./emit/rust.ts";
 import { emitTypeScript } from "./emit/typescript.ts";
 import { buildIr } from "./ir.ts";
 
@@ -240,6 +241,57 @@ describe("emitters", () => {
     expect(code).toContain('Session(HandleContext(ctx.transport, data["sessionId"]), data)');
     expect(code).toContain("async def open_session(self) -> Session:");
     expect(code).toContain("class NotFoundError(ChannelstackError):");
+  });
+});
+
+describe("a wait narrowed by fixed values (#13)", () => {
+  const narrowed = spec();
+  (narrowed.paths as Record<string, object>)["/sessions/{session}/widgets"] = {
+    get: {
+      summary: "Widgets",
+      parameters: [{ name: "session", in: "path", required: true, schema: { type: "string" } }],
+      responses: { 200: json({ type: "array", items: ref("Widget") }) },
+      "x-channelstack-method": { on: "Session", name: "widgets" },
+      "x-channelstack-waits": [
+        { name: "waitForWidget", mode: "next", where: { kind: "widget", size: 3 }, what: "a widget" },
+      ],
+    },
+  };
+  const ir = buildIr(narrowed);
+  const session = ir.resources.find((resource) => resource.name === "Session");
+
+  test("the IR keeps `where` on a list wait, and refuses it on an `until` wait", () => {
+    expect(session?.waits?.map((wait) => [wait.name, wait.where])).toEqual([
+      ["waitForWidget", { kind: "widget", size: 3 }],
+    ]);
+    const until = structuredClone(narrowed);
+    const read = (until.paths as Record<string, unknown>)["/sessions/{session}/widgets"] as {
+      get: Record<string, unknown>;
+    };
+    read.get["x-channelstack-waits"] = [
+      { name: "untilWidgets", mode: "until", in: true, where: { size: 3 }, what: "widgets" },
+    ];
+    expect(() => buildIr(until)).toThrow("`where` narrows the items of a list wait");
+  });
+
+  test("refuses a `where` field its items don't have", () => {
+    const typo = structuredClone(narrowed);
+    const read = (typo.paths as Record<string, unknown>)["/sessions/{session}/widgets"] as {
+      get: Record<string, unknown>;
+    };
+    read.get["x-channelstack-waits"] = [
+      { name: "waitForWidget", mode: "next", where: { opne: true }, what: "a widget" },
+    ];
+    expect(() => buildIr(typo)).toThrow("`where` names `opne`, which its items don't have");
+  });
+
+  test("every emitter adds one equality per field", () => {
+    const code = (files: Map<string, string>) => [...files.values()].join("\n");
+    expect(code(emitTypeScript(ir))).toContain('(item) => item.kind === "widget" && item.size === 3');
+    expect(code(emitPython(ir))).toContain('lambda item: item.kind == "widget" and item.size == 3');
+    expect(code(emitRust(ir))).toContain(
+      'item.get("kind") == Some(&Value::from("widget")) && item.get("size") == Some(&Value::from(3))',
+    );
   });
 });
 

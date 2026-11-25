@@ -57,6 +57,8 @@ export interface IrWait {
   text?: string;
   /** The wait's first argument is the read's own options, passed through to it. */
   filter?: true;
+  /** Only items whose fields have these values count: `{ open: true }`. */
+  where?: Record<string, string | number | boolean>;
   /** What is waited for, for the timeout message. */
   what: string;
 }
@@ -422,6 +424,12 @@ export function buildIr(openapi: Json): Ir {
             "an `until` wait needs a response, and either a `field` and the values it must leave (`not`), or `in`",
           );
         }
+        if (wait.mode === "until" && wait.where) {
+          throw new SpecError(
+            where,
+            "`where` narrows the items of a list wait (`next`, `latest`), not an `until` wait",
+          );
+        }
         const item = wait.mode === "until" && returned ? returned : itemOf(returned, where);
         owner.waits = [
           ...(owner.waits ?? []),
@@ -433,6 +441,7 @@ export function buildIr(openapi: Json): Ir {
             ...(wait.from ? { from: wait.from } : {}),
             ...(wait.text ? { text: wait.text } : {}),
             ...(wait.filter ? { filter: true as const } : {}),
+            ...(wait.where ? { where: { ...wait.where } } : {}),
             ...(wait.mode === "next" && wait.turn ? { turn: { field: wait.turn.field, value: wait.turn.value } } : {}),
             ...(wait.mode === "until" && wait.in !== true ? { field: wait.field, not: wait.not } : {}),
             ...(wait.mode === "until" && wait.in === true
@@ -475,6 +484,27 @@ export function buildIr(openapi: Json): Ir {
       visit(types.find((candidate) => candidate.name === type.name)?.type ?? null);
     }
   };
+  // A `where` names fields of the item it narrows: a typo would be a wait that never matches.
+  for (const resource of resources.values()) {
+    for (const wait of resource.waits ?? []) {
+      const { item: waited } = wait;
+      const item = waited.kind === "named" ? types.find((type) => type.name === waited.name)?.type : waited;
+      const fields =
+        item?.kind === "resource"
+          ? resources.get(item.name)?.fields
+          : item?.kind === "object"
+            ? item.fields
+            : undefined;
+      for (const field of Object.keys(wait.where ?? {})) {
+        if (!fields?.some((known) => known.name === field)) {
+          throw new SpecError(
+            `${resource.name}.${wait.name}`,
+            `\`where\` names \`${field}\`, which its items don't have`,
+          );
+        }
+      }
+    }
+  }
   for (const resource of resources.values()) {
     for (const field of resource.fields) visit(field.type);
     for (const method of resource.methods) {

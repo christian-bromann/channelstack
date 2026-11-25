@@ -1391,8 +1391,8 @@ class SlackUser:
         return [SlackMessage(ctx, item) for item in data]
 
     async def wait_for_modal(self, *, title: Text | None = None, timeout: Duration | None = None) -> SlackModal:
-        """Wait for the next new modal from the agent, after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForModal", self.modals, lambda item: text_matches(item.title, title), "a modal from the agent", timeout=timeout)
+        """Wait for the next new open modal from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForModal", self.modals, lambda item: text_matches(item.title, title) and item.open is True, "an open modal from the agent", timeout=timeout)
 
 
 class SlackConversation:

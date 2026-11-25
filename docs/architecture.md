@@ -251,7 +251,7 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 
 - **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`, defined in [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md)) run through every SDK in CI, like WebDriver's WPT.
 - **No stale output.** CI fails if `openapi.json`, `ir.json` or any generated SDK is out of date with the routes.
-- **The TS contract holds.** CI type-checks `api/examples/*.test.ts` against the generated TypeScript SDK, so the hand-designed API in `api/*.d.ts` and the generated one can't drift.
+- **The TS contract holds.** CI type-checks `api/examples/*.test.ts` against the generated TypeScript SDK, and checks that every member of every handle in `api/*.d.ts` exists on the generated handle (gaps listed with their issues), so the hand-designed API and the generated one can't drift.
 - **Versioning.** One tag releases the server, the spec and every SDK at the same version. SDKs check the server's major version on connect.
 
 ## 6. Distribution
