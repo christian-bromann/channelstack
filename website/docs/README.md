@@ -26,12 +26,12 @@ The folder is the section and the frontmatter's `order` is the position in it. A
 | Page | Kind | What it covers |
 |---|---|---|
 | Overview (`index.mdx`) | Explanation | What channelstack is in one screen: a test scripts people, the fake platform delivers to the unchanged agent, the matchers read what a person would see. Animated: the request flow |
-| Why channelstack (`why.mdx`) | Explanation | Why agents in chat tools are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
+| Why channelstack (`why.md`) | Explanation | Why agents in chat tools are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
 | Getting started (`getting-started.mdx`) | Tutorial | Install, start the server, `channelstack env`, run a reference-style Bolt agent, write and pass a first Vitest test, then break the agent and watch it fail. Animated: the terminal |
 
 **Quickstarts** (`docs/quickstarts/`)
 
-One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each follows a reference agent in `examples/agents/` that CI runs, so the steps are known to work.
+One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each was followed step by step against a local channelstack, so the steps are known to work. The Chat SDK and AI SDK ones also match a reference agent in `examples/agents/` that CI runs; Pi has no reference agent.
 
 | Page | Kind | What it covers |
 |---|---|---|
