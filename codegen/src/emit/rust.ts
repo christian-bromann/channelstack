@@ -13,12 +13,14 @@ const NOT_RAW = new Set(["self", "Self", "crate", "super"]);
 /** Names a handle already has from its traits or the generator: a field named so gets a `_`. */
 const TAKEN = new Set(["data", "ctx", "wrap", "wrap_opt", "wrap_vec", "from_wire", "from_wire_in", "close", "seen"]);
 
-/** A Rust identifier for an IR name: snake_case, and never a keyword. */
-function ident(name: string): string {
+/** A Rust identifier for an IR name: snake_case, and never a keyword. The docs name things with it too. */
+export function rustName(name: string): string {
   const snake = snakeCase(name);
   if (NOT_RAW.has(snake)) return `${snake}_`;
   return KEYWORDS.has(snake) ? `r#${snake}` : snake;
 }
+
+const ident = rustName;
 
 /** `createUser` → `CreateUser`, for builder types. */
 const pascal = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);

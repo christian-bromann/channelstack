@@ -10,7 +10,7 @@ description: "The channelstack client and sessions: every method, in every SDK's
 
 The client you connect with, and the session each test runs in. Every handle on the platform pages is reached from here.
 
-Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object and Python's keyword arguments. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `user` handle.
+Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object, Python's keyword arguments and Rust's builder setters. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `user` handle.
 
 Besides the errors listed with each method, most methods can fail with [`action_requires`](/docs/reference/api/errors#action-requires), [`cross_workspace_credential`](/docs/reference/api/errors#cross-workspace-credential), [`fake_actor_in_live_world`](/docs/reference/api/errors#fake-actor-in-live-world), [`internal`](/docs/reference/api/errors#internal), [`invalid_argument`](/docs/reference/api/errors#invalid-argument), [`live_misconfigured`](/docs/reference/api/errors#live-misconfigured), [`live_not_allowlisted`](/docs/reference/api/errors#live-not-allowlisted), [`not_found`](/docs/reference/api/errors#not-found), [`session_not_found`](/docs/reference/api/errors#session-not-found), [`unauthorized`](/docs/reference/api/errors#unauthorized), [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): a bad request, a closed session, or live mode refusing or misconfigured.
 
@@ -28,6 +28,10 @@ const status = await channelstack.status();
 
 ```python title="Python"
 status = await channelstack.status()
+```
+
+```rust title="Rust"
+let status = channelstack.status().await?;
 ```
 
 </CodeGroup>
@@ -48,9 +52,13 @@ const session = await channelstack.openSession({ name: "…" });
 session = await channelstack.open_session(name="…")
 ```
 
+```rust title="Rust"
+let session = channelstack.open_session().name("…").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `name` | `name` | `string` | no | option |
 
@@ -68,6 +76,10 @@ await channelstack.reset();
 
 ```python title="Python"
 await channelstack.reset()
+```
+
+```rust title="Rust"
+channelstack.reset().await?;
 ```
 
 </CodeGroup>
@@ -88,9 +100,13 @@ const env = await channelstack.env({ proxy });
 env = await channelstack.env(proxy=proxy)
 ```
 
+```rust title="Rust"
+let env = channelstack.env().proxy(proxy).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `proxy` | `proxy` | `boolean` | no | option |
 
@@ -110,6 +126,10 @@ const uiLoginLink = await channelstack.uiLoginLink();
 ui_login_link = await channelstack.ui_login_link()
 ```
 
+```rust title="Rust"
+let ui_login_link = channelstack.ui_login_link().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`UiLoginLink`](/docs/reference/api/client#uiloginlink-1).
@@ -118,7 +138,7 @@ ui_login_link = await channelstack.ui_login_link()
 
 Returned by [`Channelstack.openSession()`](/docs/reference/api/client#opensession).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `sessionId` | `session_id` | `string` |
 | `drivers` | `drivers` | `string[]` |
@@ -135,6 +155,10 @@ await session.close();
 
 ```python title="Python"
 await session.close()
+```
+
+```rust title="Rust"
+session.close().await?;
 ```
 
 </CodeGroup>
@@ -155,9 +179,13 @@ const eventPage = await session.events({ since: "…" });
 event_page = await session.events(since="…")
 ```
 
+```rust title="Rust"
+let event_page = session.events().since("…").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `since` | `since` | `string` | no | option |
 
@@ -175,6 +203,10 @@ const quiet = await session.quiet();
 
 ```python title="Python"
 quiet = await session.quiet()
+```
+
+```rust title="Rust"
+let quiet = session.quiet().await?;
 ```
 
 </CodeGroup>
@@ -195,6 +227,10 @@ const echoFixture = await session.echo();
 echo_fixture = await session.echo()
 ```
 
+```rust title="Rust"
+let echo_fixture = session.echo().await?;
+```
+
 </CodeGroup>
 
 **Returns** `EchoFixture`.
@@ -211,6 +247,10 @@ const slack = await session.slack();
 
 ```python title="Python"
 slack = await session.slack()
+```
+
+```rust title="Rust"
+let slack = session.slack().await?;
 ```
 
 </CodeGroup>
@@ -231,6 +271,10 @@ const github = await session.github();
 github = await session.github()
 ```
 
+```rust title="Rust"
+let github = session.github().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`GitHubFixture`](/docs/reference/api/github#githubfixture).
@@ -247,6 +291,10 @@ const linear = await session.linear();
 
 ```python title="Python"
 linear = await session.linear()
+```
+
+```rust title="Rust"
+let linear = session.linear().await?;
 ```
 
 </CodeGroup>
@@ -267,6 +315,10 @@ const notion = await session.notion();
 notion = await session.notion()
 ```
 
+```rust title="Rust"
+let notion = session.notion().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`NotionFixture`](/docs/reference/api/notion#notionfixture).
@@ -277,7 +329,7 @@ Plain values the handles return and take.
 
 ### Status
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `ready` | `ready` | `boolean` |
 | `version` | `version` | `string` |
@@ -285,14 +337,14 @@ Plain values the handles return and take.
 
 ### EventPage
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `events` | `events` | `LogEvent[]` |
 | `cursor` | `cursor` | `string` |
 
 ### LogEvent
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `at` | `at` | `string` |
 | `driver` | `driver` | `string` |
@@ -302,7 +354,7 @@ Plain values the handles return and take.
 
 ### Quiet
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `busy` | `busy` | `boolean` |
 | `quietForMs` | `quiet_for_ms` | `number` |
@@ -322,7 +374,7 @@ type Capabilities = Record<string, Capability>;
 
 ### Capability
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `fake` | `fake` | `boolean` |
 | `live` | `live` | `boolean` |
@@ -330,7 +382,7 @@ type Capabilities = Record<string, Capability>;
 
 ### DeliveryAttempt
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `number` | `number` | `number` |
 | `sentAt` | `sent_at` | `string` |
@@ -345,6 +397,6 @@ type Capabilities = Record<string, Capability>;
 
 ### UiLoginLink
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `url` | `url` | `string` |

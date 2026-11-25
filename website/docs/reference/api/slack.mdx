@@ -10,7 +10,7 @@ description: "Every handle, method and wait of the Slack fake, in every SDK's la
 
 Every handle of the Slack fake: the `slack` fixture, the people and objects a test creates on it, and what they read and wait for.
 
-Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object and Python's keyword arguments. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `SlackUser` handle.
+Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object, Python's keyword arguments and Rust's builder setters. The variable names are the ones the calls return elsewhere on these pages, so `user` is a `SlackUser` handle.
 
 Besides the errors listed with each method, most methods can fail with [`action_requires`](/docs/reference/api/errors#action-requires), [`cross_workspace_credential`](/docs/reference/api/errors#cross-workspace-credential), [`fake_actor_in_live_world`](/docs/reference/api/errors#fake-actor-in-live-world), [`internal`](/docs/reference/api/errors#internal), [`invalid_argument`](/docs/reference/api/errors#invalid-argument), [`live_misconfigured`](/docs/reference/api/errors#live-misconfigured), [`live_not_allowlisted`](/docs/reference/api/errors#live-not-allowlisted), [`not_found`](/docs/reference/api/errors#not-found), [`session_not_found`](/docs/reference/api/errors#session-not-found), [`unauthorized`](/docs/reference/api/errors#unauthorized), [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): a bad request, a closed session, or live mode refusing or misconfigured.
 
@@ -18,7 +18,7 @@ Besides the errors listed with each method, most methods can fail with [`action_
 
 Returned by [`Session.slack()`](/docs/reference/api/client#slack).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `app` | `app` | `SlackApp` |
 | `apiUrl` | `api_url` | `string` |
@@ -39,9 +39,13 @@ const user = await slack.createUser({ name: "…" });
 user = await slack.create_user(name="…")
 ```
 
+```rust title="Rust"
+let user = slack.create_user().name("…").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `name` | `name` | `string` | yes | option |
 | `id` | `id` | `string` | no | option |
@@ -74,6 +78,10 @@ const users = await slack.users();
 users = await slack.users()
 ```
 
+```rust title="Rust"
+let users = slack.users().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackUsers`](/docs/reference/api/slack#slackusers).
@@ -90,6 +98,10 @@ const conversations = await slack.conversations();
 
 ```python title="Python"
 conversations = await slack.conversations()
+```
+
+```rust title="Rust"
+let conversations = slack.conversations().await?;
 ```
 
 </CodeGroup>
@@ -110,9 +122,13 @@ const conversation = await slack.createChannel({ name: "…" });
 conversation = await slack.create_channel(name="…")
 ```
 
+```rust title="Rust"
+let conversation = slack.create_channel().name("…").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `name` | `name` | `string` | no | option |
 | `private` | `private` | `boolean` | no | option |
@@ -139,6 +155,10 @@ const deliveries = await slack.deliveries();
 deliveries = await slack.deliveries()
 ```
 
+```rust title="Rust"
+let deliveries = slack.deliveries().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackDeliveries`](/docs/reference/api/slack#slackdeliveries).
@@ -159,9 +179,13 @@ const apiCalls = await slack.calls({ operation: "…" });
 api_calls = await slack.calls(operation="…")
 ```
 
+```rust title="Rust"
+let api_calls = slack.calls().operation("…").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `operation` | `operation` | `string` | no | option |
 | `error` | `error` | `true \| string` | no | option |
@@ -182,6 +206,10 @@ const uninstallDeliveries = await slack.uninstallApp();
 
 ```python title="Python"
 uninstall_deliveries = await slack.uninstall_app()
+```
+
+```rust title="Rust"
+let uninstall_deliveries = slack.uninstall_app().await?;
 ```
 
 </CodeGroup>
@@ -206,11 +234,15 @@ const fault = await slack.fault({ type });
 fault = await slack.fault(type=type)
 ```
 
+```rust title="Rust"
+let fault = slack.fault().r#type(r#type).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `type` | `type` | `"rate_limit" \| "latency" \| "error" \| "drop_socket"` | yes | option |
+| `type` | `type` · `r#type` | `"rate_limit" \| "latency" \| "error" \| "drop_socket"` | yes | option |
 | `operation` | `operation` | `string` | no | option |
 | `retryAfter` | `retry_after` | `Duration` | no | option |
 | `delay` | `delay` | `Duration` | no | option |
@@ -236,9 +268,13 @@ const apiCall = await slack.waitForCall({ operation: "…" });
 api_call = await slack.wait_for_call(operation="…")
 ```
 
+```rust title="Rust"
+let api_call = slack.wait_for_call().operation("…").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `operation` | `operation` | `string` | no | filter |
 | `error` | `error` | `true \| string` | no | filter |
@@ -248,7 +284,7 @@ api_call = await slack.wait_for_call(operation="…")
 
 ## SlackApp
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -264,7 +300,7 @@ api_call = await slack.wait_for_call(operation="…")
 
 Returned by [`SlackFixture.createUser()`](/docs/reference/api/slack#createuser).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -289,9 +325,13 @@ const message = await user.say("…", { channel });
 message = await user.say("…", channel=channel)
 ```
 
+```rust title="Rust"
+let message = user.say("…").channel(&channel).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `message` | `message` | `string \| SlackMessageInput` | yes | positional |
 | `channel` | `channel` | `SlackConversation` | no | option |
@@ -315,9 +355,13 @@ const message = await user.reply("…", { thread });
 message = await user.reply("…", thread=thread)
 ```
 
+```rust title="Rust"
+let message = user.reply("…").thread(&thread).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `message` | `message` | `string \| SlackMessageInput` | yes | positional |
 | `thread` | `thread` | `SlackThread \| SlackMessage` | yes | option |
@@ -341,9 +385,13 @@ const result = await user.edit("…", { message });
 result = await user.edit("…", message=message)
 ```
 
+```rust title="Rust"
+let result = user.edit("…").message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `text` | `text` | `string \| SlackMessageInput` | yes | positional |
 | `message` | `message` | `SlackMessage` | yes | option |
@@ -366,9 +414,13 @@ await user.delete({ message });
 await user.delete(message=message)
 ```
 
+```rust title="Rust"
+user.delete().message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `message` | `message` | `SlackMessage` | yes | option |
 
@@ -390,9 +442,13 @@ const delivery = await user.click("…", { message });
 delivery = await user.click("…", message=message)
 ```
 
+```rust title="Rust"
+let delivery = user.click("…").message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `button` | `button` | `string \| SlackButtonRef` | yes | positional |
 | `message` | `message` | `SlackMessage` | no | option |
@@ -417,9 +473,13 @@ const delivery = await user.select(option, { menu: "…", message });
 delivery = await user.select(option, menu="…", message=message)
 ```
 
+```rust title="Rust"
+let delivery = user.select(option).menu("…").message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `option` | `option` | `string \| string[]` | yes | positional |
 | `menu` | `menu` | `string \| SlackMenuRef` | yes | option |
@@ -445,9 +505,13 @@ const delivery = await user.shortcut("…", { message });
 delivery = await user.shortcut("…", message=message)
 ```
 
+```rust title="Rust"
+let delivery = user.shortcut("…").message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `callbackId` | `callback_id` | `string` | yes | positional |
 | `message` | `message` | `SlackMessage` | yes | option |
@@ -472,9 +536,13 @@ const delivery = await user.runCommand("…", { channel });
 delivery = await user.run_command("…", channel=channel)
 ```
 
+```rust title="Rust"
+let delivery = user.run_command("…").channel(&channel).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `command` | `command` | `string` | yes | positional |
 | `channel` | `channel` | `SlackConversation` | yes | option |
@@ -499,9 +567,13 @@ const delivery = await user.stop({ thread });
 delivery = await user.stop(thread=thread)
 ```
 
+```rust title="Rust"
+let delivery = user.stop().thread(&thread).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `thread` | `thread` | `SlackThread \| SlackMessage` | yes | option |
 
@@ -525,11 +597,15 @@ const thread = await user.openAgentThread({ from });
 thread = await user.open_agent_thread(from_=from_)
 ```
 
+```rust title="Rust"
+let thread = user.open_agent_thread().from(&from).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `from` | `from_` | `SlackConversation` | no | option |
+| `from` | `from_` · `from` | `SlackConversation` | no | option |
 
 **Returns** [`SlackThread`](/docs/reference/api/slack#slackthread).
 
@@ -551,9 +627,13 @@ const message = await user.pickPrompt("…", { thread });
 message = await user.pick_prompt("…", thread=thread)
 ```
 
+```rust title="Rust"
+let message = user.pick_prompt("…").thread(&thread).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `title` | `title` | `string` | yes | positional |
 | `thread` | `thread` | `SlackThread \| SlackMessage` | yes | option |
@@ -578,9 +658,13 @@ const delivery = await user.switchContext(channel, { thread });
 delivery = await user.switch_context(channel, thread=thread)
 ```
 
+```rust title="Rust"
+let delivery = user.switch_context(&channel).thread(&thread).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `channel` | `channel` | `SlackConversation` | yes | positional |
 | `thread` | `thread` | `SlackThread \| SlackMessage` | yes | option |
@@ -605,6 +689,10 @@ const modals = await user.modals();
 modals = await user.modals()
 ```
 
+```rust title="Rust"
+let modals = user.modals().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackModals`](/docs/reference/api/slack#slackmodals).
@@ -625,9 +713,13 @@ const delivery = await user.react("…", { message });
 delivery = await user.react("…", message=message)
 ```
 
+```rust title="Rust"
+let delivery = user.react("…").message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `emoji` | `emoji` | `string` | yes | positional |
 | `message` | `message` | `SlackMessage` | yes | option |
@@ -650,9 +742,13 @@ const delivery = await user.unreact("…", { message });
 delivery = await user.unreact("…", message=message)
 ```
 
+```rust title="Rust"
+let delivery = user.unreact("…").message(&message).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `emoji` | `emoji` | `string` | yes | positional |
 | `message` | `message` | `SlackMessage` | yes | option |
@@ -675,9 +771,13 @@ const conversation = await user.openDM(participants);
 conversation = await user.open_dm(participants)
 ```
 
+```rust title="Rust"
+let conversation = user.open_dm(participants).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `participants` | `participants` | `SlackUser \| SlackApp \| Array<SlackUser \| SlackApp>` | yes | positional |
 
@@ -697,9 +797,13 @@ await user.invite(participants, { channel });
 await user.invite(participants, channel=channel)
 ```
 
+```rust title="Rust"
+user.invite(participants).channel(&channel).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `participants` | `participants` | `SlackUser \| SlackApp \| Array<SlackUser \| SlackApp>` | yes | positional |
 | `channel` | `channel` | `SlackConversation` | yes | option |
@@ -722,9 +826,13 @@ await user.kick(participant, { channel });
 await user.kick(participant, channel=channel)
 ```
 
+```rust title="Rust"
+user.kick(&participant).channel(&channel).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `participant` | `participant` | `SlackUser \| SlackApp` | yes | positional |
 | `channel` | `channel` | `SlackConversation` | yes | option |
@@ -747,6 +855,10 @@ const ephemeralMessages = await user.ephemeral();
 ephemeral_messages = await user.ephemeral()
 ```
 
+```rust title="Rust"
+let ephemeral_messages = user.ephemeral().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackEphemeralMessages`](/docs/reference/api/slack#slackephemeralmessages). It reads once the agent is quiet.
@@ -767,9 +879,13 @@ const modal = await user.waitForModal();
 modal = await user.wait_for_modal()
 ```
 
+```rust title="Rust"
+let modal = user.wait_for_modal().await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `title` | `title` | `string \| RegExp` | no | contains, or matches |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -780,7 +896,7 @@ modal = await user.wait_for_modal()
 
 Returned by [`SlackFixture.createChannel()`](/docs/reference/api/slack#createchannel), [`SlackUser.openDM()`](/docs/reference/api/slack#opendm).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `kind` | `kind` | `"channel" \| "private_channel" \| "im" \| "mpim"` |
@@ -798,6 +914,10 @@ const message = await conversation.latestMessage();
 
 ```python title="Python"
 message = await conversation.latest_message()
+```
+
+```rust title="Rust"
+let message = conversation.latest_message().await?;
 ```
 
 </CodeGroup>
@@ -818,6 +938,10 @@ const messages = await conversation.messages();
 messages = await conversation.messages()
 ```
 
+```rust title="Rust"
+let messages = conversation.messages().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackMessages`](/docs/reference/api/slack#slackmessages).
@@ -834,6 +958,10 @@ const members = await conversation.members();
 
 ```python title="Python"
 members = await conversation.members()
+```
+
+```rust title="Rust"
+let members = conversation.members().await?;
 ```
 
 </CodeGroup>
@@ -854,11 +982,15 @@ const transcript = await conversation.transcript({ as });
 transcript = await conversation.transcript(as_=as_)
 ```
 
+```rust title="Rust"
+let transcript = conversation.transcript().r#as(&r#as).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `as` | `as_` | `SlackUser \| SlackApp` | no | option |
+| `as` | `as_` · `r#as` | `SlackUser \| SlackApp` | no | option |
 
 **Returns** [`SlackTranscript`](/docs/reference/api/slack#slacktranscript).
 
@@ -876,11 +1008,15 @@ const message = await conversation.waitForMessage({ from: "my-agent" });
 message = await conversation.wait_for_message(from_="my-agent")
 ```
 
+```rust title="Rust"
+let message = conversation.wait_for_message().from("my-agent").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `from` | `from_` | `SlackUser \| SlackApp \| string` | no | a handle, or a name |
+| `from` | `from_` · `from` | `SlackUser \| SlackApp \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage). When the time is up, it fails with what it was waiting for.
@@ -889,7 +1025,7 @@ message = await conversation.wait_for_message(from_="my-agent")
 
 Returned by [`SlackUser.say()`](/docs/reference/api/slack#say), [`SlackUser.reply()`](/docs/reference/api/slack#reply), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.pickPrompt()`](/docs/reference/api/slack#pickprompt).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `channel` | `channel` | `string` |
 | `ts` | `ts` | `string` |
@@ -919,6 +1055,10 @@ const updated = await message.refresh();
 updated = await message.refresh()
 ```
 
+```rust title="Rust"
+let updated = message.refresh().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
@@ -935,6 +1075,10 @@ const reactions = await message.reactions();
 
 ```python title="Python"
 reactions = await message.reactions()
+```
+
+```rust title="Rust"
+let reactions = message.reactions().await?;
 ```
 
 </CodeGroup>
@@ -955,11 +1099,15 @@ const transcript = await message.transcript({ as });
 transcript = await message.transcript(as_=as_)
 ```
 
+```rust title="Rust"
+let transcript = message.transcript().r#as(&r#as).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `as` | `as_` | `SlackUser \| SlackApp` | no | option |
+| `as` | `as_` · `r#as` | `SlackUser \| SlackApp` | no | option |
 
 **Returns** [`SlackTranscript`](/docs/reference/api/slack#slacktranscript).
 
@@ -977,6 +1125,10 @@ const messageDeliveries = await message.deliveries();
 message_deliveries = await message.deliveries()
 ```
 
+```rust title="Rust"
+let message_deliveries = message.deliveries().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackMessageDeliveries`](/docs/reference/api/slack#slackmessagedeliveries).
@@ -987,7 +1139,7 @@ message_deliveries = await message.deliveries()
 
 Returned by [`SlackUser.openAgentThread()`](/docs/reference/api/slack#openagentthread).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `channel` | `channel` | `string` |
 | `ts` | `ts` | `string` |
@@ -1005,6 +1157,10 @@ const suggestedPrompts = await thread.suggestedPrompts();
 
 ```python title="Python"
 suggested_prompts = await thread.suggested_prompts()
+```
+
+```rust title="Rust"
+let suggested_prompts = thread.suggested_prompts().await?;
 ```
 
 </CodeGroup>
@@ -1027,6 +1183,10 @@ const replies = await thread.replies();
 replies = await thread.replies()
 ```
 
+```rust title="Rust"
+let replies = thread.replies().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackReplies`](/docs/reference/api/slack#slackreplies).
@@ -1043,6 +1203,10 @@ const threadStatus = await thread.status();
 
 ```python title="Python"
 thread_status = await thread.status()
+```
+
+```rust title="Rust"
+let thread_status = thread.status().await?;
 ```
 
 </CodeGroup>
@@ -1065,11 +1229,15 @@ const transcript = await thread.transcript({ as });
 transcript = await thread.transcript(as_=as_)
 ```
 
+```rust title="Rust"
+let transcript = thread.transcript().r#as(&r#as).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `as` | `as_` | `SlackUser \| SlackApp` | no | option |
+| `as` | `as_` · `r#as` | `SlackUser \| SlackApp` | no | option |
 
 **Returns** [`SlackTranscript`](/docs/reference/api/slack#slacktranscript).
 
@@ -1087,11 +1255,15 @@ const message = await thread.waitForReply({ from: "my-agent" });
 message = await thread.wait_for_reply(from_="my-agent")
 ```
 
+```rust title="Rust"
+let message = thread.wait_for_reply().from("my-agent").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `from` | `from_` | `SlackUser \| SlackApp \| string` | no | a handle, or a name |
+| `from` | `from_` · `from` | `SlackUser \| SlackApp \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage). When the time is up, it fails with what it was waiting for.
@@ -1110,11 +1282,15 @@ const message = await thread.latestReply({ from: "my-agent" });
 message = await thread.latest_reply(from_="my-agent")
 ```
 
+```rust title="Rust"
+let message = thread.latest_reply().from("my-agent").await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
-| `from` | `from_` | `SlackUser \| SlackApp \| string` | no | a handle, or a name |
+| `from` | `from_` · `from` | `SlackUser \| SlackApp \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 | `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
 
@@ -1124,11 +1300,11 @@ message = await thread.latest_reply(from_="my-agent")
 
 Returned by [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"slack"` |
-| `type` | `type` | `string` |
+| `type` | `type` · `r#type` | `string` |
 | `eventType` | `event_type` | `string \| undefined` |
 | `eventId` | `event_id` | `string \| undefined` |
 | `payload` | `payload` | `unknown \| undefined` |
@@ -1147,6 +1323,10 @@ const updated = await delivery.refresh();
 
 ```python title="Python"
 updated = await delivery.refresh()
+```
+
+```rust title="Rust"
+let updated = delivery.refresh().await?;
 ```
 
 </CodeGroup>
@@ -1169,9 +1349,13 @@ const deliveryAttempt = await delivery.retry({ after });
 delivery_attempt = await delivery.retry(after=after)
 ```
 
+```rust title="Rust"
+let delivery_attempt = delivery.retry().after(after).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `after` | `after` | `Duration` | no | option |
 | `reason` | `reason` | `"http_timeout" \| "http_error" \| "too_many_redirects"` | no | option |
@@ -1194,9 +1378,13 @@ const deliveryAttempt = await delivery.resend({ badSignature });
 delivery_attempt = await delivery.resend(bad_signature=bad_signature)
 ```
 
+```rust title="Rust"
+let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `badSignature` | `bad_signature` | `boolean` | no | option |
 | `stale` | `stale` | `boolean` | no | option |
@@ -1220,9 +1408,13 @@ const updated = await delivery.settled();
 updated = await delivery.settled()
 ```
 
+```rust title="Rust"
+let updated = delivery.settled().await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 
@@ -1232,7 +1424,7 @@ updated = await delivery.settled()
 
 Returned by [`SlackStream.refresh()`](/docs/reference/api/slack#refresh-2).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `channel` | `channel` | `string` |
 | `ts` | `ts` | `string` |
@@ -1255,6 +1447,10 @@ const updated = await stream.refresh();
 updated = await stream.refresh()
 ```
 
+```rust title="Rust"
+let updated = stream.refresh().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackStream`](/docs/reference/api/slack#slackstream).
@@ -1275,9 +1471,13 @@ const updated = await stream.ended();
 updated = await stream.ended()
 ```
 
+```rust title="Rust"
+let updated = stream.ended().await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `timeout` | `timeout` | `Duration` | no | default 10s |
 
@@ -1285,7 +1485,7 @@ updated = await stream.ended()
 
 ## SlackModal
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `viewId` | `view_id` | `string` |
 | `user` | `user` | `SlackUser` |
@@ -1308,6 +1508,10 @@ const modalValues = await modal.values();
 modal_values = await modal.values()
 ```
 
+```rust title="Rust"
+let modal_values = modal.values().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackModalValues`](/docs/reference/api/slack#slackmodalvalues).
@@ -1328,9 +1532,13 @@ const delivery = await modal.submit();
 delivery = await modal.submit()
 ```
 
+```rust title="Rust"
+let delivery = modal.submit().await?;
+```
+
 </CodeGroup>
 
-| Parameter | Python | Type | Required | |
+| Parameter | Python · Rust | Type | Required | |
 |---|---|---|---|---|
 | `values` | `values` | `Record<string, string \| string[]>` | no | positional |
 
@@ -1354,6 +1562,10 @@ const delivery = await modal.close();
 delivery = await modal.close()
 ```
 
+```rust title="Rust"
+let delivery = modal.close().await?;
+```
+
 </CodeGroup>
 
 **Returns** [`SlackDelivery | undefined`](/docs/reference/api/slack#slackdelivery).
@@ -1366,7 +1578,7 @@ delivery = await modal.close()
 
 Returned by [`SlackFixture.fault()`](/docs/reference/api/slack#fault).
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 
@@ -1384,6 +1596,10 @@ await fault.undo();
 await fault.undo()
 ```
 
+```rust title="Rust"
+fault.undo().await?;
+```
+
 </CodeGroup>
 
 **Returns** nothing. Disposing the handle calls it.
@@ -1396,7 +1612,7 @@ Plain values the handles return and take.
 
 ### SlackTeam
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -1415,7 +1631,7 @@ type SlackConversations = SlackConversation[];
 
 ### SlackMessageInput
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `text` | `text` | `string \| undefined` |
 | `blocks` | `blocks` | `unknown[] \| undefined` |
@@ -1423,14 +1639,14 @@ type SlackConversations = SlackConversation[];
 
 ### SlackMessageMetadata
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `event_type` | `event_type` | `string` |
 | `event_payload` | `event_payload` | `Record<string, unknown>` |
 
 ### SlackButtonRef
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `label` | `label` | `string \| undefined` |
 | `actionId` | `action_id` | `string \| undefined` |
@@ -1438,7 +1654,7 @@ type SlackConversations = SlackConversation[];
 
 ### SlackMenuRef
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `label` | `label` | `string \| undefined` |
 | `actionId` | `action_id` | `string \| undefined` |
@@ -1487,14 +1703,14 @@ type SlackReactions = SlackReaction[];
 
 ### SlackReaction
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `emoji` | `emoji` | `string` |
 | `by` | `by` | `Array<SlackUser \| SlackApp>` |
 
 ### SlackThreadStatus
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `state` | `state` | `"working" \| "streaming" \| "stopped" \| "idle"` |
 | `text` | `text` | `string \| undefined` |
@@ -1502,14 +1718,14 @@ type SlackReactions = SlackReaction[];
 
 ### SlackTranscript
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `entries` | `entries` | `SlackTranscriptEntry[]` |
 | `text` | `text` | `string` |
 
 ### SlackTranscriptEntry
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `author` | `author` | `SlackPrincipal` |
@@ -1525,7 +1741,7 @@ type SlackReactions = SlackReaction[];
 
 ### SlackPrincipal
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -1557,7 +1773,7 @@ type SlackApiCalls = SlackApiCall[];
 
 ### SlackApiCall
 
-| Field | Python | Type |
+| Field | Python · Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"slack"` |

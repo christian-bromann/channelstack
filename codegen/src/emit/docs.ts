@@ -7,6 +7,7 @@
  */
 import type { Ir, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
 import { pythonName } from "./python.ts";
+import { rustName } from "./rust.ts";
 import { BANNER, errorClassName, IrIndex } from "./shared.ts";
 import { typeScriptTypes } from "./typescript.ts";
 
@@ -52,7 +53,22 @@ const code = (text: string) => `\`${text}\``;
 interface Value {
   name: string;
   literal?: string;
+  /** A handle: Rust passes it by reference. */
+  handle?: boolean;
 }
+
+/** A name in Python and Rust: one when they agree, both when a keyword makes them differ (`from_`, `r#type`). */
+const otherNames = (name: string) => {
+  const python = pythonName(name);
+  const rust = rustName(name);
+  return python === rust ? code(python) : `${code(python)} · ${code(rust)}`;
+};
+
+/** Rust: a handle by reference, anything else as it is. */
+const rustValue = (value: Value) => value.literal ?? `${value.handle ? "&" : ""}${rustName(value.name)}`;
+
+/** One tab of a code group. */
+const tab = (title: string, lang: string, line: string) => [`\`\`\`${lang} title="${title}"`, line, "```", ""];
 
 export function emitDocs(ir: Ir): Map<string, string> {
   const index = new IrIndex(ir);
@@ -118,7 +134,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
   const errorsPath = `${ROUTE}/errors`;
   const errorLink = (errorCode: string) => `[${code(errorCode)}](${errorsPath}#${slugify(errorCode)})`;
 
-  /** The same call in each SDK's language. Rust joins when its emitter does. */
+  /** The same call in each SDK's language. */
   const calls = (
     receiver: string,
     name: string,
@@ -139,17 +155,14 @@ export function emitDocs(ir: Ir): Map<string, string> {
     const pyArgs = [...args.map(pyValue), ...options.map((option) => `${pythonName(option.name)}=${pyValue(option)}`)];
     const tsCall = `await ${receiver}.${name}(${tsArgs.join(", ")})`;
     const pyCall = `await ${pythonName(receiver)}.${pythonName(name)}(${pyArgs.join(", ")})`;
+    // Rust: arguments to the method, then a setter per option, and the builder is awaited.
+    const rsCall = `${rustName(receiver)}.${rustName(name)}(${args.map(rustValue).join(", ")})${options.map((option) => `.${rustName(option.name)}(${rustValue(option)})`).join("")}.await?`;
     return [
       "<CodeGroup>",
       "",
-      '```ts title="TypeScript"',
-      result ? `const ${result} = ${tsCall};` : `${tsCall};`,
-      "```",
-      "",
-      '```python title="Python"',
-      result ? `${pythonName(result)} = ${pyCall}` : pyCall,
-      "```",
-      "",
+      ...tab("TypeScript", "ts", result ? `const ${result} = ${tsCall};` : `${tsCall};`),
+      ...tab("Python", "python", result ? `${pythonName(result)} = ${pyCall}` : pyCall),
+      ...tab("Rust", "rust", result ? `let ${rustName(result)} = ${rsCall};` : `${rsCall};`),
       "</CodeGroup>",
       "",
     ];
@@ -159,6 +172,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
   const exampleValue = (param: IrParam): Value => ({
     name: param.name,
     ...(param.shorthand !== undefined || param.type.kind === "string" ? { literal: '"…"' } : {}),
+    ...(param.type.kind === "ref" ? { handle: true } : {}),
   });
 
   /** The options a call shows: the required ones, or the first when none is. The table lists them all. */
@@ -188,29 +202,30 @@ export function emitDocs(ir: Ir): Map<string, string> {
       ...args.map((value) => value.literal ?? pythonName(value.name)),
       ...[...filter, ...options].map((value) => `${pythonName(value.name)}=${value.literal ?? pythonName(value.name)}`),
     ];
+    // Rust: the wait is a builder; the filter and the options are its setters.
+    const rsCall = `${rustName(receiver)}.${rustName(wait.name)}(${args.map(rustValue).join(", ")})${[...filter, ...options].map((value) => `.${rustName(value.name)}(${rustValue(value)})`).join("")}.await?`;
     return [
       "<CodeGroup>",
       "",
-      '```ts title="TypeScript"',
-      `const ${result} = await ${receiver}.${wait.name}(${tsArgs.join(", ")});`,
-      "```",
-      "",
-      '```python title="Python"',
-      `${pythonName(result ?? "result")} = await ${pythonName(receiver)}.${pythonName(wait.name)}(${pyArgs.join(", ")})`,
-      "```",
-      "",
+      ...tab("TypeScript", "ts", `const ${result} = await ${receiver}.${wait.name}(${tsArgs.join(", ")});`),
+      ...tab(
+        "Python",
+        "python",
+        `${pythonName(result ?? "result")} = await ${pythonName(receiver)}.${pythonName(wait.name)}(${pyArgs.join(", ")})`,
+      ),
+      ...tab("Rust", "rust", `let ${rustName(result ?? "result")} = ${rsCall};`),
       "</CodeGroup>",
       "",
     ];
   };
 
   const paramRow = (param: { name: string; type: string; required: boolean; note?: string }) =>
-    `| ${code(param.name)} | ${code(pythonName(param.name))} | ${cell(code(param.type))} | ${param.required ? "yes" : "no"} | ${cell(param.note ?? "")} |`;
+    `| ${code(param.name)} | ${otherNames(param.name)} | ${cell(code(param.type))} | ${param.required ? "yes" : "no"} | ${cell(param.note ?? "")} |`;
 
   const paramTable = (rows: Array<{ name: string; type: string; required: boolean; note?: string }>) =>
     rows.length === 0
       ? []
-      : ["| Parameter | Python | Type | Required | |", "|---|---|---|---|---|", ...rows.map(paramRow), ""];
+      : ["| Parameter | Python · Rust | Type | Required | |", "|---|---|---|---|---|", ...rows.map(paramRow), ""];
 
   const paramOf = (param: IrParam, positional: boolean) => ({
     name: param.name,
@@ -325,11 +340,11 @@ export function emitDocs(ir: Ir): Map<string, string> {
     fields.length === 0
       ? []
       : [
-          "| Field | Python | Type |",
+          "| Field | Python · Rust | Type |",
           "|---|---|---|",
           ...fields.map(
             (field) =>
-              `| ${code(field.name)} | ${code(pythonName(field.name))} | ${cell(code(`${ts(field.type)}${field.optional ? " | undefined" : ""}`))} |`,
+              `| ${code(field.name)} | ${otherNames(field.name)} | ${cell(code(`${ts(field.type)}${field.optional ? " | undefined" : ""}`))} |`,
           ),
           "",
         ];
@@ -441,7 +456,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
         "",
         intro,
         "",
-        `Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object and Python's keyword arguments. The variable names are the ones the calls return elsewhere on these pages, so \`user\` is a ${code(page.prefix ? `${page.prefix}User` : "user")} handle.`,
+        `Each call is shown in every SDK's language, with its required options (the table under it lists them all). Arguments go first; options are TypeScript's trailing object, Python's keyword arguments and Rust's builder setters. The variable names are the ones the calls return elsewhere on these pages, so \`user\` is a ${code(page.prefix ? `${page.prefix}User` : "user")} handle.`,
         "",
         `Besides the errors listed with each method, most methods can fail with ${[...everywhere].sort().map(errorLink).join(", ")}: a bad request, a closed session, or live mode refusing or misconfigured.`,
         "",

@@ -277,7 +277,9 @@ describe("emitters", () => {
     // The result is an object, so it's `result`; the first option shows, the table lists them all.
     expect(client).toContain('const result = await widget.update("…", { parent });');
     expect(client).toContain('result = await widget.update("…", parent=parent)');
+    expect(client).toContain('let result = widget.update("…").parent(&parent).await?;');
     expect(client).toContain("| `label` | `label` | `string` | yes | positional |");
+    expect(client).toContain("| Parameter | Python · Rust | Type | Required | |");
     expect(client).toContain('| `mode` | `mode` | `"a" \\| "b"` | no | option |');
     const errors = pages.get("website/docs/reference/api/errors.mdx") ?? "";
     expect(errors).toContain("### not_found\n\nHTTP 404. It isn't there.");
