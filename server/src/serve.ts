@@ -13,7 +13,7 @@ import { createRecorder, forward } from "./core/proxy/record.ts";
 import { Redactor } from "./core/redact/index.ts";
 import type { SocketSession } from "./core/router/index.ts";
 import { Secrets } from "./core/secrets/index.ts";
-import { DRIVERS, proxyHosts, secretSpecs } from "./drivers/index.ts";
+import { DRIVERS, proxyHosts, secretSpecs, TOKEN_PATTERNS } from "./drivers/index.ts";
 
 /** The only address the server binds: the control API is never reachable from another machine. */
 const LOOPBACK = "127.0.0.1";
@@ -114,7 +114,7 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   }
   const secrets = Secrets.load(options.home, secretSpecs());
   const token = createBearerToken();
-  const redactor = new Redactor();
+  const redactor = new Redactor(TOKEN_PATTERNS);
   redactor.register(token, ...secrets.all());
   const log = createLogger({ level: options.logLevel, redactor, write: (line) => process.stderr.write(`${line}\n`) });
 

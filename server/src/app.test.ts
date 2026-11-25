@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { type Harness, harness, TOKEN } from "../test/app-harness.ts";
 import type { ServerUrls } from "./app.ts";
-import { signEchoDelivery } from "./core/signing/echo.ts";
+import { signEchoDelivery } from "./drivers/echo/signing.ts";
 import { DRIVERS } from "./drivers/index.ts";
 
 const servers: Server[] = [];

@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 
 import { IdGenerator } from "../core/ids/index.ts";
+import { Redactor } from "../core/redact/index.ts";
 import { GITHUB_IDS, githubLegacyNodeId, githubNodeId } from "./github/ids.ts";
-import { DRIVERS } from "./index.ts";
+import { DRIVERS, TOKEN_PATTERNS } from "./index.ts";
 import { linearIdentifier } from "./linear/ids.ts";
 import { SLACK_TS_PATTERN, slackTs } from "./slack/ids.ts";
 
@@ -107,5 +108,28 @@ describe("exit check 0.5: ids look real", () => {
       expect(githubNodeId(type, [1])).toMatch(new RegExp(`^${prefix}kgDO`));
     }
     expect(githubLegacyNodeId("IntegrationInstallation", 12345)).toBe("MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uMTIzNDU=");
+  });
+});
+
+/** Every secret format a driver declares, and the live tokens it names, with the driver's name. */
+const secrets = DRIVERS.flatMap((driver) => [
+  ...Object.entries(driver.secrets).map(([name, format]) => [`${driver.name}.${name}`, format] as const),
+  ...(driver.liveTokens ?? []).map((format, at) => [`${driver.name} live token ${at + 1}`, format] as const),
+]);
+/** A format with a recognisable prefix (`xoxb-`, `ntn_`): those are scrubbed by shape, the rest by value once loaded. */
+const prefixed = secrets.filter(([, format]) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern)));
+
+describe("secret formats", () => {
+  test.each(secrets)("%s matches the platform's layout", (_name, format) => {
+    // An RSA key takes a moment to make, and its layout doesn't vary: a few are enough.
+    const draws = String(format.pattern).includes("PRIVATE KEY") ? 3 : 200;
+    for (let i = 0; i < draws; i++) expect(format.generate()).toMatch(format.pattern);
+  });
+
+  test.each(prefixed)("a %s is scrubbed by its shape", (_name, format) => {
+    const token = format.generate();
+    const out = new Redactor(TOKEN_PATTERNS).text(`calling with ${token} failed`);
+    expect(out).not.toContain(token);
+    expect(out).toContain("[redacted]");
   });
 });

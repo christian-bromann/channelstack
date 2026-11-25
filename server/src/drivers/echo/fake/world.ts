@@ -1,8 +1,8 @@
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { signEchoDelivery } from "../../../core/signing/echo.ts";
 import { ECHO_IDS } from "../ids.ts";
 import { messageCreated } from "../payloads.ts";
+import { signEchoDelivery } from "../signing.ts";
 import type { EchoMessage, EchoPrincipal, EchoRoom, EchoWorld } from "../world.ts";
 import type { EchoStore } from "./store.ts";
 

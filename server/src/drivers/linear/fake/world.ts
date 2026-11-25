@@ -2,10 +2,10 @@ import type { RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
-import { signLinearWebhook, stampLinearWebhook } from "../../../core/signing/linear.ts";
 import { LINEAR_IDS } from "../ids.ts";
 import { linearLinks } from "../links.ts";
 import { linearPayloads } from "../payloads.ts";
+import { signLinearWebhook, stampLinearWebhook } from "../signing.ts";
 import { linearText } from "../text.ts";
 import type {
   LinearActivityRecord,

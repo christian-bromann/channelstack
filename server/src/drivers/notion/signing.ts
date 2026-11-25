@@ -1,4 +1,4 @@
-import { hmacSha256Hex } from "./hmac.ts";
+import { hmacSha256Hex } from "../../core/signing/hmac.ts";
 
 /**
  * Notion's webhook signature (https://developers.notion.com/reference/webhooks#validating-event-authenticity):

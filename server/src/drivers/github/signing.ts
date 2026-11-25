@@ -2,7 +2,7 @@ import { createPublicKey } from "node:crypto";
 
 import { importSPKI, jwtVerify } from "jose";
 
-import { hmacHex } from "./hmac.ts";
+import { hmacHex } from "../../core/signing/hmac.ts";
 
 /**
  * GitHub's webhook signatures (https://docs.github.com/webhooks/using-webhooks/validating-webhook-deliveries):

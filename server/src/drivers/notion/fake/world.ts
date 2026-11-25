@@ -2,7 +2,6 @@ import type { RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
-import { signNotionWebhook } from "../../../core/signing/notion.ts";
 import { NotionApiError } from "../errors.ts";
 import { NOTION_IDS } from "../ids.ts";
 import { notionLinks } from "../links.ts";
@@ -11,6 +10,7 @@ import { notionObjects } from "../objects.ts";
 import { type Author, type EventParent, notionPayloads, stampAttempt } from "../payloads.ts";
 import { notionReads, type TextPattern } from "../reads.ts";
 import { plainText, type RichTextItem, textItem, userMention } from "../rich-text.ts";
+import { signNotionWebhook } from "../signing.ts";
 import type {
   NotionBlockRecord,
   NotionCommentRecord,

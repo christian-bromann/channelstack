@@ -20,7 +20,7 @@ export interface Ir {
 }
 
 /** A driver: its name (`github`), and its title, which is also the prefix of its types (`GitHubUser`). */
-export interface IrChannel {
+interface IrChannel {
   name: string;
   title: string;
   /** channelstack's own test platform (`echo`), not a channel people test against. */

@@ -6,17 +6,20 @@ import { GitHubLiveClient } from "./live/client.ts";
 import { githubMaintenance } from "./live/maintenance.ts";
 import { createLiveGitHubWorld } from "./live/world.ts";
 import { registerGitHubRoutes } from "./routes.ts";
+import { GITHUB_SECRETS } from "./secrets.ts";
 
 /** The GitHub driver: the fake REST API and App webhooks, and the control actions a test's people take. */
 export const github: DriverDefinition = {
   name: "github",
   title: "GitHub",
   ids: GITHUB_IDS,
+  tokenPatterns: [/gh[opsur]_[A-Za-z0-9]{20,}/g, /github_pat_[A-Za-z0-9_]{20,}/g],
+  liveTokens: [GITHUB_SECRETS.personalToken],
   hosts: ["api.github.com"],
   secrets: {
-    webhookSecret: "github.webhookSecret",
-    privateKey: "github.privateKey",
-    installationToken: "github.installationToken",
+    webhookSecret: GITHUB_SECRETS.webhookSecret,
+    privateKey: GITHUB_SECRETS.privateKey,
+    installationToken: GITHUB_SECRETS.installationToken,
   },
   // A real GitHub App installed on a test org (live-mode.md, section 4). People bring their own tokens.
   live: {

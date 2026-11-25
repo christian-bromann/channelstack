@@ -1,16 +1,5 @@
 const REDACTED = "[redacted]";
 
-/** Shapes of the tokens the four platforms (and the echo driver) issue, fake or real. */
-const TOKEN_PATTERNS: readonly RegExp[] = [
-  /xox[abeoprs]-[A-Za-z0-9-]{10,}/g,
-  /xapp-\d-[A-Za-z0-9-]{10,}/g,
-  /gh[opsur]_[A-Za-z0-9]{20,}/g,
-  /github_pat_[A-Za-z0-9_]{20,}/g,
-  /lin_(?:api|oauth|wh)_[A-Za-z0-9]{16,}/g,
-  /ntn_[A-Za-z0-9]{20,}/g,
-  /secret_[A-Za-z0-9]{20,}/g,
-  /echo_app_[A-Za-z0-9]{20,}/g,
-];
 const BEARER_PATTERN = /\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
 
@@ -20,6 +9,12 @@ const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
  */
 export class Redactor {
   readonly #literals = new Set<string>();
+  readonly #patterns: readonly RegExp[];
+
+  /** `patterns`: the shapes of every platform's tokens, which each driver declares (`tokenPatterns`). */
+  constructor(patterns: readonly RegExp[] = []) {
+    this.#patterns = patterns;
+  }
 
   /** Register a secret value that has no recognisable shape (signing secrets, the bearer token). */
   register(...secrets: string[]): void {
@@ -47,7 +42,7 @@ export class Redactor {
   #tokensIn(input: string): string {
     let out = input;
     for (const literal of this.#literals) out = out.split(literal).join(REDACTED);
-    for (const pattern of TOKEN_PATTERNS) out = out.replace(pattern, REDACTED);
+    for (const pattern of this.#patterns) out = out.replace(pattern, REDACTED);
     return out;
   }
 }

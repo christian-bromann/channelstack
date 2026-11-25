@@ -2,7 +2,6 @@ import type { DeliveryTransport } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
-import { signSlackRequest } from "../../../core/signing/slack.ts";
 import { type Block, blockControls, findButton, findSelect, identified, plain, selectOptions } from "../blocks.ts";
 import { SLACK_IDS, slackTs } from "../ids.ts";
 import {
@@ -12,6 +11,7 @@ import {
   payloadForm,
   slashCommandFields,
 } from "../interaction-payloads.ts";
+import { signSlackRequest } from "../signing.ts";
 import {
   type Immediate,
   NOBODY,

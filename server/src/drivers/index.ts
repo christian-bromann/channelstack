@@ -24,6 +24,9 @@ export function channelsExtension(): Array<{ name: string; title: string; intern
   }));
 }
 
+/** The shapes of every platform's tokens, fake or real, for the redactor. */
+export const TOKEN_PATTERNS: readonly RegExp[] = DRIVERS.flatMap((driver) => driver.tokenPatterns);
+
 /** Every provider host proxy mode routes to a fake, and that channelstack's CA may vouch for. */
 export function proxyHosts(): string[] {
   return DRIVERS.flatMap((driver) => driver.hosts ?? []);

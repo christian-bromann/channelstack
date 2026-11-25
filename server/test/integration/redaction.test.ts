@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "vitest";
 
-import { SECRET_FORMATS } from "../../src/core/secrets/index.ts";
+import { DRIVERS } from "../../src/drivers/index.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 
 /**
@@ -13,15 +13,11 @@ import { type RunningBinary, startBinary } from "./harness.ts";
  * of them in the server's logs, its error responses or the event log.
  */
 
-// Live-shaped tokens are built at runtime, so no token-shaped literal is ever committed.
-const liveShaped = [
-  SECRET_FORMATS["slack.botToken"].generate(),
-  SECRET_FORMATS["slack.userToken"].generate(),
-  SECRET_FORMATS["github.installationToken"].generate(),
-  SECRET_FORMATS["linear.apiKey"].generate(),
-  SECRET_FORMATS["notion.token"].generate(),
-  ["github", "pat", "11ABCDEFG0aBcDeFgHiJkL", "mNoPqRsTuVwXyZ0123456789"].join("_"),
-];
+// Live-shaped tokens are built at runtime, so no token-shaped literal is ever committed: one of
+// each prefixed token every driver knows, fake or live.
+const liveShaped = DRIVERS.flatMap((driver) => [...Object.values(driver.secrets), ...(driver.liveTokens ?? [])])
+  .filter((format) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern)) && !String(format.pattern).startsWith("/^echo"))
+  .map((format) => format.generate());
 const email = ["ana.live", "example.com"].join("@");
 
 const agent = createServer((_request, response) => {

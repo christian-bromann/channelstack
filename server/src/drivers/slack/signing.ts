@@ -1,4 +1,4 @@
-import { hmacSha256Hex } from "./hmac.ts";
+import { hmacSha256Hex } from "../../core/signing/hmac.ts";
 
 /**
  * Slack's request signature (https://docs.slack.dev/authentication/verifying-requests-from-slack):

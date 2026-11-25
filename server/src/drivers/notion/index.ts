@@ -6,14 +6,16 @@ import { NotionRestClient } from "./live/client.ts";
 import { notionMaintenance } from "./live/maintenance.ts";
 import { createLiveNotionWorld } from "./live/world.ts";
 import { registerNotionRoutes } from "./routes.ts";
+import { NOTION_SECRETS } from "./secrets.ts";
 
 /** The Notion driver: the fake REST API and its webhooks, and the control actions a test's people take. */
 export const notion: DriverDefinition = {
   name: "notion",
   title: "Notion",
   ids: NOTION_IDS,
+  tokenPatterns: [/ntn_[A-Za-z0-9]{20,}/g, /secret_[A-Za-z0-9]{20,}/g],
   hosts: ["api.notion.com"],
-  secrets: { token: "notion.token", verificationToken: "notion.verificationToken" },
+  secrets: { token: NOTION_SECRETS.token, verificationToken: NOTION_SECRETS.verificationToken },
   // The integration's token in a test workspace (live-mode.md, section 4). People bring their own tokens.
   live: {
     credentials: ["CHANNELSTACK_NOTION_TOKEN"],

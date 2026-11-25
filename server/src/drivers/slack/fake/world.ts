@@ -3,7 +3,6 @@ import type { DeliveryAttempt, DeliveryRecord, RetryPolicy } from "../../../core
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
-import { signSlackRequest } from "../../../core/signing/slack.ts";
 import { identified } from "../blocks.ts";
 import { SLACK_IDS, slackTs } from "../ids.ts";
 import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
@@ -19,6 +18,7 @@ import {
   reactionEvent,
   richTextBlock,
 } from "../payloads.ts";
+import { signSlackRequest } from "../signing.ts";
 import {
   type Immediate,
   type SlackConversationKind,

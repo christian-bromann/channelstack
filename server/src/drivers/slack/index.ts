@@ -6,6 +6,7 @@ import { SlackWebClient } from "./live/client.ts";
 import { slackMaintenance } from "./live/maintenance.ts";
 import { createLiveWorld } from "./live/world.ts";
 import { registerSlackRoutes } from "./routes.ts";
+import { SLACK_SECRETS } from "./secrets.ts";
 
 /** The start of a text, short enough for one line of a failure message. */
 const excerpt = (text: string): string => {
@@ -18,13 +19,15 @@ export const slack: DriverDefinition = {
   name: "slack",
   title: "Slack",
   ids: SLACK_IDS,
+  tokenPatterns: [/xox[abeoprs]-[A-Za-z0-9-]{10,}/g, /xapp-\d-[A-Za-z0-9-]{10,}/g],
+  liveTokens: [SLACK_SECRETS.userToken],
   redeliver: "retry",
   hosts: ["slack.com"],
   secrets: {
-    botToken: "slack.botToken",
-    appToken: "slack.appToken",
-    signingSecret: "slack.signingSecret",
-    verificationToken: "slack.verificationToken",
+    botToken: SLACK_SECRETS.botToken,
+    appToken: SLACK_SECRETS.appToken,
+    signingSecret: SLACK_SECRETS.signingSecret,
+    verificationToken: SLACK_SECRETS.verificationToken,
   },
   // A real app in a sandbox workspace (live-mode.md, section 4). People bring their own tokens.
   live: {

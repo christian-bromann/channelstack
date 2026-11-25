@@ -9,7 +9,7 @@ import type { Ledger, LedgerEntry } from "../ledger/index.ts";
 import type { Logger } from "../log/index.ts";
 import type { Registry } from "../registry/index.ts";
 import type { Allowlist } from "../safety/index.ts";
-import type { LiveVault, SecretSpec } from "../secrets/index.ts";
+import type { LiveVault, SecretFormat, SecretSpec } from "../secrets/index.ts";
 import type { DriverRouter } from "./route.ts";
 
 /**
@@ -203,6 +203,17 @@ export interface DriverDefinition {
   readonly redeliver?: string;
   /** Every kind of id the driver generates (`idFormats`): exit check 0.5 holds each one to its format. */
   readonly ids: Readonly<Record<string, IdFormat>>;
+  /**
+   * The shapes of the platform's tokens, fake or real (`/xox[abeoprs]-…/g`, global): the redactor
+   * scrubs them from logs, errors and the event log. A signing secret with no shape is scrubbed
+   * by its value instead, once the secrets are loaded.
+   */
+  readonly tokenPatterns: readonly RegExp[];
+  /**
+   * Tokens the real platform issues that the fake never generates (a person's Slack token, a
+   * Linear API key). The redaction tests make one of each and check `tokenPatterns` scrubs it.
+   */
+  readonly liveTokens?: readonly SecretFormat[];
   readonly secrets: SecretSpec;
   /** What makes it live. A driver without it is always fake. */
   readonly live?: LiveDeclaration;

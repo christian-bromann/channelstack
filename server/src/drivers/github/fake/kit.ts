@@ -1,8 +1,8 @@
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { signGitHubWebhook } from "../../../core/signing/github.ts";
 import { GITHUB_IDS } from "../ids.ts";
 import { type GitHubObjects, githubObjects } from "../payloads.ts";
+import { signGitHubWebhook } from "../signing.ts";
 import {
   type GitHubIssueRecord,
   type GitHubPermission,
