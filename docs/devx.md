@@ -29,7 +29,7 @@ The names don't collide with emulate: its portless mode uses `*.emulate.localhos
 
 - **Channels:** Slack, GitHub, Linear and Notion. No Teams for now.
 - **One workspace or org per channel:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. Multi-workspace installs are out of scope until a real test case needs them.
-- **State lives in memory.** Restarting the server gives a fresh world from `channelstack.config.ts`. `channelstack reset` does the same without restarting.
+- **State lives in memory.** Restarting the server gives a fresh world.
 - **No model mocking.** channelstack fakes the channel, not the LLM. Use your framework's own fake model, or a real one (see [section 6](#6-the-model-is-yours)).
 - **Fake by default, real with credentials.** The same test runs against the fakes on every PR and against real sandbox workspaces nightly (see [section 10](#10-live-mode-the-same-tests-against-the-real-platforms)).
 - **One shared world, many scopes.** The agent is configured once, so all tests share one workspace per channel. Each test runs in its own session: it owns what it creates, sees only the deliveries its own conversations caused, and is cleaned up at the end. The CLI and UI share a long-lived `dev` session.
@@ -49,21 +49,25 @@ channelstack is an independent project: the fake platforms are channelstack's ow
 
 ```bash
 npm i -D channelstack
-npx channelstack          # first run: starts the portless proxy, trusts its CA, writes channelstack.config.ts
+CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events \
+  npx channelstack        # first run: starts the portless proxy and trusts its CA
 ```
 
 ```
 channelstack 0.1 · in-memory
 
-  UI       https://channelstack.localhost
-  Slack    https://slack.localhost/api/      workspace "Acme" · app my-agent
-  GitHub   https://github.localhost          org "acme" · app my-agent
-  Linear   https://linear.localhost/graphql  workspace "Acme" · app my-agent
-  Notion   https://notion.localhost/v1       workspace "Acme" · integration my-agent
+  Control  https://channelstack.localhost/_channelstack
+  echo     https://echo.localhost
+  slack    https://slack.localhost
+  github   https://github.localhost
+  linear   https://linear.localhost
+  notion   https://notion.localhost
+  UI       https://channelstack.localhost/…   (a one-time login link)
 
-  Delivering to  https://my-agent.localhost/{slack,github,linear,notion}   (waiting for your agent…)
-  `npx channelstack env` prints tokens and URLs as .env lines
+  `channelstack env` prints tokens and URLs as .env lines
 ```
+
+`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` tells each fake where your agent takes its events ([section 3](#3-the-agents-app-built-in-no-config-file)).
 
 Point the agent at it, using only options the SDKs already have. When the variable is unset, the agent talks to the real service, so production code is unchanged.
 
@@ -83,33 +87,30 @@ portless run my-agent pnpm dev           # → https://my-agent.localhost
 
 Tokens and signing secrets are random, generated once per install and kept in `~/.channelstack/secrets.json` (mode 0600). They stay the same across restarts, so `.env.local` never goes stale, and `channelstack secrets rotate` replaces them. Socket Mode apps get `wss://slack.localhost/link` from `apps.connections.open` and need no public URL at all.
 
-## 3. Config: `channelstack.config.ts`
+## 3. The agent's app: built in, no config file
 
-```ts
-import { defineConfig } from "channelstack";
+There is no config file. Each fake comes with your agent's app already installed, named `my-agent`, with what a typical agent has:
 
-export default defineConfig({
-  slack: {
-    workspace: "Acme",
-    app: { name: "my-agent", manifest: "./slack-manifest.yaml" },   // reuse the real manifest
-  },
-  github: {
-    org: "acme",
-    app: { name: "my-agent", webhook: "https://my-agent.localhost/github", permissions: { issues: "write", pull_requests: "write", checks: "write" } },
-  },
-  linear: {
-    workspace: "Acme",
-    app: { name: "my-agent", webhook: "https://my-agent.localhost/linear", agent: true },
-  },
-  notion: {
-    workspace: "Acme",
-    integration: { name: "my-agent", webhook: "https://my-agent.localhost/notion", events: ["comment.created"] },
-  },
-});
+| Channel | The built-in app |
+|---|---|
+| Slack | A bot with the scopes a conversational agent uses (`app_mentions:read`, `channels:history`, `chat:write`, `im:history`, `reactions:write`, `assistant:write`, …) and the bot events it subscribes to (`app_mention`, `message.*`, `reaction_added`, `member_joined_channel`, `app_uninstalled`, `agent_session_stopped`, `assistant_thread_started`, …). HTTP delivery or Socket Mode |
+| GitHub | The App `my-agent` (its bot is `my-agent[bot]`), with write access to issues, pull requests, contents, checks and statuses, subscribed to issue, comment, pull request, review, push and check run events |
+| Linear | An agent app, subscribed to `AgentSessionEvent`, `Issue` and `Comment` webhooks |
+| Notion | An integration with every capability, subscribed to `page.*` and `comment.*` events |
+
+Where each fake delivers events comes from the server's environment, one variable per channel: `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, with `SLACK`, `GITHUB`, `LINEAR` or `NOTION`.
+
+```bash
+CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events \
+CHANNELSTACK_GITHUB_WEBHOOK_URL=https://my-agent.localhost/github \
+npx channelstack
 ```
 
-- **The config describes only your agent's app**: its manifest or permissions, where to deliver events, and the workspace or org name. It contains **no users, channels, repos or pages**. Tests create those themselves (see [section 5](#5-tests-plug-into-vitest-playwright-webdriverio-and-pytest)), so every test states exactly the world it needs and shares nothing with other tests.
-- A real Slack manifest supplies scopes, events and interactivity URLs. channelstack then rejects calls outside the granted scopes (`missing_scope`), just as Slack does. GitHub App permissions work the same way.
+A Slack agent on Socket Mode connects out by itself and needs no URL.
+
+- **Nothing else exists up front: no users, channels, repos or pages.** Tests create those themselves (see [section 5](#5-tests-plug-into-vitest-and-pytest)), so every test states exactly the world it needs and shares nothing with other tests.
+- **The app's scopes hold.** channelstack rejects calls outside the granted scopes (`missing_scope`), just as Slack does.
+- **Live, the app is your real one.** Its credentials come from environment variables (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN`, `CHANNELSTACK_GITHUB_APP_ID`, …; [live-mode.md](live-mode.md)).
 
 ## 4. Driving it from the outside
 
@@ -124,50 +125,41 @@ The link signs one browser in and works once; `channelstack ui` prints a fresh o
 The CLI attaches to a running server. It finds it through portless (`channelstack.localhost`), or through `--server <url>` or `CHANNELSTACK_URL`. It's for poking the agent by hand while developing, and for shell scripts.
 
 ```bash
-# Slack
+# Slack (people and channels are created the first time they're named)
 channelstack slack say   --as ana --in "#support" "@my-agent what broke last night?"
 channelstack slack reply --as ben --thread last "and the one before?"
-channelstack slack click --as ana "Approve"              # the button in the latest message that has it
 channelstack slack react --as ben :eyes: --on last
-channelstack slack stop  --thread last                   # press Stop on the stream
-channelstack slack dm    --as cara my-agent "hi"
+channelstack slack click --as ana "Approve"              # the button in the latest message that has it
+channelstack slack stop  --thread last                   # press Stop on the agent's work in the thread
 
-# GitHub
-channelstack github comment --as ana acme/web#42 "@my-agent fix the failing test"
-channelstack github review  --as ben acme/web#42 --line src/app.ts:18 "this leaks"
-channelstack github open-pr --as ana acme/web --from fix-login "Fix login redirect"
-
-# Linear
-channelstack linear create   --as ana ENG "Checkout fails on Safari"
-channelstack linear delegate ENG-12 --to my-agent
-channelstack linear prompt   ENG-12 --as ana "also update the docs"
-channelstack linear stop     ENG-12
-
-# Notion
-channelstack notion comment --as ana "Roadmap" "@my-agent summarize the Q1 section"
+# Watching
+channelstack show                                         # the latest conversation as a person would read it
+channelstack show --thread last                           # only the latest thread; --json for raw
+channelstack tail                                         # events to the agent and its API calls, as they happen; --once
+channelstack ui                                           # a one-time link that opens the UI in a browser
 
 # Deliveries (any channel)
 channelstack deliveries [slack]                           # what was delivered, with ids, outcomes and attempts
 channelstack redeliver [slack] [last|<id>]                # again, as the platform does: Slack's retry, with X-Slack-Retry-Num
 
-# Watching
-channelstack tail                                         # live stream: events in, agent API calls out
-channelstack show                                         # the latest conversation as rendered text
-channelstack show --thread last                           # only the latest thread; --json for raw
-channelstack ui                                           # a one-time link that opens the UI in a browser
-channelstack reset
+# For a coding agent
+channelstack mcp                                          # these commands as MCP tools over stdio (section 4b)
 
-# Setup and maintenance
+# The server and its setup
+channelstack [start]                                      # --no-portless, --port <n>, --proxy, --proxy-port <n>, --record <dir>, --log-level <level>
 channelstack env [--proxy]                                # .env lines for the agent; --proxy for proxy mode
-channelstack doctor                                       # portless, CA trust per runtime, server, live credentials
+channelstack ca rotate                                    # a new CA for proxy mode
 channelstack secrets rotate                               # new fake tokens and signing secrets
-channelstack login slack --user ana                       # live mode: save a browser session for UI-only actions
-channelstack sweep                                        # live mode: remove leftovers from crashed runs
+
+# Live mode
+channelstack doctor                                       # which channels run live, their credentials and allowlists, saved browser sessions
+channelstack login slack --user ana                       # sign Ana in by hand, once, and save the session for the browser actor
+channelstack sweep                                        # remove leftovers from crashed runs; --older-than-hours, --run, --check
 ```
 
-`--as <name>` creates that user the first time it's used, and `--in "#name"` does the same for channels, so the dev loop needs no seed data either. Repos, Linear teams and Notion pages are created the same way on first mention (`acme/web`, `ENG`, `"Roadmap"`).
+`--as <name>` creates that user the first time it's used, and `--in "#name"` does the same for channels, so the dev loop needs no seed data either. GitHub, Linear and Notion have no person commands on the CLI: drive them from a test. `deliveries` and `redeliver` cover every channel.
 
-`last` always refers to the most recent message, thread, issue or delivery, so a loop of "say, look, fix the code, say again" needs no IDs. A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
+`last` always refers to the most recent message, thread or delivery, so a loop of "say, look, fix the code, say again" needs no IDs. A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
 
 Everything the CLI does happens in one shared session called `dev`, which the UI shows too. It lives until the server stops ([decision 0010](decisions/0010-dev-session-and-attach-cli.md)).
 
@@ -177,9 +169,9 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
 ```
 
-The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. `github_comment`, `linear_delegate` and `notion_comment` follow once the dev session can find GitHub, Linear and Notion people and objects by name, as it does Slack's ([#33](https://github.com/christian-bromann/channelstack/issues/33)). The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
+The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
 
-## 5. Tests: plug into Vitest, Playwright, WebdriverIO and pytest
+## 5. Tests: plug into Vitest and pytest
 
 channelstack has no test package of its own to import. It integrates into the test framework you already use. Each integration does three things:
 1. starts channelstack, or attaches to one that's running;
@@ -197,6 +189,8 @@ export default defineConfig({ plugins: [channelstack()] });
 // adds globalSetup (start or attach), a setup file that registers matchers,
 // and types for the test context
 ```
+
+The plugin takes `mode` (`auto`, `attach` or `start`), `server` (a URL to attach to), `timeout` (default 10s) and `quietFor` (default 750ms). The two defaults apply to every matcher and to every wait in the SDK: `waitFor…`, `latest…`, the reads that wait for quiet, and actions that wait for a button to appear.
 
 ```ts
 import { test, expect } from "vitest";
@@ -279,20 +273,21 @@ Why this shape:
   | Slack | a bot gets events from, and can post in, only the channels it's a member of (`not_in_channel` otherwise) | `createChannel({ participants: [ana, slack.app] })` |
   | GitHub | an App receives webhooks only for repos it's installed on | `createRepo({ apps: [github.app] })` |
   | Notion | an integration sees only pages explicitly connected to it | `createPage({ connections: [notion.app] })` |
-  | Linear | an app is installed workspace-wide | installed from the config; nothing per resource |
+  | Linear | an app is installed workspace-wide | installed from the start; nothing per resource |
 
   Leaving the app out is how you test the uninvited case: the agent should handle `not_in_channel` cleanly, or call `conversations.join` when it ought to. Shared fixtures can include the app once, so tests stay short.
 - **Every action returns the thing it created** (a message, comment, session or delivery), so you can chain the next step without looking anything up.
 
 #### Users as shared fixtures
 
-People you use across many tests belong in your own fixtures file, not in channelstack's config. That's plain Vitest `test.extend` (Playwright fixtures and pytest fixtures work the same way):
+People you use across many tests belong in your own fixtures file. That's plain Vitest `test.extend` (pytest fixtures work the same way):
 
 ```ts
 // test/fixtures.ts
 import { test as base } from "vitest";
+import type { SlackConversation, SlackUser } from "channelstack";
 
-export const test = base.extend<{ ana: SlackUser; ben: SlackUser; support: SlackChannel }>({
+export const test = base.extend<{ ana: SlackUser; ben: SlackUser; support: SlackConversation }>({
   ana: async ({ slack }, use) => use(await slack.createUser({ name: "Ana" })),
   ben: async ({ slack }, use) => use(await slack.createUser({ name: "Ben", admin: true })),
   support: async ({ slack, ana, ben }, use) =>
@@ -312,37 +307,36 @@ test("answers in #support", async ({ support, ana }) => {
 
 Each test still gets fresh users and a fresh channel (fixtures are created per test), so parallel tests never share state. Fixtures also compose: `support` depends on `ana` and `ben`.
 
-**What config-defined users would have offered, and where each benefit goes instead:**
+**Why there are no predefined users, and where each benefit goes instead:**
 
-| Benefit of users in the config | Without them |
+| Benefit of predefined users | Without them |
 |---|---|
 | People exist for the UI and CLI before any test runs | The CLI and UI create users on first use (`--as ana`, or the user picker) |
 | Stable user IDs, for agents that allowlist admins by ID (`ADMINS=U0ADMIN01`) | `createUser({ name: "Cara", id: "U0ADMIN01" })` accepts a fixed ID |
-| The same person across Slack, GitHub, Linear and Notion | A test links them explicitly when it matters: `github.createUser({ login: "ana", sameAs: slackAna })`. Most tests don't need it |
+| The same person across Slack, GitHub, Linear and Notion | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
 | Less setup per test | Shared fixtures (above) are one line per test and visible where they're used |
 
-So config-defined users lose nothing worth keeping, and they'd bring hidden shared state, which parallel tests can't afford.
+So predefined users would add nothing worth keeping, and they'd bring hidden shared state, which parallel tests can't afford.
 
-#### Disposables: supported, not required
+#### Cleanup: the session does it
 
-Everything created through a fixture (channels, PRs, issues, pages) is cleaned up when the test ends, so tests just use `const`. Created resources also implement `Symbol.asyncDispose`, for code that runs outside a fixture: scripts, the WebdriverIO service, `beforeAll` blocks.
+Everything a test creates (channels, PRs, issues, pages) belongs to its session, and closing the session removes it, so tests just use `const`. Three handles implement `Symbol.asyncDispose`, for code that runs outside a fixture (a script, a `beforeAll` block): the client, a session, and an injected Slack fault.
 
 ```ts
-await using channel = await slack.createChannel();   // archived when the scope ends
+await using session = await client.openSession();              // what it created is removed when the scope ends
+await using fault = await slack.fault({ type: "rate_limit" });  // undone when the scope ends
 ```
 
-`await using` needs TypeScript ≥ 5.2 with the `esnext.disposable` lib, or a runtime with native support. Plain `const` with fixture cleanup covers the main path, so the two don't conflict. A dispose step only cleans up; it never asserts anything.
+`await using` needs TypeScript ≥ 5.2 with the `esnext.disposable` lib, or a runtime with native support. A dispose step only cleans up; it never asserts anything.
 
 - The fixtures (`slack`, `github`, `linear`, `notion`) come from Vitest's own test context, so you import `test` and `expect` from `vitest` as usual.
 - Each fixture creates its own channel, PR, issue or page, so tests run in parallel against one server.
 
-### The other frameworks
+### The integrations
 
 | Framework | Integration | Fixtures | Matchers |
 |---|---|---|---|
 | Vitest | `channelstack/vitest` plugin | test context (`({ slack }) =>`) | `expect.extend` |
-| Playwright Test | `channelstack/playwright` | `test.extend` fixtures | `expect.extend` |
-| WebdriverIO | `@channelstack/wdio-service` | `browser.channelstack` or a service handle | `expect-webdriverio` matchers |
 | pytest | `pytest-channelstack` plugin | `channelstack` (the client), `channelstack_session`, `slack`, `github`, `linear`, `notion` | `expect(thread).to_have_reply_from("my-agent")`, `not_to_…` for negations ([decision 0018](decisions/0018-pytest-expect.md)) |
 
 ### pytest
@@ -374,12 +368,12 @@ async def test_a_mention_gets_one_reply(slack):
   asyncio_default_test_loop_scope = session
   ```
 
-- **Settings:** `--channelstack-mode attach|start|auto` (or `channelstack_mode` in the ini file), `channelstack_timeout` (10s) and `channelstack_quiet_for` (750ms).
+- **Settings:** `--channelstack-mode attach|start|auto` (or `channelstack_mode` in the ini file), `channelstack_timeout` (10s) and `channelstack_quiet_for` (750ms). As with Vitest, the two defaults apply to every check and to every wait in the SDK (`wait_for_…`, `latest_…`).
 - **Live mode:** a test that does something live mode can't do is skipped with the reason, as with Vitest.
 
 ### The matchers
 
-All matchers are **asynchronous and wait until the condition holds or a timeout passes**, like Playwright's web-first assertions and expect-webdriverio. A test never needs `sleep`.
+All matchers are **asynchronous and wait until the condition holds or a timeout passes**. A test never needs `sleep`.
 
 - **Positive** matchers resolve once the condition holds.
 - **Negative and exact-count** matchers (`not.…`, `toHaveRepliesFrom`) wait until the agent goes quiet. channelstack knows when that is: no open stream, no request from the agent in flight, no retry it was told to make later, no delivery in flight or about to be retried (Slack's retries a minute or more away don't hold a check up), and a short settle window that the matcher watches from start to end. It then checks the result. When a check fails or a wait gives up, the message also says what the agent left open, for example `Still open: a stream my-agent started and never stopped: "Thinking…"` ([decision 0009](decisions/0009-quiet-means-watched.md)).
@@ -446,13 +440,13 @@ This keeps the UI cheap: one generic transcript view plus generic controls, not 
 ## 8. CI
 
 ```yaml
-- run: npx channelstack start --detach --unprivileged     # portless without sudo; or --no-tls
+- run: npx channelstack start --no-portless --port 4500 &   # with CHANNELSTACK_<CHANNEL>_WEBHOOK_URL in the job's env
 - run: npx channelstack env >> $GITHUB_ENV
 - run: pnpm start &                                   # the agent, against the env above
 - run: pnpm vitest run                                # the plugin attaches to the running server
 ```
 
-Without portless, `npx channelstack start --no-portless --port 4500` serves `http://localhost:4500/{slack,github,linear,notion}` on one port, and `channelstack env` prints those URLs instead. A Docker image covers Python, Go and other stacks.
+With `--no-portless` the server serves `http://localhost:4500/{slack,github,linear,notion}` on one loopback port, with no TLS to trust, and `channelstack env` prints those URLs. A Docker image covers Python, Go and other stacks.
 
 ## 9. Proxy mode: for agents that can't change their base URL
 
@@ -477,8 +471,7 @@ npx channelstack env --proxy >> .env.local     # HTTPS_PROXY plus a CA trusted o
 Credentials make things real. Without them everything is fake. With them, the same test talks to a real sandbox workspace:
 
 ```ts
-// channelstack.config.ts: a real app, from env vars in CI (CHANNELSTACK_SLACK_APP_ID, CHANNELSTACK_SLACK_BOT_TOKEN, …)
-slack: { app: { name: "my-agent", manifest: "./slack-manifest.yaml" } }
+// the server's environment holds the real app's credentials in CI (CHANNELSTACK_SLACK_APP_ID, CHANNELSTACK_SLACK_BOT_TOKEN, …)
 
 // in a test: a real person, if CHANNELSTACK_SLACK_USER_ANA_TOKEN is set; fake otherwise
 const ana = await slack.createUser({ name: "Ana" });
@@ -487,9 +480,9 @@ const ana = await slack.createUser({ name: "Ana" });
 - **One test file, two runs.** CI runs it fake on every PR and live nightly, with no edits. `CHANNELSTACK_REALITY=fake` forces fake locally, even with credentials present.
 - **Safety:** live mode only runs in workspaces, orgs and teams listed in `CHANNELSTACK_LIVE_*` allowlists, and refuses anywhere else with `live_not_allowlisted` before it does anything there. Everything a test creates carries the run's tag in its name (`channelstack-run-<run>-…`) and is removed when its session closes: Slack channels are archived, and what the test wrote in a DM is deleted.
 - **Acting, not relaying.** Live mode acts on the real platform (as the app, or as a person with their token) and reads the results back. The platform delivers events to your agent directly; how your agent is reachable is up to it. Delivery chaos (retries, bad signatures, redelivery) is fake-only.
-- **UI-only actions** such as Slack button clicks, Stop and modal submit have no public API. Live, the **browser actor** does them, signing in on its own with no one at the keyboard: a passkey on GitHub and Linear, the emailed code from a test inbox on Slack and Notion.
-- **A bot token alone** acts as the bot, never as a person. Person actions need a user token per sandbox person. On Slack, that token comes from a separate app for the sandbox's people. A person's message is the exception: Slack marks one posted through its API with the posting app's bot, and agents ignore it, so a person's `say` and `reply` are typed in the client by the browser actor.
-- **What live can't do skips, with the reason.** A fake-only step (delivery chaos, `channelstack reset`) is refused with `unsupported_in_live`, and one that needs a piece the run doesn't have (the browser actor, proxy mode) with `action_requires`. Vitest reports the test as skipped with that reason, for example `[live: SlackUser.click live needs the browser actor: …]`. The fake run on every PR runs it in full. A setup that can't work fails instead, so a broken nightly run goes red: credentials set in part or a token of the wrong kind (`live_misconfigured`), or a person without a token acting in a live workspace (`fake_actor_in_live_world`; `live_misconfigured` already at `createUser` under `CHANNELSTACK_REALITY=live`).
+- **UI-only actions** such as Slack button clicks, Stop and modal submit have no public API. Live, the **browser actor** does them in a browser, with the session that `channelstack login slack --user <name>` saved for that person.
+- **A bot token alone** acts as the bot, never as a person. Person actions need a user token per sandbox person. On Slack, that token comes from a separate app for the sandbox's people. A person's message is the exception: Slack marks one posted through its API with the posting app's bot, and agents ignore it, so a person's `say` and `reply` work live through their saved browser session: the browser actor types them in the client.
+- **What live can't do skips, with the reason.** A fake-only step (delivery chaos such as `delivery.retry()`) is refused with `unsupported_in_live`, and one that needs a piece the run doesn't have (the browser actor, proxy mode) with `action_requires`. Vitest reports the test as skipped with that reason, for example `[live: SlackUser.click live needs the browser actor: …]`. The fake run on every PR runs it in full. A setup that can't work fails instead, so a broken nightly run goes red: credentials set in part or a token of the wrong kind (`live_misconfigured`), or a person without a token acting in a live workspace (`fake_actor_in_live_world`; `live_misconfigured` already at `createUser` under `CHANNELSTACK_REALITY=live`).
 - **Checking the setup and cleaning up:**
 
   ```bash
@@ -506,21 +499,20 @@ const ana = await slack.createUser({ name: "Ana" });
 
 ## 11. TLS trust across runtimes
 
-portless trusts its CA in the system store, but not every runtime reads that store. `channelstack env` prints what each one needs, and `channelstack doctor` checks:
+portless trusts its CA in the system store, but not every runtime reads that store. Set what each one needs:
 
 | Runtime | Setting |
 |---|---|
 | Node ≥ 24 | `NODE_USE_SYSTEM_CA=1` (or `NODE_EXTRA_CA_CERTS=<portless CA>`) |
 | Python (certifi) | `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` = a bundle of certifi plus the portless CA |
 | Go | the macOS keychain works as is; on Linux, `SSL_CERT_FILE` |
-| Anything awkward | `--no-tls` |
+| Anything awkward | `--no-portless`: plain HTTP on one loopback port |
 
 ## 12. Package layout
 
 | Package | Purpose |
 |---|---|
-| `channelstack` | CLI, UI and the test integrations, as subpath exports: `channelstack/vitest`, `channelstack/playwright`, `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
-| `@channelstack/wdio-service` | WebdriverIO service and `expect-webdriverio` matchers |
+| `channelstack` | CLI, the client and the test integrations. The root export is the client and its types (`import type { SlackUser } from "channelstack"`), as is `channelstack/client`; the integrations are `channelstack/vitest` and `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
 | `pytest-channelstack` | pytest plugin: fixtures and `expect(...)` checks over the control API |
 
 > The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5. Examples are in `api/examples/`.
@@ -529,6 +521,6 @@ portless trusts its CA in the system store, but not every runtime reads that sto
 
 1. **Notion v0.1:** comment webhooks with `X-Notion-Signature` (HMAC-SHA256 with the verification token), page and database events, integration mentions in comments and page bodies. Person actions use personal access tokens ([reality-matrix.md](reality-matrix.md)).
 2. **The GitHub API host:** the fake serves both `github.localhost` as the API root (like `api.github.com`) and the GHE-style `github.localhost/api/v3`, because some SDKs assume the GHE layout when a host is set (phase 3).
-3. **Settle window:** `quietFor` defaults to 750 ms, configurable per integration (`channelstack({ quietFor })`) and per matcher (`{ quietFor: "1s" }`).
+3. **Settle window:** `quietFor` defaults to 750 ms, configurable per integration (`channelstack({ quietFor })`, `channelstack_quiet_for`), which sets it for every matcher and SDK wait, and per call (`{ quietFor: "1s" }`).
 
 Open questions for the maintainer are listed in [AGENTS.md](../AGENTS.md#still-open).
