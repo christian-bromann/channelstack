@@ -13,14 +13,14 @@ A test harness for AI agents that live in Slack, GitHub, Linear and Notion. One 
 | 1 | [docs/phases.md](docs/phases.md) | What to build, in which order, and the gate that proves each phase is done | **Spec** |
 | 2 | [docs/architecture.md](docs/architecture.md) | How the server and the SDK generator work, id formats | **Spec** |
 | 3 | [api/](api/) (`*.d.ts` and `examples/`) | The public TypeScript API, and examples that become the acceptance tests | **Spec** (the contract) |
-| 4 | [docs/devx.md](docs/devx.md) | How developers use it: CLI, config, tests, UI | **Spec** |
+| 4 | [docs/devx.md](docs/devx.md) | How developers use it: CLI, environment, tests, UI | **Spec** |
 | 5 | [docs/live-mode.md](docs/live-mode.md) | Live mode: acting on real platforms and observing results | **Spec** |
 | 6 | [docs/reality-matrix.md](docs/reality-matrix.md) | Per method: works in fake, works live, and what live needs | **Spec** (reference) |
 | 7 | [docs/implementation-plan.md](docs/implementation-plan.md) | The long-form design: protocol, drivers, conformance, security, SDK generation | **Spec** (detail) |
 | — | [docs/niche.md](docs/niche.md), [docs/audience.md](docs/audience.md), [docs/app-developers.md](docs/app-developers.md), [docs/framework-testing.md](docs/framework-testing.md), [docs/competitive-analysis.html](docs/competitive-analysis.html) | Why we build it, for whom, and the market | Background only |
 | 8 | [docs/code-map.md](docs/code-map.md) | Which module owns each concern. Check it before writing any function | **Spec** (kept current) |
 | — | [phase-log/](phase-log/) | Each phase's plan and closing note (reviews live on the PRs) | Working record |
-| — | [index.html](index.html) | The landing page | Marketing; must match the API (phase 8 checks it) |
+| — | [index.html](index.html) | The landing page | Marketing; must match the API |
 
 **When documents disagree,** the order of precedence is:
 1. `api/*.d.ts`
@@ -98,7 +98,7 @@ Don't reopen these without asking.
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |
 | Default mode | Base-URL mode through portless. Proxy mode is opt-in |
-| Test API | Actor-first: `ana.say(text, { channel })`. Resources are only read and waited on. Users are created per test (`createUser`), never declared in config; the app joins conversations explicitly (`participants: [ana, slack.app]`) |
+| Test API | Actor-first: `ana.say(text, { channel })`. Resources are only read and waited on. Users are created per test (`createUser`); there is no config file (each fake has a built-in app named `my-agent`, and `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` says where its events go); the app joins conversations explicitly (`participants: [ana, slack.app]`) |
 | Ids | Every handle uses the platform's own id format, in fake mode too (architecture.md 3.2) |
 | Tests | Integrate into Vitest and pytest with fixtures and matchers. No separate test package, no own runner. No Jest ([decision 0017](docs/decisions/0017-no-jest.md)) |
 | Models | channelstack doesn't mock LLMs. Agents use their framework's own fake model |
