@@ -377,9 +377,9 @@ export function emitRust(ir: Ir): Map<string, string> {
         `        let Self { ctx, me, seen, ${wanted ? "wanted, " : ""}options } = self;`,
         "        let _ = &seen;",
         `        let filters: Map<String, Value> = options.iter().filter(|(name, _)| [${filters.map(str).join(", ")}].contains(&name.as_str())).map(|(name, value)| (name.clone(), value.clone())).collect();`,
-        `        let timeout = options.get("timeout").cloned().unwrap_or_else(|| Value::from("10s"));`,
+        `        let timeout = options.get("timeout").cloned().unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));`,
         ...(w.mode === "latest"
-          ? [`        let quiet_for = options.get("quietFor").cloned().unwrap_or_else(|| Value::from("750ms"));`]
+          ? [`        let quiet_for = options.get("quietFor").cloned().unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));`]
           : []),
         ...(w.from ? [`        let from = options.get("from").cloned().unwrap_or(Value::Null);`] : []),
         ...(w.text
@@ -557,7 +557,7 @@ export function emitRust(ir: Ir): Map<string, string> {
     "use crate::runtime::client::{as_unit, as_value, enc, encode_segment, path_value, send, BoxFuture, Call, Ctx, Dyn, Handle, IntoArg};",
     "use crate::runtime::error::{Error, Result};",
     "use crate::runtime::launcher::{launch, Mode};",
-    "use crate::runtime::wait::{check_text, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next};",
+    "use crate::runtime::wait::{check_text, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next, DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT};",
     "",
     "/// The server version this SDK was generated for. It checks the server's major version on connect.",
     `pub const VERSION: &str = ${str(ir.version)};`,

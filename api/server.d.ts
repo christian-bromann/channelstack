@@ -21,7 +21,10 @@ export interface ChannelstackIntegrationOptions {
    * `attach`: fail if none is running. `start`: always start a private one.
    */
   mode?: "auto" | "attach" | "start";
-  /** Default timeout for matchers and every SDK wait (`waitFor…`, `latest…`, `settled`). Default "10s". */
+  /**
+   * Default timeout for matchers and every SDK wait (`waitFor…`, `latest…`, `settled`). Default "10s".
+   * A project without its own `testTimeout` gets one above it: 30s, or three times this.
+   */
   timeout?: Duration;
   /** Default quiet window for negative and exact-count matchers and `latest…` reads. Default "750ms". */
   quietFor?: Duration;

@@ -19,6 +19,7 @@ import type {
   SlackFixture,
 } from "../../sdks/typescript/client.ts";
 import { parseDuration } from "../../sdks/typescript/runtime/duration.ts";
+import { waitDefaults } from "../../sdks/typescript/runtime/wait.ts";
 import type { MatcherName, matchers } from "../matchers-core/index.ts";
 
 export interface ChannelstackIntegrationOptions {
@@ -29,9 +30,12 @@ export interface ChannelstackIntegrationOptions {
    * `attach`: fail if none is running. `start`: always start a private one.
    */
   mode?: "auto" | "attach" | "start";
-  /** Default matcher and wait timeout. Default "10s". */
+  /**
+   * Default timeout for matchers and every SDK wait (`waitFor…`, `latest…`, `settled`). Default "10s".
+   * A project without its own `testTimeout` gets one above it: 30s, or three times this.
+   */
   timeout?: Duration;
-  /** Default quiet window for negative and exact-count matchers. Default "750ms". */
+  /** Default quiet window for negative and exact-count matchers and `latest…` reads. Default "750ms". */
   quietFor?: Duration;
 }
 
@@ -88,7 +92,7 @@ const sibling = (name: string) => fileURLToPath(new URL(`./${name}${extname(impo
  * this is 30s, or three times the `timeout` if that's longer.
  */
 export function defaultTestTimeout(options: Pick<ChannelstackIntegrationOptions, "timeout">): number {
-  return Math.max(30_000, 3 * parseDuration(options.timeout ?? "10s"));
+  return Math.max(30_000, 3 * parseDuration(options.timeout ?? waitDefaults().timeout));
 }
 
 /** The Vitest plugin. */

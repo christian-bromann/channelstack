@@ -13,7 +13,7 @@ use super::duration::parse_duration;
 use super::error::{Error, Result};
 use super::launcher::Started;
 use super::transport::Transport;
-use super::wait::{QuietState, retry_while, until_quiet};
+use super::wait::{DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, QuietState, retry_while, until_quiet};
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -254,7 +254,7 @@ pub async fn send(
     retry: &[&str],
 ) -> Result<Value> {
     if once_quiet {
-        until_quiet(|| ctx.quiet(), &Value::from("10s"), &Value::from("750ms")).await?;
+        until_quiet(|| ctx.quiet(), &Value::from(DEFAULT_TIMEOUT), &Value::from(DEFAULT_QUIET_FOR)).await?;
     }
     if retry.is_empty() {
         return ctx.transport.request(verb, &path, body, query).await;

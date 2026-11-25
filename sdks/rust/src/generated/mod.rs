@@ -19,7 +19,8 @@ use crate::runtime::client::{
 use crate::runtime::error::{Error, Result};
 use crate::runtime::launcher::{Mode, launch};
 use crate::runtime::wait::{
-    check_text, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next,
+    DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, latest_once_quiet, text_matches,
+    wait_for, wait_for_next,
 };
 
 /// The server version this SDK was generated for. It checks the server's major version on connect.
@@ -7110,7 +7111,7 @@ impl SlackFixtureWaitForCall {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let item = wait_for_next(
             &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
@@ -7978,7 +7979,7 @@ impl SlackUserWaitForModal {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let text = options.get("title").cloned().unwrap_or(Value::Null);
         check_text(&text)?;
         let item = wait_for_next(
@@ -8190,7 +8191,7 @@ impl SlackConversationWaitForMessage {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
             &seen.positions,
@@ -8635,7 +8636,7 @@ impl SlackThreadWaitForReply {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
             &seen.positions,
@@ -8708,11 +8709,11 @@ impl SlackThreadLatestReply {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let quiet_for = options
             .get("quietFor")
             .cloned()
-            .unwrap_or_else(|| Value::from("750ms"));
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
             || run_slack_thread_replies(&ctx, &me, vec![], filters.clone()),
@@ -8971,7 +8972,7 @@ impl SlackDeliverySettled {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let value = wait_for("the delivery to settle", &timeout, || {
             let read = run_slack_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
@@ -9134,7 +9135,7 @@ impl SlackStreamEnded {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let value = wait_for("the stream to end", &timeout, || {
             let read = run_slack_stream_refresh(&ctx, &me, vec![], filters.clone());
             async move {
@@ -9684,7 +9685,7 @@ impl GitHubFixtureWaitForCall {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let item = wait_for_next(
             &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
@@ -11134,7 +11135,7 @@ impl GitHubDeliverySettled {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let value = wait_for("the delivery to settle", &timeout, || {
             let read = run_git_hub_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
@@ -11375,7 +11376,7 @@ impl GitHubIssueWaitForComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
         check_text(&text)?;
@@ -11456,11 +11457,11 @@ impl GitHubIssueLatestComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let quiet_for = options
             .get("quietFor")
             .cloned()
-            .unwrap_or_else(|| Value::from("750ms"));
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
             || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
@@ -12248,7 +12249,7 @@ impl LinearFixtureWaitForCall {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let item = wait_for_next(
             &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
@@ -13309,7 +13310,7 @@ impl LinearIssueWaitForComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
         check_text(&text)?;
@@ -13390,11 +13391,11 @@ impl LinearIssueLatestComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let quiet_for = options
             .get("quietFor")
             .cloned()
-            .unwrap_or_else(|| Value::from("750ms"));
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
             || run_linear_issue_comments(&ctx, &me, vec![], filters.clone()),
@@ -13625,7 +13626,7 @@ impl LinearDeliverySettled {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let value = wait_for("the delivery to settle", &timeout, || {
             let read = run_linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
@@ -13844,7 +13845,7 @@ impl LinearAgentSessionWaitForState {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let values = match &wanted {
             Value::Array(values) => values.clone(),
             one => vec![one.clone()],
@@ -13906,7 +13907,7 @@ impl LinearAgentSessionWaitForActivity {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let text = options.get("type").cloned().unwrap_or(Value::Null);
         check_text(&text)?;
         let item = wait_for_next(
@@ -14523,7 +14524,7 @@ impl NotionFixtureWaitForCall {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let item = wait_for_next(
             &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
@@ -15610,7 +15611,7 @@ impl NotionDeliverySettled {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let value = wait_for("the delivery to settle", &timeout, || {
             let read = run_notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
             async move {
@@ -15882,7 +15883,7 @@ impl NotionDiscussionWaitForComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
             &seen.positions,
@@ -15955,11 +15956,11 @@ impl NotionDiscussionLatestComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let quiet_for = options
             .get("quietFor")
             .cloned()
-            .unwrap_or_else(|| Value::from("750ms"));
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
             || run_notion_discussion_comments(&ctx, &me, vec![], filters.clone()),
@@ -16281,7 +16282,7 @@ impl GitHubPullRequestWaitForComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
         check_text(&text)?;
@@ -16362,11 +16363,11 @@ impl GitHubPullRequestLatestComment {
         let timeout = options
             .get("timeout")
             .cloned()
-            .unwrap_or_else(|| Value::from("10s"));
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
         let quiet_for = options
             .get("quietFor")
             .cloned()
-            .unwrap_or_else(|| Value::from("750ms"));
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = latest_once_quiet(
             || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
