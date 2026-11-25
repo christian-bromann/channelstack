@@ -1,6 +1,12 @@
 /**
  * Runs under Bun (`bun scripts/bun-compile.ts <entry> <target> <outfile>`), for `build-binary.ts`:
- * `bun build --compile` through `Bun.build`, with one plugin.
+ * `bun build --compile` through `Bun.build`, with one plugin. `<entry> --bundle <dir>` builds the
+ * same way without `--compile`, for a test that runs what the binary would hold under `bun`.
+ *
+ * It minifies whitespace only. WebdriverIO tells a browser from an element by its scope
+ * function's name (`scopeType.name === "Browser"` in `@wdio/utils`), and Bun's identifier and
+ * syntax minifiers rename or drop it (`keepNames` doesn't keep it): the browser actor's session
+ * then has no capabilities and fails to start (#49, decision 0019).
  *
  * The plugin makes WebdriverIO bundle (the browser actor, `core/browser`). It loads its protocol
  * driver and its Node half with computed imports (`import(options.automationProtocol || "webdriver")`,
@@ -21,8 +27,10 @@ interface BunPlugin {
 declare const Bun: {
   build(options: {
     entrypoints: string[];
-    compile: { target: string; outfile: string };
-    minify: boolean;
+    compile?: { target: string; outfile: string };
+    outdir?: string;
+    target?: "bun";
+    minify: { whitespace: boolean };
     plugins: BunPlugin[];
   }): Promise<{ success: boolean; logs: unknown[] }>;
   file(path: string): { text(): Promise<string> };
@@ -54,13 +62,13 @@ const literalImports: BunPlugin = {
 };
 
 const [entry, target, outfile] = process.argv.slice(2);
-if (!entry || !target || !outfile) throw new Error("Usage: bun scripts/bun-compile.ts <entry> <target> <outfile>");
-const result = await Bun.build({
-  entrypoints: [entry],
-  compile: { target, outfile },
-  minify: true,
-  plugins: [literalImports],
-});
+if (!entry || !target || !outfile) {
+  throw new Error("Usage: bun scripts/bun-compile.ts <entry> <target> <outfile> | <entry> --bundle <dir>");
+}
+const options = { entrypoints: [entry], minify: { whitespace: true }, plugins: [literalImports] };
+const result = await Bun.build(
+  target === "--bundle" ? { ...options, outdir: outfile, target: "bun" } : { ...options, compile: { target, outfile } },
+);
 if (!result.success) {
   for (const log of result.logs) console.error(log);
   process.exit(1);
