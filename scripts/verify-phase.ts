@@ -32,7 +32,11 @@ const STANDING: readonly Check[] = [
   { name: "Spec is current", script: ["spec:check"], group: "static" },
   { name: "SDKs are current", script: ["sdk:check"], group: "static" },
   { name: "Linear's schema module matches its SDL", script: ["linear:schema:check"], group: "static" },
-  { name: "The examples type-check against the generated SDK", script: ["api:check"], group: "static" },
+  {
+    name: "The contract against the generated SDK: the examples, and every member",
+    script: ["api:check"],
+    group: "static",
+  },
   { name: "No secrets in output", script: ["test:redaction"], group: "unit" },
   { name: "No duplicate code", script: ["check:dupes"], group: "static" },
   { name: "Architecture boundaries", script: ["check:deps"], group: "static" },

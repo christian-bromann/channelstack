@@ -66,7 +66,7 @@ implement-phase ─► draft PR ─► gate green, PR ready ─► review-phase 
 
 - **One phase at a time.** Don't start phase *n+1* until phase *n*'s PR is merged and tagged. Set up `verify:phase` and CI in phase 0.
 - **The examples are the acceptance tests.** `api/examples/*.test.ts` must pass against reference agents as each phase enables them. Don't weaken an example to make it pass. If an example is wrong, fix it and the types together, and say why.
-- **Keep `api/*.d.ts` and the generated TypeScript SDK in sync.** `pnpm api:check` type-checks the examples against the generated SDK. If the generated SDK can't satisfy `api/*.d.ts`, change the generator or the routes, or change the contract on purpose with a note in the PR.
+- **Keep `api/*.d.ts` and the generated TypeScript SDK in sync.** `pnpm api:check` type-checks the examples against the generated SDK, and checks that every member of every contract type exists on what implements it (gaps listed with their issues). If the generated SDK can't satisfy `api/*.d.ts`, change the generator or the routes, or change the contract on purpose with a note in the PR.
 - **Update the docs a phase lists** under "Docs to update", in the same PR.
 - **Record decisions** in `docs/decisions/<id>.md`: what was decided, why, and the alternatives.
 
