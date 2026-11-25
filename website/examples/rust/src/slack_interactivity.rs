@@ -1,5 +1,4 @@
-use channelstack::{Handle, Result};
-use regex::Regex;
+use channelstack::{Handle, Result, Regex};
 use serde_json::json;
 
 use crate::fixtures;

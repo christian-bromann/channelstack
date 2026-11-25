@@ -123,7 +123,6 @@ name = "channelstack-docs-examples"
 version = "0.0.0"
 dependencies = [
  "channelstack",
- "regex",
  "serde_json",
  "tokio",
 ]
