@@ -6,20 +6,19 @@
  *
  * Usage: `node scripts/lib/slack-event-tap.ts <agent.ts>`, spawned with an IPC channel.
  */
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { App } from "@slack/bolt";
 
 const [path] = process.argv.slice(2);
 if (!path || !process.send) throw new Error("Usage: spawned with IPC, `slack-event-tap.ts <agent.ts>`");
 const agent = resolve(path);
 
-// The agent's own copy of Bolt (CommonJS, so its `import` gets this same module).
-const { App } = createRequire(agent)("@slack/bolt") as {
-  App: { prototype: { processEvent(event: { body: unknown }): Promise<void> } };
-};
+// The Bolt the reference agents import: one root dependency, so this is their `App`. Should it
+// ever stop being theirs, nothing is recorded and `pnpm conformance` fails (decision 0020).
 const processEvent = App.prototype.processEvent;
-App.prototype.processEvent = function (this: unknown, event) {
+App.prototype.processEvent = function (this: App, event) {
   // With a callback, a closed channel is an error passed here, not one that stops the agent.
   if (process.connected) process.send?.({ slackEvent: event.body }, undefined, {}, () => {});
   return processEvent.call(this, event);
