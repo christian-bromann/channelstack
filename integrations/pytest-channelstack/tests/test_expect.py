@@ -141,7 +141,7 @@ async def test_status() -> None:
             return Status("working", "is thinking…")
 
     await expect(Working()).to_have_status("working", **FAST)
-    with pytest.raises(AssertionError, match=r"Expected the thread to be idle, it is working \('is thinking…'\)"):
+    with pytest.raises(AssertionError, match=r'Expected the thread to be idle, it is working \("is thinking…"\)'):
         await expect(Working()).to_have_status("idle", **FAST)
 
 
@@ -177,9 +177,16 @@ async def test_no_call_with_an_error() -> None:
             calls = [Call("chat.postMessage"), Call("reactions.add", "already_reacted")]
             return [call for call in calls if error is None or call.error == error]
 
-    await expect(Fixture()).not_to_have_received_call(re.compile(".*"), error="not_in_channel", **FAST)
-    with pytest.raises(AssertionError, match="found 1: reactions.add → already_reacted"):
-        await expect(Fixture()).not_to_have_received_call(re.compile(".*"), error="already_reacted", **FAST)
+    await expect(Fixture()).not_to_have_received_call(re.compile(".*"), error="not_in_channel", timeout="300ms")
+    with pytest.raises(AssertionError, match=r"found 1\. Its calls:\n  reactions.add → already_reacted"):
+        await expect(Fixture()).not_to_have_received_call(re.compile(".*"), error="already_reacted", timeout="300ms")
+    await expect(Fixture()).not_to_have_received_call("chat.postMessage", times=2, timeout="300ms")
+    with pytest.raises(
+        AssertionError,
+        match=r'not to call "chat.postMessage" 1 times, found 1\. Its calls:\n'
+        r"  chat.postMessage\n  reactions.add → already_reacted",
+    ):
+        await expect(Fixture()).not_to_have_received_call("chat.postMessage", times=1, timeout="300ms")
 
 
 async def test_a_live_refusal_while_describing_a_failure_keeps_it_a_failure(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -243,7 +250,7 @@ async def test_text_a_person_sees_once_or_exactly_n_times() -> None:
     await expect(conversation).to_contain_text("Deploying", timeout="300ms")
     await expect(conversation).to_contain_text("Deploying", count=1, timeout="300ms")
     await expect(conversation).not_to_contain_text("Thinking…", timeout="300ms")
-    with pytest.raises(AssertionError, match="Expected exactly 2 entries with text matching 'Deploying', found 1"):
+    with pytest.raises(AssertionError, match='Expected exactly 2 entries with text matching "Deploying", found 1'):
         await expect(conversation).to_contain_text("Deploying", count=2, timeout="300ms")
 
 
@@ -265,7 +272,7 @@ async def test_text_as_a_person_sees_it_includes_their_ephemeral_messages() -> N
     conversation = WithEphemeral()
     await expect(conversation).to_contain_text("Only you", as_=PERSON, timeout="300ms")
     await expect(conversation).not_to_contain_text("Only you", timeout="300ms")
-    with pytest.raises(AssertionError, match="Expected text matching 'Only you', found 0"):
+    with pytest.raises(AssertionError, match='Expected text matching "Only you", found 0'):
         await expect(conversation).to_contain_text("Only you", timeout="300ms")
     assert conversation.viewers[0] is PERSON
 
@@ -275,6 +282,13 @@ async def test_a_button_on_the_apps_latest_message() -> None:
     await expect(conversation).to_have_button("Approve", timeout="300ms")
     with pytest.raises(AssertionError, match="Buttons there: Approve, Cancel"):
         await expect(conversation).to_have_button("Reject", timeout="300ms")
+
+
+async def test_no_button_with_a_label() -> None:
+    conversation = Conversation(Entry("1", BOT, "Approve?", ("Approve", "Cancel")))
+    await expect(conversation).not_to_have_button("Reject", timeout="300ms")
+    with pytest.raises(AssertionError, match=r"Expected no button matching /approve/i\. Buttons there: Approve"):
+        await expect(conversation).not_to_have_button(re.compile("approve", re.I), timeout="300ms")
 
 
 @dataclass(frozen=True)
@@ -299,6 +313,27 @@ async def test_comments_from_someone_and_exactly_how_many() -> None:
     await expect(issue).to_have_comments_from("my-agent", count=1, timeout="300ms")
     with pytest.raises(AssertionError, match="Expected exactly 2 comments from my-agent, found 1"):
         await expect(issue).to_have_comments_from("my-agent", count=2, timeout="300ms")
+
+
+async def test_no_comment_from_someone_and_not_exactly_how_many() -> None:
+    issue = Issue(Comment(ANA, "@my-agent look"), Comment(AGENT, "Safari breaks on the redirect"))
+    await expect(issue).not_to_have_comment_from("my-agent", text="Chrome", timeout="300ms")
+    await expect(issue).not_to_have_comments_from("my-agent", count=2, timeout="300ms")
+    with pytest.raises(AssertionError, match=r'Expected no comment from my-agent matching "Safari"\. The conversation'):
+        await expect(issue).not_to_have_comment_from("my-agent", text="Safari", timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected not exactly 1 comments from my-agent, found 1"):
+        await expect(issue).not_to_have_comments_from("my-agent", count=1, timeout="300ms")
+
+
+async def test_a_notion_page_points_to_its_discussions() -> None:
+    class Page:
+        _ctx = None
+
+        async def discussions(self) -> list[object]:
+            return []
+
+    with pytest.raises(TypeError, match="to_have_comment_from needs a Notion discussion, not a page"):
+        await expect(Page()).to_have_comment_from("my-agent", timeout="300ms")
 
 
 @dataclass(frozen=True)
@@ -341,3 +376,13 @@ async def test_an_agent_session_its_state_and_activities() -> None:
     # People's prompts aren't the agent's activities.
     with pytest.raises(AssertionError, match="Expected a prompt"):
         await expect(session).to_have_activity(type="prompt", timeout="300ms")
+
+
+async def test_an_agent_session_not_in_a_state_and_without_an_activity() -> None:
+    session = AgentSession("complete", Activity("prompt", ANA, "fix it"), Activity("thought", AGENT, "Looking"))
+    await expect(session).not_to_have_session_state("active", timeout="300ms")
+    await expect(session).not_to_have_activity(type="error", timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected the agent session not to be complete, it is complete"):
+        await expect(session).not_to_have_session_state("complete", timeout="300ms")
+    with pytest.raises(AssertionError, match=r"Expected no thought from my-agent\. The session has:\n  my-agent"):
+        await expect(LinearIssue(session)).not_to_have_activity(type="thought", from_=AGENT, timeout="300ms")
