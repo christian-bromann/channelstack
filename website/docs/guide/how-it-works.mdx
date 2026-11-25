@@ -44,7 +44,7 @@ Three flows meet at the server, and it helps to keep them apart:
 | Platform to agent | The fake signs and delivers the event the real platform would send (`app_mention`, `issue_comment`, `AgentSessionEvent`), over HTTP or Slack's Socket Mode                |
 | Agent to platform | The agent answers through the provider API it already uses (`chat.postMessage`, `POST /repos/…/comments`, `agentActivityCreate`). The fake serves the call and records it |
 
-The server records all three in an event log per session. That log feeds the matchers, the UI's inspector and `channelstack tail`.
+The server records all three in an event log per session. That log feeds the UI's inspector and `channelstack tail`; the matchers read the platform's state through the read methods instead (below).
 
 ## The control API
 

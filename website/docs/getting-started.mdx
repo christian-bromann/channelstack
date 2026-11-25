@@ -15,7 +15,7 @@ In this tutorial you build a tiny Slack agent, run it against channelstack's fak
     {
       cmd: "CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelstack start --no-portless --port 4500",
     },
-    { out: "channelstack 0.1.0 · in-memory" },
+    { out: "channelstack 0.0.0 · in-memory" },
     { out: "  Control  http://127.0.0.1:4500/_channelstack" },
     { out: "  slack    http://127.0.0.1:4500/slack" },
     { cmd: "npx channelstack env > .env.local" },
@@ -52,7 +52,7 @@ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events \
 
 ```
 {"level":"info","message":"listening","address":"127.0.0.1:4500","control":"http://127.0.0.1:4500/_channelstack","portless":false}
-channelstack 0.1.0 · in-memory
+channelstack 0.0.0 · in-memory
 
   Control  http://127.0.0.1:4500/_channelstack
   echo     http://127.0.0.1:4500/echo
@@ -68,7 +68,7 @@ channelstack 0.1.0 · in-memory
 The fake Slack now runs at `http://127.0.0.1:4500/slack`, with a workspace and an app called `my-agent` already installed. (`echo` is a tiny chat platform channelstack uses to test itself; you can ignore it.) `CHANNELSTACK_SLACK_WEBHOOK_URL` tells it where your agent will listen for events: `/slack/events` on port 3000 is Bolt's default.
 
 > [!NOTE]
-> `--no-portless` serves everything on one port. Without it, channelstack uses [portless](https://github.com/vercel-labs/portless) to give each fake its own HTTPS name, such as `https://slack.localhost`. That's the default once portless is installed; see [Connecting your agent](/docs/guide/connecting-your-agent).
+> `--no-portless` serves everything on one port. Without it, channelstack uses [portless](https://github.com/vercel-labs/portless) to give each fake its own HTTPS name, such as `https://slack.localhost`. That's the default; see [Connecting your agent](/docs/guide/connecting-your-agent).
 
 ## 3. Point the agent at the fake
 

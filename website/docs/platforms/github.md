@@ -348,7 +348,8 @@ The fake answers with GitHub's status codes and its error object (`message`, `do
 | 403 | `Must have … access to …` | A person writing where they only have read |
 | 404 | `Not Found` | A repository the App isn't installed on, an unknown issue or comment, a path the fake doesn't serve |
 | 404 | `Label does not exist` | Removing a label the issue doesn't have |
-| 405 | `Pull Request is not mergeable` | Merging a closed or conflicting pull request, or a draft |
+| 405 | `Pull Request is not mergeable` | Merging a closed or conflicting pull request |
+| 405 | `Pull Request is still a draft` | Merging a draft |
 | 409 | `<path> does not match <sha>` | A Contents API write with an outdated `sha` |
 | 422 | `Validation Failed` | A missing field, a review comment outside the diff, a check run with more than three actions |
 | 400 | `Problems parsing JSON` | A body that isn't JSON |

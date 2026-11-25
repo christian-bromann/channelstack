@@ -17,7 +17,7 @@ npx channelstack
 ```
 
 ```
-channelstack 0.1.0 · in-memory
+channelstack 0.0.0 · in-memory
 
   Control  https://channelstack.localhost/_channelstack
   echo     https://echo.localhost
