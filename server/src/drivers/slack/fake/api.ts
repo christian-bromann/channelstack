@@ -145,7 +145,8 @@ export function createSlackApi(
     is_app_user: false,
   });
 
-  const conversationObject = (conversation: SlackConversationRecord) => {
+  /** A conversation as Slack describes it; `info` adds what only `conversations.info` says (`last_read`). */
+  const conversationObject = (conversation: SlackConversationRecord, info = false) => {
     if (conversation.kind === "im") {
       const [other] = [...conversation.members].filter((id) => id !== bot());
       return {
@@ -189,7 +190,7 @@ export function createSlackApi(
       // Milliseconds, unlike `created`.
       updated: conversation.created * 1000,
       properties: {},
-      ...(conversation.members.has(bot()) ? { last_read: "0000000000.000000" } : {}),
+      ...(info && conversation.members.has(bot()) ? { last_read: "0000000000.000000" } : {}),
     };
   };
 
@@ -531,7 +532,7 @@ export function createSlackApi(
       return { type: "message", channel: conversation.id, message: messageOf(message) };
     },
 
-    "conversations.info": (args) => ({ channel: conversationObject(joined(required(args, "channel"))) }),
+    "conversations.info": (args) => ({ channel: conversationObject(joined(required(args, "channel")), true) }),
 
     "conversations.history": (args) => {
       const conversation = joined(required(args, "channel"));
@@ -616,7 +617,7 @@ export function createSlackApi(
             types.includes(wanted(conversation)) &&
             (conversation.kind === "channel" || conversation.members.has(bot())),
         )
-        .map(conversationObject);
+        .map((conversation) => conversationObject(conversation));
       return { channels, response_metadata: { next_cursor: "" } };
     },
 

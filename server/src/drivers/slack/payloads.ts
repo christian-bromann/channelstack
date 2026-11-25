@@ -19,7 +19,11 @@ export function messageSubscription(conversation: SlackConversationRecord): stri
   ];
 }
 
-/** Slack's `rich_text` block for a message a person typed: text, with mentions as their own elements. */
+/**
+ * Slack's `rich_text` block of a message's text, for a message sent without blocks (a person's, or
+ * the app's): the text, with user mentions as their own elements. Slack also turns mrkdwn styles,
+ * links, channel and special mentions and emoji into elements; the fake doesn't yet (#45).
+ */
 export function richTextBlock(text: string, blockId: string): unknown {
   const elements = splitAtMentions(text).map((piece) =>
     "user" in piece ? { type: "user", user_id: piece.user } : { type: "text", text: piece.text },
