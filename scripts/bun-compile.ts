@@ -6,7 +6,7 @@
  * It minifies whitespace only. WebdriverIO tells a browser from an element by its scope
  * function's name (`scopeType.name === "Browser"` in `@wdio/utils`), and Bun's identifier and
  * syntax minifiers rename or drop it (`keepNames` doesn't keep it): the browser actor's session
- * then has no capabilities and fails to start (#49).
+ * then has no capabilities and fails to start (#49, decision 0019).
  *
  * The plugin makes WebdriverIO bundle (the browser actor, `core/browser`). It loads its protocol
  * driver and its Node half with computed imports (`import(options.automationProtocol || "webdriver")`,
