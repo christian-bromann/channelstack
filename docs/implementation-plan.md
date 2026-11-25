@@ -5,7 +5,7 @@ Status: draft, 2026-11-19. Builds on the research in `docs/research/` and `docs/
 The public test API follows `docs/devx.md` and the type definitions in `api/`. Highlights:
 - Actions are methods on the person, with the content first and the place as an option: `ana.say("…", { channel })`.
 - Users, channels, repos and pages are created per test.
-- The agent's app is described once in `channelstack.config.ts`.
+- There is no config file: each fake has a built-in app named `my-agent`, and where its events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`.
 - Matchers come through each test framework's `expect`.
 
 ## 1. What we are building
@@ -13,11 +13,11 @@ The public test API follows `docs/devx.md` and the type definitions in `api/`. H
 channelstack lets you write an end-to-end test for an agent that lives in Slack, GitHub, Linear or Notion. A test plays the people around the agent: it posts the DM, opens the issue, clicks the button, presses Stop. It then reads back what those people would see. The same test runs against a fake platform on every PR and against the real platform nightly.
 
 ```ts
-// channelstack.config.ts describes the agent's app (manifest, delivery URLs); fake by default, real with credentials
+// the fakes' built-in app is `my-agent`; fake by default, real with credentials in the environment
 test("a DM gets one threaded answer", async ({ slack }) => {
   const ana = await slack.createUser({ name: "Ana" })          // fake person, or real with { token }
-  const msg = await ana.say("@robin summarize #812", { to: slack.app })
-  await expect(msg.thread).toHaveRepliesFrom("robin", { count: 1 })
+  const msg = await ana.say("@my-agent summarize #812", { to: slack.app })
+  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 })
 })
 ```
 
@@ -52,7 +52,7 @@ This plan and `docs/devx.md` describe the same product. Where they used to diffe
 | The world | **One shared fake world per server:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. The agent is configured once (one token and one base URL per channel), so there can't be a separate world per test |
 | Sessions | A session is a **scope inside that world**, not a world of its own. It owns the users, channels, repos and pages it created, filters the event log to deliveries its actions caused, and cleans everything up on `DELETE`. Each test-framework fixture opens one session per test, and the CLI and UI share a long-lived `dev` session |
 | Starting the agent | channelstack never starts or wraps the agent. `channelstack exec` is dropped; you run `channelstack env` and then `portless run my-agent pnpm dev` |
-| Config | `channelstack.config.ts` describes only the agent's app on each channel (fake by default, real with credentials). People and places are created per test |
+| Config | No config file. Each fake has a built-in app named `my-agent`; where events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, and live credentials from `CHANNELSTACK_<CHANNEL>_*` env vars. People and places are created per test |
 | Test API | Actor-first and per-framework (`api/*.d.ts`): `ana.say(text, { channel })`, with fixtures and matchers in `channelstack/vitest` and `pytest-channelstack` |
 | Secrets | Fake tokens and signing secrets are generated with a CSPRNG **once per install** and kept in `~/.channelstack/secrets.json` (mode 0600). They stay stable across restarts so `.env.local` stays valid. `channelstack secrets rotate` replaces them |
 | State | In memory. A restart starts a fresh world |
@@ -82,8 +82,6 @@ What went wrong with emulate 0.12.3, the version the stack used:
 - **Base URLs:** every swap forced product changes.
 
 Emulate 0.14 has since closed some of these, but not streams, Stop, proxying or any fidelity evidence.
-
-**Success criterion for phase 8:** MDA's e2e suite is the 2,788 lines of test cases plus less than 300 lines of setup.
 
 ## 3. Architecture
 
@@ -128,14 +126,14 @@ Sessions work like WebDriver's, with one difference: they're **scopes in one sha
 - **Reads are scoped.** `GET …/events` returns only deliveries and API calls caused by the session's own resources. Attribution follows the conversation: the agent's `chat.postMessage` into a channel the session owns belongs to that session.
 - **`DELETE /sessions/{sid}`** removes everything the session created, in the fake and, through the cleanup ledger, on live platforms.
 - **`GET /status`** reports server health, the server version and which drivers are loaded.
-- **`POST /reset`** drops the whole world. This is what `channelstack reset` runs; avoid it in parallel suites.
+- **`POST /reset`** drops the whole world. This is what the fixture's `channelstack.reset()` calls; avoid it in parallel suites.
 
 ### 4.2 Objects are handles, with the platform's own ids
 
 Each object the test creates is a handle whose id is **the real platform's id format**, so fake mode looks real to the agent, its logs and anyone reading a failure. Later calls take the id as a path parameter. This is what makes the object-style SDK API possible in any language.
 
 ```
-GET  /sessions/{sid}/slack/app                                     → { id: "A08D4E5F6G7", botUserId: "U08K1L2M3N4", teamId: "T08A1B2C3D4", live: false }   (from channelstack.config.ts)
+GET  /sessions/{sid}/slack/app                                     → { id: "A08D4E5F6G7", botUserId: "U08K1L2M3N4", teamId: "T08A1B2C3D4", live: false }   (the built-in app, `my-agent`)
 POST /sessions/{sid}/slack/users                      { name, id?, admin?, token? }                     → { id: "U08B5K2M9QX", live: false }
 POST /sessions/{sid}/slack/channels                   { name?, private?, participants: ["U08B5K2M9QX", "A08D4E5F6G7"] } → { id: "C08E1F2G3H4", name: "test-k3f9" }
 POST /sessions/{sid}/slack/users/{user}/say           { text, blocks?, channel | to }                   → { channel: "C08E1F2G3H4", ts: "1732101234.567899" }
@@ -211,11 +209,13 @@ Messages never echo tokens or upstream response bodies. Those go to the internal
 
 ## 5. Real versus fake: credentials decide
 
-```ts
-// channelstack.config.ts
-slack: { app: { name: "robin", manifest: "./slack-manifest.yaml" } }                     // fake app (server generates signing secret + bot token)
-slack: { app: { name: "robin", manifest: "./slack-manifest.yaml", appId, botToken } }    // real app
+```bash
+# the Slack app
+(no credentials)                                                                         # fake app `my-agent` (server generates signing secret + bot token)
+CHANNELSTACK_SLACK_APP_ID=A… CHANNELSTACK_SLACK_BOT_TOKEN=xoxb-…                         # real app
+```
 
+```ts
 // in a test
 await slack.createUser({ name: "Ana" })                                                  // fake person
 await slack.createUser({ name: "Ana", token: process.env.ANA_SLACK_TOKEN })              // real person
@@ -232,7 +232,7 @@ The rule: **a conversation lives where its app or container lives, and everyone 
 
 How credentials are resolved:
 
-- **From the environment as well as code.** `slack.createUser({ name: "Ana" })` looks for `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (from the user's name), and the Slack app from the config looks for `CHANNELSTACK_SLACK_APP_ID` and `CHANNELSTACK_SLACK_BOT_TOKEN`. One test file therefore runs fake on PRs and live nightly, with no edits.
+- **From the environment as well as code.** `slack.createUser({ name: "Ana" })` looks for `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (from the user's name), and the Slack app looks for `CHANNELSTACK_SLACK_APP_ID` and `CHANNELSTACK_SLACK_BOT_TOKEN`. One test file therefore runs fake on PRs and live nightly, with no edits.
 - **Forcing a reality.** `CHANNELSTACK_REALITY=fake` forces fake everywhere, even when credentials are present. This protects local runs. `CHANNELSTACK_REALITY=live` fails if any object would fall back to fake.
 - **Checked on creation.** Credentials are checked when the object is created: `auth.test` on Slack, `GET /user` on GitHub, `viewer` on Linear, `users/me` on Notion. The workspace, org or team must match the container's and must be allowlisted.
 - **Kept on the server.** Credentials live in the session's in-memory vault. The SDK sends them once, the server never returns them, and recordings redact them.
@@ -253,7 +253,7 @@ The full per-feature breakdown of what works live, and what it needs (user token
 channelstack never starts or wraps the agent. It produces the environment the agent needs, and the agent runs however it normally runs:
 
 ```bash
-npx channelstack env >> .env.local            # tokens, signing secrets, API URLs, CA settings
+npx channelstack env >> .env.local            # tokens, signing secrets, API URLs
 portless run my-agent pnpm dev           # the agent at https://my-agent.localhost
 ```
 
@@ -261,7 +261,7 @@ portless run my-agent pnpm dev           # the agent at https://my-agent.localho
 const env = await channelstack.env()          // the same values from the `channelstack` fixture, e.g. to spawn the agent in globalSetup
 ```
 
-The agent's inbound endpoint is part of the app in `channelstack.config.ts`: `slack: { app: { name, manifest, urls: { events: "https://my-agent.localhost/slack/events" } } }`. Because the agent runs under its own portless name, that URL never changes. A real Slack app can't use this, because Slack delivers wherever the Request URL points. See 6.3.
+Where the fake delivers the agent's events comes from the server's environment: `CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events` (and `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`). Because the agent runs under its own portless name, that URL never changes. A real Slack app can't use this, because Slack delivers wherever the Request URL points. See 6.3.
 
 ### 6.1 Base-URL mode (default)
 
@@ -274,7 +274,7 @@ Each driver's fake is served by portless at a stable name. Where the agent's SDK
 | Linear | `https://linear.localhost/graphql` | `apiUrl` / `LINEAR_API_URL` |
 | Notion | `https://notion.localhost` | `baseUrl` / `NOTION_BASE_URL` |
 
-- **TLS comes from portless.** Its CA is in the system trust store. `channelstack env` adds what each runtime needs to read it: `NODE_USE_SYSTEM_CA=1`, a certifi-plus-portless bundle for Python, and `SSL_CERT_FILE` for Go on Linux.
+- **TLS comes from portless.** Its CA is in the system trust store, so a runtime that doesn't read that store has to be told (for Node, `NODE_USE_SYSTEM_CA=1`). `channelstack env` prints only tokens, secrets and API URLs.
 - **Without portless** (`--no-portless`, mostly CI), all fakes share one port with path prefixes (`http://localhost:4500/slack/api/`), and no certificates are involved.
 - **These names don't collide with emulate,** whose portless mode uses `*.emulate.localhost`.
 
@@ -402,7 +402,7 @@ await ana.click("Approve", { message: msg })   // live: drives app.slack.com via
 ```
 
 - The server owns a WebdriverIO BiDi session per browser actor, and each driver ships page objects for its platform's UI. This is WebdriverIO's home ground and is the main reason to keep it in the server rather than the SDKs.
-- Sign-in is unattended, so it runs in CI: a passkey through WebDriver's virtual authenticator on GitHub and Linear, the emailed code from a test inbox on Slack and Notion. The session is saved and reused; it signs in again only when `channelstack doctor` finds it expired. channelstack never handles account passwords. Details: [reality-matrix.md, "Signing in without people"](reality-matrix.md#signing-in-without-people).
+- The browser actor never signs in itself: a person signs in by hand once with `channelstack login slack --user ana`, and the saved session is reused. `channelstack doctor` says when it has expired. channelstack never handles account passwords. Details: [reality-matrix.md, "Browser sessions"](reality-matrix.md#browser-sessions).
 - **Risk:** UI selectors break. That's acceptable because it's live-only and nightly, and fake mode covers the same flow on every PR.
 
 ## 9. Proving the fakes against the real platforms
@@ -444,7 +444,7 @@ Each release generates a coverage page from the capabilities tables, divergences
 | Slack | Developer sandbox workspace, 2 test users with user tokens, 1 reference app. Sandboxes expire after about 6 months, so we track renewal |
 | GitHub | `channelstack-e2e` org, a GitHub App, 2 machine users |
 | Linear | Free test workspace, 2 users, the agent app |
-| Notion | Test workspace, integration, 2 users with personal access tokens and unattended browser sign-in |
+| Notion | Test workspace, integration, 2 users with personal access tokens |
 
 - **Secrets** live in CI environment secrets for a protected `live` environment. Fork PRs never get them.
 - **Budgets:** live jobs are rate-limit aware (Slack tier limits) and run serially per platform.
@@ -455,7 +455,7 @@ The same three steps work for every stack: create the world, give the agent its 
 
 | Stack | How it plugs in | Notes |
 |---|---|---|
-| **MDA** | Proxy mode against `mda-local up`. The Trigger Server receives real-format signed deliveries | Replaces the closed stack's `--fake-*` flags, `MDA_*_API_URL` overrides and patches 0008/0009. Scripted directive model fixtures stay. Port 3 scenarios first: DM → single reply (MDAC-220), button approval, Stop |
+| **MDA** | Proxy mode against `mda-local up`. The Trigger Server receives real-format signed deliveries | Replaces the closed stack's `--fake-*` flags, `MDA_*_API_URL` overrides and patches 0008/0009. Scripted directive model fixtures stay |
 | **Chat SDK** (`chat` with `@chat-adapter/slack`, `/github`, `/linear`, `/notion`) | `channelstack env` provides `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and the GitHub/Linear/Notion equivalents. Endpoint is `/api/webhooks/{platform}`. Base-URL mode if the adapter accepts an API URL (verify per adapter), otherwise proxy mode | Recipe: Next.js route plus a Vitest file. Chat SDK's own matchers test adapter calls; channelstack tests the platform result |
 | **AI SDK** (agent loop) with Bolt, Octokit or the Notion SDK as the channel | Base-URL mode. The model is `MockLanguageModelV2`/V3 from `ai/test` or emulate's AI service | Example: a Bolt app that streams an AI SDK response with `chat.startStream`. That's exactly the surface no one fakes today |
 | **Pi** (`@mariozechner/pi-coding-agent` SDK) | Socket Mode fake or base URL; deterministic model through pi-ai's provider configuration | Example: "a DM to mom gets a threaded reply and a reaction" |
@@ -481,7 +481,7 @@ server routes (zod-openapi) ──► spec/openapi.json ──► spec/ir.json �
 | Extension | Meaning |
 |---|---|
 | `x-channelstack-resource: { id?, scope? }` on a schema | Values of the schema are handles; `id` names the identifying field |
-| `x-channelstack-ref: [SlackChannel]` on a request field | The field takes a handle and sends its id |
+| `x-channelstack-ref: [SlackConversation]` on a request field | The field takes a handle and sends its id |
 | `x-channelstack-method: { on: SlackUser, name: say, args: [text], options: [channel, to] }` | Binds an operation to a method on a handle. Path parameters bind to the handle's session and id; `args` become positional parameters and `options` the trailing options object (`ana.say(text, { channel })`) |
 | `x-channelstack-factory: { on: SlackFixture, name: createUser }` | Declares a factory method |
 | `x-channelstack-error-codes` | Lists the error codes an operation can return |
@@ -501,7 +501,7 @@ The exact shapes, with the IR they produce, are in [architecture.md](architectur
 
 | Language | Style |
 |---|---|
-| TypeScript | `async` methods; ESM and CJS builds; types from the IR (checked against the hand-designed `api/*.d.ts`); fixtures and matchers through `channelstack/vitest`; created resources implement `AsyncDisposable` for use outside fixtures |
+| TypeScript | `async` methods; ESM and CJS builds; types from the IR (checked against the hand-designed `api/*.d.ts`); fixtures and matchers through `channelstack/vitest`; the client, the session and `SlackFault` implement `AsyncDisposable` for use outside fixtures |
 | Python | Async-first (`httpx`) with a sync facade; Pydantic models; `pytest-channelstack` fixtures (`slack`, `github`, `linear`, `notion`); `await ana.say("hi", channel=channel)`; snake_case |
 | Rust | `reqwest` + `serde` + `tokio`; builder structs for optional arguments; `Drop` handles cleanup best-effort, plus an explicit `close().await` |
 
@@ -514,8 +514,8 @@ The exact shapes, with the IR they produce, are in [architecture.md](architectur
 
 - **Server binary:** `bun build --compile` for darwin-arm64, darwin-x64, linux-x64, linux-arm64 and windows-x64.
 - **npm:** `@channelstack/server-<platform>` as optionalDependencies of `channelstack`, the esbuild pattern.
-- **PyPI:** wheels per platform with the binary bundled, the ruff pattern.
-- **Rust:** downloads the release binary on first use, with checksum verification, or uses `CHANNELSTACK_SERVER_BIN`.
+- **PyPI:** `channelstack`, without the binary. The launcher finds it at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH`.
+- **Rust:** the crate doesn't download a binary either; it finds it at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH`.
 - **Docker:** `ghcr.io/<org>/channelstack` for CI and for proxying Go or Linux agents.
 - **Releases:** one tag releases the server, the spec and every SDK at the same version.
 
@@ -540,7 +540,7 @@ channelstack/
     src/core/                sessions, registry, ids, secrets, signing, reality rules, event log, delivery, errors, redaction, safety, ledger, proxy, ca, recorder (docs/code-map.md names the module for each)
     src/drivers/{echo,slack,github,linear,notion}/
       routes.ts  world.ts  fake/  live/  payloads.ts  transcript.ts  capabilities.ts
-    src/cli.ts               channelstack [start] | env | doctor | reset | mcp | <channel> <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets
+    src/cli.ts               channelstack [start] | env | doctor | mcp | ui | slack <action> --as … | deliveries | redeliver | tail | show | login | sweep | ca | secrets
   ui/                        the functional browser UI (transcript view, inspector, chaos controls), served at channelstack.localhost
   spec/                      openapi.json, ir.json (generated, committed)
   codegen/                   ir builder + emitters/{ts,python,rust}
@@ -556,7 +556,7 @@ channelstack/
 
 ## 14. Milestones
 
-Replaced by [phases.md](phases.md): nine phases, each with a gate (`pnpm verify:phase <n>`) of automated exit checks.
+Replaced by [phases.md](phases.md): eight phases (0 to 7), each with a gate (`pnpm verify:phase <n>`) of automated exit checks.
 
 ## 15. Decisions for you
 
