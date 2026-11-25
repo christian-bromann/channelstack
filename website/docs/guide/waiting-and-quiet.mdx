@@ -136,6 +136,6 @@ await ben.click("Approve", { message: ask });
 | `latest…` (`latestReply`, `latestComment`)                                                                        | The last item that matches, once the session is quiet                   | The agent may write several messages, and you want the final one: the one with the button, the finished answer |
 | `session.waitForState(states)`, `stream.ended()`, `delivery.settled()`                                            | The object, once it reaches one of the given states                     | You want a state, not a message                                                                                |
 
-`waitFor…` keeps its place per handle and per filter. Two `waitForCall` waits with different operations each find their own call, even if both calls were already there.
+`waitFor…` keeps its place per handle. `waitForCall` keeps one per filter too, so two `waitForCall` waits with different operations each find their own call, even if both calls were already there. The others keep one place per handle, whatever their `from`, `text` or `type`: a `waitForReply({ from: ana })` after a `waitForReply({ from: app })` looks only past the reply the first one returned.
 
 Each of these takes `timeout`, and `latest…` takes `quietFor` too. A wait that gives up throws with what it was waiting for, and with the "Still open" line when there is one.
