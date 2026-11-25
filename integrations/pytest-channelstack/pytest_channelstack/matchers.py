@@ -10,15 +10,23 @@ Each check reads plain SDK methods, the way the TypeScript matchers do (`integra
   for the whole quiet window, and check once.
 """
 
+import json
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Protocol
 
 from channelstack import ChannelstackError
 from channelstack.runtime.client import quiet_of
-from channelstack.runtime.duration import Duration
+from channelstack.runtime.duration import Duration, parse_duration
 from channelstack.runtime.transport import unreported_refusals
-from channelstack.runtime.wait import WaitTimeoutError, from_matches, text_matches, until_quiet, wait_for
+from channelstack.runtime.wait import (
+    WaitTimeoutError,
+    from_matches,
+    pattern_on_wire,
+    text_matches,
+    until_quiet,
+    wait_for,
+)
 
 Text = str | re.Pattern[str]
 
@@ -38,12 +46,25 @@ def _name(author: AuthorRef) -> str:
 
 
 def _show(text: Text) -> str:
-    return repr(text) if isinstance(text, str) else f"/{text.pattern}/"
+    """What was asked for, as matchers-core shows it: a string quoted, a pattern as `/source/flags`."""
+    if isinstance(text, str):
+        return json.dumps(text, ensure_ascii=False)
+    wire = pattern_on_wire(text)
+    return wire if isinstance(wire, str) else f"/{wire['source']}/{wire['flags']}"
+
+
+def _named(name: str, expected: Text) -> bool:
+    """A name asked for by a string must equal it; a pattern need only match."""
+    return name == expected if isinstance(expected, str) else expected.search(name) is not None
+
+
+def _number(value: float) -> str:
+    """A number as JavaScript prints it: `3000`, not `3000.0`."""
+    return str(int(value)) if float(value).is_integer() else str(value)
 
 
 def _says(messages: Sequence[Any]) -> str:
-    lines = [f"{message.author.name}: {message.text}" for message in messages]
-    return "\n".join(f"  {line}" for line in lines) if lines else "  (nothing)"
+    return _listing([f"{message.author.name}: {message.text}" for message in messages])
 
 
 def _from(author: AuthorRef, text: Text | None = None) -> Callable[[Any], bool]:
@@ -65,14 +86,6 @@ def _streaming(message: Any) -> str | None:
     return getattr(stream, "state", None) if stream is not None else getattr(message, "streaming", None)
 
 
-def _calls_matching(operation: Text, calls: Sequence[Any]) -> list[Any]:
-    return [
-        call
-        for call in calls
-        if (call.operation == operation if isinstance(operation, str) else operation.search(call.operation))
-    ]
-
-
 def _listing(lines: Sequence[str]) -> str:
     return "\n".join(f"  {line}" for line in lines) if lines else "  (nothing)"
 
@@ -90,11 +103,29 @@ def _written(comments: Sequence[Any]) -> str:
     return _listing([f"{comment.author.name}: {_comment_text(comment)}" for comment in comments])
 
 
-async def _comments_of(subject: Any) -> list[Any]:
-    """The comments of a subject that has a conversation: an issue, a pull request, a discussion."""
-    if not hasattr(subject, "comments"):
-        raise TypeError("This check needs something with comments: an issue, a pull request or a discussion")
-    return list(await subject.comments())
+async def _comments_of(subject: Any, check: str) -> list[Any]:
+    """The comments of a subject that has a conversation: a GitHub issue or pull request, a Linear issue, a Notion
+    discussion. A Notion page has none of its own: they are in its discussions."""
+    if hasattr(subject, "comments"):
+        return list(await subject.comments())
+    raise TypeError(
+        f"{check} needs a Notion discussion, not a page: a page's comments are in its discussions. "
+        "Pass `comment.discussion`, or one of `await page.discussions()`."
+        if hasattr(subject, "discussions")
+        else f"{check} needs a GitHub issue or pull request, a Linear issue or a Notion discussion"
+    )
+
+
+def _block_texts(blocks: Sequence[Any]) -> list[str]:
+    """The text of each block of a Notion page, nested ones included: its rich text, or a child page's title."""
+    texts: list[str] = []
+    for block in blocks:
+        kind = block.get("type")
+        data: dict[str, Any] = (block.get(kind) if kind else None) or {}
+        rich_text = data.get("rich_text")
+        text = "".join(item.get("plain_text") or "" for item in rich_text) if rich_text else data.get("title") or ""
+        texts += [str(text), *_block_texts(block.get("children") or [])]
+    return texts
 
 
 async def _session_of(subject: Any) -> Any | None:
@@ -284,7 +315,8 @@ class Expectation:
             holds=lambda messages: any(map(streaming, messages)),
             describe=lambda messages: (
                 f"Expected {'no' if negate else 'a'} reply being streamed"
-                f"{'' if author is None else f' by {_name(author)}'}. The thread has:\n{_says(messages)}"
+                f"{'' if author is None else f' by {_name(author)}'}. The thread has:\n"
+                + _listing([f"{m.author.name}: {m.text} [{_streaming(m) or 'not a stream'}]" for m in messages])
             ),
             negate=negate,
             timeout=timeout,
@@ -311,7 +343,7 @@ class Expectation:
             holds=lambda status: status.state == expected,
             describe=lambda status: (
                 f"Expected the thread {'not ' if negate else ''}to be {expected}, it is {status.state}"
-                f"{'' if not status.text else f' ({status.text!r})'}"
+                f"{'' if not status.text else f' ("{status.text}")'}"
             ),
             negate=negate,
             timeout=timeout,
@@ -336,7 +368,7 @@ class Expectation:
             holds=lambda status: status.text is not None and text_matches(status.text, text),
             describe=lambda status: (
                 f"Expected the status line {'not ' if negate else ''}to match {_show(text)}, "
-                f"{'there is none' if status.text is None else f'it is {status.text!r}'}"
+                f"{'there is none' if status.text is None else f'it is "{status.text}"'}"
             ),
             negate=negate,
             timeout=timeout,
@@ -407,20 +439,21 @@ class Expectation:
         quiet_for: Duration | None,
         negate: bool,
     ) -> None:
-        async def read() -> list[Any]:
-            calls = await (self._subject.calls(error=error) if error else self._subject.calls())
-            return _calls_matching(operation, calls)
+        async def read() -> tuple[list[Any], list[Any]]:
+            calls = list(await (self._subject.calls(error=error) if error is not None else self._subject.calls()))
+            return calls, [call for call in calls if _named(call.operation, operation)]
 
-        def described(matching: Sequence[Any]) -> str:
+        def described(value: tuple[list[Any], list[Any]]) -> str:
+            calls, matching = value
             wanted = f"the agent {'not ' if negate else ''}to call {_show(operation)}"
+            wanted += "" if times is None else f" {times} times"
             wanted += "" if error is None else f" with error {error}"
-            wanted += "" if times is None else f" exactly {times} times"
-            found = ", ".join(f"{call.operation} → {call.error}" if call.error else call.operation for call in matching)
-            return f"Expected {wanted}, found {len(matching)}{f': {found}' if found else ''}"
+            listed = _listing([f"{call.operation} → {call.error}" if call.error else call.operation for call in calls])
+            return f"Expected {wanted}, found {len(matching)}. Its calls:\n{listed}"
 
         await self._settle(
             read=read,
-            holds=lambda matching: len(matching) > 0 if times is None else len(matching) == times,
+            holds=lambda value: len(value[1]) > 0 if times is None else len(value[1]) == times,
             describe=described,
             negate=negate,
             once_quiet=times is not None,
@@ -445,11 +478,12 @@ class Expectation:
         operation: Text,
         *,
         error: str | None = None,
+        times: int | None = None,
         timeout: Duration | None = None,
         quiet_for: Duration | None = None,
     ) -> None:
-        """Once the agent is quiet, it made no such call (with this error, if given)."""
-        await self._received_call(operation, error, None, timeout, quiet_for, negate=True)
+        """Once the agent is quiet, it made no such call (with this error; any number but `times`, if given)."""
+        await self._received_call(operation, error, times, timeout, quiet_for, negate=True)
 
     # What a person reads: text and buttons
 
@@ -473,13 +507,17 @@ class Expectation:
         self,
         text: Text,
         *,
+        count: int | None = None,
         from_: AuthorRef | None = None,
         as_: Author | None = None,
         timeout: Duration | None = None,
         quiet_for: Duration | None = None,
     ) -> None:
-        """Once the agent is quiet, no entry a person would see contains this text (as `as_` sees it, if given)."""
-        await self._contains_text(text, None, from_, as_, timeout, quiet_for, negate=True)
+        """Once the agent is quiet, no entry a person would see contains this text (as `as_` sees it, if given).
+
+        With `count`, any number of such entries but `count`.
+        """
+        await self._contains_text(text, count, from_, as_, timeout, quiet_for, negate=True)
 
     async def _contains_text(
         self,
@@ -512,9 +550,7 @@ class Expectation:
             quiet_for=quiet_for,
         )
 
-    async def to_have_button(self, label: Text, *, timeout: Duration | None = None) -> None:
-        """A message (or the app's latest message in a thread or conversation) has a button with this label."""
-
+    async def _button(self, label: Text, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
         async def read() -> list[str]:
             subject = self._subject
             # A message is one entry of its thread's transcript.
@@ -528,25 +564,74 @@ class Expectation:
             read=read,
             holds=lambda controls: any(text_matches(control, label) for control in controls),
             describe=lambda controls: (
-                f"Expected a button matching {_show(label)}. Buttons there: {', '.join(controls) or 'none'}"
+                f"Expected {'no' if negate else 'a'} button matching {_show(label)}. "
+                f"Buttons there: {', '.join(controls) or 'none'}"
             ),
-            negate=False,
+            negate=negate,
             timeout=timeout,
+            quiet_for=quiet_for,
         )
 
+    async def to_have_button(self, label: Text, *, timeout: Duration | None = None) -> None:
+        """A message (or the app's latest message in a thread or conversation) has a button with this label."""
+        await self._button(label, timeout, None, negate=False)
+
+    async def not_to_have_button(
+        self, label: Text, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the message (or the app's latest one) has no button with this label."""
+        await self._button(label, timeout, quiet_for, negate=True)
+
     # Comments: GitHub issues and pull requests, Linear issues, Notion discussions
+
+    async def _comment_from(
+        self, author: AuthorRef, text: Text | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        wanted = f"{'no' if negate else 'a'} comment from {_name(author)}"
+        wanted += "" if text is None else f" matching {_show(text)}"
+        await self._settle(
+            read=lambda: _comments_of(self._subject, "to_have_comment_from"),
+            holds=lambda comments: any(map(_comment_from(author, text), comments)),
+            describe=lambda comments: f"Expected {wanted}. The conversation has:\n{_written(comments)}",
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
 
     async def to_have_comment_from(
         self, author: AuthorRef, *, text: Text | None = None, timeout: Duration | None = None
     ) -> None:
         """A comment from this author, matching `text` if given."""
-        wanted = f"a comment from {_name(author)}{'' if text is None else f' matching {_show(text)}'}"
+        await self._comment_from(author, text, timeout, None, negate=False)
+
+    async def not_to_have_comment_from(
+        self,
+        author: AuthorRef,
+        *,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no comment from this author (matching `text` if given)."""
+        await self._comment_from(author, text, timeout, quiet_for, negate=True)
+
+    async def _comments_from(
+        self, author: AuthorRef, count: int, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        def found(comments: Sequence[Any]) -> int:
+            return len(list(filter(_comment_from(author), comments)))
+
         await self._settle(
-            read=lambda: _comments_of(self._subject),
-            holds=lambda comments: any(map(_comment_from(author, text), comments)),
-            describe=lambda comments: f"Expected {wanted}. The conversation has:\n{_written(comments)}",
-            negate=False,
+            read=lambda: _comments_of(self._subject, "to_have_comments_from"),
+            holds=lambda comments: found(comments) == count,
+            describe=lambda comments: (
+                f"Expected {'not ' if negate else ''}exactly {count} comments from {_name(author)}, "
+                f"found {found(comments)}:\n{_written(comments)}"
+            ),
+            negate=negate,
+            once_quiet=True,
             timeout=timeout,
+            quiet_for=quiet_for,
         )
 
     async def to_have_comments_from(
@@ -558,24 +643,24 @@ class Expectation:
         quiet_for: Duration | None = None,
     ) -> None:
         """Exactly `count` comments from this author, checked once the agent is quiet."""
-        await self._settle(
-            read=lambda: _comments_of(self._subject),
-            holds=lambda comments: len(list(filter(_comment_from(author), comments))) == count,
-            describe=lambda comments: (
-                f"Expected exactly {count} comments from {_name(author)}, "
-                f"found {len(list(filter(_comment_from(author), comments)))}:\n{_written(comments)}"
-            ),
-            negate=False,
-            once_quiet=True,
-            timeout=timeout,
-            quiet_for=quiet_for,
-        )
+        await self._comments_from(author, count, timeout, quiet_for, negate=False)
+
+    async def not_to_have_comments_from(
+        self,
+        author: AuthorRef,
+        *,
+        count: int,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Any number of comments from this author but `count`, checked once the agent is quiet."""
+        await self._comments_from(author, count, timeout, quiet_for, negate=True)
 
     # Linear agent sessions
 
-    async def to_have_session_state(self, wanted: str, *, timeout: Duration | None = None) -> None:
-        """The agent session (or an issue's latest one) is in this state: `active`, `complete`, …"""
-
+    async def _session_state(
+        self, wanted: str, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
         async def read() -> str:
             session = await _session_of(self._subject)
             return "no session" if session is None else str(await session.state())
@@ -583,20 +668,33 @@ class Expectation:
         await self._settle(
             read=read,
             holds=lambda current: current == wanted,
-            describe=lambda current: f"Expected the agent session to be {wanted}, it is {current}",
-            negate=False,
+            describe=lambda current: (
+                f"Expected the agent session {'not ' if negate else ''}to be {wanted}, it is {current}"
+            ),
+            negate=negate,
             timeout=timeout,
+            quiet_for=quiet_for,
         )
 
-    async def to_have_activity(
-        self,
-        *,
-        type: str | None = None,
-        from_: AuthorRef | None = None,
-        text: Text | None = None,
-        timeout: Duration | None = None,
+    async def to_have_session_state(self, wanted: str, *, timeout: Duration | None = None) -> None:
+        """The agent session (or an issue's latest one) is in this state: `active`, `complete`, …"""
+        await self._session_state(wanted, timeout, None, negate=False)
+
+    async def not_to_have_session_state(
+        self, wanted: str, *, timeout: Duration | None = None, quiet_for: Duration | None = None
     ) -> None:
-        """The session has an activity of this type (from this author, matching `text`), people's prompts aside."""
+        """Once the agent is quiet, the agent session (or an issue's latest one) is in another state."""
+        await self._session_state(wanted, timeout, quiet_for, negate=True)
+
+    async def _activity(
+        self,
+        type: str | None,
+        from_: AuthorRef | None,
+        text: Text | None,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
         wanted = (
             f"{type or 'activity'}{'' if from_ is None else f' from {_name(from_)}'}"
             f"{'' if text is None else f' matching {_show(text)}'}"
@@ -618,12 +716,519 @@ class Expectation:
             read=read,
             holds=lambda activities: any(map(matches, activities)),
             describe=lambda activities: (
-                f"Expected a {wanted}. The session has:\n"
+                f"Expected {'no' if negate else 'a'} {wanted}. The session has:\n"
                 + _listing([f"{a.author.name} ({a.type}): {getattr(a, 'body', None) or ''}" for a in activities])
             ),
-            negate=False,
+            negate=negate,
             timeout=timeout,
+            quiet_for=quiet_for,
         )
+
+    async def to_have_activity(
+        self,
+        *,
+        type: str | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+    ) -> None:
+        """The session has an activity of this type (from this author, matching `text`), people's prompts aside."""
+        await self._activity(type, from_, text, timeout, None, negate=False)
+
+    async def not_to_have_activity(
+        self,
+        *,
+        type: str | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, the session has no such activity, people's prompts aside."""
+        await self._activity(type, from_, text, timeout, quiet_for, negate=True)
+
+    # Slack: modals and ephemeral messages
+
+    async def _opened_modal(
+        self, title: Text | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        await self._settle(
+            read=self._subject.modals,
+            holds=lambda modals: any(text_matches(modal.title, title) for modal in modals),
+            describe=lambda modals: (
+                f"Expected {'no' if negate else 'a'} modal{'' if title is None else f' titled {_show(title)}'} "
+                f"to have been opened. Opened: {', '.join(_show(modal.title) for modal in modals) or 'none'}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_opened_modal(self, title: Text | None = None, *, timeout: Duration | None = None) -> None:
+        """Subject: a person. The agent opened a modal for them (submitted by now or not), titled `title` if given."""
+        await self._opened_modal(title, timeout, None, negate=False)
+
+    async def not_to_have_opened_modal(
+        self, title: Text | None = None, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, it has opened no modal for this person (titled `title`, if given)."""
+        await self._opened_modal(title, timeout, quiet_for, negate=True)
+
+    def _ephemeral_for(self, user: Author, negate: bool) -> None:
+        # It doesn't wait, as in matchers-core: who sees a message is fixed when it is posted.
+        visible_to: Author | None = getattr(self._subject, "visible_to", None)
+        if (visible_to is not None and visible_to.id == user.id) == negate:
+            seen = "everyone can see it" if visible_to is None else f"only {visible_to.name} can"
+            raise AssertionError(
+                f"Expected the message {'not ' if negate else ''}to be visible only to {user.name}, {seen}"
+            )
+
+    async def to_be_ephemeral_for(self, user: Author) -> None:
+        """Only this person can see the message."""
+        self._ephemeral_for(user, negate=False)
+
+    async def not_to_be_ephemeral_for(self, user: Author) -> None:
+        """The message isn't one only this person can see."""
+        self._ephemeral_for(user, negate=True)
+
+    # Deliveries
+
+    async def _attempts(self) -> list[Any]:
+        return list((await self._subject.refresh()).attempts)
+
+    async def _accepted(
+        self, within: Duration | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        limit = None if within is None else parse_duration(within)
+
+        async def read() -> Any:
+            return next((attempt for attempt in await self._attempts() if not attempt.forged_signature), None)
+
+        def holds(attempt: Any) -> bool:
+            # Accepted, and with `within`, accepted that fast: the platform's window is only the outer limit.
+            return (
+                attempt is not None
+                and attempt.status == "acknowledged"
+                and (limit is None or (attempt.duration_ms or 0) <= limit)
+            )
+
+        def described(attempt: Any) -> str:
+            expected = f"Expected delivery {self._subject.id} {'not ' if negate else ''}to be accepted"
+            expected += "" if limit is None else f" within {_number(limit)}ms"
+            status = "missing" if attempt is None else attempt.status
+            http = "" if attempt is None or attempt.response_status is None else f" (HTTP {attempt.response_status})"
+            took = "" if attempt is None or attempt.duration_ms is None else f" after {_number(attempt.duration_ms)}ms"
+            return f"{expected}, its first attempt is {status}{http}{took}"
+
+        await self._settle(
+            read=read, holds=holds, describe=described, negate=negate, timeout=timeout, quiet_for=quiet_for
+        )
+
+    async def to_be_accepted(self, *, within: Duration | None = None, timeout: Duration | None = None) -> None:
+        """The agent answered the delivery with 2xx, within the platform's window (and within `within`, if given)."""
+        await self._accepted(within, timeout, None, negate=False)
+
+    async def not_to_be_accepted(
+        self, *, within: Duration | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, its first answer to the delivery wasn't a 2xx (within `within`, if given)."""
+        await self._accepted(within, timeout, quiet_for, negate=True)
+
+    async def _rejected(self, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        async def read() -> Any:
+            forged = [attempt for attempt in await self._attempts() if attempt.forged_signature]
+            return forged[-1] if forged else None
+
+        def refused(attempt: Any) -> bool:
+            return (
+                attempt is not None
+                and attempt.status == "failed"
+                and attempt.response_status is not None
+                and 400 <= attempt.response_status < 500
+            )
+
+        def described(attempt: Any) -> str:
+            delivery = self._subject.id
+            if attempt is None:
+                return (
+                    f"Expected delivery {delivery} to be rejected, but no forged attempt was sent. "
+                    "Call delivery.resend(bad_signature=True) first"
+                )
+            answer = attempt.status if attempt.response_status is None else attempt.response_status
+            return (
+                f"Expected the forged attempt of delivery {delivery} {'not ' if negate else ''}to be rejected "
+                f"with a 4xx, the agent answered {answer}"
+            )
+
+        await self._settle(
+            read=read, holds=refused, describe=described, negate=negate, timeout=timeout, quiet_for=quiet_for
+        )
+
+    async def to_be_rejected(self, *, timeout: Duration | None = None) -> None:
+        """A forged delivery (`resend(bad_signature=True)` or `stale=True`) was refused by the agent with a 4xx."""
+        await self._rejected(timeout, None, negate=False)
+
+    async def not_to_be_rejected(self, *, timeout: Duration | None = None, quiet_for: Duration | None = None) -> None:
+        """Once the agent is quiet, it didn't refuse the forged delivery with a 4xx."""
+        await self._rejected(timeout, quiet_for, negate=True)
+
+    async def _retried(
+        self, times: int | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        async def read() -> int:
+            return len([attempt for attempt in await self._attempts() if not attempt.forged_signature]) - 1
+
+        await self._settle(
+            read=read,
+            holds=lambda retries: retries > 0 if times is None else retries == times,
+            describe=lambda retries: (
+                f"Expected delivery {self._subject.id} {'not ' if negate else ''}to be retried"
+                f"{'' if times is None else f' {times} times'}, it was retried {retries} times"
+            ),
+            negate=negate,
+            once_quiet=times is not None,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_be_retried(
+        self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """The delivery needed retries (exactly `times` of them once the agent is quiet, if given)."""
+        await self._retried(times, timeout, quiet_for, negate=False)
+
+    async def not_to_be_retried(
+        self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the delivery needed no retries (or any number but `times`, if given)."""
+        await self._retried(times, timeout, quiet_for, negate=True)
+
+    # GitHub: reviews, check runs, labels, merging
+
+    async def _review_comment(
+        self,
+        path: str | None,
+        line: int | None,
+        from_: AuthorRef | None,
+        text: Text | None,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        wanted = "" if path is None else f" on {path}{'' if line is None else f':{line}'}"
+        wanted += "" if from_ is None else f" from {_name(from_)}"
+        wanted += "" if text is None else f" matching {_show(text)}"
+
+        def matches(comment: Any) -> bool:
+            return (
+                (path is None or comment.path == path)
+                and (line is None or comment.line == line)
+                and (from_ is None or from_matches(comment.author, from_))
+                and text_matches(_comment_text(comment), text)
+            )
+
+        await self._settle(
+            read=self._subject.review_comments,
+            holds=lambda comments: any(map(matches, comments)),
+            describe=lambda comments: (
+                f"Expected {'no' if negate else 'a'} comment on the diff{wanted}. The diff has:\n"
+                + _listing([f"{c.author.name} on {c.path}:{c.line}: {c.body}" for c in comments])
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_review_comment(
+        self,
+        *,
+        path: str | None = None,
+        line: int | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+    ) -> None:
+        """Subject: a pull request. A comment on the diff, matched by every field that is given."""
+        await self._review_comment(path, line, from_, text, timeout, None, negate=False)
+
+    async def not_to_have_review_comment(
+        self,
+        *,
+        path: str | None = None,
+        line: int | None = None,
+        from_: AuthorRef | None = None,
+        text: Text | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no comment on the diff matches every field that is given."""
+        await self._review_comment(path, line, from_, text, timeout, quiet_for, negate=True)
+
+    async def _review_from(
+        self, author: AuthorRef, state: str | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        def described(reviews: Sequence[Any]) -> str:
+            lines = [f"{r.author.name}: {r.state}{'' if r.body == '' else f' {_show(r.body)}'}" for r in reviews]
+            return (
+                f"Expected {'no' if negate else 'a'} review from {_name(author)}"
+                f"{'' if state is None else f' with state {state}'}. Reviews there:\n{_listing(lines)}"
+            )
+
+        await self._settle(
+            read=self._subject.reviews,
+            holds=lambda reviews: any(
+                from_matches(review.author, author) and (state is None or review.state == state) for review in reviews
+            ),
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_review_from(
+        self, author: AuthorRef, *, state: str | None = None, timeout: Duration | None = None
+    ) -> None:
+        """Subject: a pull request. A review from this author, with this verdict (`APPROVED`, …) if given."""
+        await self._review_from(author, state, timeout, None, negate=False)
+
+    async def not_to_have_review_from(
+        self,
+        author: AuthorRef,
+        *,
+        state: str | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no review from this author (with this verdict, if given)."""
+        await self._review_from(author, state, timeout, quiet_for, negate=True)
+
+    async def _check_run(
+        self,
+        name: Text,
+        status: str | None,
+        conclusion: str | None,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        wanted = ", ".join(part for part in (status, conclusion) if part is not None)
+
+        def described(runs: Sequence[Any]) -> str:
+            lines = [
+                f"{run.name}: {run.status}{'' if run.conclusion is None else f', {run.conclusion}'}" for run in runs
+            ]
+            return (
+                f"Expected {'no' if negate else 'a'} check run {_show(name)}{f' ({wanted})' if wanted else ''}. "
+                f"Check runs there:\n{_listing(lines)}"
+            )
+
+        await self._settle(
+            read=self._subject.check_runs,
+            holds=lambda runs: any(
+                _named(run.name, name)
+                and (status is None or run.status == status)
+                and (conclusion is None or run.conclusion == conclusion)
+                for run in runs
+            ),
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_check_run(
+        self,
+        name: Text,
+        *,
+        status: str | None = None,
+        conclusion: str | None = None,
+        timeout: Duration | None = None,
+    ) -> None:
+        """Subject: a pull request or a commit. A check run of this name, in this status and conclusion if given."""
+        await self._check_run(name, status, conclusion, timeout, None, negate=False)
+
+    async def not_to_have_check_run(
+        self,
+        name: Text,
+        *,
+        status: str | None = None,
+        conclusion: str | None = None,
+        timeout: Duration | None = None,
+        quiet_for: Duration | None = None,
+    ) -> None:
+        """Once the agent is quiet, no such check run (in this status and conclusion, if given)."""
+        await self._check_run(name, status, conclusion, timeout, quiet_for, negate=True)
+
+    async def _label(self, name: str, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        await self._settle(
+            read=self._subject.labels,
+            holds=lambda labels: any(label.lower() == name.lower() for label in labels),
+            describe=lambda labels: (
+                f"Expected {'no' if negate else 'the'} label {_show(name)}. Labels there: {', '.join(labels) or 'none'}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_label(self, name: str, *, timeout: Duration | None = None) -> None:
+        """Subject: an issue or a pull request. It has this label, compared case-insensitively."""
+        await self._label(name, timeout, None, negate=False)
+
+    async def not_to_have_label(
+        self, name: str, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue or pull request doesn't have this label."""
+        await self._label(name, timeout, quiet_for, negate=True)
+
+    async def _merged(self, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        await self._settle(
+            read=self._subject.merged,
+            holds=bool,
+            describe=lambda _: f"Expected the pull request {'not ' if negate else ''}to be merged",
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_be_merged(self, *, timeout: Duration | None = None) -> None:
+        """Subject: a pull request. It has been merged."""
+        await self._merged(timeout, None, negate=False)
+
+    async def not_to_be_merged(self, *, timeout: Duration | None = None, quiet_for: Duration | None = None) -> None:
+        """Once the agent is quiet, the pull request isn't merged."""
+        await self._merged(timeout, quiet_for, negate=True)
+
+    # Linear issues: delegation, assignment, workflow state
+
+    async def _principal(
+        self,
+        read: Callable[[], Awaitable[Any]],
+        expected: Author | None,
+        verb: str,
+        timeout: Duration | None,
+        quiet_for: Duration | None,
+        negate: bool,
+    ) -> None:
+        """Who the issue is delegated or assigned to, compared by id; `None` asks for no one."""
+        await self._settle(
+            read=read,
+            holds=lambda current: (
+                current is None if expected is None else current is not None and current.id == expected.id
+            ),
+            describe=lambda current: (
+                f"Expected the issue {'not ' if negate else ''}to be {verb} to "
+                f"{'no one' if expected is None else expected.name}, it is {verb} to "
+                f"{'no one' if current is None else current.name}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_be_delegated_to(self, app: Author | None, *, timeout: Duration | None = None) -> None:
+        """Subject: a Linear issue. It is delegated to this app, or (with `None`) to none."""
+        await self._principal(self._subject.delegated_to, app, "delegated", timeout, None, negate=False)
+
+    async def not_to_be_delegated_to(
+        self, app: Author | None, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue isn't delegated to this app (or, with `None`, it is to one)."""
+        await self._principal(self._subject.delegated_to, app, "delegated", timeout, quiet_for, negate=True)
+
+    async def to_be_assigned_to(self, user: Author | None, *, timeout: Duration | None = None) -> None:
+        """Subject: a Linear issue. It is assigned to this person, or (with `None`) to no one."""
+        await self._principal(self._subject.assignee, user, "assigned", timeout, None, negate=False)
+
+    async def not_to_be_assigned_to(
+        self, user: Author | None, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue isn't assigned to this person (or, with `None`, it is to someone)."""
+        await self._principal(self._subject.assignee, user, "assigned", timeout, quiet_for, negate=True)
+
+    async def _state(self, name: str, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        async def read() -> str:
+            return str((await self._subject.state()).name)
+
+        await self._settle(
+            read=read,
+            holds=lambda current: current.lower() == name.lower(),
+            describe=lambda current: (
+                f"Expected the issue {'not ' if negate else ''}to be in {_show(name)}, it is in {_show(current)}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_state(self, name: str, *, timeout: Duration | None = None) -> None:
+        """Subject: a Linear issue. Its workflow state, by name, compared case-insensitively."""
+        await self._state(name, timeout, None, negate=False)
+
+    async def not_to_have_state(
+        self, name: str, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the issue is in another workflow state."""
+        await self._state(name, timeout, quiet_for, negate=True)
+
+    # Notion pages: blocks and properties
+
+    async def _block(self, text: Text, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        async def read() -> list[str]:
+            return _block_texts(await self._subject.blocks())
+
+        await self._settle(
+            read=read,
+            holds=lambda texts: any(text_matches(line, text) for line in texts),
+            describe=lambda texts: (
+                f"Expected the page {'not ' if negate else ''}to have a block matching {_show(text)}. "
+                f"Its blocks:\n{_listing(texts)}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_block(self, text: Text, *, timeout: Duration | None = None) -> None:
+        """Subject: a Notion page. A block (at any depth) whose text matches; a child page's title counts."""
+        await self._block(text, timeout, None, negate=False)
+
+    async def not_to_have_block(
+        self, text: Text, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, no block of the page (at any depth) matches."""
+        await self._block(text, timeout, quiet_for, negate=True)
+
+    async def _property_value(
+        self, name: str, expected: object, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        async def read() -> object:
+            return await self._subject.property(name)
+
+        await self._settle(
+            read=read,
+            holds=lambda value: value == expected,
+            describe=lambda value: (
+                f"Expected {name} {'not ' if negate else ''}to be {expected}, "
+                f"it is {json.dumps(value, ensure_ascii=False, default=str)}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_property_value(self, name: str, expected: object, *, timeout: Duration | None = None) -> None:
+        """Subject: a Notion page (a database row). A property has this value, compared with `==`.
+
+        So `unittest.mock.ANY`, or any object with its own `__eq__`, works as TypeScript's asymmetric matchers do.
+        """
+        await self._property_value(name, expected, timeout, None, negate=False)
+
+    async def not_to_have_property_value(
+        self, name: str, expected: object, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the property has another value."""
+        await self._property_value(name, expected, timeout, quiet_for, negate=True)
 
 
 def expect(subject: Any) -> Expectation:
