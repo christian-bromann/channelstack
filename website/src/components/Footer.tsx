@@ -5,12 +5,12 @@ import { Mark } from "./Mark";
 
 const DOCS = [
   ["Getting started", "/docs/getting-started"],
-  ["Slack", "/docs/slack"],
-  ["GitHub", "/docs/github"],
-  ["Linear", "/docs/linear"],
-  ["Notion", "/docs/notion"],
-  ["Live mode", "/docs/live-mode"],
-  ["API reference", "/docs/api-reference"],
+  ["Slack", "/docs/platforms/slack"],
+  ["GitHub", "/docs/platforms/github"],
+  ["Linear", "/docs/platforms/linear"],
+  ["Notion", "/docs/platforms/notion"],
+  ["Live mode", "/docs/guide/live-mode"],
+  ["Reference", "/docs/reference"],
 ] as const;
 
 export function Footer() {
