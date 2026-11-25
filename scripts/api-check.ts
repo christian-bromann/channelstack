@@ -68,14 +68,12 @@ for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
 
 /**
  * Contract types nothing implements by that name: the bases whose members every handle repeats
- * (checked there), configuration (#10), the matchers' own option type, and option bags (the
- * examples check them as the methods' parameters).
+ * (checked there), the matchers' own option type, and option bags (the examples check them as the
+ * methods' parameters).
  */
 const NOT_HANDLES = new Set([
-  ...["Principal", "User", "App", "Resource", "HasTranscript", "Inspectable", "Delivery", "ResendOptions"],
-  ...["DeliveryFilter", "ApiCallFilter"],
-  ...["ChannelstackConfig", "ServerConfig", "SlackConfig", "SlackLiveApp", "SlackAppUrls", "GitHubConfig"],
-  ...["GitHubAppConfig", "LinearConfig", "LinearAppConfig", "NotionConfig", "NotionIntegrationConfig"],
+  ...["Principal", "User", "App", "Resource", "HasTranscript", "SlackHasTranscript", "Inspectable", "Delivery"],
+  ...["ResendOptions", "SlackResendOptions", "LinearResendOptions", "DeliveryFilter", "ApiCallFilter"],
   ...["ChannelstackMatchers", "TextOptions"],
   ...["SlackUserOptions", "SlackChannelOptions", "GitHubUserOptions", "GitHubRepoOptions", "LinearUserOptions"],
   ...["LinearTeamOptions", "NotionUserOptions", "NotionPageOptions", "NotionDatabaseOptions"],
@@ -95,33 +93,11 @@ const KNOWN_GAPS: Readonly<Record<string, string>> = {
     ].map((type) => [`${type}.channel`, "#36"]),
   ),
   ...Object.fromEntries(
-    ["SlackConversation", "GitHubRepo", "LinearTeam", "NotionPage", "NotionDatabase"].map((type) => [
-      `${type}.uiUrl`,
-      "#36",
-    ]),
-  ),
-  ...Object.fromEntries(
-    ["SlackConversation", "GitHubRepo", "LinearTeam", "NotionPage", "NotionDatabase"].map((type) => [
-      `${type}.[Symbol.asyncDispose]`,
-      "#36",
-    ]),
-  ),
-  ...Object.fromEntries(["Slack", "GitHub", "Linear", "Notion"].map((channel) => [`${channel}ApiCall.app`, "#40"])),
-  ...Object.fromEntries(
     ["GitHub", "Linear", "Notion"].flatMap((channel) => [
       [`${channel}TranscriptEntry.streaming`, "#40"],
       [`${channel}TranscriptEntry.visibleTo`, "#40"],
     ]),
   ),
-  "ChannelstackFixture.deliveries": "#40",
-  "ChannelstackFixture.calls": "#40",
-  "ChannelstackIntegrationOptions.channels": "#40",
-  "ChannelstackIntegrationOptions.config": "#10",
-  "SlackUser.renameChannel": "#37",
-  "SlackUser.archiveChannel": "#37",
-  SlackChannel: "#37",
-  SlackDM: "#37",
-  SlackAgentThread: "#37",
   SlackInjectedFault: "#37",
 };
 
