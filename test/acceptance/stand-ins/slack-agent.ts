@@ -9,6 +9,8 @@ const app = new bolt.App({
 app.event("app_mention", async ({ event }) => {
   console.log(`handled ${event.text}`);
 });
+// A moment first, so a parent that closes the IPC channel at once has closed it by now.
+await new Promise((resolve) => setTimeout(resolve, 200));
 await app.processEvent({
   body: {
     type: "event_callback",

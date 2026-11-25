@@ -13,7 +13,6 @@ import { pathToFileURL } from "node:url";
 const [path] = process.argv.slice(2);
 if (!path || !process.send) throw new Error("Usage: spawned with IPC, `slack-event-tap.ts <agent.ts>`");
 const agent = resolve(path);
-const send = process.send.bind(process);
 
 // The agent's own copy of Bolt (CommonJS, so its `import` gets this same module).
 const { App } = createRequire(agent)("@slack/bolt") as {
@@ -21,7 +20,8 @@ const { App } = createRequire(agent)("@slack/bolt") as {
 };
 const processEvent = App.prototype.processEvent;
 App.prototype.processEvent = function (this: unknown, event) {
-  send({ slackEvent: event.body });
+  // With a callback, a closed channel is an error passed here, not one that stops the agent.
+  if (process.connected) process.send?.({ slackEvent: event.body }, undefined, {}, () => {});
   return processEvent.call(this, event);
 };
 

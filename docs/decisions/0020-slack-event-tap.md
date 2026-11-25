@@ -22,6 +22,11 @@ the fake's `block_actions` are recorded too.
 
 - The agent keeps its own connection to Slack. Nothing is relayed, forwarded or made up, so live
   mode's rule holds, and the tap is in the live run's scripts, not in the server.
+- "channelstack never starts or wraps the agent" is about the user's agent. This is channelstack's
+  own reference agent, which the nightly scripts already start, and only while they record.
+- If the tap stops working (a Bolt that no longer calls `processEvent`, or a second copy of Bolt),
+  the run fails: a channel whose scenarios passed live with none of its webhooks recorded is a
+  problem of `pnpm conformance`.
 - It needs nothing new in the sandbox: no second app, no request URL, no relay channel.
 - What's recorded is what Bolt got, which is exactly what Slack sent over the socket.
 
