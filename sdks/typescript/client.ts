@@ -1,6 +1,6 @@
 /**
- * `channelstack/client`: the generated client the test integrations are built on.
- * Experimental until the integrations ship (phase 1); the public contract is `api/*.d.ts`.
+ * `channelstack` and `channelstack/client`: the generated client the test integrations are built
+ * on, and its types (`import type { SlackUser } from "channelstack"`). The public contract is `api/*.d.ts`.
  */
 export * from "./generated/index.ts";
 export { type Duration, parseDuration } from "./runtime/duration.ts";

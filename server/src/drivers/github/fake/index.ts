@@ -5,7 +5,7 @@ import { GitHubStore } from "./store.ts";
 import { createFakeWorld, type FakeGitHubWorld } from "./world.ts";
 
 /**
- * The agent's App, until `channelstack.config.ts` describes it: the permissions and webhook
+ * The agent's App, built in (there is no config file): the permissions and webhook
  * events an agent that works on issues, pull requests and checks usually has.
  */
 const DEFAULT_APP = {

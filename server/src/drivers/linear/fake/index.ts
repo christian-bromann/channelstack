@@ -3,7 +3,7 @@ import { createLinearApi } from "./api.ts";
 import { LinearStore } from "./store.ts";
 import { createFakeWorld, type FakeLinearWorld } from "./world.ts";
 
-/** The agent's app, until `channelstack.config.ts` describes it: an agent subscribed to its sessions, issues and comments. */
+/** The agent's app, built in (there is no config file): an agent subscribed to its sessions, issues and comments. */
 const DEFAULT_APP = { name: "my-agent", events: ["AgentSessionEvent", "Issue", "Comment"] } as const;
 
 export interface LinearFake extends FakeBackend {
