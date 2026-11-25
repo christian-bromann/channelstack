@@ -107,6 +107,12 @@ const json = (text: string): unknown => {
   }
 };
 
+/** A form's `payload` field, parsed: how Slack sends an interaction. */
+const formPayload = (body: string): unknown => {
+  const payload = new URLSearchParams(body).get("payload");
+  return payload === null ? undefined : json(payload);
+};
+
 /** A recorder writing to `<dir>/shapes.jsonl`, private (0600). */
 export function createRecorder(dir: string): Recorder {
   const file = join(dir, "shapes.jsonl");
@@ -130,11 +136,14 @@ export function createRecorder(dir: string): Recorder {
       return response;
     },
     webhook(channel, type, body) {
-      const parsed = json(body);
+      // JSON, or a form whose `payload` is JSON (Slack's interactions).
+      const parsed = json(body) ?? formPayload(body);
       if (parsed === undefined) return;
-      // By type and action: `issues opened` and `issues closed` are shaped differently.
-      const action = (parsed as { action?: unknown } | null)?.action;
-      const operation = typeof action === "string" && action.length <= 64 ? `${type} ${action}` : type;
+      // By type and action: `issues opened` and `issues closed` are shaped differently, and so are
+      // Slack's events by the event's type (`event_callback app_mention`).
+      const fields = parsed as { action?: unknown; event?: { type?: unknown } } | null;
+      const detail = typeof fields?.action === "string" ? fields.action : fields?.event?.type;
+      const operation = typeof detail === "string" && detail.length <= 64 ? `${type} ${detail}` : type;
       write({ kind: "webhook", channel, operation, shape: shapeOf(parsed) });
     },
   };

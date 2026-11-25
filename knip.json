@@ -8,6 +8,7 @@
         "scenarios/runners/typescript/*.ts",
         "integrations/vitest/*.ts",
         "examples/agents/*/agent.ts",
+        "scripts/lib/slack-event-tap.ts",
         "test/acceptance/*.ts",
         "test/acceptance/stand-ins/*.ts",
         "test/acceptance/default-timeout/*.ts",

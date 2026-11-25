@@ -73,6 +73,19 @@ describe("the recorder", () => {
     );
     expect(await response.json()).toEqual({ ok: true, ts: "1.2", message: { text: "hello" } });
     recorder.webhook("github", "issue_comment", JSON.stringify({ action: "created", comment: { body: "hi" } }));
+    // Slack's events by the event's type, and its interactions from the form they come in.
+    recorder.webhook(
+      "slack",
+      "event_callback",
+      JSON.stringify({ type: "event_callback", event: { type: "app_mention", text: "hi" } }),
+    );
+    recorder.webhook(
+      "slack",
+      "block_actions",
+      new URLSearchParams({
+        payload: JSON.stringify({ type: "block_actions", actions: [{ value: "hi" }] }),
+      }).toString(),
+    );
     const file = join(dir, "shapes.jsonl");
     expect(statSync(file).mode & 0o777).toBe(0o600);
     const lines = readFileSync(file, "utf8")
@@ -92,6 +105,18 @@ describe("the recorder", () => {
         channel: "github",
         operation: "issue_comment created",
         shape: { action: "=created", comment: { body: "string" } },
+      },
+      {
+        kind: "webhook",
+        channel: "slack",
+        operation: "event_callback app_mention",
+        shape: { type: "=event_callback", event: { type: "=app_mention", text: "string" } },
+      },
+      {
+        kind: "webhook",
+        channel: "slack",
+        operation: "block_actions",
+        shape: { type: "=block_actions", actions: [{ value: "string" }] },
       },
     ]);
     expect(readFileSync(file, "utf8")).not.toMatch(/xoxb-secret|hello|"hi"/);
