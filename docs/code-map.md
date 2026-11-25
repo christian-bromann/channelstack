@@ -22,7 +22,9 @@
 | Live mode from the terminal | `cli/live.ts` | `doctor` (which channels run live, whether their credentials work and are allowlisted, saved browser sessions), `sweep` (what crashed runs left, `--check` for the nightly job) and `login` (a person signs in by hand, once; the session is saved for the browser actor), over each driver's `live.maintenance` | Call a platform from the CLI without the driver's maintenance |
 | Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError` | Read `server.json` or call the control API from another CLI module |
 | Acting from the terminal | `cli/slack.ts` | `slack say`, `reply`, `react`, `click`, `stop`; people and channels by name, created on first use; what `last` means | Resolve names or `last` anywhere else |
-| Watching from the terminal | `cli/watch.ts` | `show` (a transcript as text or JSON) and `tail` (deliveries and API calls as they happen) | — |
+| Watching from the terminal | `cli/watch.ts` | `show` (a transcript as text or JSON), `tail` (deliveries and API calls as they happen) and `readEvents` (the lines since a cursor, for `tail` and MCP) | — |
+| Deliveries from the terminal | `cli/deliveries.ts` | `deliveries <channel>` (ids, events, outcomes, attempts) and `redeliver <channel> <id>` (Slack retries, the others redeliver), for every channel | List or resend deliveries from another CLI module |
+| MCP for coding agents | `cli/mcp.ts` | `channelstack mcp`: the attach commands as MCP tools over stdio, each calling the CLI's own function; attaches on the first call; a `CliError` becomes the tool's error | Write a tool's logic in `mcp.ts`: it belongs in the command's module, which the CLI calls too |
 | The UI page in the binary | `ui/page.ts` (the page itself is `ui/index.html`) | Importing the page as text, for the binary's entry only | Import it from `app.ts`: the app takes the page as an option, so it also runs under Node |
 | The list of drivers | `drivers/index.ts` | `DRIVERS`, `secretSpecs()` | Import a driver from core |
 

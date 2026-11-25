@@ -4,7 +4,9 @@ import { parseArgs } from "node:util";
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
 import { attach, type Attached } from "./cli/attach.ts";
+import { runDeliveries, runRedeliver } from "./cli/deliveries.ts";
 import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
+import { runMcp } from "./cli/mcp.ts";
 import { runSlack } from "./cli/slack.ts";
 import { runShow, runTail } from "./cli/watch.ts";
 import { rotateCa } from "./core/ca/index.ts";
@@ -41,6 +43,9 @@ Usage:
   channelstack slack stop  [--as <name>] [--thread last]   Press Stop on the agent's work in a thread
   channelstack show [--thread last] [--json]    The latest conversation as a person would read it
   channelstack tail [--once]                    Events to the agent and its API calls, as they happen
+  channelstack deliveries <channel>             What was delivered to the agent: ids, events, outcomes, attempts
+  channelstack redeliver <channel> <delivery>   Deliver it again, the way the platform does (Slack retries it)
+  channelstack mcp                              These commands as MCP tools over stdio, for a coding agent
   channelstack ui                               A one-time link that opens the UI in a browser
       --server <url>              The server to attach to (default: the one in server.json; also CHANNELSTACK_URL
                                   with CHANNELSTACK_TOKEN)
@@ -256,6 +261,10 @@ async function main() {
   }
   if (command === "show") return print(await runShow(attach(values), values));
   if (command === "tail") return runTail(attach(values), values, print);
+  if (command === "deliveries") return print(await runDeliveries(attach(values), action));
+  if (command === "redeliver") return print(await runRedeliver(attach(values), action, rest[0]));
+  // Attaches on its first tool call, so a coding agent can start it before the server.
+  if (command === "mcp") return runMcp(values, pkg.version);
   fail(`unknown command "${command}". Run \`channelstack --help\`.`);
 }
 

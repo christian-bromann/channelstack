@@ -91,7 +91,9 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // against the sandboxes is nightly (`.github/workflows/live.yml`, `pnpm conformance`).
   6: [],
   // Phase 7: 7.1's Rust half is the smoke scenarios through the Rust runner (the acceptance run's
-  // smoke part, next to TypeScript and Python); the Rust SDK's own checks are here.
+  // smoke part, next to TypeScript and Python); the Rust SDK's own checks are here. The acceptance
+  // run covers 7.3 (`test/acceptance/pytest` against Bolt, in its `slack` part) and 7.4
+  // (`test/acceptance/mcp.test.ts`); pytest-channelstack's own tests are in `pnpm test`.
   7: [{ name: "7.1 The Rust SDK: clippy and its own tests", script: ["test:rust"], group: "unit" }],
 };
 

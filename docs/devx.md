@@ -179,7 +179,7 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
 ```
 
-The MCP tools mirror the CLI: `slack_say`, `slack_click`, `slack_stop`, `github_comment`, `linear_delegate`, `notion_comment`, `show_thread`, `list_deliveries`, `redeliver`, `tail`. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. A `channelstack` skill on skills.sh comes with it, the same way portless and emulate ship theirs.
+The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries <channel>`, `channelstack redeliver <channel> <id>`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. `github_comment`, `linear_delegate` and `notion_comment` follow once the dev session can find GitHub, Linear and Notion people and objects by name, as it does Slack's ([#33](https://github.com/christian-bromann/channelstack/issues/33)). The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
 
 ## 5. Tests: plug into Vitest, Playwright, WebdriverIO and pytest
 

@@ -245,6 +245,8 @@ Handles passed as arguments or options are sent by id (`kind: "ref"`). In respon
 
 The modules have the same names in every language ([code-map.md](code-map.md)).
 
+In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed getters for its fields, and every method returns a builder: option setters, then `.send().await` or `.await` directly (`IntoFuture`). Waits are builders too (`thread.wait_for_reply().from("my-agent").timeout("5s").await`). Arguments that take a handle take any `&impl Handle`; errors are one `channelstack::Error` with the protocol's `code()`. The launcher finds the binary at `CHANNELSTACK_SERVER_BIN` or on the `PATH` for now; downloading the release binary comes with distribution (section 6, phase 8). The smoke runner (`scenarios/runners/rust`) calls methods by their API names through the generated `call_by_name`.
+
 ### 5.4 Keeping the SDKs honest
 
 - **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`, defined in [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md)) run through every SDK in CI, like WebDriver's WPT.
@@ -273,11 +275,12 @@ channelstack/
   codegen/           src/ir.ts (OpenAPI → IR) + src/emit/{typescript,python,rust}.ts
   sdks/typescript/   the npm package `channelstack`: runtime/ (hand-written), generated/, bin/ (runs the platform binary)
   sdks/python/       channelstack/runtime/ (hand-written) + channelstack/generated/
-  sdks/rust/         runtime/ + generated/
+  sdks/rust/         the crate `channelstack`: src/runtime/ (hand-written) + src/generated/
   integrations/      vitest, pytest-channelstack, checks
   scenarios/         smoke/*.yaml (protocol parity), runners/<language>/, agents/ (reference agents for the scenarios) + per-driver differential suites
   scripts/           the gate (verify-phase), spec and SDK generation, the binary build, packaging and smoke runs
   conformance/       schema validators, shape differ, coverage page
+  skills/channelstack/  the skill for coding agents that drive the MCP tools (skills.sh)
   docs/
 ```
 

@@ -9,7 +9,7 @@ SDK breadth and MCP ([phases.md](../../docs/phases.md#phase-7-sdk-breadth-and-mc
 | 7.1 Smoke parity | `pnpm test:smoke` runs every `scenarios/smoke/*.yaml` through the TypeScript, Python and Rust runners against the same binary | new `codegen/src/emit/rust.ts`, `sdks/rust/` (runtime and generated), `scenarios/runners/rust/`, `scripts/smoke.ts` (`SDKS` gains `rust`) |
 | 7.2 Jest | Dropped: no Jest support (the maintainer's decision, [decision 0017](../../docs/decisions/0017-no-jest.md)). `api/jest.d.ts` and its example are removed | — |
 | 7.3 pytest | `test/acceptance/pytest/test_slack.py` (a pytest port of the Slack conversation tests) against the Bolt agent | new `integrations/pytest-channelstack/` (fixtures, assertion helpers), on the Python SDK; the Python SDK's handles for every route |
-| 7.4 MCP | `server/src/cli/mcp.test.ts`: a scripted MCP client over stdio lists the tools, creates a user, sends a message and reads the agent's reply | new `server/src/cli/mcp.ts` (`channelstack mcp`), `skills/channelstack/SKILL.md` |
+| 7.4 MCP | `test/acceptance/mcp.test.ts` (with the Bolt agent, like 1.6's CLI test): a scripted MCP client over stdio lists the tools, posts as a person it creates, reads the agent's reply, tails, lists and redelivers | new `server/src/cli/mcp.ts` (`channelstack mcp`) and `server/src/cli/deliveries.ts` (`channelstack deliveries`, `redeliver`), `readEvents` in `cli/watch.ts`, `skills/channelstack/SKILL.md`. `github_comment`, `linear_delegate` and `notion_comment` deferred to #33 |
 
 ## Reuse
 
@@ -31,7 +31,7 @@ Each pinned to an exact version. The Rust toolchain is pinned in `rust-toolchain
 
 | Package | Why a library and not our code | License |
 |---|---|---|
-| `@modelcontextprotocol/sdk` (server) | The protocol's own TypeScript SDK, for the stdio server and the test's client | MIT |
+| `@modelcontextprotocol/sdk` 1.32.2 (server, and the root for the test's client) | The protocol's own TypeScript SDK, for the stdio server and the test's client | MIT |
 | Rust SDK: `reqwest` =0.13.5 (`json`, `query`, `rustls`), `tokio` =1.54.1, `serde_json` =1.0.154, `thiserror` =2.0.21, `percent-encoding` =2.3.2 | HTTP with TLS (portless serves HTTPS), async, JSON, typed errors and path escaping: what Rust clients use | MIT / Apache-2.0 |
 | Rust smoke runner: `yaml-rust2` =0.13.0, `regex` =1.13.1 | The smoke scenarios are YAML, and their `matches` checks regular expressions | MIT / Apache-2.0 |
 | CI: `Swatinem/rust-cache` v2.9.3 (by commit) | Caches the Rust builds between runs | MIT |
