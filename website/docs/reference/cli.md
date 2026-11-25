@@ -220,24 +220,28 @@ Prints the `dev` session's events as they happen, one line each: `<HH:MM:SS.mmm>
 ## `channelstack deliveries`
 
 ```bash
-channelstack deliveries <channel>
+channelstack deliveries [<channel>]
 ```
 
-`<channel>` is `slack`, `github`, `linear` or `notion`. Prints one line per delivery in the `dev` session, oldest first:
+Prints one line per delivery in the `dev` session, oldest first. `<channel>` is `slack`, `github`, `linear` or `notion`; with one, only that channel's:
 
 ```
 <id>  <type> <event type or action>  <status>  (attempts: <HTTP status of each attempt, or ->)
 ```
 
-Prints `Nothing was delivered to the agent on <channel> yet.` when there is none. Fails with `say which channel: slack, github, linear, notion.` without one.
+Without a channel, every channel's deliveries, in the order they were sent, each line starting with its channel (`slack  Ev0A1B2C3D4E  event_callback app_mention  acknowledged  (attempts: 200)`). A channel the server can't list, such as one running live, is left out.
+
+Prints `Nothing was delivered to the agent on <channel> yet.`, or without a channel `Nothing was delivered to the agent yet.`, when there is none. An unknown channel fails with `say which channel: slack, github, linear, notion, not "<channel>".`
 
 ## `channelstack redeliver`
 
 ```bash
-channelstack redeliver <channel> <delivery>
+channelstack redeliver [<channel>] [last|<delivery>]
 ```
 
-Delivers it again, the way the platform does: on Slack it is a retry (with `X-Slack-Retry-Num`), on the others a redelivery. `<delivery>` is an id that `channelstack deliveries` printed. Prints `Retried <id>` (Slack) or `Redelivered <id>`.
+Delivers it again, the way the platform does: on Slack it is a retry (with `X-Slack-Retry-Num`), on the others a redelivery. `last`, the default, is the newest delivery, of that channel or of any; `<delivery>` is an id that `channelstack deliveries` printed, found in whichever channel has it. Prints `Retried <id> (slack)` or `Redelivered <id> (<channel>)`.
+
+It fails with `nothing was delivered to the agent yet.` (or `… on <channel> yet.`) when there is nothing to send, and with ``no delivery <id>. `channelstack deliveries` lists them.`` (or `no delivery <id> on <channel>. …`) for an id it can't find.
 
 ## `channelstack ui`
 
@@ -264,8 +268,8 @@ Serves the attach commands as MCP tools over stdio, for a coding agent that is b
 | `slack_stop` | `as?`, `thread?` | `slack stop` |
 | `show_thread` | `thread?`, `json?` | `show` |
 | `tail` | none | `tail --once`, from where the last call stopped (`Nothing new.` when nothing happened) |
-| `list_deliveries` | `channel` | `deliveries` |
-| `redeliver` | `channel`, `delivery` | `redeliver` |
+| `list_deliveries` | `channel?` | `deliveries` |
+| `redeliver` | `channel?`, `delivery?` (`last`, the default, or an id) | `redeliver` |
 
 `thread` and `on` take `last` (the default) or `<channel id>:<ts>`.
 

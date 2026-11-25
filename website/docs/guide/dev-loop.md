@@ -111,10 +111,10 @@ npx channelstack redeliver slack Ev0A1B2C3D4E
 ```
 
 ```
-Retried Ev0A1B2C3D4E
+Retried Ev0A1B2C3D4E (slack)
 ```
 
-On Slack this is Slack's own retry, with its retry headers, so an agent that answers twice doesn't handle retries. GitHub, Linear and Notion redeliver the event instead (`Redelivered …`). `deliveries` and `redeliver` take `slack`, `github`, `linear` or `notion`, but only Slack has commands that act in the dev session so far, so the other lists stay empty there. For delivery failures in tests, see [Delivery and failures](/docs/guide/delivery-and-failures).
+On Slack this is Slack's own retry, with its retry headers, so an agent that answers twice doesn't handle retries. GitHub, Linear and Notion redeliver the event instead (`Redelivered … (github)`). Without an id, `redeliver` sends the newest delivery again; without a channel, `deliveries` lists every channel's and `redeliver` finds the id in any. Both take `slack`, `github`, `linear` or `notion`, but only Slack has commands that act in the dev session so far, so the other lists stay empty there. For delivery failures in tests, see [Delivery and failures](/docs/guide/delivery-and-failures).
 
 ## The shared `dev` session
 

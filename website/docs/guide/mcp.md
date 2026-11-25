@@ -44,8 +44,8 @@ Every tool acts in the shared `dev` session, the same one the CLI and the UI use
 | `slack_stop` | `as`?, `thread`? | `channelstack slack stop` |
 | `show_thread` | `thread`?, `json`? | `channelstack show` |
 | `tail` | none | `channelstack tail`, but each call returns only what happened since the last one (everything, the first time) |
-| `list_deliveries` | `channel`: `slack`, `github`, `linear` or `notion` | `channelstack deliveries` |
-| `redeliver` | `channel`, `delivery` (an id from `list_deliveries`) | `channelstack redeliver` |
+| `list_deliveries` | `channel`?: `slack`, `github`, `linear` or `notion`; every channel's without it | `channelstack deliveries` |
+| `redeliver` | `channel`?, `delivery`? (`last`, the default, or an id from `list_deliveries`) | `channelstack redeliver` |
 
 - **`as`** is a person's name, such as `ana`. The person is created the first time the name is used.
 - **`channel`** in `slack_say` is created the first time, with the person and the bot in it.
@@ -66,7 +66,7 @@ This is what a coding agent does with the tools while it works on the bot:
 
    The bot answers asynchronously. If its reply isn't there yet, call `show_thread` again.
 3. **See why.** `tail` returns the events delivered to the bot (`→ slack app_mention  200`) and the API calls it made (`← slack chat.postMessage  200`). A failed delivery, or a call refused with an error code, is usually the bug.
-4. **Change the bot, then send the same event again.** `list_deliveries` with `{ "channel": "slack" }` lists each delivery's id, event, outcome and attempts. `redeliver` with that id sends it again, the way Slack retries it, and returns `Retried Ev0A1B2C3D4E`. A bot that now answers twice doesn't handle retries.
+4. **Change the bot, then send the same event again.** `list_deliveries` with `{ "channel": "slack" }` lists each delivery's id, event, outcome and attempts. `redeliver` with that id sends it again, the way Slack retries it, and returns `Retried Ev0A1B2C3D4E (slack)`. A bot that now answers twice doesn't handle retries.
 5. **Check again** with `show_thread`.
 
 Once the bot behaves, the agent pins it down in a test ([Writing tests](/docs/guide/writing-tests)), which gets a fresh session and creates its own people.
