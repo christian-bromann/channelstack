@@ -51,7 +51,7 @@ minification it fails with the error the live run logged.
 
 ## Upstream
 
-Both causes are worth filing upstream, which is the maintainer's call since it means posting
-publicly: Bun's `keepNames` not keeping names, and `@wdio/utils` comparing scope types by name
-rather than by identity. When either is fixed, this decision can go back to full minification,
-with the test above still guarding it.
+`@wdio/utils` comparing scope types by name rather than by identity is filed as
+[webdriverio/webdriverio#16504](https://github.com/webdriverio/webdriverio/issues/16504). Bun's
+`keepNames` not keeping names isn't filed. When WebdriverIO's check is fixed, this decision can go
+back to full minification, with the test above still guarding it.
