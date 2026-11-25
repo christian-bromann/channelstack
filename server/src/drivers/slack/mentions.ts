@@ -34,12 +34,12 @@ const LINK = /<([^@#!>|][^>|]*)(?:\|([^>]*))?>/g;
  * (`<https://…>`, `<https://…|label>`) and escapes `&`, `<` and `>`. Mentions stay as they are.
  */
 export function typedText(text: string): string {
-  return text
-    .replace(LINK, (_, url: string, label: string | undefined) => label ?? url)
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&");
+  return unescapeMrkdwn(text.replace(LINK, (_, url: string, label: string | undefined) => label ?? url));
 }
+
+/** Slack mrkdwn's escapes undone: `&lt;`, `&gt;` and `&amp;` are `<`, `>` and `&`. */
+export const unescapeMrkdwn = (text: string): string =>
+  text.replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
 
 /** An emoji's name as Slack stores it: `:eyes:` and `eyes` are the same reaction. */
 export const emojiName = (emoji: string): string => emoji.replace(/^:|:$/g, "");

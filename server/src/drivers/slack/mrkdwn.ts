@@ -2,19 +2,24 @@
  * Slack mrkdwn → the `rich_text` block Slack makes of a message sent with text and no blocks (#45).
  *
  * The rules are Slack's, as recorded from real Slack (`mrkdwn.fixtures.json`), quirks included:
- * - `*bold*`, `_italic_`, `~strike~` and `` `code` `` style text when the opening marker starts a
- *   word (no letter, digit or the same marker before it, no space or the same marker after it)
- *   and the closing one ends it (no letter or digit after it), on one line. Styles nest; code
- *   holds links and mentions but no styles or emoji.
- * - `<@U…>`, `<#C…>`, `<!here>`, `<!subteam^S…>`, `<!date^…>` and `<https://…|label>` are their
- *   elements; a label is styled like text. Bare URLs and email addresses are links.
+ * - `*bold*`, `_italic_`, `~strike~` and `` `code` `` style text. An opening marker has no letter,
+ *   digit or the same marker before it, and no space or the same marker after it; a closing one
+ *   has no letter or digit after it. Markers pair like brackets, innermost first, within a line;
+ *   a pair inside the same style splits the text without changing its style. `<…>` doesn't hide
+ *   a marker: a pair that closes inside one leaves it as text. Code holds links and mentions, but
+ *   no styles or emoji.
+ * - `<@U…>`, `<#C…>`, `<!here>`, `<!subteam^S…>`, `<!date^…^…>` and `<https://…|label>` are their
+ *   elements; a label is styled like text. Anything else in `<…>` (a space, nothing after `@`, a
+ *   malformed date) stays as typed. Bare URLs and email addresses are links.
  * - `:name:` is an emoji (its code points from the emoji data Slack uses, none for a name it
  *   doesn't know), `:name::skin-tone-N:` one with a skin tone; a name of digits only isn't one.
- * - ```` ```…``` ```` is a preformatted section, and lines starting with `>` a quote. A single
- *   newline next to one is dropped; a blank line is kept.
+ * - ```` ```…``` ```` is a preformatted section, and lines starting with `>` a quote (`>` alone is
+ *   text). A single newline next to either is dropped; a blank line is kept.
  * - `&amp;`, `&lt;` and `&gt;` are unescaped.
  */
 import emojiData from "emoji-datasource" with { type: "json" };
+
+import { unescapeMrkdwn } from "./mentions.ts";
 
 type Element = Record<string, unknown>;
 type StyleName = "bold" | "italic" | "strike" | "code";
@@ -32,7 +37,7 @@ interface EmojiEntry {
 }
 
 let emojiByName: Map<string, EmojiEntry> | undefined;
-/** The emoji Slack knows, by every short name it answers to. Built on first use. */
+/** The emoji Slack knows, by every short name it answers to. The index is built on first use. */
 function emoji(name: string): EmojiEntry | undefined {
   if (!emojiByName) {
     emojiByName = new Map();
@@ -53,8 +58,6 @@ function emoji(name: string): EmojiEntry | undefined {
   return emojiByName.get(name);
 }
 
-const unescapeText = (text: string) => text.replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
-
 const styleObject = (style: Style) =>
   style.size === 0 ? {} : { style: Object.fromEntries(STYLE_ORDER.filter((s) => style.has(s)).map((s) => [s, true])) };
 
@@ -64,53 +67,63 @@ const isWordChar = (char: string | undefined) => char !== undefined && /[\p{L}\p
 class Elements {
   readonly list: Element[] = [];
   private buffer = "";
-  private readonly style: Style;
-  constructor(style: Style) {
+  private style: Style = NO_STYLE;
+  text(text: string, style: Style) {
+    if (style !== this.style) this.flush();
     this.style = style;
-  }
-  text(text: string) {
     this.buffer += text;
   }
   push(...elements: Element[]) {
     this.flush();
     this.list.push(...elements);
   }
+  flush() {
+    if (this.buffer) this.list.push({ type: "text", text: unescapeMrkdwn(this.buffer), ...styleObject(this.style) });
+    this.buffer = "";
+  }
   done(): Element[] {
     this.flush();
     return this.list;
   }
-  private flush() {
-    if (this.buffer) this.list.push({ type: "text", text: unescapeText(this.buffer), ...styleObject(this.style) });
-    this.buffer = "";
-  }
 }
 
-/** One `<…>`: a mention, a channel, a special mention, a date or a link. */
-function entity(inner: string, style: Style): Element[] {
+const DATE = /^!date\^(\d+)\^([^^]+)(?:\^(.+))?$/;
+
+/** One `<…>`'s elements: a mention, a channel, a special mention, a date or a link. Undefined: it stays text. */
+function entity(inner: string, style: Style): Element[] | undefined {
   const bar = inner.indexOf("|");
   const head = bar === -1 ? inner : inner.slice(0, bar);
   const label = bar === -1 ? undefined : inner.slice(bar + 1);
+  if (head === "" || /\s/.test(head)) return undefined;
   const styled = styleObject(style);
-  if (inner.startsWith("@")) return [{ type: "user", user_id: head.slice(1), ...styled }];
-  if (inner.startsWith("#")) return [{ type: "channel", channel_id: head.slice(1), ...styled }];
-  if (inner.startsWith("!date^")) {
-    const [, timestamp, format, url] = head.split("^");
-    return [
-      {
-        type: "date",
-        timestamp: Number(timestamp),
-        format,
-        ...(url ? { url } : {}),
-        ...(label === undefined ? {} : { fallback: unescapeText(label) }),
-        ...styled,
-      },
-    ];
+  const sigil = head[0];
+  const id = head.slice(1);
+  if (sigil === "@") return id ? [{ type: "user", user_id: id, ...styled }] : undefined;
+  if (sigil === "#") return id ? [{ type: "channel", channel_id: id, ...styled }] : undefined;
+  if (sigil === "!") {
+    if (id.startsWith("date^")) {
+      const date = DATE.exec(head);
+      if (!date) return undefined;
+      const [, timestamp, format, url] = date;
+      return [
+        {
+          type: "date",
+          timestamp: Number(timestamp),
+          format,
+          ...(url ? { url } : {}),
+          ...(label === undefined ? {} : { fallback: unescapeMrkdwn(label) }),
+          ...styled,
+        },
+      ];
+    }
+    if (id.startsWith("subteam^")) {
+      const group = id.slice("subteam^".length);
+      return group ? [{ type: "usergroup", usergroup_id: group, ...styled }] : undefined;
+    }
+    // Slack keeps whatever follows the `!`, a label included (`<!here|here>` is the range `here|here`).
+    return id ? [{ type: "broadcast", range: inner.slice(1), ...styled }] : undefined;
   }
-  if (inner.startsWith("!subteam^"))
-    return [{ type: "usergroup", usergroup_id: head.slice("!subteam^".length), ...styled }];
-  // Slack keeps whatever follows the `!`, a label included (`<!here|here>` is the range `here|here`).
-  if (inner.startsWith("!")) return [{ type: "broadcast", range: inner.slice(1), ...styled }];
-  const url = unescapeText(head);
+  const url = unescapeMrkdwn(head);
   if (label === undefined || label === "") return [{ type: "link", url, ...styled }];
   // A label is styled like text: each of its runs is a link of its own.
   return inline(label, style).map((element) =>
@@ -120,24 +133,13 @@ function entity(inner: string, style: Style): Element[] {
   );
 }
 
-/** Text with `<…>` entities and nothing else: what code and preformatted sections hold. */
-function entitiesOnly(text: string, style: Style): Element[] {
-  const out = new Elements(style);
-  let from = 0;
-  for (const match of text.matchAll(/<([^<>]+)>/g)) {
-    out.text(text.slice(from, match.index));
-    out.push(...entity(match[1] as string, style));
-    from = match.index + match[0].length;
-  }
-  out.text(text.slice(from));
-  return out.done();
-}
-
 // Sticky: each is tried at one position (`lastIndex`), without copying the rest of the text.
+const ENTITY = /<([^<>]*)>/y;
 const BARE_URL = /(?:https?:\/\/|www\.)[^\s<>]+/y;
-const BARE_EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/uy;
 const TRAILING_PUNCTUATION = /[.,!?;:)\]'"]+$/;
 const EMOJI = /:([A-Za-z0-9_+'-]+):(?::skin-tone-([2-6]):)?/y;
+const EMAIL_LOCAL = /[\p{L}\p{N}._%+-]/u;
+const EMAIL_DOMAIN = /^[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/u;
 
 /** `pattern`'s match starting exactly at `at`, if any. */
 const matchAt = (pattern: RegExp, text: string, at: number) => {
@@ -145,47 +147,115 @@ const matchAt = (pattern: RegExp, text: string, at: number) => {
   return pattern.exec(text);
 };
 
-/** One line's worth of mrkdwn (or several, for a quote) → its elements, in `style`. */
-function inline(text: string, style: Style): Element[] {
-  const out = new Elements(style);
+/** Text with `<…>` entities and nothing else: what code and preformatted sections hold. */
+function entitiesOnly(text: string, style: Style): Element[] {
+  const out = new Elements();
   let i = 0;
   while (i < text.length) {
+    const match = text[i] === "<" ? matchAt(ENTITY, text, i) : null;
+    const elements = match ? entity(match[1] as string, style) : undefined;
+    if (match && elements) {
+      out.push(...elements);
+      i += match[0].length;
+      continue;
+    }
+    out.text(text[i] as string, style);
+    i++;
+  }
+  return out.done();
+}
+
+/**
+ * Where each style marker that opens is closed: markers pair like brackets, per marker, within a
+ * line. One pass, so a line of markers that never close costs no more than any other.
+ */
+function markerPairs(text: string): Map<number, number> {
+  const pairs = new Map<number, number>();
+  const open: Record<string, number[]> = { "*": [], _: [], "~": [], "`": [] };
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i] as string;
+    if (char === "\n") {
+      for (const stack of Object.values(open)) stack.length = 0;
+      continue;
+    }
+    const stack = open[char];
+    if (!stack) continue;
+    const before = text[i - 1];
+    const after = text[i + 1];
+    const last = stack.at(-1);
+    if (last !== undefined && i > last + 1 && !isWordChar(after)) {
+      pairs.set(stack.pop() as number, i);
+      continue;
+    }
+    if (!isWordChar(before) && before !== char && after !== undefined && !/\s/.test(after) && after !== char) {
+      stack.push(i);
+    }
+  }
+  return pairs;
+}
+
+/** The email addresses in `text`, by where each starts. Found from each `@`, so it costs one pass. */
+function emailsIn(text: string): Map<number, string> {
+  const found = new Map<number, string>();
+  for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
+    let start = at;
+    while (start > 0 && EMAIL_LOCAL.test(text[start - 1] as string)) start--;
+    while (start < at && !isWordChar(text[start])) start++;
+    if (start === at || text[start - 1] === ".") continue;
+    const domain = EMAIL_DOMAIN.exec(text.slice(at + 1, at + 256))?.[0];
+    if (domain) found.set(start, text.slice(start, at + 1 + domain.length));
+  }
+  return found;
+}
+
+/** A section's or a quote's mrkdwn → its elements, in `base` style (a link label's). */
+function inline(text: string, base: Style): Element[] {
+  const pairs = markerPairs(text);
+  const emails = emailsIn(text);
+  const out = new Elements();
+  /** The styles open here, each with where it closes; innermost last. */
+  const active: Array<{ close: number; style: Style }> = [];
+  let style = base;
+  let i = 0;
+  while (i < text.length) {
+    const limit = active.at(-1)?.close ?? text.length;
+    if (i === limit) {
+      out.flush();
+      active.pop();
+      style = active.at(-1)?.style ?? base;
+      i++;
+      continue;
+    }
     const char = text[i] as string;
     const before = text[i - 1];
     if (char === "<") {
-      const end = text.indexOf(">", i);
-      if (end > i + 1) {
-        out.push(...entity(text.slice(i + 1, end), style));
-        i = end + 1;
+      const match = matchAt(ENTITY, text, i);
+      const elements = match && i + match[0].length <= limit ? entity(match[1] as string, style) : undefined;
+      if (match && elements) {
+        out.push(...elements);
+        i += match[0].length;
         continue;
       }
     }
     const marker = MARKERS[char];
-    if (marker && !style.has(marker)) {
-      const after = text[i + 1];
-      const opens =
-        !isWordChar(before) && before !== char && after !== undefined && !/\s/.test(after) && after !== char;
-      if (opens) {
-        let close = -1;
-        for (let j = i + 2; j < text.length && text[j] !== "\n"; j++) {
-          if (text[j] === char && !isWordChar(text[j + 1])) {
-            close = j;
-            break;
-          }
-        }
-        if (close !== -1) {
-          const inner = text.slice(i + 1, close);
-          const styled = new Set(style).add(marker);
-          out.push(...(marker === "code" ? entitiesOnly(inner, styled) : inline(inner, styled)));
-          i = close + 1;
-          continue;
-        }
+    const close = pairs.get(i);
+    if (marker && close !== undefined && close < limit) {
+      const styled = new Set(style).add(marker);
+      if (marker === "code") {
+        out.push(...entitiesOnly(text.slice(i + 1, close), styled));
+        i = close + 1;
+        continue;
       }
+      out.flush();
+      active.push({ close, style: styled });
+      style = styled;
+      i++;
+      continue;
     }
     if (char === ":") {
       const match = matchAt(EMOJI, text, i);
       const name = match?.[1];
-      if (match && name && !/^\d+$/.test(name)) {
+      if (match && name && !/^\d+$/.test(name) && i + match[0].length <= limit) {
         const known = emoji(name);
         const tone = match[2];
         const skin = tone && known?.skins?.[(0x1f3f9 + Number(tone)).toString(16).toUpperCase()];
@@ -201,26 +271,26 @@ function inline(text: string, style: Style): Element[] {
       }
     }
     if (!isWordChar(before) && (char === "h" || char === "w")) {
-      const url = matchAt(BARE_URL, text, i)?.[0].replace(TRAILING_PUNCTUATION, "");
-      if (url && url !== "www.") {
+      const url = matchAt(BARE_URL, text, i)?.[0]
+        .slice(0, limit - i)
+        .replace(TRAILING_PUNCTUATION, "");
+      if (url && url !== "www." && !/^https?:\/\/$/.test(url)) {
         out.push(
           url.startsWith("www.")
-            ? { type: "link", url: `http://${unescapeText(url)}`, text: unescapeText(url), ...styleObject(style) }
-            : { type: "link", url: unescapeText(url), ...styleObject(style) },
+            ? { type: "link", url: `http://${unescapeMrkdwn(url)}`, text: unescapeMrkdwn(url), ...styleObject(style) }
+            : { type: "link", url: unescapeMrkdwn(url), ...styleObject(style) },
         );
         i += url.length;
         continue;
       }
     }
-    if (!isWordChar(before) && before !== "." && isWordChar(char)) {
-      const email = matchAt(BARE_EMAIL, text, i)?.[0];
-      if (email) {
-        out.push({ type: "link", url: `mailto:${email}`, text: email, ...styleObject(style) });
-        i += email.length;
-        continue;
-      }
+    const email = emails.get(i);
+    if (email && i + email.length <= limit) {
+      out.push({ type: "link", url: `mailto:${email}`, text: email, ...styleObject(style) });
+      i += email.length;
+      continue;
     }
-    out.text(char);
+    out.text(char, style);
     i++;
   }
   return out.done();
@@ -234,35 +304,7 @@ const emojiElement = (name: string, unicode: string | undefined, tone: number | 
   ...styleObject(style),
 });
 
-/** Text between fences → its sections, and its quotes (runs of lines starting with `>`). */
-function sectionsAndQuotes(text: string): Element[] {
-  const elements: Element[] = [];
-  const lines = text.split("\n");
-  const isQuote = (line: string) => line.startsWith(">") || line.startsWith("&gt;");
-  let k = 0;
-  while (k < lines.length) {
-    const group: string[] = [];
-    const quoted = isQuote(lines[k] as string);
-    while (k < lines.length && isQuote(lines[k] as string) === quoted) group.push(lines[k++] as string);
-    if (!quoted) {
-      const body = group.join("\n");
-      if (body !== "") elements.push({ type: "rich_text_section", elements: inline(body, NO_STYLE) });
-      continue;
-    }
-    const first = group[0] as string;
-    const marker = first.startsWith("&gt;") ? "&gt;" : ">";
-    const padded = first.slice(marker.length).startsWith(" ");
-    // Slack strips `> ` from the quote's first line, and only `>` from the lines after it.
-    const body = [
-      first.slice(marker.length + (padded ? 1 : 0)),
-      ...group.slice(1).map((line) => line.slice(line.startsWith("&gt;") ? 4 : 1)),
-    ].join("\n");
-    elements.push({ type: "rich_text_quote", elements: inline(body, NO_STYLE), contains_padding: padded });
-  }
-  return elements;
-}
-
-/** A single newline next to a fence goes; a blank line stays. */
+/** A single newline next to a quote or a fence goes; a blank line stays. */
 const trimEdge = (text: string, start: boolean, end: boolean) => {
   let out = text;
   if (start && out.startsWith("\n") && !out.startsWith("\n\n")) out = out.slice(1);
@@ -270,30 +312,88 @@ const trimEdge = (text: string, start: boolean, end: boolean) => {
   return out;
 };
 
+const isQuoteLine = (line: string) => line.startsWith(">") || line.startsWith("&gt;");
+
+/**
+ * Text between fences → its sections, and its quotes (runs of lines starting with `>`), with
+ * whether the fence after it starts on a quote's line (Slack shows a bordered fence then).
+ * `fenceBefore` and `fenceAfter`: whether a fence touches it.
+ */
+function sectionsAndQuotes(
+  text: string,
+  fenceBefore: boolean,
+  fenceAfter: boolean,
+): { elements: Element[]; quotesFence: boolean } {
+  const elements: Element[] = [];
+  const lines = text.split("\n");
+  /** Where each line starts in `text`. */
+  const starts: number[] = [];
+  for (let k = 0, at = 0; k < lines.length; at += (lines[k] as string).length + 1, k++) starts.push(at);
+  let plainFrom = 0;
+  let afterQuote = false;
+  let quotesFence = false;
+  const plain = (to: number, quoteNext: boolean) => {
+    const body = trimEdge(text.slice(plainFrom, to), afterQuote || (plainFrom === 0 && fenceBefore), quoteNext);
+    if (body !== "") elements.push({ type: "rich_text_section", elements: inline(body, NO_STYLE) });
+  };
+  let k = 0;
+  while (k < lines.length) {
+    if (!isQuoteLine(lines[k] as string)) {
+      k++;
+      continue;
+    }
+    const first = k;
+    while (k < lines.length && isQuoteLine(lines[k] as string)) k++;
+    const group = lines.slice(first, k);
+    const head = group[0] as string;
+    const marker = head.startsWith("&gt;") ? "&gt;" : ">";
+    const padded = head.slice(marker.length).startsWith(" ");
+    // Slack strips `> ` from the quote's first line, and only `>` from the lines after it.
+    const body = [
+      head.slice(marker.length + (padded ? 1 : 0)),
+      ...group.slice(1).map((line) => line.slice(line.startsWith("&gt;") ? 4 : 1)),
+    ].join("\n");
+    const onFenceLine = k === lines.length && fenceAfter;
+    if (body.trim() === "" && !onFenceLine) continue; // `>` alone is text: it stays in the section around it.
+    quotesFence = onFenceLine;
+    plain(starts[first] as number, true);
+    elements.push({
+      type: "rich_text_quote",
+      elements: body === "" ? [{ type: "text", text: "" }] : inline(body, NO_STYLE),
+      contains_padding: padded,
+    });
+    plainFrom = k === lines.length ? text.length : (starts[k] as number) - 1;
+    afterQuote = true;
+  }
+  if (plainFrom < text.length) plain(text.length, fenceAfter);
+  return { elements, quotesFence };
+}
+
 /** The elements of the `rich_text` block Slack makes of `text`. */
-export function richTextElements(text: string): Element[] {
+export function richTextElements(message: string): Element[] {
+  // Slack keeps no spaces at the end of a message (`> ` is `>`).
+  const text = message.replace(/[ \t]+$/, "");
   const elements: Element[] = [];
   const fences: Array<{ start: number; end: number; content: string }> = [];
-  let search = 0;
-  while (true) {
+  for (let search = 0; ;) {
     const open = text.indexOf("```", search);
     if (open === -1) break;
     const close = text.indexOf("```", open + 3);
     if (close === -1) break;
     const content = text.slice(open + 3, close).replace(/^\n/, "");
-    if (content === "") {
-      search = close + 3;
-      continue;
-    }
-    fences.push({ start: open, end: close + 3, content });
+    if (content !== "") fences.push({ start: open, end: close + 3, content });
     search = close + 3;
   }
   let from = 0;
   for (const [n, fence] of fences.entries()) {
-    elements.push(...sectionsAndQuotes(trimEdge(text.slice(from, fence.start), n > 0, true)));
-    elements.push({ type: "rich_text_preformatted", elements: entitiesOnly(fence.content, NO_STYLE) });
+    const before = sectionsAndQuotes(text.slice(from, fence.start), n > 0, true);
+    elements.push(...before.elements, {
+      type: "rich_text_preformatted",
+      elements: entitiesOnly(fence.content, NO_STYLE),
+      ...(before.quotesFence ? { border: 1 } : {}),
+    });
     from = fence.end;
   }
-  elements.push(...sectionsAndQuotes(trimEdge(text.slice(from), fences.length > 0, false)));
+  elements.push(...sectionsAndQuotes(text.slice(from), fences.length > 0, false).elements);
   return elements;
 }

@@ -9,10 +9,18 @@ describe("Slack's rich_text block of a message's mrkdwn (#45)", () => {
     expect(richTextElements(text)).toEqual(elements);
   });
 
-  test("a long message parses in linear time", () => {
-    const text = "*bold* _it_ :eyes: <@U0BOT0000> https://example.com ".repeat(2000);
+  // A message is at most 40,000 characters. Inputs that make a naive parser rescan the rest of the
+  // line at each character took over a second at that length; a linear pass takes milliseconds.
+  test.each([
+    ["openers that never close", "*a ".repeat(13_333)],
+    ["one long email-like run", "a-".repeat(20_000)],
+    ["`<` that never closes", "<".repeat(40_000)],
+    ["colons", ":a".repeat(20_000)],
+    ["markers nested 6,000 deep", `${"*a ".repeat(6_000)}${"a* ".repeat(6_000)}`],
+    ["every kind at once", "_x *y ~z `w <@U0 https://a.example ".repeat(1_100)],
+  ])("%s, at the length limit, parses quickly", (_, text) => {
     const started = performance.now();
-    expect(richTextElements(text).length).toBe(1);
-    expect(performance.now() - started).toBeLessThan(1000);
+    richTextElements(text);
+    expect(performance.now() - started).toBeLessThan(500);
   });
 });
