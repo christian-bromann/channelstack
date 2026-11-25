@@ -122,8 +122,9 @@ export const resendPayloads = {
       from: formatMailbox(email.from),
       created_at: resendTime(email.createdAt),
       subject: email.subject,
-      html: email.html ?? null,
-      text: email.text ?? null,
+      // Only the bodies the email has: Resend's description has no null for either.
+      ...(email.html === undefined ? {} : { html: email.html }),
+      ...(email.text === undefined ? {} : { text: email.text }),
       bcc: addresses(email.bcc),
       cc: addresses(email.cc),
       reply_to: addresses(email.replyTo),

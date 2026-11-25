@@ -1,6 +1,7 @@
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import {
   domainOf,
+  localPartOf,
   type Mailbox,
   messageId,
   messageIdsIn,
@@ -126,11 +127,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
           throw new ProtocolError("invalid_argument", `Someone has the address ${address} already`);
         }
       } else {
-        const local =
-          input.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, ".")
-            .replace(/^\.|\.$/g, "") || "person";
+        const local = localPartOf(input.name);
         address = `${local}@example.com`;
         for (let n = 2; store.personAt(address); n++) address = `${local}${n}@example.com`;
       }
@@ -199,11 +196,10 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
     },
 
     /**
-     * The agent sends an email through the API (`POST /emails`). Its domain must be the team's
-     * verified one. Each recipient gets it, Resend's test addresses do what they are for, and the
-     * webhook hears `email.sent` and then what happened.
+     * Check an email the agent sends, as Resend does before it accepts one: the domain is the
+     * team's verified one, and it has someone to go to and a body. Throws Resend's refusal; sends nothing.
      */
-    appSends(input: SendInput): ResendEmailRecord {
+    checkSend(input: SendInput) {
       const [from] = parseAddresses(input.from);
       if (!from) throw new ResendApiError(422, "validation_error", "Invalid `from` field.");
       if (domainOf(from.address) !== store.app.domain) {
@@ -224,14 +220,29 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
       );
       const inReplyTo = messageIdsIn(headers["in-reply-to"])[0];
       const references = messageIdsIn(headers.references);
-      const id = ids.next(RESEND_IDS.email);
-      const thread = threadFor({ id, inReplyTo, references });
-      // The email belongs to the session of the thread it answers, or of a person it reaches.
       const cc = parseAddresses(input.cc);
       const bcc = parseAddresses(input.bcc);
+      // The email belongs to the session of the thread it answers, or of a person it reaches.
+      const answered = threadOf({ inReplyTo, references }, (id) => store.byMessageId(id)?.thread);
       const reached = [...to, ...cc, ...bcc].map((mailbox) => store.personAt(mailbox.address)).find(Boolean);
       const session =
-        thread !== id ? store.threads.owner(thread) : reached === undefined ? undefined : store.users.owner(reached.id);
+        answered !== undefined
+          ? store.threads.owner(answered)
+          : reached === undefined
+            ? undefined
+            : store.users.owner(reached.id);
+      return { from, to, cc, bcc, inReplyTo, references, thread: answered, session };
+    },
+
+    /**
+     * The agent sends an email through the API (`POST /emails`). Its domain must be the team's
+     * verified one. Each recipient gets it, Resend's test addresses do what they are for, and the
+     * webhook hears `email.sent` and then what happened.
+     */
+    appSends(input: SendInput): ResendEmailRecord {
+      const { from, to, cc, bcc, inReplyTo, references, session, thread: answered } = this.checkSend(input);
+      const id = ids.next(RESEND_IDS.email);
+      const thread = answered ?? id;
       const outcomes = to.map((mailbox) => testOutcome(mailbox.address) ?? "delivered");
       const lastEvent: ResendLastEvent =
         outcomes.find((outcome) => outcome === "bounced" || outcome === "suppressed") ??
@@ -268,11 +279,20 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
             type: "Permanent",
             subType: "General",
             message:
-              "The recipient's email address is on the suppression list because it has a recent history of producing hard bounces.",
+              "The recipient's email provider sent a hard bounce message, but didn't specify the reason for the hard bounce.",
+            diagnosticCode: ["smtp; 550 5.1.1 user unknown"],
           },
         });
       } else if (lastEvent === "suppressed") {
-        emit(session, "email.suppressed", email);
+        emit(session, "email.suppressed", email, {
+          suppressed: {
+            type: "OnAccountSuppressionList",
+            reason: "previous_bounce",
+            message:
+              "The email address is on the suppression list because it has a recent history of producing hard bounces.",
+            diagnosticCode: [],
+          },
+        });
       } else {
         emit(session, "email.delivered", email);
         if (lastEvent === "complained") emit(session, "email.complained", email);

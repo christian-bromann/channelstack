@@ -120,8 +120,17 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     recent.set(key, calls);
     if (calls.length <= RATE_LIMIT) return undefined;
     return {
-      ...errorAnswer(429, "rate_limit_exceeded", "Too many requests. You can only make 10 requests per second."),
-      headers: { "retry-after": "1", "ratelimit-limit": String(RATE_LIMIT), "ratelimit-remaining": "0" },
+      ...errorAnswer(
+        429,
+        "rate_limit_exceeded",
+        "Too many requests. You can only make 10 requests per second. See rate limit response headers for more information. Or contact support to increase rate limit.",
+      ),
+      headers: {
+        "retry-after": "1",
+        "ratelimit-limit": String(RATE_LIMIT),
+        "ratelimit-remaining": "0",
+        "ratelimit-reset": "1",
+      },
     };
   };
 
@@ -160,13 +169,16 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     return email;
   };
 
-  endpoint("post", "/emails", "emails.send", (c, body) =>
-    once(c, body, () => {
-      const email = world.appSends(sendInput(body));
-      const session = world.sessionOf(email);
-      return limited(session) ?? { body: { id: email.id }, sessions: [session] };
-    }),
-  );
+  endpoint("post", "/emails", "emails.send", (c, body) => {
+    const input = sendInput(body);
+    // Over the limit, nothing is sent and the key isn't used up: the agent may send again.
+    const refused = limited(world.checkSend(input).session);
+    if (refused) return refused;
+    return once(c, body, () => {
+      const email = world.appSends(input);
+      return { body: { id: email.id }, sessions: [world.sessionOf(email)] };
+    });
+  });
 
   endpoint("post", "/emails/batch", "batch.send", (_c, body) => {
     const items: unknown = body;
@@ -174,9 +186,12 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
       throw new ResendApiError(422, "validation_error", "The body must be an array of emails.");
     if (items.length > 100) throw new ResendApiError(422, "validation_error", "A batch has at most 100 emails.");
     const inputs = items.map((item) => sendInput(item as Record<string, unknown>));
+    // Every email is checked before any is sent: a batch is sent whole, or not at all.
+    const checked = inputs.map((input) => world.checkSend(input));
+    const refused = limited(checked[0]?.session);
+    if (refused) return refused;
     const emails = inputs.map((input) => world.appSends(input));
-    const sessions = emails.map(world.sessionOf);
-    return limited(sessions[0]) ?? { body: { data: emails.map((email) => ({ id: email.id })) }, sessions };
+    return { body: { data: emails.map((email) => ({ id: email.id })) }, sessions: emails.map(world.sessionOf) };
   });
 
   endpoint("get", "/emails", "emails.list", (c) => {
