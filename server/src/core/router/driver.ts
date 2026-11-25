@@ -192,6 +192,15 @@ export interface Driver {
 /** How a driver registers itself with core: its name, the secrets it needs, and how to build it. */
 export interface DriverDefinition {
   readonly name: string;
+  /** The platform's name as people write it (`GitHub`), and the prefix of its types in the SDKs (`GitHubUser`). */
+  readonly title: string;
+  /** channelstack's own test platform (`echo`): in the binary, but not a channel anyone tests against. */
+  readonly internal?: boolean;
+  /**
+   * The last path segment that sends a delivery again (`/deliveries/{delivery}/<this>`), in the
+   * platform's own word: Slack retries. Defaults to `redeliver`.
+   */
+  readonly redeliver?: string;
   readonly secrets: SecretSpec;
   /** What makes it live. A driver without it is always fake. */
   readonly live?: LiveDeclaration;

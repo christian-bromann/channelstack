@@ -15,6 +15,7 @@ import { join, relative } from "node:path";
 import ts from "typescript";
 
 import { checkContract } from "../codegen/src/contract.ts";
+import { CHANNELS } from "../server/src/drivers/index.ts";
 import { ENABLED_TESTS } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 
@@ -81,7 +82,7 @@ const NOT_HANDLES = new Set([
 
 /** Value types the SDK has once per channel: each channel's is compared with the contract's. */
 const PER_CHANNEL = Object.fromEntries(
-  ["ApiCall", "Transcript", "TranscriptEntry"].map((name) => [name, ["Slack", "GitHub", "Linear", "Notion"]]),
+  ["ApiCall", "Transcript", "TranscriptEntry"].map((name) => [name, CHANNELS.map((channel) => channel.title)]),
 );
 
 /** What the contract declares and nothing implements yet, each with the issue that tracks it. */

@@ -15,6 +15,16 @@ export interface Ir {
   errors: string[];
   /** What channelstack's own codes mean, and their HTTP status (`x-channelstack-errors`). A fake's codes are the platform's own. */
   errorDocs: Record<string, { status: number; description: string }>;
+  /** The drivers in the binary, in their order (`x-channelstack-channels`). */
+  channels: IrChannel[];
+}
+
+/** A driver: its name (`github`), and its title, which is also the prefix of its types (`GitHubUser`). */
+export interface IrChannel {
+  name: string;
+  title: string;
+  /** channelstack's own test platform (`echo`), not a channel people test against. */
+  internal?: true;
 }
 
 /** A handle: an object with an identity on the server, and methods. */
@@ -544,6 +554,7 @@ export function buildIr(openapi: Json): Ir {
     types: types.filter((type) => reachable.has(type.name)),
     errors: [...errors].sort(),
     errorDocs: openapi["x-channelstack-errors"] ?? {},
+    channels: openapi["x-channelstack-channels"] ?? [],
   };
 }
 

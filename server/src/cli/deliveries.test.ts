@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
+import { CHANNEL_NAMES } from "../drivers/index.ts";
 import { type Attached, CliError } from "./attach.ts";
-import { CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
+import { runDeliveries, runRedeliver } from "./deliveries.ts";
 
 /** An attachment that records what the commands ask the control API, and answers from `answers`. */
 function recording(answers: Record<string, unknown> = {}) {
@@ -71,7 +72,7 @@ describe("channelstack deliveries", () => {
       "github 3f2a  issues opened  acknowledged  (attempts: 200)\nslack  Ev02  event_callback message  acknowledged  (attempts: 200)\n",
     );
     const { server: empty } = recording(
-      Object.fromEntries(CHANNELS.map((c) => [`GET /sessions/ses_dev/${c}/deliveries`, []])),
+      Object.fromEntries(CHANNEL_NAMES.map((c) => [`GET /sessions/ses_dev/${c}/deliveries`, []])),
     );
     expect(await runDeliveries(empty, undefined)).toBe("Nothing was delivered to the agent yet.\n");
   });
@@ -79,7 +80,7 @@ describe("channelstack deliveries", () => {
   test("an unknown channel is named", async () => {
     const { server, asked } = recording();
     await expect(runDeliveries(server, "teams")).rejects.toThrow(
-      new CliError(`say which channel: ${CHANNELS.join(", ")}, not "teams".`),
+      new CliError(`say which channel: ${CHANNEL_NAMES.join(", ")}, not "teams".`),
     );
     expect(asked).toEqual([]);
   });

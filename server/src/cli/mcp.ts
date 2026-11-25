@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { attach, type Attached, type AttachFlags, CliError, ServerGoneError } from "./attach.ts";
-import { CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
+import { DELIVERY_CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
 import { runSlack } from "./slack.ts";
 import { readEvents, runShow } from "./watch.ts";
 
@@ -104,7 +104,7 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
     {
       description:
         "What channelstack delivered to the bot: each delivery's id, event, outcome and attempts. Every channel's, or one channel's.",
-      inputSchema: { channel: z.enum(CHANNELS).optional() },
+      inputSchema: { channel: z.enum(DELIVERY_CHANNELS).optional() },
     },
     ({ channel }) => tool((attached) => runDeliveries(attached, channel)),
   );
@@ -114,7 +114,7 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
       description:
         "Deliver an event to the bot again, the way the platform does (Slack retries it): the newest delivery, or one by its id from list_deliveries.",
       inputSchema: {
-        channel: z.enum(CHANNELS).optional(),
+        channel: z.enum(DELIVERY_CHANNELS).optional(),
         delivery: z.string().min(1).optional().describe('"last" (the default) or an id from list_deliveries'),
       },
     },

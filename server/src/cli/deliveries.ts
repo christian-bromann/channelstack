@@ -1,8 +1,10 @@
+import { CHANNEL_NAMES, CHANNELS } from "../drivers/index.ts";
 import { type Attached, CliError, segment } from "./attach.ts";
 
-/** The channels whose deliveries the dev session shows. */
-export const CHANNELS = ["slack", "github", "linear", "notion"] as const;
-type Channel = (typeof CHANNELS)[number];
+type Channel = string;
+
+/** The channels whose deliveries the dev session shows: every channel, as a list `z.enum` takes. */
+export const DELIVERY_CHANNELS = CHANNEL_NAMES as [string, ...string[]];
 
 interface Delivery {
   id: string;
@@ -14,11 +16,11 @@ interface Delivery {
   attempts: Array<{ responseStatus?: number; sentAt?: string }>;
 }
 
-const isChannel = (value: string | undefined): value is Channel => CHANNELS.includes(value as Channel);
+const isChannel = (value: string | undefined): value is Channel => value !== undefined && CHANNEL_NAMES.includes(value);
 
 function channelOf(value: string): Channel {
   if (isChannel(value)) return value;
-  throw new CliError(`say which channel: ${CHANNELS.join(", ")}, not "${value}".`);
+  throw new CliError(`say which channel: ${CHANNEL_NAMES.join(", ")}, not "${value}".`);
 }
 
 /** A channel's deliveries in the dev session, oldest first. */
@@ -30,7 +32,7 @@ async function deliveriesOf(server: Attached, channel: Channel): Promise<Deliver
 /** Every channel's deliveries. A channel this server can't list (live, say) is left out, not an error. */
 async function allDeliveries(server: Attached): Promise<Array<{ channel: Channel; delivery: Delivery }>> {
   const listed = await Promise.all(
-    CHANNELS.map(async (channel) => {
+    CHANNEL_NAMES.map(async (channel) => {
       try {
         return (await deliveriesOf(server, channel)).map((delivery) => ({ channel, delivery }));
       } catch (error) {
@@ -94,6 +96,8 @@ export async function runRedeliver(server: Attached, args: readonly string[]): P
   }
   const session = segment(await server.devSession());
   const path = `/sessions/${session}/${found.channel}/deliveries/${segment(found.delivery.id)}`;
-  await server.request("POST", found.channel === "slack" ? `${path}/retry` : `${path}/redeliver`, {});
-  return `${found.channel === "slack" ? "Retried" : "Redelivered"} ${found.delivery.id} (${found.channel})\n`;
+  // Each platform's own word for it: Slack retries, the others redeliver.
+  const again = CHANNELS.find((definition) => definition.name === found.channel)?.redeliver ?? "redeliver";
+  await server.request("POST", `${path}/${again}`, {});
+  return `${again === "retry" ? "Retried" : "Redelivered"} ${found.delivery.id} (${found.channel})\n`;
 }

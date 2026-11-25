@@ -15,6 +15,8 @@ const excerpt = (text: string): string => {
 /** The Slack driver: the fake Web API and Events API, and the control actions a test's people take. */
 export const slack: DriverDefinition = {
   name: "slack",
+  title: "Slack",
+  redeliver: "retry",
   hosts: ["slack.com"],
   secrets: {
     botToken: "slack.botToken",

@@ -16919,5 +16919,28 @@
       "status": 400,
       "description": "A person's token belongs to a different workspace than the app's."
     }
-  }
+  },
+  "channels": [
+    {
+      "name": "echo",
+      "title": "Echo",
+      "internal": true
+    },
+    {
+      "name": "slack",
+      "title": "Slack"
+    },
+    {
+      "name": "github",
+      "title": "GitHub"
+    },
+    {
+      "name": "linear",
+      "title": "Linear"
+    },
+    {
+      "name": "notion",
+      "title": "Notion"
+    }
+  ]
 }

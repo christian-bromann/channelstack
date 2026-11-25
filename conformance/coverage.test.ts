@@ -20,8 +20,20 @@ const spec = {
         "x-channelstack-live": { unsupported: "delivery chaos is fake only" },
       },
     },
+    "/sessions/{session}/echo/deliveries/{delivery}/resend": {
+      post: { "x-channelstack-method": { on: "EchoDelivery", name: "resend" } },
+    },
     "/status": { get: { "x-channelstack-method": { on: "Channelstack", name: "status" } } },
   },
+  // Echo is internal, and a channel named after a route segment (`resend`) must not claim that route.
+  "x-channelstack-channels": [
+    { name: "echo", internal: true as const },
+    { name: "slack" },
+    { name: "github" },
+    { name: "linear" },
+    { name: "notion" },
+    { name: "resend" },
+  ],
 };
 const results: ConformanceResults = {
   at: "2026-11-24T03:00:00.000Z",

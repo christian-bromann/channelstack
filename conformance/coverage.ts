@@ -15,7 +15,11 @@ interface Operation {
 
 /** What the page is made from. */
 export interface CoverageInput {
-  spec: { paths: Record<string, Record<string, Operation>> };
+  spec: {
+    paths: Record<string, Record<string, Operation>>;
+    /** The drivers in the binary (`x-channelstack-channels`): every one but the internal ones is a channel. */
+    "x-channelstack-channels": ReadonlyArray<{ name: string; internal?: true }>;
+  };
   divergences: readonly Divergence[];
   /** The latest differential run, if there is one. */
   results?: ConformanceResults;
@@ -35,7 +39,11 @@ export interface CoverageRow {
   agreed: string;
 }
 
-const CHANNELS = ["slack", "github", "linear", "notion"];
+const channelsOf = (input: CoverageInput) =>
+  input.spec["x-channelstack-channels"].filter((channel) => !channel.internal).map((channel) => channel.name);
+
+/** The driver a control-API path belongs to: the segment after the session (`/sessions/{session}/slack/…`). */
+const driverOf = (path: string) => /^\/sessions\/\{session\}\/([^/]+)/.exec(path)?.[1];
 
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
 
@@ -79,9 +87,10 @@ export function coverageRows(input: CoverageInput): CoverageRow[] {
     if (uncalled.length > 0)
       throw new Error(`${scenario.name} covers ${uncalled.join(", ")}, which no step of it calls`);
   }
+  const CHANNELS = channelsOf(input);
   for (const [path, operations] of Object.entries(input.spec.paths)) {
-    const channel = CHANNELS.find((name) => path.includes(`/${name}`));
-    if (!channel) continue;
+    const channel = driverOf(path);
+    if (!channel || !CHANNELS.includes(channel)) continue;
     for (const operation of Object.values(operations)) {
       const method = operation["x-channelstack-method"] ?? operation["x-channelstack-factory"];
       if (!method) continue;
@@ -104,6 +113,7 @@ export function coverageRows(input: CoverageInput): CoverageRow[] {
 /** The page in a few lines of Markdown, for a CI job's summary: per channel, its actions and how many work live and agreed. */
 export function coverageSummary(input: CoverageInput): string {
   const rows = coverageRows(input);
+  const CHANNELS = channelsOf(input);
   const lines = [
     "## channelstack coverage",
     "",
@@ -128,6 +138,7 @@ export function coverageSummary(input: CoverageInput): string {
 /** The page: a self-contained HTML document, every value escaped. */
 export function coveragePage(input: CoverageInput): string {
   const rows = coverageRows(input);
+  const CHANNELS = channelsOf(input);
   const nightly = input.results
     ? `The latest differential run ended ${escapeHtml(input.results.at)}${input.results.live ? "" : ", against the fakes only"}.`
     : "No differential run's results were given to this build.";

@@ -19,21 +19,30 @@ const ROUTE = "/docs/reference/api";
  * The pages, in sidebar order. The client's and the errors page sit in "Test API"; the platforms'
  * in "Platform APIs", each linked to its guide under /docs/platforms.
  */
-const PAGES = [
-  { slug: "client", title: "Client and sessions", prefix: undefined, fixture: undefined, order: 2 },
-  { slug: "slack", title: "Slack API", prefix: "Slack", fixture: "slack", order: 1 },
-  { slug: "github", title: "GitHub API", prefix: "GitHub", fixture: "github", order: 2 },
-  { slug: "linear", title: "Linear API", prefix: "Linear", fixture: "linear", order: 3 },
-  { slug: "notion", title: "Notion API", prefix: "Notion", fixture: "notion", order: 4 },
-] as const;
+const pagesOf = (ir: Ir): Page[] => [
+  { slug: "client", title: "Client and sessions", order: 2 },
+  ...ir.channels
+    .filter((channel) => !channel.internal)
+    .map((channel, at) => ({
+      slug: channel.name,
+      title: `${channel.title} API`,
+      prefix: channel.title,
+      fixture: channel.name,
+      order: at + 1,
+    })),
+];
 const ERRORS_ORDER = 4;
 const PLATFORM_SECTION = "Platform APIs";
 const TEST_SECTION = "Test API";
 
-type Page = (typeof PAGES)[number];
-
-/** `echo` is channelstack's own test platform: it isn't documented. */
-const INTERNAL = "Echo";
+interface Page {
+  slug: string;
+  title: string;
+  /** A platform's type prefix (`GitHub`); none for the client's page. */
+  prefix?: string;
+  fixture?: string;
+  order: number;
+}
 
 /** Prose from the routes, safe in MDX: braces and `<` outside code spans are escaped. */
 const prose = (text: string) =>
@@ -73,8 +82,12 @@ export function emitDocs(ir: Ir): Map<string, string> {
   const { typeOf } = typeScriptTypes(index);
   const ts = (type: IrType) => typeOf(type, "public");
 
+  const PAGES = pagesOf(ir);
+  // channelstack's own test platforms (`echo`) aren't documented.
+  const internal = ir.channels.filter((channel) => channel.internal).map((channel) => channel.title);
+  const isInternal = (name: string) => internal.some((prefix) => name.startsWith(prefix));
   const pageOf = (name: string): Page | undefined => {
-    if (name.startsWith(INTERNAL)) return undefined;
+    if (isInternal(name)) return undefined;
     return PAGES.find((page) => page.prefix !== undefined && name.startsWith(page.prefix)) ?? PAGES[0];
   };
 
@@ -471,12 +484,18 @@ export function emitDocs(ir: Ir): Map<string, string> {
     );
   }
 
-  files.set(`${DIR}/errors.mdx`, errorsPage(ir, anchors, everywhere));
+  files.set(`${DIR}/errors.mdx`, errorsPage(ir, PAGES, isInternal, anchors, everywhere));
   return files;
 }
 
 /** Every error code: what channelstack's own mean, and where the fakes' come from. */
-function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: ReadonlySet<string>): string {
+function errorsPage(
+  ir: Ir,
+  PAGES: readonly Page[],
+  isInternal: (name: string) => boolean,
+  anchors: ReadonlyMap<string, string>,
+  everywhere: ReadonlySet<string>,
+): string {
   const raisedBy = (errorCode: string) =>
     ir.resources.flatMap((resource) =>
       resource.methods
@@ -491,15 +510,14 @@ function errorsPage(ir: Ir, anchors: ReadonlyMap<string, string>, everywhere: Re
   const own = ir.errors.filter((errorCode) => errorCode in ir.errorDocs);
   // A platform code that only Echo's resources raise is internal, like Echo.
   const platforms = ir.errors.filter(
-    (errorCode) =>
-      !(errorCode in ir.errorDocs) && raisedBy(errorCode).some(({ resource }) => !resource.startsWith(INTERNAL)),
+    (errorCode) => !(errorCode in ir.errorDocs) && raisedBy(errorCode).some(({ resource }) => !isInternal(resource)),
   );
   const classLine = (errorCode: string) =>
     `SDK class: ${code(errorClassName(errorCode))} in TypeScript and Python, a subclass of ${code("ChannelstackError")}. Rust: ${code("Error::Api { code, .. }")} with ${code("code")} equal to ${code(`codes::${rustErrorConst(errorCode)}`)}.`;
   const section = (errorCode: string, lines: string[]) => [`### ${errorCode}`, "", ...lines, ""];
   const where = (errorCode: string) => {
     if (everywhere.has(errorCode)) return "Most methods can return it.";
-    const methods = raisedBy(errorCode).filter(({ resource }) => !resource.startsWith(INTERNAL));
+    const methods = raisedBy(errorCode).filter(({ resource }) => !isInternal(resource));
     if (methods.length === 0) return "";
     const shown = methods.slice(0, 12).map(link).join(", ");
     return `Raised by ${shown}${methods.length > 12 ? `, and ${methods.length - 12} more` : ""}.`;
