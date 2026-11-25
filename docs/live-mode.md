@@ -30,7 +30,7 @@ Every live action is one of three mechanisms. Observing is a fourth.
 |---|---|---|---|
 | A1 | **API call as the app** | Posting as the bot, installing the App on a repo, GitHub redelivery, reads the app can do | App credentials |
 | A2 | **API call as a person** | Everything people do through normal API surfaces: DM, edit, delete, react, comment, review, inline comment, resolve review threads, label, assign, delegate, create issues and pages; say and reply on GitHub, Linear and Notion | One user token per sandbox person |
-| A3 | **Browser actor** | UI-only actions, and a Slack person's messages (below): Slack say and reply, click, select, modal submit, shortcut, slash command, Stop, opening the agent thread, switching context; GitHub requested actions; Linear Stop; Notion "Add connections" | Sign-in secrets per person (section 5) |
+| A3 | **Browser actor** | UI-only actions, and a Slack person's messages (below): Slack say and reply, click, select, modal submit, shortcut, slash command, Stop, opening the agent thread, switching context; GitHub requested actions; Linear Stop; Notion "Add connections" | A saved browser session per person (section 5) |
 | O | **Observe** | Checking that the agent reacted | Section 3 |
 
 **Is a bot token enough?** Only for A1. A bot token acts as the bot, never as a person. So with only a bot token, live mode can post as the bot and read, but every `ana.*` action needs Ana's token (or the browser).
@@ -42,7 +42,7 @@ Every live action is one of three mechanisms. Observing is a fourth.
 | **Reads** (default) | Everything a person can see through the API: messages, replies, reactions, comments, reviews, check runs, issue state, agent sessions and activities, page content. Matchers poll until the timeout (10 s by default) | A person's token or the app's credentials |
 | **GitHub delivery log** | Each webhook GitHub delivered to the agent's App: event, payload, the agent's status code and duration (`GET /app/hook/deliveries`, App JWT). Read-only | The App's credentials |
 | **Proxy mode** (optional) | The agent's own outgoing calls: Slack status line, streams, ephemeral messages, `views.open`. The agent opts in by running with `channelstack env --proxy` (implementation plan 6.2) | Agent configured for the proxy |
-| **Browser** | What a person sees in the UI, including things with no read API (status line, ephemeral messages) | Sign-in secrets |
+| **Browser** | What a person sees in the UI, including things with no read API (status line, ephemeral messages) | A saved browser session |
 
 Things no API returns (Slack status, suggested prompts, ephemeral messages, in-progress streams) need proxy mode or the browser live, and say so in the matrix.
 
@@ -50,18 +50,20 @@ Things no API returns (Slack status, suggested prompts, ephemeral messages, in-p
 
 All from environment variables in CI. None is committed or logged, and the control API never returns them (implementation plan 5, 12).
 
-| Channel | A1 app | A2 person (per sandbox person `ANA`) | A3 browser sign-in |
+| Channel | A1 app | A2 person (per sandbox person `ANA`) |
 |---|---|---|---|
-| Slack | `CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN` | `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (`xoxp-`), issued by a **separate** Slack app for the sandbox's people, never by the agent's own app | Test inbox access |
-| GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` | `CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN` (fine-grained PAT, machine account) | `CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_PASSKEY` |
-| Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key) | `CHANNELSTACK_LINEAR_USER_ANA_PASSKEY`, or inbox |
-| Notion | `CHANNELSTACK_NOTION_TOKEN` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) | Test inbox access |
+| Slack | `CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN` | `CHANNELSTACK_SLACK_USER_ANA_TOKEN` (`xoxp-`), issued by a **separate** Slack app for the sandbox's people, never by the agent's own app |
+| GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` | `CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN` (fine-grained PAT, machine account) |
+| Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key) |
+| Notion | `CHANNELSTACK_NOTION_TOKEN` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) |
 
 The agents' side of a live run, for the reference agents `pnpm live` runs: `CHANNELSTACK_GITHUB_WEBHOOK_SECRET` (the App's webhook secret), `CHANNELSTACK_NOTION_VERIFICATION_TOKEN` and `CHANNELSTACK_LINEAR_WEBHOOK_SECRET` (what Notion and Linear sign with), and `CHANNELSTACK_NOTION_RELAY_URL` and `CHANNELSTACK_LINEAR_RELAY_URL`, the smee.io channels their webhooks point at (GitHub's is read from the App). A relay channel is public: it suits test sandboxes only.
 
+The browser actor (A3) needs no secret in the environment: it uses the session saved by `channelstack login slack --user ana` (section 5).
+
 The A1 credentials make a driver live: with all of them set, its routes act on the real platform. With some set and not all, its routes are refused with `live_misconfigured`, naming what is missing, and the test fails. The allowlists are `CHANNELSTACK_LIVE_SLACK_TEAMS`, `CHANNELSTACK_LIVE_GITHUB_ORGS`, `CHANNELSTACK_LIVE_LINEAR_WORKSPACES` and `CHANNELSTACK_LIVE_NOTION_WORKSPACES` (comma-separated ids).
 
-**A Slack person's message is typed in the client.** Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included, whichever app issued it, and `as_user=true` doesn't change that. Agents drop such a message as a bot's (the reference agent does, and so does the "ignores other bots" check), so no API post of a person's reaches the agent. Live, `say` and `reply` are typed in Slack's client by the browser actor (A3), and report `action_requires` until it exists. The person's user token, from a separate Slack app for the sandbox's people (not the agent's own), stays the A2 credential for everything else: channels, invites, DMs, reactions, edits, deletes and reads.
+**A Slack person's message is typed in the client.** Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included, whichever app issued it, and `as_user=true` doesn't change that. Agents drop such a message as a bot's (the reference agent does, and so does the "ignores other bots" check), so no API post of a person's reaches the agent. Live, `say` and `reply` work: the browser actor (A3) types them in Slack's client, from the person's saved browser session. Without a saved session they report `action_requires`. The person's user token, from a separate Slack app for the sandbox's people (not the agent's own), stays the A2 credential for everything else: channels, invites, DMs, reactions, edits, deletes and reads.
 
 How the agent itself is reachable is the agent's concern. channelstack's own nightly job runs Slack's reference agent in Socket Mode, with the app's `CHANNELSTACK_SLACK_APP_TOKEN` (`xapp-`), so it needs no public URL.
 
@@ -72,15 +74,11 @@ The agent's own signing secrets are never needed live: channelstack doesn't sign
 - Everything a test creates is tagged and recorded in the cleanup ledger, and deleted at the end of its session (`channelstack sweep` after a crash).
 - channelstack never changes the agent app's configuration live (manifest, webhook URL).
 
-## 5. Browser actor sign-in
+## 5. Browser actor sessions
 
-Unattended, so it runs in CI:
-- **GitHub and Linear:** a passkey through WebDriver's virtual authenticator, with the private key loaded from a CI secret.
-- **Slack and Notion:** the emailed code from a test inbox.
+The browser actor never signs in itself. A person signs in by hand, once, with `channelstack login slack --user ana`: channelstack opens a browser window at the sandbox's sign-in page and, once they are in, saves the session's cookies (`<home>/browser/slack-ana.json`, 0600; `--save <path>` writes a copy too). The browser actor reuses that session, and `createUser({ browser: { storageState } })` can name another saved one. `channelstack doctor` says whether each saved session is still signed in; when one has expired, the person runs `channelstack login` again. Account passwords are never handled.
 
-The session is saved and reused, and the browser signs in again only when `channelstack doctor` finds it expired. Account passwords are never handled.
-
-Full table and rules: [reality-matrix.md, "Signing in without people"](reality-matrix.md#signing-in-without-people).
+The browser actor is built for Slack. Rules: [reality-matrix.md, "Browser sessions"](reality-matrix.md#browser-sessions).
 
 ## 6. Verifying the fakes (internal, not a user feature)
 
@@ -111,7 +109,7 @@ Paths follow implementation plan section 13.
 | W2 | Live reads behind the transcript model and matchers (O) | `server/src/drivers/<channel>/live/world.ts` | Matchers pass against real threads, timelines, sessions and pages, with polling and timeouts | All four built; GitHub as W1 |
 | W3 | GitHub delivery-log reads | `server/src/drivers/github/live/deliveries.ts` | `delivery.attempts`, `toBeAccepted` and `toBeRejected` work live on GitHub from the log | Waits for the GitHub App |
 | W4 | `unsupported_in_live` for fake-only features | `server/src/core/reality/`, `live` on each route | Delivery chaos on Slack, Linear and Notion live reports `unsupported_in_live` with a reason; the test framework skips that step | Built: every fake-only row of the matrix (exit check 5.4) |
-| W5 | Browser actor with unattended sign-in | `server/src/core/browser/`, `server/src/drivers/<channel>/live/ui.ts` | The A3 rows work for Slack first (click, Stop), then the others; `channelstack doctor` checks saved sessions | Built for Slack's say, reply and click, from a session saved by hand with `channelstack login`; `channelstack doctor` checks saved sessions. Unattended sign-in waits for a test inbox and passkeys |
+| W5 | Browser actor | `server/src/core/browser/`, `server/src/drivers/<channel>/live/ui.ts` | The A3 rows work for Slack first (click, Stop), then the others; `channelstack doctor` checks saved sessions | Built for Slack's say, reply and click, from a session saved by hand with `channelstack login slack`; `channelstack doctor` checks saved sessions |
 | W6 | Allowlists, tagging and ledger cleanup | `server/src/core/safety/`, `server/src/core/ledger/` | Acting outside an allowlist is refused; `channelstack sweep` removes leftovers | Built (exit checks 5.2, 5.3) |
 
 How it is put together: [decision 0015](decisions/0015-live-mode.md).
@@ -132,7 +130,7 @@ Before writing this spec, probes drove each platform's official receiver with th
 |---|---|---|
 | V1 | Slack: `ana.say` triggers the agent's real `app_mention`; the reply is read back | `toHaveReplyFrom` passes. 2026-11-23: a message posted through the API carries the posting app's bot, with a token from any app, so the agent ignores it. **Passed 2026-11-24** with the browser actor typing the message in Slack's client; cleanup leaves nothing behind |
 | V2 | GitHub delivery log lists a delivery within a few seconds and shows the agent's status code and duration | Fields present; delay under 5 s at p95 |
-| V3 | Browser sign-in without people on all four platforms in GitHub Actions | Sessions saved; second run reuses them |
+| V3 | The browser actor reuses a saved session in GitHub Actions | A session saved with `channelstack login slack` works in CI, and a second run reuses it |
 | V4 | Browser A3 on Slack: click and Stop reach the agent | Agent's response visible in the thread. **Click passed 2026-11-24** (Ana, a workspace admin, approves and the agent's "deploying" is read back). Stop isn't built yet |
 | V5 | The open items in the matrix's "Still to confirm" list | Each answered and recorded in the matrix |
 
