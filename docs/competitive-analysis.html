@@ -82,7 +82,7 @@ hr{border:0;border-top:1px solid var(--line);margin:0}
     <li>a browser client to chat with your bot</li>
     <li>actors and assertions on what a person sees</li>
     <li>delivery chaos (retries, redelivery, bad signatures)</li>
-    <li>a standard set of behaviour checks, wired into Vitest, Jest, Playwright, WebdriverIO and pytest</li>
+    <li>a standard set of behaviour checks, wired into Vitest and pytest</li>
     <li>the agent surfaces emulate rules out (Slack streams, agent sessions, Socket Mode), plus Notion, which emulate doesn't have</li>
   </ul>
   <p><strong>Position:</strong> channelstack is a local server, reachable through portless, built on emulate wherever emulate models state, and the shared version of what OpenClaw and Hermes each built for themselves.</p>
@@ -226,7 +226,7 @@ hr{border:0;border-top:1px solid var(--line);margin:0}
   <span class="eyebrow">Recommendation</span>
   <h2>A first milestone that proves the gap</h2>
   <ol>
-    <li><strong>The <code>channelstack</code> server:</strong> Slack at <code>https://slack.localhost</code> through portless, with one in-memory workspace. It stores state in emulate, and serves streams, agent sessions and Stop, Socket Mode, a delivery log and redelivery itself. Config comes from <code>channelstack.config.ts</code> or the app's real manifest. GitHub, Linear and Notion (<code>github.</code>, <code>linear.</code>, <code>notion.localhost</code>) follow the same pattern.</li>
+    <li><strong>The <code>channelstack</code> server:</strong> Slack at <code>https://slack.localhost</code> through portless, with one in-memory workspace. It stores state in emulate, and serves streams, agent sessions and Stop, Socket Mode, a delivery log and redelivery itself. GitHub, Linear and Notion (<code>github.</code>, <code>linear.</code>, <code>notion.localhost</code>) follow the same pattern.</li>
     <li><strong>The browser UI</strong> at <code>https://channelstack.localhost</code>, plus the attach CLI (<code>channelstack slack say --as ana …</code>) and MCP: a channel view, the inspector, and chaos controls.</li>
     <li><strong>The <code>channelstack/vitest</code> plugin and <code>slackChecks()</code>:</strong> fixtures in the test context, <code>expect</code> extended with channel matchers, and about 12 checks taken from the bug classes above. Models stay with each framework's own fakes.</li>
     <li><strong>The proof:</strong> re-land MDA's channel tests on channelstack in about 5k lines instead of 13.8k, then show it to the teams behind junior, centaur and Open SWE, and to the OpenClaw and Hermes maintainers.</li>

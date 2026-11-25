@@ -59,8 +59,8 @@ They write TypeScript or Python on top of Bolt, Chat SDK, Mastra, LangGraph, the
 |---|---|
 | 1, 2 | `npx channelstack`: Slack at `https://slack.localhost` (and `github.`, `linear.`, `notion.localhost`), a browser client at `https://channelstack.localhost` with an inspector, and the attach CLI (`channelstack slack say --as ana …`). One env var per channel in the agent. |
 | 3 | `slackChecks({ app })` in their test runner, or the Checks panel in the UI: about 12 checks, each named after a real bug class. |
-| 4 | Their own test framework: the `channelstack/vitest` plugin (or Playwright, WebdriverIO, pytest) injects `slack`, `github`, `linear` and `notion` fixtures and extends `expect` with `toHaveRepliesFrom`, `toHaveCommentsFrom` and similar. "Save as test" from the UI. |
-| 5 | `channelstack start --detach` in CI. Models stay with their framework's own fakes or a real model. |
+| 4 | Their own test framework: the `channelstack/vitest` plugin (or `pytest-channelstack`) injects `slack`, `github`, `linear` and `notion` fixtures and extends `expect` with `toHaveRepliesFrom`, `toHaveCommentsFrom` and similar. "Save as test" from the UI. |
+| 5 | `npx channelstack start --no-portless --port 4500 &` in CI. Models stay with their framework's own fakes or a real model. |
 
 **The adoption trigger:** usually the first embarrassing production bug (a duplicate reply in a customer channel), or the first time a new teammate has to set up the dev workspace and ngrok.
 
