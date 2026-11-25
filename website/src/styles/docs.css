@@ -307,6 +307,39 @@
   border-bottom: 0;
 }
 
+/* A reference entry's facts: label and value side by side, set apart by hairlines. */
+.prose dl.facts {
+  display: grid;
+  grid-template-columns: minmax(120px, 11rem) minmax(0, 1fr);
+  margin: 0.9em 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.prose dl.facts dt,
+.prose dl.facts dd {
+  margin: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.prose dl.facts dt {
+  padding-right: 16px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .prose dl.facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prose dl.facts dt {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+}
+
 /* A code block with a title names its file. */
 .prose pre[data-title] {
   position: relative;
