@@ -42,7 +42,7 @@ export async function withLiveStack(
   // The people's saved browser sessions (`channelstack login`), where this run's server looks for them.
   const saved = join(env.CHANNELSTACK_HOME || join(homedir(), ".channelstack"), "browser");
   if (existsSync(saved)) cpSync(saved, join(home, "browser"), { recursive: true });
-  // In the nightly job they come from a secret instead.
+  // In the nightly job they come from a secret instead, unless an earlier step left newer ones.
   writeSessions(env, home);
   const live: NodeJS.ProcessEnv = {
     ...env,

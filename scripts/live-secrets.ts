@@ -7,6 +7,13 @@
  * a value: only names.
  *
  *   node scripts/live-secrets.ts [--env-file <path>] [--repo <owner/name>] [--dry-run]
+ *   node scripts/live-secrets.ts --sessions-only [--repo <owner/name>] [--dry-run]
+ *
+ * `--sessions-only` sets `CHANNELSTACK_BROWSER_SESSIONS` and nothing else: the bundle the run
+ * started from (`$CHANNELSTACK_BROWSER_SESSIONS`) with each saved session that differs from it, and
+ * only if one does. The nightly job runs it last, with a token that may write the environment's secrets
+ * (`CHANNELSTACK_SECRETS_TOKEN`), so the next run starts from the sessions as this one left them:
+ * Slack renews a session's cookies while it is used and retires the old copy (#22).
  */
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -19,8 +26,14 @@ import { ROOT } from "./lib/generate.ts";
 const ENVIRONMENT = "live";
 
 const { values } = parseArgs({
-  options: { "env-file": { type: "string" }, repo: { type: "string" }, "dry-run": { type: "boolean" } },
+  options: {
+    "env-file": { type: "string" },
+    repo: { type: "string" },
+    "dry-run": { type: "boolean" },
+    "sessions-only": { type: "boolean" },
+  },
 });
+const sessionsOnly = values["sessions-only"] === true;
 const envFile =
   values["env-file"] ?? join(process.env.CHANNELSTACK_HOME || join(homedir(), ".channelstack"), "live.env");
 const dryRun = values["dry-run"] === true;
@@ -44,21 +57,22 @@ const named = (kind: "secrets" | "vars") => [
     [...workflow.matchAll(new RegExp(`\\$\\{\\{\\s*${kind}\\.([A-Z0-9_]+)\\s*\\}\\}`, "g"))].map((m) => m[1] as string),
   ),
 ];
-const secrets = named("secrets");
-const variables = named("vars");
-
-// live.env holds credentials: refused if others can read it, as channelstack refuses a saved session.
-let mode: number;
-try {
-  mode = statSync(envFile).mode;
-} catch {
-  fail(`no ${envFile}: put the sandboxes' credentials there first (docs/live-mode.md, section 4)`);
-}
-if (process.platform !== "win32" && (mode! & 0o077) !== 0) fail(`${envFile} can be read by others: chmod 600 it`);
+const secrets = sessionsOnly ? ["CHANNELSTACK_BROWSER_SESSIONS"] : named("secrets");
+const variables = sessionsOnly ? [] : named("vars");
 
 /** `NAME=value` lines, a value optionally in single or double quotes, as `set -a; . live.env` reads them. */
 const env = new Map<string, string>();
-for (const line of readFileSync(envFile, "utf8").split("\n")) {
+// live.env holds credentials: refused if others can read it, as channelstack refuses a saved session.
+let mode = 0;
+if (!sessionsOnly) {
+  try {
+    mode = statSync(envFile).mode;
+  } catch {
+    fail(`no ${envFile}: put the sandboxes' credentials there first (docs/live-mode.md, section 4)`);
+  }
+}
+if (process.platform !== "win32" && (mode & 0o077) !== 0) fail(`${envFile} can be read by others: chmod 600 it`);
+for (const line of sessionsOnly ? [] : readFileSync(envFile, "utf8").split("\n")) {
   const found = /^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$/.exec(line);
   if (!found) continue;
   let value = (found[2] as string).trim();
@@ -82,6 +96,25 @@ try {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   bundled = {};
 }
+if (sessionsOnly) {
+  // The bundle the run started from: nobody in it is dropped, and a session this run didn't renew
+  // (the browser never opened, or it was signed out and so not saved) stays as it was uploaded.
+  let started: Record<string, unknown> = {};
+  try {
+    started = JSON.parse(process.env.CHANNELSTACK_BROWSER_SESSIONS || "{}") as Record<string, unknown>;
+  } catch {
+    fail("CHANNELSTACK_BROWSER_SESSIONS isn't JSON: set it again with pnpm live:secrets");
+  }
+  const renewed = Object.keys(bundled).filter(
+    (file) => JSON.stringify(bundled[file]) !== JSON.stringify(started[file]),
+  );
+  if (renewed.length === 0) {
+    process.stdout.write("No browser session was renewed, so CHANNELSTACK_BROWSER_SESSIONS stays as it is.\n");
+    process.exit(0);
+  }
+  process.stdout.write(`Renewed: ${renewed.join(", ")}\n`);
+  bundled = { ...started, ...Object.fromEntries(renewed.map((file) => [file, bundled[file]])) };
+}
 if (Object.keys(bundled).length > 0) {
   const value = JSON.stringify(bundled);
   // GitHub keeps a secret of up to 48 KB.
@@ -101,7 +134,7 @@ const set: string[] = [];
 const missing: string[] = [];
 const failed: string[] = [];
 
-if (!dryRun) {
+if (!dryRun && !sessionsOnly) {
   // The environment the nightly job runs in; creating it again changes nothing.
   const made = gh(["api", "-X", "PUT", `repos/${repo}/environments/${ENVIRONMENT}`, "--silent"]);
   if (made.status !== 0) fail(`can't create the ${ENVIRONMENT} environment on ${repo}: ${made.stderr.trim()}`);

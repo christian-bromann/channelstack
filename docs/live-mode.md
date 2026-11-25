@@ -59,7 +59,7 @@ All from environment variables in CI. None is committed or logged, and the contr
 
 The agents' side of a live run, for the reference agents `pnpm live` runs: `CHANNELSTACK_GITHUB_WEBHOOK_SECRET` (the App's webhook secret), `CHANNELSTACK_NOTION_VERIFICATION_TOKEN` and `CHANNELSTACK_LINEAR_WEBHOOK_SECRET` (what Notion and Linear sign with), and `CHANNELSTACK_NOTION_RELAY_URL` and `CHANNELSTACK_LINEAR_RELAY_URL`, the smee.io channels their webhooks point at (GitHub's is read from the App). A relay channel is public: it suits test sandboxes only.
 
-The browser actor (A3) needs no secret in the environment: it uses the session saved by `channelstack login slack --user ana` (section 5).
+The browser actor (A3) needs no secret in the environment: it uses the session saved by `channelstack login slack --user ana` (section 5). The nightly job takes the saved sessions from `CHANNELSTACK_BROWSER_SESSIONS`, and saves the ones it renewed back with `CHANNELSTACK_SECRETS_TOKEN` (section 5).
 
 The A1 credentials make a driver live: with all of them set, its routes act on the real platform. With some set and not all, its routes are refused with `live_misconfigured`, naming what is missing, and the test fails. The allowlists are `CHANNELSTACK_LIVE_SLACK_TEAMS`, `CHANNELSTACK_LIVE_GITHUB_ORGS`, `CHANNELSTACK_LIVE_LINEAR_WORKSPACES` and `CHANNELSTACK_LIVE_NOTION_WORKSPACES` (comma-separated ids).
 
@@ -77,6 +77,15 @@ The agent's own signing secrets are never needed live: channelstack doesn't sign
 ## 5. Browser actor sessions
 
 The browser actor never signs in itself. A person signs in by hand, once, with `channelstack login slack --user ana`: channelstack opens a browser window at the sandbox's sign-in page and, once they are in, saves the session's cookies (`<home>/browser/slack-ana.json`, 0600; `--save <path>` writes a copy too). The browser actor reuses that session, and `createUser({ browser: { storageState } })` can name another saved one. `channelstack doctor` says whether each saved session is still signed in; when one has expired, the person runs `channelstack login` again. Account passwords are never handled.
+
+**Sessions are renewed as they're used.** Slack renews a session's cookies while it is used, and retires the copy the session was started from. So whenever a person's browser closes, channelstack saves the session as it is now, if it is still signed in; the next use starts from that. In the nightly job ([#22](https://github.com/christian-bromann/channelstack/issues/22)):
+- **Within a run:** the sessions come from `CHANNELSTACK_BROWSER_SESSIONS`, but only for files the runner doesn't have yet. A later step (`pnpm conformance` after `pnpm live`) keeps the renewed copy an earlier step saved.
+- **Between runs:** the job's last step, which runs even when the run failed or was cancelled, uploads the sessions the run renewed, with `pnpm live:secrets --sessions-only`. It starts from the bundle the run began with, so nobody is dropped, and it uploads nothing when no session changed. Live runs go one at a time (the workflow's concurrency group), so two of them can't both renew a session from the same copy.
+- **The token:** that step needs `CHANNELSTACK_SECRETS_TOKEN`, a fine-grained token for this repository only, with *Environments: read and write*. Put it in `live.env`, and `pnpm live:secrets` uploads it with the rest. Without it, the step warns and saves nothing, and a session lasts one run.
+  - A fine-grained token expires, at most a year after it's made; renew it before then.
+  - In `live.env`, it's in the environment of every local live run, like the other credentials there. It can only write this repository's environment secrets.
+- **Locally:** a session saved under `~/.channelstack/browser` wins over the same person's in a `CHANNELSTACK_BROWSER_SESSIONS` set in the shell.
+- **A run that dies first:** if a run dies before its last step, the uploaded copy may already be retired. Then the person signs in again with `channelstack login`, and runs `pnpm live:secrets`.
 
 The browser actor is built for Slack. Rules: [reality-matrix.md, "Browser sessions"](reality-matrix.md#browser-sessions).
 
