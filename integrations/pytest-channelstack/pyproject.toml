@@ -1,7 +1,7 @@
 [project]
 name = "pytest-channelstack"
 version = "0.0.0"
-description = "pytest fixtures and assertion helpers for channelstack: test AI agents in Slack, GitHub, Linear and Notion."
+description = "pytest fixtures and expect(...) checks for channelstack: test AI agents in Slack, GitHub, Linear and Notion."
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = ["channelstack", "pytest==8.4.2", "pytest-asyncio==1.4.1"]

@@ -19,7 +19,7 @@ use crate::runtime::client::{
 use crate::runtime::error::{Error, Result};
 use crate::runtime::launcher::{Mode, launch};
 use crate::runtime::wait::{
-    from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next,
+    check_text, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next,
 };
 
 /// The server version this SDK was generated for. It checks the server's major version on connect.
@@ -7961,6 +7961,7 @@ impl SlackUserWaitForModal {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let text = options.get("title").cloned().unwrap_or(Value::Null);
+        check_text(&text)?;
         let item = wait_for_next(
             &seen.positions,
             "waitForModal",
@@ -11347,6 +11348,7 @@ impl GitHubIssueWaitForComment {
             .unwrap_or_else(|| Value::from("10s"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
+        check_text(&text)?;
         let item = wait_for_next(
             &seen.positions,
             "waitForComment",
@@ -13280,6 +13282,7 @@ impl LinearIssueWaitForComment {
             .unwrap_or_else(|| Value::from("10s"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
+        check_text(&text)?;
         let item = wait_for_next(
             &seen.positions,
             "waitForComment",
@@ -13875,6 +13878,7 @@ impl LinearAgentSessionWaitForActivity {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let text = options.get("type").cloned().unwrap_or(Value::Null);
+        check_text(&text)?;
         let item = wait_for_next(
             &seen.positions,
             "waitForActivity",
@@ -16250,6 +16254,7 @@ impl GitHubPullRequestWaitForComment {
             .unwrap_or_else(|| Value::from("10s"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
+        check_text(&text)?;
         let item = wait_for_next(
             &seen.positions,
             "waitForComment",

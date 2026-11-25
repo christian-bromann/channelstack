@@ -7,6 +7,7 @@ use serde_json::Value;
 use tokio::process::{Child, Command};
 
 use super::error::{Error, Result};
+use super::wait::wait_for;
 
 const STATUS_PATH: &str = "/_channelstack/status";
 
@@ -109,13 +110,13 @@ fn server_binary() -> Result<String> {
 
 /// Start a private server on a free loopback port. Its token goes to a private file, never to the shared one.
 async fn start_server() -> Result<ServerConnection> {
-    // A new directory only this user can enter, under a name nobody can guess or create first.
-    let directory = tempfile::Builder::new()
+    // A new directory only this user can enter, under a name nobody can guess or create first. It
+    // removes itself if the server never starts; once it does, `Started::stop` removes it.
+    let private = tempfile::Builder::new()
         .prefix("channelstack-")
         .tempdir()
-        .map_err(|error| Error::Launch(format!("Couldn't create a private directory: {error}")))?
-        .keep();
-    let server_file = directory.join("server.json");
+        .map_err(|error| Error::Launch(format!("Couldn't create a private directory: {error}")))?;
+    let server_file = private.path().join("server.json");
     let mut child = Command::new(server_binary()?)
         .args(["start", "--no-portless", "--port", "0", "--server-file"])
         .arg(&server_file)
@@ -126,30 +127,44 @@ async fn start_server() -> Result<ServerConnection> {
         .map_err(|error| {
             Error::Launch(format!("Couldn't start the channelstack server: {error}"))
         })?;
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
-    loop {
-        if let Ok(Some(status)) = child.try_wait() {
-            let _ = std::fs::remove_dir_all(&directory);
-            return Err(Error::Launch(format!(
-                "The channelstack server exited before it was ready ({status})"
-            )));
+    let ready = wait_for(
+        "the channelstack server to start",
+        &Value::from("15s"),
+        || {
+            let exited = child.try_wait().ok().flatten();
+            let server_file = &server_file;
+            async move {
+                if let Some(status) = exited {
+                    return Err(Error::Launch(format!(
+                        "The channelstack server exited before it was ready ({status})"
+                    )));
+                }
+                Ok(match read_server_file(server_file) {
+                    Some((url, token)) if is_up(&url, &token).await => Some((url, token)),
+                    _ => None,
+                })
+            }
+        },
+    )
+    .await;
+    match ready {
+        Ok((url, token)) => Ok(ServerConnection {
+            url,
+            token,
+            started: Some(Started {
+                child,
+                directory: private.keep(),
+            }),
+        }),
+        Err(error) => {
+            let _ = child.kill().await;
+            Err(match error {
+                Error::Timeout { .. } => {
+                    Error::Launch("The channelstack server didn't start within 15s".into())
+                }
+                other => other,
+            })
         }
-        if let Some((url, token)) = read_server_file(&server_file)
-            && is_up(&url, &token).await
-        {
-            return Ok(ServerConnection {
-                url,
-                token,
-                started: Some(Started { child, directory }),
-            });
-        }
-        if tokio::time::Instant::now() > deadline {
-            Started { child, directory }.stop().await;
-            return Err(Error::Launch(
-                "The channelstack server didn't start within 15s".into(),
-            ));
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }
 

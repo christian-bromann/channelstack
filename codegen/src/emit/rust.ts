@@ -379,7 +379,12 @@ export function emitRust(ir: Ir): Map<string, string> {
           ? [`        let quiet_for = options.get("quietFor").cloned().unwrap_or_else(|| Value::from("750ms"));`]
           : []),
         ...(w.from ? [`        let from = options.get("from").cloned().unwrap_or(Value::Null);`] : []),
-        ...(w.text ? [`        let text = options.get(${str(w.text)}).cloned().unwrap_or(Value::Null);`] : []),
+        ...(w.text
+          ? [
+              `        let text = options.get(${str(w.text)}).cloned().unwrap_or(Value::Null);`,
+              "        check_text(&text)?;",
+            ]
+          : []),
         ...body,
         "    }",
         "}",
@@ -549,7 +554,7 @@ export function emitRust(ir: Ir): Map<string, string> {
     "use crate::runtime::client::{as_unit, as_value, enc, encode_segment, path_value, send, BoxFuture, Call, Ctx, Dyn, Handle, IntoArg};",
     "use crate::runtime::error::{Error, Result};",
     "use crate::runtime::launcher::{launch, Mode};",
-    "use crate::runtime::wait::{from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next};",
+    "use crate::runtime::wait::{check_text, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next};",
     "",
     "/// The server version this SDK was generated for. It checks the server's major version on connect.",
     `pub const VERSION: &str = ${str(ir.version)};`,

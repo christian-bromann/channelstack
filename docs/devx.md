@@ -523,7 +523,7 @@ portless trusts its CA in the system store, but not every runtime reads that sto
 |---|---|
 | `channelstack` | CLI, UI and the test integrations, as subpath exports: `channelstack/vitest`, `channelstack/playwright`, `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
 | `@channelstack/wdio-service` | WebdriverIO service and `expect-webdriverio` matchers |
-| `pytest-channelstack` | pytest plugin: fixtures and assertion helpers over the control API |
+| `pytest-channelstack` | pytest plugin: fixtures and `expect(...)` checks over the control API |
 
 > The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5. Examples are in `api/examples/`.
 

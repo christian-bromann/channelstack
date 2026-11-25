@@ -41,17 +41,28 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<Value>>,
 {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-    loop {
-        match call().await {
-            Err(error)
-                if error.code().is_some_and(|code| codes.contains(&code))
-                    && tokio::time::Instant::now() < deadline =>
-            {
-                tokio::time::sleep(Duration::from_millis(50)).await;
+    let refusal = std::sync::Mutex::new(None::<Error>);
+    let accepted = wait_for("the call to be accepted", &Value::from("10s"), || {
+        let attempt = call();
+        let refusal = &refusal;
+        async move {
+            match attempt.await {
+                Ok(value) => Ok(Some(value)),
+                Err(error) if error.code().is_some_and(|code| codes.contains(&code)) => {
+                    *refusal.lock().expect("the last refusal") = Some(error);
+                    Ok(None)
+                }
+                Err(error) => Err(error),
             }
-            other => return other,
         }
+    })
+    .await;
+    match accepted {
+        Err(Error::Timeout { .. }) => match refusal.lock().expect("the last refusal").take() {
+            Some(refused) => Err(refused),
+            None => accepted,
+        },
+        other => other,
     }
 }
 
@@ -60,15 +71,19 @@ pub fn text_matches(text: &str, expected: &Value) -> bool {
     match expected {
         Value::Null => true,
         Value::String(wanted) => text.contains(wanted.as_str()),
-        Value::Object(pattern) => pattern_regex(pattern).is_some_and(|regex| regex.is_match(text)),
+        // A pattern that doesn't compile never matches; `check_text` refuses it before a wait starts.
+        Value::Object(pattern) => pattern_regex(pattern).is_ok_and(|regex| regex.is_match(text)),
         _ => false,
     }
 }
 
 /// A pattern as it goes on the wire (`{ "source": …, "flags": "im" }`) as a regular expression.
 /// The flags the SDKs send are `i`, `m` and `s`, which mean the same in Rust's regex syntax.
-fn pattern_regex(pattern: &serde_json::Map<String, Value>) -> Option<regex::Regex> {
-    let source = pattern.get("source")?.as_str()?;
+fn pattern_regex(pattern: &serde_json::Map<String, Value>) -> Result<regex::Regex> {
+    let source = pattern
+        .get("source")
+        .and_then(Value::as_str)
+        .ok_or_else(|| Error::Invalid("A pattern needs its `source`".into()))?;
     let flags: String = pattern
         .get("flags")
         .and_then(Value::as_str)
@@ -81,7 +96,20 @@ fn pattern_regex(pattern: &serde_json::Map<String, Value>) -> Option<regex::Rege
     } else {
         format!("(?{flags})")
     };
-    regex::Regex::new(&format!("{prefix}{source}")).ok()
+    regex::Regex::new(&format!("{prefix}{source}")).map_err(|error| {
+        Error::Invalid(format!(
+            "The pattern /{source}/ isn't one Rust's regex can use: {error}"
+        ))
+    })
+}
+
+/// Refuse text to look for that can never match: a pattern Rust's regex can't compile (look-around,
+/// back-references). Waits call it before they start, so the error says why instead of timing out.
+pub fn check_text(expected: &Value) -> Result<()> {
+    match expected {
+        Value::Object(pattern) => pattern_regex(pattern).map(|_| ()),
+        _ => Ok(()),
+    }
 }
 
 /// Does an author match a `from` filter: a handle's data (by id), a name or id, or nothing (anyone)?
@@ -126,25 +154,43 @@ impl QuietState {
     }
 }
 
-/// Resolve once the agent has been quiet for `quiet_for`.
+/// Resolve once the agent has been quiet for `quiet_for`. A wait that gives up says what the agent
+/// left open: that is usually the bug.
 pub async fn until_quiet<F, Fut>(quiet: F, timeout: &Value, quiet_for: &Value) -> Result<()>
 where
     F: Fn() -> Fut,
     Fut: Future<Output = Result<QuietState>>,
 {
     let quiet_for_ms = parse_duration(quiet_for)?;
-    wait_for(
+    let still_open = std::sync::Mutex::new(Vec::<String>::new());
+    let settled = wait_for(
         &format!("the agent to be quiet for {quiet_for_ms}ms"),
         timeout,
         || {
             let state = quiet();
+            let still_open = &still_open;
             async move {
                 let state = state.await?;
+                *still_open.lock().expect("what is still open") = state.open.clone();
                 Ok((!state.busy && state.quiet_for_ms >= quiet_for_ms).then_some(()))
             }
         },
     )
-    .await
+    .await;
+    match settled {
+        Err(Error::Timeout { what, timeout_ms }) => {
+            let open = still_open.lock().expect("what is still open").join("; ");
+            Err(Error::Timeout {
+                what: if open.is_empty() {
+                    what
+                } else {
+                    format!("{what}. Still open: {open}")
+                },
+                timeout_ms,
+            })
+        }
+        other => other,
+    }
 }
 
 /// How far each `wait_for_…` of a handle has looked, so the next one waits for something new; and
@@ -238,7 +284,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::text_matches;
+    use super::{check_text, text_matches};
     use serde_json::json;
 
     #[test]
@@ -266,5 +312,65 @@ mod tests {
             "a\nb",
             &json!({ "source": "^b$", "flags": "m" })
         ));
+        // A pattern Rust's regex can't use is refused up front, with the reason.
+        let lookahead = json!({ "source": "a(?=b)", "flags": "" });
+        assert!(!text_matches("ab", &lookahead));
+        let refused = check_text(&lookahead).unwrap_err().to_string();
+        assert!(
+            refused.contains("/a(?=b)/ isn't one Rust's regex can use"),
+            "{refused}"
+        );
+        assert!(check_text(&json!("plain text")).is_ok());
+    }
+
+    fn refusal(code: &str) -> super::Error {
+        super::Error::Api {
+            code: code.into(),
+            status: 409,
+            message: code.into(),
+            data: json!({}),
+        }
+    }
+
+    #[tokio::test]
+    async fn retry_while_repeats_only_the_refusals_it_names() {
+        let attempts = std::sync::atomic::AtomicUsize::new(0);
+        let accepted = super::retry_while(&["not_yet"], || {
+            let attempt = attempts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async move {
+                if attempt < 2 {
+                    Err(refusal("not_yet"))
+                } else {
+                    Ok(json!("clicked"))
+                }
+            }
+        })
+        .await;
+        assert_eq!(accepted.unwrap(), json!("clicked"));
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 3);
+
+        // Any other refusal is the answer at once.
+        let refused =
+            super::retry_while(&["not_yet"], || async { Err(refusal("not_allowed")) }).await;
+        assert_eq!(refused.unwrap_err().code(), Some("not_allowed"));
+    }
+
+    #[tokio::test]
+    async fn a_quiet_wait_that_gives_up_says_what_is_still_open() {
+        let busy = || async {
+            Ok(super::QuietState {
+                busy: true,
+                quiet_for_ms: 0.0,
+                open: vec!["a stream my-agent never stopped".into()],
+            })
+        };
+        let gave_up = super::until_quiet(busy, &json!("120ms"), &json!("50ms"))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            gave_up.contains("Still open: a stream my-agent never stopped"),
+            "{gave_up}"
+        );
     }
 }

@@ -262,7 +262,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 ## Phase 7: SDK breadth and MCP
 
 **Build:**
-- Python: the full SDK and `pytest-channelstack` (fixtures and assertion helpers).
+- Python: the full SDK and `pytest-channelstack` (fixtures and `expect(...)` checks, [decision 0018](decisions/0018-pytest-expect.md)).
 - Rust: the generated SDK.
 - `channelstack mcp` and the skill for coding agents.
 
