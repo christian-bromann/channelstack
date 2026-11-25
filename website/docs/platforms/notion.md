@@ -67,7 +67,10 @@ The token and verification token are random, made once for your machine and kept
 ### `@notionhq/client`
 
 ```ts title="agent.ts"
-import { Client, verifyWebhookSignature } from "@notionhq/client";
+import notionClient from "@notionhq/client";
+
+// The package is CommonJS: Node gives it to an ES module as its default export.
+const { Client, verifyWebhookSignature } = notionClient;
 
 const notion = new Client({
   auth: process.env.NOTION_TOKEN,

@@ -164,8 +164,10 @@ The fake serves the API both at the root (like `api.github.com`) and at `/api/v3
 
 ```ts title="agent.ts"
 import { LinearClient } from "@linear/sdk";
-import { Client } from "@notionhq/client";
+import notionClient from "@notionhq/client";
 
+// @notionhq/client is CommonJS: Node gives it to an ES module as its default export.
+const { Client } = notionClient;
 const { LINEAR_ACCESS_TOKEN, LINEAR_API_URL, NOTION_TOKEN, NOTION_BASE_URL } = process.env;
 
 const linear = new LinearClient({
