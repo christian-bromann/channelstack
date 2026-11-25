@@ -41,7 +41,9 @@ export function attach(flags: AttachFlags): Attached {
     : (readPrivateJsonFile(file) as { url?: string; token?: string } | undefined);
   if (!found?.url) throw new ServerGoneError("no running server found. Start one with `channelstack start`.");
   if (!found.token) throw new CliError(`CHANNELSTACK_TOKEN is needed to talk to ${found.url}.`);
-  const { url, token } = found;
+  // A trailing slash doesn't matter, as in the SDKs: `http://host/` is `http://host`.
+  const url = found.url.replace(/\/+$/, "");
+  const { token } = found;
 
   const request = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
     const response = await fetch(`${url}${CONTROL_PREFIX}${path}`, {

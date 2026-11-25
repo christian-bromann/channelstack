@@ -33,7 +33,7 @@ An agent on Slack's Socket Mode connects out and needs no webhook URL. Without o
 
 | Variable | Read by | Meaning |
 |---|---|---|
-| `CHANNELSTACK_URL` | CLI, SDKs, Vitest plugin, pytest | The server to attach to, instead of the one in `server.json`. A trailing slash doesn't matter |
+| `CHANNELSTACK_URL` | CLI, SDKs, Vitest plugin, pytest | The server to attach to, instead of the one in `server.json`. A trailing slash doesn't matter, to the CLI or the SDKs |
 | `CHANNELSTACK_TOKEN` | CLI, SDKs, Vitest plugin, pytest | The control API token for `CHANNELSTACK_URL`. The CLI needs it whenever a URL is given; the SDKs fall back to `server.json`'s token when its URL is the same |
 | `CHANNELSTACK_HOME` | CLI, SDKs, Vitest plugin, pytest | Where `server.json` is: `<home>/server.json` |
 | `CHANNELSTACK_SERVER_FILE` | CLI | Where the attach commands read the URL and token. The SDKs always read `<home>/server.json` |
