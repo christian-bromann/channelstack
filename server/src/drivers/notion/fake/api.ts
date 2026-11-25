@@ -1,8 +1,8 @@
-import { type Context, Hono } from "hono";
+import type { Context, Hono } from "hono";
 
 import { bearerFrom } from "../../../core/auth/index.ts";
+import { type RestAnswer, restApi } from "../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { NotionApiError, pagingOf } from "../errors.ts";
 import { NOTION_IDS } from "../ids.ts";
@@ -38,13 +38,6 @@ const NEEDS: Readonly<Record<string, NotionCapability>> = {
 /** A path parameter: every route here names the ones it reads. */
 const param = (c: Context, name: string): string => c.req.param(name) ?? "";
 
-interface Answer {
-  body: unknown;
-  /** The test sessions whose objects the call read or changed. */
-  sessions: Iterable<string>;
-  status?: number;
-}
-
 /**
  * Notion's REST API, as the integration sees it (`@notionhq/client` at API version `2025-09-03`):
  * the integration's token, and only what it is connected to. Each call is on record for the test
@@ -52,8 +45,6 @@ interface Answer {
  */
 export function createNotionApi(context: DriverContext, world: FakeNotionWorld): Hono {
   const { store, objects } = world;
-  const { clock } = context;
-  const api = new Hono();
   const bot = () => store.bot.id;
   const requestId = () => context.ids.next(NOTION_IDS.uuid);
 
@@ -64,86 +55,57 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
     message,
     request_id: requestId(),
   });
+  const errorAnswer = (status: number, code: string, message: string): RestAnswer => ({
+    body: errorBody(status, code, message),
+    sessions: [],
+    status,
+  });
 
   /** A block as the API shows it: a `child_page` has its page's current title. */
   const blockObject = (block: NotionBlockRecord) => objects.block({ ...block, data: world.dataOf(block) });
   const sessionOf = (id: string) => store.sessionOf(id);
 
-  const endpoint = (
-    method: "get" | "post" | "patch" | "delete",
-    path: string,
-    operation: string,
-    handle: (c: Context, body: Record<string, unknown>) => Answer,
-  ) =>
-    api.on(method.toUpperCase(), path, async (c) => {
-      const startedAt = clock();
+  const { endpoint, finish } = restApi(context, {
+    driver: "notion",
+    authorize(c, operation) {
       const token = bearerFrom(c.req.header("authorization")) ?? "";
-      if (token === "" || !constantTimeEqual(token, context.secret("token")))
-        return c.json(errorBody(401, "unauthorized", "API token is invalid."), 401);
+      if (token === "" || !constantTimeEqual(token, context.secret("token"))) {
+        return errorAnswer(401, "unauthorized", "API token is invalid.");
+      }
       const version = c.req.header("notion-version");
-      if (version === undefined)
-        return c.json(
-          errorBody(
-            400,
-            "missing_version",
-            "Notion-Version header failed validation: Notion-Version header should be defined, instead was `undefined`.",
-          ),
+      if (version === undefined) {
+        return errorAnswer(
           400,
+          "missing_version",
+          "Notion-Version header failed validation: Notion-Version header should be defined, instead was `undefined`.",
         );
-      if (!VERSIONS.includes(version))
-        return c.json(
-          errorBody(
-            400,
-            "validation_error",
-            `Notion-Version header failed validation: ${version} is not a supported version.`,
-          ),
+      }
+      if (!VERSIONS.includes(version)) {
+        return errorAnswer(
           400,
+          "validation_error",
+          `Notion-Version header failed validation: ${version} is not a supported version.`,
         );
+      }
       const needs = NEEDS[operation];
-      if (needs && !store.bot.capabilities.includes(needs))
-        return c.json(errorBody(403, "restricted_resource", "Insufficient permissions for this endpoint."), 403);
-
-      let body: Record<string, unknown> = {};
-      if (method === "post" || method === "patch") {
-        const text = await c.req.text();
-        try {
-          body = text === "" ? {} : (JSON.parse(text) as Record<string, unknown>);
-        } catch {
-          return c.json(errorBody(400, "invalid_json", "Error parsing JSON body."), 400);
-        }
+      if (needs && !store.bot.capabilities.includes(needs)) {
+        return errorAnswer(403, "restricted_resource", "Insufficient permissions for this endpoint.");
       }
-
-      let answer: Answer;
-      try {
-        answer = handle(c, body);
-      } catch (error) {
-        if (!(error instanceof NotionApiError)) throw error;
-        answer = { body: errorBody(error.status, error.code, error.message), sessions: [], status: error.status };
-      }
+      return undefined;
+    },
+    refusal: (error) =>
+      error instanceof NotionApiError ? errorAnswer(error.status, error.code, error.message) : undefined,
+    invalidJson: () => errorAnswer(400, "invalid_json", "Error parsing JSON body."),
+    notFound: () => errorAnswer(400, "invalid_request_url", "Invalid request URL."),
+    // Every answer of Notion's has its request's id, not only an error (found by the shape differ).
+    decorate(answer) {
       const status = answer.status ?? 200;
-      // Every answer of Notion's has its request's id, not only an error (found by the shape differ).
-      if (status < 400 && typeof answer.body === "object" && answer.body !== null && !Array.isArray(answer.body)) {
-        answer = { ...answer, body: { ...(answer.body as object), request_id: requestId() } };
+      if (status >= 400 || typeof answer.body !== "object" || answer.body === null || Array.isArray(answer.body)) {
+        return answer;
       }
-      const url = new URL(c.req.url);
-      recordCall(
-        context.events,
-        "notion",
-        answer.sessions,
-        {
-          operation,
-          method: method.toUpperCase(),
-          path: url.pathname,
-          request: method === "get" || method === "delete" ? Object.fromEntries(url.searchParams) : body,
-          responseStatus: status,
-          response: answer.body,
-          error: status >= 400 ? String((answer.body as { code?: string }).code ?? "error") : undefined,
-          durationMs: clock() - startedAt,
-        },
-        { unattributed: "world" },
-      );
-      return c.json(answer.body, status as 200);
-    });
+      return { ...answer, body: { ...(answer.body as object), request_id: requestId() } };
+    },
+  });
 
   const paging = (c: Context) =>
     pagingOf({
@@ -571,6 +533,5 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   });
 
   // Mounted under a path prefix, the app's own not-found would answer: this one is Notion's.
-  api.all("*", (c) => c.json(errorBody(400, "invalid_request_url", "Invalid request URL."), 400));
-  return api;
+  return finish();
 }

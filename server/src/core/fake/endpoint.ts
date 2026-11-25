@@ -26,6 +26,8 @@ export interface RestPlatform {
   notFound(c: Context): RestAnswer;
   /** What the platform adds to every answer (a request id). */
   decorate?(answer: RestAnswer): RestAnswer;
+  /** A call about nothing in a session: on record for every session (`world`, the default), or for none. */
+  readonly unattributed?: "world" | "drop";
 }
 
 type Method = "get" | "post" | "put" | "patch" | "delete";
@@ -72,7 +74,8 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
       if (platform.decorate) result = platform.decorate(result);
       const status = result.status ?? 200;
       const url = new URL(c.req.url);
-      const failed = status >= 400 ? (result.body as { name?: unknown; code?: unknown } | null) : undefined;
+      const failed =
+        status >= 400 ? (result.body as { name?: unknown; code?: unknown; error?: unknown } | null) : undefined;
       recordCall(
         context.events,
         platform.driver,
@@ -85,10 +88,10 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
           request: method === "get" || method === "delete" ? Object.fromEntries(url.searchParams) : await requestOf(c),
           responseStatus: status,
           response: result.body,
-          error: failed ? String(failed.name ?? failed.code ?? "error") : undefined,
+          error: failed ? String(failed.name ?? failed.code ?? failed.error ?? "error") : undefined,
           durationMs: clock() - startedAt,
         },
-        { unattributed: "world" },
+        { unattributed: platform.unattributed ?? "world" },
       );
       for (const [name, value] of Object.entries(result.headers ?? {})) c.header(name, value);
       return c.json(result.body, status as 200);
