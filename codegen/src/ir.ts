@@ -484,6 +484,26 @@ export function buildIr(openapi: Json): Ir {
       visit(types.find((candidate) => candidate.name === type.name)?.type ?? null);
     }
   };
+  // A `where` names fields of the item it narrows: a typo would be a wait that never matches.
+  for (const resource of resources.values()) {
+    for (const wait of resource.waits ?? []) {
+      const item = wait.item.kind === "named" ? types.find((type) => type.name === wait.item.name)?.type : wait.item;
+      const fields =
+        item?.kind === "resource"
+          ? resources.get(item.name)?.fields
+          : item?.kind === "object"
+            ? item.fields
+            : undefined;
+      for (const field of Object.keys(wait.where ?? {})) {
+        if (!fields?.some((known) => known.name === field)) {
+          throw new SpecError(
+            `${resource.name}.${wait.name}`,
+            `\`where\` names \`${field}\`, which its items don't have`,
+          );
+        }
+      }
+    }
+  }
   for (const resource of resources.values()) {
     for (const field of resource.fields) visit(field.type);
     for (const method of resource.methods) {

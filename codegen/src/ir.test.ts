@@ -274,6 +274,17 @@ describe("a wait narrowed by fixed values (#13)", () => {
     expect(() => buildIr(until)).toThrow("`where` narrows the items of a list wait");
   });
 
+  test("refuses a `where` field its items don't have", () => {
+    const typo = structuredClone(narrowed);
+    const read = (typo.paths as Record<string, unknown>)["/sessions/{session}/widgets"] as {
+      get: Record<string, unknown>;
+    };
+    read.get["x-channelstack-waits"] = [
+      { name: "waitForWidget", mode: "next", where: { opne: true }, what: "a widget" },
+    ];
+    expect(() => buildIr(typo)).toThrow("`where` names `opne`, which its items don't have");
+  });
+
   test("every emitter adds one equality per field", () => {
     const code = (files: Map<string, string>) => [...files.values()].join("\n");
     expect(code(emitTypeScript(ir))).toContain('(item) => item.kind === "widget" && item.size === 3');

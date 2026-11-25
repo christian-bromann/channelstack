@@ -16,6 +16,11 @@ function snakeCase(name: string): string {
 
 const OUT = "sdks/python/channelstack/generated/__init__.py";
 
+/** A string, number or boolean as Python writes it: `True`, `3`, `"open"`. */
+function pythonLiteral(value: string | number | boolean): string {
+  return typeof value === "boolean" ? (value ? "True" : "False") : JSON.stringify(value);
+}
+
 /** The Python SDK's generated half: async handle classes, frozen dataclasses for data, typed errors. */
 export function emitPython(ir: Ir): Map<string, string> {
   const index = new IrIndex(ir);
@@ -47,7 +52,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       case "unknown":
         return "Any";
       case "literal":
-        return `Literal[${typeof type.value === "boolean" ? (type.value ? "True" : "False") : JSON.stringify(type.value)}]`;
+        return `Literal[${pythonLiteral(type.value)}]`;
       case "enum":
         return `Literal[${type.values.map((value) => JSON.stringify(value)).join(", ")}]`;
       case "array":
@@ -277,9 +282,10 @@ export function emitPython(ir: Ir): Map<string, string> {
     const conditions = [
       ...(fromField ? [`from_matches(item.${snakeCase(w.from ?? "")}, from_)`] : []),
       ...(w.text ? [`text_matches(item.${snakeCase(w.text)}, ${snakeCase(w.text)})`] : []),
+      // `is` for True and False, as PEP 8 asks; `==` for the rest.
       ...Object.entries(w.where ?? {}).map(
         ([field, value]) =>
-          `item.${snakeCase(field)} == ${typeof value === "boolean" ? (value ? "True" : "False") : JSON.stringify(value)}`,
+          `item.${snakeCase(field)} ${typeof value === "boolean" ? "is" : "=="} ${pythonLiteral(value)}`,
       ),
     ];
     const matches = `lambda item: ${conditions.length > 0 ? conditions.join(" and ") : "True"}`;
