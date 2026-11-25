@@ -87,7 +87,7 @@ The reference is generated wherever there's one source for it, so it can't drift
 ## Writing a page
 
 - **Open with what the page is for,** in one or two sentences, before any heading. Then H2 sections; the right-hand outline is built from H2 and H3.
-- **Show, then explain.** A code block early, then what it does. Every example is one that runs against the reference agents (`api/examples/` has the real ones).
+- **Show, then explain.** A code block early, then what it does. Every example is compiled and type-checked in every language it's shown in; the ones that run against the reference agents are in `api/examples/`.
 - **Plain words, short sentences,** the way the rest of the repository is written. Name things the way the API does.
 - **Describe what's built.** A feature that isn't built yet isn't documented as if it were; at most a sentence says it's coming, with its issue.
 - **Link across kinds** instead of mixing them: a how-to links to the explanation of why, and to the reference for every option.
