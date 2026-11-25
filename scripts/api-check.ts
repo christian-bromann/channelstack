@@ -74,7 +74,13 @@ for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
  */
 const NOT_HANDLES = new Set([
   ...["Principal", "User", "App", "Resource", "HasTranscript", "SlackHasTranscript", "Inspectable", "Delivery"],
-  ...["ResendOptions", "SlackResendOptions", "LinearResendOptions", "DeliveryFilter", "ApiCallFilter"],
+  ...[
+    "DeliveryResendOptions",
+    "SlackDeliveryResendOptions",
+    "LinearDeliveryResendOptions",
+    "DeliveryFilter",
+    "ApiCallFilter",
+  ],
   ...["ChannelstackMatchers", "TextOptions"],
   ...["SlackUserOptions", "SlackChannelOptions", "GitHubUserOptions", "GitHubRepoOptions", "LinearUserOptions"],
   ...["LinearTeamOptions", "NotionUserOptions", "NotionPageOptions", "NotionDatabaseOptions"],

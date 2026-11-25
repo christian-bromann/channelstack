@@ -1,6 +1,6 @@
 import type {
   App, ApiCall, Delivery, DeliveryAttempt, Duration, Inspectable, Principal,
-  QuietOptions, ResendOptions, Resource, RichText, Timestamp, Transcript, User, WaitOptions,
+  QuietOptions, DeliveryResendOptions, Resource, RichText, Timestamp, Transcript, User, WaitOptions,
 } from "./common";
 
 // ---------------------------------------------------------------------------
@@ -302,10 +302,10 @@ export interface SlackDelivery extends Delivery<SlackDeliveryType> {
    */
   retry(options?: { after?: Duration; reason?: "http_timeout" | "http_error" | "too_many_redirects" }): Promise<DeliveryAttempt>;
 
-  resend(options?: SlackResendOptions): Promise<DeliveryAttempt>;
+  resend(options?: SlackDeliveryResendOptions): Promise<DeliveryAttempt>;
 }
 
-export interface SlackResendOptions extends ResendOptions {
+export interface SlackDeliveryResendOptions extends DeliveryResendOptions {
   /** Send with a timestamp outside Slack's five-minute replay window. */
   stale?: boolean;
   /** Override or add headers for this attempt. */

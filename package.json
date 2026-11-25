@@ -35,6 +35,7 @@
     "linear:schema:check": "node scripts/linear-schema.ts --check",
     "check:dupes": "jscpd",
     "check:deps": "depcruise server codegen sdks/typescript integrations examples scenarios scripts test conformance --config .dependency-cruiser.cjs",
+    "check:channels": "node scripts/check-channels.ts",
     "check:unused": "knip",
     "verify:phase": "node scripts/verify-phase.ts"
   },

@@ -45,9 +45,9 @@ export type Delivery<TType extends string = string, TPayload = unknown> = AnyDel
 export type DeliveryStatus = Delivery["status"];
 export type DeliveryTransport = G.DeliveryAttempt["transport"];
 export type SlackDeliveryType = G.SlackDelivery["type"];
-export type ResendOptions = Option<G.GitHubDelivery["resend"]>;
-export type SlackResendOptions = Option<G.SlackDelivery["resend"]>;
-export type LinearResendOptions = Option<G.LinearDelivery["resend"]>;
+export type DeliveryResendOptions = Option<G.GitHubDelivery["resend"]>;
+export type SlackDeliveryResendOptions = Option<G.SlackDelivery["resend"]>;
+export type LinearDeliveryResendOptions = Option<G.LinearDelivery["resend"]>;
 export type ApiCallFilter = Option<G.SlackFixture["calls"]>;
 export type TranscriptEntry = Transcript["entries"][number];
 export type HasTranscript = { transcript(): Promise<Transcript> };

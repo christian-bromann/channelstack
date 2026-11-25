@@ -1,6 +1,6 @@
 import type {
   App, Delivery, DeliveryAttempt, HasTranscript, Inspectable, QuietOptions,
-  ResendOptions, Resource, RichText, Timestamp, User, WaitOptions,
+  DeliveryResendOptions, Resource, RichText, Timestamp, User, WaitOptions,
 } from "./common";
 
 // ---------------------------------------------------------------------------
@@ -217,10 +217,10 @@ export interface LinearDelivery extends Delivery {
   /** Redeliver the same webhook (same `webhookId`), as Linear does on failure. */
   redeliver(): Promise<DeliveryAttempt>;
 
-  resend(options?: LinearResendOptions): Promise<DeliveryAttempt>;
+  resend(options?: LinearDeliveryResendOptions): Promise<DeliveryAttempt>;
 }
 
-export interface LinearResendOptions extends ResendOptions {
+export interface LinearDeliveryResendOptions extends DeliveryResendOptions {
   /** Send with a `webhookTimestamp` outside Linear's one-minute replay window. */
   stale?: boolean;
 }
