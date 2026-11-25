@@ -16,7 +16,7 @@ const steps = (texts: readonly string[]) => (
   </ol>
 );
 
-/** A test's message reaching the agent, and the agent's reply coming back to the test. */
+/** A test's message reaching the app, and the app's reply coming back to the test. */
 export function RequestFlow() {
   return (
     <figure className="fig fig-flow">
@@ -39,16 +39,16 @@ export function RequestFlow() {
           <span className="pkt pkt-3 back">chat.postMessage</span>
         </div>
         <div className="fig-node">
-          <b>Your agent</b>
+          <b>Your app</b>
           <span>unchanged</span>
           <span>real SDK</span>
         </div>
       </div>
       <figcaption>
         {steps([
-          "The test acts as Ana: she mentions the agent in a channel.",
-          "The fake Slack delivers the event to your agent, signed, the way Slack does.",
-          "Your agent answers through the Slack API it already uses, which now points at the fake.",
+          "The test acts as Ana: she mentions the app in a channel.",
+          "The fake Slack delivers the event to your app, signed, the way Slack does.",
+          "Your app answers through the Slack API it already uses, which now points at the fake.",
           "The matcher reads the thread as Ana would see it, and passes.",
         ])}
       </figcaption>
@@ -142,14 +142,14 @@ export function SessionScopes() {
   );
 }
 
-/** A negative check watches until the agent has been quiet for the whole window, then checks once. */
+/** A negative check watches until the app has been quiet for the whole window, then checks once. */
 export function QuietWindow() {
   return (
     <figure className="fig fig-quiet">
       <div className="quiet-stage" aria-hidden="true">
         <code className="quiet-call">await expect(thread).not.toHaveReplyFrom("my-agent")</code>
         <div className="quiet-track">
-          <span className="quiet-busy">agent busy</span>
+          <span className="quiet-busy">app busy</span>
           <span className="quiet-event e1">delivery</span>
           <span className="quiet-event e2">API call</span>
           <span className="quiet-event e3">stream end</span>
@@ -167,8 +167,8 @@ export function QuietWindow() {
       </div>
       <figcaption>
         {steps([
-          "The check starts watching. The agent is still busy: a delivery is in flight, then its API calls, then a stream.",
-          "Once nothing is open, the quiet window starts. Anything the agent does now restarts it.",
+          "The check starts watching. The app is still busy: a delivery is in flight, then its API calls, then a stream.",
+          "Once nothing is open, the quiet window starts. Anything the app does now restarts it.",
           "After 750 ms of quiet, watched from start to end, the check reads the thread once.",
         ])}
       </figcaption>
@@ -176,7 +176,7 @@ export function QuietWindow() {
   );
 }
 
-/** Slack retrying a delivery the agent acknowledged too late, and an agent that answers once anyway. */
+/** Slack retrying a delivery the app acknowledged too late, and an app that answers once anyway. */
 export function RetryTimeline() {
   return (
     <figure className="fig fig-retry">
@@ -189,7 +189,7 @@ export function RetryTimeline() {
           </div>
         </div>
         <div className="retry-row">
-          <span className="retry-who">Your agent</span>
+          <span className="retry-who">Your app</span>
           <div className="retry-track">
             <span className="retry-work">working on it…</span>
             <span className="retry-mark r3">seen Ev0MPS… → ack, skip</span>
@@ -212,8 +212,8 @@ export function RetryTimeline() {
         {steps([
           "Slack delivers the event. Without an answer within 3 seconds it counts the delivery as failed.",
           "It sends the same event again, with the attempt number and the reason in its retry headers.",
-          "An agent that remembers the event id acknowledges the retry and does nothing else.",
-          "The thread gets one reply. An agent that doesn't check answers twice.",
+          "An app that remembers the event id acknowledges the retry and does nothing else.",
+          "The thread gets one reply. An app that doesn't check answers twice.",
         ])}
       </figcaption>
     </figure>
@@ -231,7 +231,7 @@ export function ProxyRouting() {
     <figure className="fig fig-proxy">
       <div className="proxy-stage" aria-hidden="true">
         <div className="fig-node">
-          <b>Your agent</b>
+          <b>Your app</b>
           <span>calls slack.com</span>
           <span>HTTPS_PROXY set</span>
         </div>
@@ -255,8 +255,8 @@ export function ProxyRouting() {
       </div>
       <figcaption>
         {steps([
-          "The agent calls the platform's real host. The proxy in its environment takes the connection.",
-          "slack.com, api.github.com, api.linear.app and api.notion.com go to the fakes, under a certificate only the agent trusts.",
+          "The app calls the platform's real host. The proxy in its environment takes the connection.",
+          "slack.com, api.github.com, api.linear.app and api.notion.com go to the fakes, under a certificate only the app trusts.",
           "The fakes answer exactly as they do on *.localhost.",
           "Every other host, such as the model's API, passes through untouched.",
         ])}
@@ -273,14 +273,14 @@ export function FakeOrLive() {
       ? [
           ["Slack is", "channelstack's fake, in memory"],
           ["Ana is", "a fake person the test created"],
-          ["The event reaches the agent", "from channelstack, signed like Slack's"],
+          ["The event reaches the app", "from channelstack, signed like Slack's"],
           ["Retries, bad signatures, faults", "yes"],
           ["Runs", "on every pull request, in seconds"],
         ]
       : [
           ["Slack is", "a real sandbox workspace"],
           ["Ana is", "a real sandbox account, with her own token"],
-          ["The event reaches the agent", "from Slack itself, as in production"],
+          ["The event reaches the app", "from Slack itself, as in production"],
           ["Retries, bad signatures, faults", "not live: no delivery to test, and faults skip"],
           ["Runs", "nightly, against the allowlisted workspace"],
         ];

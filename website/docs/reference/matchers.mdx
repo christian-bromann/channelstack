@@ -21,19 +21,19 @@ Every matcher is async: `await` it.
 | Kind | Waits | Then |
 |---|---|---|
 | Positive | Polls (every 50ms) until the condition holds | Passes as soon as it holds; fails at `timeout` |
-| Negative (`.not`) | Until the agent has been quiet for `quietFor`, watching for the whole window | Checks once |
-| Exact count (`count`, `times`) | Until the agent has been quiet for `quietFor`, watching for the whole window | Checks once |
+| Negative (`.not`) | Until the app has been quiet for `quietFor`, watching for the whole window | Checks once |
+| Exact count (`count`, `times`) | Until the app has been quiet for `quietFor`, watching for the whole window | Checks once |
 
 "Quiet" means no API call in flight, no delivery in flight or about to be retried, and no open stream, in the subject's session. A quiet wait that runs out of time fails with `Timed out after <n>ms waiting for the agent to be quiet for <n>ms`, plus what is still open.
 
-Live, channelstack can't see when the agent is done: proxy mode will, once it reads the agent's calls back live ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Until then, once a session has acted live, its quiet check is refused with `action_requires`, so negative and exact-count matchers skip the test there.
+Live, channelstack can't see when the app is done: proxy mode will, once it reads the app's calls back live ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Until then, once a session has acted live, its quiet check is refused with `action_requires`, so negative and exact-count matchers skip the test there.
 
 | Option | Type | Default | On |
 |---|---|---|---|
 | `timeout` | `Duration` | The plugin's `timeout` (`10s`) | Every matcher but `toBeEphemeralFor` |
 | `quietFor` | `Duration` | The plugin's `quietFor` (`750ms`) | Every matcher under `.not`, and exact-count ones |
 
-A failure message says what was expected, then what is there. When the check fails and the agent left something open in the session (a stream it never stopped, a delivery about to be retried), it ends with `Still open: …`.
+A failure message says what was expected, then what is there. When the check fails and the app left something open in the session (a stream it never stopped, a delivery about to be retried), it ends with `Still open: …`.
 
 Text arguments (`text`, a `string | RegExp`) match a string by substring and a `RegExp` by `test`. An author (`AuthorRef`) is a handle, matched by `id`, or a string, matched against the `name` or the `id`.
 
@@ -616,7 +616,7 @@ expect(subject).toHaveReceivedCall(operation, options?)
   <dd>`to_have_received_call`, and `not_to_have_received_call` for the negation</dd>
 </dl>
 
-It reads `calls()`, so live it needs proxy mode, which doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)): the test is skipped (`action_requires`).
+It reads `calls()`, so live it needs proxy mode, which doesn't read the app's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)): the test is skipped (`action_requires`).
 
 ## Read methods
 

@@ -10,27 +10,27 @@ Each entry starts from what you see, then says what usually causes it and how to
 
 ## Delivery
 
-### Nothing reaches the agent
+### Nothing reaches the app
 
-The person's message is in the transcript, but the agent never answers, and its log shows no request.
+The person's message is in the transcript, but the app never answers, and its log shows no request.
 
 **Check:** `npx channelstack deliveries slack` after a `slack say`, or `msg.delivery` in a test.
 
-| What you see | Cause | Fix |
-|---|---|---|
-| `Nothing was delivered to the agent on slack yet.` | The server doesn't know where the agent listens. It reads `CHANNELSTACK_SLACK_WEBHOOK_URL` only when it starts | Restart the server with the variable set, e.g. `CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events` |
-| No delivery, and the webhook URL is set | The app isn't in the conversation, so Slack sends it nothing | Give it access: `createChannel({ participants: [ana, slack.app] })`, or `ana.invite(slack.app, { channel })` |
-| Status `unreachable` | Nothing listens at that URL: the agent isn't running, or the port or path differs | Start the agent, and match the URL to its port and events path |
-| Status `timed_out` | The agent took longer than Slack's 3 seconds to answer the request | Acknowledge first, then work. This is also what makes Slack retry |
-| Status `failed` with `401` or `403` | The agent rejected the signature, usually because its signing secret is stale | See [stale secrets](#the-agent-gets-invalid-auth-or-rejects-every-delivery) |
+| What you see                                       | Cause                                                                                                        | Fix                                                                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `Nothing was delivered to the agent on slack yet.` | The server doesn't know where the app listens. It reads `CHANNELSTACK_SLACK_WEBHOOK_URL` only when it starts | Restart the server with the variable set, e.g. `CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events` |
+| No delivery, and the webhook URL is set            | The app isn't in the conversation, so Slack sends it nothing                                                 | Give it access: `createChannel({ participants: [ana, slack.app] })`, or `ana.invite(slack.app, { channel })`       |
+| Status `unreachable`                               | Nothing listens at that URL: the app isn't running, or the port or path differs                              | Start the app, and match the URL to its port and events path                                                       |
+| Status `timed_out`                                 | The app took longer than Slack's 3 seconds to answer the request                                             | Acknowledge first, then work. This is also what makes Slack retry                                                  |
+| Status `failed` with `401` or `403`                | The app rejected the signature, usually because its signing secret is stale                                  | See [stale secrets](#the-app-gets-invalid-auth-or-rejects-every-delivery)                                          |
 
 The same rules hold for GitHub, Linear and Notion with their own variables (`CHANNELSTACK_GITHUB_WEBHOOK_URL`, …). [Delivery and failures](/docs/guide/delivery-and-failures) explains each status.
 
 ### Socket Mode doesn't connect
 
-A Socket Mode agent starts, but events wait and end as `timed_out`.
+A Socket Mode app starts, but events wait and end as `timed_out`.
 
-**Cause:** the agent opens its socket by calling `apps.connections.open`, and it asked real Slack, or asked with the wrong token.
+**Cause:** the app opens its socket by calling `apps.connections.open`, and it asked real Slack, or asked with the wrong token.
 
 **Fix:**
 
@@ -42,13 +42,13 @@ A Socket Mode agent starts, but events wait and end as `timed_out`.
 
 ### TLS or certificate errors
 
-The agent fails on its first call with one of these:
+The app fails on its first call with one of these:
 
-| Runtime | Error |
-|---|---|
-| Node | `unable to get local issuer certificate`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `SELF_SIGNED_CERT_IN_CHAIN` |
-| Python | `SSL: CERTIFICATE_VERIFY_FAILED` |
-| Go | `x509: certificate signed by unknown authority` |
+| Runtime | Error                                                                                                    |
+| ------- | -------------------------------------------------------------------------------------------------------- |
+| Node    | `unable to get local issuer certificate`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `SELF_SIGNED_CERT_IN_CHAIN` |
+| Python  | `SSL: CERTIFICATE_VERIFY_FAILED`                                                                         |
+| Go      | `x509: certificate signed by unknown authority`                                                          |
 
 **In base-URL mode with portless:** the `*.localhost` names are served with portless's certificate, which portless trusts in the system store, and not every runtime reads that store. `channelstack env` doesn't print TLS settings for this mode.
 
@@ -57,7 +57,7 @@ The agent fails on its first call with one of these:
 - Go: works as is on macOS (the keychain); on Linux, `SSL_CERT_FILE`.
 - Anything else: start with `--no-portless`, which serves plain HTTP on loopback.
 
-**In proxy mode:** the agent didn't get what `channelstack env --proxy` prints, or it started before `channelstack ca rotate` and still has the old CA. Load the lines into the agent's environment and restart it. Go on macOS ignores `SSL_CERT_FILE`: run it in Docker ([Proxy mode](/docs/guide/proxy-mode#go-on-macos-run-it-in-docker)).
+**In proxy mode:** the app didn't get what `channelstack env --proxy` prints, or it started before `channelstack ca rotate` and still has the old CA. Load the lines into the app's environment and restart it. Go on macOS ignores `SSL_CERT_FILE`: run it in Docker ([Proxy mode](/docs/guide/proxy-mode#go-on-macos-run-it-in-docker)).
 
 ## The server and the CLI
 
@@ -89,13 +89,13 @@ A channelstack server is already running at http://127.0.0.1:4500 (pid 41235, fr
 
 With portless, the error can also be `portless isn't installed. Install it (npm install -g portless) or start with --no-portless.`
 
-### The agent gets `invalid_auth`, or rejects every delivery
+### The app gets `invalid_auth`, or rejects every delivery
 
-The agent's API calls fail with `invalid_auth` (`← slack chat.postMessage  200 invalid_auth` in `tail`), or every delivery ends `failed` with `401`.
+The app's API calls fail with `invalid_auth` (`← slack chat.postMessage  200 invalid_auth` in `tail`), or every delivery ends `failed` with `401`.
 
-**Cause:** the agent's tokens and signing secret don't match the server's. They are made once per install and stay the same across restarts, so this happens after `channelstack secrets rotate`, or when the agent's `.env` came from a server with another `CHANNELSTACK_HOME` (another machine, a CI cache).
+**Cause:** the app's tokens and signing secret don't match the server's. They are made once per install and stay the same across restarts, so this happens after `channelstack secrets rotate`, or when the app's `.env` came from a server with another `CHANNELSTACK_HOME` (another machine, a CI cache).
 
-**Fix:** run `npx channelstack env` again, write it to the agent's `.env`, and restart the agent. If the server says `<home>/secrets.json is not valid JSON`, delete the file and start again: channelstack makes new secrets.
+**Fix:** run `npx channelstack env` again, write it to the app's `.env`, and restart the app. If the server says `<home>/secrets.json is not valid JSON`, delete the file and start again: channelstack makes new secrets.
 
 ## Matchers
 
@@ -110,12 +110,12 @@ A positive matcher polls until it holds or the timeout (10 seconds by default) p
 
 **Causes, most likely first:**
 
-- Nothing reached the agent ([above](#nothing-reaches-the-agent)).
-- The agent's reply was refused. `await slack.calls({ error: true })` in the test lists the agent's calls that got an error code, such as `not_in_channel`.
-- The agent answered somewhere else: in the channel instead of the thread, or in a DM. The message lists what the thread has.
-- The agent is slow: a real model, or a live run. Raise it for one check (`{ timeout: "30s" }`) or for all of them (`channelstack({ timeout: "30s" })`).
+- Nothing reached the app ([above](#nothing-reaches-the-app)).
+- The app's reply was refused. `await slack.calls({ error: true })` in the test lists the app's calls that got an error code, such as `not_in_channel`.
+- The app answered somewhere else: in the channel instead of the thread, or in a DM. The message lists what the thread has.
+- The app is slow: an agent with a real model, or a live run. Raise it for one check (`{ timeout: "30s" }`) or for all of them (`channelstack({ timeout: "30s" })`).
 
-A line that starts with `Still open:` names what the agent left unfinished, such as a stream it started and never stopped. That is often the bug.
+A line that starts with `Still open:` names what the app left unfinished, such as a stream it started and never stopped. That is often the bug.
 
 ### A negative check is slow
 
@@ -125,15 +125,15 @@ A line that starts with `Still open:` names what the agent left unfinished, such
 Timed out after 10000ms waiting for the agent to be quiet for 750ms. Still open: a stream my-agent started and never stopped: "Thinking…"
 ```
 
-**Cause:** negative and exact-count checks wait until the agent has been quiet for the quiet window (750 ms by default) and then check once. An agent that never goes quiet (a stream left open, a delivery about to be retried, a call in flight) makes them wait the full timeout. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains why.
+**Cause:** negative and exact-count checks wait until the app has been quiet for the quiet window (750 ms by default) and then check once. An app that never goes quiet (a stream left open, a delivery about to be retried, a call in flight) makes them wait the full timeout. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains why.
 
-**Fix:** stop the stream the message names. If your agent is reliably fast, lower the window with `channelstack({ quietFor: "300ms" })`; raise it if a check passes before a slow agent has answered.
+**Fix:** stop the stream the message names. If your app is reliably fast, lower the window with `channelstack({ quietFor: "300ms" })`; raise it if a check passes before a slow agent has answered.
 
 ## Platform errors
 
 ### `not_in_channel`
 
-**From the agent's call** (`← slack chat.postMessage  200 not_in_channel`): the app isn't a member of the channel it posts to. A test creates channels with the participants it names, so add the app: `participants: [ana, slack.app]`, or `ana.invite(slack.app, { channel })`. For a private channel the app isn't in, Slack answers `channel_not_found` instead, and so does the fake.
+**From the app's call** (`← slack chat.postMessage  200 not_in_channel`): the app isn't a member of the channel it posts to. A test creates channels with the participants it names, so add the app: `participants: [ana, slack.app]`, or `ana.invite(slack.app, { channel })`. For a private channel the app isn't in, Slack answers `channel_not_found` instead, and so does the fake.
 
 **From the test's own step** (`U0… is not a member of C0…`): a person acted in a conversation they aren't in. Add them to `participants`, or have someone in it invite them.
 

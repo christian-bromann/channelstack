@@ -1,12 +1,12 @@
 ---
 title: "Writing tests"
 order: 3
-description: "Add the Vitest plugin, create people and places per test, act as those people, give the app access, and read what the agent did."
+description: "Add the Vitest plugin, create people and places per test, act as those people, give the app access, and read what the app did."
 ---
 
 # Writing tests
 
-This page shows how to write channelstack tests in Vitest: the plugin, the fixtures each test gets, how people act, how the agent gets access, and how tests clean up. It assumes the server and your agent are running and connected, as in [connecting your agent](/docs/guide/connecting-your-agent).
+This page shows how to write channelstack tests in Vitest: the plugin, the fixtures each test gets, how people act, how the app gets access, and how tests clean up. It assumes the server and your app are running and connected, as in [connecting your app](/docs/guide/connecting-your-agent).
 
 ## Add the plugin
 
@@ -30,9 +30,9 @@ The plugin adds a global setup that finds the server, a setup file that gives ea
 | `mode`     | `"auto"`                           | `"attach"` fails when no server is running. `"start"` always starts a private one. `"auto"` attaches if it can, and starts one otherwise                                                                            |
 | `server`   | from `~/.channelstack/server.json` | The server to attach to. Also `CHANNELSTACK_URL`, with `CHANNELSTACK_TOKEN`                                                                                                                                         |
 | `timeout`  | `"10s"`                            | How long a matcher, `channelstack.quiet()` and every SDK wait (`waitForReply`, `latestReply`, `settled`, …) give up after. A project without its own `testTimeout` gets one above it: 30s, or three times `timeout` |
-| `quietFor` | `"750ms"`                          | How long the agent must be quiet before a negative or exact-count matcher checks, or a `latest…` read reads                                                                                                         |
+| `quietFor` | `"750ms"`                          | How long the app must be quiet before a negative or exact-count matcher checks, or a `latest…` read reads                                                                                                           |
 
-Your agent is configured from the server you started yourself (`npx channelstack`), so attaching to that server is the usual setup. A server the plugin starts on its own has no agent connected to it. In CI, `mode: "attach"` makes a missing server fail at once instead of later. The [plugin reference](/docs/reference/vitest-plugin) lists every option.
+Your app is configured from the server you started yourself (`npx channelstack`), so attaching to that server is the usual setup. A server the plugin starts on its own has no app connected to it. In CI, `mode: "attach"` makes a missing server fail at once instead of later. The [plugin reference](/docs/reference/vitest-plugin) lists every option.
 
 ## A first test
 
@@ -73,23 +73,23 @@ async def test_a_mention_gets_exactly_one_reply_in_the_thread(slack: SlackFixtur
 
 </CodeGroup>
 
-The test creates a person and a channel, has the person mention the agent, and checks three things a person would notice: there is an answer, there is only one, and it's in the thread rather than in the channel. Each matcher waits for the agent; nothing in the test sleeps. The Python version runs under [pytest](/docs/guide/pytest); the rest of this page shows TypeScript.
+The test creates a person and a channel, has the person mention the app, and checks three things a person would notice: there is an answer, there is only one, and it's in the thread rather than in the channel. Each matcher waits for the app; nothing in the test sleeps. The Python version runs under [pytest](/docs/guide/pytest); the rest of this page shows TypeScript.
 
 ## The fixtures
 
 Every test gets these fixtures from its context:
 
-| Fixture        | What it is                                                                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slack`        | The fake Slack workspace: `createUser`, `createChannel`, the agent's `app`, `calls`, `deliveries`, `fault`                                         |
-| `github`       | The fake GitHub org: `createUser`, `createRepo`, the agent's `app` (a GitHub App)                                                                  |
-| `linear`       | The fake Linear workspace: `createUser`, `createTeam`, the agent's `app`                                                                           |
-| `notion`       | The fake Notion workspace: `createUser`, `createPage`, `createDatabase`, the agent's integration as `app`                                          |
-| `channelstack` | The server itself: `url`, `env()` (what `channelstack env` prints), `quiet()` (resolves when the agent is quiet in this test's session), `reset()` |
+| Fixture        | What it is                                                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `slack`        | The fake Slack workspace: `createUser`, `createChannel`, the built-in `app`, `calls`, `deliveries`, `fault`                                      |
+| `github`       | The fake GitHub org: `createUser`, `createRepo`, the built-in `app` (a GitHub App)                                                               |
+| `linear`       | The fake Linear workspace: `createUser`, `createTeam`, the built-in `app`                                                                        |
+| `notion`       | The fake Notion workspace: `createUser`, `createPage`, `createDatabase`, the built-in integration as `app`                                       |
+| `channelstack` | The server itself: `url`, `env()` (what `channelstack env` prints), `quiet()` (resolves when the app is quiet in this test's session), `reset()` |
 
 The fixtures are scoped to the test's own [session](/docs/guide/how-it-works#sessions-scopes-in-one-shared-world), which opens before the test's hooks and closes after them, whether the test names a fixture or not. Two tests that run at the same moment never see each other's people, channels or deliveries.
 
-Each fixture's `app` is the agent's app on that platform, named `my-agent`. Matchers take it, or its name as a string, wherever they take an author: `toHaveReplyFrom(slack.app)` and `toHaveReplyFrom("my-agent")` mean the same.
+Each fixture's `app` is the built-in app your code acts as on that platform, named `my-agent`. Matchers take it, or its name as a string, wherever they take an author: `toHaveReplyFrom(slack.app)` and `toHaveReplyFrom("my-agent")` mean the same.
 
 ## People act, resources are read
 
@@ -113,7 +113,7 @@ Actions with no person behind them live on the fixture or the object they concer
 
 ## Give the app access explicitly
 
-Nothing grants your agent access behind your back. Each platform's real rule applies, and you state the access in the test:
+Nothing grants your app access behind your back. Each platform's real rule applies, and you state the access in the test:
 
 | Platform | The platform's rule                                                                                      | In a test                                                                                          |
 | -------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -154,14 +154,14 @@ const answer = await msg.thread.waitForReply({ from: "my-agent" });
 expect(answer.text).toMatch(/api/i);
 ```
 
-| To get                                  | Use                                                                                                                                                                                    |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The next new message from someone       | `thread.waitForReply({ from })`, `conversation.waitForMessage({ from })`, `issue.waitForComment({ from })`, `discussion.waitForComment({ from })`, `session.waitForActivity({ type })` |
-| The latest one, once the agent is quiet | `thread.latestReply({ from })`, `issue.latestComment({ from })`, `discussion.latestComment({ from })`                                                                                  |
-| Everything so far                       | `thread.replies()`, `conversation.messages()`, `issue.comments()`, `session.activities()`, `page.markdown()`                                                                           |
-| What a person would read                | `transcript()`, with `toString()` for snapshots                                                                                                                                        |
-| What the agent called                   | `slack.calls({ operation, error })`, `slack.waitForCall({ operation })`                                                                                                                |
-| What the server sent the agent          | `msg.delivery`, `github.deliveries({ type, resource })`                                                                                                                                |
+| To get                                | Use                                                                                                                                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The next new message from someone     | `thread.waitForReply({ from })`, `conversation.waitForMessage({ from })`, `issue.waitForComment({ from })`, `discussion.waitForComment({ from })`, `session.waitForActivity({ type })` |
+| The latest one, once the app is quiet | `thread.latestReply({ from })`, `issue.latestComment({ from })`, `discussion.latestComment({ from })`                                                                                  |
+| Everything so far                     | `thread.replies()`, `conversation.messages()`, `issue.comments()`, `session.activities()`, `page.markdown()`                                                                           |
+| What a person would read              | `transcript()`, with `toString()` for snapshots                                                                                                                                        |
+| What the app called                   | `slack.calls({ operation, error })`, `slack.waitForCall({ operation })`                                                                                                                |
+| What the server sent the app          | `msg.delivery`, `github.deliveries({ type, resource })`                                                                                                                                |
 
 [Waiting and quiet](/docs/guide/waiting-and-quiet) explains how the `waitFor…` and `latest…` methods differ, and the API reference ([Slack](/docs/reference/api/slack), [GitHub](/docs/reference/api/github), [Linear](/docs/reference/api/linear), [Notion](/docs/reference/api/notion)) lists every read.
 
@@ -200,7 +200,7 @@ People are never declared in a config file. Every test states the world it needs
 
 ## Fixed ids
 
-Generated ids are realistic and unique. When your agent allowlists people by id, fix one:
+Generated ids are realistic and unique. When your app allowlists people by id, fix one:
 
 ```ts
 test("allowlisted people by fixed id", async ({ slack }) => {
@@ -218,7 +218,7 @@ test("allowlisted people by fixed id", async ({ slack }) => {
 
 GitHub takes a numeric `id`, and Linear and Notion take a UUID. The id must have the platform's format.
 
-A fixed id is unique in the whole world, not only in the test, because the agent can't tell two `U0ADMIN01` apart. While one session holds it, another session that asks for it is refused with `invalid_argument`, and the id is free again when the first session closes. Tests that fix the same id must not run at the same time.
+A fixed id is unique in the whole world, not only in the test, because the app can't tell two `U0ADMIN01` apart. While one session holds it, another session that asks for it is refused with `invalid_argument`, and the id is free again when the first session closes. Tests that fix the same id must not run at the same time.
 
 ## Files and fixture directories
 

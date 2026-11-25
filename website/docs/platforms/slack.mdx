@@ -1,12 +1,12 @@
 ---
 title: "Slack"
 order: 1
-description: "Test a Slack agent against channelstack's fake Slack, from connecting Bolt or the Chat SDK to buttons, modals, streams, Stop and retries."
+description: "Test a Slack bot, app or agent against channelstack's fake Slack, from connecting Bolt or the Chat SDK to buttons, modals, streams, Stop and retries."
 ---
 
 # Slack
 
-This page shows how to test an agent built on Slack's APIs: how to point it at the fake, which people and channels a test creates, what those people can do, and what you can check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+This page shows how to test an app built on Slack's APIs: how to point it at the fake, which people and channels a test creates, what those people can do, and what you can check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
 
 > [!TIP]
 > Every method, option and wait of the Slack fake, with each call in TypeScript, Python and Rust, is in the [Slack API reference](/docs/reference/api/slack).
@@ -28,27 +28,27 @@ test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
 
 ## What the fake covers
 
-The fake Slack is one workspace (`Acme`) with one app installed in it, named `my-agent`. It serves the Web API at `https://slack.localhost/api/` and delivers the Events API, interactivity and slash commands to your agent, over HTTP or Socket Mode.
+The fake Slack is one workspace (`Acme`) with one app installed in it, named `my-agent`. It serves the Web API at `https://slack.localhost/api/` and delivers the Events API, interactivity and slash commands to your app, over HTTP or Socket Mode.
 
-| Area | What's there |
-|---|---|
-| Messages | `chat.postMessage`, `update`, `delete`, `postEphemeral`, `response_url` answers, Block Kit blocks, message metadata |
-| Streaming | `chat.startStream`, `appendStream`, `stopStream`, and the Stop button |
-| Agents and assistants | `assistant.threads.setStatus`, `setSuggestedPrompts`, `setTitle`, `agents.sessions.setStatus` and `rename`, the split view events |
-| Conversations | Public and private channels, DMs and group DMs: `conversations.history`, `replies`, `info`, `list`, `members`, `open`, `join` |
-| People | `users.info`, `users.list`, `auth.test` |
-| Reactions and files | `reactions.add`, `remove`, `get`; `files.getUploadURLExternal`, `completeUploadExternal`, `info` |
-| Interactivity | `block_actions` (buttons, select menus), `views.open`, `push`, `update`, `view_submission`, `view_closed`, message shortcuts, slash commands |
-| Events | `app_mention`, `message.*`, `reaction_added` and `removed`, `member_joined_channel` and `left`, `app_uninstalled`, `tokens_revoked`, `agent_session_stopped`, `assistant_thread_started`, `assistant_thread_context_changed` |
-| Transport | HTTP request URL with Slack's signature, Socket Mode (`apps.connections.open` and the WebSocket) |
+| Area                  | What's there                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Messages              | `chat.postMessage`, `update`, `delete`, `postEphemeral`, `response_url` answers, Block Kit blocks, message metadata                                                                                                          |
+| Streaming             | `chat.startStream`, `appendStream`, `stopStream`, and the Stop button                                                                                                                                                        |
+| Agents and assistants | `assistant.threads.setStatus`, `setSuggestedPrompts`, `setTitle`, `agents.sessions.setStatus` and `rename`, the split view events                                                                                            |
+| Conversations         | Public and private channels, DMs and group DMs: `conversations.history`, `replies`, `info`, `list`, `members`, `open`, `join`                                                                                                |
+| People                | `users.info`, `users.list`, `auth.test`                                                                                                                                                                                      |
+| Reactions and files   | `reactions.add`, `remove`, `get`; `files.getUploadURLExternal`, `completeUploadExternal`, `info`                                                                                                                             |
+| Interactivity         | `block_actions` (buttons, select menus), `views.open`, `push`, `update`, `view_submission`, `view_closed`, message shortcuts, slash commands                                                                                 |
+| Events                | `app_mention`, `message.*`, `reaction_added` and `removed`, `member_joined_channel` and `left`, `app_uninstalled`, `tokens_revoked`, `agent_session_stopped`, `assistant_thread_started`, `assistant_thread_context_changed` |
+| Transport             | HTTP request URL with Slack's signature, Socket Mode (`apps.connections.open` and the WebSocket)                                                                                                                             |
 
-The app has the scopes a conversational agent usually has (`chat:write`, `app_mentions:read`, the `*:history` and `*:read` scopes, `reactions:write`, `files:write`, `users:read`, `assistant:write` and a few more). A method outside them answers `missing_scope`, as Slack does.
+The app has the scopes a conversational bot or agent usually has (`chat:write`, `app_mentions:read`, the `*:history` and `*:read` scopes, `reactions:write`, `files:write`, `users:read`, `assistant:write` and a few more). A method outside them answers `missing_scope`, as Slack does.
 
 Not covered yet: Slack Connect channels (`createChannel({ shared: true })` answers `unsupported_in_fake`), renaming and archiving channels, attaching files to a person's message, Workflow Builder, Canvases and Lists. A Web API method the fake doesn't have answers `unknown_method`.
 
-## Connecting a Slack agent
+## Connecting a Slack app
 
-Ask the running server for the agent's settings:
+Ask the running server for the app's settings:
 
 ```bash
 npx channelstack env
@@ -102,11 +102,11 @@ const bot = new Chat({ userName: "my-agent", adapters: { slack }, state: createM
 // Serve bot.webhooks.slack(request) at /slack/events.
 ```
 
-An agent that hard-codes `slack.com` (slack-go, most Go and Rust clients) can't take a base URL. Run it in [proxy mode](/docs/guide/proxy-mode) instead.
+An app that hard-codes `slack.com` (slack-go, most Go and Rust clients) can't take a base URL. Run it in [proxy mode](/docs/guide/proxy-mode) instead.
 
 ### Where events are delivered
 
-channelstack never starts your agent; it sends events to a URL you give it when the server starts:
+channelstack never starts your app; it sends events to a URL you give it when the server starts:
 
 ```bash
 CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelstack start
@@ -114,11 +114,11 @@ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelsta
 
 Events, interactions (buttons, menus, modals, shortcuts) and slash commands all go to that one URL, which is how Bolt and the Chat SDK serve them by default. `/slack/events` is Bolt's default path and the one the reference agents use. Any slash command name is accepted.
 
-Without `CHANNELSTACK_SLACK_WEBHOOK_URL` and without a Socket Mode connection, nothing is delivered: a person's message is stored, but the app hears nothing. See [Connecting your agent](/docs/guide/connecting-your-agent) for TLS trust and the other runtimes.
+Without `CHANNELSTACK_SLACK_WEBHOOK_URL` and without a Socket Mode connection, nothing is delivered: a person's message is stored, but the app hears nothing. See [Connecting your app](/docs/guide/connecting-your-agent) for TLS trust and the other runtimes.
 
 ### Socket Mode
 
-An agent in Socket Mode connects out and needs no request URL. Give Bolt the app token:
+An app in Socket Mode connects out and needs no request URL. Give Bolt the app token:
 
 ```ts title="agent.ts"
 const app = new App({
@@ -131,9 +131,9 @@ const app = new App({
 await app.start();
 ```
 
-Bolt calls `apps.connections.open` with the `xapp-…` token through the same base URL, and the fake hands back a WebSocket URL on its own host. From then on, deliveries go over the socket instead of the request URL. Attempts, retries and the quiet rule work the same on both transports. `slack.socketConnections` says how many connections the agent held when the test's `slack` fixture was made: it's a snapshot, and nothing refreshes it during the test.
+Bolt calls `apps.connections.open` with the `xapp-…` token through the same base URL, and the fake hands back a WebSocket URL on its own host. From then on, deliveries go over the socket instead of the request URL. Attempts, retries and the quiet rule work the same on both transports. `slack.socketConnections` says how many connections the app held when the test's `slack` fixture was made: it's a snapshot, and nothing refreshes it during the test.
 
-While the agent is between connections, a delivery waits for it to reconnect until its ack window ends. An agent that also has a request URL and has held no socket for 30 seconds is reached over HTTP again.
+While the app is between connections, a delivery waits for it to reconnect until its ack window ends. An app that also has a request URL and has held no socket for 30 seconds is reached over HTTP again.
 
 ## People and channels in a test
 
@@ -146,15 +146,15 @@ const deployBot = await slack.createUser({ name: "deploy-bot", bot: true });
 const cara = await slack.createUser({ name: "Cara", id: "U0ADMIN01" });
 ```
 
-| Option | What it does |
-|---|---|
-| `name` | Required. How mentions (`@Ana`) and matchers find the person |
-| `id` | A fixed user id, for agents that allowlist people by id. Generated (`U…`) otherwise |
-| `displayName`, `realName`, `email`, `timezone` | Profile fields the agent reads with `users.info` |
-| `admin`, `owner` | Workspace roles. `users.info` shows `is_admin`, `is_owner` |
-| `guest` | A guest restricted to the channels it's added to |
-| `bot` | Another bot, to check that the agent ignores bots |
-| `token`, `browser` | Live mode only: see [Live](#live) |
+| Option                                         | What it does                                                                      |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| `name`                                         | Required. How mentions (`@Ana`) and matchers find the person                      |
+| `id`                                           | A fixed user id, for apps that allowlist people by id. Generated (`U…`) otherwise |
+| `displayName`, `realName`, `email`, `timezone` | Profile fields the app reads with `users.info`                                    |
+| `admin`, `owner`                               | Workspace roles. `users.info` shows `is_admin`, `is_owner`                        |
+| `guest`                                        | A guest restricted to the channels it's added to                                  |
+| `bot`                                          | Another bot, to check that the app ignores bots                                   |
+| `token`, `browser`                             | Live mode only: see [Live](#live)                                                 |
 
 Channels have only the members you list. The app is a member only when you include `slack.app`, which is Slack's own rule: an app that isn't in a channel gets no events from it and can't post there (`not_in_channel`).
 
@@ -163,12 +163,12 @@ const channel = await slack.createChannel({ participants: [ana, ben, slack.app] 
 const incidents = await slack.createChannel({ name: "incidents", private: true, participants: [ana, slack.app] });
 ```
 
-| Option | What it does |
-|---|---|
-| `participants` | People and the app. Only they are members |
-| `name` | Without `#`. Generated (`test-<id>`) if omitted. Unique per test session, so parallel tests can each have a `#support` |
-| `private` | A private channel: the app reads it with the `groups:*` scopes, and an outsider gets `channel_not_found` |
-| `topic`, `purpose` | Shown by `conversations.info` |
+| Option             | What it does                                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `participants`     | People and the app. Only they are members                                                                              |
+| `name`             | Without `#`. Generated (`test-<id>`) if omitted. Unique per test session, so parallel tests can each have a `#support` |
+| `private`          | A private channel: the app reads it with the `groups:*` scopes, and an outsider gets `channel_not_found`               |
+| `topic`, `purpose` | Shown by `conversations.info`                                                                                          |
 
 A DM needs no channel: `ana.say("hi", { to: slack.app })` opens one, and `ana.openDM([ben, slack.app])` opens a group DM. The app is always in a DM with itself. To add the app later, a person invites it: `await ana.invite(slack.app, { channel })` sends `member_joined_channel`.
 
@@ -208,9 +208,9 @@ await ana.runCommand("/deploy web staging", { channel });
 await ana.shortcut("create_ticket", { message: report });
 ```
 
-A button is found by its visible label or by `{ actionId, value }`. Without `message`, `click` uses the latest agent message in the thread (or channel) that has the button. Like a person, `click`, `select` and `pickPrompt` wait for the control to appear: they try again while it isn't there, up to the timeout, and then fail with a list of what was there.
+A button is found by its visible label or by `{ actionId, value }`. Without `message`, `click` uses the app's latest message in the thread (or channel) that has the button. Like a person, `click`, `select` and `pickPrompt` wait for the control to appear: they try again while it isn't there, up to the timeout, and then fail with a list of what was there.
 
-A modal is the one the agent opened for that person with `views.open`. `submit` fills inputs by label or by `block_id.action_id` and sends `view_submission`; `close` sends `view_closed` if the agent asked for it. `modal.errors` holds what the agent answered with `response_action: "errors"`. `ana.modals()` lists every modal the agent opened for Ana, open or not.
+A modal is the one the app opened for that person with `views.open`. `submit` fills inputs by label or by `block_id.action_id` and sends `view_submission`; `close` sends `view_closed` if the app asked for it. `modal.errors` holds what the app answered with `response_action: "errors"`. `ana.modals()` lists every modal the app opened for Ana, open or not.
 
 ### Streams, status and Stop
 
@@ -239,7 +239,7 @@ await ana.reply("summarize this channel", { thread });
 
 ### Conversations and membership
 
-`ana.openDM(ben)` or `ana.openDM([ben, slack.app])` opens or reuses a DM; `ana.invite(...)` and `ana.kick(...)` change who's in a channel. `ana.ephemeral()` returns the messages only Ana can see, once the agent is quiet.
+`ana.openDM(ben)` or `ana.openDM([ben, slack.app])` opens or reuses a DM; `ana.invite(...)` and `ana.kick(...)` change who's in a channel. `ana.ephemeral()` returns the messages only Ana can see, once the app is quiet.
 
 ### What only the test does
 
@@ -253,26 +253,26 @@ await msg.delivery!.retry({ after: "3s", reason: "http_timeout" });
 
 ## What to check
 
-The matchers read what a person would see: edits applied, deleted messages gone, stream chunks joined, button labels as text, ephemeral messages only for their recipient. Positive matchers resolve as soon as the condition holds; `.not` and exact counts wait until the agent is quiet first. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains why.
+The matchers read what a person would see: edits applied, deleted messages gone, stream chunks joined, button labels as text, ephemeral messages only for their recipient. Positive matchers resolve as soon as the condition holds; `.not` and exact counts wait until the app is quiet first. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains why.
 
-| Matcher | Subject | Reads |
-|---|---|---|
-| `toHaveReplyFrom(author, { text })` | thread, DM | `thread.replies()` |
-| `toHaveRepliesFrom(author, { count })` | thread, DM | `thread.replies()`, once quiet |
-| `toHaveChannelMessageFrom(author)` | conversation | `conversation.messages()` (outside threads) |
-| `toContainText(text, { count, from, as })` | anything with a transcript | `transcript()` |
-| `toHaveStreamingReplyFrom(author)` | thread | `message.stream` |
-| `toHaveStatus(state)`, `toHaveStatusText(text)` | thread | `thread.status()` |
-| `toHaveButton(label)` | message, thread | `message.blocks` |
-| `toHaveReaction(emoji, { by })` | message | `message.reactions()` |
-| `toHaveOpenedModal(title)` | person | `user.modals()` |
-| `toBeEphemeralFor(user)` | message | `message.visibleTo` |
-| `toBeAccepted`, `toBeRejected`, `toBeRetried` | delivery | `delivery.attempts` |
-| `toHaveReceivedCall(operation, { times, error })` | `slack` | `slack.calls()` |
+| Matcher                                           | Subject                    | Reads                                       |
+| ------------------------------------------------- | -------------------------- | ------------------------------------------- |
+| `toHaveReplyFrom(author, { text })`               | thread, DM                 | `thread.replies()`                          |
+| `toHaveRepliesFrom(author, { count })`            | thread, DM                 | `thread.replies()`, once quiet              |
+| `toHaveChannelMessageFrom(author)`                | conversation               | `conversation.messages()` (outside threads) |
+| `toContainText(text, { count, from, as })`        | anything with a transcript | `transcript()`                              |
+| `toHaveStreamingReplyFrom(author)`                | thread                     | `message.stream`                            |
+| `toHaveStatus(state)`, `toHaveStatusText(text)`   | thread                     | `thread.status()`                           |
+| `toHaveButton(label)`                             | message, thread            | `message.blocks`                            |
+| `toHaveReaction(emoji, { by })`                   | message                    | `message.reactions()`                       |
+| `toHaveOpenedModal(title)`                        | person                     | `user.modals()`                             |
+| `toBeEphemeralFor(user)`                          | message                    | `message.visibleTo`                         |
+| `toBeAccepted`, `toBeRejected`, `toBeRetried`     | delivery                   | `delivery.attempts`                         |
+| `toHaveReceivedCall(operation, { times, error })` | `slack`                    | `slack.calls()`                             |
 
 `thread.status()` is `working` while a status line is set, `streaming` while a reply streams, `stopped` after Stop and `idle` when done. The [matchers reference](/docs/reference/matchers) has every option.
 
-Every matcher is built on a read you can call yourself: `channel.messages()`, `thread.replies()`, `thread.latestReply({ from })` (once the agent is quiet), `message.refresh()`, `message.stream`, `thread.status()`, `slack.calls({ operation, error })`, `slack.deliveries()`. A transcript reads like the conversation and makes a good snapshot:
+Every matcher is built on a read you can call yourself: `channel.messages()`, `thread.replies()`, `thread.latestReply({ from })` (once the app is quiet), `message.refresh()`, `message.stream`, `thread.status()`, `slack.calls({ operation, error })`, `slack.deliveries()`. A transcript reads like the conversation and makes a good snapshot:
 
 ```ts
 const transcript = await msg.thread.transcript();
@@ -301,7 +301,7 @@ test("approval buttons act once, even on a double click", async ({ slack }) => {
 });
 ```
 
-To run the same checks every Slack agent should pass (one reply to a mention, survives the 3-second retry, rejects a bad signature, honours Stop), add `slackChecks()` from `channelstack/checks`. See [Standard checks](/docs/guide/standard-checks).
+To run the same checks every Slack app should pass (one reply to a mention, survives the 3-second retry, rejects a bad signature, honours Stop), add `slackChecks()` from `channelstack/checks`. See [Standard checks](/docs/guide/standard-checks).
 
 ## Delivery specifics
 
@@ -309,19 +309,19 @@ To run the same checks every Slack agent should pass (one reply to a mention, su
 
 Every HTTP delivery carries Slack's signature over the exact bytes sent:
 
-| Header | Value |
-|---|---|
-| `X-Slack-Request-Timestamp` | Seconds since the epoch |
-| `X-Slack-Signature` | `v0=` and the hex HMAC-SHA256 of `v0:<timestamp>:<body>`, keyed with `SLACK_SIGNING_SECRET` |
-| `X-Slack-Retry-Num`, `X-Slack-Retry-Reason` | On retries only |
+| Header                                      | Value                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `X-Slack-Request-Timestamp`                 | Seconds since the epoch                                                                     |
+| `X-Slack-Signature`                         | `v0=` and the hex HMAC-SHA256 of `v0:<timestamp>:<body>`, keyed with `SLACK_SIGNING_SECRET` |
+| `X-Slack-Retry-Num`, `X-Slack-Retry-Reason` | On retries only                                                                             |
 
-Events are JSON (`event_callback` with `event_id`, `team_id`, `api_app_id`). Interactions are form-encoded with a `payload` field, and slash commands are form-encoded fields, as on Slack. Your agent should refuse a signature that doesn't match and a timestamp more than five minutes old: `delivery.resend({ badSignature: true })` and `resend({ stale: true })` check that it does.
+Events are JSON (`event_callback` with `event_id`, `team_id`, `api_app_id`). Interactions are form-encoded with a `payload` field, and slash commands are form-encoded fields, as on Slack. Your app should refuse a signature that doesn't match and a timestamp more than five minutes old: `delivery.resend({ badSignature: true })` and `resend({ stale: true })` check that it does.
 
 ### Acknowledgement and retries
 
-The agent has 3 seconds to answer an event with a 2xx. If it doesn't, the fake retries the way Slack does: the same payload and `event_id`, almost at once, then after a minute, then after five minutes, with `X-Slack-Retry-Num` and `X-Slack-Retry-Reason` (`http_timeout`, `http_error` or `connection_failed`). An answer with `X-Slack-No-Retry: 1` ends the retries. Interactions and slash commands are not retried.
+The app has 3 seconds to answer an event with a 2xx. If it doesn't, the fake retries the way Slack does: the same payload and `event_id`, almost at once, then after a minute, then after five minutes, with `X-Slack-Retry-Num` and `X-Slack-Retry-Reason` (`http_timeout`, `http_error` or `connection_failed`). An answer with `X-Slack-No-Retry: 1` ends the retries. Interactions and slash commands are not retried.
 
-In a test, `msg.delivery!.retry({ after: "3s", reason: "http_timeout" })` sends a retry on purpose, so you can check the agent answers once:
+In a test, `msg.delivery!.retry({ after: "3s", reason: "http_timeout" })` sends a retry on purpose, so you can check the app answers once:
 
 ```ts
 await msg.delivery!.retry({ after: "3s", reason: "http_timeout" });
@@ -332,41 +332,41 @@ Over Socket Mode, the same retry arrives as an envelope with `retry_attempt` and
 
 ### Faults
 
-`slack.fault(...)` changes how the Web API answers the agent until it's undone or the test ends:
+`slack.fault(...)` changes how the Web API answers the app until it's undone or the test ends:
 
-| Fault | Effect |
-|---|---|
-| `{ type: "rate_limit", operation, retryAfter, times }` | HTTP 429, `Retry-After` in seconds, error `ratelimited` |
-| `{ type: "latency", operation, delay }` | The call answers late |
-| `{ type: "error", operation, error, times }` | The call fails with that Slack error, such as `msg_too_long` |
-| `{ type: "drop_socket", after }` | Cuts the Socket Mode connections once, without a goodbye |
+| Fault                                                  | Effect                                                       |
+| ------------------------------------------------------ | ------------------------------------------------------------ |
+| `{ type: "rate_limit", operation, retryAfter, times }` | HTTP 429, `Retry-After` in seconds, error `ratelimited`      |
+| `{ type: "latency", operation, delay }`                | The call answers late                                        |
+| `{ type: "error", operation, error, times }`           | The call fails with that Slack error, such as `msg_too_long` |
+| `{ type: "drop_socket", after }`                       | Cuts the Socket Mode connections once, without a goodbye     |
 
 ### What the fake refuses
 
-The fake refuses what Slack refuses, with Slack's error code (`{ ok: false, error }`). The ones agents meet most:
+The fake refuses what Slack refuses, with Slack's error code (`{ ok: false, error }`). The ones apps meet most:
 
-| Error | When |
-|---|---|
-| `not_authed`, `invalid_auth` | No token, or a token that isn't the app's |
-| `not_allowed_token_type` | The bot token on `apps.connections.open`, or the app token anywhere else |
-| `missing_scope` | A method outside the app's scopes, with `needed` and `provided` |
-| `not_in_channel`, `channel_not_found` | Posting where the app isn't a member (public, or private and DM) |
-| `is_archived`, `message_not_found`, `thread_not_found` | What the names say |
-| `cant_update_message`, `cant_delete_message` | Editing or deleting someone else's message |
-| `user_not_in_channel` | `chat.postEphemeral` to someone outside the channel |
-| `msg_too_long` | A message or stream over Slack's length limit |
-| `stopped_by_user`, `message_not_in_streaming_state` | Writing to a stream after Stop, or one that has ended |
+| Error                                                              | When                                                                         |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `not_authed`, `invalid_auth`                                       | No token, or a token that isn't the app's                                    |
+| `not_allowed_token_type`                                           | The bot token on `apps.connections.open`, or the app token anywhere else     |
+| `missing_scope`                                                    | A method outside the app's scopes, with `needed` and `provided`              |
+| `not_in_channel`, `channel_not_found`                              | Posting where the app isn't a member (public, or private and DM)             |
+| `is_archived`, `message_not_found`, `thread_not_found`             | What the names say                                                           |
+| `cant_update_message`, `cant_delete_message`                       | Editing or deleting someone else's message                                   |
+| `user_not_in_channel`                                              | `chat.postEphemeral` to someone outside the channel                          |
+| `msg_too_long`                                                     | A message or stream over Slack's length limit                                |
+| `stopped_by_user`, `message_not_in_streaming_state`                | Writing to a stream after Stop, or one that has ended                        |
 | `invalid_trigger_id`, `expired_trigger_id`, `exchanged_trigger_id` | `views.open` with a bad, more than 3-second-old or already used `trigger_id` |
-| `hash_conflict` | `views.update` with an outdated `hash` |
-| `already_reacted`, `no_reaction` | Adding a reaction twice, removing one that isn't there |
-| `account_inactive` | Any call after `slack.uninstallApp()` |
-| `unknown_method` | A method the fake doesn't have |
+| `hash_conflict`                                                    | `views.update` with an outdated `hash`                                       |
+| `already_reacted`, `no_reaction`                                   | Adding a reaction twice, removing one that isn't there                       |
+| `account_inactive`                                                 | Any call after `slack.uninstallApp()`                                        |
+| `unknown_method`                                                   | A method the fake doesn't have                                               |
 
 A test's own action can be refused too: `name_taken` for a second channel with the same name in one session, `split_view_unavailable`, `dispatch_failed` when the app has no request URL and no socket, and `not_found` when a button never appeared. The [errors reference](/docs/reference/api/errors) lists them all.
 
 ## Live
 
-The same tests can run against a real Slack sandbox workspace. Set the app's credentials (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN`), allowlist the workspace with `CHANNELSTACK_LIVE_SLACK_TEAMS`, and give each sandbox person a user token (`CHANNELSTACK_SLACK_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`). Live, Slack delivers to your agent itself; channelstack acts and reads the results back.
+The same tests can run against a real Slack sandbox workspace. Set the app's credentials (`CHANNELSTACK_SLACK_APP_ID`, `CHANNELSTACK_SLACK_BOT_TOKEN`), allowlist the workspace with `CHANNELSTACK_LIVE_SLACK_TEAMS`, and give each sandbox person a user token (`CHANNELSTACK_SLACK_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`). Live, Slack delivers to your app itself; channelstack acts and reads the results back.
 
 Slack marks every message posted through its API as an app's, so a person's `say` and `reply` are typed in Slack's own client by the browser actor, and so is `click`. Save each person's browser session once with `channelstack login slack --user ana`, or pass `browser: { storageState }` to `createUser`. Edits, deletes, reactions, invites and every read go through the user token.
 
