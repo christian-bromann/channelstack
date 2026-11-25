@@ -20,6 +20,7 @@ export interface DocModule {
 /** The sidebar's sections, in order: a folder of website/docs each (`""` is the folder itself). */
 export const SECTIONS = [
   { folder: "", title: "Introduction" },
+  { folder: "quickstarts", title: "Quickstarts" },
   { folder: "guide", title: "Guide" },
   { folder: "platforms", title: "Platforms" },
   { folder: "reference", title: "Reference" },

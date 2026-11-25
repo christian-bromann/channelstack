@@ -192,7 +192,7 @@ export function HeroWaves() {
           <i>A</i> ana
         </span>
         <span className="speaker-agent">
-          <i>R</i> robin
+          <i>M</i> my-agent
         </span>
       </p>
     </div>

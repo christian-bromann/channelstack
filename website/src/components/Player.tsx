@@ -63,8 +63,8 @@ const EXAMPLES: Example[] = [
     code: { ts: { file: "issues.test.ts", sample: github }, py: { file: "test_issues.py", sample: githubPy } },
     Mock: GitHubMock,
     checks: [
-      { step: 3, text: "robin commented, mentioning Safari" },
-      { step: 5, text: "one comment from robin after the redelivery" },
+      { step: 3, text: "my-agent commented, mentioning Safari" },
+      { step: 5, text: "one comment from my-agent after the redelivery" },
     ],
     notes: [
       <>
@@ -103,8 +103,8 @@ const EXAMPLES: Example[] = [
     code: { ts: { file: "comments.test.ts", sample: notion }, py: { file: "test_comments.py", sample: notionPy } },
     Mock: NotionMock,
     checks: [
-      { step: 3, text: "robin answered in the same discussion" },
-      { step: 4, text: "exactly one comment from robin" },
+      { step: 3, text: "my-agent answered in the same discussion" },
+      { step: 4, text: "exactly one comment from my-agent" },
     ],
     notes: [
       <>Connections and their inheritance, like Notion</>,

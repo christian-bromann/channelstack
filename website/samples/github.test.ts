@@ -8,14 +8,14 @@ test("answers on the issue and ignores itself", async ({ github }) => {
   const issue = await mo.openIssue({ title: "Login 500s on Safari" }, { repo });
 
   // [!step 2]
-  const comment = await mo.comment("@robin can you take a look?", { issue });
+  const comment = await mo.comment("@my-agent can you take a look?", { issue });
   // [!step 3]
-  await expect(issue).toHaveCommentFrom("robin", { text: /Safari/ });
+  await expect(issue).toHaveCommentFrom("my-agent", { text: /Safari/ });
 
   // the same delivery again must not start a second run
   // [!step 4]
   await comment.delivery!.redeliver();
   // [!step 5]
-  await expect(issue).toHaveCommentsFrom("robin", { count: 1 });
+  await expect(issue).toHaveCommentsFrom("my-agent", { count: 1 });
 });
 // @show:end

@@ -119,7 +119,7 @@ const ana = await slack.createUser({ name: "Ana", browser: { storageState: ".aut
 
 - The file signs a person in: it must be private (`chmod 600`), and an `.auth/` folder belongs in `.gitignore`.
 - When Slack ends the saved session, the next action fails with `live_misconfigured` and the `channelstack login` command to run.
-- `channelstack login` takes `slack` today. Signing in with no one at the keyboard (a test inbox, passkeys) is coming.
+- `channelstack login` takes `slack`: the browser actor is for Slack.
 - The first start after Chrome updates can take a minute or two while the matching driver is fetched.
 
 ## What skips, and what fails

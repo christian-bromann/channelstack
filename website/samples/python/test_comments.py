@@ -12,8 +12,8 @@ async def test_answers_a_comment_mention_in_the_same_discussion(notion: NotionFi
     )
 
     # [!step 2]
-    comment = await ana.comment("@robin summarize this page", page=page)
+    comment = await ana.comment("@my-agent summarize this page", page=page)
     # [!step 3]
-    await expect(comment.discussion).to_have_comment_from("robin", text="search")
+    await expect(comment.discussion).to_have_comment_from("my-agent", text="search")
     # [!step 4]
-    await expect(comment.discussion).to_have_comments_from("robin", count=1)
+    await expect(comment.discussion).to_have_comments_from("my-agent", count=1)

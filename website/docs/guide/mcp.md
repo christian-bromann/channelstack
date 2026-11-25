@@ -83,6 +83,6 @@ The tools return the same text as `show`, `tail` and `deliveries`. None of it ca
 
 channelstack's repository has a skill for coding agents in [`skills/channelstack/SKILL.md`](https://github.com/christian-bromann/channelstack/blob/main/skills/channelstack/SKILL.md). It tells the agent how to set up the server and the MCP config, runs it through the loop above, and shows the test to write afterwards. Copy it into your coding agent's skills folder, for example `.claude/skills/channelstack/SKILL.md` for Claude Code.
 
-## Only Slack, for now
+## Slack only
 
-The tools that act as a person are Slack's. `list_deliveries` and `redeliver` take every channel, but nothing acts on GitHub, Linear or Notion in the dev session yet, so drive those from a test. `github_comment`, `linear_delegate` and `notion_comment` are coming ([#33](https://github.com/christian-bromann/channelstack/issues/33)).
+The tools that act as a person are Slack's. `list_deliveries` and `redeliver` take every channel, but nothing acts on GitHub, Linear or Notion in the dev session: drive those from a test.

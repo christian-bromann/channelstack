@@ -10,11 +10,11 @@ test("the calls quoted in the page copy exist", async ({ slack }) => {
   const channel = await slack.createChannel({ participants: [ana, slack.app] });
 
   // "ana.say(…)" and "expect(thread)"
-  const message = await ana.say("@robin hi", { channel });
+  const message = await ana.say("@my-agent hi", { channel });
   const thread = message.thread;
 
   // "toHaveRepliesFrom(…, { count: 1 })"
-  await expect(thread).toHaveRepliesFrom("robin", { count: 1 });
+  await expect(thread).toHaveRepliesFrom("my-agent", { count: 1 });
   // "not.toContainText"
   await expect(thread).not.toContainText("Thinking…");
   // 'ana.click("Approve", { message })'
