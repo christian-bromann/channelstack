@@ -53,6 +53,11 @@ export function createLiveResendWorld(deps: {
   const store = new ResendStore(new Registry());
   const people = new LivePeople();
   const read = new Map<string, number>();
+  /**
+   * What people sent whose `Message-ID` Resend hadn't given yet: it assigns one once the email is
+   * on its way, and an answer names it in `In-Reply-To`. By the email's id, with whose key sent it.
+   */
+  const unnamed = new Map<string, LiveCredential>();
   let app: LiveCredential | undefined;
 
   /** Everyone an email goes to must be at an allowlisted domain (or a Resend test address): sent mail can't be taken back. */
@@ -119,7 +124,8 @@ export function createLiveResendWorld(deps: {
       },
     });
     // Its `Message-ID`, which the agent's answer will name in `In-Reply-To`.
-    const sent = await client.call<{ message_id?: string; created_at?: string }>(credential, "GET", `/emails/${id}`);
+    const sent = await client.call<{ message_id?: string | null }>(credential, "GET", `/emails/${id}`);
+    if (!sent.message_id) unnamed.set(id, credential);
     return keep(session, {
       id,
       direction: "outside",
@@ -193,6 +199,15 @@ export function createLiveResendWorld(deps: {
     async refresh(session) {
       if (clock() - (read.get(session) ?? 0) < READ_CACHE_MS) return;
       read.set(session, clock());
+      // First the `Message-ID`s Resend has given since: the answers are threaded by them.
+      for (const [id, credential] of unnamed) {
+        const record = store.emails.find(id);
+        if (store.emails.owner(id) !== session || !record) continue;
+        const sent = await client.call<{ message_id?: string | null }>(credential, "GET", `/emails/${id}`);
+        if (!sent.message_id) continue;
+        unnamed.delete(id);
+        store.emails.add(id, { ...record, messageId: sent.message_id }, session);
+      }
       for (const { id: address, credential } of people.of(session)) {
         const list = await client.call<{ data: Array<{ id: string }> }>(
           credential,
