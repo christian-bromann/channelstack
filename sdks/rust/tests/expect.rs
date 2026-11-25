@@ -1,6 +1,7 @@
 //! `expect(…)` against a server the SDK starts (`Mode::Start`, with `CHANNELSTACK_SERVER_BIN`): checks
-//! that pass and fail, a negative one, an exact count, a delivery and the agent's calls. No agent
-//! runs, so people say everything, and Slack delivers to an endpoint that only answers 200.
+//! that pass and fail, a negative one, an exact count, a delivery and the agent's calls, and a pattern
+//! the server evaluates (a Notion anchor). No agent runs, so people say everything, and Slack
+//! delivers to an endpoint that only answers 200.
 //! `pnpm test:rust` sets the binary; without it, the test says so and passes.
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -141,6 +142,24 @@ async fn the_matchers() -> channelstack::Result<()> {
         .not_to_have_received_call("chat.postMessage")
         .quiet_for("50ms")
         .await?;
+
+    // A case-insensitive `Regex` the server evaluates: Notion anchors a comment to the block it finds.
+    let notion = session.notion().await?;
+    let ana = notion.create_user().name("Ana").await?;
+    let page = notion
+        .create_page()
+        .title("Roadmap")
+        .content("# Q1\n- ship search\n- ship billing")
+        .await?;
+    let anchored = ana
+        .comment("Is this still on?")
+        .page(&page)
+        .anchor(Regex::new("(?i)SHIP SEARCH")?)
+        .await?;
+    assert_eq!(
+        anchored.discussion().anchor().as_deref(),
+        Some("ship search")
+    );
 
     session.close().await?;
     client.close().await;

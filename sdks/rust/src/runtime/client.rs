@@ -113,10 +113,10 @@ impl<T: IntoArg> IntoArg for Option<T> {
         self.map_or(Value::Null, IntoArg::into_arg)
     }
 }
-/// A pattern, as it goes on the wire (`{ "source": … }`): its flags are in its source (`(?i)…`).
+/// A pattern, as it goes on the wire (`{ "source": …, "flags": … }`): see `pattern_on_wire`.
 impl IntoArg for &regex::Regex {
     fn into_arg(self) -> Value {
-        serde_json::json!({ "source": self.as_str(), "flags": "" })
+        crate::runtime::wait::pattern_on_wire(self)
     }
 }
 impl IntoArg for regex::Regex {

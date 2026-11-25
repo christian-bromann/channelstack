@@ -87,6 +87,27 @@ pub fn text_matches(text: &str, expected: &Value) -> bool {
     }
 }
 
+/// A `Regex` as it goes on the wire (`{ "source": …, "flags": "im" }`), as Python's `pattern_on_wire`
+/// sends one: the server's patterns are JavaScript's, which have no inline flags, so a leading flag
+/// group (`(?i)`, `(?ms)`) moves into `flags`. Any other group stays in the source.
+pub fn pattern_on_wire(regex: &regex::Regex) -> Value {
+    let mut source = regex.as_str();
+    let mut inline = String::new();
+    while let Some((group, rest)) = source
+        .strip_prefix("(?")
+        .and_then(|after| after.split_once(')'))
+        .filter(|(group, _)| !group.is_empty() && group.chars().all(|flag| "ims".contains(flag)))
+    {
+        inline.push_str(group);
+        source = rest;
+    }
+    let flags: String = "ims"
+        .chars()
+        .filter(|flag| inline.contains(*flag))
+        .collect();
+    serde_json::json!({ "source": source, "flags": flags })
+}
+
 /// A pattern as it goes on the wire (`{ "source": …, "flags": "im" }`) as a regular expression.
 /// The flags the SDKs send are `i`, `m` and `s`, which mean the same in Rust's regex syntax.
 fn pattern_regex(pattern: &serde_json::Map<String, Value>) -> Result<regex::Regex> {
@@ -307,8 +328,30 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{check_text, text_matches};
+    use super::{check_text, pattern_on_wire, text_matches};
     use serde_json::json;
+
+    #[test]
+    fn a_regex_goes_on_the_wire_with_its_inline_flags_as_flags() {
+        let wire = |source: &str| pattern_on_wire(&regex::Regex::new(source).unwrap());
+        assert_eq!(
+            wire("(?i)rate limits"),
+            json!({ "source": "rate limits", "flags": "i" })
+        );
+        assert_eq!(
+            wire("(?s)(?mi)^a.b"),
+            json!({ "source": "^a.b", "flags": "ims" })
+        );
+        assert_eq!(
+            wire("ENG-\\d+"),
+            json!({ "source": "ENG-\\d+", "flags": "" })
+        );
+        // A scoped group, or a flag JavaScript has no equivalent for, stays where it is.
+        assert_eq!(wire("(?i:a)b"), json!({ "source": "(?i:a)b", "flags": "" }));
+        assert_eq!(wire("(?x)a b"), json!({ "source": "(?x)a b", "flags": "" }));
+        // And it matches what the Regex matched.
+        assert!(text_matches("RATE LIMITS", &wire("(?i)rate limits")));
+    }
 
     #[test]
     fn texts_and_patterns() {
