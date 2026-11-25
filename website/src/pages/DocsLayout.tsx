@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useLayoutEffect } from "react";
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from "react-router-dom";
 
 import { CodeGroup } from "../components/docs/CodeGroup";
 import { Example } from "../components/docs/Example";
@@ -59,12 +59,38 @@ function Sidebar({ area }: { area: DocArea }) {
   );
 }
 
+/**
+ * The router's scrolling to another page (`<ScrollRestoration />`) is instant: the page's smooth
+ * scrolling is for links within a page, so it's off while the page changes (`.page-change` in
+ * base.css). Rendered just before `<ScrollRestoration />`, so its layout effect runs first.
+ */
+function PageChange() {
+  const { pathname } = useLocation();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: it runs for each page, which `pathname` names
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("page-change");
+    // Apply it now: the browser may otherwise scroll with the style it had before the class.
+    getComputedStyle(root).scrollBehavior;
+    const frame = requestAnimationFrame(() => root.classList.remove("page-change"));
+    return () => {
+      cancelAnimationFrame(frame);
+      root.classList.remove("page-change");
+    };
+  }, [pathname]);
+  return null;
+}
+
 /** The docs shell: the sidebar by section, the page, and the page's outline. */
 export function Component() {
   const { pathname } = useLocation();
   const area = areaOfPath(pathname) ?? "guide";
   return (
     <>
+      {/* A link opens a page at its top, or at the section it names; Back, Forward and a reload
+          return to where the reader was. */}
+      <PageChange />
+      <ScrollRestoration />
       <Nav />
       <div className="wrap docs">
         <details className="doc-menu">
@@ -98,18 +124,6 @@ export function DocPage({ slug, mod }: { slug: string; mod: DocModule }) {
   const next = pages[index + 1];
   const Content = mod.default;
   const title = entry?.title ?? "Docs";
-  const { hash } = useLocation();
-  // A new page starts at its top, or at the section its link names; the router would keep the old
-  // page's scroll position. Only when the page changes: a link to a section of the same page
-  // scrolls there smoothly, as the browser does. "instant" here, to skip that smooth scroll.
-  const shownSlug = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (shownSlug.current === slug) return;
-    shownSlug.current = slug;
-    const target = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null;
-    if (target) target.scrollIntoView({ behavior: "instant", block: "start" });
-    else window.scrollTo({ top: 0, behavior: "instant" });
-  }, [slug, hash]);
   return (
     <>
       <Seo
