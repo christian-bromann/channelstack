@@ -108,7 +108,7 @@ export default defineConfig({
 });
 ```
 
-- **The config describes only your agent's app**: its manifest or permissions, where to deliver events, and the workspace or org name. It contains **no users, channels, repos or pages**. Tests create those themselves (see [section 5](#5-tests-plug-into-vitest-jest-playwright-webdriverio-and-pytest)), so every test states exactly the world it needs and shares nothing with other tests.
+- **The config describes only your agent's app**: its manifest or permissions, where to deliver events, and the workspace or org name. It contains **no users, channels, repos or pages**. Tests create those themselves (see [section 5](#5-tests-plug-into-vitest-playwright-webdriverio-and-pytest)), so every test states exactly the world it needs and shares nothing with other tests.
 - A real Slack manifest supplies scopes, events and interactivity URLs. channelstack then rejects calls outside the granted scopes (`missing_scope`), just as Slack does. GitHub App permissions work the same way.
 
 ## 4. Driving it from the outside
@@ -146,11 +146,9 @@ channelstack linear stop     ENG-12
 # Notion
 channelstack notion comment --as ana "Roadmap" "@my-agent summarize the Q1 section"
 
-# Delivery chaos (any channel)
-channelstack deliveries                                   # recent deliveries and their status
-channelstack redeliver last
-channelstack slack retry last --after 3s                  # Slack's retry, with X-Slack-Retry-Num
-channelstack deliver last --bad-signature
+# Deliveries (any channel)
+channelstack deliveries [slack]                           # what was delivered, with ids, outcomes and attempts
+channelstack redeliver [slack] [last|<id>]                # again, as the platform does: Slack's retry, with X-Slack-Retry-Num
 
 # Watching
 channelstack tail                                         # live stream: events in, agent API calls out
@@ -169,7 +167,7 @@ channelstack sweep                                        # live mode: remove le
 
 `--as <name>` creates that user the first time it's used, and `--in "#name"` does the same for channels, so the dev loop needs no seed data either. Repos, Linear teams and Notion pages are created the same way on first mention (`acme/web`, `ENG`, `"Roadmap"`).
 
-`last` always refers to the most recent message, thread, issue or delivery, so a loop of "say, look, fix the code, say again" needs no IDs.
+`last` always refers to the most recent message, thread, issue or delivery, so a loop of "say, look, fix the code, say again" needs no IDs. A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
 
 Everything the CLI does happens in one shared session called `dev`, which the UI shows too. It lives until the server stops ([decision 0010](decisions/0010-dev-session-and-attach-cli.md)).
 
@@ -179,9 +177,9 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
 ```
 
-The MCP tools mirror the CLI: `slack_say`, `slack_click`, `slack_stop`, `github_comment`, `linear_delegate`, `notion_comment`, `show_thread`, `list_deliveries`, `redeliver`, `tail`. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. A `channelstack` skill on skills.sh comes with it, the same way portless and emulate ship theirs.
+The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. `github_comment`, `linear_delegate` and `notion_comment` follow once the dev session can find GitHub, Linear and Notion people and objects by name, as it does Slack's ([#33](https://github.com/christian-bromann/channelstack/issues/33)). The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
 
-## 5. Tests: plug into Vitest, Jest, Playwright, WebdriverIO and pytest
+## 5. Tests: plug into Vitest, Playwright, WebdriverIO and pytest
 
 channelstack has no test package of its own to import. It integrates into the test framework you already use. Each integration does three things:
 1. starts channelstack, or attaches to one that's running;
@@ -343,10 +341,41 @@ await using channel = await slack.createChannel();   // archived when the scope 
 | Framework | Integration | Fixtures | Matchers |
 |---|---|---|---|
 | Vitest | `channelstack/vitest` plugin | test context (`({ slack }) =>`) | `expect.extend` |
-| Jest | `channelstack/jest` preset | `globalThis` handles | `expect.extend` |
 | Playwright Test | `channelstack/playwright` | `test.extend` fixtures | `expect.extend` |
 | WebdriverIO | `@channelstack/wdio-service` | `browser.channelstack` or a service handle | `expect-webdriverio` matchers |
-| pytest | `pytest-channelstack` plugin | `slack`, `github`, `linear`, `notion` fixtures | assertion helpers (`assert_shows_once(thread, "my-agent")`) |
+| pytest | `pytest-channelstack` plugin | `channelstack` (the client), `channelstack_session`, `slack`, `github`, `linear`, `notion` | `expect(thread).to_have_reply_from("my-agent")`, `not_to_…` for negations ([decision 0018](decisions/0018-pytest-expect.md)) |
+
+### pytest
+
+`pip install pytest-channelstack` registers the plugin. A test asks for the fixtures it needs, and awaits `expect(...)`:
+
+```python
+import re
+from pytest_channelstack import expect
+
+async def test_a_mention_gets_one_reply(slack):
+    ana = await slack.create_user(name="Ana")
+    channel = await slack.create_channel(participants=[ana, slack.app])
+
+    msg = await ana.say("@my-agent summarize yesterday's incidents", channel=channel)
+
+    await expect(msg.thread).to_have_reply_from("my-agent", text=re.compile("incident", re.I))
+    await expect(msg.thread).to_have_replies_from(slack.app, count=1)
+    await expect(channel).not_to_have_channel_message_from("my-agent")
+```
+
+- **Fixtures:** `channelstack` is the client for the whole run (`env()`, `reset()`); `channelstack_session` is the test's session, closed after it; `slack`, `github`, `linear` and `notion` are the channels' fixtures in it.
+- **One event loop.** The client outlives each test, so tests and fixtures run on the run's loop. With pytest-asyncio, set it once:
+
+  ```ini
+  [pytest]
+  asyncio_mode = auto
+  asyncio_default_fixture_loop_scope = session
+  asyncio_default_test_loop_scope = session
+  ```
+
+- **Settings:** `--channelstack-mode attach|start|auto` (or `channelstack_mode` in the ini file), `channelstack_timeout` (10s) and `channelstack_quiet_for` (750ms).
+- **Live mode:** a test that does something live mode can't do is skipped with the reason, as with Vitest.
 
 ### The matchers
 
@@ -490,11 +519,11 @@ portless trusts its CA in the system store, but not every runtime reads that sto
 
 | Package | Purpose |
 |---|---|
-| `channelstack` | CLI, UI and the test integrations, as subpath exports: `channelstack/vitest`, `channelstack/jest`, `channelstack/playwright`, `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
+| `channelstack` | CLI, UI and the test integrations, as subpath exports: `channelstack/vitest`, `channelstack/playwright`, `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
 | `@channelstack/wdio-service` | WebdriverIO service and `expect-webdriverio` matchers |
-| `pytest-channelstack` | pytest plugin: fixtures and assertion helpers over the control API |
+| `pytest-channelstack` | pytest plugin: fixtures and `expect(...)` checks over the control API |
 
-> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5 and Jest 30. Examples are in `api/examples/`.
+> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5. Examples are in `api/examples/`.
 
 ## 13. Settled since the first draft
 

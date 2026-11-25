@@ -1,0 +1,2 @@
+# The port is linted like the plugin it tests.
+extend = "../../../integrations/pytest-channelstack/pyproject.toml"

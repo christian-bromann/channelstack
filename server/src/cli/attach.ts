@@ -5,6 +5,12 @@ import { serverFilePath } from "../serve.ts";
 /** A problem to tell the person at the terminal, in one line. The CLI prints it and exits with 1. */
 export class CliError extends Error {}
 
+/**
+ * The server isn't there any more, or isn't the one this attachment found: none is running, it
+ * can't be reached, or it no longer takes the token (it restarted). Attaching again may help.
+ */
+export class ServerGoneError extends CliError {}
+
 /** Where the attach commands find the running server, from flags, the environment or `server.json`. */
 export interface AttachFlags {
   server?: string | undefined;
@@ -33,7 +39,7 @@ export function attach(flags: AttachFlags): Attached {
   const found = explicit
     ? { url: explicit, token: process.env.CHANNELSTACK_TOKEN }
     : (readPrivateJsonFile(file) as { url?: string; token?: string } | undefined);
-  if (!found?.url) throw new CliError("no running server found. Start one with `channelstack start`.");
+  if (!found?.url) throw new ServerGoneError("no running server found. Start one with `channelstack start`.");
   if (!found.token) throw new CliError(`CHANNELSTACK_TOKEN is needed to talk to ${found.url}.`);
   const { url, token } = found;
 
@@ -46,10 +52,13 @@ export function attach(flags: AttachFlags): Attached {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }).catch(() => {
-      throw new CliError(`the server at ${url} isn't reachable. Start one with \`channelstack start\`.`);
+      throw new ServerGoneError(`the server at ${url} isn't reachable. Start one with \`channelstack start\`.`);
     });
     const text = await response.text();
     const data = text === "" ? undefined : (JSON.parse(text) as unknown);
+    if (response.status === 401) {
+      throw new ServerGoneError(`the server at ${url} doesn't take this token: it may have restarted.`);
+    }
     if (!response.ok) {
       const problem = data as { message?: string; error?: string } | undefined;
       throw new CliError(problem?.message ?? problem?.error ?? `the server refused the request (${response.status}).`);

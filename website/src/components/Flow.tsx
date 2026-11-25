@@ -14,7 +14,7 @@ export function Flow() {
             <li>ana.click("Approve", …)</li>
             <li>expect(thread)</li>
           </ul>
-          <p className="node-foot">vitest · jest · pytest</p>
+          <p className="node-foot">vitest · pytest</p>
         </div>
 
         <div className="wires" aria-hidden="true">

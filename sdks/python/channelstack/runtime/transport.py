@@ -2,8 +2,9 @@
 
 import asyncio
 import time
-from collections.abc import Callable, Mapping
-from typing import Any
+from collections.abc import Awaitable, Callable, Mapping
+from contextvars import ContextVar
+from typing import Any, cast
 
 import httpx
 
@@ -36,6 +37,23 @@ def on_refusal(handler: Callable[[ChannelstackError, str], None] | None) -> None
     _refusal_handler = handler
 
 
+# Reads whose refusals go to their caller only: scoped to their own async context, so others' still do.
+_unreported: ContextVar[bool] = ContextVar("channelstack_unreported_refusals", default=False)
+
+
+async def unreported_refusals[T](read: Callable[[], Awaitable[T]]) -> T:
+    """Run a read whose refusals go only to its caller, not to the refusal handler.
+
+    For what is only nice to have, like the open work a failure message adds: a refused read then
+    can't turn a failing test into a skipped one.
+    """
+    token = _unreported.set(True)
+    try:
+        return await read()
+    finally:
+        _unreported.reset(token)
+
+
 def _without_none(values: Mapping[str, Any] | None) -> dict[str, Any] | None:
     return None if values is None else {key: value for key, value in values.items() if value is not None}
 
@@ -63,13 +81,13 @@ class Transport:
             raise ChannelstackError("internal", status, f"HTTP {status}: the response is not JSON") from None
         if response.is_success:
             return payload
-        error: dict[str, Any] = payload if isinstance(payload, dict) else {}
+        error = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
         code = str(error.get("error", "internal"))
         error_class = self._errors.get(code, ChannelstackError)
         refusal = error_class(
             code, response.status_code, str(error.get("message", f"HTTP {response.status_code}")), error.get("data")
         )
-        if _refusal_handler is not None:
+        if _refusal_handler is not None and not _unreported.get():
             _refusal_handler(refusal, path)
         raise refusal
 

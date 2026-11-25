@@ -1,8 +1,8 @@
 name: Set up channelstack
-description: Node, pnpm, Bun and (optionally) uv at the versions CI pins, with the dependencies installed.
+description: Node, pnpm, Bun, Rust and (optionally) uv at the versions CI pins, with the dependencies installed.
 inputs:
   python:
-    description: Also set up uv and the Python SDK's environment.
+    description: Also set up uv, and the environments of the Python SDK and pytest-channelstack.
     default: "true"
 runs:
   using: composite
@@ -19,8 +19,12 @@ runs:
       uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       with:
         version: ${{ env.UV_VERSION }}
+    # The Rust toolchain comes from rust-toolchain.toml when cargo first runs; its builds are cached.
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
     - run: pnpm install --frozen-lockfile
       shell: bash
     - if: inputs.python == 'true'
-      run: uv sync --project sdks/python --frozen
+      run: |
+        uv sync --project sdks/python --frozen
+        uv sync --project integrations/pytest-channelstack --frozen
       shell: bash

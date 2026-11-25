@@ -109,7 +109,7 @@ class Runner:
             return f"{shown}, expected a match for /{check['matches']}/"
         if "contains" in check:
             wanted = self.resolve(check["contains"])
-            items = (
+            items: Sequence[Any] = (
                 cast(Sequence[Any], actual)
                 if isinstance(actual, Sequence) and not isinstance(actual, str)
                 else []

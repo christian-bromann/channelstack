@@ -436,6 +436,8 @@ export function emitPython(ir: Ir): Map<string, string> {
   const lines = [
     `# ${BANNER}`,
     "# ruff: noqa",
+    "# The classes build each other from the wire: `_from_wire` is private to this module, not to its class.",
+    "# pyright: reportPrivateUsage=false",
     "from __future__ import annotations",
     "",
     ...(JSON.stringify(ir).includes('"kind":"pattern"') ? ["import re"] : []),

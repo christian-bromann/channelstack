@@ -1,4 +1,4 @@
-/** `channelstack`: public types. Test-framework entry points live in `channelstack/vitest` and `channelstack/jest`. */
+/** `channelstack`: public types. The test-framework entry point lives in `channelstack/vitest`; pytest has `pytest-channelstack`. */
 export * from "./common";
 export * from "./config";
 export * from "./server";

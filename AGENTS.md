@@ -100,7 +100,7 @@ Don't reopen these without asking.
 | Default mode | Base-URL mode through portless. Proxy mode is opt-in |
 | Test API | Actor-first: `ana.say(text, { channel })`. Resources are only read and waited on. Users are created per test (`createUser`), never declared in config; the app joins conversations explicitly (`participants: [ana, slack.app]`) |
 | Ids | Every handle uses the platform's own id format, in fake mode too (architecture.md 3.2) |
-| Tests | Integrate into Vitest, Jest and pytest with fixtures and matchers. No separate test package, no own runner |
+| Tests | Integrate into Vitest and pytest with fixtures and matchers. No separate test package, no own runner. No Jest ([decision 0017](docs/decisions/0017-no-jest.md)) |
 | Models | channelstack doesn't mock LLMs. Agents use their framework's own fake model |
 | Live mode | Acts on real platforms and reads results back. **Never relays, forwards or synthesizes events to the agent.** Delivery chaos is fake only |
 | Secrets | Fake tokens and signing secrets come from a CSPRNG once per install, stored in `~/.channelstack/secrets.json` (0600). No hard-coded secrets anywhere. Live credentials stay in memory, are never logged and never returned by the control API |

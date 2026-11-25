@@ -22,9 +22,5 @@
   "include": [
     "*.d.ts",
     "examples"
-  ],
-  "exclude": [
-    "jest.d.ts",
-    "examples/jest.usage.test.ts"
   ]
 }

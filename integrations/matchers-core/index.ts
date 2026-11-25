@@ -1,6 +1,6 @@
 /**
  * The channel matchers, independent of any test framework. Each one reads plain SDK methods and
- * returns whether it passed and what to say if not; `integrations/vitest` (and later Jest) only
+ * returns whether it passed and what to say if not; `integrations/vitest` only
  * adapt them to their `expect`.
  *
  * - A positive matcher polls until its condition holds, or fails after the timeout.

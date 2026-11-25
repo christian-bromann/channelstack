@@ -1,6 +1,6 @@
 /**
  * `channelstack/checks`: the standard behaviour checks. Each call registers ordinary tests
- * in the current suite of whichever framework is running (Vitest, Jest, Playwright).
+ * in the current suite of whichever framework is running (Vitest, Playwright).
  */
 import type { Duration } from "./common";
 

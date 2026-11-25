@@ -1,0 +1,5 @@
+# The Rust toolchain the SDK and its smoke runner build with, here and in CI.
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

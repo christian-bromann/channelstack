@@ -20,9 +20,11 @@
 | Listening, the token file, portless names | `serve.ts` | `start`: loopback bind, `server.json`, alias registration, upgrading a WebSocket a fake expects (`app.socket`); in proxy mode, the TLS listener the proxy routes the provider hosts to, with the CA's certificate, and the provider origins as the drivers' URLs | Call `Bun.serve` anywhere else (everything else also runs under Node) |
 | The command line | `cli.ts` | Parsing arguments and dispatching: `start` (and `--proxy`), `secrets rotate`, `ca rotate`, `doctor`, `sweep`, `--version`, and the attach commands below | Read `process.argv` or `process.env` flags in core |
 | Live mode from the terminal | `cli/live.ts` | `doctor` (which channels run live, whether their credentials work and are allowlisted, saved browser sessions), `sweep` (what crashed runs left, `--check` for the nightly job) and `login` (a person signs in by hand, once; the session is saved for the browser actor), over each driver's `live.maintenance` | Call a platform from the CLI without the driver's maintenance |
-| Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError` | Read `server.json` or call the control API from another CLI module |
+| Attaching to a running server | `cli/attach.ts` | Finding the server (`--server`, `CHANNELSTACK_URL`, `server.json`), calling the control API, the shared `dev` session, `CliError`, and `ServerGoneError` (none running, unreachable, or it restarted) | Read `server.json` or call the control API from another CLI module |
 | Acting from the terminal | `cli/slack.ts` | `slack say`, `reply`, `react`, `click`, `stop`; people and channels by name, created on first use; what `last` means | Resolve names or `last` anywhere else |
-| Watching from the terminal | `cli/watch.ts` | `show` (a transcript as text or JSON) and `tail` (deliveries and API calls as they happen) | — |
+| Watching from the terminal | `cli/watch.ts` | `show` (a transcript as text or JSON), `tail` (deliveries and API calls as they happen) and `readEvents` (the lines since a cursor, for `tail` and MCP) | — |
+| Deliveries from the terminal | `cli/deliveries.ts` | `deliveries [<channel>]` (ids, events, outcomes, attempts; every channel's by default) and `redeliver [<channel>] [last\|<id>]` (Slack retries, the others redeliver; `last` is the newest), for every channel | List or resend deliveries from another CLI module |
+| MCP for coding agents | `cli/mcp.ts` | `channelstack mcp`: the attach commands as MCP tools over stdio, each calling the CLI's own function; attaches on the first call, and again after a `ServerGoneError`; a `CliError` becomes the tool's error; `tail`'s cursor per attachment. The skill that drives it is `skills/channelstack/SKILL.md` | Write a tool's logic in `mcp.ts`: it belongs in the command's module, which the CLI calls too |
 | The UI page in the binary | `ui/page.ts` (the page itself is `ui/index.html`) | Importing the page as text, for the binary's entry only | Import it from `app.ts`: the app takes the page as an option, so it also runs under Node |
 | The list of drivers | `drivers/index.ts` | `DRIVERS`, `secretSpecs()` | Import a driver from core |
 
@@ -103,23 +105,23 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 |---|---|---|
 | OpenAPI → IR | `ir.ts` | The IR's types and `buildIr`. Refuses a spec no SDK could express (an unbound operation, a body field no method exposes) |
 | What every emitter needs | `emit/shared.ts` | Name conversion, `IrIndex` lookups, path templates |
-| Emitters | `emit/typescript.ts`, `emit/python.ts` | IR → generated source, as path → contents. Rust in phase 7 |
+| Emitters | `emit/typescript.ts`, `emit/python.ts`, `emit/rust.ts` | IR → generated source, as path → contents. Rust's is formatted with `rustfmt` by `scripts/sdk.ts`: handles with typed getters, a builder per method and wait (`ana.say("hi").channel(&c).await`), and `call_by_name` for code that calls methods by name |
 
-## SDK runtimes (`sdks/typescript/runtime/`, `sdks/python/channelstack/runtime/`)
+## SDK runtimes (`sdks/typescript/runtime/`, `sdks/python/channelstack/runtime/`, `sdks/rust/src/runtime/`)
 
 The same modules with the same names in every language.
 
 | Concern | Module | Notes |
 |---|---|---|
-| Transport | `transport` | Bearer token, retries while the server starts, error code → typed exception, a hook that sees every refusal with its request path (`onRefusal` / `on_refusal`, for a test integration) |
+| Transport | `transport` | Bearer token, retries while the server starts, error code → typed exception, a hook that sees every refusal with its request path (`onRefusal` / `on_refusal`, for a test integration), and reads whose refusals skip it (`unreportedRefusals` / `unreported_refusals`) |
 | Launcher | `launcher` | `auto` / `attach` / `start`; finding the server binary and its per-platform package name |
-| Client base | `client` | What generated handles share: `HandleContext`, the root client's `close`, the version check on connect |
+| Client base | `client` | What generated handles share: `HandleContext`, the root client's `close`, the version check on connect. Rust's also has how arguments go on the wire (`IntoArg`, `enc`), the one request function (`send`), the builder every method returns (`Call`) and a handle by name (`Dyn`) |
 | Credentials | `credentials` | A credential the test left out, from the environment: `CHANNELSTACK_SLACK_USER_{name}_TOKEN` with the person's name (`x-channelstack-credential` on the field) |
-| Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, repeating a call a person would wait for (`retryWhile`), text matching for waits, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it |
+| Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, repeating a call a person would wait for (`retryWhile`), text matching for waits, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it. Rust's `WaitState` is a handle's wait positions and its field handles' states, so `msg.thread()` is the same thread each time |
 | Durations | `duration` | Parsing `"3s"`, `"750ms"` |
 | Files | `files` | Reading fixture files and directories a test hands over (`readTree`, `readChanges`), and where relative paths start (`setFilesRoot`) |
 
-The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary.
+The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary. The Rust SDK is the `channelstack` crate (`sdks/rust`, in the repository's Cargo workspace, toolchain in `rust-toolchain.toml`); its errors are `runtime/error.rs`, and its launcher finds the binary at `CHANNELSTACK_SERVER_BIN` or on the `PATH` (downloading a release is phase 8).
 
 ## Scenarios (`scenarios/`)
 
@@ -127,7 +129,7 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 |---|---|---|
 | Protocol parity scenarios | `smoke/*.yaml` | The format is [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md) |
 | Conformance scenarios | `<channel>/*.yaml` | The differential run's scenarios: the same format, with `record` steps and `covers`; each runs against the fake and against the sandbox (decision 0016) |
-| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`, 0600), as plain data with no secret field (`runners/typescript/secrets.ts`, the one rule, which `conformance/lib.ts` uses too) |
+| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py`, `runners/rust` (a binary crate, on the SDK's `call_by_name`) | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`, 0600), as plain data with no secret field (`runners/typescript/secrets.ts`, the one rule, which `conformance/lib.ts` uses too) |
 | Reference agents | `agents/` | Plain programs with no channelstack code in them, configured from `channelstack env` |
 
 ## Examples (`examples/agents/`)
@@ -182,11 +184,13 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Compiling the server | `build-binary.ts`, `bun-compile.ts` | `bun build --compile` (through `Bun.build`, with a plugin that makes WebdriverIO's computed imports literal so it bundles), one npm package per platform |
 | Running the server from source | `dev-server.sh` | Stands in for the binary (`CHANNELSTACK_SERVER_BIN`) on machines that block freshly compiled executables. CI never uses it |
 | Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check; `--part` for one part of the acceptance suite (Slack; GitHub and Linear; Notion, every channel at once and the tests with their own agent; the checks against the broken agents, Slack's and the others') |
+| The Rust SDK's checks | `test-rust.ts` (`pnpm test:rust`) | clippy with warnings as errors, and the crate's tests, its typed API against the server binary |
 | A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints; `others` adds one agent per channel (every channel in one run); `serverEnv` gives the server alone live credentials. Everything that needs both uses it |
-| `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack`, each channel's checks, and `shared.test.ts` with one agent per channel |
+| `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack`, each channel's checks, and `shared.test.ts` with one agent per channel. `runPytestExamples`: the pytest port (`test/acceptance/pytest`) against the Bolt agent, in the `slack` part |
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |
 | A whole server against a stand-in platform | `test/acceptance/stand-ins/` | `github-live-server.sh`: the server from source with GitHub live against `githubStub`, through `start({ platforms })`, which only code can set |
-| Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser) or their own server (`live-skip`, a live server whose refusals skip) |
+| The Slack conversation tests in pytest | `test/acceptance/pytest/` | `test_slack.py`, the port of `api/examples/slack.test.ts`'s conversation tests, with its own `pytest.ini` (one event loop, attach mode) and `ruff.toml`; the transcript test holds the Vitest snapshot itself |
+| Acceptance tests that aren't examples | `test/acceptance/` | `stack/` runs with the examples' server and agent (quiet, parallel sessions); the files next to it bring their own agent (`mdac-220`, the CLI and UI with a browser, `mcp.test.ts`: an MCP client over stdio) or their own server (`live-skip`, a live server whose refusals skip) |
 | The live run | `live.ts` (`pnpm live`) | Every "live mode" block against the real sandboxes; nightly in `.github/workflows/live.yml` |
 | A live server with every agent | `lib/live-stack.ts` | `withLiveStack`: the live server, each channel's agent, the saved browser sessions, then `sweep --check` for the run and the removal of what is left; for `pnpm live` and `pnpm conformance` |
 | The differential run | `conformance.ts` (`pnpm conformance`) | Each conformance scenario against the fake (`withStack`) and, for the channels with credentials, the sandbox (`withLiveStack`); the comparison is `conformance/lib.ts`; `--fake-only` in CI |
@@ -209,11 +213,10 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 
 | Concern | Module | Notes |
 |---|---|---|
-| Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest and Jest adapt it; they don't reimplement matchers |
+| Matcher logic | `integrations/matchers-core/` | Framework-neutral matcher implementations built on the SDK's read methods and `wait`. Vitest's integration adapts it and doesn't reimplement matchers. pytest's can't import TypeScript, so `pytest-channelstack/matchers.py` is its Python counterpart: the same checks, semantics and messages, kept in step with this module |
 | Vitest | `integrations/vitest/` | Plugin (`index.ts`), attaching to or starting a server (`global-setup.ts`), a session and fixtures per test, registered with `test.override` so a suite's `test.extend` builds on them, the `expect.extend` adapter, and skipping a test live mode can't run, with the reason (`setup.ts`); a channel's fixture refused live becomes a stand-in that refuses on first use, so only that channel's tests skip (`refused.ts`, `refusedLive` for channelstack's own per-test checks) |
-| Jest | `integrations/jest/` *(planned, phase 7)* | Globals, the `expect.extend` adapter |
 | Checks | `integrations/checks/` | `slackChecks()`, `githubChecks()`, `linearChecks()`, `notionChecks()`: the standard behaviour checks, registered as ordinary tests, built on the public API and the matchers only. `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS` and `NOTION_CHECKS` list their ids |
-| pytest | `integrations/pytest-channelstack/` *(planned, phase 7)* | Fixtures and assertion helpers |
+| pytest | `integrations/pytest-channelstack/` | The plugin (`plugin.py`): one client per run (`channelstack`), a session per test (`channelstack_session`), a fixture per channel, the `--channelstack-mode` option and ini settings, and skipping a test live mode can't run, with the reason. `expect(subject)` (`matchers.py`): the conversation matchers with matchers-core's semantics, `not_to_…` for negations ([decision 0018](decisions/0018-pytest-expect.md)). The run's settings (`options.py`). Tests and fixtures share one event loop (`asyncio_default_test_loop_scope = session`) |
 
 ## Generated code (never edit by hand)
 
