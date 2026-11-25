@@ -78,16 +78,25 @@ export function isRunId(value: string): boolean {
   return /^[a-z0-9]{1,24}$/.test(value) && !/\d{7}/.test(value);
 }
 
+/**
+ * A run id as given (`CHANNELSTACK_RUN_ID`, `sweep --run`), in the form live names take: lowercased,
+ * and each run of 7 or more digits written in base 36 until none is left (`gh45602242231` →
+ * `ghky6ebav`), the same way every time. A CI job's `gh${{ github.run_id }}` works as it is, and the
+ * sweep finds a run by the id the job was given. Undefined when the result isn't a run id.
+ */
+export function normalizeRunId(value: string): string | undefined {
+  let id = value.trim().toLowerCase();
+  while (/\d{7}/.test(id)) id = id.replace(/\d{7,}/g, (digits) => BigInt(digits).toString(36));
+  return isRunId(id) ? id : undefined;
+}
+
 /** The run id: from `CHANNELSTACK_RUN_ID` (CI sets it to the job's), else made up from the CSPRNG. */
 export function runId(env: Readonly<Record<string, string | undefined>>): string {
-  const given = env.CHANNELSTACK_RUN_ID?.trim().toLowerCase();
+  const given = env.CHANNELSTACK_RUN_ID?.trim();
   if (given) {
-    if (!isRunId(given)) {
-      throw new Error(
-        `CHANNELSTACK_RUN_ID must be 1-24 letters and digits, with no 7 digits in a row (Linear takes those for a phone number), got "${given}"`,
-      );
-    }
-    return given;
+    const id = normalizeRunId(given);
+    if (id === undefined) throw new Error(`CHANNELSTACK_RUN_ID must be 1-24 letters and digits, got "${given}"`);
+    return id;
   }
   return randomString(10, LETTERS);
 }
