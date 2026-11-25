@@ -37,7 +37,7 @@ The test never touches your agent. Ana's message goes into a fake Slack workspac
 ## What it doesn't do
 
 - **It doesn't run your agent.** You start the agent as usual. `channelstack env` prints the variables it needs.
-- **It doesn't fake the model.** Your agent's framework has its own fake model (the AI SDK's `MockLanguageModelV2`, LangChain's `FakeListChatModel`, …), or you use a real one. The matchers check how the agent behaved, not the exact words.
+- **It doesn't fake the model.** Your agent's framework has its own fake model (the AI SDK's `MockLanguageModelV4`, LangChain's `FakeListChatModel`, …), or you use a real one. The matchers check how the agent behaved, not the exact words.
 - **It isn't a pixel copy of each product.** The UI shows the conversations you have with the agent as the same transcript the matchers read, next to every delivery and API call behind them.
 
 ## Where to go next
