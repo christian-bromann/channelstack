@@ -8,18 +8,7 @@ description: "channelstack is a test harness for the apps and agents you build f
 
 channelstack tests the apps and agents you build for Slack, GitHub, Linear and Notion: a Slack bot, a GitHub App, a Linear or Notion integration, a workflow or notification bot, or an AI agent. It runs those platforms as fakes on your machine, so a test can play the people in a conversation and check what they would see.
 
-```ts
-test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-
-  const msg = await ana.say("@my-agent summarize yesterday's incidents", { channel });
-
-  await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /incident/i });
-  await expect(msg.thread).toHaveRepliesFrom(slack.app, { count: 1 });
-  await expect(channel).not.toHaveChannelMessageFrom("my-agent");
-});
-```
+<Example id="slack-mention-one-reply" />
 
 The test never touches your app. Ana's message goes into a fake Slack workspace, which delivers the event to your app the way Slack would. Your app answers through the Slack SDK it already uses, pointed at the fake. The matchers then read the thread.
 

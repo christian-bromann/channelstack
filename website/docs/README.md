@@ -121,7 +121,15 @@ GitHub's alert syntax, which reads fine on GitHub too:
 
 Fenced blocks are highlighted at build time (`ts`, `tsx`, `js`, `python`, `rust`, `bash`, `json`, `yaml`, `diff`, `ini`). A `title` names the file: ` ```ts title="vitest.config.ts" `.
 
-The same example in several languages or package managers goes in tabs:
+A test, or anything that uses the test API (actors, fixtures, `expect`), is never a fenced block. It's an `<Example id="slack-mention-one-reply" />`: three real files in `website/examples/`, shown as TypeScript, Python and Rust tabs and checked in CI, so they can't rot.
+
+- `ts/<id>.test.ts`, type-checked against `api/*.d.ts` (`pnpm typecheck:samples` here).
+- `python/test_<id_with_underscores>.py`, an `async def test_…(slack: SlackFixture)` checked by pyright, strict (`pnpm typecheck` at the root).
+- `rust/src/<id_with_underscores>.rs`, a `#[tokio::test] #[ignore]` that gets its session from `fixtures::session()`, compiled by clippy (`pnpm test:rust` at the root).
+
+`// @show:start` and `// @show:end` (`#` in Python) mark what the page shows; setup the reader doesn't need stays outside. Where a language can't say something, a one-line comment in that file says so. A missing file fails the build.
+
+Anything else in several languages or package managers goes in tabs by hand:
 
 ````mdx
 <CodeGroup>

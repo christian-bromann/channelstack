@@ -11,23 +11,7 @@ This page shows how to test an integration built on Notion's API: how to point i
 > [!TIP]
 > Every method, option and wait of the Notion fake, with each call in TypeScript, Python and Rust, is in the [Notion API reference](/docs/reference/api/notion).
 
-```ts title="comments.test.ts"
-import { test, expect } from "vitest";
-
-test("a mention in a page comment gets a reply in the same discussion", async ({ notion }) => {
-  const ana = await notion.createUser({ name: "Ana" });
-  const page = await notion.createPage({
-    title: "Roadmap",
-    content: "# Q1\n- ship search\n- ship billing",
-    connections: [notion.app],
-  });
-
-  const comment = await ana.comment("@my-agent summarize this page", { page });
-
-  await expect(comment.discussion).toHaveCommentFrom("my-agent", { text: /search/i });
-  await expect(comment.discussion).toHaveCommentsFrom(notion.app, { count: 1 });
-});
-```
+<Example id="notion-comment-mention" />
 
 ## What the fake covers
 
@@ -113,10 +97,7 @@ CHANNELSTACK_NOTION_WEBHOOK_URL=http://localhost:3000/webhooks/notion npx channe
 
 A test creates the people, pages and databases it needs. Nothing is declared in a config file.
 
-```ts
-const ana = await notion.createUser({ name: "Ana" });
-const ben = await notion.createUser({ name: "Ben", email: "ben@example.com" });
-```
+<Example id="notion-people" />
 
 | Option               | What it does                                                   |
 | -------------------- | -------------------------------------------------------------- |
@@ -127,15 +108,7 @@ const ben = await notion.createUser({ name: "Ben", email: "ben@example.com" });
 
 ### Pages
 
-```ts
-const space = await notion.createPage({ title: "Engineering", connections: [notion.app] });
-const spec = await notion.createPage({
-  title: "Spec",
-  parent: space,
-  content: { path: "./fixtures/spec.md" },
-  icon: "📐",
-});
-```
+<Example id="notion-pages" />
 
 `notion.createPage` makes seed data: it sends no event. Use `ana.createPage(...)` when the creation itself should reach the app as `page.created`.
 
@@ -150,15 +123,7 @@ const spec = await notion.createPage({
 
 ### Databases
 
-```ts
-const tasks = await notion.createDatabase({
-  title: "Tasks",
-  properties: { Name: "title", Status: { status: ["Todo", "Ready for agent", "Done"] }, Estimate: "number" },
-  rows: [{ Name: "Write the onboarding guide", Status: "Todo" }],
-  connections: [notion.app],
-});
-const [row] = await tasks.rows({ Name: "Write the onboarding guide" });
-```
+<Example id="notion-database" />
 
 Property types are `title`, `rich_text`, `number`, `checkbox`, `date`, `people`, `url`, `email`, `{ select: [...] }`, `{ multi_select: [...] }`, `{ status: [...] }` and `{ relation: database }`. A row is a page, so everything a page can do, a row can do.
 
@@ -166,13 +131,7 @@ Property types are `title`, `rich_text`, `number`, `checkbox`, `date`, `people`,
 
 The integration sees a page or database only when it's connected to it, or to a page above it, which is Notion's rule. Rows inherit from their database. Anything else answers `object_not_found` (with Notion's hint about sharing) and sends no event:
 
-```ts
-const notes = await notion.createPage({ title: "Private notes" }); // not connected
-const comment = await ana.comment("@my-agent read this", { page: notes });
-expect(comment.delivery).toBeUndefined();
-
-await ana.connect(notion.app, { page: notes });
-```
+<Example id="notion-connect" />
 
 `connect` and `disconnect` are Share → Connections in Notion: a person adds or removes the integration on a page. They send no event, as on Notion.
 
@@ -182,25 +141,13 @@ Every action is a method on the person who takes it, with the content first and 
 
 ### Comments and discussions
 
-```ts
-const comment = await ana.comment("@my-agent is this enough for the mobile app?", { page, anchor: "Rate limits" });
-await comment.discussion.waitForComment({ from: notion.app });
-
-await ana.reply("@my-agent and what should we change?", { discussion: comment.discussion });
-await ana.editComment("@my-agent is this enough for the iOS app?", { comment });
-await ana.resolve({ discussion: comment.discussion });
-```
+<Example id="notion-discussions" />
 
 `comment` starts a discussion: on the page, or with `anchor` (a string or a `RegExp`) on the block whose text matches. It sends `comment.created` and resolves to the comment; its discussion is `comment.discussion`, and `discussion.anchor` the text it's anchored to. `reply` adds to a discussion, `editComment` and `deleteComment` send `comment.updated` and `comment.deleted`, and `resolve` and `reopen` change the discussion without an event. `@name` becomes a real mention.
 
 ### Page edits and mentions
 
-```ts
-await ana.edit({ append: "## Open questions\n- who owns billing?" }, { page });
-await ana.edit({ replace: "# Draft\nStarting over." }, { page });
-await ana.rename("Spec v2", { page });
-await ana.mention(notion.app, { page, inBlock: "TODO" });
-```
+<Example id="notion-edits" />
 
 `edit` appends to or replaces the body (Markdown or blocks) and sends `page.content_updated`. `mention` puts a mention of the integration inside the page body, in the block whose text matches `inBlock` or in a new paragraph, which is also a content update. `rename` changes the title property and sends `page.properties_updated`.
 
@@ -208,12 +155,7 @@ Content updates are batched, as on Notion: the first edit of a page starts a del
 
 ### Pages, rows and properties
 
-```ts
-const report = await ana.createPage({ title: "Checkout outage", parent: space, content: "Started 09:12 UTC" });
-
-const row = await ana.addRow({ Name: "Migrate to Postgres 17", Status: "Todo" }, { database: tasks });
-await ana.setProperty("Status", "Ready for agent", { page: row });
-```
+<Example id="notion-create-and-rows" />
 
 `ana.createPage` and `addRow` send `page.created`; `setProperty` sends `page.properties_updated`.
 
@@ -237,25 +179,7 @@ The reads behind them: `page.markdown()`, `page.blocks()`, `page.discussions()`,
 
 A full test, a person adds a row and asks the integration to fill in a property:
 
-```ts title="rows.test.ts"
-import { test, expect } from "vitest";
-
-test("database rows: the agent fills in a property", async ({ notion }) => {
-  const ana = await notion.createUser({ name: "Ana" });
-  const tasks = await notion.createDatabase({
-    title: "Tasks",
-    properties: { Name: "title", Status: { status: ["Todo", "In progress", "Done"] }, Estimate: "number" },
-    connections: [notion.app],
-  });
-
-  const row = await ana.addRow({ Name: "Migrate to Postgres 17", Status: "Todo" }, { database: tasks });
-  const comment = await ana.comment("@my-agent estimate this", { page: row });
-
-  await expect(row).toHavePropertyValue("Estimate", expect.any(Number));
-  await expect(comment.discussion).toHaveCommentsFrom(notion.app, { count: 1 });
-  await expect(notion).toHaveReceivedCall("pages.update");
-});
-```
+<Example id="notion-rows-test" />
 
 `notionChecks()` from `channelstack/checks` adds the checks every Notion integration should pass: a reply in the same discussion, ignores its own comments, redelivery, a bad signature. See [Standard checks](/docs/guide/standard-checks).
 
@@ -275,13 +199,7 @@ Events are sparse, as Notion's are: the entity, its parent, who did it (`authors
 
 The integration has five seconds to answer with a 2xx. A delivery that wasn't answered in time is retried like Notion does, up to eight more times over about a day (after one minute, then 5, 15 and 30 minutes, then 1, 2, 6 and 12 hours). In a test you send it again yourself:
 
-```ts
-const comment = await ana.comment("@my-agent hi", { page });
-
-await comment.delivery!.redeliver();                      // the next attempt_number, signed again
-await comment.delivery!.resend({ badSignature: true });   // signed with the wrong token
-await expect(comment.delivery!).toBeRejected();
-```
+<Example id="notion-redeliver" />
 
 Notion webhooks carry no timestamp, so there's no `stale` option here. [Delivery and failures](/docs/guide/delivery-and-failures) covers what each of these proves.
 

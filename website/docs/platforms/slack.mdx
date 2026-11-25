@@ -11,20 +11,7 @@ This page shows how to test an app built on Slack's APIs: how to point it at the
 > [!TIP]
 > Every method, option and wait of the Slack fake, with each call in TypeScript, Python and Rust, is in the [Slack API reference](/docs/reference/api/slack).
 
-```ts title="agent.test.ts"
-import { test, expect } from "vitest";
-
-test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-
-  const msg = await ana.say("@my-agent summarize yesterday's incidents", { channel });
-
-  await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /incident/i });
-  await expect(msg.thread).toHaveRepliesFrom(slack.app, { count: 1 });
-  await expect(channel).not.toHaveChannelMessageFrom("my-agent");
-});
-```
+<Example id="slack-mention-one-reply" />
 
 ## What the fake covers
 
@@ -139,12 +126,7 @@ While the app is between connections, a delivery waits for it to reconnect until
 
 A test creates the people it needs and the places they talk in. Nothing is declared in a config file, and nothing is shared between tests unless you share it with `test.extend` (see [Writing tests](/docs/guide/writing-tests)).
 
-```ts
-const ana = await slack.createUser({ name: "Ana" });
-const ben = await slack.createUser({ name: "Ben", admin: true });
-const deployBot = await slack.createUser({ name: "deploy-bot", bot: true });
-const cara = await slack.createUser({ name: "Cara", id: "U0ADMIN01" });
-```
+<Example id="slack-people" />
 
 | Option                                         | What it does                                                                      |
 | ---------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -158,10 +140,7 @@ const cara = await slack.createUser({ name: "Cara", id: "U0ADMIN01" });
 
 Channels have only the members you list. The app is a member only when you include `slack.app`, which is Slack's own rule: an app that isn't in a channel gets no events from it and can't post there (`not_in_channel`).
 
-```ts
-const channel = await slack.createChannel({ participants: [ana, ben, slack.app] });
-const incidents = await slack.createChannel({ name: "incidents", private: true, participants: [ana, slack.app] });
-```
+<Example id="slack-channels" />
 
 | Option             | What it does                                                                                                           |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -178,15 +157,7 @@ Every action is a method on the person who takes it. The content comes first, an
 
 ### Messages, threads, reactions and edits
 
-```ts
-const msg = await ana.say("@my-agent what's the status of the web deploy?", { channel });
-await msg.thread.waitForReply({ from: "my-agent" });
-
-await ana.reply("and the API?", { thread: msg });
-await ana.edit("@my-agent what's the status of the web deploy today?", { message: msg });
-await ana.react("ticket", { message: msg });
-await ana.delete({ message: msg });
-```
+<Example id="slack-messages" />
 
 `@name` in a message becomes a real mention (`<@U…>`) of that person or app; write `@@` for a literal `@`. A mention of the app sends `app_mention`, and the message also sends `message.channels` (or `.groups`, `.im`, `.mpim`). `msg.delivery` is the `app_mention` delivery; `msg.deliveries()` lists them all.
 
@@ -194,19 +165,7 @@ await ana.delete({ message: msg });
 
 ### Buttons, menus, modals, commands and shortcuts
 
-```ts
-const ask = await msg.thread.latestReply({ from: "my-agent" });
-await ben.click("Approve", { message: ask });
-
-await ana.select("staging", { menu: "Environment", message: ask });
-
-await ana.click("Open form", { thread: msg.thread });
-const modal = await ana.waitForModal({ title: /incident/i });
-await modal.submit({ Severity: "SEV2", Summary: "Checkout errors" });
-
-await ana.runCommand("/deploy web staging", { channel });
-await ana.shortcut("create_ticket", { message: report });
-```
+<Example id="slack-interactivity" />
 
 A button is found by its visible label or by `{ actionId, value }`. Without `message`, `click` uses the app's latest message in the thread (or channel) that has the button. Like a person, `click`, `select` and `pickPrompt` wait for the control to appear: they try again while it isn't there, up to the timeout, and then fail with a list of what was there.
 
@@ -214,26 +173,13 @@ A modal is the one the app opened for that person with `views.open`. `submit` fi
 
 ### Streams, status and Stop
 
-```ts
-const msg = await ana.say("write a long report on Q3", { to: slack.app });
-await expect(msg.thread).toHaveStreamingReplyFrom("my-agent");
-
-await ana.stop({ thread: msg });
-await expect(msg.thread).toHaveStatus("stopped");
-```
+<Example id="slack-streaming-stop" />
 
 `stop` presses Stop on the agent's work in a thread and sends `agent_session_stopped`. After that, `chat.appendStream` and `chat.stopStream` on that stream answer `stopped_by_user`.
 
 ### The agent split view
 
-```ts
-const thread = await ana.openAgentThread({ from: incidents });
-const prompts = await thread.suggestedPrompts();
-
-await ana.pickPrompt("What changed?", { thread });
-await ana.switchContext(general, { thread });
-await ana.reply("summarize this channel", { thread });
-```
+<Example id="slack-agent-threads" />
 
 `openAgentThread` sends `assistant_thread_started` (with the channel Ana is looking at as its context), `switchContext` sends `assistant_thread_context_changed`, and `pickPrompt` posts the prompt's message as Ana. An app that isn't subscribed to those events gets `split_view_unavailable`.
 
@@ -245,11 +191,7 @@ await ana.reply("summarize this channel", { thread });
 
 Some things have no person behind them. They live on the fixture or the delivery:
 
-```ts
-await slack.uninstallApp();                    // app_uninstalled and tokens_revoked
-await slack.fault({ type: "rate_limit", operation: "chat.postMessage", retryAfter: "1s", times: 1 });
-await msg.delivery!.retry({ after: "3s", reason: "http_timeout" });
-```
+<Example id="slack-delivery-faults" />
 
 ## What to check
 
@@ -274,32 +216,11 @@ The matchers read what a person would see: edits applied, deleted messages gone,
 
 Every matcher is built on a read you can call yourself: `channel.messages()`, `thread.replies()`, `thread.latestReply({ from })` (once the app is quiet), `message.refresh()`, `message.stream`, `thread.status()`, `slack.calls({ operation, error })`, `slack.deliveries()`. A transcript reads like the conversation and makes a good snapshot:
 
-```ts
-const transcript = await msg.thread.transcript();
-expect(transcript.toString()).toMatchSnapshot();
-```
+<Example id="slack-transcript" />
 
 A full test, an approval that must act once even on a double click:
 
-```ts title="approvals.test.ts"
-import { test, expect } from "vitest";
-
-test("approval buttons act once, even on a double click", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const ben = await slack.createUser({ name: "Ben", admin: true });
-  const channel = await slack.createChannel({ participants: [ana, ben, slack.app] });
-  const msg = await ana.say("@my-agent deploy web to staging", { channel });
-
-  const ask = await msg.thread.latestReply({ from: "my-agent" });
-  await expect(ask).toHaveButton("Approve");
-
-  await ben.click("Approve", { message: ask });
-  await ben.click("Approve", { message: ask });
-
-  await expect(msg.thread).toContainText("Deploying", { count: 1 });
-  await expect(slack).not.toHaveReceivedCall(/.*/, { error: "not_in_channel" });
-});
-```
+<Example id="slack-approval-double-click" />
 
 To run the same checks every Slack app should pass (one reply to a mention, survives the 3-second retry, rejects a bad signature, honours Stop), add `slackChecks()` from `channelstack/checks`. See [Standard checks](/docs/guide/standard-checks).
 
@@ -323,10 +244,7 @@ The app has 3 seconds to answer an event with a 2xx. If it doesn't, the fake ret
 
 In a test, `msg.delivery!.retry({ after: "3s", reason: "http_timeout" })` sends a retry on purpose, so you can check the app answers once:
 
-```ts
-await msg.delivery!.retry({ after: "3s", reason: "http_timeout" });
-await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
-```
+<Example id="slack-retry" />
 
 Over Socket Mode, the same retry arrives as an envelope with `retry_attempt` and `retry_reason`. [Delivery and failures](/docs/guide/delivery-and-failures) covers redelivery, faults and what each proves.
 

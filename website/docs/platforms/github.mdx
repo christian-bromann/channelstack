@@ -11,20 +11,7 @@ This page shows how to test a GitHub App: how to point it at the fake, which peo
 > [!TIP]
 > Every method, option and wait of the GitHub fake, with each call in TypeScript, Python and Rust, is in the [GitHub API reference](/docs/reference/api/github).
 
-```ts title="triage.test.ts"
-import { test, expect } from "vitest";
-
-test("a mention in an issue gets one comment, and no self-trigger loop", async ({ github }) => {
-  const ana = await github.createUser({ login: "ana" });
-  const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
-  const issue = await ana.openIssue({ title: "Login fails on Safari", body: "Steps: …" }, { repo });
-
-  await ana.comment("@my-agent can you triage this?", { issue });
-
-  await expect(issue).toHaveCommentFrom(github.app, { text: /triage/i });
-  await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
-});
-```
+<Example id="github-mention-one-comment" />
 
 ## What the fake covers
 
@@ -141,10 +128,7 @@ CHANNELSTACK_GITHUB_WEBHOOK_URL=http://localhost:3000/api/github/webhooks npx ch
 
 A test creates the people and repositories it needs. Nothing is declared in a config file.
 
-```ts
-const ana = await github.createUser({ login: "ana" });
-const ben = await github.createUser({ login: "ben", role: "admin", name: "Ben Ortiz" });
-```
+<Example id="github-people" />
 
 | Option          | What it does                                                                                                          |
 | --------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -156,15 +140,7 @@ const ben = await github.createUser({ login: "ben", role: "admin", name: "Ben Or
 
 A login is unique within a test session, so parallel tests can each have an `ana`, with different numeric ids.
 
-```ts
-const repo = await github.createRepo({
-  name: "web",
-  files: "./fixtures/web",
-  collaborators: [ana, { user: ben, permission: "maintain" }],
-  labels: ["bug", { name: "agent:fix", color: "5319e7" }],
-  apps: [github.app],
-});
-```
+<Example id="github-repo" />
 
 | Option          | What it does                                                                                                                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -180,14 +156,7 @@ const repo = await github.createRepo({
 
 The App hears about a repository only when it's installed there, which is GitHub's rule. Pass `apps: [github.app]` to `createRepo`, or install it later:
 
-```ts
-const repo = await github.createRepo({ collaborators: [ana] }); // not installed
-const issue = await ana.openIssue({ title: "Hello?" }, { repo });
-const comment = await ana.comment("@my-agent ping", { issue });
-expect(comment.delivery).toBeUndefined();
-
-await repo.installApp(github.app);                               // sends installation_repositories
-```
+<Example id="github-install-app" />
 
 For the App's token, a repository it isn't installed on doesn't exist: every call about it answers 404. `repo.uninstallApp(github.app)` takes it away again.
 
@@ -197,61 +166,25 @@ Every action is a method on the person who takes it, with the content first and 
 
 ### Issues and comments
 
-```ts
-const issue = await ana.openIssue({ title: "Typo in the README", labels: ["bug"] }, { repo });
-
-await ana.comment("@my-agent is this a duplicate?", { issue });
-await ana.label("agent:fix", { issue });
-await ana.assign([ben], { issue });
-await ana.editIssue({ title: "Typo in README.md" }, { issue });
-await ana.close({ issue });
-```
+<Example id="github-issues" />
 
 `@login` in a body becomes a real mention; `@my-agent` mentions the App by its slug. `comment` sends `issue_comment` (`created`) and resolves to the comment, with the delivery on `comment.delivery`. `edit`, `delete`, `react` and `minimize` act on a comment; `unlabel` and `reopen` undo the others.
 
 ### Pushes and pull requests
 
-```ts
-const pr = await ana.openPullRequest(
-  { from: "fix-login", title: "Fix login redirect", changes: { "src/login.ts": "export const redirect = '/home';\n" } },
-  { repo },
-);
-
-const commit = await ana.push({ "src/app.ts": "export const broken = ;\n" }, { repo, branch: "fix-login", message: "wip" });
-```
+<Example id="github-pull-requests" />
 
 `push` commits file changes (a map of path to new contents, `null` to delete, or a list of files) to a branch, creating it from the default branch if it's missing. It sends `push`, and `pull_request` (`synchronize`) for open pull requests on that branch. `openPullRequest` pushes `changes` to `from` first when you pass them; `draft: true` opens a draft and `reviewers` requests reviews right away.
 
 ### Reviews
 
-```ts
-await ana.markReady({ pr });
-await ben.review({
-  pr,
-  event: "REQUEST_CHANGES",
-  body: "@my-agent please address these",
-  comments: [{ path: "src/app.ts", line: 1, body: "name this something clearer" }],
-});
-
-const inline = await ana.reviewComment("@my-agent why is this exported?", { pr, path: "src/app.ts", line: 1 });
-await ana.reply("thanks", { comment: inline });
-await ana.resolve({ comment: inline });
-
-await ana.requestReview([ben], { pr });
-await ana.merge({ pr, method: "squash" });
-```
+<Example id="github-reviews" />
 
 `review` sends `pull_request_review` and one `pull_request_review_comment` per inline comment. A comment on a line outside the diff is refused with 422, as on GitHub. `resolve` and `unresolve` send `pull_request_review_thread`.
 
 ### Check runs
 
-```ts
-await expect(pr).toHaveCheckRun("my-agent", { conclusion: "action_required" });
-const [run] = await pr.checkRuns();
-
-await ana.requestAction("autofix", { checkRun: run! });
-await ana.rerun({ checkRun: run! });
-```
+<Example id="github-check-runs" />
 
 `requestAction` clicks one of the buttons the App put on its check run (`check_run`, action `requested_action`); `run.actions` lists their identifiers. `rerun` clicks Re-run (`check_run`, action `rerequested`).
 
@@ -276,33 +209,7 @@ The reads behind them are there for anything a matcher doesn't cover: `issue.sta
 
 A full test, a review round from a requested change to the merge:
 
-```ts title="review.test.ts"
-import { test, expect } from "vitest";
-
-test("a full review round: changes requested, fixed, approved, merged", async ({ github }) => {
-  const ana = await github.createUser({ login: "ana" });
-  const ben = await github.createUser({ login: "ben" });
-  const repo = await github.createRepo({ files: "./fixtures/web", collaborators: [ana, ben], apps: [github.app] });
-  const pr = await ana.openPullRequest(
-    { from: "feat", draft: true, changes: { "src/app.ts": "export const x = 1\n" } },
-    { repo },
-  );
-
-  await ana.markReady({ pr });
-  await ben.review({
-    pr,
-    event: "REQUEST_CHANGES",
-    body: "@my-agent please address these",
-    comments: [{ path: "src/app.ts", line: 1, body: "name this something clearer" }],
-  });
-
-  const fix = await pr.headCommit();
-  expect(fix.author?.name).toBe(github.app.name);
-  await ben.review({ pr, event: "APPROVE" });
-  await ana.merge({ pr, method: "squash" });
-  await expect(pr).toBeMerged();
-});
-```
+<Example id="github-review-round" />
 
 `githubChecks()` from `channelstack/checks` adds the checks every GitHub App should pass: one comment per mention, ignores its own comments, redelivery, a bad signature. See [Standard checks](/docs/guide/standard-checks).
 
@@ -327,13 +234,7 @@ The payload has `repository`, `organization`, `sender` and `installation`, as on
 
 The App has ten seconds to answer. GitHub doesn't retry a failed delivery on its own, and neither does the fake: a delivery that failed or timed out stays that way until someone redelivers it from the App's delivery log. In a test, that's `delivery.redeliver()`: the same GUID and payload, a new attempt.
 
-```ts
-const comment = await ana.comment("@my-agent investigate", { issue });
-await expect(issue).toHaveCommentFrom(github.app);
-
-await comment.delivery!.redeliver();
-await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
-```
+<Example id="github-redeliver" />
 
 `delivery.resend({ badSignature: true })` sends it signed with the wrong secret, and `toBeRejected()` checks the app refused it. GitHub webhooks carry no timestamp, so there's no `stale` option here. The app can read the same log itself through `GET /app/hook/deliveries` and redeliver with `POST /app/hook/deliveries/{id}/attempts`. [Delivery and failures](/docs/guide/delivery-and-failures) covers what each of these proves.
 
@@ -365,10 +266,6 @@ The same tests can run in a real test organization. Set the App's credentials (`
 
 Live, GitHub delivers to your App itself. channelstack acts, reads the results back, and reads the App's delivery log, so `github.deliveries()`, `toBeAccepted()` and `redeliver()` work live too. The log lags a few seconds behind, so poll it:
 
-```ts
-await expect.poll(async () => (await github.deliveries({ type: "issue_comment", resource: repo })).length, {
-  timeout: 30_000,
-}).toBeGreaterThan(0);
-```
+<Example id="github-live-deliveries" />
 
 Built live today: repositories, collaborators, issues, comments, labels, assignees, reactions, reads and the delivery log. Pushes, pull requests, reviews and check runs aren't live yet; live runs skip those steps and say why. `resend({ badSignature })` stays fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/github).

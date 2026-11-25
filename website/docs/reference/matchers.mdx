@@ -8,11 +8,7 @@ description: "Every channelstack matcher: its subject, arguments and options, ho
 
 Every matcher the [Vitest plugin](/docs/reference/vitest-plugin) adds to `expect`, with its name in Python ([pytest-channelstack](/docs/guide/pytest)) and in the Rust SDK. Why matchers wait the way they do is in [Waiting and quiet](/docs/guide/waiting-and-quiet).
 
-```ts
-await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /incident/i });
-await expect(msg.thread).toHaveRepliesFrom(slack.app, { count: 1 });
-await expect(channel).not.toHaveChannelMessageFrom("my-agent");
-```
+<Example id="matchers-overview" />
 
 ## How they wait
 

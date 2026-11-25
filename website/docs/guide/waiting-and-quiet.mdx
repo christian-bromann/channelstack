@@ -14,13 +14,7 @@ An app answers when it's ready. Between a person's message and the app's reply t
 
 So every matcher waits, the way Playwright's web-first assertions do. A test never needs `sleep`:
 
-```ts
-const msg = await ana.say("@my-agent summarize yesterday's incidents", { channel });
-
-await expect(msg.thread).toHaveReplyFrom("my-agent"); // waits for a reply
-await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 }); // waits for quiet, then counts
-await expect(channel).not.toHaveChannelMessageFrom("my-agent"); // waits for quiet, then checks
-```
+<Example id="waiting-two-ways" />
 
 The three lines wait in two different ways, and the difference is the subject of this page.
 
@@ -101,10 +95,7 @@ export default defineConfig({
 });
 ```
 
-```ts
-await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
-await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
-```
+<Example id="waiting-options" />
 
 | Setting    | Default   | Meaning                                                                                                                          |
 | ---------- | --------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -121,14 +112,7 @@ The test runner's own timeout has to stay above the longest wait in the test. Th
 
 Matchers check. When a test needs the value, to read its text or act on it, it uses a read method that waits. There are two kinds:
 
-```ts
-// The next new reply from the agent: returns as soon as one arrives.
-const answer = await msg.thread.waitForReply({ from: "my-agent" });
-
-// The agent's last reply, once it's done: waits for at least one, then for quiet.
-const ask = await msg.thread.latestReply({ from: "my-agent" });
-await ben.click("Approve", { message: ask });
-```
+<Example id="waiting-reads" />
 
 | Method                                                                                                            | Returns                                                                 | Use it when                                                                                                  |
 | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |

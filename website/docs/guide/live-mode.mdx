@@ -25,16 +25,7 @@ What follows from that:
 
 Here is a test from channelstack's Slack examples. It runs fake by default, and live once Ana has a token:
 
-```ts title="slack.test.ts"
-test("a real person asks the real agent", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-
-  const msg = await ana.say("@my-agent summarize #support today", { channel });
-
-  await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
-});
-```
+<Example id="live-mode-real-person" />
 
 A channel is live when **all** of its app credentials are set in the server's environment, and its allowlist names the sandbox:
 
@@ -115,9 +106,7 @@ Saved ana's slack session to /Users/you/.channelstack/browser/slack-ana.json (on
 
 A visible browser opens at the sandbox's sign-in page and waits up to ten minutes. The actor finds the file by the person's name. To keep a copy for a test that names its own path, add `--save .auth/ana-slack.json` and pass it to `createUser`:
 
-```ts
-const ana = await slack.createUser({ name: "Ana", browser: { storageState: ".auth/ana-slack.json" } });
-```
+<Example id="live-mode-browser-user" />
 
 - The file signs a person in: it must be private (`chmod 600`), and an `.auth/` folder belongs in `.gitignore`.
 - When Slack ends the saved session, the next action fails with `live_misconfigured` and the `channelstack login` command to run.

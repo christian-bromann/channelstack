@@ -11,21 +11,7 @@ This page shows how to test an integration or agent built on Linear's APIs: how 
 > [!TIP]
 > Every method, option and wait of the Linear fake, with each call in TypeScript, Python and Rust, is in the [Linear API reference](/docs/reference/api/linear).
 
-```ts title="delegation.test.ts"
-import { test, expect } from "vitest";
-
-test("delegating an issue opens one session with a first thought", async ({ linear }) => {
-  const ana = await linear.createUser({ name: "Ana" });
-  const team = await linear.createTeam({ members: [ana] });
-  const issue = await ana.createIssue({ title: "Checkout fails on Safari" }, { team });
-
-  const session = await ana.delegate(linear.app, { issue });
-
-  await expect(session).toHaveActivity({ type: "thought" }, { timeout: "10s" });
-  await expect(issue).toBeDelegatedTo(linear.app);
-  expect(await issue.sessions()).toHaveLength(1);
-});
-```
+<Example id="linear-delegation" />
 
 ## What the fake covers
 
@@ -127,10 +113,7 @@ The `@linear/sdk` reference agent serves `/webhooks/linear`, the Chat SDK one `/
 
 A test creates the people, teams and issues it needs. Nothing is declared in a config file.
 
-```ts
-const ana = await linear.createUser({ name: "Ana" });
-const ben = await linear.createUser({ name: "Ben", admin: true });
-```
+<Example id="linear-people" />
 
 | Option                 | What it does                                                   |
 | ---------------------- | -------------------------------------------------------------- |
@@ -140,18 +123,7 @@ const ben = await linear.createUser({ name: "Ben", admin: true });
 | `admin`, `guest`       | Workspace roles                                                |
 | `token`                | Live mode only: see [Live](#live)                              |
 
-```ts
-const team = await linear.createTeam({
-  key: "OPS",
-  members: [ana, ben],
-  labels: ["incident"],
-  states: [
-    { name: "Triage", type: "triage" },
-    { name: "Investigating", type: "started" },
-    { name: "Resolved", type: "completed" },
-  ],
-});
-```
+<Example id="linear-team" />
 
 | Option    | What it does                                                                                                                                                                                   |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -163,12 +135,7 @@ const team = await linear.createTeam({
 
 Issues are created by a person, so the creation reaches the app as an `Issue` event:
 
-```ts
-const issue = await ana.createIssue(
-  { title: "API latency spike", labels: ["incident"], priority: 2, state: "Triage", assignee: ben },
-  { team },
-);
-```
+<Example id="linear-issue" />
 
 `createIssue` also takes `description`, `parent` (a sub-issue) and `delegate: linear.app`, which delegates right away and opens a session.
 
@@ -182,53 +149,25 @@ Every action is a method on the person who takes it, with the content first and 
 
 ### Delegation and agent sessions
 
-```ts
-const session = await ana.delegate(linear.app, { issue });
-
-const issue2 = await ana.createIssue({ title: "Bump the Node version", delegate: linear.app }, { team });
-const session2 = await issue2.session();
-
-const comment = await ana.comment("@my-agent can you take a look?", { issue });
-await expect(comment.session!).toHaveActivity({ type: "response" });
-
-await ana.undelegate({ issue });
-```
+<Example id="linear-delegate" />
 
 `delegate` and a mention each open a session and send `AgentSessionEvent` (`created`). `delegate` resolves to the session; a mention's session is on `comment.session`, and `issue.session()` waits for the latest one on an issue. `undelegate` takes the issue back.
 
 ### Prompts and elicitations
 
-```ts
-const question = await session.waitForActivity({ type: "elicitation" });
-await ana.answer("Only Safari 18", { elicitation: question });
-
-await ana.prompt("also update the docs", { session });
-```
+<Example id="linear-elicitation" />
 
 `prompt` and `answer` send `AgentSessionEvent` (`prompted`), with the person's text as a `prompt` activity. After a prompt, `session.waitForActivity()` only looks at what came after it, so you get the answer to that prompt, not to an earlier one.
 
 ### Stop
 
-```ts
-await expect(session).toHaveActivity({ type: "thought" });
-await ana.stop({ session });
-await expect(session).toHaveSessionState("complete");
-```
+<Example id="linear-stop" />
 
 `stop` presses Stop in Linear. The agent gets `prompted` with the `stop` signal on the activity, and the session stays `stopping` until the agent's response or error ends the turn. Only a person can send `stop`: the app's own `agentActivityCreate` with it is refused.
 
 ### Issues and comments
 
-```ts
-await ana.setState("In Progress", { issue });
-await ana.assign(ben, { issue });
-await ana.label(["incident"], { issue });
-await ana.editIssue({ priority: 1 }, { issue });
-
-const comment = await ana.comment("Is this still happening?", { issue });
-await ana.reply("@my-agent can you check the logs?", { comment });
-await ana.edit("Is this still happening on Safari?", { comment });
-```
+<Example id="linear-issue-actions" />
 
 `ana.react(emoji, { comment })` adds a reaction. `@name` in a body becomes a real Linear mention. These send `Issue` or `Comment` webhooks (`create`, `update`, `remove`).
 
@@ -255,24 +194,7 @@ The reads behind them: `session.state()`, `session.waitForState(["complete", "er
 
 A full test, an agent that asks a question and continues after the answer, then links its work:
 
-```ts title="sessions.test.ts"
-import { test, expect } from "vitest";
-
-test("the agent asks a question and continues after the answer", async ({ linear }) => {
-  const ana = await linear.createUser({ name: "Ana" });
-  const team = await linear.createTeam({ members: [ana] });
-  const issue = await ana.createIssue({ title: "Fix the login bug" }, { team });
-  const session = await ana.delegate(linear.app, { issue });
-
-  const question = await session.waitForActivity({ type: "elicitation" });
-  await expect(issue).toHaveSessionState("awaitingInput");
-  await ana.answer("Only Safari 18", { elicitation: question });
-
-  await expect(session).toHaveActivity({ type: "response", text: /safari 18/i });
-  await expect(linear).toHaveReceivedCall("agentActivityCreate");
-  expect(await linear.calls({ error: true })).toEqual([]);
-});
-```
+<Example id="linear-question-answer" />
 
 `linearChecks()` from `channelstack/checks` adds the checks every Linear agent should pass: a first activity soon after delegation, the turn always ends, Stop is honoured, redelivery, a stale or badly signed webhook. See [Standard checks](/docs/guide/standard-checks).
 
@@ -295,13 +217,7 @@ The body also has `type`, `action`, `organizationId` and `webhookId`. Because th
 
 The app has five seconds to answer with a 2xx. A delivery that wasn't answered in time is retried on Linear's schedule: after a minute, an hour and six hours. In a test you don't wait for those; you send the delivery again yourself:
 
-```ts
-const session = await ana.delegate(linear.app, { issue });
-
-await session.delivery!.redeliver();          // same webhook, new timestamp, signed again
-await session.delivery!.resend({ stale: true });
-await expect(session.delivery!).toBeRejected();
-```
+<Example id="linear-redeliver" />
 
 `resend({ stale: true })` stamps a `webhookTimestamp` two minutes back; `resend({ badSignature: true })` signs with a secret that isn't the app's. An agent that handles a redelivered `created` twice shows up as duplicate activities. [Delivery and failures](/docs/guide/delivery-and-failures) covers what each of these proves.
 

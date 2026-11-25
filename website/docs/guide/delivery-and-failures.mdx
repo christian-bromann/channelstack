@@ -25,19 +25,7 @@ Over Slack's Socket Mode there is no signature, because the connection is the ap
 
 An action that reaches the app gives you the delivery it caused:
 
-```ts
-const msg = await ana.say("@my-agent hi", { channel });
-msg.delivery; // the app_mention event_callback
-
-const comment = await ana.comment("@my-agent investigate", { issue });
-comment.delivery; // the issue_comment webhook
-
-const session = await ana.delegate(linear.app, { issue });
-session.delivery; // the AgentSessionEvent that opened the session
-
-const command = await ana.runCommand("/deploy web staging", { channel });
-// a slash command, click, shortcut or modal submission resolves to its delivery
-```
+<Example id="delivery-handles" />
 
 A delivery has its `attempts`, each with the request headers, the app's response status and body, and how long the app took. Its `status` is the latest attempt's:
 
@@ -57,17 +45,7 @@ A delivery has its `attempts`, each with the request headers, the app's response
 
 Slack expects an acknowledgement within 3 seconds. An app that does its work before answering the HTTP request misses that window, and Slack sends the same event again. An app that doesn't notice answers twice.
 
-```ts
-test("survives Slack's 3s retry without answering twice", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-  const msg = await ana.say("@my-agent hi", { channel });
-
-  await msg.delivery!.retry({ after: "3s", reason: "http_timeout" });
-
-  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
-});
-```
+<Example id="delivery-slack-retry" />
 
 `retry()` sends the event again the way Slack does: the same payload and `event_id`, with `X-Slack-Retry-Num` and `X-Slack-Retry-Reason`. `after` defaults to 3 seconds, Slack's first retry, and `reason` to `http_timeout` (`http_error` and `too_many_redirects` are the others). The exact-count check then waits for the app to be quiet, so a second answer has time to show up.
 
@@ -77,19 +55,7 @@ The test proves the app is idempotent on `event_id`. The usual fix is to acknowl
 
 A redelivery is the same event again, without anything that marks it as a retry. GitHub sends one when someone clicks Redeliver in the App's settings, Linear and Notion when the first delivery failed:
 
-```ts
-test("a redelivered comment doesn't produce a second answer", async ({ github }) => {
-  const ana = await github.createUser({ login: "ana" });
-  const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
-  const issue = await ana.openIssue({ title: "Flaky test" }, { repo });
-  const comment = await ana.comment("@my-agent investigate", { issue });
-  await expect(issue).toHaveCommentFrom(github.app);
-
-  await comment.delivery!.redeliver();
-
-  await expect(issue).toHaveCommentsFrom(github.app, { count: 1, quietFor: "2s" });
-});
-```
+<Example id="delivery-github-redeliver" />
 
 | Platform | Call                   | What the app gets                                                                 |
 | -------- | ---------------------- | --------------------------------------------------------------------------------- |
@@ -100,39 +66,13 @@ test("a redelivered comment doesn't produce a second answer", async ({ github })
 
 For Linear, check that the work doesn't start over:
 
-```ts
-test("a redelivered webhook doesn't duplicate activities", async ({ linear }) => {
-  const ana = await linear.createUser({ name: "Ana" });
-  const team = await linear.createTeam({ members: [ana] });
-  const issue = await ana.createIssue({ title: "Anything" }, { team });
-  const session = await ana.delegate(linear.app, { issue });
-  await expect(session).toHaveActivity({ type: "thought" });
-  const before = (await session.activities()).length;
-
-  await session.delivery!.redeliver();
-
-  await expect(issue).toHaveSessionState("complete");
-  const thoughts = (await session.activities()).filter((a) => a.type === "thought");
-  expect(thoughts.length).toBeLessThanOrEqual(before);
-});
-```
+<Example id="delivery-linear-redeliver" />
 
 ## Bad signatures and stale timestamps
 
 An app must refuse a request it can't verify. `resend` sends the delivery again with a twist, and `toBeRejected` checks that the app answered it with a 4xx:
 
-```ts
-test("rejects a bad signature and a stale timestamp", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const msg = await ana.say("hi", { to: slack.app });
-
-  await msg.delivery!.resend({ badSignature: true });
-  await expect(msg.delivery!).toBeRejected();
-
-  await msg.delivery!.resend({ stale: true });
-  await expect(msg.delivery!).toBeRejected();
-});
-```
+<Example id="delivery-bad-signature" />
 
 | Option               | What it sends                                                                                            | Platforms                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------- |
@@ -148,17 +88,7 @@ Most SDKs verify signatures for you (Bolt, Probot, `@octokit/webhooks`, `LinearW
 
 `toBeAccepted` checks that the app answered 2xx, and with `within`, that it did so that fast:
 
-```ts
-test("a slash command is acknowledged within 3 seconds", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-
-  const command = await ana.runCommand("/deploy web staging", { channel });
-
-  await expect(command).toBeAccepted({ within: "3s" });
-  await expect(channel).toContainText(/deploying web to staging/i);
-});
-```
+<Example id="delivery-slash-command-ack" />
 
 It reads the first real attempt. Without `within`, the platform's ack window is the limit, because an attempt answered after it is `timed_out`, not `acknowledged`. The same check works on a modal submission (`await modal.submit(…)`), a click and a shortcut.
 
@@ -168,18 +98,7 @@ It reads the first real attempt. Without `within`, the platform's ack window is 
 
 `slack.fault` makes the fake Slack Web API misbehave in a way the app has to handle:
 
-```ts
-test("backs off on rate limits and still answers", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const fault = await slack.fault({ type: "rate_limit", operation: "chat.postMessage", retryAfter: "1s", times: 1 });
-
-  const msg = await ana.say("hi", { to: slack.app });
-
-  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
-  await expect(slack).toHaveReceivedCall("chat.postMessage", { times: 2 });
-  await fault.undo();
-});
-```
+<Example id="delivery-rate-limit" />
 
 | Fault         | Options                                                             | What the app sees                                                                                                                                                          |
 | ------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -190,16 +109,7 @@ test("backs off on rate limits and still answers", async ({ slack }) => {
 
 Without `operation`, a fault applies to every Web API method; without `times`, to every call until it's undone.
 
-```ts
-test("reconnects after the Socket Mode connection drops", async ({ slack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  await slack.fault({ type: "drop_socket" });
-
-  const msg = await ana.say("still there?", { to: slack.app });
-
-  await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "20s" });
-});
-```
+<Example id="delivery-socket-drop" />
 
 A fault lasts until `fault.undo()`, the end of an `await using` scope, or the end of the test's session, whichever comes first.
 
@@ -210,12 +120,7 @@ A fault lasts until `fault.undo()`, the end of an `await using` scope, or the en
 
 When a workspace removes the app, Slack sends `app_uninstalled` and `tokens_revoked`. The app should acknowledge both and drop what it stored for the workspace:
 
-```ts
-test("the uninstall is handled", async ({ slack }) => {
-  const deliveries = await slack.uninstallApp();
-  for (const delivery of deliveries) await expect(delivery).toBeAccepted();
-});
-```
+<Example id="delivery-uninstall" />
 
 The app is installed again, with the same tokens, when the test's session closes. Like a fault, the uninstall affects every test running at the same moment, so run it on its own. On GitHub, `repo.uninstallApp(github.app)` removes the App from one repository and resolves to the `installation_repositories` delivery.
 
@@ -223,15 +128,7 @@ The app is installed again, with the same tokens, when the test's session closes
 
 Live, the real platform delivers to your app and channelstack isn't in the path. An action has no delivery: `msg.delivery`, `comment.delivery` and `session.delivery` are `undefined`, so nothing is refused and nothing skips on its own. The `!` in the examples above throws a `TypeError` live. A test that must also run live checks first, and skips:
 
-```ts
-test("survives Slack's retry", async ({ slack, skip }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const msg = await ana.say("@my-agent hello", { to: slack.app });
-  const delivery = msg.delivery ?? skip("live: the platform delivers to the agent itself");
-  await delivery.retry({ after: "3s", reason: "http_timeout" });
-  await expect(msg.thread).toHaveRepliesFrom(slack.app, { count: 1 });
-});
-```
+<Example id="delivery-live-skip" />
 
 The rest is refused, and Vitest and pytest skip the test with the reason:
 

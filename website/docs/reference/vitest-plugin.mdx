@@ -92,17 +92,7 @@ Relative fixture paths in a test (`files: "./fixtures/web"`, `content: { path: "
 
 Every fixture is automatic. Destructure what a test needs:
 
-```ts title="support.test.ts"
-import { expect, test } from "vitest";
-
-test("answers in the thread", async ({ slack, channelstack }) => {
-  const ana = await slack.createUser({ name: "Ana" });
-  const channel = await slack.createChannel({ participants: [ana, slack.app] });
-  const msg = await ana.say("@my-agent hi", { channel });
-  await expect(msg.thread).toHaveReplyFrom("my-agent");
-  await channelstack.quiet();
-});
-```
+<Example id="vitest-plugin-fixtures" />
 
 | Fixture        | Type                  | What it is                                            |
 | -------------- | --------------------- | ----------------------------------------------------- |
@@ -116,16 +106,7 @@ The channel fixtures' members are listed in the API reference: [`SlackFixture`](
 
 A suite builds its own fixtures on these with `test.extend`:
 
-```ts title="fixtures.ts"
-import { test as base } from "vitest";
-import type { SlackConversation, SlackUser } from "channelstack";
-
-export const test = base.extend<{ ana: SlackUser; support: SlackConversation }>({
-  ana: async ({ slack }, use) => use(await slack.createUser({ name: "Ana" })),
-  support: async ({ slack, ana }, use) =>
-    use(await slack.createChannel({ name: "support", participants: [ana, slack.app] })),
-});
-```
+<Example id="vitest-plugin-extend" />
 
 ### `ChannelstackFixture`
 
