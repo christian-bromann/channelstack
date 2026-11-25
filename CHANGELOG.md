@@ -52,4 +52,4 @@ The first version: everything below is new.
 
 ### Docs
 
-- The docs at channelstack.dev/docs: quickstarts for Managed Deep Agents, Chat SDK, AI SDK and Pi, a guide, a page per platform, and a reference generated from the spec.
+- The docs at channelstack.dev/docs: quickstarts for Chat SDK, AI SDK and Pi, a guide, a page per platform, and a reference generated from the spec.

@@ -1,0 +1,238 @@
+---
+title: "AI SDK"
+order: 3
+description: "Stream an AI SDK answer into Slack from a Bolt app, with the AI SDK's mock model, and test the status line, the stream and Stop."
+---
+
+# AI SDK
+
+In this tutorial you write a Bolt app that answers a direct message by streaming text from the [AI SDK](https://ai-sdk.dev)'s `streamText` into Slack, with the AI SDK's own mock model, so every run streams the same answer. Then you test the status line, the stream and the Stop button, and break the agent once. It follows the `bolt-ai-sdk` reference agent that channelstack's CI runs.
+
+[Getting started](/docs/getting-started) explains the server, `channelstack env` and a first test in more detail. This page builds on it.
+
+## 1. Create the project
+
+You need Node.js 24 or newer, which runs the TypeScript files below as they are.
+
+```bash
+mkdir streaming-agent && cd streaming-agent
+npm init -y
+npm pkg set type=module
+npm i @slack/bolt@5.1.0 ai@7.0.177
+npm i -D channelstack vitest
+```
+
+These are the versions channelstack's CI runs the reference agent with.
+
+## 2. Start channelstack
+
+In a second terminal:
+
+```bash
+CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events \
+  npx channelstack start --no-portless --port 4500
+```
+
+In the first terminal:
+
+```bash
+npx channelstack env > .env.local
+```
+
+## 3. The model
+
+The agent gets its answers from the AI SDK's `MockLanguageModelV4`, which streams scripted pieces of text the way a real model streams tokens. It waits a moment before the first piece, so the status line has time to show, and a prompt with "long" in it streams for a few seconds, long enough for someone to press Stop. This is the reference agents' own model:
+
+```ts title="model.ts"
+import { simulateReadableStream } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
+
+/** A model that streams the same answer to the same prompt on every run. */
+export function writer(prompt: string) {
+  const subject = prompt.replace(/^write (the |a )?/i, "");
+  const pieces = [
+    `# ${subject}\n\n`,
+    "## What changed\n\nThe delivery queue now retries a slow acknowledgement the way the platform does, signatures are checked before anything else is read, and a rate-limited call waits for as long as it was told to before it tries again. None of this needs a change in your code.\n\n",
+    "## What to do\n\nUpdate, run the tests once and read the new failure messages: they name the message a person would still see, which is usually the line you need to fix.\n\n",
+    "## Thanks\n\nTo everyone who reported a conversation that went wrong and sent the transcript along with it.\n",
+    // A long piece of writing keeps going for a few seconds.
+    ...(/\blong\b/i.test(prompt)
+      ? Array.from({ length: 16 }, (_, index) => `\n## Appendix ${index + 1}\n\nMore detail, for those who asked.\n`)
+      : []),
+  ];
+  return new MockLanguageModelV4({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        initialDelayInMs: 700,
+        chunkDelayInMs: 250,
+        chunks: [
+          { type: "text-start" as const, id: "answer" },
+          ...pieces.map((delta) => ({ type: "text-delta" as const, id: "answer", delta })),
+          { type: "text-end" as const, id: "answer" },
+          {
+            type: "finish" as const,
+            finishReason: { unified: "stop" as const, raw: undefined },
+            usage: {
+              inputTokens: { total: 12, noCache: 12, cacheRead: undefined, cacheWrite: undefined },
+              outputTokens: { total: 180, text: 180, reasoning: undefined },
+            },
+          },
+        ],
+      }),
+    }),
+  });
+}
+```
+
+In production you pass a real provider's model to `streamText` instead, and the rest of the agent stays the same.
+
+## 4. Write the agent
+
+The agent answers each direct message in three steps: it sets a status line, streams the model's text into one message with `chat.startStream` and `chat.appendStream`, and ends the stream with `chat.stopStream`. When the person presses Stop, Slack sends `agent_session_stopped`, and the agent aborts the model:
+
+```ts title="agent.ts"
+import { App } from "@slack/bolt";
+import { streamText } from "ai";
+
+import { writer } from "./model.ts";
+
+const app = new App({
+  token: process.env.SLACK_BOT_TOKEN,
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  // Unset in production, so the agent talks to Slack itself.
+  clientOptions: process.env.SLACK_API_URL ? { slackApiUrl: process.env.SLACK_API_URL } : {},
+});
+
+/** What is being written right now, by thread: Stop aborts it. */
+const writing = new Map<string, AbortController>();
+
+app.event("agent_session_stopped", async ({ event }) => {
+  const { channel, thread_ts: thread } = event as unknown as { channel: string; thread_ts: string };
+  writing.get(`${channel}:${thread}`)?.abort();
+});
+
+app.message(async ({ message, client }) => {
+  // Only what a person newly wrote in a DM: no edits, no bots.
+  if (message.subtype !== undefined || "bot_id" in message || message.channel_type !== "im") return;
+  const { channel } = message;
+  const thread = message.thread_ts ?? message.ts;
+  const prompt = message.text ?? "";
+
+  await client.assistant.threads.setStatus({ channel_id: channel, thread_ts: thread, status: "is thinking…" });
+  const stop = new AbortController();
+  writing.set(`${channel}:${thread}`, stop);
+  const { textStream } = streamText({ model: writer(prompt), prompt, abortSignal: stop.signal });
+  let stream: string | undefined;
+  try {
+    for await (const text of textStream) {
+      if (stop.signal.aborted) return;
+      if (stream === undefined)
+        stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text })).ts;
+      else await client.chat.appendStream({ channel, ts: stream, markdown_text: text });
+    }
+    if (stream !== undefined && !stop.signal.aborted) await client.chat.stopStream({ channel, ts: stream });
+  } catch (error) {
+    // After Stop, Slack refuses more text with `stopped_by_user`: that is expected.
+    const stopped = (error as { data?: { error?: string } }).data?.error === "stopped_by_user";
+    if (!stop.signal.aborted && !stopped) throw error;
+  } finally {
+    writing.delete(`${channel}:${thread}`);
+  }
+});
+
+await app.start(3000);
+console.log("⚡️ Bolt app is running");
+```
+
+It streams in a DM because Slack allows a stream there without more arguments. To stream in a thread of a channel, `chat.startStream` also needs `recipient_user_id` and `recipient_team_id`, and the fake refuses it without them, as Slack does.
+
+Start it in a third terminal:
+
+```bash
+node --env-file=.env.local agent.ts
+```
+
+## 5. Write the tests
+
+Add the Vitest plugin:
+
+```ts title="vitest.config.ts"
+import channelstack from "channelstack/vitest";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [channelstack()],
+  test: { testTimeout: 30_000 },
+});
+```
+
+`testTimeout` keeps Vitest's own limit above the 10 seconds a channelstack check waits, so a failing check can say what went wrong before Vitest stops the test.
+
+And two tests: one watches the answer from the status line to the end of the stream, the other presses Stop halfway:
+
+```ts title="agent.test.ts"
+import { expect, test } from "vitest";
+
+test("streams a reply and shows a status while working", async ({ slack }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const msg = await ana.say("write the release notes for 0.10", { to: slack.app });
+
+  await expect(msg.thread).toHaveStatus("working");
+  await expect(msg.thread).toHaveStatusText(/thinking/i);
+  await expect(msg.thread).toHaveStreamingReplyFrom("my-agent");
+  await expect(msg.thread).toHaveStatus("idle");
+
+  const reply = await msg.thread.latestReply({ from: "my-agent" });
+  const stream = await reply.stream!.ended();
+  expect(stream.state).toBe("completed");
+});
+
+test("Stop ends the stream and the agent stays quiet", async ({ slack }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const msg = await ana.say("write a long report on Q3", { to: slack.app });
+  await expect(msg.thread).toHaveStreamingReplyFrom("my-agent");
+
+  await ana.stop({ thread: msg });
+
+  await expect(msg.thread).toHaveStatus("stopped");
+  await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+});
+```
+
+Run them:
+
+```bash
+npx vitest run
+```
+
+```
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+```
+
+`toHaveStatus` reads what a person sees of the agent in that thread: `working` while the status line is set, `streaming` while a stream is open, `idle` once it has ended, and `stopped` after Stop. Each check waits until it holds, so the first test follows the answer through those states in order, and `reply.stream` says how the stream ended: `completed` here. In the second, `toHaveRepliesFrom` waits until the agent is quiet and then counts: one message, the stream, and nothing after it.
+
+## 6. Break it on purpose
+
+Forget to end the stream:
+
+```diff title="agent.ts"
+-    if (stream !== undefined && !stop.signal.aborted) await client.chat.stopStream({ channel, ts: stream });
+```
+
+Restart the agent and run the tests again. The first test fails once its wait runs out:
+
+```
+ FAIL  agent.test.ts > streams a reply and shows a status while working
+Error: Expected the thread to be idle, it is streaming
+Still open: a stream my-agent started and never stopped: "# release notes for 0.10"
+```
+
+Every piece of text arrived, so the message looks complete in a test that only reads its text. In Slack it would still show as being written. The `Still open:` line is channelstack telling you what the agent left unfinished, which is often the bug itself. Put `stopStream` back, restart the agent, and both tests pass.
+
+## Next steps
+
+- [Slack](/docs/platforms/slack): streams, the status line, Stop and the agent split view, and the errors the fake answers with.
+- [Waiting and quiet](/docs/guide/waiting-and-quiet): why `toHaveRepliesFrom` waits for quiet and the other checks don't.
+- [Standard checks](/docs/guide/standard-checks): `slackChecks()` includes a Stop check for every Slack agent.
+- [Chat SDK](/docs/quickstarts/chat-sdk): the same kind of agent on the Chat SDK, where `thread.post(textStream)` streams for you.

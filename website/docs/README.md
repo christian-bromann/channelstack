@@ -27,6 +27,16 @@ The folder is the section and the frontmatter's `order` is the position in it.
 | Why channelstack (`why.mdx`) | Explanation | Why agents in chat tools are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
 | Getting started (`getting-started.mdx`) | Tutorial | Install, start the server, `channelstack env`, run a reference-style Bolt agent, write and pass a first Vitest test, then break the agent and watch it fail. Animated: the terminal |
 
+**Quickstarts** (`docs/quickstarts/`)
+
+One per agent framework, in the order people use them with channelstack. Each is a short tutorial: the framework's own agent, pointed at the fakes, and a first passing test. Each follows a reference agent in `examples/agents/` that CI runs, so the steps are known to work.
+
+| Page | Kind | What it covers |
+|---|---|---|
+| Chat SDK | Tutorial | A Chat SDK bot (`chat` with `@chat-adapter/slack`, and the GitHub and Linear adapters) |
+| AI SDK | Tutorial | A Bolt app that streams an AI SDK answer, with the AI SDK's mock model |
+| Pi | Tutorial | A Pi agent in Slack |
+
 **Guide** (`docs/guide/`)
 
 | Page | Kind | What it covers |

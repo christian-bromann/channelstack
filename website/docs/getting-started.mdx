@@ -22,8 +22,8 @@ In this tutorial you build a tiny Slack agent, run it against channelstack's fak
     { cmd: "node --env-file=.env.local agent.js" },
     { out: "⚡️ Bolt app is running" },
     { cmd: "npx vitest run" },
-    { out: " ✓ agent.test.ts > a mention gets one reply, in the thread", ok: true },
     { out: " Test Files  1 passed (1)", ok: true },
+    { out: "      Tests  1 passed (1)", ok: true },
   ]}
 />
 
@@ -51,6 +51,7 @@ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events \
 ```
 
 ```
+{"level":"info","message":"listening","address":"127.0.0.1:4500","control":"http://127.0.0.1:4500/_channelstack","portless":false}
 channelstack 0.1.0 · in-memory
 
   Control  http://127.0.0.1:4500/_channelstack
@@ -118,8 +119,13 @@ Add the Vitest plugin:
 import channelstack from "channelstack/vitest";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({ plugins: [channelstack()] });
+export default defineConfig({
+  plugins: [channelstack()],
+  test: { testTimeout: 30_000 },
+});
 ```
+
+`testTimeout` keeps Vitest's own limit, 5 seconds by default, above the 10 seconds a channelstack check waits. Without it, Vitest stops a failing test before the check can say what went wrong.
 
 And the test:
 
@@ -147,9 +153,8 @@ npx vitest run
 ```
 
 ```
- ✓ agent.test.ts > a mention gets one reply, in the thread
-
  Test Files  1 passed (1)
+      Tests  1 passed (1)
 ```
 
 Here's what happened. The plugin found the running server and opened a session for the test. Ana's message went into the fake workspace, which sent your agent a signed `app_mention` event. Your agent called `chat.postMessage` on the fake, which put the reply in the thread. The first matcher waited for that reply; the other two waited until the agent had gone quiet, then checked that there was exactly one reply and nothing in the channel itself.
@@ -163,12 +168,12 @@ A test you have never seen fail isn't proven yet. In `agent.js`, drop `thread_ts
 +  await say({ text: `On it: ${question}` });
 ```
 
-Restart the agent and run the test again. It fails, and says why:
+Restart the agent and run the test again. After ten seconds of waiting for the reply, it fails, and says why:
 
 ```
- ✗ agent.test.ts > a mention gets one reply, in the thread
-   Expected a reply from my-agent matching /summarize the incidents/. The thread has:
-     (nothing)
+ FAIL  agent.test.ts > a mention gets one reply, in the thread
+Error: Expected a reply from my-agent matching /summarize the incidents/. The thread has:
+  (nothing)
 ```
 
 The reply went to the channel, so the thread is empty. Put `thread_ts` back, restart the agent, and the test passes again.
@@ -183,6 +188,7 @@ npx channelstack show
 ```
 
 ```
+ben said it in #support (C043CPD6TPN:1795578175.436386)
 ben: @my-agent are you there?
   my-agent: On it: are you there?
 ```
