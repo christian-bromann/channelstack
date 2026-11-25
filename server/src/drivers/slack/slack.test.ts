@@ -259,10 +259,20 @@ describe("messages and the events they send", () => {
     expect(
       (await get(`/conversations/${channel.id}/threads/${root.ts}/replies`)).map((m: { text: string }) => m.text),
     ).toEqual(["and the API?", "anyone?"]);
-    // Every message in the thread names the same thread, and the thread reads back its root.
+    // The thread reads back its root, as it is now (after an edit), from its own `ts` or a reply's.
     expect(nested.thread).toMatchObject({ channel: channel.id, ts: root.ts });
-    const started = await get(`/conversations/${nested.thread.channel}/threads/${nested.thread.ts}`);
-    expect(started).toMatchObject({ ts: root.ts, text: "status?", author: { id: ana.id } });
+    await post(`/users/${ana.id}/edit`, {
+      message: { channel: root.channel, ts: root.ts },
+      text: { text: "status of the deploy?" },
+    });
+    for (const ts of [root.ts, reply.ts, nested.ts]) {
+      expect(await get(`/conversations/${channel.id}/threads/${ts}`)).toMatchObject({
+        ts: root.ts,
+        text: "status of the deploy?",
+        edited: true,
+        author: { id: ana.id },
+      });
+    }
     expect((await h.call("GET", `${base}/conversations/${channel.id}/threads/1.2`)).body.error).toBe("not_found");
     expect(events(agent as RecordingAgent)[1].event).toMatchObject({
       type: "message",
