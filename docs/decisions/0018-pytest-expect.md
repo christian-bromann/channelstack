@@ -31,6 +31,9 @@ says what the thread had and what the agent left open.
 - phase 7 ports the conversation matchers (replies, channel messages, streaming, status, reactions, the agent's
   calls). The rest of the matcher set follows the same pattern later (docs/phases.md, "After 0.1").
 
+**Since (2026-11-25):** every matcher is ported, each with its `not_to_…` form. The Rust SDK's `expect` follows
+the same shape ([decision 0019](0019-rust-expect.md)).
+
 ## Alternatives considered
 
 - **Assertion functions** (`await assert_reply_from(thread, "my-agent")`). Rejected: a second vocabulary next to

@@ -279,7 +279,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## After 0.1
 
-The full matcher set for pytest, Discord, Stripe and email drivers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned.
+Discord, Stripe and email drivers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
 
 ## Appendix: delivery cases
 
