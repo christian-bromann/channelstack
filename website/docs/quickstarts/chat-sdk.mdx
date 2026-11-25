@@ -184,11 +184,11 @@ The bot still received Ana's follow-up, but without a subscription the Chat SDK 
 
 The Chat SDK's GitHub and Linear adapters work the same way: each reads its API URL from what `channelstack env` prints (`GITHUB_API_URL`, `LINEAR_API_URL`), or takes an `apiUrl` option. Give each adapter its own endpoint and tell the server about it when it starts. These are the paths the `chat-sdk-github` and `chat-sdk-linear` reference agents use:
 
-| Adapter | Package | Endpoint | Server setting |
-|---|---|---|---|
-| Slack | `@chat-adapter/slack@4.45.0` | `/slack/events` | `CHANNELSTACK_SLACK_WEBHOOK_URL` |
-| GitHub | `@chat-adapter/github@4.45.0` | `/api/webhooks/github` | `CHANNELSTACK_GITHUB_WEBHOOK_URL` |
-| Linear | `@chat-adapter/linear@4.45.0` | `/api/webhooks/linear` | `CHANNELSTACK_LINEAR_WEBHOOK_URL` |
+| Adapter | Package                       | Endpoint               | Server setting                    |
+| ------- | ----------------------------- | ---------------------- | --------------------------------- |
+| Slack   | `@chat-adapter/slack@4.45.0`  | `/slack/events`        | `CHANNELSTACK_SLACK_WEBHOOK_URL`  |
+| GitHub  | `@chat-adapter/github@4.45.0` | `/api/webhooks/github` | `CHANNELSTACK_GITHUB_WEBHOOK_URL` |
+| Linear  | `@chat-adapter/linear@4.45.0` | `/api/webhooks/linear` | `CHANNELSTACK_LINEAR_WEBHOOK_URL` |
 
 The server reads these once, when it starts, so restart it after adding one.
 

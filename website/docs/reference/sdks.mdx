@@ -10,7 +10,7 @@ The three SDKs that drive channelstack without a test framework, and the control
 
 ## The same scenario in each
 
-A person mentions the agent in a channel, and the script reads the agent's reply in the thread.
+A person mentions the app in a channel, and the script reads the app's reply in the thread.
 
 <CodeGroup>
 
@@ -127,7 +127,7 @@ Everything a script does happens in a session: a scope in the server's one share
 | `Channelstack` (the client) | Does                                                                  |
 | --------------------------- | --------------------------------------------------------------------- |
 | `openSession({ name? })`    | Opens a session                                                       |
-| `env({ proxy? })`           | The agent's env vars, as `channelstack env` prints them               |
+| `env({ proxy? })`           | The app's env vars, as `channelstack env` prints them                 |
 | `status()`                  | `{ ready, version, drivers }`                                         |
 | `reset()`                   | Drops all state on every channel. Avoid in parallel use               |
 | `uiLoginLink()`             | A one-time UI link, as `channelstack ui` prints                       |
@@ -138,7 +138,7 @@ Everything a script does happens in a session: a scope in the server's one share
 | `sessionId`                                   | The session's id                                                                                                                                                                                                                                    |
 | `slack()`, `github()`, `linear()`, `notion()` | The channel fixtures for this session ([Slack](/docs/reference/api/slack#slackfixture), [GitHub](/docs/reference/api/github#githubfixture), [Linear](/docs/reference/api/linear#linearfixture), [Notion](/docs/reference/api/notion#notionfixture)) |
 | `quiet()`                                     | `{ busy, quietForMs, open }`: what negative checks wait on                                                                                                                                                                                          |
-| `events({ since? })`                          | The session's event log: actions, deliveries with every attempt, the agent's API calls                                                                                                                                                              |
+| `events({ since? })`                          | The session's event log: actions, deliveries with every attempt, the app's API calls                                                                                                                                                                |
 | `close()`                                     | Closes the session and removes everything it created                                                                                                                                                                                                |
 
 ## Naming
@@ -167,7 +167,7 @@ The SDKs never sleep a fixed time: every wait polls until its condition holds, a
 | Wait                                                                  | Returns                                                                        |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `waitForReply`, `waitForMessage`, `waitForComment`, `waitForActivity` | The next new item matching the filter, after the last one this handle returned |
-| `latestReply`, `latestComment`                                        | Waits for one, then for the agent to be quiet, then returns the latest         |
+| `latestReply`, `latestComment`                                        | Waits for one, then for the app to be quiet, then returns the latest           |
 | `waitForModal`, `waitForState`, `waitForCall`, `settled`, `ended`     | The first state that matches                                                   |
 
 | Setting                          | Default |

@@ -20,7 +20,7 @@ npx channelstack show
 | Command | Does |
 |---|---|
 | [`channelstack [start]`](#channelstack-start) | Start the server |
-| [`channelstack env`](#channelstack-env) | Print `.env` lines for the agent |
+| [`channelstack env`](#channelstack-env) | Print `.env` lines for the app |
 | [`channelstack slack say`](#channelstack-slack-say) | Post a message as a person |
 | [`channelstack slack reply`](#channelstack-slack-reply) | Reply in a thread as a person |
 | [`channelstack slack react`](#channelstack-slack-react) | React to a message as a person |
@@ -28,7 +28,7 @@ npx channelstack show
 | [`channelstack slack stop`](#channelstack-slack-stop) | Press Stop on the agent's work in a thread |
 | [`channelstack show`](#channelstack-show) | Print the latest conversation as a person reads it |
 | [`channelstack tail`](#channelstack-tail) | Print deliveries and API calls as they happen |
-| [`channelstack deliveries`](#channelstack-deliveries) | List what was delivered to the agent |
+| [`channelstack deliveries`](#channelstack-deliveries) | List what was delivered to the app |
 | [`channelstack redeliver`](#channelstack-redeliver) | Deliver something again |
 | [`channelstack ui`](#channelstack-ui) | Print a one-time link to the UI |
 | [`channelstack mcp`](#channelstack-mcp) | Serve the attach commands as MCP tools |
@@ -83,7 +83,7 @@ channelstack [start] [--no-portless] [--port <n>] [--server-file <path>] [--log-
 | `--port <n>` | `0` with portless (a free port), `4500` without | The loopback port. `0` picks a free one |
 | `--server-file <path>` | `CHANNELSTACK_SERVER_FILE`, else `<home>/server.json` | Where to write the control API's URL and token (0600) |
 | `--log-level <level>` | `CHANNELSTACK_LOG_LEVEL`, else `info` | `debug`, `info`, `warn`, `error` or `silent`. Logs go to stderr |
-| `--proxy` | off | Also run an HTTP proxy for agents with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app` and `api.notion.com` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
+| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app` and `api.notion.com` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
 | `--proxy-port <n>` | `7464` | The proxy's loopback port. `0` picks a free one. Needs `--proxy` |
 | `--record <dir>` | none | Write the shape of every exchange with those hosts, and of every webhook, to `<dir>/shapes.jsonl`: structure only, never a value. Needs `--proxy` |
 
@@ -120,13 +120,13 @@ With `--proxy`, a `Proxy` line adds the proxy's URL and the CA file, and the las
 channelstack env [--proxy] [--server <url>]
 ```
 
-Prints `KEY=value` lines for the agent, one per line, from the running server, so the URLs match how it was started.
+Prints `KEY=value` lines for the app, one per line, from the running server, so the URLs match how it was started.
 
 | Flag | Meaning |
 |---|---|
-| `--proxy` | For proxy mode: the proxy and the CA the agent trusts, instead of the API URLs. Fails with `channelstack env --proxy needs proxy mode: start the server with --proxy` when the server runs without `--proxy` |
+| `--proxy` | For proxy mode: the proxy and the CA the app trusts, instead of the API URLs. Fails with `channelstack env --proxy needs proxy mode: start the server with --proxy` when the server runs without `--proxy` |
 
-What it prints is listed in [Environment variables](/docs/reference/environment-variables#what-channelstack-env-prints). A channel that runs live prints nothing: the agent keeps its own configuration.
+What it prints is listed in [Environment variables](/docs/reference/environment-variables#what-channelstack-env-prints). A channel that runs live prints nothing: the app keeps its own configuration.
 
 ## `channelstack slack say`
 
@@ -215,7 +215,7 @@ channelstack tail [--once]
 |---|---|
 | `--once` | Print what is there and exit, instead of following |
 
-Prints the `dev` session's events as they happen, one line each: `<HH:MM:SS.mmm> <summary>  <outcome>`, with deliveries to the agent marked `→` and its API calls `←`. Times are UTC. It reads every 250ms until interrupted.
+Prints the `dev` session's events as they happen, one line each: `<HH:MM:SS.mmm> <summary>  <outcome>`, with deliveries to the app marked `→` and its API calls `←`. Times are UTC. It reads every 250ms until interrupted.
 
 ## `channelstack deliveries`
 
@@ -341,4 +341,4 @@ Replaces every fake token and signing secret in `<home>/secrets.json`. Restart t
 channelstack ca rotate
 ```
 
-Replaces proxy mode's CA in `<home>/ca`. Restart the server; agents keep trusting the new one from the same files. Prints `Replaced proxy mode's CA (<file>). …`.
+Replaces proxy mode's CA in `<home>/ca`. Restart the server; apps keep trusting the new one from the same files. Prints `Replaced proxy mode's CA (<file>). …`.

@@ -1,12 +1,12 @@
 ---
 title: "Running in CI"
 order: 12
-description: "A GitHub Actions job that starts channelstack, points your agent at it and runs the tests, plus a nightly job against real sandboxes."
+description: "A GitHub Actions job that starts channelstack, points your app at it and runs the tests, plus a nightly job against real sandboxes."
 ---
 
 # Running in CI
 
-In CI you run the same four things you run locally, in order: the server, `channelstack env`, your agent, and the tests. This page has a GitHub Actions job for Vitest and for pytest, a nightly live job, and what to look at when a job hangs.
+In CI you run the same four things you run locally, in order: the server, `channelstack env`, your app, and the tests. This page has a GitHub Actions job for Vitest and for pytest, a nightly live job, and what to look at when a job hangs.
 
 ## The job
 
@@ -55,11 +55,11 @@ jobs:
 What each step does:
 
 1. **Start channelstack.** `--no-portless` serves every fake on one loopback port over plain HTTP (`http://127.0.0.1:4500/slack`, …), so the runner needs no portless and no CA. The server reads `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` when it starts, so set it on this step; a Socket Mode agent connects out and needs none. The loop waits until the server has written `~/.channelstack/server.json` and answers.
-2. **Point the agent at it.** `channelstack env` prints the fake tokens, signing secrets and API URLs as `KEY=value` lines. Appending them to `$GITHUB_ENV` makes them part of every later step's environment. They are fake values, made fresh for this runner.
-3. **Start the agent** in the background, unchanged, and wait until its port answers.
+2. **Point the app at it.** `channelstack env` prints the fake tokens, signing secrets and API URLs as `KEY=value` lines. Appending them to `$GITHUB_ENV` makes them part of every later step's environment. They are fake values, made fresh for this runner.
+3. **Start the app** in the background, unchanged, and wait until its port answers.
 4. **Run the tests.** The Vitest plugin finds the running server through `server.json` and gives each test its own session.
 
-Make the plugin refuse to start a server of its own in CI. In `auto` mode (the default), a missing server makes it start a private one, which your agent doesn't know about, and every test would time out instead of failing at once:
+Make the plugin refuse to start a server of its own in CI. In `auto` mode (the default), a missing server makes it start a private one, which your app doesn't know about, and every test would time out instead of failing at once:
 
 ```ts title="vitest.config.ts"
 import { defineConfig } from "vitest/config";
@@ -189,7 +189,7 @@ How it differs from the fake job:
 
 - **Credentials are job-level `env`,** so the server (app credentials, allowlists, `CHANNELSTACK_RUN_ID`), the test process (people's tokens) and `doctor` and `sweep` all see them. Allowlists aren't secret, so they can be repository variables.
 - **`CHANNELSTACK_RUN_ID`** tags everything the run creates, and a re-run of the job keeps it. It must be 1 to 24 letters and digits.
-- **The agent runs with its real app**, not with `channelstack env` (which prints nothing for a live channel). Real Slack delivers to it; Socket Mode means the runner needs no public URL.
+- **The app runs with its real app**, not with `channelstack env` (which prints nothing for a live channel). Real Slack delivers to it; Socket Mode means the runner needs no public URL.
 - **The browser actor** needs each person's saved session: run `channelstack login slack --user ana` once on your machine and store the file's contents as a secret. `ubuntu-latest` has Chrome.
 - **`doctor`** fails the job before the tests when a credential is wrong or a session has expired.
 - **Stopping the server** closes what its sessions still hold; then `sweep --check` fails the job if anything of this run is left, and `sweep` removes it.
@@ -198,11 +198,11 @@ Tests that use fake-only features skip with the reason, and a setup that can't w
 
 ## If the job hangs
 
-A matcher waits 10 seconds by default and a negative check waits for the agent to be quiet, so a single test doesn't hang for long. When the job does, look at these in order:
+A matcher waits 10 seconds by default and a negative check waits for the app to be quiet, so a single test doesn't hang for long. When the job does, look at these in order:
 
 - **The server never came up.** The `until` loop times out after 30 seconds. `channelstack.log` says why, for example that a server is already running from the same `server.json`, or that portless isn't installed (start with `--no-portless`).
-- **The agent never came up, or crashed.** Its wait loop times out, or every test fails with no reply. Read `agent.log`: a missing variable usually means the `channelstack env` step ran in a different job, or before the server was up.
-- **Events don't reach the agent.** `CHANNELSTACK_SLACK_WEBHOOK_URL` wasn't set on the step that started the server, or it doesn't match the agent's port and path.
+- **The app never came up, or crashed.** Its wait loop times out, or every test fails with no reply. Read `agent.log`: a missing variable usually means the `channelstack env` step ran in a different job, or before the server was up.
+- **Events don't reach the app.** `CHANNELSTACK_SLACK_WEBHOOK_URL` wasn't set on the step that started the server, or it doesn't match the app's port and path.
 - **Every test waits its full timeout.** Start the server with `--log-level debug`: it logs each delivery attempt and how it ended (`unreachable`, `timed_out`, a status code). Logs are redacted, so they can go into an artifact.
 - **Live runs are slower.** A real model and real rate limits take longer: give positive matchers a longer `timeout`. The first browser actor start on a fresh runner can take a minute or two while the matching Chrome driver is fetched.
 
