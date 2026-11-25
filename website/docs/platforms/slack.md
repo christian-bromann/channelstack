@@ -131,7 +131,7 @@ const app = new App({
 await app.start();
 ```
 
-Bolt calls `apps.connections.open` with the `xapp-…` token through the same base URL, and the fake hands back a WebSocket URL on its own host. From then on, deliveries go over the socket instead of the request URL. Attempts, retries and the quiet rule work the same on both transports. `slack.socketConnections` says how many connections the agent holds right now.
+Bolt calls `apps.connections.open` with the `xapp-…` token through the same base URL, and the fake hands back a WebSocket URL on its own host. From then on, deliveries go over the socket instead of the request URL. Attempts, retries and the quiet rule work the same on both transports. `slack.socketConnections` says how many connections the agent held when the test's `slack` fixture was made: it's a snapshot, and nothing refreshes it during the test.
 
 While the agent is between connections, a delivery waits for it to reconnect until its ack window ends. An agent that also has a request URL and has held no socket for 30 seconds is reached over HTTP again.
 

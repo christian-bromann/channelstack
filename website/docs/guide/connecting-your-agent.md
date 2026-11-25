@@ -231,7 +231,7 @@ A few things differ from HTTP delivery, as they do on Slack:
 
 - There is no signature to check: the connection is the app's own. The standard `slack.bad-signature` check passes without sending anything.
 - A retry carries `retry_attempt` and `retry_reason` in the envelope instead of headers.
-- `slack.socketConnections` tells a test how many connections the agent has open, and `slack.fault({ type: "drop_socket" })` drops them to test reconnecting. See [delivery and failures](/docs/guide/delivery-and-failures#faults).
+- `slack.socketConnections` tells a test how many connections the agent had open when the test's `slack` fixture was made (a snapshot, not refreshed), and `slack.fault({ type: "drop_socket" })` drops them to test reconnecting. See [delivery and failures](/docs/guide/delivery-and-failures#faults).
 
 ## TLS trust per runtime
 
