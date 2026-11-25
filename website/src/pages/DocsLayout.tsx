@@ -19,6 +19,9 @@ import { areaOfPath, type DocArea, type DocModule } from "../lib/docs";
 import { docEntries, entriesOf, sectionsOf } from "../lib/docs-meta";
 import { SITE } from "../lib/site";
 
+/** The API reference is generated (`pnpm sdk`): its files aren't edited by hand, so the footer points at the generator. */
+const GENERATED = "website/docs/reference/api/";
+
 /** What every page can use without importing it (website/docs/README.md lists them). */
 const MDX_COMPONENTS = {
   CodeGroup,
@@ -105,7 +108,15 @@ export function DocPage({ slug, mod }: { slug: string; mod: DocModule }) {
       </article>
       {entry ? (
         <p className="doc-edit">
-          <a href={`${SITE.repo}/edit/main/${entry.source}`}>Suggest changes to this page</a>
+          {entry.source.startsWith(GENERATED) ? (
+            <>
+              This page is generated from the <a href={`${SITE.repo}/tree/main/server/src`}>control API's routes</a> by{" "}
+              <a href={`${SITE.repo}/blob/main/codegen/src/emit/docs.ts`}>codegen/src/emit/docs.ts</a>: suggest changes
+              there.
+            </>
+          ) : (
+            <a href={`${SITE.repo}/edit/main/${entry.source}`}>Suggest changes to this page</a>
+          )}
         </p>
       ) : null}
       <nav className="doc-pager" aria-label="Previous and next page">
