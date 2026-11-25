@@ -12,3 +12,6 @@ coverage/
 __pycache__/
 *.tsbuildinfo
 report/
+
+# Rust build output
+/target

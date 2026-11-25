@@ -90,6 +90,9 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // `conformance` part). CI's `coverage page` job publishes the page (6.5); the differential run
   // against the sandboxes is nightly (`.github/workflows/live.yml`, `pnpm conformance`).
   6: [],
+  // Phase 7: 7.1's Rust half is the smoke scenarios through the Rust runner (the acceptance run's
+  // smoke part, next to TypeScript and Python); the Rust SDK's own checks are here.
+  7: [{ name: "7.1 The Rust SDK: clippy and its own tests", script: ["test:rust"], group: "unit" }],
 };
 
 const phase = Number(process.argv[2]);

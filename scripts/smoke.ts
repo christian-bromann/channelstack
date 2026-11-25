@@ -1,7 +1,7 @@
 /**
  * Runs the smoke scenarios through an SDK against the compiled binary (exit check 0.2).
  *
- *   node scripts/smoke.ts [--sdk typescript|python] [--bin <server binary>] [--runner <run.ts>]
+ *   node scripts/smoke.ts [--sdk typescript|python|rust] [--bin <server binary>] [--runner <run.ts>]
  *
  * A scenario that `requires: [echo-agent]` runs against a server this script starts next to the
  * reference agent; the others run in `start` mode, where the SDK's launcher starts the binary itself.
@@ -17,8 +17,8 @@ import { binaryPath } from "./lib/packages.ts";
 import { run } from "./lib/process.ts";
 import { withStack } from "./lib/stack.ts";
 
-export type Sdk = "typescript" | "python";
-export const SDKS: readonly Sdk[] = ["typescript", "python"];
+export type Sdk = "typescript" | "python" | "rust";
+export const SDKS: readonly Sdk[] = ["typescript", "python", "rust"];
 
 export interface SmokeOptions {
   sdks: readonly Sdk[];
@@ -41,6 +41,10 @@ function runScenario(
   if (sdk === "typescript") {
     const runner = options.typescriptRunner ?? join(ROOT, "scenarios", "runners", "typescript", "run.ts");
     run(process.execPath, [runner, file, "--mode", mode], { env });
+  } else if (sdk === "rust") {
+    // Built once (cargo skips what is current), then run as the binary it is.
+    run("cargo", ["build", "--quiet", "--locked", "--package", "channelstack-smoke"], { cwd: ROOT, env });
+    run(join(ROOT, "target", "debug", "channelstack-smoke"), [file, "--mode", mode], { env });
   } else {
     const runner = join(ROOT, "scenarios", "runners", "python", "run.py");
     run("uv", ["run", "--project", join(ROOT, "sdks", "python"), "--frozen", "python", runner, file, "--mode", mode], {

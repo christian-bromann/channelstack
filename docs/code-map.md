@@ -103,9 +103,9 @@ Each driver has the same files; see the contract in [architecture.md](architectu
 |---|---|---|
 | OpenAPI → IR | `ir.ts` | The IR's types and `buildIr`. Refuses a spec no SDK could express (an unbound operation, a body field no method exposes) |
 | What every emitter needs | `emit/shared.ts` | Name conversion, `IrIndex` lookups, path templates |
-| Emitters | `emit/typescript.ts`, `emit/python.ts` | IR → generated source, as path → contents. Rust in phase 7 |
+| Emitters | `emit/typescript.ts`, `emit/python.ts`, `emit/rust.ts` | IR → generated source, as path → contents. Rust's is formatted with `rustfmt` by `scripts/sdk.ts`: handles with typed getters, a builder per method and wait (`ana.say("hi").channel(&c).await`), and `call_by_name` for code that calls methods by name |
 
-## SDK runtimes (`sdks/typescript/runtime/`, `sdks/python/channelstack/runtime/`)
+## SDK runtimes (`sdks/typescript/runtime/`, `sdks/python/channelstack/runtime/`, `sdks/rust/src/runtime/`)
 
 The same modules with the same names in every language.
 
@@ -113,13 +113,13 @@ The same modules with the same names in every language.
 |---|---|---|
 | Transport | `transport` | Bearer token, retries while the server starts, error code → typed exception, a hook that sees every refusal with its request path (`onRefusal` / `on_refusal`, for a test integration) |
 | Launcher | `launcher` | `auto` / `attach` / `start`; finding the server binary and its per-platform package name |
-| Client base | `client` | What generated handles share: `HandleContext`, the root client's `close`, the version check on connect |
+| Client base | `client` | What generated handles share: `HandleContext`, the root client's `close`, the version check on connect. Rust's also has how arguments go on the wire (`IntoArg`, `enc`), the one request function (`send`), the builder every method returns (`Call`) and a handle by name (`Dyn`) |
 | Credentials | `credentials` | A credential the test left out, from the environment: `CHANNELSTACK_SLACK_USER_{name}_TOKEN` with the person's name (`x-channelstack-credential` on the field) |
 | Waiting and polling | `wait` | The one polling loop: cursor reads, timeouts, repeating a call a person would wait for (`retryWhile`), text matching for waits, quiet checks (`untilQuiet`; `watching` makes it look for the whole window, and a timeout names what the agent left open). Every `waitFor…`, `latest…` and matcher uses it |
 | Durations | `duration` | Parsing `"3s"`, `"750ms"` |
 | Files | `files` | Reading fixture files and directories a test hands over (`readTree`, `readChanges`), and where relative paths start (`setFilesRoot`) |
 
-The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary.
+The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`), and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary. The Rust SDK is the `channelstack` crate (`sdks/rust`, in the repository's Cargo workspace, toolchain in `rust-toolchain.toml`); its errors are `runtime/error.rs`, and its launcher finds the binary at `CHANNELSTACK_SERVER_BIN` or on the `PATH` (downloading a release is phase 8).
 
 ## Scenarios (`scenarios/`)
 
@@ -127,7 +127,7 @@ The TypeScript SDK's entry is `sdks/typescript/client.ts` (`channelstack/client`
 |---|---|---|
 | Protocol parity scenarios | `smoke/*.yaml` | The format is [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md) |
 | Conformance scenarios | `<channel>/*.yaml` | The differential run's scenarios: the same format, with `record` steps and `covers`; each runs against the fake and against the sandbox (decision 0016) |
-| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py` | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`, 0600), as plain data with no secret field (`runners/typescript/secrets.ts`, the one rule, which `conformance/lib.ts` uses too) |
+| Running a scenario through an SDK | `runners/typescript/run.ts`, `runners/python/run.py`, `runners/rust` (a binary crate, on the SDK's `call_by_name`) | One interpreter per language, on the SDK's public API and its `wait` module; the TypeScript one writes what `record` steps saved (`--record`, 0600), as plain data with no secret field (`runners/typescript/secrets.ts`, the one rule, which `conformance/lib.ts` uses too) |
 | Reference agents | `agents/` | Plain programs with no channelstack code in them, configured from `channelstack env` |
 
 ## Examples (`examples/agents/`)
@@ -182,6 +182,7 @@ Reference agents for the acceptance suite: real frameworks, written as a develop
 | Compiling the server | `build-binary.ts`, `bun-compile.ts` | `bun build --compile` (through `Bun.build`, with a plugin that makes WebdriverIO's computed imports literal so it bundles), one npm package per platform |
 | Running the server from source | `dev-server.sh` | Stands in for the binary (`CHANNELSTACK_SERVER_BIN`) on machines that block freshly compiled executables. CI never uses it |
 | Smoke runs against the binary | `smoke.ts`, `accept.ts` | Server and reference agent next to each SDK's runner; `--repeat` for the flake check; `--part` for one part of the acceptance suite (Slack; GitHub and Linear; Notion, every channel at once and the tests with their own agent; the checks against the broken agents, Slack's and the others') |
+| The Rust SDK's checks | `test-rust.ts` (`pnpm test:rust`) | clippy with warnings as errors, and the crate's tests, its typed API against the server binary |
 | A server next to a reference agent | `lib/stack.ts` | `withStack`: a private state directory, the binary, the agent with what `channelstack env` prints; `others` adds one agent per channel (every channel in one run); `serverEnv` gives the server alone live credentials. Everything that needs both uses it |
 | `api/examples` against the reference agents | `examples.ts` | `runExamples`, and `ENABLED_TESTS`: the example tests this phase has built. Also runs `test/acceptance/stack`, each channel's checks, and `shared.test.ts` with one agent per channel |
 | The examples against the generated SDK | `api-check.ts` | `pnpm api:check`: type errors in enabled tests fail; errors in tests of later phases are counted |

@@ -27,13 +27,14 @@ SDK breadth and MCP ([phases.md](../../docs/phases.md#phase-7-sdk-breadth-and-mc
 
 ## New dependencies
 
-To be pinned as they are added, with the reason.
+Each pinned to an exact version. The Rust toolchain is pinned in `rust-toolchain.toml` (1.99.0, with rustfmt and clippy).
 
 | Package | Why a library and not our code | License |
 |---|---|---|
 | `@modelcontextprotocol/sdk` (server) | The protocol's own TypeScript SDK, for the stdio server and the test's client | MIT |
-| Rust: `reqwest` (rustls), `tokio`, `serde`, `serde_json`, `thiserror` | HTTP, async, JSON: what every Rust client uses | MIT / Apache-2.0 |
-| Rust runner: a YAML parser | The smoke scenarios are YAML | MIT / Apache-2.0 |
+| Rust SDK: `reqwest` =0.13.5 (`json`, `query`, `rustls`), `tokio` =1.54.1, `serde_json` =1.0.154, `thiserror` =2.0.21, `percent-encoding` =2.3.2 | HTTP with TLS (portless serves HTTPS), async, JSON, typed errors and path escaping: what Rust clients use | MIT / Apache-2.0 |
+| Rust smoke runner: `yaml-rust2` =0.13.0, `regex` =1.13.1 | The smoke scenarios are YAML, and their `matches` checks regular expressions | MIT / Apache-2.0 |
+| CI: `Swatinem/rust-cache` v2.9.3 (by commit) | Caches the Rust builds between runs | MIT |
 
 ## Docs to update
 
