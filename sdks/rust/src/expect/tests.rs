@@ -463,6 +463,20 @@ async fn status_and_its_line() -> Result<()> {
         failed,
         "Expected the status line to match \"x\", there is none"
     );
+    expect(&thread)
+        .not_to_have_status("idle")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&thread)
+            .not_to_have_status("working")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected the thread not to be working, it is working (\"Deploying web\")"
+    );
     Ok(())
 }
 
@@ -514,6 +528,21 @@ async fn a_reaction_a_modal_and_who_can_see_a_message() -> Result<()> {
     assert_eq!(
         failed,
         "Expected a :eyes: reaction by my-agent. Reactions there: :eyes: by Ana"
+    );
+    expect(&message)
+        .not_to_have_reaction("eyes")
+        .by(agent())
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&message)
+            .not_to_have_reaction(":eyes:")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected no :eyes: reaction. Reactions there: :eyes: by Ana"
     );
 
     expect(&message).to_have_opened_modal("Deploy").await?;
@@ -569,6 +598,20 @@ async fn comments_from_someone_and_exactly_how_many() -> Result<()> {
         failed,
         "Expected exactly 2 comments from my-agent, found 1:\n  Ana: @my-agent triage\n  my-agent: Labelled bug"
     );
+    expect(&issue)
+        .not_to_have_comments_from("my-agent", 2)
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&issue)
+            .not_to_have_comments_from("my-agent", 1)
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected not exactly 1 comments from my-agent, found 1:\n  Ana: @my-agent triage\n  my-agent: Labelled bug"
+    );
     let discussion =
         StandIn::with(json!({ "comments": [{ "author": ana(), "text": "Summarize?" }] }));
     let failed = failure(
@@ -623,6 +666,22 @@ async fn a_pull_request_its_reviews_checks_and_labels() -> Result<()> {
         failed,
         "Expected a comment on the diff on src/a.ts:4. The diff has:\n  my-agent on src/a.ts:3: Off by one"
     );
+    expect(&pull)
+        .not_to_have_review_comment()
+        .path("src/b.ts")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&pull)
+            .not_to_have_review_comment()
+            .from("my-agent")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected no comment on the diff from my-agent. The diff has:\n  my-agent on src/a.ts:3: Off by one"
+    );
 
     expect(&pull)
         .to_have_review_from("my-agent")
@@ -638,6 +697,21 @@ async fn a_pull_request_its_reviews_checks_and_labels() -> Result<()> {
     assert_eq!(
         failed,
         "Expected a review from my-agent with state APPROVED. Reviews there:\n  my-agent: CHANGES_REQUESTED \"See inline\""
+    );
+    expect(&pull)
+        .not_to_have_review_from("my-agent")
+        .state("APPROVED")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&pull)
+            .not_to_have_review_from("my-agent")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected no review from my-agent. Reviews there:\n  my-agent: CHANGES_REQUESTED \"See inline\""
     );
 
     // A name is the whole name; a pattern is found in it.
@@ -659,6 +733,21 @@ async fn a_pull_request_its_reviews_checks_and_labels() -> Result<()> {
     assert_eq!(
         failed,
         "Expected a check run \"review\" (completed, success). Check runs there:\n  my-agent / review: completed, failure"
+    );
+    expect(&pull)
+        .not_to_have_check_run("my-agent / review")
+        .conclusion("success")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&pull)
+            .not_to_have_check_run(Regex::new("review")?)
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected no check run /review/. Check runs there:\n  my-agent / review: completed, failure"
     );
 
     expect(&pull).to_have_label("bug").await?;
@@ -699,6 +788,20 @@ async fn a_linear_issue_its_session_and_who_has_it() -> Result<()> {
         failed,
         "Expected the agent session to be active, it is complete"
     );
+    expect(&issue)
+        .not_to_have_session_state("active")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&issue)
+            .not_to_have_session_state("complete")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected the agent session not to be complete, it is complete"
+    );
 
     expect(&issue)
         .to_have_activity()
@@ -717,6 +820,22 @@ async fn a_linear_issue_its_session_and_who_has_it() -> Result<()> {
         failed,
         "Expected a activity matching \"Fix it\". The session has:\n  my-agent (response): Fixed in #12"
     );
+    expect(&issue)
+        .not_to_have_activity()
+        .r#type("error")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&issue)
+            .not_to_have_activity()
+            .text("#12")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected no activity matching \"#12\". The session has:\n  my-agent (response): Fixed in #12"
+    );
 
     expect(&issue).to_be_delegated_to(agent()).await?;
     expect(&issue).to_be_assigned_to(Value::Null).await?;
@@ -724,6 +843,20 @@ async fn a_linear_issue_its_session_and_who_has_it() -> Result<()> {
     assert_eq!(
         failed,
         "Expected the issue to be assigned to Ana, it is assigned to no one"
+    );
+    expect(&issue)
+        .not_to_be_assigned_to(ana())
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&issue)
+            .not_to_be_assigned_to(Value::Null)
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected the issue not to be assigned to no one, it is assigned to no one"
     );
     let failed = failure(
         expect(&issue)
@@ -741,6 +874,20 @@ async fn a_linear_issue_its_session_and_who_has_it() -> Result<()> {
     assert_eq!(
         failed,
         "Expected the issue to be in \"Done\", it is in \"In Review\""
+    );
+    expect(&issue)
+        .not_to_have_state("Done")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&issue)
+            .not_to_have_state("IN REVIEW")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected the issue not to be in \"IN REVIEW\", it is in \"In Review\""
     );
     Ok(())
 }
@@ -763,6 +910,20 @@ async fn a_notion_page_its_blocks_and_properties() -> Result<()> {
         failed,
         "Expected the page to have a block matching \"Agenda\". Its blocks:\n  Weekly notes\n  \n  Decisions"
     );
+    expect(&page)
+        .not_to_have_block("Agenda")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&page)
+            .not_to_have_block("Decisions")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected the page not to have a block matching \"Decisions\". Its blocks:\n  Weekly notes\n  \n  Decisions"
+    );
 
     expect(&page)
         .to_have_property_value("Status", "Done")
@@ -775,6 +936,17 @@ async fn a_notion_page_its_blocks_and_properties() -> Result<()> {
             .await,
     );
     assert_eq!(failed, "Expected Status to be In progress, it is \"Done\"");
+    expect(&page)
+        .not_to_have_property_value("Status", "In progress")
+        .quiet_for(QUIET)
+        .await?;
+    let failed = failure(
+        expect(&page)
+            .not_to_have_property_value("Points", 3)
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(failed, "Expected Points not to be 3, it is 3");
     Ok(())
 }
 
@@ -808,6 +980,20 @@ async fn deliveries_accepted_rejected_and_retried() -> Result<()> {
         failed,
         "Expected delivery D1 not to be retried, it was retried 1 times"
     );
+    let failed = failure(
+        expect(&accepted)
+            .not_to_be_accepted()
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected delivery D1 not to be accepted, its first attempt is acknowledged (HTTP 200) after 1200ms"
+    );
+    expect(&accepted)
+        .not_to_be_rejected()
+        .quiet_for(QUIET)
+        .await?;
 
     let failed = failure(expect(&accepted).to_be_rejected().timeout(FAST).await);
     assert_eq!(
@@ -819,12 +1005,21 @@ async fn deliveries_accepted_rejected_and_retried() -> Result<()> {
         { "status": "failed", "responseStatus": 401, "forgedSignature": true },
     ] }));
     expect(&forged).to_be_rejected().await?;
+    let failed = failure(expect(&forged).not_to_be_rejected().quiet_for(QUIET).await);
+    assert_eq!(
+        failed,
+        "Expected the forged attempt of delivery D1 not to be rejected with a 4xx, the agent answered 401"
+    );
     let missing = StandIn::with(json!({ "attempts": [] }));
     let failed = failure(expect(&missing).to_be_accepted().timeout(FAST).await);
     assert_eq!(
         failed,
         "Expected delivery D1 to be accepted, its first attempt is missing"
     );
+    expect(&missing)
+        .not_to_be_accepted()
+        .quiet_for(QUIET)
+        .await?;
     Ok(())
 }
 
