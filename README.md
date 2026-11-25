@@ -20,7 +20,7 @@
 > [!NOTE]
 > channelstack is under construction and not on npm yet. See [Status](#status).
 
-channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, a workflow or notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
+channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
 
 ```ts
 test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
