@@ -1169,6 +1169,28 @@ let suggested_prompts = thread.suggested_prompts().await?;
 
 **Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
+### root()
+
+The message that starts a thread, as it is now.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const message = await thread.root();
+```
+
+```python title="Python"
+message = await thread.root()
+```
+
+```rust title="Rust"
+let message = thread.root().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
+
 ### replies()
 
 Replies in a thread, oldest first, without the message that starts it.
