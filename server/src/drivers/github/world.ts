@@ -97,6 +97,13 @@ interface GitHubPullRecord {
   requestedReviewers: number[];
   /** What the diff between base and head adds up to, kept current as the head moves. */
   stats: { commits: number; additions: number; deletions: number; changedFiles: number };
+  /**
+   * Whether head merges into base without a conflict, kept current with `stats`. GitHub computes
+   * it the same way; until the first computation it is unknown (`null` in its payloads).
+   */
+  mergeable?: boolean;
+  /** Whether each of head's commits replays onto base without a conflict, the way a rebase merge does. */
+  rebaseable?: boolean;
 }
 
 /** An issue. A pull request is an issue too, with `pull` set. */

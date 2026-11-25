@@ -93,9 +93,13 @@ export function registerPulls(register: Register): void {
     return c.json(world.kit.objects.pullRequest(issue), 201);
   });
 
-  register("get", "/pulls/:number{[0-9]+}", read, (call) =>
-    call.c.json(call.world.kit.objects.pullRequest(pullOf(call))),
-  );
+  // Reading one pull request computes what isn't known yet (after a reopen), as GitHub starts it on a read.
+  register("get", "/pulls/:number{[0-9]+}", read, async (call) => {
+    const pull = pullOf(call);
+    if (pull.state === "open" && pull.pull?.mergeable === undefined)
+      await call.world.repos.refreshPull(call.repo, pull);
+    return call.c.json(call.world.kit.objects.pullRequest(pull));
+  });
 
   register("patch", "/pulls/:number{[0-9]+}", write, (call) => {
     const { c, world, body, bot } = call;

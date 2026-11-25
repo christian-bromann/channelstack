@@ -182,6 +182,9 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       }
       if (changes.state !== undefined && changes.state !== issue.state) {
         issue.state = changes.state;
+        // Reopened, its branches may have moved while it was closed: GitHub computes it again.
+        if (issue.pull && changes.state === "open")
+          Object.assign(issue.pull, { mergeable: undefined, rebaseable: undefined });
         issue.closedAt = changes.state === "closed" ? clock() : undefined;
         issue.closedBy = changes.state === "closed" ? actor : undefined;
         issue.stateReason = issue.pull

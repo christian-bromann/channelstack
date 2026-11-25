@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import { Redactor } from "../redact/index.ts";
-import { EventLog } from "./index.ts";
+import { readCalls } from "../router/inspect.ts";
+import { CursorList, EventLog, WORLD_SCOPE } from "./index.ts";
 
 describe("the event log", () => {
   test("delivery attempts and API calls get a one-line summary; a failure says how it failed", () => {
@@ -37,5 +38,43 @@ describe("the event log", () => {
     expect(log.read("ses_a", first.cursor).events.map((event) => event.data)).toEqual([{ n: 2 }]);
     log.drop("ses_a");
     expect(log.read("ses_a").events).toEqual([]);
+  });
+});
+
+describe("a cursor list with a limit", () => {
+  test("keeps the newest items, and cursors still count every item", () => {
+    const list = new CursorList<number>({ limit: 3 });
+    const first = list.read();
+    for (const n of [1, 2]) list.append(n);
+    const early = list.read(first.cursor);
+    expect(early.items).toEqual([1, 2]);
+    for (const n of [3, 4, 5]) list.append(n);
+
+    expect(list.read().items).toEqual([3, 4, 5]);
+    // On from a cursor that is still in the list: exactly what came after it.
+    expect(list.read(early.cursor).items).toEqual([3, 4, 5]);
+    // A reader that fell behind (its place was dropped) gets what is left, and goes on from there.
+    const behind = list.read(first.cursor);
+    expect(behind.items).toEqual([3, 4, 5]);
+    expect(behind.first).toBe(2);
+    list.append(6);
+    expect(list.read(behind.cursor).items).toEqual([6]);
+  });
+
+  test("the world scope keeps its newest events; a session's log keeps them all", () => {
+    const log = new EventLog(() => 0, new Redactor());
+    for (let n = 0; n < 10_005; n++) {
+      log.append(WORLD_SCOPE, "github", "api_call", { operation: `call ${n}`, responseStatus: 200 });
+      log.append("ses_a", "github", "api_call", { operation: `call ${n}`, responseStatus: 200 });
+    }
+    const world = log.read(WORLD_SCOPE);
+    expect(world.events).toHaveLength(10_000);
+    expect(world.events[0]?.data.operation).toBe("call 5");
+    // What was dropped still counts: the first event kept is the sixth ever recorded.
+    expect(world.first).toBe(5);
+    // And the calls read from it keep their ids: the oldest kept is the sixth call ever made.
+    const calls = readCalls(log, WORLD_SCOPE, "github", {});
+    expect([calls[0]?.id, calls.at(-1)?.id]).toEqual(["call_6", "call_10005"]);
+    expect(log.read("ses_a").events).toHaveLength(10_005);
   });
 });
