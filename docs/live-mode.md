@@ -78,6 +78,12 @@ The agent's own signing secrets are never needed live: channelstack doesn't sign
 
 The browser actor never signs in itself. A person signs in by hand, once, with `channelstack login slack --user ana`: channelstack opens a browser window at the sandbox's sign-in page and, once they are in, saves the session's cookies (`<home>/browser/slack-ana.json`, 0600; `--save <path>` writes a copy too). The browser actor reuses that session, and `createUser({ browser: { storageState } })` can name another saved one. `channelstack doctor` says whether each saved session is still signed in; when one has expired, the person runs `channelstack login` again. Account passwords are never handled.
 
+**Sessions are renewed as they're used.** Slack renews a session's cookies while it is used, and retires the copy the session was started from. So whenever a person's browser closes, channelstack saves the session as it is now, if it is still signed in; the next use starts from that. In the nightly job ([#22](https://github.com/christian-bromann/channelstack/issues/22)):
+- **Within a run:** the sessions come from `CHANNELSTACK_BROWSER_SESSIONS`, but only for files the runner doesn't have yet. A later step (`pnpm conformance` after `pnpm live`) keeps the renewed copy an earlier step saved.
+- **Between runs:** the job's last step, which runs even when the run failed or was cancelled, uploads the sessions as the run left them, with `pnpm live:secrets --sessions-only`. Live runs go one at a time (the workflow's concurrency group), so two of them can't both renew a session from the same copy.
+- **The token:** that step needs `CHANNELSTACK_SECRETS_TOKEN`, a fine-grained token for this repository only, with *Environments: read and write*. Put it in `live.env`, and `pnpm live:secrets` uploads it with the rest. Without it, the step warns and saves nothing, and a session lasts one run.
+- **A run that dies first:** if a run dies before its last step, the uploaded copy may already be retired. Then the person signs in again with `channelstack login`, and runs `pnpm live:secrets`.
+
 The browser actor is built for Slack. Rules: [reality-matrix.md, "Browser sessions"](reality-matrix.md#browser-sessions).
 
 ## 6. Verifying the fakes (internal, not a user feature)

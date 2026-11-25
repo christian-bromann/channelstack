@@ -283,8 +283,12 @@ const SESSION_FILE = /^([a-z]+)-([a-z0-9][a-z0-9._-]*)\.json$/;
  * secret, `{ "<channel>-<person>.json": <storage state> }`): where the server looks for them, and
  * where `channelstack login --save` puts a test's own copy (`.auth/<person>-<channel>.json`)
  * unless one is there. Each file is private (0600).
+ *
+ * The secret only fills in what `home` doesn't have yet. A session already there was saved by an
+ * earlier step of the same job, as that step left it, and is newer: Slack renews a session's
+ * cookies while it is used and retires the copy the job started with (#22).
  */
-export function writeSessions(env: Env, home: string): void {
+export function writeSessions(env: Env, home: string, auth = join(ROOT, ".auth")): void {
   const bundle = env.CHANNELSTACK_BROWSER_SESSIONS;
   if (!bundle) return;
   let sessions: Record<string, StorageState>;
@@ -297,8 +301,9 @@ export function writeSessions(env: Env, home: string): void {
     const named = SESSION_FILE.exec(file);
     if (!named)
       throw new Error(`CHANNELSTACK_BROWSER_SESSIONS has a session named "${file}", not <channel>-<person>.json`);
-    writeStorageState(join(home, "browser", file), state);
-    const copy = join(ROOT, ".auth", `${named[2]}-${named[1]}.json`);
+    const path = join(home, "browser", file);
+    if (!existsSync(path)) writeStorageState(path, state);
+    const copy = join(auth, `${named[2]}-${named[1]}.json`);
     if (!existsSync(copy)) writeStorageState(copy, state);
   }
 }

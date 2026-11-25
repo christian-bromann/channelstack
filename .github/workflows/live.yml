@@ -77,3 +77,17 @@ jobs:
             build/coverage/index.html
             build/conformance/results.json
           if-no-files-found: ignore
+      # The people's saved sessions as this run left them, for the next run (#22). Slack renews a
+      # session's cookies while it is used and retires the copy the run started with, so they are
+      # saved back after every run, even a failed or cancelled one. The token may only write this
+      # repository's environment secrets (a fine-grained token: Environments, read and write).
+      - name: Save the renewed browser sessions
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ secrets.CHANNELSTACK_SECRETS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::CHANNELSTACK_SECRETS_TOKEN isn't set, so the renewed browser sessions aren't saved; the next run's Slack steps will be signed out"
+            exit 0
+          fi
+          pnpm live:secrets --sessions-only --repo "$GITHUB_REPOSITORY"
