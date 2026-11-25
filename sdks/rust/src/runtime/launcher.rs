@@ -30,16 +30,17 @@ pub struct ServerConnection {
     pub(crate) started: Option<Started>,
 }
 
-/// A server this launcher started: stopped, and its directory removed, when the client closes.
+/// A server this launcher started: stopped, and its directory removed, when the client closes. A
+/// client dropped without closing (a test that panics) does the same: the process is killed on drop,
+/// and the directory, with its `server.json`, goes with its guard.
 pub(crate) struct Started {
     child: Child,
-    directory: PathBuf,
+    _directory: tempfile::TempDir,
 }
 
 impl Started {
     pub(crate) async fn stop(mut self) {
         let _ = self.child.kill().await;
-        let _ = std::fs::remove_dir_all(&self.directory);
     }
 }
 
@@ -110,8 +111,8 @@ fn server_binary() -> Result<String> {
 
 /// Start a private server on a free loopback port. Its token goes to a private file, never to the shared one.
 async fn start_server() -> Result<ServerConnection> {
-    // A new directory only this user can enter, under a name nobody can guess or create first. It
-    // removes itself if the server never starts; once it does, `Started::stop` removes it.
+    // A new directory only this user can enter, under a name nobody can guess or create first. Its
+    // guard removes it when it is dropped: here if the server never starts, with `Started` otherwise.
     let private = tempfile::Builder::new()
         .prefix("channelstack-")
         .tempdir()
@@ -153,7 +154,7 @@ async fn start_server() -> Result<ServerConnection> {
             token,
             started: Some(Started {
                 child,
-                directory: private.keep(),
+                _directory: private,
             }),
         }),
         Err(error) => {

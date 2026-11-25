@@ -11,45 +11,89 @@ interface Delivery {
   eventType?: string;
   action?: string;
   status: string;
-  attempts: Array<{ responseStatus?: number }>;
+  attempts: Array<{ responseStatus?: number; sentAt?: string }>;
 }
 
-function channelOf(value: string | undefined): Channel {
-  if (CHANNELS.includes(value as Channel)) return value as Channel;
-  throw new CliError(`say which channel: ${CHANNELS.join(", ")}${value ? `, not "${value}"` : ""}.`);
+const isChannel = (value: string | undefined): value is Channel => CHANNELS.includes(value as Channel);
+
+function channelOf(value: string): Channel {
+  if (isChannel(value)) return value;
+  throw new CliError(`say which channel: ${CHANNELS.join(", ")}, not "${value}".`);
+}
+
+/** A channel's deliveries in the dev session, oldest first. */
+async function deliveriesOf(server: Attached, channel: Channel): Promise<Delivery[]> {
+  const session = segment(await server.devSession());
+  return server.request<Delivery[]>("GET", `/sessions/${session}/${channel}/deliveries`);
+}
+
+/** Every channel's deliveries. A channel this server can't list (live, say) is left out, not an error. */
+async function allDeliveries(server: Attached): Promise<Array<{ channel: Channel; delivery: Delivery }>> {
+  const listed = await Promise.all(
+    CHANNELS.map(async (channel) => {
+      try {
+        return (await deliveriesOf(server, channel)).map((delivery) => ({ channel, delivery }));
+      } catch (error) {
+        if (error instanceof CliError) return [];
+        throw error;
+      }
+    }),
+  );
+  return listed.flat();
+}
+
+const sentAt = (delivery: Delivery) => delivery.attempts[0]?.sentAt ?? "";
+
+function line(delivery: Delivery): string {
+  const what = [delivery.type, delivery.eventType ?? delivery.action].filter(Boolean).join(" ");
+  const attempts = delivery.attempts.map((attempt) => attempt.responseStatus ?? "-").join(", ");
+  return `${delivery.id}  ${what}  ${delivery.status}  (attempts: ${attempts})\n`;
 }
 
 /**
- * `channelstack deliveries <channel>`: what the dev session sent the agent, newest last, one line
+ * `channelstack deliveries [<channel>]`: what the dev session sent the agent, oldest first, one line
  * each: the delivery's id (for `redeliver`), what it was, how it ended and each attempt's status.
+ * Without a channel, every channel's, each line starting with its channel.
  */
 export async function runDeliveries(server: Attached, channel: string | undefined): Promise<string> {
-  const driver = channelOf(channel);
-  const session = segment(await server.devSession());
-  const deliveries = await server.request<Delivery[]>("GET", `/sessions/${session}/${driver}/deliveries`);
-  if (deliveries.length === 0) return `Nothing was delivered to the agent on ${driver} yet.\n`;
-  return deliveries
-    .map((delivery) => {
-      const what = [delivery.type, delivery.eventType ?? delivery.action].filter(Boolean).join(" ");
-      const attempts = delivery.attempts.map((attempt) => attempt.responseStatus ?? "-").join(", ");
-      return `${delivery.id}  ${what}  ${delivery.status}  (attempts: ${attempts})\n`;
-    })
-    .join("");
+  if (channel !== undefined) {
+    const driver = channelOf(channel);
+    const deliveries = await deliveriesOf(server, driver);
+    if (deliveries.length === 0) return `Nothing was delivered to the agent on ${driver} yet.\n`;
+    return deliveries.map(line).join("");
+  }
+  const every = (await allDeliveries(server)).sort((a, b) => sentAt(a.delivery).localeCompare(sentAt(b.delivery)));
+  if (every.length === 0) return "Nothing was delivered to the agent yet.\n";
+  return every.map(({ channel, delivery }) => `${channel.padEnd(7)}${line(delivery)}`).join("");
 }
 
 /**
- * `channelstack redeliver <channel> <delivery>`: send a delivery to the agent again, the way the
- * platform does: Slack retries it (with its retry headers), the others redeliver it.
+ * `channelstack redeliver [<channel>] [last|<delivery>]`: send a delivery to the agent again, the way
+ * the platform does: Slack retries it (with its retry headers), the others redeliver it. `last` (the
+ * default) is the newest delivery, of that channel or of any; an id is found in whichever channel has it.
  */
-export async function runRedeliver(
-  server: Attached,
-  channel: string | undefined,
-  delivery: string | undefined,
-): Promise<string> {
-  const driver = channelOf(channel);
-  if (!delivery) throw new CliError(`say which delivery: an id that \`channelstack deliveries ${driver}\` printed.`);
+export async function runRedeliver(server: Attached, args: readonly string[]): Promise<string> {
+  const [first, second] = args;
+  const channel = isChannel(first) ? first : undefined;
+  const wanted = (channel ? second : first) ?? "last";
+  if (channel === undefined && second !== undefined) channelOf(first ?? "");
+  const candidates =
+    channel === undefined
+      ? await allDeliveries(server)
+      : (await deliveriesOf(server, channel)).map((delivery) => ({ channel, delivery }));
+  const found =
+    wanted === "last"
+      ? candidates.sort((a, b) => sentAt(a.delivery).localeCompare(sentAt(b.delivery))).at(-1)
+      : candidates.find(({ delivery }) => delivery.id === wanted);
+  if (!found) {
+    throw new CliError(
+      wanted === "last"
+        ? `nothing was delivered to the agent${channel ? ` on ${channel}` : ""} yet.`
+        : `no delivery ${wanted}${channel ? ` on ${channel}` : ""}. \`channelstack deliveries\` lists them.`,
+    );
+  }
   const session = segment(await server.devSession());
-  const path = `/sessions/${session}/${driver}/deliveries/${segment(delivery)}`;
-  await server.request("POST", driver === "slack" ? `${path}/retry` : `${path}/redeliver`, {});
-  return `${driver === "slack" ? "Retried" : "Redelivered"} ${delivery}\n`;
+  const path = `/sessions/${session}/${found.channel}/deliveries/${segment(found.delivery.id)}`;
+  await server.request("POST", found.channel === "slack" ? `${path}/retry` : `${path}/redeliver`, {});
+  return `${found.channel === "slack" ? "Retried" : "Redelivered"} ${found.delivery.id} (${found.channel})\n`;
 }

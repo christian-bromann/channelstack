@@ -103,8 +103,8 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
     "list_deliveries",
     {
       description:
-        "What channelstack delivered to the bot on a channel: each delivery's id, event, outcome and attempts.",
-      inputSchema: { channel: z.enum(CHANNELS) },
+        "What channelstack delivered to the bot: each delivery's id, event, outcome and attempts. Every channel's, or one channel's.",
+      inputSchema: { channel: z.enum(CHANNELS).optional() },
     },
     ({ channel }) => tool((attached) => runDeliveries(attached, channel)),
   );
@@ -112,10 +112,19 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
     "redeliver",
     {
       description:
-        "Deliver an event to the bot again, the way the platform does (Slack retries it). Take the id from list_deliveries.",
-      inputSchema: { channel: z.enum(CHANNELS), delivery: z.string().min(1) },
+        "Deliver an event to the bot again, the way the platform does (Slack retries it): the newest delivery, or one by its id from list_deliveries.",
+      inputSchema: {
+        channel: z.enum(CHANNELS).optional(),
+        delivery: z.string().min(1).optional().describe('"last" (the default) or an id from list_deliveries'),
+      },
     },
-    ({ channel, delivery }) => tool((attached) => runRedeliver(attached, channel, delivery)),
+    ({ channel, delivery }) =>
+      tool((attached) =>
+        runRedeliver(
+          attached,
+          [channel, delivery].filter((arg) => arg !== undefined),
+        ),
+      ),
   );
 
   // `tail` remembers where it got to on each attachment: each call returns what happened since the

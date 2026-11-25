@@ -146,11 +146,9 @@ channelstack linear stop     ENG-12
 # Notion
 channelstack notion comment --as ana "Roadmap" "@my-agent summarize the Q1 section"
 
-# Delivery chaos (any channel)
-channelstack deliveries                                   # recent deliveries and their status
-channelstack redeliver last
-channelstack slack retry last --after 3s                  # Slack's retry, with X-Slack-Retry-Num
-channelstack deliver last --bad-signature
+# Deliveries (any channel)
+channelstack deliveries [slack]                           # what was delivered, with ids, outcomes and attempts
+channelstack redeliver [slack] [last|<id>]                # again, as the platform does: Slack's retry, with X-Slack-Retry-Num
 
 # Watching
 channelstack tail                                         # live stream: events in, agent API calls out
@@ -169,7 +167,7 @@ channelstack sweep                                        # live mode: remove le
 
 `--as <name>` creates that user the first time it's used, and `--in "#name"` does the same for channels, so the dev loop needs no seed data either. Repos, Linear teams and Notion pages are created the same way on first mention (`acme/web`, `ENG`, `"Roadmap"`).
 
-`last` always refers to the most recent message, thread, issue or delivery, so a loop of "say, look, fix the code, say again" needs no IDs.
+`last` always refers to the most recent message, thread, issue or delivery, so a loop of "say, look, fix the code, say again" needs no IDs. A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
 
 Everything the CLI does happens in one shared session called `dev`, which the UI shows too. It lives until the server stops ([decision 0010](decisions/0010-dev-session-and-attach-cli.md)).
 
@@ -179,7 +177,7 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
 ```
 
-The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries <channel>`, `channelstack redeliver <channel> <id>`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. `github_comment`, `linear_delegate` and `notion_comment` follow once the dev session can find GitHub, Linear and Notion people and objects by name, as it does Slack's ([#33](https://github.com/christian-bromann/channelstack/issues/33)). The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
+The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. `github_comment`, `linear_delegate` and `notion_comment` follow once the dev session can find GitHub, Linear and Notion people and objects by name, as it does Slack's ([#33](https://github.com/christian-bromann/channelstack/issues/33)). The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
 
 ## 5. Tests: plug into Vitest, Playwright, WebdriverIO and pytest
 

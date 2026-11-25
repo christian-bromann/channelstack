@@ -24,10 +24,10 @@ Everything happens in one long-lived `dev` session, shared with the CLI and the 
 1. **Act as a person.** `slack_say` with `as: "ana"`, `channel: "#support"`, `text: "@my-agent summarize today"`. Follow up with `slack_reply`, `slack_react`, `slack_click` (a button's label) or `slack_stop`.
 2. **Read the answer.** `show_thread` shows the latest conversation as a person reads it. The bot works asynchronously: if its reply isn't there yet, call it again.
 3. **See why.** `tail` returns what happened since its last call: events delivered to the bot (`→ slack app_mention  200`) and the API calls it made (`← slack chat.postMessage  200`). A delivery that failed, or a call refused with an error code, is usually the bug.
-4. **Change the bot, then send the same event again.** `list_deliveries` with `channel: "slack"` lists them with ids; `redeliver` sends one again, the way Slack retries (with its retry headers). A bot that answers twice doesn't handle retries.
+4. **Change the bot, then send the same event again.** `list_deliveries` lists them with ids (`channel: "slack"` for Slack's only); `redeliver` sends the newest again (or one by `delivery` id), the way Slack retries (with its retry headers). A bot that answers twice doesn't handle retries.
 5. **Check again** with `show_thread`.
 
-The same commands exist on the CLI: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, `channelstack show`, `channelstack tail`, `channelstack deliveries slack`, `channelstack redeliver slack <id>`.
+The same commands exist on the CLI: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, `channelstack show`, `channelstack tail`, `channelstack deliveries`, `channelstack redeliver last`.
 
 ## Then write the test
 

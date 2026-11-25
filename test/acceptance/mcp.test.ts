@@ -71,7 +71,7 @@ test("an MCP client posts as a person and reads the agent's reply", async () => 
         const [delivery] = deliveries.split(" ");
         expect(deliveries).toMatch(/^Ev\w+ {2}event_callback app_mention {2}acknowledged {2}\(attempts: 200\)$/m);
         const again = await client.callTool({ name: "redeliver", arguments: { channel: "slack", delivery } });
-        expect(text(again)).toBe(`Retried ${delivery}\n`);
+        expect(text(again)).toBe(`Retried ${delivery} (slack)\n`);
         // The bot got it a second time: the delivery has a second attempt.
         await waitFor("the delivery's second attempt", async () => {
           const listed = text(await client.callTool({ name: "list_deliveries", arguments: { channel: "slack" } }));
