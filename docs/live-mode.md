@@ -56,8 +56,9 @@ All from environment variables in CI. None is committed or logged, and the contr
 | GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` | `CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN` (fine-grained PAT, machine account) |
 | Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key) |
 | Notion | `CHANNELSTACK_NOTION_TOKEN` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) |
+| Resend | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key), and the agent's address in `CHANNELSTACK_RESEND_ADDRESS` | `CHANNELSTACK_RESEND_USER_ANA_TOKEN`: a key of Ana's **own** Resend team, with a verified domain her address is on. Every recipient must be at a domain in `CHANNELSTACK_LIVE_RESEND_DOMAINS` |
 
-The agents' side of a live run, for the reference agents `pnpm live` runs: `CHANNELSTACK_GITHUB_WEBHOOK_SECRET` (the App's webhook secret), `CHANNELSTACK_NOTION_VERIFICATION_TOKEN` and `CHANNELSTACK_LINEAR_WEBHOOK_SECRET` (what Notion and Linear sign with), and `CHANNELSTACK_NOTION_RELAY_URL` and `CHANNELSTACK_LINEAR_RELAY_URL`, the smee.io channels their webhooks point at (GitHub's is read from the App). A relay channel is public: it suits test sandboxes only.
+The agents' side of a live run, for the reference agents `pnpm live` runs: `CHANNELSTACK_GITHUB_WEBHOOK_SECRET` (the App's webhook secret), `CHANNELSTACK_NOTION_VERIFICATION_TOKEN` and `CHANNELSTACK_LINEAR_WEBHOOK_SECRET` (what Notion and Linear sign with), `CHANNELSTACK_RESEND_WEBHOOK_SECRET` (what the agent's Resend webhook signs with), and `CHANNELSTACK_NOTION_RELAY_URL`, `CHANNELSTACK_LINEAR_RELAY_URL` and `CHANNELSTACK_RESEND_RELAY_URL`, the smee.io channels their webhooks point at (GitHub's is read from the App). A relay channel is public: it suits test sandboxes only.
 
 The browser actor (A3) needs no secret in the environment: it uses the session saved by `channelstack login slack --user ana` (section 5).
 

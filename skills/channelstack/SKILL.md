@@ -51,4 +51,4 @@ pytest is the same with `pytest-channelstack`: `await expect(msg.thread).to_have
 - State is in memory: restarting the server starts from nothing. Run `npx channelstack env` again only after `channelstack secrets rotate`.
 - channelstack doesn't run the bot or its model. Use your framework's fake model in tests.
 - The tools never return the server's token. Don't paste tokens from `.env` into chat either.
-- GitHub, Linear and Notion have no MCP tools beyond `list_deliveries` and `redeliver`; drive them from a test.
+- GitHub, Linear, Notion and Resend have no MCP tools beyond `list_deliveries` and `redeliver`; drive them from a test.

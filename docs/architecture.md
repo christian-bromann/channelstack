@@ -80,6 +80,9 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | Tokens | `lin_oauth_…`, `lin_api_…` |
 | Notion | Every object | UUIDs (v4), dashed in the API and as 32 hex characters in URLs |
 | | Tokens | `ntn_…` |
+| Resend | Email, domain, webhook | UUIDs (v4). A webhook message is Svix's `msg_` and 27 base-62 characters (`svix-id`); a `Message-ID` is `<24 lowercase characters@domain>` |
+| | People | A person is their mailbox: their id is their address |
+| | Tokens | `re_<8>_<24>` API keys, `whsec_…` webhook secrets (base64 of 24 bytes) |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
 - **Sequential where the platform is:** GitHub issue numbers, Linear identifiers, Slack `ts`.

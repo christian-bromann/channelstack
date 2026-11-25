@@ -283,6 +283,33 @@ const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
       stops,
     );
   },
+
+  // Resend: the agent's team's webhook goes to CHANNELSTACK_RESEND_RELAY_URL.
+  async resend(env, stops, { dir, path }) {
+    const key = env.CHANNELSTACK_RESEND_API_KEY;
+    if (!(key && env.CHANNELSTACK_RESEND_WEBHOOK_SECRET && isRelay(env.CHANNELSTACK_RESEND_RELAY_URL))) {
+      if (key) {
+        say(
+          "Resend: no CHANNELSTACK_RESEND_WEBHOOK_SECRET and smee.io CHANNELSTACK_RESEND_RELAY_URL, so no agent runs here",
+        );
+      }
+      return;
+    }
+    await webhookAgent(
+      "Resend",
+      {
+        dir,
+        path,
+        source: env.CHANNELSTACK_RESEND_RELAY_URL as string,
+        env: {
+          RESEND_API_KEY: key,
+          RESEND_WEBHOOK_SECRET: env.CHANNELSTACK_RESEND_WEBHOOK_SECRET,
+          ...(env.CHANNELSTACK_RESEND_ADDRESS ? { RESEND_FROM: `my-agent <${env.CHANNELSTACK_RESEND_ADDRESS}>` } : {}),
+        },
+      },
+      stops,
+    );
+  },
 };
 
 /**

@@ -44,6 +44,7 @@ channelstack is an independent project: the fake platforms are channelstack's ow
 | GitHub | Repos with an in-memory git store, issues, PRs, reviews, check runs, App installations, signed webhooks with GUIDs, the App delivery log and redelivery |
 | Linear | Teams, issues, comments, delegation, agent sessions and activities, the stop signal, signed webhooks |
 | Notion | Pages, blocks, databases, comments and discussions, connections, signed integration webhooks |
+| Resend | Email to and from the agent's team: sending, the receiving API, Svix-signed webhooks, Resend's test addresses ([decision 0021](decisions/0021-email-channels.md)) |
 
 ## 2. First run
 
@@ -78,6 +79,7 @@ Point the agent at it, using only options the SDKs already have. When the variab
 | GitHub (Octokit, Probot) | `baseUrl` | `GITHUB_API_URL=https://github.localhost`, with `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY` (a PEM in one line), `GITHUB_WEBHOOK_SECRET`, `GITHUB_INSTALLATION_ID` |
 | Linear (`@linear/sdk`) | `apiUrl` | `LINEAR_API_URL=https://linear.localhost/graphql` |
 | Notion (`@notionhq/client`) | `baseUrl` | `NOTION_BASE_URL=https://notion.localhost` |
+| Resend (`resend`) | the environment | `RESEND_BASE_URL=https://resend.localhost` |
 | Chat SDK, Mastra, Flue | the adapter's API URL option | the same variables |
 
 ```bash
@@ -97,6 +99,7 @@ There is no config file. Each fake comes with your agent's app already installed
 | GitHub | The App `my-agent` (its bot is `my-agent[bot]`), with write access to issues, pull requests, contents, checks and statuses, subscribed to issue, comment, pull request, review, push and check run events |
 | Linear | An agent app, subscribed to `AgentSessionEvent`, `Issue` and `Comment` webhooks |
 | Notion | An integration with every capability, subscribed to `page.*` and `comment.*` events |
+| Resend | A team with one verified domain (`acme.example`) that sends and receives, its address `my-agent@acme.example`, its webhook subscribed to every `email.*` event |
 
 Where each fake delivers events comes from the server's environment, one variable per channel: `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, with `SLACK`, `GITHUB`, `LINEAR` or `NOTION`.
 
@@ -255,6 +258,7 @@ await ana.reply("thanks!", { discussion });
 | GitHub | `push(changes, { repo, branch })` · `openIssue({ title }, { repo })` · `openPullRequest({ from }, { repo })` · `comment(text, { issue })` (an issue or a PR) · `review({ pr, event, comments })` · `reviewComment(text, { pr, path, line })` · `reply(text, { comment })` · `resolve({ comment })` · `label(names, { issue })` · `assign(people, { issue })` · `requestReview(people, { pr })` · `merge({ pr })` · `rerun({ checkRun })` |
 | Linear | `createIssue({ title }, { team })` · `comment(text, { issue })` · `reply(text, { comment })` · `delegate(linear.app, { issue })` · `prompt(text, { session })` · `answer(text, { elicitation })` · `stop({ session })` · `assign(user, { issue })` · `setState(name, { issue })` |
 | Notion | `comment(text, { page, anchor? })` · `reply(text, { discussion })` · `resolve({ discussion })` · `edit({ append }, { page })` · `mention(notion.app, { page })` · `setProperty(name, value, { page })` · `addRow(values, { database })` · `connect(notion.app, { page })` |
+| Resend | `send({ to, cc, subject, text, html })` · `reply(email, { text, all })` · `inbox()` · `waitForEmail({ from })` |
 
 Why this shape:
 - **It reads as a sentence:** "Ana says … in the channel", "Ben clicks Approve on the reply". Autocomplete on `ana.` shows everything a person can do on that platform.
@@ -386,6 +390,7 @@ Every matcher reads the **transcript**: each channel's state reduced to what a p
 | GitHub | `toHaveCommentFrom(app)`, `toHaveCommentsFrom(app, { count })`, `toHaveReviewComment({ path, line, from })`, `toHaveCheckRun(name, { status, conclusion })`, `toHaveLabel(name)`, `toBeMerged()` |
 | Linear | `toHaveSessionState("pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error")`, `toHaveActivity({ type, from, text })`, `toHaveCommentFrom(app)`, `toBeDelegatedTo(app)`, `toBeAssignedTo(user)`, `toHaveState(name)` |
 | Notion | `toHaveCommentFrom(app)` and `toHaveCommentsFrom(app, { count })` on a discussion, `toHaveBlock(text \| RegExp)`, `toHavePropertyValue(name, value)` (asymmetric matchers such as `expect.any(Number)` work) |
+| Resend | `toHaveReplyFrom(app)` and `toHaveRepliesFrom(app, { count })` on a thread: its answers, without the quoted history |
 | Any delivery | `toBeAccepted({ within: "3s" })`, `toBeRejected()` (bad signature), `toBeRetried({ times })` |
 
 The matchers assert on **behaviour** (once, in the thread, stopped, acknowledged in time, on the right line), not on exact wording. So they hold whether the agent uses a real model or a fake one.

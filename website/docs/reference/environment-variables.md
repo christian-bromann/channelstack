@@ -26,7 +26,7 @@ An empty variable counts as not set everywhere.
 | `CHANNELSTACK_SERVER_FILE` | `<home>/server.json` | Where `start` writes the control API's URL and token (0600). `--server-file` wins. The attach CLI reads it too |
 | `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the app. Read once, when the server starts |
 
-`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR` or `NOTION`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`.
+`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION` or `RESEND`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`.
 
 An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. See [Connecting your app](/docs/guide/connecting-your-agent).
 
@@ -51,6 +51,7 @@ The SDKs read a person's token from the environment when a test leaves `token` o
 | `CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN` | `github.createUser({ login })`: a machine user's fine-grained PAT |
 | `CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN` | `linear.createUser({ name })`: a personal API key |
 | `CHANNELSTACK_NOTION_USER_<NAME>_TOKEN` | `notion.createUser({ name })`: a personal access token |
+| `CHANNELSTACK_RESEND_USER_<NAME>_TOKEN` | `resend.createUser({ name })`: an API key of the person's own Resend team, with a verified domain their address is on |
 
 `<NAME>` is the name in upper case with every run of other characters as `_`: `Ana` is `ANA`, `ana-smith` is `ANA_SMITH`, the login `ana-channelstack` is `ANA_CHANNELSTACK`.
 
@@ -64,6 +65,7 @@ Read by the **server**. A channel runs live when every one of its credentials is
 | GitHub | `CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY` (the App's PEM) | `CHANNELSTACK_LIVE_GITHUB_ORGS`: account logins the App is installed on | |
 | Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LIVE_LINEAR_WORKSPACES`: organization ids | |
 | Notion | `CHANNELSTACK_NOTION_TOKEN` (the integration's token) | `CHANNELSTACK_LIVE_NOTION_WORKSPACES`: workspace ids | `CHANNELSTACK_NOTION_PAGE`, `CHANNELSTACK_NOTION_UNSEEN_PAGE` |
+| Resend | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key, `re_…`) | `CHANNELSTACK_LIVE_RESEND_DOMAINS`: the domains mail may go to. Every recipient is checked before anything is sent | `CHANNELSTACK_RESEND_ADDRESS` |
 
 Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace; anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
 
@@ -73,6 +75,7 @@ Allowlists are comma-separated. Live mode acts only where its allowlist names th
 | `CHANNELSTACK_RUN_ID` | random (10 characters) | The run's id, in the tag every live object carries (`channelstack-run-<id>`) and for `channelstack sweep --run`. 1 to 24 letters and digits, lowercased; 7 or more digits in a row are written in base 36 (Linear refuses names that look like phone numbers). CI sets it to the job's |
 | `CHANNELSTACK_NOTION_PAGE` | the only top-level page the integration sees | The page live Notion tests create their pages under. Needed when the integration sees more than one |
 | `CHANNELSTACK_NOTION_UNSEEN_PAGE` | none | A page the people can write in and the integration isn't connected to, for tests that create a page the integration can't see |
+| `CHANNELSTACK_RESEND_ADDRESS` | `my-agent@` the team's first verified domain | Where people email the agent live: an address on its team's receiving domain |
 
 Live credentials stay in the server's memory. They are never logged, never returned by the control API, and `channelstack env` prints nothing for a live channel.
 
@@ -104,6 +107,10 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `NOTION_BASE_URL` | Notion | E.g. `https://notion.localhost` |
 | `NOTION_TOKEN` | Notion | The integration's token |
 | `NOTION_VERIFICATION_TOKEN` | Notion | What webhook deliveries are signed with |
+| `RESEND_BASE_URL` | Resend | E.g. `https://resend.localhost`. The `resend` SDK reads it itself |
+| `RESEND_API_KEY` | Resend | The agent's team's key (`re_…`) |
+| `RESEND_WEBHOOK_SECRET` | Resend | What webhook deliveries are signed with (`whsec_…`) |
+| `RESEND_FROM` | Resend | The address the agent sends from, with its name: `my-agent <my-agent@acme.example>` |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
 The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.

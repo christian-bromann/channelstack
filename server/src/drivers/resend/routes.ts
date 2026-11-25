@@ -22,6 +22,7 @@ import {
 } from "../../core/router/inspect.ts";
 import type { ResendWorld } from "./backend.ts";
 import type { FakeResendWorld } from "./fake/world.ts";
+import { RESEND_API } from "./live/client.ts";
 import type { ResendEmailRecord, ResendUserRecord } from "./world.ts";
 
 const ResendPrincipal = principalSchema("ResendPrincipal");
@@ -210,7 +211,7 @@ export function registerResendRoutes(
     response: ResendFixture,
     factory: { on: "Session", name: "resend" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: deps.live ? "https://api.resend.com" : deps.apiUrl() }),
+    handler: () => ({ app: appWire(), apiUrl: deps.live ? RESEND_API : deps.apiUrl() }),
   });
 
   router.route({

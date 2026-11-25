@@ -5,14 +5,12 @@ import {
   messageId,
   messageIdsIn,
   parseAddresses,
-  replyHeaders,
-  replySubject,
   threadOf,
 } from "../../../core/email/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import type { TranscriptPrincipal } from "../../../core/router/inspect.ts";
 import { RESEND_IDS } from "../ids.ts";
+import { principalOf, replyOf } from "../mail.ts";
 import { resendPayloads } from "../payloads.ts";
 import { RESEND_SECRETS } from "../secrets.ts";
 import { signResendWebhook } from "../signing.ts";
@@ -110,17 +108,9 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
 
   const isApp = (mailbox: Mailbox) => mailbox.address === store.app.address;
 
-  /** Who wrote an email, as a transcript names them. */
-  const principalOf = (email: ResendEmailRecord): TranscriptPrincipal => {
-    if (email.author === store.app.id) return { id: store.app.id, name: store.app.name, kind: "app" };
-    const person = email.author === undefined ? undefined : store.users.find(email.author);
-    if (person) return { id: person.id, name: person.name, kind: "user" };
-    return { id: email.from.address, name: email.from.name || email.from.address, kind: "user" };
-  };
-
   return {
     store,
-    principalOf,
+    principalOf: (email: ResendEmailRecord) => principalOf(store, email),
     isApp,
 
     /** A person: a mailbox at `<name>@example.com` unless the test gives an address. Their id is their address. */
@@ -198,19 +188,10 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
       to: ResendEmailRecord,
       input: { text: string | undefined; html: string | undefined; all: boolean },
     ): ResendEmailRecord {
-      const sender = to.replyTo.length > 0 ? to.replyTo : [to.from];
-      const others = input.all
-        ? [...to.to, ...to.cc].filter(
-            (mailbox) => mailbox.address !== person.address && !sender.some((s) => s.address === mailbox.address),
-          )
-        : [];
       return this.personSends(session, person, {
-        to: sender,
-        cc: others,
-        subject: replySubject(to.subject),
+        ...replyOf(person, to, input.all),
         text: input.text,
         html: input.html,
-        ...replyHeaders({ messageId: to.messageId, references: to.references }),
       });
     },
 

@@ -55,6 +55,7 @@ Each channel is a fixture your test receives by name (`async ({ slack, github })
 | GitHub  | `github` | Apps and installations, issues and pull requests, reviews, check runs            |
 | Linear  | `linear` | Teams, issues and comments, delegation, agent sessions, activities and Stop      |
 | Notion  | `notion` | Pages and databases, comments and discussions, connections and webhooks          |
+| Resend  | `resend` | Email to the agent and its answers in the thread, the receiving API, Svix-signed webhooks |
 
 The same tests can also run against the real platforms in sandbox workspaces ([live mode](docs/live-mode.md)).
 
@@ -93,7 +94,7 @@ import channelstack from "channelstack/vitest";
 export default defineConfig({ plugins: [channelstack()] });
 ```
 
-There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
+There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
 
 ## Status
 

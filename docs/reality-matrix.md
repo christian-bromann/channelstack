@@ -207,6 +207,24 @@ Notion now has **personal access tokens** that act as the person who created the
 | `notion.sendVerification()` | Done | No | — | Fake-only: the `{ verification_token }` request Notion sends once when a subscription is created |
 | Events the integration caused itself | Done | Yes | — | **unverified**: the fake sends them (its own comments, edits and property changes), with the bot in `authors`, so an agent must ignore its own. The checks assume that |
 
+## Resend
+
+Built in phase 8, against stand-ins; checked against real Resend teams once the sandbox teams exist (exit check 8.7). An agent on Resend has a team: an API key and a verified domain that sends and receives. With its key set (`CHANNELSTACK_RESEND_API_KEY`), Resend runs live: each person is a team of their own (`CHANNELSTACK_RESEND_USER_<NAME>_TOKEN`), with an address on that team's verified domain. A person's email goes out through Resend from their team; the agent's answers are read back from what that team received. The agent's address is `CHANNELSTACK_RESEND_ADDRESS`, or `my-agent@` its team's domain.
+
+Sent email can't be taken back. Live, every recipient must be at a domain in `CHANNELSTACK_LIVE_RESEND_DOMAINS` (or a `@resend.dev` test address), checked before Resend is asked to send; a run tags what it sends with an `X-Channelstack-Run` header. The sweep has nothing to remove.
+
+| Feature | Fake | Live | How (live) | Notes |
+|---|---|---|---|---|
+| `resend.createUser({ name, address, token })` | Done | Built | The person's own team's key; their address on its verified domain | A person is their mailbox: their `id` is their address. In the fake, `<name>@example.com` |
+| `ana.send({ to, cc, subject, text, html })` | Done | Built | `POST /emails` with the person's key | To the agent's address it reaches the agent's team as a received email (`email.received`). Attachments aren't built yet, fake or live |
+| `ana.reply(email, { text, all })` | Done | Built | `POST /emails`, with `In-Reply-To` and `References` | `Re:` its subject, to its sender (`Reply-To` first), and with `all` to everyone on it |
+| `ana.inbox()`, `waitForEmail` | Done | Built | The person's team's receiving API | Read again before each read (cached for a second) |
+| `thread.messages()`, `replies()`, `transcript()`, `toHaveReplyFrom` | Done | Built | Each person's received mail | A thread is the emails joined by `In-Reply-To` and `References`. A transcript has each email's own words, without the quoted history |
+| The agent's API (`emails.send`, `batch.send`, `emails.receiving.get` and `list`, `emails.get`, `domains.list`) | Done | Agent's concern | — | The fake answers as Resend's description says (exit check 8.3), with Resend's error shape (`{ statusCode, name, message }`), `Idempotency-Key`, the `@resend.dev` test addresses, and 10 requests a second (counted per test session in the fake) |
+| Webhook deliveries (`email.received`, `email.sent`, `email.delivered`, …) | Done | Agent's concern | — | Resend delivers to the agent's own URL. The fake signs as Svix does (`svix-id`, `svix-timestamp`, `svix-signature`) and retries on Resend's schedule (5 s, 5 min, 30 min, 2, 5, 10 and 10 h) |
+| `delivery.resend()` / redelivery | Done | No | — | Fake-only. Resend replays a webhook only from its dashboard |
+| `resend.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Resend doesn't report the team's calls |
+
 ---
 
 ## What this means for test authors
