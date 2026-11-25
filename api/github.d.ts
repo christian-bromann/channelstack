@@ -9,7 +9,7 @@ import type {
 
 /** The `github` test fixture: one in-memory organization. */
 export interface GitHubFixture extends Inspectable<GitHubDelivery> {
-  /** The agent's GitHub App from `channelstack.config.ts`. Install it on repos explicitly. */
+  /** The agent's GitHub App, built in as `my-agent` (its bot is `my-agent[bot]`). Install it on repos explicitly. */
   readonly app: GitHubApp;
   /** Base URL to give the agent (Octokit `baseUrl`), e.g. `https://github.localhost`. */
   readonly apiUrl: string;

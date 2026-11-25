@@ -132,7 +132,7 @@ export interface ChannelstackMatchers<R = unknown> {
 export interface TextOptions extends QuietOptions {
   /** Only entries by this author. */
   from?: AuthorRef;
-  /** Read the transcript as this person (ephemeral messages included only for them). */
+  /** Slack only: read the transcript as this person (ephemeral messages included only for them). */
   as?: Principal;
 }
 

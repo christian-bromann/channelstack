@@ -12,8 +12,9 @@
  * - Text inputs are `RichText`: `@name` becomes a real mention of that user or app on the
  *   platform (`<@U…>` in Slack, `@login` on GitHub, a mention node in Linear and Notion).
  *   Write `@@` for a literal `@`.
- * - Created resources implement `AsyncDisposable`. Fixtures clean up at the end of each
- *   test, so `await using` is only needed outside fixtures. Disposing never asserts.
+ * - Fixtures clean up what a test created when it ends, so a test never disposes of
+ *   anything itself. Only the client, a session and a Slack fault implement `AsyncDisposable`
+ *   (`await using`), for code outside the fixtures. Disposing never asserts.
  */
 
 /** A duration: milliseconds as a number, or `"250ms"`, `"3s"`, `"1m"`. */
@@ -28,14 +29,15 @@ export type ChannelKind = "slack" | "github" | "linear" | "notion";
 export type RichText = string;
 
 export interface WaitOptions {
-  /** Give up after this long. Default: 10s (configurable per test framework integration). */
+  /** Give up after this long. Default: 10s, or the test framework integration's `timeout`. */
   timeout?: Duration;
 }
 
 export interface QuietOptions extends WaitOptions {
   /**
    * For negative and exact-count checks: how long the agent must be quiet (no open
-   * stream, no API call in flight) before the check is evaluated. Default: 750ms.
+   * stream, no API call in flight) before the check is evaluated. Default: 750ms, or the test
+   * framework integration's `quietFor`.
    */
   quietFor?: Duration;
 }
@@ -53,7 +55,7 @@ export interface User extends Principal {
   readonly kind: "user";
 }
 
-/** The agent's app on a channel, as described in `channelstack.config.ts`. One per channel. */
+/** The agent's app on a channel: built into each fake as `my-agent`. One per channel. */
 export interface App extends Principal {
   readonly kind: "app";
   /** The app's bot or actor user id on the platform (Slack `U…`, GitHub `<slug>[bot]` id). */
@@ -63,13 +65,11 @@ export interface App extends Principal {
 /** Anything that can be named as an author in a matcher: a handle or its `name`. */
 export type AuthorRef = Principal | string;
 
-/** Something channelstack created for a test. */
-export interface Resource extends AsyncDisposable {
+/** Something channelstack created for a test. The test's session removes it when the test ends. */
+export interface Resource {
   readonly channel: ChannelKind;
   /** The platform's own id, in its real format (`C08E1F2G3H4`, a Linear or Notion UUID, …), in fake mode too. */
   readonly id: string;
-  /** Link to this resource in the channelstack UI. */
-  readonly uiUrl: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,13 +104,10 @@ export interface DeliveryAttempt {
   readonly forgedSignature: boolean;
 }
 
+/** How to resend a delivery. Every platform takes `badSignature`; Slack and Linear add `stale`, Slack adds `headers`. */
 export interface ResendOptions {
   /** Sign with the wrong secret. The agent should reject it. */
   badSignature?: boolean;
-  /** Send with a timestamp outside the platform's replay window. */
-  stale?: boolean;
-  /** Override or add headers for this attempt. */
-  headers?: Record<string, string>;
 }
 
 /** An event, interaction or webhook channelstack sent to the agent, with every attempt. */
@@ -127,14 +124,12 @@ export interface Delivery<TType extends string = string, TPayload = unknown> {
   /** Wait until the latest attempt reaches a final status. Resolves with the delivery, read again. */
   settled(options?: WaitOptions): Promise<this>;
 
-  /** Send the same delivery again, unchanged or with a twist (bad signature, stale timestamp). */
+  /** Send the same delivery again, unchanged or with a twist (a bad signature). */
   resend(options?: ResendOptions): Promise<DeliveryAttempt>;
 }
 
 export interface DeliveryFilter {
   type?: string | RegExp;
-  status?: DeliveryStatus | DeliveryStatus[];
-  since?: Timestamp;
   /** Only deliveries caused by actions on this resource. */
   resource?: Resource;
 }
@@ -157,8 +152,6 @@ export interface ApiCall {
   readonly response: unknown;
   /** The platform error code channelstack returned, e.g. `not_in_channel`, `missing_scope`. */
   readonly error?: string;
-  /** The app identity the call authenticated as. */
-  readonly app?: App;
 }
 
 export interface ApiCallFilter {
@@ -208,7 +201,7 @@ export interface TranscriptEntry {
 }
 
 export interface HasTranscript {
-  transcript(options?: { as?: Principal }): Promise<Transcript>;
+  transcript(): Promise<Transcript>;
 }
 
 /** Files in a test: inline contents, or a path to a fixture file or directory. */
