@@ -1,6 +1,6 @@
 // Runs after the static build: every link inside a docs page to another page of the site must
 // reach a page, and its #anchor a heading there. The API reference is generated, so this is also
-// what catches a heading id that codegen/src/emit/docs.ts and plugins/rehype-headings.ts make differently.
+// what catches a generated link to a heading that isn't there.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 

@@ -5,6 +5,7 @@
  *
  * The pages land in website/docs/reference/api/, and `pnpm sdk:check` fails when they're stale.
  */
+import { headingIds, slugify } from "../../../website/plugins/slug.ts";
 import type { Ir, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
 import { pythonName } from "./python.ts";
 import { rustName } from "./rust.ts";
@@ -32,14 +33,6 @@ type Page = (typeof PAGES)[number];
 
 /** `echo` is channelstack's own test platform: it isn't documented. */
 const INTERNAL = "Echo";
-
-/** A heading's id, as website/plugins/rehype-headings.ts makes it. The link check in the site's build catches a mismatch. */
-const slugify = (text: string) =>
-  text
-    .toLowerCase()
-    .replace(/[`'"’]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 
 /** Prose from the routes, safe in MDX: braces and `<` outside code spans are escaped. */
 const prose = (text: string) =>
@@ -105,16 +98,13 @@ export function emitDocs(ir: Ir): Map<string, string> {
     return name === receiver ? "updated" : name;
   };
 
-  // Every heading's anchor, in page order, the way the site dedupes them: `refresh`, `refresh-1`, …
+  // Every heading's anchor, in page order, with the ids the site gives them: `refresh`, `refresh-1`, …
   const anchors = new Map<string, string>();
-  const seen = new Map<string, Map<string, number>>();
+  const ids = new Map<string, (heading: string) => string>();
   const anchor = (page: Page, key: string, heading: string): string => {
-    const counts = seen.get(page.slug) ?? new Map<string, number>();
-    seen.set(page.slug, counts);
-    const base = slugify(heading);
-    const count = counts.get(base) ?? 0;
-    counts.set(base, count + 1);
-    const id = count === 0 ? base : `${base}-${count}`;
+    const idOf = ids.get(page.slug) ?? headingIds();
+    ids.set(page.slug, idOf);
+    const id = idOf(heading);
     anchors.set(key, `${ROUTE}/${page.slug}#${id}`);
     return id;
   };
@@ -422,7 +412,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
       alias(`type:${type.name}`, `type-heading:${type.name}`);
     }
   }
-  seen.clear();
+  ids.clear();
 
   const files = new Map<string, string>();
   for (const { page, resources, types } of plan) {
