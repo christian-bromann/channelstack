@@ -30,7 +30,12 @@ export type Principal = User | App;
 export type AuthorRef = Principal | string;
 export type Resource = G.SlackConversation | G.GitHubRepo | G.LinearTeam | G.NotionPage | G.NotionDatabase;
 
-export type Delivery = G.SlackDelivery | G.GitHubDelivery | G.LinearDelivery | G.NotionDelivery;
+type AnyDelivery = G.SlackDelivery | G.GitHubDelivery | G.LinearDelivery | G.NotionDelivery;
+/** A delivery of any channel, narrowed by its `type` and `payload` as the contract's `Delivery<TType, TPayload>` is. */
+export type Delivery<TType extends string = string, TPayload = unknown> = AnyDelivery & {
+  readonly type: TType;
+  readonly payload: TPayload;
+};
 export type DeliveryStatus = Delivery["status"];
 export type DeliveryTransport = G.DeliveryAttempt["transport"];
 export type SlackDeliveryType = G.SlackDelivery["type"];
@@ -42,8 +47,16 @@ export type DeliveryFilter =
 
 export type ApiCall = G.SlackApiCall | G.GitHubApiCall | G.LinearApiCall | G.NotionApiCall;
 export type ApiCallFilter = Option<G.SlackFixture["calls"]>;
-/** What every channel fixture has to inspect what the agent did. */
-export type Inspectable = G.SlackFixture | G.GitHubFixture | G.LinearFixture | G.NotionFixture;
+/** What every channel fixture has to inspect what the agent did: the fixture whose deliveries are `TDelivery`. */
+export type Inspectable<TDelivery extends Delivery = Delivery> = TDelivery extends G.SlackDelivery
+  ? G.SlackFixture
+  : TDelivery extends G.GitHubDelivery
+    ? G.GitHubFixture
+    : TDelivery extends G.LinearDelivery
+      ? G.LinearFixture
+      : TDelivery extends G.NotionDelivery
+        ? G.NotionFixture
+        : never;
 
 export type Transcript = G.SlackTranscript | G.GitHubTranscript | G.LinearTranscript | G.NotionTranscript;
 export type TranscriptEntry = Transcript["entries"][number];

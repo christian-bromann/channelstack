@@ -171,6 +171,9 @@ try {
       `import type { ${names.join(", ")} } from "channelstack";`,
       'import { connect } from "channelstack";',
       `export type Every = [${names.join(", ")}];`,
+      // The contract's generic types take their type arguments here too.
+      'export const narrowed = (delivery: Delivery<"app_mention">): "app_mention" => delivery.type;',
+      "export const inspected = (slack: SlackFixture): Inspectable<SlackDelivery> => slack;",
       "export const open = connect;",
       "",
     ].join("\n"),
