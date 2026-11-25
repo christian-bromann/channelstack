@@ -48,7 +48,7 @@ const EXAMPLES: Example[] = [
     ],
     notes: [
       <>
-        Delivers a signed <code>message.im</code> event to your agent
+        Delivers a signed <code>message.im</code> event to your app
       </>,
       <>
         Sends <code>block_actions</code> when Ana clicks Approve

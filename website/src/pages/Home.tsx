@@ -29,7 +29,7 @@ const CHANNELS = [
   {
     id: "slack",
     name: "Slack",
-    text: "DMs, mentions, threads and the agent view, with progress streams rendered the way people see them.",
+    text: "DMs, mentions, threads, buttons and the agent view, with progress streams rendered the way people see them.",
     chips: ["Events API", "block_actions", "chat.startStream", "assistant.threads", "agent_session_stopped"],
   },
   {
@@ -41,7 +41,7 @@ const CHANNELS = [
   {
     id: "linear",
     name: "Linear",
-    text: "Agent sessions end to end: delegation, prompts, questions, activities and the Stop signal.",
+    text: "Issues, comments and their webhooks, and agent sessions end to end: delegation, prompts, activities and Stop.",
     chips: ["delegation", "AgentSessionEvent", "agentActivityCreate", "stop signal"],
   },
   {
@@ -55,12 +55,12 @@ const CHANNELS = [
 const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
   {
     icon: <Route size={22} />,
-    title: "Your agent’s real code path",
+    title: "Your app’s real code path",
     body: (
       <>
-        <code>channelstack env</code> points your agent’s own SDKs at <code>slack.localhost</code>,{" "}
-        <code>github.localhost</code> and friends. Agents with hard-coded hosts use proxy mode instead: set{" "}
-        <code>HTTPS_PROXY</code> and trust a CA that only that agent sees.
+        <code>channelstack env</code> points your app’s own SDKs at <code>slack.localhost</code>,{" "}
+        <code>github.localhost</code> and friends. Apps with hard-coded hosts use proxy mode instead: set{" "}
+        <code>HTTPS_PROXY</code> and trust a CA that only that app sees.
       </>
     ),
   },
@@ -100,14 +100,14 @@ const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
 type Cell = [tone: "y" | "n" | "p", text: string];
 const COMPARE: Array<[string, Cell, Cell, Cell, Cell]> = [
   [
-    "Agent code unchanged",
+    "Your code unchanged",
     ["n", "No"],
     ["p", "Base URL overrides"],
     ["y", "Yes"],
     ["y", "Yes: a base URL, or a proxy"],
   ],
   [
-    "Platform calls your agent",
+    "Platform calls your app",
     ["n", "No"],
     ["p", "Some webhooks"],
     ["y", "Yes"],
@@ -137,15 +137,16 @@ export default function Home() {
             <HeroWaves />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
-              Test harness for agents that live in chat
+              Test harness for Slack, GitHub, Linear and Notion apps
             </p>
             <h1 id="hero-title">
-              Your agent’s whole world, <em>on localhost.</em>
+              Your app’s whole world, <em>on localhost.</em>
             </h1>
             <p className="lede">
-              channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine. Script the
-              people, let your agent answer through its real code path, and assert on the conversation a person would
-              see. Signed webhooks, real payload shapes and real ids, with no changes to how your agent works.
+              channelstack recreates <strong>Slack, GitHub, Linear and Notion</strong> on your machine, for the bots,
+              integrations and AI agents you build on them. Script the people, let your app answer through its real
+              code path, and assert on what a person would see. Signed webhooks, real payload shapes and real ids, with
+              no changes to how your app works.
             </p>
             <div className="cta">
               <a className="btn primary" href="#quick-start">
@@ -172,10 +173,10 @@ export default function Home() {
           <div className="wrap">
             <div className="sec-head">
               <p className="kicker">Four platforms, one API</p>
-              <h2 id="channels-title">Everywhere your agent gets a message.</h2>
+              <h2 id="channels-title">Everywhere your app gets an event.</h2>
               <p className="sec-lede">
-                One package fakes all four, with the people, events and API calls agents actually use. Use one in a
-                test, or several when your agent spans them. Discord, Stripe and email come next.
+                One package fakes all four, with the people, events and API calls apps actually use. Use one in a
+                test, or several when your app spans them. Discord, Stripe and email come next.
               </p>
             </div>
             <div className="channels" ref={channels}>
@@ -227,9 +228,9 @@ export default function Home() {
           <div className="wrap">
             <div className="sec-head">
               <p className="kicker">Why channelstack</p>
-              <h2 id="why-title">Mocks test your mock. channelstack tests your agent.</h2>
+              <h2 id="why-title">Mocks test your mock. channelstack tests your app.</h2>
               <p className="sec-lede">
-                Chat agents break in the gaps between systems: a webhook signed the wrong way, a payload shape that
+                Integrations break in the gaps between systems: a webhook signed the wrong way, a payload shape that
                 changed last month, a stray progress message nobody asserted on. channelstack closes those gaps.
               </p>
             </div>
@@ -253,9 +254,9 @@ export default function Home() {
           <div className="wrap">
             <div className="sec-head">
               <p className="kicker">How it works</p>
-              <h2 id="how-title">One server between your test and your agent.</h2>
+              <h2 id="how-title">One server between your test and your app.</h2>
               <p className="sec-lede">
-                Your test scripts the people. channelstack delivers what the platform would deliver, and your agent
+                Your test scripts the people. channelstack delivers what the platform would deliver, and your app
                 answers with its real SDKs, into the same fake workspace your test reads back.
               </p>
             </div>
@@ -322,14 +323,14 @@ export default function Home() {
               </li>
               <li className="step reveal">
                 <p className="step-n">Step 2</p>
-                <h3>Point your agent at it</h3>
+                <h3>Point your app at it</h3>
                 <p>
-                  Start channelstack with where your agent takes events, then start the agent the way you always do,
+                  Start channelstack with where your app takes events, then start the app the way you always do,
                   with channelstack’s environment.
                 </p>
                 <div className="snippet">
                   <Terminal
-                    label="Commands to start channelstack and your agent"
+                    label="Commands to start channelstack and your app"
                     lines={[
                       "$ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelstack",
                       "$ npx channelstack env >> .env.local",
@@ -342,7 +343,7 @@ export default function Home() {
                 <p className="step-n">Step 3</p>
                 <h3>Run</h3>
                 <p>
-                  Add the plugin and run your tests as usual. A failure says what a person sees, and what the agent left
+                  Add the plugin and run your tests as usual. A failure says what a person sees, and what the app left
                   open.
                 </p>
                 <div className="snippet">
@@ -370,7 +371,7 @@ export default function Home() {
               </div>
             </div>
             <p className="why-name">
-              <strong>Why “channelstack”?</strong> Your agent lives in a stack of channels: Slack, GitHub, Linear,
+              <strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear,
               Notion. channelstack runs that whole stack on localhost, with the people in it, so you can test the
               conversation end to end before your users have it.
             </p>
