@@ -125,6 +125,29 @@ try {
   if (stillUp) throw new Error("SIGTERM to the channelstack command left the server running");
   console.log("SIGTERM to the channelstack command stopped the server and removed its token file");
 
+  // The package root is the client with its types, as `channelstack/client` is: tests import their
+  // handle types from it (`import type { SlackUser } from "channelstack"`).
+  const sameModule = capture(
+    "node",
+    [
+      "--input-type=module",
+      "-e",
+      'const root = await import("channelstack"); const client = await import("channelstack/client"); console.log(typeof root.connect === "function" && root.connect === client.connect);',
+    ],
+    { cwd: project },
+  ).trim();
+  if (sameModule !== "true") throw new Error('`import "channelstack"` is not the client that `channelstack/client` is');
+  writeFileSync(
+    join(project, "types.ts"),
+    'import type { SlackConversation, SlackUser } from "channelstack";\nimport { connect } from "channelstack";\nexport type People = [SlackUser, SlackConversation];\nexport const open = connect;\n',
+  );
+  run(
+    join(ROOT, "node_modules", ".bin", "tsc"),
+    ["--noEmit", "--strict", "--skipLibCheck", "--module", "nodenext", "--moduleResolution", "nodenext", "types.ts"],
+    { cwd: project },
+  );
+  console.log('import type { SlackUser } from "channelstack" type-checks against the installed package');
+
   // The scenario runner is copied in, so its `channelstack/client` import resolves to the installed package.
   const runner = join(project, "run.ts");
   cpSync(join(ROOT, "scenarios/runners/typescript/run.ts"), runner);
