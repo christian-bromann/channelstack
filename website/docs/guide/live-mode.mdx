@@ -100,6 +100,8 @@ Each server keeps its ledger in `<home>/ledger/`, so a crash leaves a list behin
 
 Some things a person does have no public API: on Slack, a person's message (one posted through the API is marked as the posting app's and agents ignore it), and a button click. Live, the **browser actor** does them: a headless Chrome, driven through WebdriverIO, signed in as that person and typing or clicking in the platform's own client. What it types is read back through the API.
 
+Today it does `say`, `reply` and `click`. Slack's Stop, menus, shortcuts, slash commands and the agent-thread steps need it too, and are refused live for now with `action_requires`, so their tests skip ([#47](https://github.com/christian-bromann/channelstack/issues/47)).
+
 It never signs in by itself and never handles a password. A person signs in by hand, once, and the session is saved:
 
 ```bash
@@ -126,13 +128,13 @@ const ana = await slack.createUser({ name: "Ana", browser: { storageState: ".aut
 
 A test that hits something live can't do is **skipped**, with the reason in the report. A setup that can't work **fails**, so a broken nightly run goes red instead of skipping everything and passing.
 
-| Code                       | Means                                                                                                                                                                                                              | The test |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| `unsupported_in_live`      | A fake-only feature (delivery chaos, faults, fixed ids, `reset`), or one not built live yet                                                                                                                        | Skips    |
-| `action_requires`          | Works live only with a piece this run doesn't have: the browser actor (a person with no saved session; Slack's Stop, menus, modals and slash commands) or proxy mode (`calls()`, the status line, negative checks) | Skips    |
-| `live_misconfigured`       | Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token, a role the account doesn't have, a saved session that is signed out or readable by others          | Fails    |
-| `fake_actor_in_live_world` | A person without a token acting in a live workspace                                                                                                                                                                | Fails    |
-| `live_not_allowlisted`     | The workspace isn't in the allowlist                                                                                                                                                                               | Fails    |
+| Code | Means | The test |
+| --- | --- | --- |
+| `unsupported_in_live` | A fake-only feature (retrying, forging or reading a delivery, `uninstallApp`, fixed ids, `reset`), or one not built live yet | Skips |
+| `action_requires` | Needs a piece live mode doesn't drive yet, so it's refused whatever the run has: the browser actor beyond typing and clicking (Slack's Stop, menus, shortcuts and slash commands; [#47](https://github.com/christian-bromann/channelstack/issues/47)), or proxy mode (`calls()`, the status line, modals, faults, waiting for quiet; [#24](https://github.com/christian-bromann/channelstack/issues/24)). Also a person the browser actor would type as who has no saved session | Skips |
+| `live_misconfigured` | Credentials set in part, a token of the wrong kind, `CHANNELSTACK_REALITY=live` with a person who has no token, a role the account doesn't have, a saved session that is signed out or readable by others | Fails |
+| `fake_actor_in_live_world` | A person without a token acting in a live workspace | Fails |
+| `live_not_allowlisted` | The workspace isn't in the allowlist | Fails |
 
 Vitest reports the test as skipped, with a note that starts with `live:` and names the operation and the reason, for example:
 
@@ -142,7 +144,7 @@ live: SlackUser.stop live needs the browser actor: Slack sends this only when a 
 
 Only the test that hit the refusal skips, even when tests run concurrently. pytest skips the same way ([pytest](/docs/guide/pytest)).
 
-**Negative and exact-count matchers skip live.** They wait until the agent is quiet ([Waiting and quiet](/docs/guide/waiting-and-quiet)), and live, without proxy mode, nothing tells channelstack when the agent is done. Positive matchers such as `toHaveReplyFrom` poll the real platform and work. Give them a longer `timeout` live: a real model and real rate limits are slower than the fake.
+**Negative and exact-count matchers skip live.** They wait until the agent is quiet ([Waiting and quiet](/docs/guide/waiting-and-quiet)), and live nothing tells channelstack when the agent is done: proxy mode will, once it reads the agent's calls back live ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Positive matchers such as `toHaveReplyFrom` poll the real platform and work. Give them a longer `timeout` live: a real model and real rate limits are slower than the fake.
 
 ## Check the setup: `doctor`
 

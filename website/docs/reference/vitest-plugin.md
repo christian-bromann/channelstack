@@ -139,8 +139,8 @@ When a channel runs live, some operations can't run there. The plugin turns two 
 
 | Error code | Means | Outcome |
 |---|---|---|
-| `unsupported_in_live` | The operation has no live counterpart, or not yet (delivery chaos, a person's Re-run) | Test skipped: `live: <message>` |
-| `action_requires` | It works live only with a piece this run lacks: the browser actor, or proxy mode | Test skipped: `live: <message>` |
+| `unsupported_in_live` | The operation has no live counterpart, or not yet (reading or forging a delivery, `uninstallApp`) | Test skipped: `live: <message>` |
+| `action_requires` | It needs a piece live mode doesn't drive yet, whatever the run has: the browser actor beyond typing and clicking ([#47](https://github.com/christian-bromann/channelstack/issues/47)), or proxy mode ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Also a person with no saved browser session | Test skipped: `live: <message>` |
 | Any other code | `live_misconfigured`, `live_not_allowlisted`, `fake_actor_in_live_world`, a platform error, … | Test fails |
 
 The skip is per test: the refused request names its session, so concurrent tests skip only themselves. A fake run never sees these refusals, so every test runs in full on every fake run.

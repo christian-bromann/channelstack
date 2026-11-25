@@ -225,7 +225,7 @@ let api_calls = notion.calls().operation("…").await?;
 
 **Returns** [`NotionApiCalls`](/docs/reference/api/notion#notionapicalls).
 
-**Live:** needs proxy mode: Notion doesn't report the integration's calls; proxy mode sees them. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: Notion doesn't report the integration's calls; proxy mode sees them. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForCall()
 
@@ -641,7 +641,7 @@ user.connect(&integration).page(&page).await?;
 
 **Returns** nothing.
 
-**Live:** needs the browser actor: no API connects a page to an integration; Notion's UI does (… → Connections). Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: no API connects a page to an integration; Notion's UI does (… → Connections). The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### disconnect()
 
@@ -670,7 +670,7 @@ user.disconnect(&integration).page(&page).await?;
 
 **Returns** nothing.
 
-**Live:** needs the browser actor: no API connects a page to an integration; Notion's UI does (… → Connections). Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: no API connects a page to an integration; Notion's UI does (… → Connections). The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ## NotionPage
 

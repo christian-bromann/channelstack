@@ -193,7 +193,7 @@ let api_calls = slack.calls().operation("…").await?;
 
 **Returns** [`SlackApiCalls`](/docs/reference/api/slack#slackapicalls).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### uninstallApp()
 
@@ -253,7 +253,7 @@ let fault = slack.fault().r#type(r#type).await?;
 
 **Returns** [`SlackFault`](/docs/reference/api/slack#slackfault).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForCall()
 
@@ -490,7 +490,7 @@ let delivery = user.select(option).menu("…").message(&message).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`dispatch_failed`](/docs/reference/api/errors#dispatch-failed).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### shortcut()
 
@@ -521,7 +521,7 @@ let delivery = user.shortcut("…").message(&message).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`dispatch_failed`](/docs/reference/api/errors#dispatch-failed).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### runCommand()
 
@@ -552,7 +552,7 @@ let delivery = user.run_command("…").channel(&channel).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`dispatch_failed`](/docs/reference/api/errors#dispatch-failed).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### stop()
 
@@ -582,7 +582,7 @@ let delivery = user.stop().thread(&thread).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`stop_unavailable`](/docs/reference/api/errors#stop-unavailable).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### openAgentThread()
 
@@ -612,7 +612,7 @@ let thread = user.open_agent_thread().from(&from).await?;
 
 **Errors** [`split_view_unavailable`](/docs/reference/api/errors#split-view-unavailable).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### pickPrompt()
 
@@ -643,7 +643,7 @@ let message = user.pick_prompt("…").thread(&thread).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### switchContext()
 
@@ -674,7 +674,7 @@ let delivery = user.switch_context(&channel).thread(&thread).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`split_view_unavailable`](/docs/reference/api/errors#split-view-unavailable).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### modals()
 
@@ -698,7 +698,7 @@ let modals = user.modals().await?;
 
 **Returns** [`SlackModals`](/docs/reference/api/slack#slackmodals).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### react()
 
@@ -864,7 +864,7 @@ let ephemeral_messages = user.ephemeral().await?;
 
 **Returns** [`SlackEphemeralMessages`](/docs/reference/api/slack#slackephemeralmessages). It reads once the agent is quiet.
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### waitForModal()
 
@@ -1168,7 +1168,7 @@ let suggested_prompts = thread.suggested_prompts().await?;
 
 **Returns** [`SlackSuggestedPrompts`](/docs/reference/api/slack#slacksuggestedprompts). It reads once the agent is quiet.
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### root()
 
@@ -1236,7 +1236,7 @@ let thread_status = thread.status().await?;
 
 **Returns** [`SlackThreadStatus`](/docs/reference/api/slack#slackthreadstatus).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### transcript()
 
@@ -1478,7 +1478,7 @@ let updated = stream.refresh().await?;
 
 **Returns** [`SlackStream`](/docs/reference/api/slack#slackstream).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### ended()
 
@@ -1539,7 +1539,7 @@ let modal_values = modal.values().await?;
 
 **Returns** [`SlackModalValues`](/docs/reference/api/slack#slackmodalvalues).
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### submit()
 
@@ -1569,7 +1569,7 @@ let delivery = modal.submit().await?;
 
 **Errors** [`dispatch_failed`](/docs/reference/api/errors#dispatch-failed).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ### close()
 
@@ -1595,7 +1595,7 @@ let delivery = modal.close().await?;
 
 **Errors** [`dispatch_failed`](/docs/reference/api/errors#dispatch-failed).
 
-**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs the browser actor: Slack sends this only when a person does it in the client; no API does it as a person. The browser actor doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ## SlackFault
 
@@ -1627,7 +1627,7 @@ fault.undo().await?;
 
 **Returns** nothing. Disposing the handle calls it.
 
-**Live:** needs proxy mode: no Slack API reads this back; proxy mode sees the agent's own calls. Without it, the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
+**Live:** needs proxy mode: a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack. Proxy mode doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so for now the call is refused with [`action_requires`](/docs/reference/api/errors#action-requires) and the test is skipped.
 
 ## Types
 

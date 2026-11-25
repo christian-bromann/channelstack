@@ -246,10 +246,12 @@ A relative fixture path starts from the test file, as in Vitest: `github.create_
 
 ## Live mode
 
-With live credentials in the environment, the same tests act on real sandbox workspaces ([live mode](/docs/guide/live-mode)). A step live mode can't do is refused with `unsupported_in_live` (a retry, a forged signature, a fault), or with `action_requires` when it needs a piece the run doesn't have (the browser actor, proxy mode). The plugin turns both into `pytest.skip`, with the reason:
+With live credentials in the environment, the same tests act on real sandbox workspaces ([live mode](/docs/guide/live-mode)). A step live mode can't do is refused with `unsupported_in_live` (`uninstall_app`, reading deliveries), or with `action_requires` when it needs a piece live mode doesn't drive yet (a fault, Slack's Stop, waiting for quiet: see [what skips](/docs/guide/live-mode#what-skips-and-what-fails)). The plugin turns both into `pytest.skip`, with the reason:
 
 ```
-SKIPPED [1] tests/test_slack.py:88: live: SlackDelivery.retry isn't supported live: …
+SKIPPED [1] tests/test_slack.py:88: live: SlackFixture.fault live needs proxy mode: …
 ```
+
+Live, a message or comment has no delivery: `msg.delivery` is `None`, so a delivery test checks for it and calls `pytest.skip` itself ([delivery and failures](/docs/guide/delivery-and-failures#fake-only)).
 
 Any other error still fails the test, so a broken live setup turns the run red. The fake run on every pull request runs every test in full.

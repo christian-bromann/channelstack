@@ -37,7 +37,7 @@ The first version: everything below is new.
 
 - With sandbox credentials in the environment, the same tests act on real Slack, GitHub, Linear and Notion workspaces and read the results back. channelstack never relays events to the agent.
 - Workspace allowlists, run tags and cleanup.
-- A browser actor for the actions only a person can do in Slack, using a session saved with `channelstack login slack`.
+- A browser actor that types and clicks as a person in Slack (`say`, `reply`, `click`), using a session saved with `channelstack login slack`. Slack's Stop, menus, shortcuts and slash commands aren't done live yet, and skip.
 - `channelstack doctor` and `channelstack sweep`.
 - A step live mode can't do skips its test, with the reason.
 

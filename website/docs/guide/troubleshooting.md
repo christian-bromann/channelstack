@@ -149,7 +149,7 @@ Live, it comes from real Slack: your app lacks the scope. Add it to the app's co
 
 The report shows the test as skipped, with a note like `live: SlackUser.stop live needs the browser actor: …`.
 
-**Cause:** the test uses something the live run can't do. `unsupported_in_live` is a fake-only feature (delivery chaos, faults, fixed ids). `action_requires` needs a piece the run doesn't have: the browser actor (a person with no saved session, or an action it doesn't do yet) or proxy mode (`calls()`, negative checks).
+**Cause:** the test uses something the live run can't do. `unsupported_in_live` is a fake-only feature (reading or forging a delivery, fixed ids). `action_requires` needs a piece live mode doesn't drive yet: the browser actor (a person with no saved session, or an action it doesn't do yet) or proxy mode (`calls()`, faults, negative checks).
 
 **Fix:** usually none: the fake run on every pull request runs the test in full. If the note says a person has no saved browser session, run `npx channelstack login slack --user ana`. A test that fails live with `live_misconfigured`, `fake_actor_in_live_world` or `live_not_allowlisted` is a setup problem, not a skip: `npx channelstack doctor` shows which. See [Live mode](/docs/guide/live-mode#what-skips-and-what-fails).
 

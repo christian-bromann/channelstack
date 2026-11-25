@@ -282,7 +282,7 @@ export function FakeOrLive() {
           ["Slack is", "a real sandbox workspace"],
           ["Ana is", "a real sandbox account, with her own token"],
           ["The event reaches the agent", "from Slack itself, as in production"],
-          ["Retries, bad signatures, faults", "skipped, with the reason"],
+          ["Retries, bad signatures, faults", "not live: no delivery to test, and faults skip"],
           ["Runs", "nightly, against the allowlisted workspace"],
         ];
   return (

@@ -6,7 +6,7 @@ description: "Test how your agent handles retries, redelivery, bad signatures, s
 
 # Delivery and failures
 
-This page shows how to test the parts of a platform agents most often get wrong: retried and redelivered events, forged requests, rate limits, dropped connections and an uninstall. Everything here works against the fakes only; in [live mode](/docs/guide/live-mode) these tests are skipped.
+This page shows how to test the parts of a platform agents most often get wrong: retried and redelivered events, forged requests, rate limits, dropped connections and an uninstall. Everything here works against the fakes only. In [live mode](/docs/guide/live-mode) an action has no delivery to test, so these tests need a guard to skip there: see [Fake only](#fake-only).
 
 ## What the fakes send
 
@@ -221,6 +221,23 @@ The app is installed again, with the same tokens, when the test's session closes
 
 ## Fake only
 
-Live, the real platform delivers to your agent, and channelstack has nothing to retry, forge or fault. `retry`, `resend`, `fault` and `slack.uninstallApp()` are refused with `unsupported_in_live`, as is reading a delivery on Slack, Linear and Notion, and Vitest and pytest skip the test with the reason. The same test runs in full against the fake on every pull request.
+Live, the real platform delivers to your agent and channelstack isn't in the path. An action has no delivery: `msg.delivery`, `comment.delivery` and `session.delivery` are `undefined`, so nothing is refused and nothing skips on its own. The `!` in the examples above throws a `TypeError` live. A test that must also run live checks first, and skips:
 
-GitHub is the exception, because its App delivery log has an API: live, `github.deliveries()`, `toBeAccepted` and `delivery.redeliver()` work against a real test org, a few seconds after GitHub delivered. See [live mode](/docs/guide/live-mode).
+```ts
+test("survives Slack's retry", async ({ slack, skip }) => {
+  const ana = await slack.createUser({ name: "Ana" });
+  const msg = await ana.say("@my-agent hello", { to: slack.app });
+  const delivery = msg.delivery ?? skip("live: the platform delivers to the agent itself");
+  await delivery.retry({ after: "3s", reason: "http_timeout" });
+  await expect(msg.thread).toHaveRepliesFrom(slack.app, { count: 1 });
+});
+```
+
+The rest is refused, and Vitest and pytest skip the test with the reason:
+
+- `slack.fault()` and `fault.undo()` with `action_requires`: a fault needs proxy mode, which live doesn't read the agent's calls back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)).
+- `slack.uninstallApp()`, and reading or resending deliveries (`slack.deliveries()`, `linear.deliveries()`, `notion.deliveries()`, `delivery.retry()`, `delivery.resend()`), with `unsupported_in_live`.
+
+The same test runs in full against the fake on every pull request.
+
+GitHub is the exception, because its App delivery log has an API: live, `github.deliveries()`, `toBeAccepted` and `delivery.redeliver()` work on the deliveries it lists, against a real test org, a few seconds after GitHub delivered. A comment's own `comment.delivery` is still `undefined` live. See [live mode](/docs/guide/live-mode).

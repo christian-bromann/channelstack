@@ -236,9 +236,13 @@ export function emitDocs(ir: Ir): Map<string, string> {
     if ("unsupported" in method.live) {
       return [`**Live:** refused with ${errorLink("unsupported_in_live")}: ${prose(method.live.unsupported)}.`, ""];
     }
-    const piece = method.live.requires === "browser" ? "the browser actor" : "proxy mode";
+    // channelstack doesn't drive either piece live yet, so these are refused whatever the run has.
+    const [piece, issue] =
+      method.live.requires === "browser"
+        ? ["the browser actor", "doesn't do this yet ([#47](https://github.com/christian-bromann/channelstack/issues/47))"]
+        : ["proxy mode", "doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24))"];
     return [
-      `**Live:** needs ${piece}: ${prose(method.live.reason)}. Without it, the call is refused with ${errorLink("action_requires")} and the test is skipped.`,
+      `**Live:** needs ${piece}: ${prose(method.live.reason)}. ${piece.charAt(0).toUpperCase()}${piece.slice(1)} ${issue}, so for now the call is refused with ${errorLink("action_requires")} and the test is skipped.`,
       "",
     ];
   };

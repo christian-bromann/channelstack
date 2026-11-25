@@ -1392,7 +1392,7 @@
           "dispose": false,
           "live": {
             "requires": "proxy",
-            "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+            "reason": "a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack"
           }
         }
       ],
@@ -4372,7 +4372,7 @@
           "dispose": true,
           "live": {
             "requires": "proxy",
-            "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+            "reason": "a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack"
           }
         }
       ]

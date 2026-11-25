@@ -205,6 +205,12 @@ const AGENT_SIDE: LiveSupport = {
   reason: "no Slack API reads this back; proxy mode sees the agent's own calls",
 };
 
+/** A fault changes what the agent's own calls get back: live, only proxy mode sits between the agent and Slack. */
+const FAULTS: LiveSupport = {
+  requires: "proxy",
+  reason: "a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack",
+};
+
 /** Uninstalling revokes every token of the installation, and reinstalling needs the OAuth consent in a browser. */
 const UNINSTALL: LiveSupport = {
   unsupported:
@@ -1224,7 +1230,7 @@ export function registerSlackRoutes(
       name: "fault",
       options: ["type", "operation", "retryAfter", "delay", "after", "error", "times"],
     },
-    live: AGENT_SIDE,
+    live: FAULTS,
     stability,
     handler: ({ session, body }) => ({
       id: fake.addFault(session.id, {
@@ -1245,7 +1251,7 @@ export function registerSlackRoutes(
     summary: "Remove a fault",
     params: z.object({ fault: z.string().openapi({ param: { name: "fault", in: "path" } }) }),
     sdkMethod: { on: "SlackFault", name: "undo", dispose: true },
-    live: AGENT_SIDE,
+    live: FAULTS,
     stability,
     handler: ({ session, params }) => fake.removeFault(session.id, params.fault),
   });

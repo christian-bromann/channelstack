@@ -26,7 +26,7 @@ Every matcher is async: `await` it.
 
 "Quiet" means no API call in flight, no delivery in flight or about to be retried, and no open stream, in the subject's session. A quiet wait that runs out of time fails with `Timed out after <n>ms waiting for the agent to be quiet for <n>ms`, plus what is still open.
 
-Live, channelstack can't see when the agent is done unless the agent runs in proxy mode. Once a session has acted live, its quiet check is refused with `action_requires`, so negative and exact-count matchers skip the test there.
+Live, channelstack can't see when the agent is done: proxy mode will, once it reads the agent's calls back live ([#24](https://github.com/christian-bromann/channelstack/issues/24)). Until then, once a session has acted live, its quiet check is refused with `action_requires`, so negative and exact-count matchers skip the test there.
 
 | Option | Type | Default | On |
 |---|---|---|---|
@@ -60,7 +60,7 @@ Text matchers read the transcript (for example [`SlackTranscript`](/docs/referen
 | `toHaveOpenedModal(title?, options?)` | `SlackUser` | `title?: string \| RegExp`; `timeout`. A modal opened for this person, submitted or not | Polls | `Expected a modal titled "…" to have been opened. Opened:` and the titles, or `none` | — |
 | `toBeEphemeralFor(user)` | `SlackMessage` | `user: SlackUser` | Doesn't wait: reads `visibleTo` once | `Expected the message to be visible only to <name>, everyone can see it` (or `only <name> can`) | — |
 
-Live, `toHaveStatus`, `toHaveStatusText` and `toHaveOpenedModal` read what needs proxy mode, so without it they skip the test (`action_requires`).
+Live, `toHaveStatus`, `toHaveStatusText` and `toHaveOpenedModal` read what needs proxy mode, which live doesn't read back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)), so they skip the test (`action_requires`).
 
 ## Comments: GitHub, Linear, Notion
 
@@ -118,7 +118,7 @@ Subject: any delivery ([`SlackDelivery`](/docs/reference/api/slack#slackdelivery
 |---|---|---|---|---|---|
 | `toHaveReceivedCall(operation, options?)` | A channel fixture: `slack`, `github`, `linear`, `notion` | `operation: string \| RegExp` (a string must equal the [operation](/docs/reference/api/slack#slackapicall)); `error?: string` (only calls that returned this error), `times?: number` (exact), `timeout`, `quietFor` | Polls; with `times`, quiet then once | `Expected the agent to call "…" <n> times with error <code>, found <m>. Its calls:` and each as `operation → error` | `to_have_received_call(operation, *, error=, times=, timeout=, quiet_for=)`, `not_to_have_received_call(operation, *, error=, timeout=, quiet_for=)` |
 
-It reads `calls()`, so live it needs proxy mode; without it the test is skipped (`action_requires`).
+It reads `calls()`, so live it needs proxy mode, which doesn't read the agent's calls back live yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)): the test is skipped (`action_requires`).
 
 ## Read methods
 
