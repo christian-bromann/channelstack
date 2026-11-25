@@ -421,7 +421,7 @@ channelstack doesn't mock or intercept LLM calls. Every framework already has it
 - the AI SDK has `MockLanguageModelV2`;
 - Pi and Flue have `fauxProvider`;
 - LangChain has `FakeListChatModel`;
-- MDA has `DirectiveChatModel`;
+- MDA's tests use LangChain's `FakeListChatModel` in `defineDeepAgent`;
 - OpenClaw has mock-openai.
 
 A test can use one of those, or a real model. The matchers are designed for this split: they check *how* the agent behaved in the channel, not *what* the model said. For example, `toHaveRepliesFrom` holds with any reply text.

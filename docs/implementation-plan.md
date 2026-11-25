@@ -37,7 +37,7 @@ The architecture copies WebDriver:
 
 ### Non-goals (for now)
 
-- **Faking the LLM.** Agents bring their own deterministic model: the AI SDK mock models, emulate's AI service, or MDA's scripted directive fixtures. Section 10 shows the recipes.
+- **Faking the LLM.** Agents bring their own deterministic model: the AI SDK mock models, emulate's AI service, or LangChain's `FakeListChatModel`, which MDA's tests use in `defineDeepAgent`. Section 10 shows the recipes.
 - **Waits and assertions in the protocol.** The server only serves reads (transcripts, event logs). The waiting matchers (`toHaveRepliesFrom`, `toHaveCommentsFrom`, …) live client-side in the test-framework integrations (`channelstack/vitest`, `pytest-channelstack`), which poll those reads.
 - **Hosting or a cloud product.**
 - **A unified "message" abstraction across platforms.** Each driver defines its own nouns: a Slack thread, a GitHub timeline, a Linear agent session, a Notion page with comments.
@@ -455,7 +455,7 @@ The same three steps work for every stack: create the world, give the agent its 
 
 | Stack | How it plugs in | Notes |
 |---|---|---|
-| **MDA** | Proxy mode against `mda-local up`. The Trigger Server receives real-format signed deliveries | Replaces the closed stack's `--fake-*` flags, `MDA_*_API_URL` overrides and patches 0008/0009. Scripted directive model fixtures stay |
+| **MDA** | Proxy mode against `mda-local up`. The Trigger Server receives real-format signed deliveries | Replaces the closed stack's `--fake-*` flags, `MDA_*_API_URL` overrides and patches 0008/0009. The tests keep LangChain's `FakeListChatModel` in `defineDeepAgent` |
 | **Chat SDK** (`chat` with `@chat-adapter/slack`, `/github`, `/linear`, `/notion`) | `channelstack env` provides `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and the GitHub/Linear/Notion equivalents. Endpoint is `/api/webhooks/{platform}`. Base-URL mode if the adapter accepts an API URL (verify per adapter), otherwise proxy mode | Recipe: Next.js route plus a Vitest file. Chat SDK's own matchers test adapter calls; channelstack tests the platform result |
 | **AI SDK** (agent loop) with Bolt, Octokit or the Notion SDK as the channel | Base-URL mode. The model is `MockLanguageModelV2`/V3 from `ai/test` or emulate's AI service | Example: a Bolt app that streams an AI SDK response with `chat.startStream`. That's exactly the surface no one fakes today |
 | **Pi** (`@mariozechner/pi-coding-agent` SDK) | Socket Mode fake or base URL; deterministic model through pi-ai's provider configuration | Example: "a DM to mom gets a threaded reply and a reaction" |

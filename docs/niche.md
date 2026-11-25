@@ -65,7 +65,7 @@ emulate fakes APIs. It doesn't test agents. Channelstack covers the parts emulat
    - snapshot/restore per test
    - a request and delivery log
    - forged and replayed deliveries for idempotency tests (retries, redelivery)
-5. **A scripted model.** `DirectiveChatModel`, which plays scripted `TOOL name args` lines, makes agent runs deterministic without an LLM. Nothing in emulate, and none of the eval tools, combines this with channel fakes.
+5. **A scripted model.** A framework's own fake model (LangChain's `FakeListChatModel`, which MDA's tests use in `defineDeepAgent`) makes agent runs deterministic without an LLM. Nothing in emulate, and none of the eval tools, combines this with channel fakes.
 6. **Later: a conformance suite** that checks the fakes against real providers. It's the reason to trust channelstack, not the pitch.
 
 **Pitch:** "emulate gives you a fake Slack. channelstack gives you a fake *user* in it, and tells you whether your agent answered once, streamed, stopped when asked and survived a retry."
