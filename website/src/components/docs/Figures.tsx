@@ -83,7 +83,6 @@ export function TerminalSession({ title = "Terminal", lines }: { title?: string;
       </div>
       <pre className="term-body" key={run}>
         {lines.map((line, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the lines are fixed for the page
           <span key={index} className={`term-line${line.cmd ? " cmd" : ""}${line.ok ? " ok" : ""}`}>
             {line.cmd ? (
               <>

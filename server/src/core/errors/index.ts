@@ -26,7 +26,7 @@ export const CORE_ERRORS = {
   action_requires: {
     status: 422,
     description:
-      "A live action needs a piece live mode doesn't drive yet: the browser actor beyond typing and clicking, or proxy mode. A test is skipped for it.",
+      "A live action needs a piece live mode doesn't drive yet (the browser actor beyond typing and clicking, proxy mode), or one this run lacks (a real person to create a channel, team or page as, a saved browser session). A test is skipped for it.",
   },
   live_misconfigured: {
     status: 412,

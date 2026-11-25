@@ -14,7 +14,7 @@ A refused call raises an error with a stable `code`, the HTTP status, a message 
 
 ### action_requires
 
-HTTP 422. A live action needs a piece live mode doesn't drive yet: the browser actor beyond typing and clicking, or proxy mode. A test is skipped for it.
+HTTP 422. A live action needs a piece live mode doesn't drive yet (the browser actor beyond typing and clicking, proxy mode), or one this run lacks (a real person to create a channel, team or page as, a saved browser session). A test is skipped for it.
 
 SDK class: `ActionRequiresError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::ACTION_REQUIRES`.
 
