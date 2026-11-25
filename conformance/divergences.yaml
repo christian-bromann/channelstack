@@ -59,8 +59,6 @@ divergences:
       - "api POST /graphql team data.team.color"
       - "api POST /graphql team data.team.defaultIssueState"
       - "api POST /graphql team data.team.markedAsDuplicateWorkflowState"
-      - "webhook AgentSessionEvent created agentActivity"
-      - "webhook AgentSessionEvent created agentSession.archivedAt"
       - "webhook AgentSessionEvent created agentSession.comment"
       - "webhook AgentSessionEvent created agentSession.commentId"
       - "webhook AgentSessionEvent created agentSession.context"
@@ -73,17 +71,14 @@ divergences:
       - "webhook AgentSessionEvent created agentSession.plan"
       - "webhook AgentSessionEvent created agentSession.pullRequestId"
       - "webhook AgentSessionEvent created agentSession.slugId"
-      - "webhook AgentSessionEvent created agentSession.sourceCommentId"
       - "webhook AgentSessionEvent created agentSession.sourceMetadata"
       - "webhook AgentSessionEvent created agentSession.workspaceDiff"
-      - "webhook AgentSessionEvent created guidance"
-      - "webhook AgentSessionEvent created previousComments"
       - "api POST /graphql team_states data.team.states.nodes.[].type"
     reason: >-
-      Real Linear's AgentSessionEvent on delegation carries more of the session (slugId, plan,
-      context and others), a comment thread and the opening prompt as agentActivity, with
-      previousComments and guidance null; and real teams and issues fill fields the fake leaves
-      null. To add to the fake: #26.
+      Real Linear's AgentSessionEvent on delegation carries the comment thread it opens for the
+      session (comment, commentId), and fields its schema doesn't declare (slugId, plan, context
+      and others), which an agent typed against @linear/sdk can't read; real teams and issues fill
+      fields the fake leaves null. To add to the fake, once a recording shows their values: #26.
     expires: 2027-02-28
   - scenario: shapes/notion
     path:

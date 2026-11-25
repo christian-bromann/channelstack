@@ -140,6 +140,8 @@ export function linearPayloads(lookups: LinearLookups) {
       issue: issueChild(issueRecord, true),
       commentId: record.comment,
       ...(root ? { comment: commentChild(root) } : {}),
+      sourceCommentId: record.sourceComment ?? null,
+      archivedAt: null,
       summary: record.summary,
       url: links.session(issueRecord, record.slugId),
     };

@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { refusal } from "../../../test/app-harness.ts";
+import { linearWebhookProblems } from "../../../test/linear-schema.ts";
 import { linearWorkspace } from "../../../test/linear-workspace.ts";
 
 const closers: Array<() => void> = [];
@@ -52,6 +53,18 @@ describe("agent sessions", () => {
       appUserId: app.id,
       promptContext: expect.stringContaining('<issue identifier="ENG-1">'),
     });
+    // What real Linear sends on a delegation (#26): the person's opening prompt as the event's
+    // activity, and null for the lists a delegated session has nothing in. All of it is Linear's schema.
+    expect(event?.payload).toMatchObject({
+      agentActivity: {
+        agentSessionId: session.id,
+        content: { type: "prompt", body: expect.stringMatching(/^Work on \[ENG-1\]\(/) },
+      },
+      previousComments: null,
+      guidance: null,
+      agentSession: { sourceCommentId: null, archivedAt: null },
+    });
+    expect(linearWebhookProblems("AgentSessionEvent", event?.payload)).toEqual([]);
     expect(session.delivery).toMatchObject({ type: "AgentSessionEvent", action: "created" });
 
     const publish = (content: object, extra: object = {}) =>
@@ -117,6 +130,17 @@ describe("agent sessions", () => {
     });
     expect(comment.body).toBe("@my-agent can you take a look?");
     expect(comment.session).toBeDefined();
+    // A mention opens the session from its comment: that is the event's source, there is no prompt
+    // activity of its own, and the thread had nothing before it.
+    await h.app.settled();
+    const opened = webhooks().find((hook) => hook.payload.action === "created")?.payload;
+    expect(opened).toMatchObject({
+      previousComments: [],
+      guidance: null,
+      agentSession: { sourceCommentId: comment.id },
+    });
+    expect(opened).not.toHaveProperty("agentActivity");
+    expect(linearWebhookProblems("AgentSessionEvent", opened)).toEqual([]);
     await gql(ACTIVITY, {
       input: { agentSessionId: comment.session.id, content: { type: "response", body: "On it" } },
     });

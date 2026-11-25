@@ -198,6 +198,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       appUser: store.appUser.id,
       creator,
       comment: comment ? rootOf(comment).id : null,
+      sourceComment: comment?.id ?? null,
       thread: comment ? rootOf(comment).id : null,
       status: "pending",
       plan: null,
@@ -213,7 +214,9 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     if (comment) comment.session = record.id;
     // Delegating is the person's first turn: Linear records it as a prompt, "Work on [ENG-1](url)",
     // before the agent says anything (the differential run found it against the real workspace).
-    if (!comment) addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`);
+    const opening = comment
+      ? undefined
+      : addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`);
     const previous = comment
       ? store
           .commentsOn(issue)
@@ -226,8 +229,11 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       oauthClientId: context.secret("clientId"),
       agentSession: payloads.session(record, store.org.id),
       promptContext: promptContext(issue, comment),
-      previousComments: previous.map(payloads.commentChild),
-      guidance: [],
+      // Real Linear sends the delegation's prompt as the event's activity, and null for what a
+      // session has none of: no earlier comments in a thread, no guidance configured.
+      ...(opening ? { agentActivity: payloads.activity(opening) } : {}),
+      previousComments: comment ? previous.map(payloads.commentChild) : null,
+      guidance: null,
     });
     return record;
   };

@@ -135,6 +135,8 @@ export interface LinearSessionRecord {
   creator: string;
   /** The comment that opened the session (a mention), as `AgentSession.comment`. */
   comment: string | null;
+  /** The comment whose mention opened the session, as `sourceCommentId`: in a thread, the reply rather than its root. */
+  sourceComment?: string | null;
   /**
    * The root comment of the thread the session's comments are in: the mention, or for a
    * delegation the first comment Linear wrote for the session. A reply there prompts the session.
