@@ -386,3 +386,119 @@ async def test_an_agent_session_not_in_a_state_and_without_an_activity() -> None
         await expect(session).not_to_have_session_state("complete", timeout="300ms")
     with pytest.raises(AssertionError, match=r"Expected no thought from my-agent\. The session has:\n  my-agent"):
         await expect(LinearIssue(session)).not_to_have_activity(type="thought", from_=AGENT, timeout="300ms")
+
+
+@dataclass(frozen=True)
+class Modal:
+    title: str
+
+
+class SlackPerson:
+    _ctx = None
+
+    def __init__(self, *titles: str) -> None:
+        self.titles = titles
+
+    async def modals(self) -> list[Modal]:
+        return [Modal(title) for title in self.titles]
+
+
+async def test_a_modal_opened_for_someone() -> None:
+    await expect(SlackPerson("Deploy")).to_have_opened_modal(timeout="300ms")
+    await expect(SlackPerson("Deploy")).to_have_opened_modal(re.compile("^dep", re.I), timeout="300ms")
+    with pytest.raises(
+        AssertionError, match='Expected a modal titled "Rollback" to have been opened. Opened: "Deploy"'
+    ):
+        await expect(SlackPerson("Deploy")).to_have_opened_modal("Rollback", timeout="300ms")
+
+
+async def test_no_modal_opened_for_someone() -> None:
+    await expect(SlackPerson()).not_to_have_opened_modal(timeout="300ms")
+    with pytest.raises(AssertionError, match='Expected no modal to have been opened. Opened: "Deploy"'):
+        await expect(SlackPerson("Deploy")).not_to_have_opened_modal(timeout="300ms")
+
+
+@dataclass(frozen=True)
+class Posted:
+    visible_to: Person | None = None
+
+
+async def test_a_message_only_one_person_sees() -> None:
+    await expect(Posted(ANA)).to_be_ephemeral_for(ANA)
+    with pytest.raises(AssertionError, match="Expected the message to be visible only to Ana, everyone can see it"):
+        await expect(Posted()).to_be_ephemeral_for(ANA)
+    with pytest.raises(AssertionError, match="visible only to Ana, only my-agent can"):
+        await expect(Posted(AGENT)).to_be_ephemeral_for(ANA)
+
+
+async def test_a_message_not_only_for_one_person() -> None:
+    await expect(Posted()).not_to_be_ephemeral_for(ANA)
+    with pytest.raises(AssertionError, match="Expected the message not to be visible only to Ana, only Ana can"):
+        await expect(Posted(ANA)).not_to_be_ephemeral_for(ANA)
+
+
+@dataclass(frozen=True)
+class Attempt:
+    status: str
+    response_status: int | None = None
+    duration_ms: float | None = None
+    forged_signature: bool = False
+
+
+@dataclass
+class Delivery:
+    attempts: list[Attempt]
+    id: str = "dlv_1"
+    _ctx: object = None
+
+    async def refresh(self) -> "Delivery":
+        return self
+
+
+async def test_a_delivery_accepted_in_time() -> None:
+    delivery = Delivery([Attempt("acknowledged", 200, 120)])
+    await expect(delivery).to_be_accepted(within="1s", timeout="300ms")
+    with pytest.raises(
+        AssertionError,
+        match=r"Expected delivery dlv_1 to be accepted within 100ms, its first attempt is acknowledged \(HTTP 200\) "
+        r"after 120ms",
+    ):
+        await expect(delivery).to_be_accepted(within=100, timeout="300ms")
+
+
+async def test_a_delivery_not_accepted() -> None:
+    await expect(Delivery([Attempt("failed", 500, 30)])).not_to_be_accepted(timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected delivery dlv_1 not to be accepted, its first attempt is"):
+        await expect(Delivery([Attempt("acknowledged", 200, 5)])).not_to_be_accepted(timeout="300ms")
+
+
+async def test_a_forged_delivery_rejected() -> None:
+    forged = Delivery([Attempt("acknowledged", 200), Attempt("failed", 401, forged_signature=True)])
+    await expect(forged).to_be_rejected(timeout="300ms")
+    with pytest.raises(AssertionError, match=r"but no forged attempt was sent\. Call delivery\.resend\(bad_signature"):
+        await expect(Delivery([Attempt("acknowledged", 200)])).to_be_rejected(timeout="300ms")
+    with pytest.raises(AssertionError, match="to be rejected with a 4xx, the agent answered 200"):
+        await expect(Delivery([Attempt("acknowledged", 200, forged_signature=True)])).to_be_rejected(timeout="300ms")
+
+
+async def test_a_forged_delivery_not_rejected() -> None:
+    await expect(Delivery([Attempt("acknowledged", 200, forged_signature=True)])).not_to_be_rejected(timeout="300ms")
+    with pytest.raises(AssertionError, match="of delivery dlv_1 not to be rejected with a 4xx, the agent answered 401"):
+        await expect(Delivery([Attempt("failed", 401, forged_signature=True)])).not_to_be_rejected(timeout="300ms")
+
+
+async def test_a_delivery_retried() -> None:
+    delivery = Delivery([Attempt("timed_out"), Attempt("timed_out"), Attempt("acknowledged", 200)])
+    await expect(delivery).to_be_retried(timeout="300ms")
+    await expect(delivery).to_be_retried(times=2, timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected delivery dlv_1 to be retried 1 times, it was retried 2 times"):
+        await expect(delivery).to_be_retried(times=1, timeout="300ms")
+
+
+async def test_a_delivery_not_retried() -> None:
+    # A forged resend isn't a retry.
+    await expect(
+        Delivery([Attempt("acknowledged", 200), Attempt("failed", 401, forged_signature=True)])
+    ).not_to_be_retried(timeout="300ms")
+    with pytest.raises(AssertionError, match="Expected delivery dlv_1 not to be retried, it was retried 1 times"):
+        await expect(Delivery([Attempt("timed_out"), Attempt("acknowledged", 200)])).not_to_be_retried(timeout="300ms")

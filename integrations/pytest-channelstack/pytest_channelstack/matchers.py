@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 from channelstack import ChannelstackError
 from channelstack.runtime.client import quiet_of
-from channelstack.runtime.duration import Duration
+from channelstack.runtime.duration import Duration, parse_duration
 from channelstack.runtime.transport import unreported_refusals
 from channelstack.runtime.wait import (
     WaitTimeoutError,
@@ -56,6 +56,11 @@ def _show(text: Text) -> str:
 def _named(name: str, expected: Text) -> bool:
     """A name asked for by a string must equal it; a pattern need only match."""
     return name == expected if isinstance(expected, str) else expected.search(name) is not None
+
+
+def _number(value: float) -> str:
+    """A number as JavaScript prints it: `3000`, not `3000.0`."""
+    return str(int(value)) if float(value).is_integer() else str(value)
 
 
 def _says(messages: Sequence[Any]) -> str:
@@ -729,6 +734,162 @@ class Expectation:
     ) -> None:
         """Once the agent is quiet, the session has no such activity, people's prompts aside."""
         await self._activity(type, from_, text, timeout, quiet_for, negate=True)
+
+    # Slack: modals and ephemeral messages
+
+    async def _opened_modal(
+        self, title: Text | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        await self._settle(
+            read=self._subject.modals,
+            holds=lambda modals: any(text_matches(modal.title, title) for modal in modals),
+            describe=lambda modals: (
+                f"Expected {'no' if negate else 'a'} modal{'' if title is None else f' titled {_show(title)}'} "
+                f"to have been opened. Opened: {', '.join(_show(modal.title) for modal in modals) or 'none'}"
+            ),
+            negate=negate,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_opened_modal(self, title: Text | None = None, *, timeout: Duration | None = None) -> None:
+        """Subject: a person. The agent opened a modal for them (submitted by now or not), titled `title` if given."""
+        await self._opened_modal(title, timeout, None, negate=False)
+
+    async def not_to_have_opened_modal(
+        self, title: Text | None = None, *, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, it has opened no modal for this person (titled `title`, if given)."""
+        await self._opened_modal(title, timeout, quiet_for, negate=True)
+
+    def _ephemeral_for(self, user: Author, negate: bool) -> None:
+        # It doesn't wait, as in matchers-core: who sees a message is fixed when it is posted.
+        visible_to: Author | None = getattr(self._subject, "visible_to", None)
+        if (visible_to is not None and visible_to.id == user.id) == negate:
+            seen = "everyone can see it" if visible_to is None else f"only {visible_to.name} can"
+            raise AssertionError(
+                f"Expected the message {'not ' if negate else ''}to be visible only to {user.name}, {seen}"
+            )
+
+    async def to_be_ephemeral_for(self, user: Author) -> None:
+        """Only this person can see the message."""
+        self._ephemeral_for(user, negate=False)
+
+    async def not_to_be_ephemeral_for(self, user: Author) -> None:
+        """The message isn't one only this person can see."""
+        self._ephemeral_for(user, negate=True)
+
+    # Deliveries
+
+    async def _attempts(self) -> list[Any]:
+        return list((await self._subject.refresh()).attempts)
+
+    async def _accepted(
+        self, within: Duration | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        limit = None if within is None else parse_duration(within)
+
+        async def read() -> Any:
+            return next((attempt for attempt in await self._attempts() if not attempt.forged_signature), None)
+
+        def holds(attempt: Any) -> bool:
+            # Accepted, and with `within`, accepted that fast: the platform's window is only the outer limit.
+            return (
+                attempt is not None
+                and attempt.status == "acknowledged"
+                and (limit is None or (attempt.duration_ms or 0) <= limit)
+            )
+
+        def described(attempt: Any) -> str:
+            expected = f"Expected delivery {self._subject.id} {'not ' if negate else ''}to be accepted"
+            expected += "" if limit is None else f" within {_number(limit)}ms"
+            status = "missing" if attempt is None else attempt.status
+            http = "" if attempt is None or attempt.response_status is None else f" (HTTP {attempt.response_status})"
+            took = "" if attempt is None or attempt.duration_ms is None else f" after {_number(attempt.duration_ms)}ms"
+            return f"{expected}, its first attempt is {status}{http}{took}"
+
+        await self._settle(
+            read=read, holds=holds, describe=described, negate=negate, timeout=timeout, quiet_for=quiet_for
+        )
+
+    async def to_be_accepted(self, *, within: Duration | None = None, timeout: Duration | None = None) -> None:
+        """The agent answered the delivery with 2xx, within the platform's window (and within `within`, if given)."""
+        await self._accepted(within, timeout, None, negate=False)
+
+    async def not_to_be_accepted(
+        self, *, within: Duration | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, its first answer to the delivery wasn't a 2xx (within `within`, if given)."""
+        await self._accepted(within, timeout, quiet_for, negate=True)
+
+    async def _rejected(self, timeout: Duration | None, quiet_for: Duration | None, negate: bool) -> None:
+        async def read() -> Any:
+            forged = [attempt for attempt in await self._attempts() if attempt.forged_signature]
+            return forged[-1] if forged else None
+
+        def refused(attempt: Any) -> bool:
+            return (
+                attempt is not None
+                and attempt.status == "failed"
+                and attempt.response_status is not None
+                and 400 <= attempt.response_status < 500
+            )
+
+        def described(attempt: Any) -> str:
+            delivery = self._subject.id
+            if attempt is None:
+                return (
+                    f"Expected delivery {delivery} to be rejected, but no forged attempt was sent. "
+                    "Call delivery.resend(bad_signature=True) first"
+                )
+            answer = attempt.status if attempt.response_status is None else attempt.response_status
+            return (
+                f"Expected the forged attempt of delivery {delivery} {'not ' if negate else ''}to be rejected "
+                f"with a 4xx, the agent answered {answer}"
+            )
+
+        await self._settle(
+            read=read, holds=refused, describe=described, negate=negate, timeout=timeout, quiet_for=quiet_for
+        )
+
+    async def to_be_rejected(self, *, timeout: Duration | None = None) -> None:
+        """A forged delivery (`resend(bad_signature=True)` or `stale=True`) was refused by the agent with a 4xx."""
+        await self._rejected(timeout, None, negate=False)
+
+    async def not_to_be_rejected(self, *, timeout: Duration | None = None, quiet_for: Duration | None = None) -> None:
+        """Once the agent is quiet, it didn't refuse the forged delivery with a 4xx."""
+        await self._rejected(timeout, quiet_for, negate=True)
+
+    async def _retried(
+        self, times: int | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        async def read() -> int:
+            return len([attempt for attempt in await self._attempts() if not attempt.forged_signature]) - 1
+
+        await self._settle(
+            read=read,
+            holds=lambda retries: retries > 0 if times is None else retries == times,
+            describe=lambda retries: (
+                f"Expected delivery {self._subject.id} {'not ' if negate else ''}to be retried"
+                f"{'' if times is None else f' {times} times'}, it was retried {retries} times"
+            ),
+            negate=negate,
+            once_quiet=times is not None,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_be_retried(
+        self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """The delivery needed retries (exactly `times` of them once the agent is quiet, if given)."""
+        await self._retried(times, timeout, quiet_for, negate=False)
+
+    async def not_to_be_retried(
+        self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the delivery needed no retries (or any number but `times`, if given)."""
+        await self._retried(times, timeout, quiet_for, negate=True)
 
 
 def expect(subject: Any) -> Expectation:
