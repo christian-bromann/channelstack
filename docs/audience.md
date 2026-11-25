@@ -119,7 +119,7 @@ The smaller ones (Mastra, Flue, Pi) only mock, or have nothing.
 
 - **Teams buying LLM-quality evals.** "Was the answer good?" belongs to LangSmith, Braintrust and Promptfoo. channelstack answers "did the agent behave correctly in the channel?" The two complement each other.
 - **Frontier labs buying RL environments.** That's a different buyer (Deeptune, Halluminate).
-- **People testing their app's outbound SaaS calls** (Stripe, Gmail) with no conversation involved. That's emulate or the twin vendors.
+- **People testing their app's outbound SaaS calls** (Stripe, a password-reset email) with no conversation involved. That's emulate or the twin vendors. An agent people email, which answers in the thread, is in scope: the Resend and Google channels ([decision 0020](decisions/0020-email-channels.md)).
 
 ## What to say to each
 

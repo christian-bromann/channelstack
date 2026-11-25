@@ -72,6 +72,8 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 5 | Live mode | Every "live mode" example passes nightly in the sandboxes, and cleanup leaves nothing behind |
 | 6 | Proxy mode and fake-vs-real conformance | An unmodified agent with hard-coded hosts passes; the nightly differential run works |
 | 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; the pytest integration; MCP drives a conversation |
+| 8 | The channel kit, the email core and Resend | Every channel is on the kit; all fake Resend examples and `resendChecks()` pass; Resend passes live |
+| 9 | Google (Gmail) | All fake Google examples and `googleChecks()` pass on the kit; Gmail passes live |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
 
@@ -277,9 +279,79 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ---
 
+## Phase 8: the channel kit, the email core and Resend
+
+[Decision 0020](decisions/0020-email-channels.md): email channels, and why Resend and Gmail. Phases 8 and 9 are two stacked pull requests, at the maintainer's request: phase 9's branches from phase 8's and is retargeted to `main` once phase 8 merges.
+
+**Build:**
+- **The channel kit** ([adding-a-channel.md](adding-a-channel.md)): what every driver repeated moves into core, and Slack, GitHub, Linear and Notion move onto it in the same commits, with their own copies deleted. The kit holds:
+  - one channel list derived from the driver registry;
+  - id, secret and token formats declared by each driver;
+  - the delivery kit (retry schedules, the emitter, delivery accessors) and the inspection routes, written once;
+  - `defineFake`, `providerEndpoint`, `PlatformRefusal` and `retryAfter`;
+  - the fixtures and SDK channel unions, generated;
+  - one harness table for the acceptance, live and conformance scripts;
+  - schema validators registered per channel.
+- `ResendOptions`, `SlackResendOptions` and `LinearResendOptions` become `DeliveryResendOptions`, `SlackDeliveryResendOptions` and `LinearDeliveryResendOptions`, so they don't read as the Resend channel's types.
+- **The email core** (`server/src/core/email/`, `api/email.d.ts`): MIME, threading by `Message-ID`, `In-Reply-To` and `References`, addresses, email threads as transcripts, and the contract's email bases.
+- **The Resend fake:**
+  - The REST surface the `resend` SDK uses: sending, batches, receiving and attachments.
+  - `email.received` and the outbound events, signed the Svix way, with Resend's retry schedule.
+  - The `@resend.dev` test addresses, idempotency keys, the rate limit and Resend's error shape.
+- `resendChecks()`, a reference agent on the `resend` SDK, and its broken variant.
+- **Resend live:** the agent's team and each person's own team. Recipients are held to the allowlisted domains, because sent email can't be taken back.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 8.1 | Every channel is on the kit | `pnpm check:channels` passes: each channel has every piece listed in adding-a-channel.md, and no driver bypasses the kit |
+| 8.2 | Every fake Resend example passes | All of `api/examples/resend.test.ts` except "live mode" |
+| 8.3 | Resend matches its schema | Every fake answer and webhook validates against the pinned `resend-openapi` description |
+| 8.4 | Signatures | Delivery cases R1–R3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with the `resend` SDK's `webhooks.verify` as the receiver |
+| 8.5 | Standard checks | `resendChecks()` pass, and each check fails against its broken variant |
+| 8.6 | All channels in one run | `api/examples/shared.test.ts` passes with Resend |
+| 8.7 | Resend live | The "live mode" block of `api/examples/resend.test.ts` passes against the sandbox teams; sending to an address outside the allowlist fails with `live_not_allowlisted` before any call |
+| 8.8 | Conformance | `scenarios/resend/` runs in the nightly differential run, and each difference is fixed or recorded in `divergences.yaml` |
+
+**Docs to update:**
+- `AGENTS.md` (the channels and addresses rows), `docs/audience.md`, `adding-a-channel.md` (new), `code-map.md`;
+- reality-matrix, `live-mode.md` section 4, the `devx.md` tables, `architecture.md`'s id table;
+- the environment-variable reference, the Resend platform page, README, `index.html` and the skill.
+
+---
+
+## Phase 9: Google (Gmail)
+
+**Build:**
+- **The Google fake on the kit:**
+  - The Gmail API surface `googleapis` uses: messages, threads, labels, history, `watch` and `stop`, the profile.
+  - Google's token endpoint for the `refresh_token` grant only. Signing users into an app stays out of scope.
+  - Pub/Sub push deliveries carrying an RS256 OIDC token from a per-install key, with its JWKS.
+  - Gmail's at-most-one-push-a-second rule, and Google's error shape.
+- `googleChecks()`, a reference agent on `googleapis` and `google-auth-library`, and its broken variant.
+- **Gmail live:** the agent's Gmail account with its Pub/Sub topic, and each person's own account. Recipients are held to the allowlist, and the sweep trashes run-labelled threads.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 9.1 | Every fake Google example passes | All of `api/examples/google.test.ts` except "live mode" |
+| 9.2 | Gmail matches its schema | Every fake answer validates against the pinned Gmail discovery document, and every push against Pub/Sub's push format |
+| 9.3 | Push tokens | Delivery cases M1–M3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with `google-auth-library`'s `verifyIdToken` as the receiver |
+| 9.4 | Standard checks | `googleChecks()` pass, and each check fails against its broken variant |
+| 9.5 | All channels in one run | `api/examples/shared.test.ts` passes with Google |
+| 9.6 | The kit held | `pnpm check:channels` passes, and the PR lists every file it changed outside the Google driver, its contract, its agents, scenarios and docs |
+| 9.7 | Gmail live | The "live mode" block of `api/examples/google.test.ts` passes against the sandbox accounts, the allowlist holds, and the sweep finds nothing left |
+| 9.8 | Conformance | `scenarios/google/` runs in the nightly differential run, and each difference is fixed or recorded in `divergences.yaml` |
+
+**Docs to update:** the same list as phase 8, for Google.
+
+---
+
 ## After 0.1
 
-Discord, Stripe and email drivers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
+Discord and Stripe drivers, more email providers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
 
 ## Appendix: delivery cases
 
@@ -308,5 +380,11 @@ Checks that each fake sends deliveries the platform's **official** receiver acce
 | N1 | `verifyWebhookSignature` accepts a body signed with the verification token | accepted |
 | N2 | A re-serialized body fails with the original signature | rejected |
 | N3 | Re-signed over the sent bytes, it verifies | accepted |
+| R1 | The `resend` SDK's `webhooks.verify` accepts an `email.received` signed with the webhook secret over the sent bytes (`svix-id`, `svix-timestamp`, `svix-signature`) | phase 8 |
+| R2 | A re-serialized body, or a wrong secret, is rejected | phase 8 |
+| R3 | A delivery whose `svix-timestamp` is over five minutes old is rejected, and Resend's retry re-signs with a new timestamp, so it is accepted | phase 8 |
+| M1 | `google-auth-library`'s `verifyIdToken` accepts a Pub/Sub push token against the fake's certificates, with the push endpoint as audience | phase 9 |
+| M2 | A token for another audience, or signed by another key, is rejected | phase 9 |
+| M3 | An expired token is rejected | phase 9 |
 
 Side finding: Bolt with a single `token` calls `auth.test` on every incoming request, so the Slack fake serves `auth.test` from phase 1.

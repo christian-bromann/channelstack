@@ -92,8 +92,8 @@ Don't reopen these without asking.
 
 | Area | Decision |
 |---|---|
-| Channels | Slack, GitHub, Linear and Notion. No Teams for now |
-| Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost` |
+| Channels | Slack, GitHub, Linear, Notion, and email: Resend and Google (Gmail), [decision 0020](docs/decisions/0020-email-channels.md). No Teams for now |
+| Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost` |
 | World | One shared fake workspace, org or integration per channel per server. Sessions are scopes inside it, not separate worlds |
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |
