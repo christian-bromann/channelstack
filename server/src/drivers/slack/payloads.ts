@@ -40,6 +40,7 @@ function botProfile(app: SlackAppRecord, team: SlackTeam): Record<string, unknow
     name: app.name,
     updated: app.updated ?? 0,
     app_id: app.id,
+    user_id: app.botUserId,
     icons: { image_36: icon(36), image_48: icon(48), image_72: icon(72) },
     team_id: team.id,
   };
