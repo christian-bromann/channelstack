@@ -85,6 +85,19 @@ describe("chat", () => {
     });
     expect(top.ts).toMatch(/^\d{10}\.\d{6}$/);
     expect(reply.message.thread_ts).toBe(question.ts);
+    // What real Slack adds to a message the app posts (#30): its bot's profile, a rich_text block of
+    // its text, and in a thread, who wrote the message the thread starts with.
+    expect(top.message.bot_profile).toMatchObject({ id: app.botId, app_id: app.id, name: "my-agent", deleted: false });
+    expect(top.message.bot_profile.updated).toEqual(expect.any(Number));
+    expect(top.message.blocks).toEqual([
+      {
+        type: "rich_text",
+        block_id: expect.any(String),
+        elements: [{ type: "rich_text_section", elements: [{ type: "text", text: "Looking into it" }] }],
+      },
+    ]);
+    expect(top.message).not.toHaveProperty("parent_user_id");
+    expect(reply.message.parent_user_id).toBe(question.author.id);
     expect((await get(`/conversations/${channel.id}/messages`)).map((m: { text: string }) => m.text)).toEqual([
       question.text,
       "Looking into it",
@@ -95,6 +108,13 @@ describe("chat", () => {
       author: { kind: "app", id: app.id, name: "my-agent" },
       threadTs: question.ts,
     });
+    // A message the app posts with blocks keeps its own.
+    const withBlocks = await api("chat.postMessage", {
+      channel: channel.id,
+      text: "fallback",
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: "*Deploy*" } }],
+    });
+    expect(withBlocks.message.blocks.map((block: { type: string }) => block.type)).toEqual(["section"]);
   });
 
   test("posting to a user id opens the DM with that person", async () => {
@@ -370,6 +390,17 @@ describe("reactions, conversations and users", () => {
       is_private: false,
       is_member: true,
       num_members: 2,
+      // What real Slack says of a channel of one workspace (#30).
+      is_shared: false,
+      is_ext_shared: false,
+      is_org_shared: false,
+      is_pending_ext_shared: false,
+      is_general: false,
+      name_normalized: channel.name,
+      previous_names: [],
+      parent_conversation: null,
+      unlinked: 0,
+      last_read: "0000000000.000000",
     });
     expect((await api("conversations.info", { channel: open.id })).error).toBe("not_in_channel");
     expect((await api("conversations.list")).channels.map((c: { id: string }) => c.id)).toEqual([channel.id, open.id]);

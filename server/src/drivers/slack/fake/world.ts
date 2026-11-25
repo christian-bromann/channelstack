@@ -246,6 +246,10 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       text: body.text,
       blocks: identified(body.blocks, () => ids.next("slack.block")),
       threadTs: options.threadTs,
+      parentUser:
+        options.threadTs === undefined
+          ? undefined
+          : store.messagesIn(conversation.id).find((root) => root.ts === options.threadTs)?.user,
       edited: undefined,
       reactions: [],
       ephemeralFor: options.ephemeralFor,
@@ -425,7 +429,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       return post(
         conversation,
         store.app.botUserId,
-        { text, blocks: input.blocks ?? [] },
+        // Slack gives what the app posts as text a `rich_text` block of it, as it does a person's message.
+        { text, blocks: input.blocks ?? (text === "" ? [] : [richTextBlock(text, ids.next("slack.block"))]) },
         { ...options, metadata: input.metadata },
       );
     },

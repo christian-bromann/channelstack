@@ -74,6 +74,7 @@ export function createSlackFake(context: DriverContext): SlackFake {
           scopes: DEFAULT_APP.scopes,
           botEvents: DEFAULT_APP.botEvents,
           installed: true,
+          updated: Math.floor(context.clock() / 1000),
         },
       );
     },

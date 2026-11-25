@@ -172,6 +172,24 @@ export function createSlackApi(
       topic: { value: conversation.topic, creator: conversation.creator, last_set: conversation.created },
       purpose: { value: conversation.purpose, creator: conversation.creator, last_set: conversation.created },
       num_members: conversation.members.size,
+      // One workspace, shared with no other: what Slack says of such a channel.
+      is_shared: false,
+      is_ext_shared: false,
+      is_org_shared: false,
+      is_pending_ext_shared: false,
+      is_general: conversation.name === "general",
+      context_team_id: store.team.id,
+      shared_team_ids: [store.team.id],
+      pending_shared: [],
+      pending_connected_team_ids: [],
+      name_normalized: conversation.name ?? `mpdm-${conversation.id.toLowerCase()}`,
+      previous_names: [],
+      parent_conversation: null,
+      unlinked: 0,
+      // Milliseconds, unlike `created`.
+      updated: conversation.created * 1000,
+      properties: {},
+      ...(conversation.members.has(bot()) ? { last_read: "0000000000.000000" } : {}),
     };
   };
 
@@ -208,11 +226,12 @@ export function createSlackApi(
     return root.threadTs ?? root.ts;
   };
 
-  const text = (args: Args): { text: string; blocks: unknown[] } => {
+  /** The text and blocks of a message the app sends. `blocks` is left out when it sent none: Slack then makes one of the text. */
+  const text = (args: Args): { text: string; blocks?: unknown[] } => {
     const blocks = json(args, "blocks");
     const value = string(args, "text") ?? string(args, "markdown_text") ?? "";
     world.checkContent(value, Array.isArray(blocks) ? blocks : undefined);
-    return { text: value, blocks: Array.isArray(blocks) ? blocks : [] };
+    return Array.isArray(blocks) ? { text: value, blocks } : { text: value };
   };
 
   /**
@@ -318,7 +337,7 @@ export function createSlackApi(
       const conversation = joined(required(args, "channel"));
       const message = messageIn(conversation, required(args, "ts"));
       if (message.user !== bot()) throw new SlackApiError("cant_update_message");
-      world.edit(conversation, message, text(args));
+      world.edit(conversation, message, { blocks: [], ...text(args) });
       return { channel: conversation.id, ts: message.ts, text: message.text, message: messageOf(message) };
     },
 
