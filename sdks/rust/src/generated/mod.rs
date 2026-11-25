@@ -1618,6 +1618,25 @@ fn run_slack_thread_suggested_prompts<'a>(
     })
 }
 
+fn run_slack_thread_root<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/slack/conversations/{}/threads/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["ts"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_slack_thread_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -8490,6 +8509,17 @@ impl SlackThread {
             vec![],
             run_slack_thread_suggested_prompts,
             as_value,
+        )
+    }
+
+    /// The message that starts a thread, as it is now. Experimental.
+    pub fn root(&self) -> Call<SlackMessage> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_thread_root,
+            SlackMessage::wrap,
         )
     }
 
@@ -16534,6 +16564,9 @@ pub async fn call_by_name(
         ("SlackThread", "suggestedPrompts") => {
             run_slack_thread_suggested_prompts(&target.ctx, &target.data, args, options).await?
         }
+        ("SlackThread", "root") => {
+            run_slack_thread_root(&target.ctx, &target.data, args, options).await?
+        }
         ("SlackThread", "replies") => {
             run_slack_thread_replies(&target.ctx, &target.data, args, options).await?
         }
@@ -17116,6 +17149,11 @@ pub async fn call_by_name(
             data,
         },
         ("SlackMessage", "refresh") => Dyn {
+            resource: Some("SlackMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("SlackThread", "root") => Dyn {
             resource: Some("SlackMessage"),
             ctx: target.ctx.clone(),
             data,

@@ -1489,6 +1489,12 @@ class SlackThread:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/threads/{quote(str(self.ts), safe='')}/suggested-prompts")
         return data
 
+    async def root(self) -> SlackMessage:
+        """The message that starts a thread, as it is now. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/threads/{quote(str(self.ts), safe='')}")
+        return SlackMessage(ctx, data)
+
     async def replies(self) -> SlackReplies:
         """Replies in a thread, oldest first, without the message that starts it. Experimental."""
         ctx = self._ctx

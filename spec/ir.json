@@ -3411,6 +3411,52 @@
           "onceQuiet": true
         },
         {
+          "name": "root",
+          "kind": "method",
+          "summary": "The message that starts a thread, as it is now",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/slack/conversations/{channel}/threads/{ts}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "ts",
+                "from": "self",
+                "field": "ts"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "SlackMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
           "name": "replies",
           "kind": "method",
           "summary": "Replies in a thread, oldest first, without the message that starts it",

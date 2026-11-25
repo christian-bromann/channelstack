@@ -223,9 +223,10 @@ export interface SlackMessage extends HasTranscript {
 }
 
 export interface SlackThread extends HasTranscript {
-  readonly root: SlackMessage;
   readonly conversation: SlackConversation;
 
+  /** The message that starts the thread, as it is now (its latest text and edits). */
+  root(): Promise<SlackMessage>;
   replies(): Promise<SlackMessage[]>;
   /** Wait for the next new reply matching `from` (any author if omitted), after the last one seen. */
   waitForReply(options?: { from?: SlackParticipant | string } & WaitOptions): Promise<SlackMessage>;
