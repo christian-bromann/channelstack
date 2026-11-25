@@ -1,0 +1,1643 @@
+{
+  "recorded": "From real Slack, 2026-11-25: chat.postMessage with text only, and the rich_text block of the message it answered. Ids are stand-ins: U0BOT0000 the app's bot, D0CHANNEL0 the conversation.",
+  "cases": [
+    {
+      "text": "*bold* _italic_ ~strike~ `code`",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "bold",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "italic",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "strike",
+              "style": {
+                "strike": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "code",
+              "style": {
+                "code": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*bold _both_ more*",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "bold ",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": "both",
+              "style": {
+                "bold": true,
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " more",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "see <https://example.com|the docs> and <https://example.com>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "see "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "the docs"
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "in <#D0CHANNEL0> ping <!here> and <!channel> and <!everyone>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "in "
+            },
+            {
+              "type": "channel",
+              "channel_id": "D0CHANNEL0"
+            },
+            {
+              "type": "text",
+              "text": " ping "
+            },
+            {
+              "type": "broadcast",
+              "range": "here"
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "broadcast",
+              "range": "channel"
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "broadcast",
+              "range": "everyone"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "hi <@U0BOT0000> and <@U0BOT0000|my-agent>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "hi "
+            },
+            {
+              "type": "user",
+              "user_id": "U0BOT0000"
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "user",
+              "user_id": "U0BOT0000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "eyes :eyes: thumbs :+1::skin-tone-2: unknown :notanemoji:",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "eyes "
+            },
+            {
+              "type": "emoji",
+              "name": "eyes",
+              "unicode": "1f440"
+            },
+            {
+              "type": "text",
+              "text": " thumbs "
+            },
+            {
+              "type": "emoji",
+              "name": "+1",
+              "unicode": "1f44d-1f3fb",
+              "skin_tone": 2
+            },
+            {
+              "type": "text",
+              "text": " unknown "
+            },
+            {
+              "type": "emoji",
+              "name": "notanemoji"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "```const a = 1;```",
+      "elements": [
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "const a = 1;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "before\n```code\nblock```\nafter",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "before"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "code\nblock"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "after"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "> quoted line\nnot quoted",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "quoted line"
+            }
+          ],
+          "contains_padding": true
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "not quoted"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "> one\n> two",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "one\n two"
+            }
+          ],
+          "contains_padding": true
+        }
+      ]
+    },
+    {
+      "text": "line1\nline2\n\nline4",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "line1\nline2\n\nline4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "a &amp; b &lt; c &gt; d & e",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "a & b < c > d & e"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "snake_case_name 2*3*4 *not bold*x",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "snake_case_name 2*3*4 *not bold*x"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "`*not bold in code*` and *`code in bold`*",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "*not bold in code*",
+              "style": {
+                "code": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "code in bold",
+              "style": {
+                "bold": true,
+                "code": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<mailto:a@example.com|mail> <!subteam^S0123ABCD|@team>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "link",
+              "url": "mailto:a@example.com",
+              "text": "mail"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "usergroup",
+              "usergroup_id": "S0123ABCD"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "• item one\n• item two\n1. first\n2. second",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "• item one\n• item two\n1. first\n2. second"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*unclosed bold",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "*unclosed bold"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "_a_ _b_",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "a",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "b",
+              "style": {
+                "italic": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "at 10:30:45 ok, a:b:c and :: and :eyes:x",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "at 10:30:45 ok, a"
+            },
+            {
+              "type": "emoji",
+              "name": "b",
+              "unicode": "1f171-fe0f"
+            },
+            {
+              "type": "text",
+              "text": "c and :: and "
+            },
+            {
+              "type": "emoji",
+              "name": "eyes",
+              "unicode": "1f440"
+            },
+            {
+              "type": "text",
+              "text": "x"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*bold*, _it_. (*paren*) ~strike~! \"*q*\"",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "bold",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": ", "
+            },
+            {
+              "type": "text",
+              "text": "it",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": ". ("
+            },
+            {
+              "type": "text",
+              "text": "paren",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": ") "
+            },
+            {
+              "type": "text",
+              "text": "strike",
+              "style": {
+                "strike": true
+              }
+            },
+            {
+              "type": "text",
+              "text": "! \""
+            },
+            {
+              "type": "text",
+              "text": "q",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": "\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "x _y_z and _ spaced _ and **double**",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "x "
+            },
+            {
+              "type": "text",
+              "text": "y_z and ",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " spaced _ and **double**"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "`unclosed code and ``empty``",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "unclosed code and ",
+              "style": {
+                "code": true
+              }
+            },
+            {
+              "type": "text",
+              "text": "`empty``"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*multi\nline* and _multi\nline_",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "*multi\nline* and _multi\nline_"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<https://example.com|x *y*> <https://example.com/a_b_c>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "x "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "y",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com/a_b_c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "&lt;not a tag&gt; <!here|here> <#D0CHANNEL0|general>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "<not a tag> "
+            },
+            {
+              "type": "broadcast",
+              "range": "here|here"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "channel",
+              "channel_id": "D0CHANNEL0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<!date^1392734382^{date}|Feb 18> <!subteam^S0123ABCD>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "date",
+              "timestamp": 1392734382,
+              "format": "{date}",
+              "fallback": "Feb 18"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "usergroup",
+              "usergroup_id": "S0123ABCD"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": ">no space quote",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "no space quote"
+            }
+          ],
+          "contains_padding": false
+        }
+      ]
+    },
+    {
+      "text": "&gt; escaped quote",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "escaped quote"
+            }
+          ],
+          "contains_padding": true
+        }
+      ]
+    },
+    {
+      "text": "text\n> quote mid\nafter",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "text"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "quote mid"
+            }
+          ],
+          "contains_padding": true
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "after"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "```a``` and ```b```",
+      "elements": [
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "a"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": " and "
+            }
+          ]
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "b"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*bold* `code` text\n```pre```",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "bold",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "code",
+              "style": {
+                "code": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " text"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "pre"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "```\nfenced on own lines\n```",
+      "elements": [
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "fenced on own lines\n"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*bold :eyes: <@U0BOT0000>* ~<https://example.com|l>~",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "bold ",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "emoji",
+              "name": "eyes",
+              "unicode": "1f440",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " ",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "user",
+              "user_id": "U0BOT0000",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "l",
+              "style": {
+                "strike": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "~*both*~ _*x*_",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "both",
+              "style": {
+                "bold": true,
+                "strike": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "text",
+              "text": "x",
+              "style": {
+                "bold": true,
+                "italic": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "https://example.com bare and www.example.com",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "text": " bare and "
+            },
+            {
+              "type": "link",
+              "url": "http://www.example.com",
+              "text": "www.example.com"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "> q *b*\n> :eyes:",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "q "
+            },
+            {
+              "type": "text",
+              "text": "b",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": "\n "
+            },
+            {
+              "type": "emoji",
+              "name": "eyes",
+              "unicode": "1f440"
+            }
+          ],
+          "contains_padding": true
+        }
+      ]
+    },
+    {
+      "text": "trailing space * and *a * b*",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "trailing space * and "
+            },
+            {
+              "type": "text",
+              "text": "a ",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " b*"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "see https://example.com. and (https://example.com/x) and https://example.com/a?b=1, ok",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "see "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "text": ". and ("
+            },
+            {
+              "type": "link",
+              "url": "https://example.com/x"
+            },
+            {
+              "type": "text",
+              "text": ") and "
+            },
+            {
+              "type": "link",
+              "url": "https://example.com/a?b=1"
+            },
+            {
+              "type": "text",
+              "text": ", ok"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "`<https://example.com|l> :eyes: &amp;` and ```<@U0BOT0000> :eyes: &lt;x&gt;```",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "l",
+              "style": {
+                "code": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " :eyes: &",
+              "style": {
+                "code": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " and "
+            }
+          ]
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U0BOT0000"
+            },
+            {
+              "type": "text",
+              "text": " :eyes: <x>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*<#D0CHANNEL0>* _<!here>_ :EYES: :thumbsup:",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "channel",
+              "channel_id": "D0CHANNEL0",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "broadcast",
+              "range": "here",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "emoji",
+              "name": "EYES"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "emoji",
+              "name": "thumbsup",
+              "unicode": "1f44d"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "mail a@example.com and _a_b_",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "mail "
+            },
+            {
+              "type": "link",
+              "url": "mailto:a@example.com",
+              "text": "a@example.com"
+            },
+            {
+              "type": "text",
+              "text": " and "
+            },
+            {
+              "type": "text",
+              "text": "a_b",
+              "style": {
+                "italic": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "```\n```",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "```\n```"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "x\n\n```p```\n\ny",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "x\n\n"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "p"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "\n\ny"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*See <https://example.com|the *new* doc> now*",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "See ",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "the ",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": "new",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "link",
+              "url": "https://example.com",
+              "text": " doc",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " now",
+              "style": {
+                "bold": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*ping <@U0BOT0000|a* b>*",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "ping <@U0BOT0000|a",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " b>*"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "_x <https://example.com/a_b> y_",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "x ",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "link",
+              "url": "https://example.com/a_b",
+              "style": {
+                "italic": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " y",
+              "style": {
+                "italic": true
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<!date^abc^{date}|fb>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "<!date^abc^{date}|fb>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<!date^^{date}|fb>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "<!date^^{date}|fb>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<!date^123|fb>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "<!date^123|fb>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<!date^1392734382^{date_short}^https://example.com|fb>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "date",
+              "timestamp": 1392734382,
+              "format": "{date_short}",
+              "url": "https://example.com",
+              "fallback": "fb"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": ">",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": ">"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "> ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": ">"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "&gt;",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": ">"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "> ```code```",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ],
+          "contains_padding": true
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "code"
+            }
+          ],
+          "border": 1
+        }
+      ]
+    },
+    {
+      "text": "x < y and y > z",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "x < y and y > z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "<|x> <@> <#> <!>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "<|x> <@> <#> <!>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "a\n\n> q",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "a\n\n"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "q"
+            }
+          ],
+          "contains_padding": true
+        }
+      ]
+    },
+    {
+      "text": "> q\n\n> q2",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "q"
+            }
+          ],
+          "contains_padding": true
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "\n\n"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "q2"
+            }
+          ],
+          "contains_padding": true
+        }
+      ]
+    },
+    {
+      "text": "> q\n\nafter",
+      "elements": [
+        {
+          "type": "rich_text_quote",
+          "elements": [
+            {
+              "type": "text",
+              "text": "q"
+            }
+          ],
+          "contains_padding": true
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "\n\nafter"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": ":face_with_bags_under_eyes: :fingerprint: :harp: :lime: :brown_mushroom:",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "emoji",
+              "name": "face_with_bags_under_eyes",
+              "unicode": "1fae9"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "emoji",
+              "name": "fingerprint",
+              "unicode": "1fac6"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "emoji",
+              "name": "harp",
+              "unicode": "1fa89"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "emoji",
+              "name": "lime",
+              "unicode": "1f34b-200d-1f7e9"
+            },
+            {
+              "type": "text",
+              "text": " "
+            },
+            {
+              "type": "emoji",
+              "name": "brown_mushroom",
+              "unicode": "1f344-200d-1f7eb"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "say ```mid``` line",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "say "
+            }
+          ]
+        },
+        {
+          "type": "rich_text_preformatted",
+          "elements": [
+            {
+              "type": "text",
+              "text": "mid"
+            }
+          ]
+        },
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": " line"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "*a <b* c>",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "a <b",
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "type": "text",
+              "text": " c>"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { splitAtMentions } from "./mentions.ts";
+import { richTextElements } from "./mrkdwn.ts";
 import type {
   SlackAppRecord,
   SlackConversationRecord,
@@ -21,14 +21,10 @@ export function messageSubscription(conversation: SlackConversationRecord): stri
 
 /**
  * Slack's `rich_text` block of a message's text, for a message sent without blocks (a person's, or
- * the app's): the text, with user mentions as their own elements. Slack also turns mrkdwn styles,
- * links, channel and special mentions and emoji into elements; the fake doesn't yet (#45).
+ * the app's): its mrkdwn as Slack's elements (`mrkdwn.ts`).
  */
 export function richTextBlock(text: string, blockId: string): unknown {
-  const elements = splitAtMentions(text).map((piece) =>
-    "user" in piece ? { type: "user", user_id: piece.user } : { type: "text", text: piece.text },
-  );
-  return { type: "rich_text", block_id: blockId, elements: [{ type: "rich_text_section", elements }] };
+  return { type: "rich_text", block_id: blockId, elements: richTextElements(text) };
 }
 
 /** The app's bot as Slack describes it on each message the app posted. */
