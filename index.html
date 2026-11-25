@@ -420,7 +420,7 @@ footer a:hover { color: var(--ink); }
         <div class="step"><span class="n2">STEP 2</span><h3>Point your agent at it</h3><p>Each fake comes with an app named <code>my-agent</code>. Tell channelstack where your agent takes events, then start the agent the way you always do, with channelstack’s environment.</p><div class="mini">$ CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &amp;
 $ npx channelstack env &gt;&gt; .env.local
 $ portless run my-agent pnpm dev</div></div>
-        <div class="step"><span class="n2">STEP 3</span><h3>Run</h3><p>Add the plugin and run your tests as usual. Every failure links to its transcript in the UI.</p><div class="mini">// vitest.config.ts
+        <div class="step"><span class="n2">STEP 3</span><h3>Run</h3><p>Add the plugin and run your tests as usual. A failure says what a person sees, and what the agent left open.</p><div class="mini">// vitest.config.ts
 plugins: [channelstack()]
 
 $ npx vitest
