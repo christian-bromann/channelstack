@@ -20,10 +20,14 @@
 //! The handles and their methods are generated from the server's routes (`src/generated/`); the
 //! runtime under them is the same as the TypeScript and Python SDKs' (`src/runtime`).
 
+pub mod expect;
 mod generated;
 pub mod runtime;
 
+pub use expect::expect;
 pub use generated::*;
+/// The pattern type text checks and waits take: `Regex::new("(?i)incident")?`.
+pub use regex::Regex;
 pub use runtime::client::{Call, Ctx, Dyn, Handle, IntoArg};
 pub use runtime::error::{Error, Result};
 pub use runtime::launcher::Mode;
