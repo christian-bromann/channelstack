@@ -1,7 +1,8 @@
 ---
 title: "CLI"
-order: 5
+order: 1
 description: "Every channelstack command and flag: start, env, the attach commands, mcp, and the live-mode commands, with their output and exit codes."
+section: "Tools"
 ---
 
 # CLI

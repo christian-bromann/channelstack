@@ -12,7 +12,7 @@ export interface Frontmatter {
   /** Position within its section, ascending. Pages without it sort last, by title. */
   order?: number;
   description?: string;
-  /** A section other than the folder's: the generated platform APIs say `Platform APIs`. */
+  /** A section other than the folder's: the Reference's pages say `Tools`, `Platform APIs` or `Test API`. */
   section?: string;
 }
 
@@ -45,7 +45,9 @@ export const SECTIONS: ReadonlyArray<{ folder?: string; title: string; area: Doc
   { folder: "guide", title: "Guide", area: "guide" },
   { folder: "platforms", title: "Platforms", area: "guide" },
   { folder: "reference", title: "Reference", area: "reference" },
+  { title: "Tools", area: "reference" },
   { title: "Platform APIs", area: "reference" },
+  { title: "Test API", area: "reference" },
 ];
 
 /** `../../docs/guide/live-mode.mdx` → `guide/live-mode`; `index` → `` (the docs landing page). */
