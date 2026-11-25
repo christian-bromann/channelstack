@@ -6,7 +6,9 @@ import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig } from "vite";
 import type {} from "vite-react-ssg";
 
+import rehypeHeadings from "./plugins/rehype-headings";
 import rehypeHighlight from "./plugins/rehype-highlight";
+import remarkCallouts from "./plugins/remark-callouts";
 import samples from "./plugins/samples-plugin";
 
 export default defineConfig({
@@ -14,7 +16,10 @@ export default defineConfig({
     samples(),
     {
       enforce: "pre",
-      ...mdx({ remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm], rehypePlugins: [rehypeHighlight] }),
+      ...mdx({
+        remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm, remarkCallouts],
+        rehypePlugins: [rehypeHeadings, rehypeHighlight],
+      }),
     },
     react(),
   ],

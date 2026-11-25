@@ -64,27 +64,27 @@ function SlackShell({ title, composer, children }: { title: ReactNode; composer:
 export function SlackMock({ step }: MockProps) {
   return (
     <SlackShell
-      composer="Message robin"
+      composer="Message my-agent"
       title={
         <>
           <span className="sl-avatar bot small" aria-hidden="true">
             R
           </span>
-          <b>robin</b>
+          <b>my-agent</b>
           <span className="sl-app">APP</span>
         </>
       }
     >
       <SlackMessage who="ana" time="10:42 AM" className={when(step, 1, "sl-msg")}>
         <p>
-          <Mention>@robin</Mention> ship #812 to staging
+          <Mention>@my-agent</Mention> ship #812 to staging
         </p>
       </SlackMessage>
       <div className="slot">
         <p className={step === 2 ? "sl-status" : "sl-status is-pending"} aria-hidden={step !== 2}>
-          <b>robin</b> is checking CI on #812…
+          <b>my-agent</b> is checking CI on #812…
         </p>
-        <SlackMessage who="robin" bot time="10:42 AM" className={when(step, 3, "sl-msg")}>
+        <SlackMessage who="my-agent" bot time="10:42 AM" className={when(step, 3, "sl-msg")}>
           <p>Deploy #812 to staging? CI passed 4 minutes ago, 2 files changed.</p>
           <p className="sl-actions">
             <span className={step >= 4 ? "sl-btn primary is-clicked" : "sl-btn primary"}>Approve</span>
@@ -92,7 +92,7 @@ export function SlackMock({ step }: MockProps) {
           </p>
         </SlackMessage>
       </div>
-      <SlackMessage who="robin" bot time="10:43 AM" className={when(step, 5, "sl-msg")}>
+      <SlackMessage who="my-agent" bot time="10:43 AM" className={when(step, 5, "sl-msg")}>
         <p>Deployed #812 to staging in 41s. ana approved it.</p>
       </SlackMessage>
     </SlackShell>
@@ -157,10 +157,10 @@ export function GitHubMock({ step }: MockProps) {
         <div className="gh-timeline">
           <GitHubComment who="mo" className={when(step, 2, "gh-comment")}>
             <p>
-              <Mention>@robin</Mention> can you take a look?
+              <Mention>@my-agent</Mention> can you take a look?
             </p>
           </GitHubComment>
-          <GitHubComment who="robin" bot className={when(step, 3, "gh-comment")}>
+          <GitHubComment who="my-agent" bot className={when(step, 3, "gh-comment")}>
             <p>Reproduced on Safari 17: the session cookie is dropped on the redirect. A fix is on the way.</p>
           </GitHubComment>
           <p className={when(step, 4, "gh-event")}>
@@ -203,7 +203,7 @@ export function LinearMock({ step }: MockProps) {
               <i className="ln-avatar bot" aria-hidden="true">
                 R
               </i>
-              robin
+              my-agent
             </span>
           </p>
         </div>
@@ -222,7 +222,7 @@ export function LinearMock({ step }: MockProps) {
               K
             </i>
             <span>
-              <b>Kai</b> delegated the issue to <b>robin</b>
+              <b>Kai</b> delegated the issue to <b>my-agent</b>
             </span>
           </li>
           <li className={when(step, 2, "ln-session")}>
@@ -230,7 +230,7 @@ export function LinearMock({ step }: MockProps) {
               <i className="ln-avatar bot" aria-hidden="true">
                 R
               </i>
-              <b>robin</b>
+              <b>my-agent</b>
               <span className="ln-agent">Agent</span>
               <span className="spacer" />
               <span className={step >= 5 ? "ln-state done" : "ln-state"}>{step >= 5 ? "Complete" : "Working"}</span>
@@ -296,10 +296,10 @@ export function NotionMock({ step }: MockProps) {
         <div className="nt-comments">
           <NotionComment who="Ana" className={when(step, 2, "nt-comment")}>
             <p>
-              <Mention>@robin</Mention> summarize this page
+              <Mention>@my-agent</Mention> summarize this page
             </p>
           </NotionComment>
-          <NotionComment who="robin" bot className={when(step, 3, "nt-comment")}>
+          <NotionComment who="my-agent" bot className={when(step, 3, "nt-comment")}>
             <p>Q1 has one goal: ship search.</p>
           </NotionComment>
           <p className={when(step, 2, "nt-reply")} aria-hidden="true">

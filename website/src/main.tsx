@@ -6,6 +6,7 @@ import "./styles/base.css";
 import "./styles/home.css";
 import "./styles/player.css";
 import "./styles/docs.css";
+import "./styles/figures.css";
 import { ViteReactSSG } from "vite-react-ssg";
 
 import { routes } from "./routes";

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import config from "../../samples/quickstart/channelstack.config.ts?sample";
 import vitestConfig from "../../samples/quickstart/vitest.config.ts?sample";
 import { Code, CopyButton, Terminal } from "../components/Code";
 import { Flow } from "../components/Flow";
@@ -325,22 +324,27 @@ export default function Home() {
                 <p className="step-n">Step 2</p>
                 <h3>Point your agent at it</h3>
                 <p>
-                  Describe your agent’s app, then start the agent the way you always do, with channelstack’s
-                  environment.
+                  Start channelstack with where your agent takes events, then start the agent the way you always do,
+                  with channelstack’s environment.
                 </p>
                 <div className="snippet">
-                  <p className="snippet-file">channelstack.config.ts</p>
-                  <Code plain sample={config} label="channelstack.config.ts" />
                   <Terminal
-                    label="Commands to start your agent"
-                    lines={["$ npx channelstack env >> .env.local", "$ portless run robin pnpm dev"]}
+                    label="Commands to start channelstack and your agent"
+                    lines={[
+                      "$ CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events npx channelstack",
+                      "$ npx channelstack env >> .env.local",
+                      "$ pnpm dev",
+                    ]}
                   />
                 </div>
               </li>
               <li className="step reveal">
                 <p className="step-n">Step 3</p>
                 <h3>Run</h3>
-                <p>Add the plugin and run your tests as usual. Every failure links to its transcript in the UI.</p>
+                <p>
+                  Add the plugin and run your tests as usual. A failure says what a person sees, and what the agent left
+                  open.
+                </p>
                 <div className="snippet">
                   <p className="snippet-file">vitest.config.ts</p>
                   <Code plain sample={vitestConfig} label="vitest.config.ts" />

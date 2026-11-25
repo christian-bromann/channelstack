@@ -1,0 +1,113 @@
+---
+title: "How it works"
+order: 1
+description: "One server fakes Slack, GitHub, Linear and Notion; tests, the CLI, MCP and the UI drive it through one control API."
+---
+
+# How it works
+
+This page explains the parts of channelstack and how they fit together: the server and its four fakes, the control API every client uses, sessions, and the transcript the matchers read. Read it when you want to know why a test behaves the way it does.
+
+<RequestFlow />
+
+## One server, four fakes
+
+channelstack is one server process. It fakes Slack, GitHub, Linear and Notion in memory and serves each fake at a stable local address:
+
+| Address                          | What it is                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| `https://channelstack.localhost` | The UI, and the control API at `/_channelstack`                                       |
+| `https://slack.localhost`        | Slack's Web API and Socket Mode; sends Events API requests and interactivity payloads |
+| `https://github.localhost`       | GitHub's REST API (also at the GHE-style `/api/v3`); sends App webhooks               |
+| `https://linear.localhost`       | Linear's GraphQL API at `/graphql`; sends webhooks and Agent Session events           |
+| `https://notion.localhost`       | Notion's API; sends integration webhooks                                              |
+
+The `*.localhost` names come from [portless](https://github.com/vercel-labs/portless). Without it, the server listens on one loopback port and puts each fake under a path prefix (`http://127.0.0.1:4500/slack`, `/github`, and so on). The [connecting your agent](/docs/guide/connecting-your-agent) page shows both.
+
+Your agent talks to a fake as if it were the real platform. It uses the platform's own SDK, unchanged, with only the base URL pointed at channelstack. The fakes behave like the platforms in the ways an agent notices:
+
+- **Ids look real.** A Slack user is `U08B5K2M9QX`, a channel `C08E1F2G3H4`, a message `ts` like `1732101234.567899`. GitHub uses numeric ids and 40-hex commit SHAs from an in-memory git store, Linear and Notion use UUIDs, and tokens have the platform's prefixes (`xoxb-…`, `ghs_…`, `lin_oauth_…`, `ntn_…`). Your agent's logs and your failing tests read like production.
+- **Refusals are real.** A fake refuses what the platform refuses, with the same error code: `not_in_channel` when the bot posts where it isn't a member, `missing_scope`, `msg_too_long`.
+- **Deliveries are real.** Events arrive signed the way each platform signs them, within the same ack windows, and Slack retries the way Slack does. See [delivery and failures](/docs/guide/delivery-and-failures).
+
+Each fake has one built-in app for your agent, named `my-agent`. There is one workspace, org or integration per fake, and the state lives in memory: a restart starts a fresh world.
+
+The fakes are channelstack's own implementation. They follow each platform's documentation, schemas and recorded traffic, and live runs against real sandboxes keep them honest.
+
+## Three kinds of traffic
+
+Three flows meet at the server, and it helps to keep them apart:
+
+| Flow              | What happens                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Test to server    | The test calls the control API: "Ana says this in that channel". The server writes it into the fake                                                                       |
+| Platform to agent | The fake signs and delivers the event the real platform would send (`app_mention`, `issue_comment`, `AgentSessionEvent`), over HTTP or Slack's Socket Mode                |
+| Agent to platform | The agent answers through the provider API it already uses (`chat.postMessage`, `POST /repos/…/comments`, `agentActivityCreate`). The fake serves the call and records it |
+
+The server records all three in an event log per session. That log feeds the UI's inspector and `channelstack tail`; the matchers read the platform's state through the read methods instead (below).
+
+## The control API
+
+Every client of channelstack uses the same plain-HTTP control API at `/_channelstack`:
+
+- the Vitest plugin and the pytest plugin, through the generated TypeScript and Python SDKs (there is a Rust SDK too);
+- the attach CLI (`channelstack slack say`, `show`, `deliveries`);
+- `channelstack mcp`, which gives a coding agent the CLI's commands as tools;
+- the UI in the browser.
+
+So anything you can click in the UI, a script can do, and a test can do the same thing a developer did by hand. The API listens on loopback only and needs a bearer token. The server writes the token to `~/.channelstack/server.json` with mode 0600, and the clients find it there on their own. The UI opens through a one-time login link instead, and can only read.
+
+The SDKs are generated from the server's routes, so they can't drift from what the server accepts. The matchers are not part of the server: they run in your test process and poll plain read methods (`thread.replies()`, `issue.comments()`) until a condition holds. That keeps assertion logic out of the server and lets each language use its own `expect`.
+
+## Base-URL mode and proxy mode
+
+By default the agent reaches the fakes because its SDK's base URL points at them (`SLACK_API_URL=https://slack.localhost/api/`). That's base-URL mode, and it needs no change beyond an option the SDK already has. Some agents hard-code `slack.com` or `api.github.com`; for those, `channelstack start --proxy` runs an HTTP proxy that sends the platforms' hosts to the fakes and passes every other host through. See [proxy mode](/docs/guide/proxy-mode).
+
+## Sessions: scopes in one shared world
+
+Your agent is configured once: one bot token and one base URL per platform. So there is only one fake Slack workspace, one GitHub org, one Linear workspace and one Notion workspace per server. Tests don't get separate worlds. Each test gets a **session**, a scope inside the shared one.
+
+<SessionScopes />
+
+A session works like this:
+
+- **It owns what it creates.** People, channels, repos, issues and pages belong to the session that made them. Generated names (`test-k3f9`) never collide, so parallel tests don't see each other.
+- **It reads only its own events.** A session's event log holds the deliveries and API calls caused by its own resources. When the agent posts into a channel the session owns, that call belongs to the session. A test's `slack.calls()` never shows another test's traffic.
+- **It cleans up after itself.** The Vitest and pytest plugins open a session before each test and close it after. Closing removes everything the test created.
+
+Three things reach past a session, and the rules for them are fixed:
+
+| What                                                     | Rule                                                                                                                                                                                    |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A name you choose (`createChannel({ name: "support" })`) | Unique per session. Two parallel tests can each have a `#support`; the agent sees two channels with different ids. A second `#support` in the same session is refused with `name_taken` |
+| An id you choose (`createUser({ id: "U0ADMIN01" })`)     | Unique in the whole world, because the agent can't tell two `U0ADMIN01` apart. While one session holds it, another is refused with `invalid_argument`                                   |
+| A global action (a fault, `slack.uninstallApp()`)        | Applies to everyone until its session closes, then it's undone. Run these tests on their own                                                                                            |
+
+The CLI, the UI and MCP share one long-lived session called `dev`. People and channels you create by hand (`channelstack slack say --as ana --in "#support" "…"`) live there until the server stops. See [the dev loop](/docs/guide/dev-loop).
+
+## The transcript
+
+Every matcher reads the **transcript**: a resource reduced to what a person would read. Edits are applied, deleted messages are gone, stream chunks are joined, an ephemeral message is visible only to its recipient, and Block Kit text and button labels are pulled out of the blocks.
+
+```ts
+const msg = await ana.say("what's 2 + 2?", { to: slack.app });
+await msg.thread.latestReply({ from: "my-agent" });
+
+const transcript = await msg.thread.transcript();
+expect(transcript.toString()).toMatchSnapshot();
+```
+
+The UI shows the same view, so it can't show anything a matcher wouldn't see. Reading as a particular person (`transcript({ as: ana })`) includes what only that person can see.
+
+This is also why the matchers check behaviour and not wording. `toHaveRepliesFrom("my-agent", { count: 1 })` holds whatever the reply says, so the same test works with a real model and a fake one. When a check fails, its message lists what a person would see instead.
+
+## Waiting instead of sleeping
+
+An agent answers when it's ready, so every matcher waits. A positive check passes as soon as its condition holds. A negative or exact-count check can't pass early, so it waits until the agent has gone quiet, and the server knows when that is: no stream open, no API call in flight, no delivery about to be retried. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains the rules.
+
+## What channelstack doesn't do
+
+- **It doesn't start or wrap your agent.** The agent is a separate process that you run as usual. `channelstack env` prints the tokens, signing secrets and URLs it needs, and the server delivers to the URL you give it.
+- **It doesn't mock the model.** channelstack fakes the channel, not the LLM. Use your framework's own fake model (the AI SDK's mock models in `ai/test`, LangChain's `FakeListChatModel`) or a real one.
+- **It doesn't relay events in live mode.** Against real sandboxes, channelstack acts as people and reads the results back; the platform delivers to your agent itself. Retries, bad signatures and other delivery chaos are fake only. See [live mode](/docs/guide/live-mode).
+- **It doesn't keep state.** Everything is in memory. Restart the server and the world is empty again.

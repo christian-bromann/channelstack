@@ -10900,7 +10900,7 @@
         "x-channelstack-stability": "experimental",
         "x-channelstack-live": {
           "requires": "proxy",
-          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+          "reason": "a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack"
         },
         "parameters": [
           {
@@ -10975,7 +10975,7 @@
         "x-channelstack-stability": "experimental",
         "x-channelstack-live": {
           "requires": "proxy",
-          "reason": "no Slack API reads this back; proxy mode sees the agent's own calls"
+          "reason": "a fault changes what the agent's own calls get back, and only proxy mode sits between the agent and Slack"
         },
         "parameters": [
           {
@@ -22432,5 +22432,55 @@
       }
     }
   },
-  "webhooks": {}
+  "webhooks": {},
+  "x-channelstack-errors": {
+    "unauthorized": {
+      "status": 401,
+      "description": "The request has no valid bearer token: the one in `server.json`, or `CHANNELSTACK_TOKEN`."
+    },
+    "invalid_argument": {
+      "status": 400,
+      "description": "An argument is missing, or has the wrong type or shape."
+    },
+    "not_found": {
+      "status": 404,
+      "description": "The handle isn't there: it was removed, or belongs to another session."
+    },
+    "session_not_found": {
+      "status": 404,
+      "description": "The session was closed, or never existed."
+    },
+    "internal": {
+      "status": 500,
+      "description": "Something failed inside channelstack. The message says what."
+    },
+    "unsupported_in_fake": {
+      "status": 501,
+      "description": "The operation isn't built in the fake yet."
+    },
+    "unsupported_in_live": {
+      "status": 501,
+      "description": "The operation has no live counterpart, or not yet: delivery chaos, a person's Re-run. A test is skipped for it."
+    },
+    "action_requires": {
+      "status": 422,
+      "description": "A live action needs a piece live mode doesn't drive yet (the browser actor beyond typing and clicking, proxy mode), or one this run lacks (a real person to create a channel, team or page as, a saved browser session). A test is skipped for it."
+    },
+    "live_misconfigured": {
+      "status": 412,
+      "description": "Live mode is set up wrong: credentials set in part, a token of the wrong kind, a person without a token under `CHANNELSTACK_REALITY=live`. A test fails for it, so a broken nightly run goes red."
+    },
+    "live_not_allowlisted": {
+      "status": 403,
+      "description": "The live workspace, org or team isn't in its `CHANNELSTACK_LIVE_*` allowlist. Nothing was done there."
+    },
+    "fake_actor_in_live_world": {
+      "status": 409,
+      "description": "A fake person acts in a live workspace."
+    },
+    "cross_workspace_credential": {
+      "status": 400,
+      "description": "A person's token belongs to a different workspace than the app's."
+    }
+  }
 }

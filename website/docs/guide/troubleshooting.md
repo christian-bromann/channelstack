@@ -1,0 +1,158 @@
+---
+title: "Troubleshooting"
+order: 13
+description: "Symptoms, their causes and fixes: nothing delivered, TLS errors, timeouts, slow negative checks, not_in_channel, skipped live tests, ports and stale secrets."
+---
+
+# Troubleshooting
+
+Each entry starts from what you see, then says what usually causes it and how to fix it. Most problems show up first in `channelstack tail` or in a delivery's status, so start there when you can.
+
+## Delivery
+
+### Nothing reaches the agent
+
+The person's message is in the transcript, but the agent never answers, and its log shows no request.
+
+**Check:** `npx channelstack deliveries slack` after a `slack say`, or `msg.delivery` in a test.
+
+| What you see | Cause | Fix |
+|---|---|---|
+| `Nothing was delivered to the agent on slack yet.` | The server doesn't know where the agent listens. It reads `CHANNELSTACK_SLACK_WEBHOOK_URL` only when it starts | Restart the server with the variable set, e.g. `CHANNELSTACK_SLACK_WEBHOOK_URL=http://localhost:3000/slack/events` |
+| No delivery, and the webhook URL is set | The app isn't in the conversation, so Slack sends it nothing | Give it access: `createChannel({ participants: [ana, slack.app] })`, or `ana.invite(slack.app, { channel })` |
+| Status `unreachable` | Nothing listens at that URL: the agent isn't running, or the port or path differs | Start the agent, and match the URL to its port and events path |
+| Status `timed_out` | The agent took longer than Slack's 3 seconds to answer the request | Acknowledge first, then work. This is also what makes Slack retry |
+| Status `failed` with `401` or `403` | The agent rejected the signature, usually because its signing secret is stale | See [stale secrets](#the-agent-gets-invalid-auth-or-rejects-every-delivery) |
+
+The same rules hold for GitHub, Linear and Notion with their own variables (`CHANNELSTACK_GITHUB_WEBHOOK_URL`, …). [Delivery and failures](/docs/guide/delivery-and-failures) explains each status.
+
+### Socket Mode doesn't connect
+
+A Socket Mode agent starts, but events wait and end as `timed_out`.
+
+**Cause:** the agent opens its socket by calling `apps.connections.open`, and it asked real Slack, or asked with the wrong token.
+
+**Fix:**
+
+- Pass `SLACK_API_URL` to the Slack client the Socket Mode receiver uses too. In Bolt, `clientOptions: { slackApiUrl: process.env.SLACK_API_URL }` covers both.
+- Use the app-level token, `SLACK_APP_TOKEN` (`xapp-…`) from `channelstack env`, as the app token. The bot token gets `not_allowed_token_type`.
+- With portless, the socket is `wss://slack.localhost/…`, so the runtime has to trust portless's certificate ([TLS errors](#tls-or-certificate-errors)). With `--no-portless` it's plain `ws://`.
+
+## TLS
+
+### TLS or certificate errors
+
+The agent fails on its first call with one of these:
+
+| Runtime | Error |
+|---|---|
+| Node | `unable to get local issuer certificate`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, `SELF_SIGNED_CERT_IN_CHAIN` |
+| Python | `SSL: CERTIFICATE_VERIFY_FAILED` |
+| Go | `x509: certificate signed by unknown authority` |
+
+**In base-URL mode with portless:** the `*.localhost` names are served with portless's certificate, which portless trusts in the system store, and not every runtime reads that store. `channelstack env` doesn't print TLS settings for this mode.
+
+- Node 24: set `NODE_USE_SYSTEM_CA=1`, or `NODE_EXTRA_CA_CERTS` to portless's CA.
+- Python: point `SSL_CERT_FILE` (and `REQUESTS_CA_BUNDLE`) at a bundle of certifi's roots plus portless's CA.
+- Go: works as is on macOS (the keychain); on Linux, `SSL_CERT_FILE`.
+- Anything else: start with `--no-portless`, which serves plain HTTP on loopback.
+
+**In proxy mode:** the agent didn't get what `channelstack env --proxy` prints, or it started before `channelstack ca rotate` and still has the old CA. Load the lines into the agent's environment and restart it. Go on macOS ignores `SSL_CERT_FILE`: run it in Docker ([Proxy mode](/docs/guide/proxy-mode#go-on-macos-run-it-in-docker)).
+
+## The server and the CLI
+
+### `channelstack env` can't find the server
+
+```
+channelstack: no running server found. Start one with `channelstack start`.
+```
+
+**Cause:** no server is running, or it runs with another state directory. The CLI looks for `<home>/server.json`, and `<home>` is `CHANNELSTACK_HOME` or `~/.channelstack`.
+
+**Fix:** start the server, and run the CLI with the same `CHANNELSTACK_HOME`. For a server started with `--server-file <path>`, pass the same `--server-file`, or use `--server <url>` with `CHANNELSTACK_TOKEN`.
+
+Related messages:
+
+- `the server at <url> isn't reachable.` The file is there, but the server isn't: it was killed without a chance to remove it. Start a new one.
+- `CHANNELSTACK_TOKEN is needed to talk to <url>.` You set `CHANNELSTACK_URL` or `--server` without the token.
+- In a test, with the plugin in `attach` mode: `No running channelstack server found.`, followed by how to start one or which variables to set.
+
+### The server won't start: port in use
+
+**Cause:** another process has the port. Without portless the server uses `4500`, and the proxy `7464`. Or another channelstack server already owns the same `server.json`:
+
+```
+A channelstack server is already running at http://127.0.0.1:4500 (pid 41235, from /Users/you/.channelstack/server.json). Stop it first, or start a private one with --server-file <path>.
+```
+
+**Fix:** stop the other server, or pick another port with `--port <n>` (and `--proxy-port <n>`). `0` picks a free one, but the URLs then change at each start, so run `channelstack env` again every time. To run a second server next to the first, give it its own `--server-file`.
+
+With portless, the error can also be `portless isn't installed. Install it (npm install -g portless) or start with --no-portless.`
+
+### The agent gets `invalid_auth`, or rejects every delivery
+
+The agent's API calls fail with `invalid_auth` (`← slack chat.postMessage  200 invalid_auth` in `tail`), or every delivery ends `failed` with `401`.
+
+**Cause:** the agent's tokens and signing secret don't match the server's. They are made once per install and stay the same across restarts, so this happens after `channelstack secrets rotate`, or when the agent's `.env` came from a server with another `CHANNELSTACK_HOME` (another machine, a CI cache).
+
+**Fix:** run `npx channelstack env` again, write it to the agent's `.env`, and restart the agent. If the server says `<home>/secrets.json is not valid JSON`, delete the file and start again: channelstack makes new secrets.
+
+## Matchers
+
+### A matcher times out
+
+```
+Expected a reply from my-agent. The thread has:
+  (nothing)
+```
+
+A positive matcher polls until it holds or the timeout (10 seconds by default) passes, then lists the replies that were there instead.
+
+**Causes, most likely first:**
+
+- Nothing reached the agent ([above](#nothing-reaches-the-agent)).
+- The agent's reply was refused. `await slack.calls({ error: true })` in the test lists the agent's calls that got an error code, such as `not_in_channel`.
+- The agent answered somewhere else: in the channel instead of the thread, or in a DM. The message lists what the thread has.
+- The agent is slow: a real model, or a live run. Raise it for one check (`{ timeout: "30s" }`) or for all of them (`channelstack({ timeout: "30s" })`).
+
+A line that starts with `Still open:` names what the agent left unfinished, such as a stream it started and never stopped. That is often the bug.
+
+### A negative check is slow
+
+`expect(thread).not.toHaveReplyFrom(...)` or `{ count: 1 }` takes a second or more, or times out with:
+
+```
+Timed out after 10000ms waiting for the agent to be quiet for 750ms. Still open: a stream my-agent started and never stopped: "Thinking…"
+```
+
+**Cause:** negative and exact-count checks wait until the agent has been quiet for the quiet window (750 ms by default) and then check once. An agent that never goes quiet (a stream left open, a delivery about to be retried, a call in flight) makes them wait the full timeout. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains why.
+
+**Fix:** stop the stream the message names. If your agent is reliably fast, lower the window with `channelstack({ quietFor: "300ms" })`; raise it if a check passes before a slow agent has answered.
+
+## Platform errors
+
+### `not_in_channel`
+
+**From the agent's call** (`← slack chat.postMessage  200 not_in_channel`): the app isn't a member of the channel it posts to. A test creates channels with the participants it names, so add the app: `participants: [ana, slack.app]`, or `ana.invite(slack.app, { channel })`. For a private channel the app isn't in, Slack answers `channel_not_found` instead, and so does the fake.
+
+**From the test's own step** (`U0… is not a member of C0…`): a person acted in a conversation they aren't in. Add them to `participants`, or have someone in it invite them.
+
+### `missing_scope`
+
+The fake checks scopes the way Slack does, per method, and refuses with `missing_scope`, naming the scope `needed` and the ones `provided`. The built-in app, `my-agent`, has the scopes a conversational agent usually has (`slack.app.scopes` lists them), and they cover every method the fake checks, so in fake mode you shouldn't see it.
+
+Live, it comes from real Slack: your app lacks the scope. Add it to the app's configuration and reinstall the app in the sandbox.
+
+## Live mode
+
+### A test skipped live
+
+The report shows the test as skipped, with a note like `live: SlackUser.stop live needs the browser actor: …`.
+
+**Cause:** the test uses something the live run can't do. `unsupported_in_live` is a fake-only feature (reading or forging a delivery, fixed ids). `action_requires` needs a piece live mode doesn't drive yet: the browser actor (a person with no saved session, or an action it doesn't do yet) or proxy mode (`calls()`, faults, negative checks).
+
+**Fix:** usually none: the fake run on every pull request runs the test in full. If the note says a person has no saved browser session, run `npx channelstack login slack --user ana`. A test that fails live with `live_misconfigured`, `fake_actor_in_live_world` or `live_not_allowlisted` is a setup problem, not a skip: `npx channelstack doctor` shows which. See [Live mode](/docs/guide/live-mode#what-skips-and-what-fails).
+
+### The UI shows nothing from my tests
+
+The UI, `show` and `tail` show the shared `dev` session only. Each test runs in its own session, so its conversations aren't there. To see what a test did, read its failure message, or `transcript()`, `deliveries()` and `calls()` in the test ([The dev loop](/docs/guide/dev-loop#the-shared-dev-session)).

@@ -13,11 +13,18 @@ const NOT_RAW = new Set(["self", "Self", "crate", "super"]);
 /** Names a handle already has from its traits or the generator: a field named so gets a `_`. */
 const TAKEN = new Set(["data", "ctx", "wrap", "wrap_opt", "wrap_vec", "from_wire", "from_wire_in", "close", "seen"]);
 
-/** A Rust identifier for an IR name: snake_case, and never a keyword. */
-function ident(name: string): string {
+/** A Rust identifier for an IR name: snake_case, and never a keyword. The docs name things with it too. */
+export function rustName(name: string): string {
   const snake = snakeCase(name);
   if (NOT_RAW.has(snake)) return `${snake}_`;
   return KEYWORDS.has(snake) ? `r#${snake}` : snake;
+}
+
+const ident = rustName;
+
+/** An error code's constant in the Rust SDK's `codes` module: `not_found` → `NOT_FOUND`. The docs name it with this too. */
+export function rustErrorConst(code: string): string {
+  return code.toUpperCase();
 }
 
 /** `createUser` → `CreateUser`, for builder types. */
@@ -568,7 +575,7 @@ export function emitRust(ir: Ir): Map<string, string> {
     "",
     "/// The protocol's error codes, as `Error::Api { code, .. }` carries them.",
     "pub mod codes {",
-    ...ir.errors.map((code) => `    pub const ${code.toUpperCase()}: &str = ${str(code)};`),
+    ...ir.errors.map((code) => `    pub const ${rustErrorConst(code)}: &str = ${str(code)};`),
     "}",
     ...ir.resources.flatMap((resource) =>
       methodsOf(resource)
