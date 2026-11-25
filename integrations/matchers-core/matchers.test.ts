@@ -166,3 +166,22 @@ describe("a failure's message", () => {
     expect(result.message()).not.toContain("Still open");
   });
 });
+
+describe("comments", () => {
+  test("on a Notion page, the comment matchers say to pass a discussion: a page has no comments of its own", async () => {
+    const page = { ...quiet, title: "Spec", discussions: async () => [], blocks: async () => [] };
+    const wanted = "needs a Notion discussion, not a page: a page's comments are in its discussions.";
+    const positive = matchers.toHaveCommentFrom(state, page, agent);
+    await expect(positive).rejects.toThrow(`toHaveCommentFrom ${wanted}`);
+    await expect(positive).rejects.not.toBeInstanceOf(TypeError);
+    await expect(matchers.toHaveCommentsFrom(state, page, agent, { count: 1 })).rejects.toThrow(
+      `toHaveCommentsFrom ${wanted}`,
+    );
+  });
+
+  test("on a discussion, they read its comments", async () => {
+    const discussion = { ...quiet, comments: async () => [{ author: agent, text: "Summary: all green" }] };
+    expect((await matchers.toHaveCommentFrom(state, discussion, agent, { text: /green/ })).pass).toBe(true);
+    expect((await matchers.toHaveCommentsFrom(state, discussion, agent, { count: 1 })).pass).toBe(true);
+  });
+});

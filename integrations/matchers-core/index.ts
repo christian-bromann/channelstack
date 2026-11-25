@@ -210,11 +210,18 @@ interface ReviewComment extends Comment {
   readonly line: number;
 }
 
-/** The comments of a subject that has a conversation: an issue, a pull request. */
-const commentsOf = (subject: unknown): Promise<readonly Comment[]> => {
-  const handle = subject as { comments?: () => Promise<Comment[]> };
-  if (typeof handle.comments !== "function") throw new TypeError("This matcher needs something with comments");
-  return handle.comments();
+/**
+ * The comments of a subject that has a conversation: a GitHub issue or pull request, a Linear
+ * issue, a Notion discussion. A Notion page has none of its own: they are in its discussions.
+ */
+const commentsOf = (subject: unknown, matcher: string): Promise<readonly Comment[]> => {
+  const handle = subject as { comments?: () => Promise<Comment[]>; discussions?: unknown };
+  if (typeof handle.comments === "function") return handle.comments();
+  throw new Error(
+    typeof handle.discussions === "function"
+      ? `${matcher} needs a Notion discussion, not a page: a page's comments are in its discussions. Pass \`comment.discussion\`, or one of \`await page.discussions()\`.`
+      : `${matcher} needs a GitHub issue or pull request, a Linear issue or a Notion discussion`,
+  );
 };
 const commentFrom = (author: AuthorRef, text?: string | RegExp) => (comment: Comment) =>
   fromMatches(comment.author, author) && textMatches(commentText(comment), text);
@@ -380,7 +387,7 @@ export const matchers = {
     });
   },
 
-  /** Subject: an issue or a pull request. At least one comment from this author in its conversation. */
+  /** Subject: a GitHub issue or pull request, a Linear issue or a Notion discussion. At least one comment from this author. */
   toHaveCommentFrom(
     state: MatcherState,
     subject: unknown,
@@ -390,7 +397,7 @@ export const matchers = {
     const wanted = `a comment from ${nameOf(author)}${options?.text === undefined ? "" : ` matching ${show(options.text)}`}`;
     return settle(subject, state, options, {
       onceQuiet: false,
-      read: () => commentsOf(subject),
+      read: () => commentsOf(subject, "toHaveCommentFrom"),
       holds: (comments) => comments.some(commentFrom(author, options?.text)),
       describe: (comments) =>
         `Expected ${state.isNot ? wanted.replace(/^a /, "no ") : wanted}. The conversation has:\n${written(comments)}`,
@@ -401,7 +408,7 @@ export const matchers = {
   toHaveCommentsFrom(state: MatcherState, subject: unknown, author: AuthorRef, options: Timing & { count: number }) {
     return settle(subject, state, options, {
       onceQuiet: true,
-      read: () => commentsOf(subject),
+      read: () => commentsOf(subject, "toHaveCommentsFrom"),
       holds: (comments) => comments.filter(commentFrom(author)).length === options.count,
       describe: (comments) =>
         `Expected ${state.isNot ? "not " : ""}exactly ${options.count} comments from ${nameOf(author)}, found ${comments.filter(commentFrom(author)).length}:\n${written(comments)}`,
