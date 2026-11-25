@@ -1,8 +1,10 @@
 import type { RouteRecord } from "vite-react-ssg";
 
-import { docLoaders, slugOf } from "./lib/docs";
+import { type DocModule, slugOf } from "./lib/docs";
 import Home from "./pages/Home";
 import { Root } from "./pages/Root";
+
+const docLoaders = import.meta.glob<DocModule>(["../docs/**/*.{md,mdx}", "!**/README.md"]);
 
 export const routes: RouteRecord[] = [
   {

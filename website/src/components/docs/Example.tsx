@@ -1,4 +1,5 @@
 import type { Sample } from "../../../plugins/samples-plugin";
+import { EXAMPLE_LANGUAGES } from "../../lib/examples";
 import { Code } from "../Code";
 import { CodeGroup } from "./CodeGroup";
 
@@ -11,41 +12,28 @@ import { CodeGroup } from "./CodeGroup";
  *   rust/src/slack_mention_one_reply.rs    (pnpm test:rust at the root: clippy)
  * Their `@show:start` … `@show:end` markers pick what the page shows (plugins/samples-plugin.ts).
  */
-const LANGUAGES = [
-  {
-    title: "TypeScript",
-    file: (id: string) => `../../../examples/ts/${id}.test.ts`,
-    samples: import.meta.glob<Sample>("../../../examples/ts/*.test.ts", {
+/** Every example file, by its path under website/examples/. The globs must be literals. */
+const SAMPLES: Record<string, Sample> = Object.fromEntries(
+  Object.entries({
+    ...import.meta.glob<Sample>("../../../examples/ts/*.test.ts", { query: "?sample", import: "default", eager: true }),
+    ...import.meta.glob<Sample>("../../../examples/python/test_*.py", {
       query: "?sample",
       import: "default",
       eager: true,
     }),
-  },
-  {
-    title: "Python",
-    file: (id: string) => `../../../examples/python/test_${id.replaceAll("-", "_")}.py`,
-    samples: import.meta.glob<Sample>("../../../examples/python/test_*.py", {
+    ...import.meta.glob<Sample>("../../../examples/rust/src/*.rs", {
       query: "?sample",
       import: "default",
       eager: true,
     }),
-  },
-  {
-    title: "Rust",
-    file: (id: string) => `../../../examples/rust/src/${id.replaceAll("-", "_")}.rs`,
-    samples: import.meta.glob<Sample>("../../../examples/rust/src/*.rs", {
-      query: "?sample",
-      import: "default",
-      eager: true,
-    }),
-  },
-];
+  }).map(([path, sample]) => [path.replace("../../../examples/", ""), sample]),
+);
 
 export function Example({ id }: { id: string }) {
-  const tabs = LANGUAGES.map(({ title, file, samples }) => {
-    const sample = samples[file(id)];
+  const tabs = EXAMPLE_LANGUAGES.map(({ title, file }) => {
+    const sample = SAMPLES[file(id)];
     // Prerendering every page runs this, so a missing file fails the build.
-    if (!sample) throw new Error(`<Example id="${id}" />: there is no ${file(id).replace("../../../", "website/")}`);
+    if (!sample) throw new Error(`<Example id="${id}" />: there is no website/examples/${file(id)}`);
     return { title, sample };
   });
   return (

@@ -3,18 +3,38 @@
  * Content-Security-Policy allows no inline styles), carries its meaning in a visible caption,
  * and shows its finished state to people who ask for reduced motion (styles/figures.css).
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
-/** The packets and steps of a figure light up in turn: `step-1` with `pkt-1`, and so on. */
-const steps = (texts: readonly string[]) => (
-  <ol className="fig-steps">
-    {texts.map((text, index) => (
-      <li key={text} className={`step-${index + 1}`}>
-        {text}
-      </li>
-    ))}
-  </ol>
-);
+import { FIGURE_CAPTIONS, type FigureCaption, type FigureName } from "./figure-captions";
+
+/** `dev` in backticks, set as code. */
+const inline = (text: string) =>
+  text
+    .split("`")
+    .map((part, index) => (index % 2 ? <code key={index}>{part}</code> : <Fragment key={index}>{part}</Fragment>));
+
+/**
+ * A figure's caption (figure-captions.ts). Numbered steps light up in turn with the figure:
+ * `step-1` with `pkt-1`, and so on.
+ */
+function Caption({ figure }: { figure: FigureName }) {
+  const caption: FigureCaption = FIGURE_CAPTIONS[figure];
+  return (
+    <figcaption>
+      {"steps" in caption ? (
+        <ol className="fig-steps">
+          {caption.steps.map((text, index) => (
+            <li key={text} className={`step-${index + 1}`}>
+              {inline(text)}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        inline(caption.text)
+      )}
+    </figcaption>
+  );
+}
 
 /** A test's message reaching the app, and the app's reply coming back to the test. */
 export function RequestFlow() {
@@ -44,14 +64,7 @@ export function RequestFlow() {
           <span>real SDK</span>
         </div>
       </div>
-      <figcaption>
-        {steps([
-          "The test acts as Ana: she mentions the app in a channel.",
-          "The fake Slack delivers the event to your app, signed, the way Slack does.",
-          "Your app answers through the Slack API it already uses, which now points at the fake.",
-          "The matcher reads the thread as Ana would see it, and passes.",
-        ])}
-      </figcaption>
+      <Caption figure="RequestFlow" />
     </figure>
   );
 }
@@ -133,11 +146,7 @@ export function SessionScopes() {
           <b>dev</b> session · the CLI, the UI and MCP · lives until the server stops
         </p>
       </div>
-      <figcaption>
-        Tests run in parallel against one server. Each test gets its own session: it sees only the people, channels and
-        deliveries it created, and everything goes away when it ends. The CLI, the UI and MCP share one long-lived
-        session called <code>dev</code>.
-      </figcaption>
+      <Caption figure="SessionScopes" />
     </figure>
   );
 }
@@ -165,13 +174,7 @@ export function QuietWindow() {
           <span>time →</span>
         </div>
       </div>
-      <figcaption>
-        {steps([
-          "The check starts watching. The app is still busy: a delivery is in flight, then its API calls, then a stream.",
-          "Once nothing is open, the quiet window starts. Anything the app does now restarts it.",
-          "After 750 ms of quiet, watched from start to end, the check reads the thread once.",
-        ])}
-      </figcaption>
+      <Caption figure="QuietWindow" />
     </figure>
   );
 }
@@ -208,14 +211,7 @@ export function RetryTimeline() {
         </div>
         <span className="retry-head" />
       </div>
-      <figcaption>
-        {steps([
-          "Slack delivers the event. Without an answer within 3 seconds it counts the delivery as failed.",
-          "It sends the same event again, with the attempt number and the reason in its retry headers.",
-          "An app that remembers the event id acknowledges the retry and does nothing else.",
-          "The thread gets one reply. An app that doesn't check answers twice.",
-        ])}
-      </figcaption>
+      <Caption figure="RetryTimeline" />
     </figure>
   );
 }
@@ -253,14 +249,7 @@ export function ProxyRouting() {
           ))}
         </div>
       </div>
-      <figcaption>
-        {steps([
-          "The app calls the platform's real host. The proxy in its environment takes the connection.",
-          "slack.com, api.github.com, api.linear.app and api.notion.com go to the fakes, under a certificate only the app trusts.",
-          "The fakes answer exactly as they do on *.localhost.",
-          "Every other host, such as the model's API, passes through untouched.",
-        ])}
-      </figcaption>
+      <Caption figure="ProxyRouting" />
     </figure>
   );
 }
@@ -309,10 +298,7 @@ await expect(msg.thread).toHaveReplyFrom("my-agent");`}
           </div>
         ))}
       </dl>
-      <figcaption>
-        The test doesn't change. Credentials in the environment decide whether it runs against the fake or the real
-        platform.
-      </figcaption>
+      <Caption figure="FakeOrLive" />
     </figure>
   );
 }

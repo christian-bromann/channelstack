@@ -6,6 +6,7 @@ import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig } from "vite";
 import type {} from "vite-react-ssg";
 
+import agentDocs from "./plugins/agent-docs";
 import rehypeHeadings from "./plugins/rehype-headings";
 import rehypeHighlight from "./plugins/rehype-highlight";
 import remarkCallouts from "./plugins/remark-callouts";
@@ -14,6 +15,7 @@ import samples from "./plugins/samples-plugin";
 export default defineConfig({
   plugins: [
     samples(),
+    agentDocs(),
     {
       enforce: "pre",
       ...mdx({

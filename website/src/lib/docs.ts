@@ -4,6 +4,7 @@
  * there, so adding a page never needs a code change. website/docs/README.md is the plan.
  *
  * The sections belong to two areas, the Guide and the Reference, each with its own sidebar.
+ * Nothing here is Vite-only: plugins/agent-docs.ts uses it at build time, in Node.
  */
 import type { ComponentType } from "react";
 
@@ -60,8 +61,6 @@ export function slugOf(file: string): string {
 export function sourceOf(file: string): string {
   return `website/docs/${file.replace(/^.*\/docs\//, "")}`;
 }
-
-export const docLoaders = import.meta.glob<DocModule>(["../../docs/**/*.{md,mdx}", "!**/README.md"]);
 
 export interface DocEntry extends Frontmatter {
   slug: string;
