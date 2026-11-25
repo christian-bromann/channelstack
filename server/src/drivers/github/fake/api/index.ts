@@ -120,7 +120,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   const hookDelivery = (entry: (typeof store.hookDeliveries)[number], detailed: boolean): Json => {
     const sameGuid = store.hookDeliveries.filter((other) => other.guid === entry.guid);
     const number = sameGuid.indexOf(entry);
-    const record = context.delivery.get(entry.session, entry.guid);
+    const record = world.kit.deliveries.delivery(entry.session, entry.guid);
     const attempt = record.attempts[number];
     const code = attempt?.responseStatus ?? 0;
     return {

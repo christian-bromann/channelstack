@@ -1,7 +1,6 @@
-import type { RetryPolicy } from "../../../core/delivery/index.ts";
+import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { randomToken } from "../../../core/secrets/index.ts";
 import { LINEAR_IDS } from "../ids.ts";
 import { linearLinks } from "../links.ts";
 import { linearPayloads } from "../payloads.ts";
@@ -29,12 +28,6 @@ import type { LinearStore } from "./store.ts";
 const ACK_WINDOW_MS = 5_000;
 /** Linear retries a webhook that wasn't answered with a 2xx: after a minute, an hour, six hours. */
 const RETRY_DELAYS_MS = [60_000, 3_600_000, 21_600_000];
-const LINEAR_RETRIES: RetryPolicy = {
-  next(_attempt, retries) {
-    const afterMs = RETRY_DELAYS_MS[retries];
-    return afterMs === undefined ? undefined : { afterMs, headers: {} };
-  },
-};
 
 /** A new team's workflow, as Linear sets one up. */
 const DEFAULT_STATES: ReadonlyArray<readonly [string, LinearStateType, string]> = [
@@ -59,7 +52,26 @@ const STATE_COLOR: Readonly<Record<LinearStateType, string>> = {
  * control API) and for the app (through GraphQL) alike. The caller brings the permission check.
  */
 export function createFakeWorld(context: DriverContext, store: LinearStore) {
-  const { ids, clock, delivery } = context;
+  const { ids, clock } = context;
+  /**
+   * Linear's deliveries: each attempt stamps `webhookTimestamp` into the body and signs it again,
+   * and names the delivery and its event in headers.
+   */
+  const deliveries = deliveryKit(context, {
+    driver: "linear",
+    timeoutMs: ACK_WINDOW_MS,
+    retry: fixedRetries(RETRY_DELAYS_MS),
+    stamp: stampLinearWebhook,
+    sign: (secret, body, atMs, { id, type }) => ({
+      "linear-delivery": id,
+      "linear-event": type,
+      "user-agent": "Linear-Webhook",
+      ...signLinearWebhook(secret, body, atMs),
+    }),
+    secret: () => context.secret("webhookSecret"),
+    // Linear's receivers refuse a timestamp more than a minute away from now.
+    staleMs: 120_000,
+  });
   const links = linearLinks(context.apiUrl, () => store.org);
   const { userOf, markdown, mentioned, readable, rootOf, stateOf } = linearText(store, links, (session, name) => {
     if (name.toLowerCase() === store.appUser.displayName.toLowerCase()) return store.appUser.id;
@@ -72,14 +84,6 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     issue: (id) => store.issue(id),
     comment: (id) => store.comments.find(id),
     state: (issue) => stateOf(issue),
-  });
-
-  /** Linear's headers for one delivery, signed with this secret over each attempt's body. */
-  const signedWith = (secret: string, id: string, type: string) => (body: string, atMs: number) => ({
-    "linear-delivery": id,
-    "linear-event": type,
-    "user-agent": "Linear-Webhook",
-    ...signLinearWebhook(secret, body, atMs),
   });
 
   /**
@@ -99,17 +103,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       webhookId: store.app.webhookId,
       webhookTimestamp: clock(),
     };
-    delivery.enqueue({
+    deliveries.send({
       id,
       session,
-      driver: "linear",
       type,
       url: context.webhookUrl ?? "",
       body: JSON.stringify(full),
-      stamp: stampLinearWebhook,
-      sign: signedWith(context.secret("webhookSecret"), id, type),
-      timeoutMs: ACK_WINDOW_MS,
-      retry: LINEAR_RETRIES,
       meta: {
         eventType: typeof payload.action === "string" ? `${type}.${payload.action}` : type,
         action: payload.action,
@@ -734,21 +733,13 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     },
 
     /** Send a delivery again, unchanged (stamped with the time it is sent), stale, or signed with a secret that isn't the app's. */
-    resend(session: string, id: string, options: { badSignature: boolean; stale: boolean }) {
-      const { request } = delivery.get(session, id);
-      const secret = options.badSignature ? randomToken() : context.secret("webhookSecret");
-      return delivery.again(session, id, {
-        sign: signedWith(secret, id, request.type),
-        // Linear's receivers refuse a timestamp more than a minute away from now.
-        ...(options.stale ? { atMs: clock() - 120_000 } : {}),
-        forged: options.badSignature || options.stale,
-      });
-    },
+    resend: (session: string, id: string, options: { badSignature: boolean; stale: boolean }) =>
+      deliveries.resend(session, id, options),
 
     /** Redeliver, as Linear retries: the same delivery, stamped and signed again. */
-    redeliver: (session: string, id: string) => delivery.again(session, id),
-    deliveries: (session: string) => delivery.list(session).filter(({ request }) => request.driver === "linear"),
-    delivery: (session: string, id: string) => delivery.get(session, id),
+    redeliver: (session: string, id: string) => deliveries.redeliver(session, id),
+    deliveries: deliveries.deliveries,
+    delivery: deliveries.delivery,
   };
 }
 

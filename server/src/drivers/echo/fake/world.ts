@@ -1,3 +1,4 @@
+import { deliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { ECHO_IDS } from "../ids.ts";
@@ -15,7 +16,13 @@ export interface FakeEchoWorld extends EchoWorld {
 }
 
 export function createFakeWorld(context: DriverContext, store: EchoStore): FakeEchoWorld {
-  const { ids, clock, events, delivery } = context;
+  const { ids, clock, events } = context;
+  const deliveries = deliveryKit(context, {
+    driver: "echo",
+    timeoutMs: ACK_WINDOW_MS,
+    sign: (secret, body, atMs) => signEchoDelivery(secret, body, atMs),
+    secret: () => context.secret("signingSecret"),
+  });
 
   const post = (room: EchoRoom, author: EchoPrincipal, text: string, deliveryId?: string): EchoMessage => {
     const message: EchoMessage = {
@@ -73,15 +80,12 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
       events.append(session, "echo", "action", { action: "say", user: user.id, room: room.id, message: message.id });
       if (context.webhookUrl !== undefined && message.delivery !== undefined) {
         const payload = messageCreated({ deliveryId: message.delivery, app: store.app, message, atMs: clock() });
-        delivery.enqueue({
+        deliveries.send({
           id: message.delivery,
           session,
-          driver: "echo",
           type: payload.type,
           url: context.webhookUrl,
           body: JSON.stringify(payload),
-          sign: (body, atMs) => signEchoDelivery(context.secret("signingSecret"), body, atMs),
-          timeoutMs: ACK_WINDOW_MS,
           meta: { payload },
         });
       }

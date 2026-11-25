@@ -1,4 +1,4 @@
-import type { RetryPolicy } from "../../../core/delivery/index.ts";
+import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
@@ -29,12 +29,6 @@ import type { NotionStore } from "./store.ts";
 const ACK_WINDOW_MS = 5_000;
 /** Notion retries up to eight times, backing off, over about a day. */
 const RETRY_DELAYS_MS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_200_000, 21_600_000, 43_200_000];
-const NOTION_RETRIES: RetryPolicy = {
-  next(_attempt, retries) {
-    const afterMs = RETRY_DELAYS_MS[retries];
-    return afterMs === undefined ? undefined : { afterMs, headers: {} };
-  },
-};
 /** How long `page.content_updated` waits to batch edits, unless a test sets another delay. */
 const DEFAULT_CONTENT_DELAY_MS = 1_000;
 const OPTION_COLORS = ["default", "gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red"];
@@ -72,7 +66,17 @@ export interface DatabaseInput {
  * and for the integration (through the REST API) alike. The caller brings the permission check.
  */
 export function createFakeWorld(context: DriverContext, store: NotionStore) {
-  const { ids, clock, delivery, timers } = context;
+  const { ids, clock, timers } = context;
+  /** Notion's deliveries: stamped with the attempt's number, signed with the verification token over the exact body. */
+  const deliveries = deliveryKit(context, {
+    driver: "notion",
+    timeoutMs: ACK_WINDOW_MS,
+    retry: fixedRetries(RETRY_DELAYS_MS),
+    stamp: stampAttempt,
+    sign: (secret, body) => ({ "user-agent": "notion-api", ...signNotionWebhook(secret, body) }),
+    secret: () => context.secret("verificationToken"),
+    forgedSecret: () => `secret_${randomToken()}`,
+  });
   const links = notionLinks(context.apiUrl, (page) => titleOf(page));
   const objects = notionObjects({
     links,
@@ -131,12 +135,6 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   /** Content updates waiting to go out, by page: one event names every block changed meanwhile. */
   const pendingContent = new Map<string, { session: string; blocks: Set<string>; authors: Map<string, Author> }>();
 
-  /** Notion's headers for an event, signed with this token over the exact body. */
-  const signedWith = (token: string) => (body: string) => ({
-    "user-agent": "notion-api",
-    ...signNotionWebhook(token, body),
-  });
-
   /**
    * Send an event to the agent if the integration is subscribed to it, may see the page and has a
    * URL. Every attempt is stamped with its number and signed with the verification token.
@@ -152,17 +150,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     const id = ids.next(NOTION_IDS.uuid);
     const payload = build(id);
     const entity = payload.entity as { id: string; type: string };
-    delivery.enqueue({
+    deliveries.send({
       id,
       session,
-      driver: "notion",
       type,
       url: context.webhookUrl,
       body: JSON.stringify(payload),
-      stamp: stampAttempt,
-      sign: signedWith(context.secret("verificationToken")),
-      timeoutMs: ACK_WINDOW_MS,
-      retry: NOTION_RETRIES,
       meta: { payload, entity, page: page.id },
     });
     return id;
@@ -913,29 +906,25 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     refresh: (_session: string, _about: { page: string } | { discussion: string }) => {},
 
     // Deliveries
-    resend(session: string, id: string, options: { badSignature: boolean }) {
-      const secret = options.badSignature ? `secret_${randomToken()}` : context.secret("verificationToken");
-      return delivery.again(session, id, {
-        sign: signedWith(secret),
-        forged: options.badSignature,
-      });
-    },
-    redeliver: (session: string, id: string) => delivery.again(session, id),
-    deliveries: (session: string) => delivery.list(session).filter(({ request }) => request.driver === "notion"),
-    delivery: (session: string, id: string) => delivery.get(session, id),
+    resend: (session: string, id: string, options: { badSignature: boolean }) =>
+      deliveries.resend(session, id, options),
+    redeliver: (session: string, id: string) => deliveries.redeliver(session, id),
+    deliveries: deliveries.deliveries,
+    delivery: deliveries.delivery,
     /** The subscription's verification request, as Notion sends it once when a subscription is created. */
     verify(session: string) {
       if (context.webhookUrl === undefined) return undefined;
       const id = ids.next(NOTION_IDS.uuid);
-      delivery.enqueue({
+      // Sent once and unsigned: the token is in the body, for the agent to save.
+      deliveries.send({
         id,
         session,
-        driver: "notion",
         type: "verification",
         url: context.webhookUrl,
         body: JSON.stringify({ verification_token: context.secret("verificationToken") }),
         sign: () => ({ "user-agent": "notion-api" }),
-        timeoutMs: ACK_WINDOW_MS,
+        retry: false,
+        stamp: false,
         meta: {
           payload: { verification_token: "[redacted]" },
           entity: { type: "subscription", id: store.bot.subscriptionId },

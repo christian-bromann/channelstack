@@ -1,4 +1,5 @@
 import type { DeliveryTransport } from "../../../core/delivery/index.ts";
+import type { DeliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
@@ -11,7 +12,6 @@ import {
   payloadForm,
   slashCommandFields,
 } from "../interaction-payloads.ts";
-import { signSlackRequest } from "../signing.ts";
 import {
   type Immediate,
   NOBODY,
@@ -34,6 +34,8 @@ const RESPONSE_URL_LIFETIME_MS = 30 * 60_000;
 export interface InteractionKit {
   context: DriverContext;
   store: SlackStore;
+  /** The world's Slack deliveries. */
+  deliveries: DeliveryKit;
   refuse(code: string, message: string, data?: Record<string, unknown>): ProtocolError;
   /** The person, who must be in the conversation. */
   member(session: string, userId: string, conversation: SlackConversationRecord): SlackUserRecord;
@@ -101,7 +103,7 @@ type Interactions = Pick<
 /** What a person does in the client beyond writing: buttons, menus, shortcuts and slash commands. */
 export function createInteractions(kit: InteractionKit): Interactions {
   const { context, store, refuse, member, requireMessage } = kit;
-  const { ids, clock, delivery } = context;
+  const { ids, clock } = context;
 
   /** A `trigger_id` the app may open one modal with, for three seconds. */
   const issueTrigger = (session: string, user: SlackUserRecord): string => {
@@ -157,17 +159,15 @@ export function createInteractions(kit: InteractionKit): Interactions {
   ): string => {
     reachable();
     const id = ids.next(SLACK_IDS.event);
-    delivery.enqueue({
+    kit.deliveries.send({
       id,
       session,
-      driver: "slack",
       type,
       url: context.webhookUrl ?? "",
       transport: kit.transport,
       body,
       contentType: "application/x-www-form-urlencoded",
-      sign: (bytes, atMs) => signSlackRequest(context.secret("signingSecret"), bytes, atMs),
-      timeoutMs: ACK_WINDOW_MS,
+      retry: false,
       meta: { payload },
       ...(answered ? { answered } : {}),
     });

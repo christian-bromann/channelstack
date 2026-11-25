@@ -1,8 +1,8 @@
 import { delay } from "../../../core/clock/index.ts";
-import type { DeliveryAttempt, DeliveryRecord, RetryPolicy } from "../../../core/delivery/index.ts";
+import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
+import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { randomToken } from "../../../core/secrets/index.ts";
 import { identified } from "../blocks.ts";
 import { SLACK_IDS, slackTs } from "../ids.ts";
 import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
@@ -121,22 +121,24 @@ const RETRY_DELAYS_MS = [0, 60_000, 300_000];
  * Slack's retries: the same payload up to three more times, saying which retry it is and why.
  * A response with `X-Slack-No-Retry: 1` ends them.
  */
-const SLACK_RETRIES: RetryPolicy = {
-  next(attempt, retries, responseHeaders) {
-    const afterMs = RETRY_DELAYS_MS[retries];
-    if (afterMs === undefined || responseHeaders?.get("x-slack-no-retry") === "1") return undefined;
-    const reason =
-      attempt.status === "timed_out"
-        ? "http_timeout"
-        : attempt.status === "failed"
-          ? "http_error"
-          : "connection_failed";
-    return { afterMs, headers: { "x-slack-retry-num": String(retries + 1), "x-slack-retry-reason": reason } };
-  },
-};
+const SLACK_RETRIES = fixedRetries(RETRY_DELAYS_MS, (attempt, retries, responseHeaders) => {
+  if (responseHeaders?.get("x-slack-no-retry") === "1") return undefined;
+  const reason =
+    attempt.status === "timed_out" ? "http_timeout" : attempt.status === "failed" ? "http_error" : "connection_failed";
+  return { "x-slack-retry-num": String(retries + 1), "x-slack-retry-reason": reason };
+});
 
 export function createFakeWorld(context: DriverContext, store: SlackStore, socket: SocketMode): FakeSlackWorld {
-  const { ids, clock, events, delivery } = context;
+  const { ids, clock, events } = context;
+  /** Slack's deliveries: signed with the signing secret over the timestamp and the exact body. Events retry; interactions don't. */
+  const deliveries = deliveryKit(context, {
+    driver: "slack",
+    timeoutMs: ACK_WINDOW_MS,
+    retry: SLACK_RETRIES,
+    sign: (secret, body, atMs) => signSlackRequest(secret, body, atMs),
+    secret: () => context.secret("signingSecret"),
+    staleMs: STALE_MS,
+  });
 
   const author = (id: string): SlackUserRecord | undefined => store.users.find(id);
 
@@ -161,18 +163,14 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       app: store.app,
       verificationToken: context.secret("verificationToken"),
     });
-    delivery.enqueue({
+    deliveries.send({
       id: eventId,
       session,
-      driver: "slack",
       type: "event_callback",
       url: context.webhookUrl ?? "",
       transport: socket.transport,
       body: JSON.stringify(payload),
-      sign: (body, atMs) => signSlackRequest(context.secret("signingSecret"), body, atMs),
-      timeoutMs: ACK_WINDOW_MS,
       meta: { eventType: event.type, payload },
-      retry: SLACK_RETRIES,
     });
     return eventId;
   };
@@ -601,11 +599,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         .filter((message) => message.ephemeralFor === user.id);
     },
 
-    deliveries: (session) => delivery.list(session).filter((record) => record.request.driver === "slack"),
-    delivery: (session, id) => delivery.get(session, id),
+    deliveries: deliveries.deliveries,
+    delivery: deliveries.delivery,
 
     async retry(session, id, options) {
-      const record = delivery.get(session, id);
+      const record = deliveries.delivery(session, id);
       await delay(context.timers, options.afterMs);
       // Slack repeats the same payload and says which retry this is, and why: one more than the
       // last retry this delivery had, whether Slack sent that one itself or a test did.
@@ -613,21 +611,12 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         0,
         ...record.attempts.map((attempt) => Number(attempt.requestHeaders["x-slack-retry-num"] ?? 0)),
       );
-      return delivery.again(session, id, {
+      return deliveries.redeliver(session, id, {
         headers: { "x-slack-retry-num": String(last + 1), "x-slack-retry-reason": options.reason },
       });
     },
 
-    resend(session, id, options) {
-      const secret = options.badSignature ? randomToken() : context.secret("signingSecret");
-      // Receivers reject a request more than five minutes old; six is safely outside.
-      const age = options.stale ? STALE_MS : 0;
-      return delivery.again(session, id, {
-        sign: (body, atMs) => signSlackRequest(secret, body, atMs - age),
-        forged: options.badSignature || options.stale,
-        ...(options.headers === undefined ? {} : { headers: options.headers }),
-      });
-    },
+    resend: (session, id, options) => deliveries.resend(session, id, options),
 
     socketConnections: () => socket.connections(),
 
@@ -663,6 +652,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   const kit: InteractionKit = {
     context,
     store,
+    deliveries,
     refuse,
     member,
     requireMessage,
