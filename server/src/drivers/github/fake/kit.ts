@@ -1,6 +1,7 @@
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { signGitHubWebhook } from "../../../core/signing/github.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import { type GitHubObjects, githubObjects } from "../payloads.ts";
 import {
   type GitHubIssueRecord,
@@ -139,7 +140,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     const about = event === "installation_repositories" || repo.installed;
     if (context.webhookUrl === undefined || !about || !store.app.events.includes(event)) return undefined;
     const session = store.sessionOf(repo);
-    const guid = ids.next("github.delivery");
+    const guid = ids.next(GITHUB_IDS.delivery);
     const full = {
       ...payload,
       ...(event === "installation_repositories" ? {} : { repository: objects.repository(repo) }),
@@ -150,7 +151,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     };
     const action = typeof payload.action === "string" ? payload.action : null;
     store.hookDeliveries.push({
-      id: Number(ids.next("github.hookDelivery")),
+      id: Number(ids.next(GITHUB_IDS.hookDelivery)),
       guid,
       session,
       event,

@@ -3,7 +3,6 @@ import { z } from "@hono/zod-openapi";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
-import { slackTsTime } from "../../core/ids/index.ts";
 import {
   DELIVERY_IS_THE_PLATFORMS,
   type LiveSupport,
@@ -23,6 +22,7 @@ import {
 } from "../../core/router/inspect.ts";
 import { plain } from "./blocks.ts";
 import type { FakeSlackWorld } from "./fake/world.ts";
+import { slackTsTime } from "./ids.ts";
 import { renderTranscript } from "./transcript.ts";
 import { shownValue, viewInputs } from "./views.ts";
 import type {

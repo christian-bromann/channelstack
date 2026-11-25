@@ -6,6 +6,7 @@ import type { DriverContext } from "../../../../core/router/index.ts";
 import { recordCall } from "../../../../core/router/inspect.ts";
 import { verifyGitHubAppJwt } from "../../../../core/signing/github.ts";
 import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
+import { GITHUB_IDS } from "../../ids.ts";
 import { githubTime } from "../../payloads.ts";
 import type { GitHubRepoRecord } from "../../world.ts";
 import { GitHubRefusal } from "../kit.ts";
@@ -258,7 +259,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
     c.header("x-github-api-version-selected", "2022-11-28");
     c.header(
       "x-github-request-id",
-      world.kit.context.ids.next("github.delivery").toUpperCase().replaceAll("-", ":").slice(0, 34),
+      world.kit.context.ids.next(GITHUB_IDS.delivery).toUpperCase().replaceAll("-", ":").slice(0, 34),
     );
     c.header("x-ratelimit-limit", "5000");
     c.header("x-ratelimit-remaining", "4999");

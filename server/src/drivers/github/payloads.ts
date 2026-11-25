@@ -1,4 +1,4 @@
-import { githubLegacyNodeId, githubNodeId } from "../../core/ids/index.ts";
+import { githubLegacyNodeId, githubNodeId } from "./ids.ts";
 import type {
   GitHubAppRecord,
   GitHubCheckRunRecord,

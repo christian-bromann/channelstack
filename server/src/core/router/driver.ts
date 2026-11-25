@@ -4,7 +4,7 @@ import type { BrowserActors } from "../browser/index.ts";
 import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
-import type { IdGenerator } from "../ids/index.ts";
+import type { IdFormat, IdGenerator } from "../ids/index.ts";
 import type { Ledger, LedgerEntry } from "../ledger/index.ts";
 import type { Logger } from "../log/index.ts";
 import type { Registry } from "../registry/index.ts";
@@ -201,6 +201,8 @@ export interface DriverDefinition {
    * platform's own word: Slack retries. Defaults to `redeliver`.
    */
   readonly redeliver?: string;
+  /** Every kind of id the driver generates (`idFormats`): exit check 0.5 holds each one to its format. */
+  readonly ids: Readonly<Record<string, IdFormat>>;
   readonly secrets: SecretSpec;
   /** What makes it live. A driver without it is always fake. */
   readonly live?: LiveDeclaration;

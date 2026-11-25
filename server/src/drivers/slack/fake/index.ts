@@ -1,4 +1,5 @@
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
+import { SLACK_IDS } from "../ids.ts";
 import { createSlackApi } from "./api.ts";
 import { createSocketMode } from "./socket.ts";
 import { SlackStore } from "./store.ts";
@@ -65,12 +66,12 @@ export function createSlackFake(context: DriverContext): SlackFake {
     store,
     seed() {
       store.seed(
-        { id: context.ids.next("slack.team"), name: "Acme", domain: "acme" },
+        { id: context.ids.next(SLACK_IDS.team), name: "Acme", domain: "acme" },
         {
-          id: context.ids.next("slack.app"),
+          id: context.ids.next(SLACK_IDS.app),
           name: DEFAULT_APP.name,
-          botId: context.ids.next("slack.bot"),
-          botUserId: context.ids.next("slack.user"),
+          botId: context.ids.next(SLACK_IDS.bot),
+          botUserId: context.ids.next(SLACK_IDS.user),
           scopes: DEFAULT_APP.scopes,
           botEvents: DEFAULT_APP.botEvents,
           installed: true,
@@ -80,7 +81,7 @@ export function createSlackFake(context: DriverContext): SlackFake {
     },
     release(session: string) {
       // Ids a test fixed are free again once its session is gone (decision 0006).
-      for (const user of store.release(session)) if (user.fixedId) context.ids.release("slack.user", user.id);
+      for (const user of store.release(session)) if (user.fixedId) context.ids.release(SLACK_IDS.user, user.id);
     },
   } satisfies SlackFake;
   fake.seed();

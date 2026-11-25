@@ -1,9 +1,9 @@
 import type { RetryPolicy } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
-import { ID_FORMATS } from "../../../core/ids/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signLinearWebhook, stampLinearWebhook } from "../../../core/signing/linear.ts";
+import { LINEAR_IDS } from "../ids.ts";
 import { linearLinks } from "../links.ts";
 import { linearPayloads } from "../payloads.ts";
 import { linearText } from "../text.ts";
@@ -91,7 +91,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     // An agent session is always announced: an agent's webhook is part of its app, so a session has a
     // delivery even where nothing listens (it is then unreachable). Other events need a URL to go to.
     if (context.webhookUrl === undefined && type !== "AgentSessionEvent") return undefined;
-    const id = ids.next("linear.uuid");
+    const id = ids.next(LINEAR_IDS.uuid);
     const full = {
       ...payload,
       type,
@@ -177,7 +177,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     options: { signal?: "stop"; comment?: LinearCommentRecord } = {},
   ) =>
     store.add(store.activities, session, {
-      id: ids.next("linear.uuid"),
+      id: ids.next(LINEAR_IDS.uuid),
       session: record.id,
       user,
       content: { type: "prompt", body },
@@ -193,7 +193,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     const session = store.sessionOf(issue);
     const now = clock();
     const record = store.add(store.sessions, session, {
-      id: ids.next("linear.uuid"),
+      id: ids.next(LINEAR_IDS.uuid),
       issue: issue.id,
       appUser: store.appUser.id,
       creator,
@@ -203,7 +203,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       plan: null,
       externalUrls: [],
       summary: null,
-      slugId: ids.next("linear.slugId"),
+      slugId: ids.next(LINEAR_IDS.slugId),
       createdAt: now,
       updatedAt: now,
       startedAt: null,
@@ -372,7 +372,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     const root = parent ? rootOf(parent) : undefined;
     const now = clock();
     const record = store.add(store.comments, session, {
-      id: ids.next("linear.uuid"),
+      id: ids.next(LINEAR_IDS.uuid),
       issue: issue.id,
       user,
       body,
@@ -413,7 +413,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
    */
   const claimId = (id: string): string => {
     try {
-      return ids.reserve("linear.uuid", id);
+      return ids.reserve(LINEAR_IDS.uuid, id);
     } catch (error) {
       if (!(error instanceof ProtocolError)) throw error;
       throw new LinearError(/already in use/.test(error.message) ? "Entity already exists" : "id must be a UUID");
@@ -463,7 +463,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     const session = store.sessions.owner(record.id);
     if (session === undefined) throw new Error("A session belongs to a test session");
     const activity = store.add(store.activities, session, {
-      id: input.id ? claimId(input.id) : ids.next("linear.uuid"),
+      id: input.id ? claimId(input.id) : ids.next(LINEAR_IDS.uuid),
       session: record.id,
       user: store.appUser.id,
       content:
@@ -598,7 +598,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       ) {
         throw new ProtocolError("invalid_argument", `There is already a person "${displayName}" in this session`);
       }
-      const id = input.id === undefined ? ids.next("linear.uuid") : ids.reserve("linear.uuid", input.id);
+      const id = input.id === undefined ? ids.next(LINEAR_IDS.uuid) : ids.reserve(LINEAR_IDS.uuid, input.id);
       return store.add(store.users, session, {
         id,
         name: input.name,
@@ -623,8 +623,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       },
     ) {
       // A generated key is unique in the world, so parallel tests never share an `ENG-1`.
-      const key = input.key ?? ids.next("linear.teamKey");
-      if (!ID_FORMATS["linear.teamKey"].accepts.test(key))
+      const key = input.key ?? ids.next(LINEAR_IDS.teamKey);
+      if (!LINEAR_IDS.teamKey.accepts.test(key))
         throw new ProtocolError(
           "invalid_argument",
           `"${key}" is not a team key: 1 to 7 capital letters or digits, starting with a letter`,
@@ -637,7 +637,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       }
       const states = (input.states ?? DEFAULT_STATES.map(([name, type, color]) => ({ name, type, color }))).map(
         (state, position): LinearStateRecord => ({
-          id: ids.next("linear.uuid"),
+          id: ids.next(LINEAR_IDS.uuid),
           name: state.name,
           type: state.type,
           color: "color" in state && typeof state.color === "string" ? state.color : STATE_COLOR[state.type],
@@ -646,12 +646,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       );
       if (states.length === 0) throw new ProtocolError("invalid_argument", "A team needs at least one workflow state");
       return store.add(store.teams, session, {
-        id: ids.next("linear.uuid"),
+        id: ids.next(LINEAR_IDS.uuid),
         key,
         name: input.name ?? key,
         members: [...input.members],
         states,
-        labels: (input.labels ?? []).map((name) => ({ id: ids.next("linear.uuid"), name, color: "#bec2c8" })),
+        labels: (input.labels ?? []).map((name) => ({ id: ids.next(LINEAR_IDS.uuid), name, color: "#bec2c8" })),
         createdAt: clock(),
       } satisfies LinearTeamRecord);
     },
@@ -672,7 +672,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       const number = ids.sequence(`linear.identifier:${team.key}`);
       const now = clock();
       const issue = store.add(store.issues, session, {
-        id: ids.next("linear.uuid"),
+        id: ids.next(LINEAR_IDS.uuid),
         team: team.id,
         number,
         identifier: `${team.key}-${number}`,
@@ -725,7 +725,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
 
     react(record: LinearCommentRecord, user: string, emoji: string) {
       if (record.reactions.some((reaction) => reaction.user === user && reaction.emoji === emoji)) return;
-      record.reactions.push({ id: ids.next("linear.uuid"), emoji, user, createdAt: clock() });
+      record.reactions.push({ id: ids.next(LINEAR_IDS.uuid), emoji, user, createdAt: clock() });
     },
 
     /** A person presses Stop: the session is stopping until the agent ends its turn. */

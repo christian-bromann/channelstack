@@ -5,6 +5,7 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signSlackRequest } from "../../../core/signing/slack.ts";
 import { identified } from "../blocks.ts";
+import { SLACK_IDS, slackTs } from "../ids.ts";
 import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
   appMentionEvent,
@@ -151,7 +152,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
   const deliver = (session: string, event: Record<string, unknown>): string | undefined => {
     // The app is reached at its request URL, or over the connection it opened (Socket Mode). With neither, nothing is sent.
     if (context.webhookUrl === undefined && socket.transport() === undefined) return undefined;
-    const eventId = ids.next("slack.event");
+    const eventId = ids.next(SLACK_IDS.event);
     const payload = eventCallback({
       event,
       eventId,
@@ -222,7 +223,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
 
   /** A message's blocks: its own, or, for text without blocks, the `rich_text` block Slack makes of the text. */
   const blocksOf = (text: string, blocks: unknown[] | undefined): unknown[] =>
-    blocks ?? (text === "" ? [] : [richTextBlock(text, ids.next("slack.block"))]);
+    blocks ?? (text === "" ? [] : [richTextBlock(text, ids.next(SLACK_IDS.block))]);
 
   const content = (session: string, input: SlackMessageInput): { text: string; blocks: unknown[] } => {
     const text = resolveMentions(input.text ?? "", (name) => resolveName(session, name));
@@ -244,11 +245,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     },
   ): SlackMessageRecord => {
     const message: SlackMessageRecord = {
-      ts: ids.slackTs(),
+      ts: slackTs(ids),
       conversation: conversation.id,
       user: userId,
       text: body.text,
-      blocks: identified(body.blocks, () => ids.next("slack.block")),
+      blocks: identified(body.blocks, () => ids.next(SLACK_IDS.block)),
       threadTs: options.threadTs,
       parentUser:
         options.threadTs === undefined ? undefined : store.findMessage(conversation.id, options.threadTs)?.user,
@@ -301,7 +302,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     const kind: SlackConversationKind = members.size === 2 ? "im" : "mpim";
     return store.addConversation(
       {
-        id: ids.next(kind === "im" ? "slack.dm" : "slack.mpim"),
+        id: ids.next(kind === "im" ? SLACK_IDS.dm : SLACK_IDS.mpim),
         kind,
         name: undefined,
         members,
@@ -346,7 +347,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
 
     createUser(session, options) {
       // A fixed id must be free in the whole world: the agent can't tell two of them apart (decision 0006).
-      const id = options.id === undefined ? ids.next("slack.user") : ids.reserve("slack.user", options.id);
+      const id = options.id === undefined ? ids.next(SLACK_IDS.user) : ids.reserve(SLACK_IDS.user, options.id);
       const user: SlackUserRecord = {
         id,
         name: options.name,
@@ -358,7 +359,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         isOwner: options.owner === true,
         isGuest: options.guest === true,
         isBot: options.bot === true,
-        botId: options.bot === true ? ids.next("slack.bot") : undefined,
+        botId: options.bot === true ? ids.next(SLACK_IDS.bot) : undefined,
         fixedId: options.id !== undefined,
       };
       store.users.add(id, user, session);
@@ -369,7 +370,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
 
     createChannel(session, options) {
       const members = new Set(options.participants.map((id) => participant(session, id)));
-      const id = ids.next("slack.channel");
+      const id = ids.next(SLACK_IDS.channel);
       const name = options.name ?? `test-${id.slice(-6).toLowerCase()}`;
       // Names are unique per session, not per workspace: parallel tests can each have a #support (decision 0006).
       if (store.conversationsOf(session).some((conversation) => conversation.name === name)) {
@@ -442,8 +443,8 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     edit(conversation, message, body) {
       const { app, team } = store;
       const previous = messageObject(message, author(message.user), team, app);
-      Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next("slack.block")) });
-      const eventTs = ids.slackTs();
+      Object.assign(message, { text: body.text, blocks: identified(body.blocks, () => ids.next(SLACK_IDS.block)) });
+      const eventTs = slackTs(ids);
       message.edited = eventTs;
       const current = messageObject(message, author(message.user), team, app);
       const id = emit(
@@ -458,7 +459,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     remove(conversation, message) {
       const previous = messageObject(message, author(message.user), store.team, store.app);
       store.removeMessage(conversation.id, message.ts);
-      emit(conversation, messageSubscription(conversation), messageDeletedEvent(previous, conversation, ids.slackTs()));
+      emit(conversation, messageSubscription(conversation), messageDeletedEvent(previous, conversation, slackTs(ids)));
     },
 
     react(conversation, message, userId, emoji, direction) {
@@ -478,7 +479,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       return emit(
         conversation,
         direction === "add" ? "reaction_added" : "reaction_removed",
-        reactionEvent(direction, { user: userId, reaction: name, message, eventTs: ids.slackTs() }),
+        reactionEvent(direction, { user: userId, reaction: name, message, eventTs: slackTs(ids) }),
       );
     },
 
@@ -532,7 +533,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
             conversation,
             team: store.team,
             inviter: inviter.id,
-            eventTs: ids.slackTs(),
+            eventTs: slackTs(ids),
           }),
         );
       }
@@ -549,7 +550,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
         user: id,
         conversation,
         team: store.team,
-        eventTs: ids.slackTs(),
+        eventTs: slackTs(ids),
       });
       if (id !== store.app.botUserId) conversation.members.delete(id);
       emit(conversation, "member_left_channel", event);
@@ -631,7 +632,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     socketConnections: () => socket.connections(),
 
     addFault(session, fault) {
-      const id = `fault_${store.faults.length + 1}_${ids.next("slack.block")}`;
+      const id = `fault_${store.faults.length + 1}_${ids.next(SLACK_IDS.block)}`;
       // Dropping the socket happens once, now; the other faults stay until they are removed.
       if (fault.type === "drop_socket") {
         if (fault.delayMs > 0) {

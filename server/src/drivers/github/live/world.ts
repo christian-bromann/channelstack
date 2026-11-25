@@ -10,6 +10,7 @@ import { taggedNames } from "../../../core/safety/index.ts";
 import type { GitHubDeliveryView, GitHubWorld } from "../backend.ts";
 import { GitHubRefusal } from "../fake/kit.ts";
 import { GitHubStore } from "../fake/store.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import type {
   GitHubCommentRecord,
   GitHubIssueRecord,
@@ -350,7 +351,7 @@ export function createLiveGitHubWorld(deps: {
           );
         }
         // A fake person can exist next to a live org, but can't act in it.
-        const id = Number(ids.next("github.user"));
+        const id = Number(ids.next(GITHUB_IDS.user));
         return store.add(store.users, session, {
           id,
           login: input.login,

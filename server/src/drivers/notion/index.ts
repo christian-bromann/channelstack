@@ -1,5 +1,6 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createNotionFake } from "./fake/index.ts";
+import { NOTION_IDS } from "./ids.ts";
 import { removeNotionEntry } from "./live/cleanup.ts";
 import { NotionRestClient } from "./live/client.ts";
 import { notionMaintenance } from "./live/maintenance.ts";
@@ -10,6 +11,7 @@ import { registerNotionRoutes } from "./routes.ts";
 export const notion: DriverDefinition = {
   name: "notion",
   title: "Notion",
+  ids: NOTION_IDS,
   hosts: ["api.notion.com"],
   secrets: { token: "notion.token", verificationToken: "notion.verificationToken" },
   // The integration's token in a test workspace (live-mode.md, section 4). People bring their own tokens.

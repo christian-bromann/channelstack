@@ -1,6 +1,7 @@
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { signEchoDelivery } from "../../../core/signing/echo.ts";
+import { ECHO_IDS } from "../ids.ts";
 import { messageCreated } from "../payloads.ts";
 import type { EchoMessage, EchoPrincipal, EchoRoom, EchoWorld } from "../world.ts";
 import type { EchoStore } from "./store.ts";
@@ -18,7 +19,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
 
   const post = (room: EchoRoom, author: EchoPrincipal, text: string, deliveryId?: string): EchoMessage => {
     const message: EchoMessage = {
-      id: ids.next("echo.message"),
+      id: ids.next(ECHO_IDS.message),
       room: room.id,
       author,
       text,
@@ -32,7 +33,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
     app: () => store.app,
 
     createUser(session, input) {
-      const id = ids.next("echo.user");
+      const id = ids.next(ECHO_IDS.user);
       const user = store.users.add(id, { id, name: input.name, kind: "user" }, session);
       events.append(session, "echo", "action", { action: "createUser", user: id });
       return user;
@@ -42,7 +43,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
       for (const participant of input.participants) {
         if (participant !== store.app.id) store.users.get(session, participant);
       }
-      const id = ids.next("echo.room");
+      const id = ids.next(ECHO_IDS.room);
       const room: EchoRoom = {
         id,
         name: input.name ?? `test-${id.slice(-6).toLowerCase()}`,
@@ -68,7 +69,7 @@ export function createFakeWorld(context: DriverContext, store: EchoStore): FakeE
       }
       // The app only hears about rooms it is a member of, and only if it has an endpoint.
       const deliver = context.webhookUrl !== undefined && room.members.includes(store.app.id);
-      const message = post(room, user, text, deliver ? ids.next("echo.delivery") : undefined);
+      const message = post(room, user, text, deliver ? ids.next(ECHO_IDS.delivery) : undefined);
       events.append(session, "echo", "action", { action: "say", user: user.id, room: room.id, message: message.id });
       if (context.webhookUrl !== undefined && message.delivery !== undefined) {
         const payload = messageCreated({ deliveryId: message.delivery, app: store.app, message, atMs: clock() });

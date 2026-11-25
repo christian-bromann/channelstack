@@ -1,5 +1,6 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createLinearFake } from "./fake/index.ts";
+import { LINEAR_IDS } from "./ids.ts";
 import { removeLinearEntry } from "./live/cleanup.ts";
 import { LinearGraphqlClient } from "./live/client.ts";
 import { linearMaintenance } from "./live/maintenance.ts";
@@ -10,6 +11,7 @@ import { registerLinearRoutes } from "./routes.ts";
 export const linear: DriverDefinition = {
   name: "linear",
   title: "Linear",
+  ids: LINEAR_IDS,
   hosts: ["api.linear.app"],
   secrets: {
     oauthToken: "linear.oauthToken",

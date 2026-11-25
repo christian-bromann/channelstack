@@ -1,4 +1,5 @@
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
+import { NOTION_IDS } from "../ids.ts";
 import { createNotionApi } from "./api.ts";
 import { NotionStore } from "./store.ts";
 import { createFakeWorld, type FakeNotionWorld } from "./world.ts";
@@ -36,11 +37,11 @@ export function createNotionFake(context: DriverContext): NotionFake {
   // Who the workspace and the integration are is drawn once: the agent holds their ids from
   // `channelstack env` and its own calls, and a reset builds a new world with the same ones.
   const identity = {
-    workspace: context.ids.next("notion.uuid"),
-    bot: context.ids.next("notion.uuid"),
-    integration: context.ids.next("notion.uuid"),
-    subscription: context.ids.next("notion.uuid"),
-    owner: context.ids.next("notion.uuid"),
+    workspace: context.ids.next(NOTION_IDS.uuid),
+    bot: context.ids.next(NOTION_IDS.uuid),
+    integration: context.ids.next(NOTION_IDS.uuid),
+    subscription: context.ids.next(NOTION_IDS.uuid),
+    owner: context.ids.next(NOTION_IDS.uuid),
   };
   const fake = {
     api: createNotionApi(context, world),
@@ -63,7 +64,7 @@ export function createNotionFake(context: DriverContext): NotionFake {
     release(session: string) {
       world.forgetSession(session);
       // Ids a test fixed are free again once its session is gone (decision 0006).
-      for (const user of store.users.list(session)) if (user.fixedId) context.ids.release("notion.uuid", user.id);
+      for (const user of store.users.list(session)) if (user.fixedId) context.ids.release(NOTION_IDS.uuid, user.id);
     },
   } satisfies NotionFake;
   fake.seed();

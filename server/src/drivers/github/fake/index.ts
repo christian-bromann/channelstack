@@ -1,4 +1,5 @@
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import { createGitHubApi } from "./api/index.ts";
 import { GitStore } from "./git.ts";
 import { GitHubStore } from "./store.ts";
@@ -37,14 +38,14 @@ export function createGitHubFake(context: DriverContext): GitHubFake {
   // Who the org and the App are is drawn once. The agent holds the App's ids from `channelstack env`
   // and isn't restarted by a reset, so a new world has the same App in it.
   const identity = {
-    org: Number(context.ids.next("github.user")),
+    org: Number(context.ids.next(GITHUB_IDS.user)),
     app: {
-      id: Number(context.ids.next("github.app")),
+      id: Number(context.ids.next(GITHUB_IDS.app)),
       slug: DEFAULT_APP.slug,
       name: DEFAULT_APP.slug,
-      clientId: context.ids.next("github.clientId"),
-      botId: Number(context.ids.next("github.user")),
-      installationId: Number(context.ids.next("github.installation")),
+      clientId: context.ids.next(GITHUB_IDS.clientId),
+      botId: Number(context.ids.next(GITHUB_IDS.user)),
+      installationId: Number(context.ids.next(GITHUB_IDS.installation)),
       events: DEFAULT_APP.events,
       permissions: DEFAULT_APP.permissions,
     },
@@ -61,7 +62,7 @@ export function createGitHubFake(context: DriverContext): GitHubFake {
       const released = store.release(session);
       for (const repo of released.repos) git.remove(world.kit.dir(repo));
       // Ids a test fixed are free again once its session is gone (decision 0006).
-      for (const user of released.users) if (user.fixedId) context.ids.release("github.user", String(user.id));
+      for (const user of released.users) if (user.fixedId) context.ids.release(GITHUB_IDS.user, String(user.id));
     },
   } satisfies GitHubFake;
   fake.seed();

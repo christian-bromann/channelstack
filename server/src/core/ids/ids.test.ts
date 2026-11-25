@@ -1,43 +1,26 @@
 import { describe, expect, test } from "vitest";
 
 import { ProtocolError } from "../errors/index.ts";
-import {
-  githubLegacyNodeId,
-  githubNodeId,
-  ID_FORMATS,
-  IdGenerator,
-  type IdKind,
-  parseSeed,
-  SLACK_TS_PATTERN,
-} from "./index.ts";
+import { CHANNELSTACK_IDS, idFormats, IdGenerator, numeric, parseSeed, UPPER_ALNUM, uuid } from "./index.ts";
 
-const COUNT = 10_000;
-const kinds = Object.keys(ID_FORMATS) as IdKind[];
 const fixedClock = () => 1_732_101_234_567;
 const generator = (seed = 42) => new IdGenerator({ seed, clock: fixedClock });
+/** Formats of a made-up platform: the generator works on any driver's. Each driver's own are tested in drivers/formats.test.ts. */
+const TEST = idFormats("test", {
+  user: {
+    pattern: /^U0[0-9A-Z]{9}$/,
+    accepts: /^U[0-9A-Z]{8,11}$/,
+    generate: (draw) => `U0${draw.chars(9, UPPER_ALNUM)}`,
+  },
+  number: numeric(1_000, 9_999, /^\d{4}$/),
+  uuid,
+});
+const formats = [...Object.values(TEST), ...Object.values(CHANNELSTACK_IDS)];
 
-describe("exit check 0.5: ids look real", () => {
-  test.each(kinds)("10,000 %s ids match the format and never collide", (kind) => {
-    const ids = generator();
-    const seen = new Set<string>();
-    for (let i = 0; i < COUNT; i++) {
-      const id = ids.next(kind);
-      expect(id).toMatch(ID_FORMATS[kind].pattern);
-      seen.add(id);
-    }
-    expect(seen.size).toBe(COUNT);
-  });
-
-  test("10,000 Slack ts values match the format and increase strictly per conversation", () => {
-    const ids = generator();
-    let last = "";
-    for (let i = 0; i < COUNT; i++) {
-      const ts = ids.slackTs();
-      expect(ts).toMatch(SLACK_TS_PATTERN);
-      expect(ts > last).toBe(true);
-      last = ts;
-    }
-    expect(last.startsWith("1732101234.") || last.startsWith("1732101235.")).toBe(true);
+describe("the id generator", () => {
+  test("a driver's formats are named after it", () => {
+    expect(TEST.user.kind).toBe("test.user");
+    expect(CHANNELSTACK_IDS.session.kind).toBe("channelstack.session");
   });
 
   test("sequential ids count per scope, like GitHub issue numbers and Linear identifiers", () => {
@@ -45,72 +28,23 @@ describe("exit check 0.5: ids look real", () => {
     expect([ids.sequence("github.issue:1"), ids.sequence("github.issue:1"), ids.sequence("github.issue:2")]).toEqual([
       1, 2, 1,
     ]);
-    const identifiers = Array.from({ length: COUNT }, () => ids.linearIdentifier("ENG"));
-    expect(identifiers[0]).toBe("ENG-1");
-    expect(identifiers.at(-1)).toBe(`ENG-${COUNT}`);
-    expect(new Set(identifiers).size).toBe(COUNT);
-    expect(ids.linearIdentifier("OPS")).toBe("OPS-1");
   });
 
-  test("GitHub node ids are built like GitHub's", () => {
+  test("monotonic microseconds increase strictly and start at the clock's time", () => {
     const ids = generator();
-    for (let i = 0; i < COUNT; i++) {
-      const user = Number(ids.next("github.user"));
-      expect(githubNodeId("User", [user])).toMatch(/^U_kgDO[A-Za-z0-9_-]{6}$/);
+    let last = 0;
+    for (let i = 0; i < 10_000; i++) {
+      const micros = ids.monotonicMicros();
+      expect(micros).toBeGreaterThan(last);
+      last = micros;
     }
-    // 583231 is octocat's database id; MDQ6… ids predate this format, so check the encoding by decoding.
-    const node = githubNodeId("Issue", [1_000_000_123, 3_000_000_456]);
-    expect(node).toMatch(/^I_kwDO[A-Za-z0-9_-]{12}$/);
-    const bytes = Buffer.from(node.slice(2), "base64url");
-    expect([bytes[0], bytes[1], bytes[2], bytes.readUInt32BE(3), bytes[7], bytes.readUInt32BE(8)]).toEqual([
-      0x93, 0x00, 0xce, 1_000_000_123, 0xce, 3_000_000_456,
-    ]);
-    expect(githubNodeId("PullRequest", [1, 2])).toMatch(/^PR_kwDO/);
-    expect(githubNodeId("Repository", [1])).toMatch(/^R_kgDO/);
-  });
-
-  test("what git identifies has the repository's id and the SHA or ref name in its node id", () => {
-    /** Decode `[0, <repo id>, <text>]` back out of a node id. */
-    const decode = (node: string) => {
-      const bytes = Buffer.from(node.slice(node.indexOf("_") + 1), "base64url");
-      const head = bytes[7] ?? 0;
-      const [at, length] =
-        head === 0xda ? [10, bytes.readUInt16BE(8)] : head === 0xd9 ? [9, bytes[8] ?? 0] : [8, head & 0x1f];
-      return [
-        bytes[0],
-        bytes[1],
-        bytes[2],
-        bytes.readUInt32BE(3),
-        bytes.subarray(at, at + length).toString(),
-        bytes.length - at - length,
-      ];
-    };
-    const sha = "9cfb61596ada71b173edf3a415802f8bbc35c1ef";
-    expect(githubNodeId("Commit", [1_000_000_123, sha])).toMatch(/^C_kwDO/);
-    expect(decode(githubNodeId("Commit", [1_000_000_123, sha]))).toEqual([0x93, 0x00, 0xce, 1_000_000_123, sha, 0]);
-    expect(decode(githubNodeId("Blob", [7, sha]))).toEqual([0x93, 0x00, 0xce, 7, sha, 0]);
-    // A short name, one of 32 bytes or more, and one longer than 255 each have their own header.
-    for (const name of ["refs/heads/main", `refs/heads/${"a".repeat(40)}`, `refs/heads/${"b".repeat(300)}`]) {
-      const node = githubNodeId("Ref", [7, name]);
-      expect(node).toMatch(/^REF_/);
-      expect(decode(node)).toEqual([0x93, 0x00, 0xce, 7, name, 0]);
-    }
-    expect(() => githubNodeId("Ref", [7, "x".repeat(70_000)])).toThrow(/that long/);
-    for (const [type, prefix] of [
-      ["Reaction", "REA_"],
-      ["App", "A_"],
-      ["StatusContext", "SC_"],
-      ["PullRequestReviewThread", "PRRT_"],
-    ] as const) {
-      expect(githubNodeId(type, [1])).toMatch(new RegExp(`^${prefix}kgDO`));
-    }
-    expect(githubLegacyNodeId("IntegrationInstallation", 12345)).toBe("MDIzOkludGVncmF0aW9uSW5zdGFsbGF0aW9uMTIzNDU=");
+    expect(Math.floor(last / 1_000_000)).toBeGreaterThanOrEqual(1_732_101_234);
   });
 
   test("the same seed gives the same ids, a different seed doesn't", () => {
     const draw = (seed: number) => {
       const ids = generator(seed);
-      return [...kinds.map((kind) => ids.next(kind)), ids.slackTs(), ids.slackTs()];
+      return [...formats.map((format) => ids.next(format)), ids.monotonicMicros(), ids.monotonicMicros()];
     };
     expect(draw(7)).toEqual(draw(7));
     expect(draw(7)).not.toEqual(draw(8));
@@ -127,30 +61,31 @@ describe("exit check 0.5: ids look real", () => {
 describe("fixed ids", () => {
   test("an id in the platform's format is accepted once", () => {
     const ids = generator();
-    expect(ids.reserve("slack.user", "U0ADMIN01")).toBe("U0ADMIN01");
-    expect(() => ids.reserve("slack.user", "U0ADMIN01")).toThrow(/already in use/);
-    ids.release("slack.user", "U0ADMIN01");
-    expect(ids.reserve("slack.user", "U0ADMIN01")).toBe("U0ADMIN01");
+    expect(ids.reserve(TEST.user, "U0ADMIN01")).toBe("U0ADMIN01");
+    expect(() => ids.reserve(TEST.user, "U0ADMIN01")).toThrow(/already in use/);
+    ids.release(TEST.user, "U0ADMIN01");
+    expect(ids.reserve(TEST.user, "U0ADMIN01")).toBe("U0ADMIN01");
   });
 
-  test("an id in the wrong format is refused with invalid_argument", () => {
+  test("an id in the wrong format is refused with invalid_argument, naming the kind", () => {
     const ids = generator();
-    for (const [kind, id] of [
-      ["slack.user", "ana"],
-      ["slack.user", "C08E1F2G3H4"],
-      ["github.user", "-1"],
-      ["linear.uuid", "not-a-uuid"],
+    for (const [format, id] of [
+      [TEST.user, "ana"],
+      [TEST.user, "C08E1F2G3H4"],
+      [TEST.number, "-1"],
+      [TEST.uuid, "not-a-uuid"],
     ] as const) {
-      expect(() => ids.reserve(kind, id)).toThrow(ProtocolError);
+      expect(() => ids.reserve(format, id)).toThrow(ProtocolError);
     }
+    expect(() => ids.reserve(TEST.user, "ana")).toThrow(/test\.user/);
   });
 
   test("a generated id never reuses a reserved one, and reset starts sequences over", () => {
     const ids = generator();
     const twin = generator();
-    const taken = twin.next("slack.user");
-    ids.reserve("slack.user", taken);
-    expect(ids.next("slack.user")).not.toBe(taken);
+    const taken = twin.next(TEST.user);
+    ids.reserve(TEST.user, taken);
+    expect(ids.next(TEST.user)).not.toBe(taken);
 
     ids.sequence("s");
     ids.reset();

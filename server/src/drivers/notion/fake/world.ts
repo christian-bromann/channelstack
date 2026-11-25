@@ -4,6 +4,7 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
 import { signNotionWebhook } from "../../../core/signing/notion.ts";
 import { NotionApiError } from "../errors.ts";
+import { NOTION_IDS } from "../ids.ts";
 import { notionLinks } from "../links.ts";
 import { type BlockDraft, markdownToBlocks } from "../markdown.ts";
 import { notionObjects } from "../objects.ts";
@@ -148,7 +149,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   ): string | undefined => {
     if (!store.bot.events.includes(type) || !accessible(page.id) || context.webhookUrl === undefined) return undefined;
     if (type.startsWith("comment.") && !store.bot.capabilities.includes("read_comments")) return undefined;
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const payload = build(id);
     const entity = payload.entity as { id: string; type: string };
     delivery.enqueue({
@@ -253,7 +254,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   ): string[] =>
     drafts.map((draft) => {
       const now = clock();
-      const id = ids.next("notion.uuid");
+      const id = ids.next(NOTION_IDS.uuid);
       const block = store.blocks.add(
         id,
         {
@@ -364,7 +365,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       for (const name of names)
         if (name !== null && !property.options.some((option) => option.name === name))
           property.options.push({
-            id: ids.next("notion.uuid"),
+            id: ids.next(NOTION_IDS.uuid),
             name,
             color: OPTION_COLORS[property.options.length % 10] ?? "default",
           });
@@ -517,7 +518,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     extra: { icon?: string | undefined; connections?: readonly string[] | undefined } = {},
   ): NotionPageRecord => {
     const now = clock();
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const page = store.pages.add(
       id,
       {
@@ -583,12 +584,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   /** A property schema as a test writes it: `"number"`, `{ status: ["Todo", "Done"] }`, `{ relation: db }`. */
   const propertySchema = (name: string, raw: unknown): NotionPropertyRecord => {
     // A database's title property is always `title`; the others get short ids of their own.
-    const id = raw === "title" ? "title" : ids.next("notion.propertyId");
+    const id = raw === "title" ? "title" : ids.next(NOTION_IDS.propertyId);
     if (typeof raw === "string") return { id, name, type: raw as NotionPropertyType, options: [] };
     const [type, value] = Object.entries(raw as Record<string, unknown>)[0] ?? [];
     if (type === "relation") return { id, name, type: "relation", options: [], relation: String(value) };
     const options = (value as string[]).map((option, at) => ({
-      id: ids.next("notion.uuid"),
+      id: ids.next(NOTION_IDS.uuid),
       name: option,
       color: OPTION_COLORS[at % 10] ?? "default",
     }));
@@ -600,12 +601,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     if (properties.filter((property) => property.type === "title").length !== 1)
       throw new ProtocolError("invalid_argument", "A database needs exactly one title property");
     const now = clock();
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const database = store.databases.add(
       id,
       {
         id,
-        dataSource: ids.next("notion.uuid"),
+        dataSource: ids.next(NOTION_IDS.uuid),
         parent: parentOf(input.parent),
         title: input.title,
         properties,
@@ -660,7 +661,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     if (rich.length === 0 || plainText(rich).trim() === "")
       throw invalid("body failed validation: rich_text should not be empty");
     const now = clock();
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const comment = store.comments.add(
       id,
       {
@@ -694,7 +695,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     rich: RichTextItem[],
     actor: string,
   ) => {
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const discussion = store.discussions.add(
       id,
       {
@@ -764,7 +765,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     ) {
       if (store.users.list(session).some((user) => user.name.toLowerCase() === input.name.toLowerCase()))
         throw new ProtocolError("invalid_argument", `There is already a person "${input.name}" in this session`);
-      const id = input.id === undefined ? ids.next("notion.uuid") : ids.reserve("notion.uuid", input.id);
+      const id = input.id === undefined ? ids.next(NOTION_IDS.uuid) : ids.reserve(NOTION_IDS.uuid, input.id);
       return store.users.add(
         id,
         {
@@ -925,7 +926,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     /** The subscription's verification request, as Notion sends it once when a subscription is created. */
     verify(session: string) {
       if (context.webhookUrl === undefined) return undefined;
-      const id = ids.next("notion.uuid");
+      const id = ids.next(NOTION_IDS.uuid);
       delivery.enqueue({
         id,
         session,

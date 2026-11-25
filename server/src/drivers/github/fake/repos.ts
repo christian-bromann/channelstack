@@ -1,4 +1,5 @@
 import { ProtocolError } from "../../../core/errors/index.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import type {
   GitHubCommitInfo,
   GitHubFileChange,
@@ -169,7 +170,7 @@ export function createRepos(kit: GitHubKit) {
     input: { name: string; color?: string | undefined; description?: string | undefined },
   ): GitHubLabelRecord => {
     const record: GitHubLabelRecord = {
-      id: Number(ids.next("github.label")),
+      id: Number(ids.next(GITHUB_IDS.label)),
       name: input.name,
       color: (input.color ?? "ededed").replace(/^#/, ""),
       description: input.description ?? null,
@@ -214,7 +215,7 @@ export function createRepos(kit: GitHubKit) {
       if (store.byLogin(session, input.login)) {
         throw new ProtocolError("invalid_argument", `There is already a person "${input.login}" in this session`);
       }
-      const id = input.id === undefined ? ids.next("github.user") : ids.reserve("github.user", String(input.id));
+      const id = input.id === undefined ? ids.next(GITHUB_IDS.user) : ids.reserve(GITHUB_IDS.user, String(input.id));
       return store.add(store.users, session, {
         id: Number(id),
         login: input.login,
@@ -228,7 +229,7 @@ export function createRepos(kit: GitHubKit) {
     },
 
     async createRepo(session: string, input: GitHubRepoInput): Promise<GitHubRepoRecord> {
-      const id = Number(ids.next("github.repo"));
+      const id = Number(ids.next(GITHUB_IDS.repo));
       const name = input.name ?? `test-${id}`;
       if (!REPO_NAME.test(name))
         throw new ProtocolError("invalid_argument", `"${name}" is not a valid repository name`);

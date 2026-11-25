@@ -1,5 +1,6 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createSlackFake } from "./fake/index.ts";
+import { SLACK_IDS } from "./ids.ts";
 import { removeSlackEntry } from "./live/cleanup.ts";
 import { SlackWebClient } from "./live/client.ts";
 import { slackMaintenance } from "./live/maintenance.ts";
@@ -16,6 +17,7 @@ const excerpt = (text: string): string => {
 export const slack: DriverDefinition = {
   name: "slack",
   title: "Slack",
+  ids: SLACK_IDS,
   redeliver: "retry",
   hosts: ["slack.com"],
   secrets: {

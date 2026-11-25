@@ -1,6 +1,7 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { capabilities } from "./capabilities.ts";
 import { createEchoFake } from "./fake/index.ts";
+import { ECHO_IDS } from "./ids.ts";
 import { registerEchoRoutes } from "./routes.ts";
 
 /**
@@ -10,6 +11,7 @@ import { registerEchoRoutes } from "./routes.ts";
 export const echo: DriverDefinition = {
   name: "echo",
   title: "Echo",
+  ids: ECHO_IDS,
   internal: true,
   secrets: { appToken: "echo.appToken", signingSecret: "echo.signingSecret" },
   create(context): Driver {

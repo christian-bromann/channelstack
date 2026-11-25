@@ -5,6 +5,7 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { NotionApiError, pagingOf } from "../errors.ts";
+import { NOTION_IDS } from "../ids.ts";
 import { NOTION_API_VERSION } from "../payloads.ts";
 import type { NotionBlockRecord, NotionCapability, NotionDatabaseRecord, NotionPageRecord } from "../world.ts";
 import type { FakeNotionWorld, PlainValue } from "./world.ts";
@@ -54,7 +55,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   const { clock } = context;
   const api = new Hono();
   const bot = () => store.bot.id;
-  const requestId = () => context.ids.next("notion.uuid");
+  const requestId = () => context.ids.next(NOTION_IDS.uuid);
 
   const errorBody = (status: number, code: string, message: string) => ({
     object: "error",

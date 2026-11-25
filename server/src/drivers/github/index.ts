@@ -1,5 +1,6 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createGitHubFake } from "./fake/index.ts";
+import { GITHUB_IDS } from "./ids.ts";
 import { removeGitHubEntry } from "./live/cleanup.ts";
 import { GitHubLiveClient } from "./live/client.ts";
 import { githubMaintenance } from "./live/maintenance.ts";
@@ -10,6 +11,7 @@ import { registerGitHubRoutes } from "./routes.ts";
 export const github: DriverDefinition = {
   name: "github",
   title: "GitHub",
+  ids: GITHUB_IDS,
   hosts: ["api.github.com"],
   secrets: {
     webhookSecret: "github.webhookSecret",

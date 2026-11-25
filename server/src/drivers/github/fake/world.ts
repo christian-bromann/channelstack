@@ -1,6 +1,7 @@
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import { createChecks } from "./checks.ts";
 import type { GitStore } from "./git.ts";
 import { createIssues } from "./issues.ts";
@@ -31,7 +32,7 @@ export function createFakeWorld(context: DriverContext, store: GitHubStore, git:
     const { request } = delivery.get(session, guid);
     const original = store.hookDeliveries.find((entry) => entry.guid === guid);
     if (original) {
-      store.hookDeliveries.push({ ...original, id: Number(ids.next("github.hookDelivery")), deliveredAt: clock() });
+      store.hookDeliveries.push({ ...original, id: Number(ids.next(GITHUB_IDS.hookDelivery)), deliveredAt: clock() });
     }
     return delivery.again(session, guid, {
       sign: (body) => kit.headers(request.type, guid, body, options.secret),
