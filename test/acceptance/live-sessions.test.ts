@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,25 +33,74 @@ test("the sessions secret fills in what's missing, and leaves a newer saved sess
   expect(read("slack-ben.json")).toBe("uploaded");
 });
 
-const liveSecrets = (home: string) =>
-  spawnSync(
-    process.execPath,
-    [join(ROOT, "scripts", "live-secrets.ts"), "--sessions-only", "--repo", "owner/name", "--dry-run"],
-    { env: { PATH: process.env.PATH, CHANNELSTACK_HOME: home }, encoding: "utf8" },
+/**
+ * `pnpm live:secrets --sessions-only` as the nightly job runs it last, against a stand-in `gh` that
+ * writes down each call: its arguments, and what it got on standard input.
+ */
+function liveSecrets(home: string, started: Record<string, unknown>) {
+  const bin = temp();
+  const log = join(bin, "gh.log");
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/sh\nprintf 'ARGS %s\\n' "$*" >> "${log}"\ncat >> "${log}"\nprintf '\\nEND\\n' >> "${log}"\n`,
   );
+  chmodSync(join(bin, "gh"), 0o755);
+  const run = spawnSync(
+    process.execPath,
+    [join(ROOT, "scripts", "live-secrets.ts"), "--sessions-only", "--repo", "owner/name"],
+    {
+      env: {
+        PATH: `${bin}:${process.env.PATH}`,
+        CHANNELSTACK_HOME: home,
+        CHANNELSTACK_BROWSER_SESSIONS: JSON.stringify(started),
+      },
+      encoding: "utf8",
+    },
+  );
+  const calls = existsSync(log)
+    ? readFileSync(log, "utf8")
+        .split("\nEND\n")
+        .filter((call) => call.trim() !== "")
+        .map((call) => {
+          const [args = "", ...stdin] = call.replace(/^ARGS /, "").split("\n");
+          return { args, stdin: stdin.join("\n") };
+        })
+    : [];
+  return { ...run, calls };
+}
 
-test("--sessions-only sets the sessions secret alone, from the saved sessions, and prints no value", () => {
+test("--sessions-only uploads the renewed sessions over the bundle the run started from, and prints no value", () => {
   const home = temp();
-  writeStorageState(join(home, "browser", "slack-ana.json"), cookie("xoxd-secret-value"));
-  const run = liveSecrets(home);
+  writeStorageState(join(home, "browser", "slack-ana.json"), cookie("xoxd-renewed"));
+  writeStorageState(join(home, "browser", "slack-ben.json"), cookie("xoxd-ben"));
+  const started = {
+    "slack-ana.json": cookie("xoxd-started"),
+    "slack-ben.json": cookie("xoxd-ben"),
+    "slack-cy.json": cookie("xoxd-cy"),
+  };
+  const run = liveSecrets(home, started);
   expect(run.status).toBe(0);
-  expect(run.stdout).toContain("CHANNELSTACK_BROWSER_SESSIONS (secret)");
-  expect(run.stdout).not.toMatch(/CHANNELSTACK_SLACK|CHANNELSTACK_GITHUB|Not in live\.env/);
-  expect(`${run.stdout}${run.stderr}`).not.toContain("xoxd-secret-value");
+  // One call, and only `secret set`: no environment created, no other secret touched.
+  expect(run.calls.map((call) => call.args)).toEqual([
+    "secret set CHANNELSTACK_BROWSER_SESSIONS --env live --repo owner/name",
+  ]);
+  // Ana's renewed session; Ben's as it was; Cy, whom this run didn't have, kept.
+  expect(JSON.parse(run.calls[0]?.stdin ?? "")).toEqual({
+    "slack-ana.json": cookie("xoxd-renewed"),
+    "slack-ben.json": cookie("xoxd-ben"),
+    "slack-cy.json": cookie("xoxd-cy"),
+  });
+  expect(run.stdout).toContain("Renewed: slack-ana.json");
+  expect(`${run.stdout}${run.stderr}`).not.toContain("xoxd-");
 });
 
-test("--sessions-only with no saved sessions leaves the secret as it is", () => {
-  const run = liveSecrets(temp());
-  expect(run.status).toBe(0);
-  expect(run.stdout).toContain("stays as it is");
+test("--sessions-only with nothing renewed, or nothing saved, leaves the secret as it is", () => {
+  const unchanged = temp();
+  writeStorageState(join(unchanged, "browser", "slack-ana.json"), cookie("xoxd-started"));
+  for (const home of [unchanged, temp()]) {
+    const run = liveSecrets(home, { "slack-ana.json": cookie("xoxd-started") });
+    expect(run.status).toBe(0);
+    expect(run.calls).toEqual([]);
+    expect(run.stdout).toContain("stays as it is");
+  }
 });

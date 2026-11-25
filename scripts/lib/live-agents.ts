@@ -286,7 +286,8 @@ const SESSION_FILE = /^([a-z]+)-([a-z0-9][a-z0-9._-]*)\.json$/;
  *
  * The secret only fills in what `home` doesn't have yet. A session already there was saved by an
  * earlier step of the same job, as that step left it, and is newer: Slack renews a session's
- * cookies while it is used and retires the copy the job started with (#22).
+ * cookies while it is used and retires the copy the job started with (#22). Locally, so, a
+ * person's own saved session wins over a `CHANNELSTACK_BROWSER_SESSIONS` set in the shell.
  */
 export function writeSessions(env: Env, home: string, auth = join(ROOT, ".auth")): void {
   const bundle = env.CHANNELSTACK_BROWSER_SESSIONS;

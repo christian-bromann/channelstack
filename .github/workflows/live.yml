@@ -85,7 +85,13 @@ jobs:
         if: ${{ always() }}
         env:
           GH_TOKEN: ${{ secrets.CHANNELSTACK_SECRETS_TOKEN }}
+          # What the run started from: a session it didn't renew is uploaded again as it was.
+          CHANNELSTACK_BROWSER_SESSIONS: ${{ secrets.CHANNELSTACK_BROWSER_SESSIONS }}
         run: |
+          if [ ! -d "$HOME/.channelstack/browser" ]; then
+            echo "No browser session was used, so there's nothing to save"
+            exit 0
+          fi
           if [ -z "$GH_TOKEN" ]; then
             echo "::warning::CHANNELSTACK_SECRETS_TOKEN isn't set, so the renewed browser sessions aren't saved; the next run's Slack steps will be signed out"
             exit 0

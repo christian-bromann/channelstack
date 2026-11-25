@@ -9,8 +9,9 @@
  *   node scripts/live-secrets.ts [--env-file <path>] [--repo <owner/name>] [--dry-run]
  *   node scripts/live-secrets.ts --sessions-only [--repo <owner/name>] [--dry-run]
  *
- * `--sessions-only` sets `CHANNELSTACK_BROWSER_SESSIONS` and nothing else, from the saved sessions
- * alone. The nightly job runs it last, with a token that may write the environment's secrets
+ * `--sessions-only` sets `CHANNELSTACK_BROWSER_SESSIONS` and nothing else: the bundle the run
+ * started from (`$CHANNELSTACK_BROWSER_SESSIONS`) with each saved session that differs from it, and
+ * only if one does. The nightly job runs it last, with a token that may write the environment's secrets
  * (`CHANNELSTACK_SECRETS_TOKEN`), so the next run starts from the sessions as this one left them:
  * Slack renews a session's cookies while it is used and retires the old copy (#22).
  */
@@ -95,6 +96,25 @@ try {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   bundled = {};
 }
+if (sessionsOnly) {
+  // The bundle the run started from: nobody in it is dropped, and a session this run didn't renew
+  // (the browser never opened, or it was signed out and so not saved) stays as it was uploaded.
+  let started: Record<string, unknown> = {};
+  try {
+    started = JSON.parse(process.env.CHANNELSTACK_BROWSER_SESSIONS || "{}") as Record<string, unknown>;
+  } catch {
+    fail("CHANNELSTACK_BROWSER_SESSIONS isn't JSON: set it again with pnpm live:secrets");
+  }
+  const renewed = Object.keys(bundled).filter(
+    (file) => JSON.stringify(bundled[file]) !== JSON.stringify(started[file]),
+  );
+  if (renewed.length === 0) {
+    process.stdout.write("No browser session was renewed, so CHANNELSTACK_BROWSER_SESSIONS stays as it is.\n");
+    process.exit(0);
+  }
+  process.stdout.write(`Renewed: ${renewed.join(", ")}\n`);
+  bundled = { ...started, ...Object.fromEntries(renewed.map((file) => [file, bundled[file]])) };
+}
 if (Object.keys(bundled).length > 0) {
   const value = JSON.stringify(bundled);
   // GitHub keeps a secret of up to 48 KB.
@@ -113,12 +133,6 @@ const repo =
 const set: string[] = [];
 const missing: string[] = [];
 const failed: string[] = [];
-
-if (sessionsOnly && !env.has("CHANNELSTACK_BROWSER_SESSIONS")) {
-  // Nothing saved here (no person signed in for this run): the secret stays as it is.
-  process.stdout.write("No saved browser sessions here, so CHANNELSTACK_BROWSER_SESSIONS stays as it is.\n");
-  process.exit(0);
-}
 
 if (!dryRun && !sessionsOnly) {
   // The environment the nightly job runs in; creating it again changes nothing.
