@@ -1246,7 +1246,7 @@ class SlackFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/faults", body={"type": type, "operation": operation, "retryAfter": None if retry_after is None else parse_duration(retry_after), "delay": None if delay is None else parse_duration(delay), "after": None if after is None else parse_duration(after), "error": error, "times": times})
         return SlackFault(ctx, data)
 
-    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> SlackApiCall:
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> SlackApiCall:
         """Wait for the next new API call from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
 
@@ -1390,7 +1390,7 @@ class SlackUser:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/ephemeral")
         return [SlackMessage(ctx, item) for item in data]
 
-    async def wait_for_modal(self, *, title: Text | None = None, timeout: Duration = "10s") -> SlackModal:
+    async def wait_for_modal(self, *, title: Text | None = None, timeout: Duration | None = None) -> SlackModal:
         """Wait for the next new open modal from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForModal", self.modals, lambda item: text_matches(item.title, title) and item.open is True, "an open modal from the agent", timeout=timeout)
 
@@ -1427,7 +1427,7 @@ class SlackConversation:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
         return SlackTranscript._from_wire(ctx, data)
 
-    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
+    async def wait_for_message(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None) -> SlackMessage:
         """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
 
@@ -1513,11 +1513,11 @@ class SlackThread:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/threads/{quote(str(self.ts), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
         return SlackTranscript._from_wire(ctx, data)
 
-    async def wait_for_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s") -> SlackMessage:
+    async def wait_for_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None) -> SlackMessage:
         """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
 
-    async def latest_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> SlackMessage:
+    async def latest_reply(self, *, from_: SlackUser | SlackApp | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> SlackMessage:
         """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
@@ -1552,7 +1552,7 @@ class SlackDelivery:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale, "headers": headers})
         return DeliveryAttempt._from_wire(ctx, data)
 
-    async def settled(self, *, timeout: Duration = "10s") -> SlackDelivery:
+    async def settled(self, *, timeout: Duration | None = None) -> SlackDelivery:
         """Wait for the delivery to settle, and resolve with the value as it is then."""
 
         async def settled() -> SlackDelivery | None:
@@ -1578,7 +1578,7 @@ class SlackStream:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/conversations/{quote(str(self.channel), safe='')}/messages/{quote(str(self.ts), safe='')}/stream")
         return SlackStream(ctx, data)
 
-    async def ended(self, *, timeout: Duration = "10s") -> SlackStream:
+    async def ended(self, *, timeout: Duration | None = None) -> SlackStream:
         """Wait for the stream to end, and resolve with the value as it is then."""
 
         async def settled() -> SlackStream | None:
@@ -1672,7 +1672,7 @@ class GitHubFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/calls", query={"operation": operation, "error": error})
         return [GitHubApiCall._from_wire(ctx, item) for item in data]
 
-    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> GitHubApiCall:
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> GitHubApiCall:
         """Wait for the next new API call from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
 
@@ -1930,7 +1930,7 @@ class GitHubDelivery:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature})
         return DeliveryAttempt._from_wire(ctx, data)
 
-    async def settled(self, *, timeout: Duration = "10s") -> GitHubDelivery:
+    async def settled(self, *, timeout: Duration | None = None) -> GitHubDelivery:
         """Wait for the delivery to settle, and resolve with the value as it is then."""
 
         async def settled() -> GitHubDelivery | None:
@@ -1993,11 +1993,11 @@ class GitHubIssue:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.repo_id), safe='')}/issues/{quote(str(self.number), safe='')}/transcript")
         return GitHubTranscript._from_wire(ctx, data)
 
-    async def wait_for_comment(self, *, from_: GitHubUser | GitHubApp | str | None = None, body: Text | None = None, timeout: Duration = "10s") -> GitHubComment:
+    async def wait_for_comment(self, *, from_: GitHubUser | GitHubApp | str | None = None, body: Text | None = None, timeout: Duration | None = None) -> GitHubComment:
         """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_) and text_matches(item.body, body), describe_wait("a comment", from_), timeout=timeout)
 
-    async def latest_comment(self, *, from_: GitHubUser | GitHubApp | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> GitHubComment:
+    async def latest_comment(self, *, from_: GitHubUser | GitHubApp | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> GitHubComment:
         """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
 
@@ -2127,7 +2127,7 @@ class LinearFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/calls", query={"operation": operation, "error": error})
         return [LinearApiCall._from_wire(ctx, item) for item in data]
 
-    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> LinearApiCall:
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> LinearApiCall:
         """Wait for the next new API call from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
 
@@ -2330,11 +2330,11 @@ class LinearIssue:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/transcript")
         return LinearTranscript._from_wire(ctx, data)
 
-    async def wait_for_comment(self, *, from_: LinearUser | LinearApp | str | None = None, body: Text | None = None, timeout: Duration = "10s") -> LinearComment:
+    async def wait_for_comment(self, *, from_: LinearUser | LinearApp | str | None = None, body: Text | None = None, timeout: Duration | None = None) -> LinearComment:
         """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_) and text_matches(item.body, body), describe_wait("a comment", from_), timeout=timeout)
 
-    async def latest_comment(self, *, from_: LinearUser | LinearApp | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> LinearComment:
+    async def latest_comment(self, *, from_: LinearUser | LinearApp | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> LinearComment:
         """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
 
@@ -2369,7 +2369,7 @@ class LinearDelivery:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
         return DeliveryAttempt._from_wire(ctx, data)
 
-    async def settled(self, *, timeout: Duration = "10s") -> LinearDelivery:
+    async def settled(self, *, timeout: Duration | None = None) -> LinearDelivery:
         """Wait for the delivery to settle, and resolve with the value as it is then."""
 
         async def settled() -> LinearDelivery | None:
@@ -2419,7 +2419,7 @@ class LinearAgentSession:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/agent-sessions/{quote(str(self.id), safe='')}/transcript")
         return LinearTranscript._from_wire(ctx, data)
 
-    async def wait_for_state(self, wanted: Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"] | list[Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]], *, timeout: Duration = "10s") -> Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]:
+    async def wait_for_state(self, wanted: Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"] | list[Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]], *, timeout: Duration | None = None) -> Literal["pending", "active", "stopping", "awaitingInput", "complete", "error", "stale"]:
         """Wait for the agent session to reach that state: one of the values given. Resolves with the value as it is then."""
         values = wanted if isinstance(wanted, list) else [wanted]
 
@@ -2429,7 +2429,7 @@ class LinearAgentSession:
 
         return await wait_for("the agent session to reach that state", reached, timeout=timeout)
 
-    async def wait_for_activity(self, *, type: Text | None = None, timeout: Duration = "10s") -> LinearAgentActivity:
+    async def wait_for_activity(self, *, type: Text | None = None, timeout: Duration | None = None) -> LinearAgentActivity:
         """Wait for the next new activity, after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForActivity", self.activities, lambda item: text_matches(item.type, type), "an activity", timeout=timeout, starts_turn=lambda item: item.type == "prompt")
 
@@ -2521,7 +2521,7 @@ class NotionFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/calls", query={"operation": operation, "error": error})
         return [NotionApiCall._from_wire(ctx, item) for item in data]
 
-    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration = "10s") -> NotionApiCall:
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> NotionApiCall:
         """Wait for the next new API call from the agent, after the last one this handle saw."""
         return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
 
@@ -2726,7 +2726,7 @@ class NotionDelivery:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature})
         return DeliveryAttempt._from_wire(ctx, data)
 
-    async def settled(self, *, timeout: Duration = "10s") -> NotionDelivery:
+    async def settled(self, *, timeout: Duration | None = None) -> NotionDelivery:
         """Wait for the delivery to settle, and resolve with the value as it is then."""
 
         async def settled() -> NotionDelivery | None:
@@ -2773,11 +2773,11 @@ class NotionDiscussion:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/transcript")
         return NotionTranscript._from_wire(ctx, data)
 
-    async def wait_for_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration = "10s") -> NotionComment:
+    async def wait_for_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None) -> NotionComment:
         """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_), describe_wait("a comment", from_), timeout=timeout)
 
-    async def latest_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration = "10s", quiet_for: Duration = "750ms") -> NotionComment:
+    async def latest_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> NotionComment:
         """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
 

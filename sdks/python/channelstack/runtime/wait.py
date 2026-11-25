@@ -15,15 +15,43 @@ class WaitTimeoutError(Exception):
         super().__init__(f"Timed out after {timeout_ms:g}ms waiting for {what}")
 
 
+@dataclass
+class WaitDefaults:
+    """What every wait uses when it isn't given a `timeout` or `quiet_for`."""
+
+    timeout: Duration = "10s"
+    quiet_for: Duration = "750ms"
+
+
+_defaults = WaitDefaults()
+
+
+def set_wait_defaults(*, timeout: Duration | None = None, quiet_for: Duration | None = None) -> None:
+    """Change the default `timeout` and `quiet_for` of every wait: `wait_for_…`, `latest_…`, the reads
+    that wait for quiet, and calls repeated while refused. pytest-channelstack sets them from
+    `channelstack_timeout` and `channelstack_quiet_for`. What isn't given stays as it is."""
+    if timeout is not None:
+        parse_duration(timeout)
+        _defaults.timeout = timeout
+    if quiet_for is not None:
+        parse_duration(quiet_for)
+        _defaults.quiet_for = quiet_for
+
+
+def wait_defaults() -> WaitDefaults:
+    """The defaults every wait uses now (a copy)."""
+    return WaitDefaults(timeout=_defaults.timeout, quiet_for=_defaults.quiet_for)
+
+
 async def wait_for[T](
     what: str | Callable[[], str],
     read: Callable[[], Awaitable[T | None]],
     *,
-    timeout: Duration = "10s",
+    timeout: Duration | None = None,
     interval: Duration = "50ms",
 ) -> T:
-    """Read until `read` returns something other than None, or the timeout passes."""
-    timeout_ms = parse_duration(timeout)
+    """Read until `read` returns something other than None, or the timeout passes (default: 10s)."""
+    timeout_ms = parse_duration(_defaults.timeout if timeout is None else timeout)
     interval_ms = parse_duration(interval)
     deadline = time.monotonic() + timeout_ms / 1000
     while True:
@@ -39,7 +67,7 @@ async def retry_while[T](
     codes: Sequence[str],
     call: Callable[[], Awaitable[T]],
     *,
-    timeout: Duration = "10s",
+    timeout: Duration | None = None,
 ) -> T:
     """Repeat a call while it is refused with one of these error codes, the way a person waits for a
     button to appear before clicking it. When the time is up, the last refusal is the error."""
@@ -125,7 +153,7 @@ async def wait_for_next[T](
     matches: Callable[[T], bool],
     what: str,
     *,
-    timeout: Duration = "10s",
+    timeout: Duration | None = None,
     starts_turn: Callable[[T], bool] | None = None,
 ) -> T:
     """Wait for the next new item of a list that matches, after the last one this handle returned.
@@ -151,17 +179,18 @@ async def wait_for_next[T](
 async def until_quiet(
     quiet: Callable[[], Awaitable[QuietState]],
     *,
-    timeout: Duration = "10s",
-    quiet_for: Duration = "750ms",
+    timeout: Duration | None = None,
+    quiet_for: Duration | None = None,
     watching: bool = False,
 ) -> None:
-    """Resolve once the agent has been quiet for `quiet_for`. Negative and exact-count checks read after this.
+    """Resolve once the agent has been quiet for `quiet_for` (750ms by default). Negative and exact-count
+    checks read after this.
 
     With `watching`, the quiet time counts from now at the earliest: the caller wants to have looked
     for the whole window. An agent that is thinking makes no sound, so a session that went quiet a
     while ago says nothing about what arrives next.
     """
-    quiet_for_ms = parse_duration(quiet_for)
+    quiet_for_ms = parse_duration(_defaults.quiet_for if quiet_for is None else quiet_for)
     started = time.monotonic()
 
     still_open: Sequence[str] = ()
@@ -188,8 +217,8 @@ async def latest_once_quiet[T](
     quiet: Callable[[], Awaitable[QuietState]],
     what: str,
     *,
-    timeout: Duration = "10s",
-    quiet_for: Duration = "750ms",
+    timeout: Duration | None = None,
+    quiet_for: Duration | None = None,
 ) -> T:
     """The last item of a list that matches, read once the agent is quiet. Waits for at least one first."""
 

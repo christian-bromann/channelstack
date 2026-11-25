@@ -15,8 +15,7 @@
 | 4 | done | 2026-11-23, [#17](https://github.com/christian-bromann/channelstack/pull/17) |
 | 5 | done | 2026-11-24, [#18](https://github.com/christian-bromann/channelstack/pull/18) (5.1, 5.2, 5.5 and 5.6 tracked in #19–#22) |
 | 6 | done | 2026-11-25, [#23](https://github.com/christian-bromann/channelstack/pull/23) (the nightly half of 6.4 and 6.5 tracked in #31) |
-| 7 | done | 2026-11-25, [#32](https://github.com/christian-bromann/channelstack/pull/32) (7.2 dropped, decision 0017; the MCP tools for GitHub, Linear and Notion tracked in #33) |
-| 8 | not started | |
+| 7 | done | 2026-11-25, [#32](https://github.com/christian-bromann/channelstack/pull/32) (7.2 dropped, decision 0017; MCP tools for GitHub, Linear and Notion dropped, #33) |
 
 ## When a phase is done
 
@@ -41,7 +40,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 
 | Check | Command | Passes when |
 |---|---|---|
-| Types | `pnpm typecheck` | No errors in `server/`, `codegen/`, `integrations/`, `sdks/typescript/`, `sdks/python/`, `scenarios/`, `scripts/` and `api/` (the examples against `api/*.d.ts`, with the Vitest and Jest versions the contract names) |
+| Types | `pnpm typecheck` | No errors in `server/`, `codegen/`, `integrations/`, `sdks/typescript/`, `sdks/python/`, `scenarios/`, `scripts/` and `api/` (the examples against `api/*.d.ts`, with the Vitest version the contract names) |
 | Lint and format | `pnpm lint` | No errors (`bun fmt --check` and lint rules for TypeScript, ruff for Python) |
 | Unit tests | `pnpm test` | Green |
 | Spec is current | `pnpm spec:check` | Regenerating `spec/openapi.json` and `spec/ir.json` from the routes gives no diff |
@@ -73,7 +72,6 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 5 | Live mode | Every "live mode" example passes nightly in the sandboxes, and cleanup leaves nothing behind |
 | 6 | Proxy mode and fake-vs-real conformance | An unmodified agent with hard-coded hosts passes; the nightly differential run works |
 | 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; the pytest integration; MCP drives a conversation |
-| 8 | MDA port, docs and 0.1.0 | Three MDA scenarios pass in an MDA PR; the quickstart works from scratch; 0.1.0 is published |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
 
@@ -219,7 +217,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 - Live adapters per channel: actions as the app and as a person, and the reads behind the transcripts and matchers.
 - GitHub delivery-log reads.
 - `unsupported_in_live` for fake-only features (delivery chaos on Slack, Linear and Notion, GitHub Re-run, Notion resolve).
-- The browser actor with unattended sign-in (passkeys through WebDriver's virtual authenticator, emailed codes from a test inbox), Slack click and Stop first.
+- The browser actor, using the session a person saved once with `channelstack login slack`, Slack click and Stop first.
 - `channelstack doctor` for live credentials and saved sessions.
 - The sandboxes and CI secrets (implementation plan, section 9.5).
 
@@ -232,7 +230,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 | 5.3 | Allowlists hold | Test: acting in a workspace, org, team or page outside the allowlist fails with `live_not_allowlisted`, before any call to the platform |
 | 5.4 | Fake-only features say so | Test: each "Not yet" or fake-only row in the matrix returns `unsupported_in_live`, and the Vitest integration skips that step with the reason |
 | 5.5 | Live spike recorded | V1–V5 from live-mode.md are answered in the matrix's "Still to confirm" list, and the matrix rows are updated |
-| 5.6 | Unattended sign-in | Two consecutive nightly runs sign in on all four platforms with no manual step, and the second reuses the saved sessions |
+| 5.6 | Saved browser sessions | `channelstack login slack` saves a person's session (0600), the browser actor reuses it across runs with no manual step, and `channelstack doctor` says whether it is still signed in |
 
 **Docs to update:** reality-matrix (all live cells), live-mode.md, `devx.md` section 10.
 
@@ -276,26 +274,6 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 | 7.4 | MCP | A scripted MCP client lists the tools, creates a user, sends a message and reads the agent's reply |
 
 **Docs to update:** `devx.md` sections 4b and 5, architecture.md section 5.
-
----
-
-## Phase 8: MDA port, docs and 0.1.0
-
-**Build:**
-- Port three MDA scenarios through `mda-local` in proxy mode. Measure MDA-side setup lines (target under 300).
-- Quickstarts for Chat SDK, AI SDK, Pi and MDA; the landing page ([index.html](../index.html)).
-- Release 0.1.0 of the server, the spec and every SDK.
-
-**Exit checks:**
-
-| # | Check | How |
-|---|---|---|
-| 8.1 | MDA | An MDA PR with the three scenarios is green |
-| 8.2 | Quickstart | A CI job follows each quickstart verbatim in a clean container and gets its first test green in under five minutes |
-| 8.3 | Release | One tag publishes to npm, PyPI, crates.io and ghcr.io; installing each and running the smoke scenario passes |
-| 8.4 | The landing page matches the API | Every code sample on `index.html` is extracted and type-checked (TypeScript) or run (Python) in CI |
-
-**Docs to update:** everything user-facing; CHANGELOG.
 
 ---
 

@@ -14,7 +14,7 @@ import type { SlackUser } from "./slack";
  * - Slack: `SlackConversation`, `SlackThread`, `SlackMessage`, `SlackUser` (modals).
  * - GitHub: `GitHubIssue`, `GitHubPullRequest`, `GitHubCommit`, `GitHubReviewComment`.
  * - Linear: `LinearIssue`, `LinearAgentSession`, `LinearComment`.
- * - Notion: `NotionPage`, `NotionDiscussion`.
+ * - Notion: `NotionPage` (blocks and properties), `NotionDiscussion` (comments).
  * - Delivery: any `Delivery`. Calls: any channel fixture.
  *
  * Every matcher is built on a plain read method, so a test can also just read the value:
@@ -81,9 +81,13 @@ export interface ChannelstackMatchers<R = unknown> {
   toBeEphemeralFor(user: SlackUser): Promise<R>;
 
   // ---------------------------------------------------------------- GitHub, Linear, Notion comments
-  /** At least one comment from this author (issue/PR conversation, Linear issue, Notion page or discussion). */
+  /**
+   * Subject: a GitHub issue or pull request, a Linear issue, or a Notion discussion (a page's
+   * comments live in its discussions: `comment.discussion`, `page.discussions()`).
+   * At least one comment from this author.
+   */
   toHaveCommentFrom(author: AuthorRef, options?: WaitOptions & { text?: string | RegExp }): Promise<R>;
-  /** Exactly `count` comments from this author. Catches self-trigger loops and duplicates. */
+  /** Subject: as for `toHaveCommentFrom`. Exactly `count` comments from this author. Catches self-trigger loops and duplicates. */
   toHaveCommentsFrom(author: AuthorRef, options: QuietOptions & { count: number }): Promise<R>;
 
   // ---------------------------------------------------------------- GitHub
@@ -132,7 +136,7 @@ export interface ChannelstackMatchers<R = unknown> {
 export interface TextOptions extends QuietOptions {
   /** Only entries by this author. */
   from?: AuthorRef;
-  /** Read the transcript as this person (ephemeral messages included only for them). */
+  /** Slack only: read the transcript as this person (ephemeral messages included only for them). */
   as?: Principal;
 }
 

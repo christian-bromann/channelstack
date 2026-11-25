@@ -1,6 +1,6 @@
 import type {
   App, Delivery, DeliveryAttempt, HasTranscript, Inspectable, QuietOptions,
-  Resource, RichText, Timestamp, User, WaitOptions,
+  ResendOptions, Resource, RichText, Timestamp, User, WaitOptions,
 } from "./common";
 
 // ---------------------------------------------------------------------------
@@ -9,7 +9,7 @@ import type {
 
 /**
  * The `linear` test fixture: one in-memory workspace. The agent's app is installed
- * workspace-wide from `channelstack.config.ts`, as on real Linear, so nothing per resource.
+ * workspace-wide (built in as `my-agent`), as on real Linear, so nothing per resource.
  */
 export interface LinearFixture extends Inspectable<LinearDelivery> {
   readonly app: LinearApp;
@@ -143,7 +143,7 @@ export interface LinearIssue extends HasTranscript {
   /** Agent sessions on this issue, oldest first. */
   sessions(): Promise<LinearAgentSession[]>;
   /** The latest agent session, waiting for one to exist. */
-  session(options?: WaitOptions): Promise<LinearAgentSession>;
+  session(): Promise<LinearAgentSession>;
 }
 
 export interface LinearComment extends HasTranscript {
@@ -216,4 +216,11 @@ export interface LinearDelivery extends Delivery {
 
   /** Redeliver the same webhook (same `webhookId`), as Linear does on failure. */
   redeliver(): Promise<DeliveryAttempt>;
+
+  resend(options?: LinearResendOptions): Promise<DeliveryAttempt>;
+}
+
+export interface LinearResendOptions extends ResendOptions {
+  /** Send with a `webhookTimestamp` outside Linear's one-minute replay window. */
+  stale?: boolean;
 }

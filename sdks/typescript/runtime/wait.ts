@@ -1,10 +1,37 @@
 import { type Duration, parseDuration } from "./duration.ts";
 
 export interface WaitOptions {
-  /** Give up after this long. Default: 10s. */
+  /** Give up after this long. Default: 10s, or what `setWaitDefaults` set. */
   timeout?: Duration;
   /** How often to read. Default: 50ms. */
   interval?: Duration;
+}
+
+/** What every wait uses when it isn't given a `timeout` or `quietFor`. */
+export interface WaitDefaults {
+  timeout: Duration;
+  quietFor: Duration;
+}
+
+const defaults: WaitDefaults = { timeout: "10s", quietFor: "750ms" };
+
+/**
+ * Change the default `timeout` and `quietFor` of every wait: `waitFor…`, `latest…`, the reads that
+ * wait for quiet, and calls repeated while refused. The Vitest plugin sets them from its `timeout`
+ * and `quietFor` options. What isn't given stays as it is.
+ */
+export function setWaitDefaults(options: Partial<WaitDefaults>): void {
+  for (const key of ["timeout", "quietFor"] as const) {
+    const value = options[key];
+    if (value === undefined) continue;
+    parseDuration(value);
+    defaults[key] = value;
+  }
+}
+
+/** The defaults every wait uses now (a copy). */
+export function waitDefaults(): WaitDefaults {
+  return { ...defaults };
 }
 
 export class WaitTimeoutError extends Error {
@@ -23,7 +50,7 @@ export async function waitFor<T>(
   read: () => Promise<T | undefined>,
   options: WaitOptions = {},
 ): Promise<T> {
-  const timeout = parseDuration(options.timeout ?? "10s");
+  const timeout = parseDuration(options.timeout ?? defaults.timeout);
   const interval = parseDuration(options.interval ?? "50ms");
   const deadline = Date.now() + timeout;
   for (;;) {
@@ -66,7 +93,7 @@ export async function retryWhile<T>(
 export interface QuietOptions extends WaitOptions {
   /**
    * How long the agent must be quiet (no call in flight, no delivery in flight or about to be retried, no open stream)
-   * before the result is read. Default: 750ms.
+   * before the result is read. Default: 750ms, or what `setWaitDefaults` set.
    */
   quietFor?: Duration;
 }
@@ -150,7 +177,7 @@ export async function untilQuiet(
   quiet: () => Promise<QuietState>,
   options: QuietOptions & { watching?: boolean } = {},
 ): Promise<void> {
-  const quietFor = parseDuration(options.quietFor ?? "750ms");
+  const quietFor = parseDuration(options.quietFor ?? defaults.quietFor);
   const started = Date.now();
   let open: string[] = [];
   await waitFor(

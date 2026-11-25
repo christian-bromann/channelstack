@@ -6,7 +6,8 @@
  *   export default defineConfig({ plugins: [channelstack()] });
  *
  * Adds a globalSetup (start or attach), a setup file that registers the matchers and
- * cleans up each test's resources, and these types.
+ * cleans up each test's resources, and these types. A project without a `testTimeout` gets
+ * one above the checks' own wait (30s, or three times `timeout`); a project's own always wins.
  */
 import type { Plugin } from "vite";
 import type { SlackFixture } from "./slack";

@@ -3,7 +3,7 @@ import { createEchoApi } from "./api.ts";
 import { EchoStore } from "./store.ts";
 import { createFakeWorld, type FakeEchoWorld } from "./world.ts";
 
-/** The app's display name. Later drivers take theirs from `channelstack.config.ts`. */
+/** The app's display name. The other drivers' built-in app is `my-agent`. */
 const APP_NAME = "echo-agent";
 
 export interface EchoFake extends FakeBackend {

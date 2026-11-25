@@ -30,6 +30,7 @@ from channelstack import (
 from channelstack.runtime.files import set_files_root
 from channelstack.runtime.launcher import Mode
 from channelstack.runtime.transport import on_refusal
+from channelstack.runtime.wait import set_wait_defaults
 
 from .options import defaults
 
@@ -46,8 +47,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="How the client finds the server: attach to a running one, start one, or either (default: auto)",
     )
     parser.addini("channelstack_mode", "How the client finds the server: auto, attach or start", default="auto")
-    parser.addini("channelstack_timeout", "How long a check waits (default: 10s)", default="10s")
-    parser.addini("channelstack_quiet_for", "How long the agent must be quiet (default: 750ms)", default="750ms")
+    # Unset, they stay the runtime's own defaults (10s, 750ms): the wait module is where those live.
+    parser.addini("channelstack_timeout", "How long a check or wait waits (default: 10s)", default="")
+    parser.addini("channelstack_quiet_for", "How long the agent must be quiet (default: 750ms)", default="")
 
 
 def _skip_live_refusal(error: ChannelstackError, path: str) -> None:
@@ -66,8 +68,11 @@ def pytest_configure(config: pytest.Config) -> None:
     if mode not in get_args(Mode):
         raise pytest.UsageError(f"channelstack_mode must be one of {', '.join(get_args(Mode))}, got {mode!r}")
     defaults.mode = cast(Mode, mode)
-    defaults.timeout = cast(str, config.getini("channelstack_timeout"))
-    defaults.quiet_for = cast(str, config.getini("channelstack_quiet_for"))
+    # Every SDK wait reads these, not only the checks: `wait_for_reply`, `latest_reply`, `settled`, …
+    set_wait_defaults(
+        timeout=cast(str, config.getini("channelstack_timeout")) or None,
+        quiet_for=cast(str, config.getini("channelstack_quiet_for")) or None,
+    )
     on_refusal(_skip_live_refusal)
 
 

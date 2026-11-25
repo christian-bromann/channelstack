@@ -31,9 +31,9 @@ Every feature runs in the fake server (in memory). The question this document an
 | Code | What it is |
 |---|---|
 | **User token** | The person's own credential: Slack `xoxp`, a GitHub PAT for a machine user, a Linear personal API key, a Notion personal access token |
-| **App credentials** | The agent app's own credentials from `channelstack.config.ts`: Slack bot token, GitHub App JWT, Linear OAuth app, Notion integration token |
+| **App credentials** | The agent app's own credentials, from the environment (`CHANNELSTACK_<CHANNEL>_*`, [live-mode.md](live-mode.md), section 4): Slack bot token, GitHub App JWT, Linear OAuth app, Notion integration token |
 | **Seeding credentials** | A separate admin token channelstack uses to set up places (channels, repos, teams, pages), so setup doesn't look like the agent acting |
-| **Browser** | A browser actor: WebdriverIO BiDi driving the real web UI as a sandbox person. It signs in on its own, with no one at the keyboard (see [Signing in without people](#signing-in-without-people)), and reuses the session between runs. Used only where the platform has no API for a person's action |
+| **Browser** | A browser actor: WebdriverIO BiDi driving the real web UI as a sandbox person. It never signs in itself: it uses the session a person saved by hand with `channelstack login slack` (see [Browser sessions](#browser-sessions)), and reuses it between runs. Used only where the platform has no API for a person's action |
 | **Proxy** | Proxy mode in pass-through: the agent's calls to the real platform go through channelstack, which records them (and can inject faults). Needed to observe the agent's calls live |
 | **Pre-provisioned** | Exists in the sandbox ahead of time, because the platform has no API to create it. `createUser({ name: "Ana" })` maps to the sandbox account by name (`CHANNELSTACK_<CHANNEL>_USER_ANA_TOKEN`) |
 
@@ -43,7 +43,7 @@ Every feature runs in the fake server (in memory). The question this document an
 |---|---|
 | App credentials only (e.g. just a bot token) | Acting as the app: posting as the bot, installing it, reading. No person actions, because a bot token never acts as a person |
 | Plus a user token per sandbox person | Most of the matrix: say, reply, react, edit, DMs, comments, reviews, delegation, reads |
-| Plus unattended sign-in secrets per person | The browser rows, as real UI actions |
+| Plus a saved browser session per person (`channelstack login slack`) | The browser rows, as real UI actions (built for Slack) |
 
 **Where the fake is deliberately more lenient than the platform:** a channel name is unique per session, not per workspace, so parallel tests can each have a `#support` ([decision 0006](decisions/0006-shared-world-collisions.md)). Real Slack refuses the second one with `name_taken`; live, places get a run-specific name.
 
@@ -68,7 +68,7 @@ Every feature runs in the fake server (in memory). The question this document an
 | `fault(...)`: rate limits, latency, errors | Done | Yes, with proxy | Proxy | Injected by the proxy on the way to the real platform. Real rate limits also apply |
 | "Agent is quiet" (negative and exact-count matchers) | Done | Yes, with proxy | Proxy | With proxy: no call in flight and no open stream. Live without proxy, nothing tells channelstack when the agent is done: a session that acted live gets `action_requires`, and those matchers skip. Positive matchers poll and work. A fallback (the transcript unchanged for `quietFor`) is possible later |
 | `transcript()` and all `toContainText…` matchers | Done | Built (Slack) | User token or App credentials | Built from the platform's read APIs, using the same renderer as the fake |
-| `channelstack reset` | Done | No | — | Live cleanup is per session (cleanup ledger) plus `channelstack sweep`. A real workspace is never wiped |
+| `channelstack.reset()` | Done | No | — | Live cleanup is per session (cleanup ledger) plus `channelstack sweep`. A real workspace is never wiped |
 
 ---
 
@@ -82,7 +82,6 @@ Every feature runs in the fake server (in memory). The question this document an
 | `ana.say(text, { channel })` | Done | Built, with browser | Browser (typed in Slack's client) | The platform sends real `message` and `app_mention` events only for a message a person types. Slack marks every message posted through its API with the posting app's `bot_id` and `app_id`, a person's user token included (`as_user` too), and agents drop it as a bot's (found against the sandbox, [decision 0015](decisions/0015-live-mode.md)). The browser actor types it in Slack's client, from a session saved with `channelstack login`; without one, live runs report `action_requires`. A person types text: `blocks` and `metadata` are an app's, and live `say` refuses them (`unsupported_in_live`) |
 | `ana.say(text, { to: slack.app })` (DM) | Done | Built, with browser | Browser; the DM is opened with the user token (`conversations.open`) | Fires `message.im`. As `say` in a channel |
 | `ana.say(text, { to: [ben, slack.app] })` (group DM) | Done | Built, with browser | Browser | As `say` in a channel |
-| `ana.say({ files })` | Yes | Yes, with browser | Browser | As `say` in a channel |
 | `ana.reply(text, { thread })` | Done | Built, with browser | Browser | Typed in the thread, as `say` in a channel. `alsoSendToChannel` (`reply_broadcast`) isn't live yet: `unsupported_in_live` |
 | `ana.edit(text, { message })` | Done | Built | User token (`chat.update`) | Only the person's own messages, as in Slack. **unverified**: whether an edit through the API carries the posting app's bot as a new message does |
 | `ana.delete({ message })` | Done | Built | User token (`chat.delete`) | |
@@ -99,13 +98,12 @@ Every feature runs in the fake server (in memory). The question this document an
 | `ana.pickPrompt(title, { thread })` | Done | Partial | Browser, or User token | The browser clicks the suggested prompt. A User-token fallback posts the prompt's text into the thread, which looks the same to the agent but isn't a click |
 | `ana.switchContext(channel, { thread })` | Done | Yes, with browser | Browser | `assistant_thread_context_changed` comes from the client |
 | `ana.invite` / `kick` | Done | Built | User token (`conversations.invite` / `kick`) | Kicking needs the right workspace role |
-| `ana.renameChannel` / `archiveChannel` | Yes | Yes | User token | Not in the fake or live yet |
 | `ana.ephemeral()` | Done | Yes, with proxy or browser | Proxy (sees `chat.postEphemeral`) or Browser | Confirmed: ephemeral messages aren't stored and don't persist across reloads, so no read API returns them. The browser only sees them while the page stays open |
 | `channel.messages()`, `thread.root()`, `thread.replies()`, `waitForReply`, `latestReply` | Done | Built | User token (`conversations.history` / `replies`) | Polled, from reads cached for a second (Slack's read methods allow about one call a second). `latestReply` waits until the agent is quiet first, which live needs proxy mode for |
 | `message.reactions()` | Done | Built | User token (the reactions in `conversations.history` / `replies`) | |
 | `message.stream` (chunks and state) | Done | Partial | Proxy (sees `chat.startStream` / `appendStream` / `stopStream`) | **unverified**: whether history returns partial text during a stream. The docs only say a stream that times out after 10 minutes keeps what was streamed. Without proxy, count on seeing only the final text |
 | `thread.status()`, `toHaveStatus`, `toHaveStatusText` | Done | Yes, with proxy or browser | Proxy (sees `assistant.threads.setStatus` and its replacement `agents.sessions.setStatus`) or Browser | Confirmed: only write methods exist, nothing reads the status back. The fake serves both method names |
-| `agentThread.suggestedPrompts()` | Done | Yes, with proxy or browser | Proxy or Browser | Confirmed: no read API |
+| `thread.suggestedPrompts()` (agent split view) | Done | Yes, with proxy or browser | Proxy or Browser | Confirmed: no read API |
 | `toBeEphemeralFor(user)` | Done | Yes, with proxy or browser | Same as `ephemeral()` | |
 | `toHaveButton(label)` | Done | Built | User token (the blocks are in history) | |
 | `toHaveOpenedModal(title)` | Done | Yes, with proxy or browser | Same as `waitForModal` | |
@@ -220,27 +218,22 @@ Notion now has **personal access tokens** that act as the person who created the
    - Linear: Stop.
    - Notion: adding connections. (Resolving discussions is not yet supported live.)
 
-   They need the browser actor live. It signs in without people (next section).
+   They need the browser actor live, with a saved session ([Browser sessions](#browser-sessions)). It is built for Slack's `say`, `reply` and `click`; the others report `action_requires` live, and the framework skips the step.
 3. **Live mode acts and observes; it never relays.** channelstack acts on the real platform and reads the results back to check that the agent reacted. The platform delivers events to the agent directly; delivery chaos (retries, bad signatures, redelivery) is fake-only. On GitHub, the App's delivery log still lets tests read what was delivered to the agent ([live-mode.md](live-mode.md)).
 4. **Agent-side visibility works live only through proxy.** That covers API calls, the status line, streams, ephemeral messages and faults.
-5. **A test can declare what it needs** with `test.requires(["browser"])` or `["proxy"]`. A live run without that piece skips the test and says why, instead of failing. The fake run never skips.
+5. **A live run without a piece a step needs skips that step and says why,** instead of failing (`action_requires`, `unsupported_in_live`). The fake run never skips.
 
-Some things are fake-only: fixed user ids, Slack Connect channels, uninstall and reinstall in every run, and `channelstack reset`. Tests that rely on them still run on every PR. The coverage page lists them as fake-only.
+Some things are fake-only: fixed user ids, Slack Connect channels, uninstall and reinstall in every run, and `channelstack.reset()`. Tests that rely on them still run on every PR. The coverage page lists them as fake-only.
 
-## Signing in without people
+## Browser sessions
 
-The browser actor runs in CI, so nobody signs in by hand. Each sandbox person is created once by the sandbox owner (no platform has an API for that). After that, the browser actor signs in on its own:
+The browser actor never signs in itself, and never handles a password. Each sandbox person is created once by the sandbox owner (no platform has an API for that), and signs in by hand once:
 
-| Platform | Unattended sign-in | Secrets in CI |
-|---|---|---|
-| **GitHub** | Passkey through WebDriver's virtual authenticator, or password plus TOTP. GitHub skips the new-device email check when 2FA or a passkey is used | The passkey's private key (`CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_PASSKEY`), or the password and TOTP seed. Use a machine account; GitHub's terms allow one free machine account per person |
-| **Linear** | Passkey through the virtual authenticator, or the emailed sign-in code | The passkey's private key, or access to the person's test inbox |
-| **Slack** | The emailed sign-in code. Developer sandboxes sign people in with a single-use code sent to their email; custom SAML isn't available there | Access to the test inbox (a mail-testing service or your own domain). Set a long session duration in the sandbox so sign-ins are rare |
-| **Notion** | The emailed sign-in code | Access to the test inbox |
+- **`channelstack login slack --user ana`** opens a browser window at the sandbox's sign-in page. Once Ana is in, channelstack saves the session's cookies (`<home>/browser/slack-ana.json`, 0600; `--save <path>` writes a copy, e.g. for a CI secret). The browser actor uses that session, or the one `createUser({ browser: { storageState } })` names.
+- **Sign in rarely.** Set a long session duration in the sandbox. `channelstack doctor` says whether each saved session is still signed in; when one has expired, the person runs `channelstack login` again.
+- **Without a saved session,** a browser row reports `action_requires` live and the framework skips the step; the fake run is unaffected. channelstack never tries to solve a CAPTCHA.
 
-- **Sign in rarely.** The session is saved (browser storage state, kept in an encrypted CI secret or a 0600 file) and reused. `channelstack doctor` checks that it still works, and the browser actor signs in again only when it doesn't. Scripted sign-ins from CI addresses are what trigger CAPTCHAs and account flags.
-- **`channelstack login <channel> --user ana`** runs the same sign-in once locally, to produce the saved session and, for passkeys, to register the virtual authenticator's key.
-- **If a sign-in is challenged** (a CAPTCHA, a new-device prompt), the browser rows are skipped with the reason and the run doesn't fail. channelstack never tries to solve a CAPTCHA.
+The browser actor is built for Slack. The browser rows of GitHub, Linear and Notion aren't built yet and report `action_requires` live.
 
 ## Still to confirm in the first live spike
 
@@ -265,7 +258,7 @@ Still open:
    - Does a page edit made with a person's PAT fire the integration's webhooks?
    - Does an in-body mention of an integration reach the agent?
 
-5. **Sign-in:** how often do scripted sign-ins from CI get challenged on each platform, and how long does a saved session last with the longest session setting?
+5. **Browser sessions:** how long does a saved Slack session last with the longest session setting?
 
 ## Sources
 
@@ -287,14 +280,12 @@ Still open:
   - [Check runs](https://docs.github.com/en/rest/checks/runs)
   - [Fine-grained PAT permissions](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)
   - [App webhooks](https://docs.github.com/en/rest/apps/webhooks)
-  - [Verifying new devices when signing in](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/verifying-new-devices-when-signing-in)
   - [Terms of Service: machine accounts](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service)
 - **Linear:**
   - [Agents](https://linear.app/developers/agents)
   - [Agent interaction](https://linear.app/developers/agent-interaction)
   - [Agent signals](https://linear.app/developers/agent-signals)
   - [GraphQL schema](https://linear.app/developers/graphql)
-  - [Login methods](https://linear.app/docs/login-methods)
 - **Notion:**
   - [Personal access tokens](https://developers.notion.com/guides/connections-and-tokens/personal-access-tokens)
   - [Comment display name](https://developers.notion.com/reference/comment-display-name)

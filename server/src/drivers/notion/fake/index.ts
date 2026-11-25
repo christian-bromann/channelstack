@@ -3,7 +3,7 @@ import { createNotionApi } from "./api.ts";
 import { NotionStore } from "./store.ts";
 import { createFakeWorld, type FakeNotionWorld } from "./world.ts";
 
-/** The agent's integration, until `channelstack.config.ts` describes it: subscribed to pages and comments, with every capability. */
+/** The agent's integration, built in (there is no config file): subscribed to pages and comments, with every capability. */
 const DEFAULT_INTEGRATION = {
   name: "my-agent",
   events: [

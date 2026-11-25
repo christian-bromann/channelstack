@@ -18,6 +18,8 @@ import type {
   NotionFixture,
   SlackFixture,
 } from "../../sdks/typescript/client.ts";
+import { parseDuration } from "../../sdks/typescript/runtime/duration.ts";
+import { waitDefaults } from "../../sdks/typescript/runtime/wait.ts";
 import type { MatcherName, matchers } from "../matchers-core/index.ts";
 
 export interface ChannelstackIntegrationOptions {
@@ -28,9 +30,12 @@ export interface ChannelstackIntegrationOptions {
    * `attach`: fail if none is running. `start`: always start a private one.
    */
   mode?: "auto" | "attach" | "start";
-  /** Default matcher and wait timeout. Default "10s". */
+  /**
+   * Default timeout for matchers and every SDK wait (`waitFor…`, `latest…`, `settled`). Default "10s".
+   * A project without its own `testTimeout` gets one above it: 30s, or three times this.
+   */
   timeout?: Duration;
-  /** Default quiet window for negative and exact-count matchers. Default "750ms". */
+  /** Default quiet window for negative and exact-count matchers and `latest…` reads. Default "750ms". */
   quietFor?: Duration;
 }
 
@@ -80,16 +85,28 @@ export const OPTIONS_ENV = "CHANNELSTACK_VITEST_OPTIONS";
 
 const sibling = (name: string) => fileURLToPath(new URL(`./${name}${extname(import.meta.url)}`, import.meta.url));
 
+/**
+ * The test timeout the plugin gives a project that sets none: comfortably above a check's own wait,
+ * so a failing check reports its own message instead of Vitest's "Test timed out in 5000ms". A
+ * check waits at most `timeout` (a negative one waits for quiet within it, then reads once), so
+ * this is 30s, or three times the `timeout` if that's longer.
+ */
+export function defaultTestTimeout(options: Pick<ChannelstackIntegrationOptions, "timeout">): number {
+  return Math.max(30_000, 3 * parseDuration(options.timeout ?? waitDefaults().timeout));
+}
+
 /** The Vitest plugin. */
 export default function channelstack(options: ChannelstackIntegrationOptions = {}) {
   return {
     name: "channelstack",
-    config(config: { test?: { setupFiles?: string | string[] } }) {
+    config(config: { test?: { setupFiles?: string | string[]; testTimeout?: number } }) {
       // The plugin's setup comes before the project's own setup files: its `beforeEach` (the
       // fixtures) runs first and its `afterEach` (closing the session) last, so a project's own
       // hooks can still use the fixtures.
       config.test ??= {};
       config.test.setupFiles = [sibling("setup"), ...[config.test.setupFiles ?? []].flat()];
+      // A project's own `testTimeout` always wins.
+      config.test.testTimeout ??= defaultTestTimeout(options);
       return { test: { globalSetup: [sibling("global-setup")], env: { [OPTIONS_ENV]: JSON.stringify(options) } } };
     },
   };

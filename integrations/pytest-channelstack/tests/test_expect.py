@@ -2,17 +2,22 @@
 
 import re
 import secrets
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
 
 from channelstack.runtime.client import HandleContext, quiet_of
 from channelstack.runtime.transport import Transport, on_refusal
-from channelstack.runtime.wait import QuietState
+from channelstack.runtime.wait import QuietState, WaitTimeoutError, set_wait_defaults, wait_defaults, wait_for
 from pytest_channelstack import expect, matchers
-from pytest_channelstack.plugin import _skip_live_refusal  # pyright: ignore[reportPrivateUsage]
+from pytest_channelstack.plugin import (
+    _skip_live_refusal,  # pyright: ignore[reportPrivateUsage]
+    pytest_configure,
+    pytest_unconfigure,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -49,14 +54,42 @@ FAST = {"timeout": "300ms"}
 
 
 @pytest.fixture(autouse=True)
-def quiet(monkeypatch: pytest.MonkeyPatch) -> None:
+def quiet(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """The session is always quiet, and has nothing open."""
 
     async def always_quiet(_: object) -> QuietState:
         return QuietState(busy=False, quiet_for_ms=60_000, open=())
 
     monkeypatch.setattr(matchers, "quiet_of", always_quiet)
-    monkeypatch.setattr(matchers.defaults, "quiet_for", "20ms")
+    before = wait_defaults()
+    set_wait_defaults(quiet_for="20ms")
+    yield
+    set_wait_defaults(timeout=before.timeout, quiet_for=before.quiet_for)
+
+
+async def test_the_ini_settings_are_every_waits_defaults() -> None:
+    """`channelstack_timeout` and `channelstack_quiet_for` reach the SDK's own waits, not only the checks."""
+
+    class Config:
+        def getoption(self, name: str) -> None:
+            return None
+
+        def getini(self, name: str) -> str:
+            return {"channelstack_mode": "auto", "channelstack_timeout": "40ms", "channelstack_quiet_for": "30ms"}[name]
+
+    before = wait_defaults()
+    pytest_configure(cast(pytest.Config, Config()))
+    try:
+        assert (wait_defaults().timeout, wait_defaults().quiet_for) == ("40ms", "30ms")
+
+        async def nothing() -> None:
+            return None
+
+        with pytest.raises(WaitTimeoutError, match="Timed out after 40ms"):
+            await wait_for("a reply", nothing)
+    finally:
+        pytest_unconfigure(cast(pytest.Config, Config()))
+        set_wait_defaults(timeout=before.timeout, quiet_for=before.quiet_for)
 
 
 async def test_a_positive_check_waits_for_what_arrives_later() -> None:

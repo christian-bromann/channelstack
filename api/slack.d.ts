@@ -1,6 +1,6 @@
 import type {
-  App, ApiCall, Delivery, DeliveryAttempt, Duration, FileInput, HasTranscript, Inspectable,
-  QuietOptions, Resource, RichText, Timestamp, User, WaitOptions,
+  App, ApiCall, Delivery, DeliveryAttempt, Duration, Inspectable, Principal,
+  QuietOptions, ResendOptions, Resource, RichText, Timestamp, Transcript, User, WaitOptions,
 } from "./common";
 
 // ---------------------------------------------------------------------------
@@ -9,7 +9,7 @@ import type {
 
 /** The `slack` test fixture: one in-memory workspace. */
 export interface SlackFixture extends Inspectable<SlackDelivery> {
-  /** The agent's app from `channelstack.config.ts`. Add it to channels explicitly. */
+  /** The agent's app, built in as `my-agent`. Add it to channels explicitly. */
   readonly app: SlackApp;
   /** Base URL to give the agent, e.g. `https://slack.localhost/api/`. */
   readonly apiUrl: string;
@@ -22,7 +22,10 @@ export interface SlackFixture extends Inspectable<SlackDelivery> {
    * Create a channel. Only the listed participants are members; include `slack.app`
    * for the agent to receive events from it and post in it (Slack's real rule).
    */
-  createChannel(options?: SlackChannelOptions): Promise<SlackChannel>;
+  createChannel(options?: SlackChannelOptions): Promise<SlackConversation>;
+
+  /** Every delivery this session caused, oldest first. */
+  deliveries(): Promise<SlackDelivery[]>;
 
   /** Simulate the workspace uninstalling the app (`app_uninstalled`, `tokens_revoked`). */
   uninstallApp(): Promise<SlackDelivery[]>;
@@ -86,7 +89,7 @@ export type SlackFault =
 
 export type SlackMessageInput =
   | RichText
-  | { text?: RichText; blocks?: unknown[]; files?: FileInput[]; metadata?: { event_type: string; event_payload: Record<string, unknown> } };
+  | { text?: RichText; blocks?: unknown[]; metadata?: { event_type: string; event_payload: Record<string, unknown> } };
 
 /**
  * A person in the workspace. Actions read as sentences, with the content first and
@@ -134,22 +137,20 @@ export interface SlackUser extends User {
 
   // ------------------------------------------------------------ conversations
   /** Open (or reuse) a DM with the app, another person, or several (a group DM). */
-  openDM(with_: SlackParticipant | SlackParticipant[]): Promise<SlackDM>;
+  openDM(with_: SlackParticipant | SlackParticipant[]): Promise<SlackConversation>;
   /**
-   * Open the app's agent / assistant split view. Sends `assistant_thread_started`.
-   * Requires `agentView` in the app config or manifest.
+   * Open the app's agent / assistant split view. Sends `assistant_thread_started`; refused with
+   * `split_view_unavailable` when the app doesn't subscribe to it (the built-in app does).
    */
-  openAgentThread(options?: { from?: SlackChannel }): Promise<SlackAgentThread>;
+  openAgentThread(options?: { from?: SlackConversation }): Promise<SlackThread>;
   /** Click one of the suggested prompts in the agent split view. */
-  pickPrompt(title: string, where: { thread: SlackAgentThread }): Promise<SlackMessage>;
+  pickPrompt(title: string, where: { thread: SlackThread }): Promise<SlackMessage>;
   /** Move to another channel while the split view stays open (`assistant_thread_context_changed`). */
-  switchContext(channel: SlackChannel, where: { thread: SlackAgentThread }): Promise<SlackDelivery>;
+  switchContext(channel: SlackConversation, where: { thread: SlackThread }): Promise<SlackDelivery>;
   /** Invite people or the app. Sends `member_joined_channel`. */
-  invite(participants: SlackParticipant | SlackParticipant[], where: { channel: SlackChannel }): Promise<void>;
+  invite(participants: SlackParticipant | SlackParticipant[], where: { channel: SlackConversation }): Promise<void>;
   /** Remove someone. Sends `member_left_channel` (or `channel_left` for the app). */
-  kick(participant: SlackParticipant, where: { channel: SlackChannel }): Promise<void>;
-  renameChannel(name: string, target: { channel: SlackChannel }): Promise<void>;
-  archiveChannel(target: { channel: SlackChannel }): Promise<void>;
+  kick(participant: SlackParticipant, where: { channel: SlackConversation }): Promise<void>;
 
   // ------------------------------------------------------------ reading
   /** Messages only this person can see (ephemeral). */
@@ -172,12 +173,19 @@ export type SlackParticipant = SlackUser | SlackApp;
 // Conversations, messages, threads: what you read and wait on
 // ---------------------------------------------------------------------------
 
-/** What channels, DMs and agent threads have in common. */
-export interface SlackConversation extends Resource, HasTranscript {
+/** Read as one person: Slack shows ephemeral messages only to their recipient. */
+export interface SlackHasTranscript {
+  transcript(options?: { as?: Principal }): Promise<Transcript>;
+}
+
+/** A channel, a private channel, a DM or a group DM. */
+export interface SlackConversation extends Resource, SlackHasTranscript {
   readonly channel: "slack";
   readonly kind: "channel" | "private_channel" | "im" | "mpim";
   /** Slack conversation id (`C…`, `G…`, `D…`). */
   readonly id: string;
+  /** Without `#`. Undefined for a DM. */
+  readonly name?: string;
 
   /** Top-level messages, oldest first. */
   messages(): Promise<SlackMessage[]>;
@@ -186,16 +194,7 @@ export interface SlackConversation extends Resource, HasTranscript {
   members(): Promise<SlackParticipant[]>;
 }
 
-export interface SlackChannel extends SlackConversation {
-  readonly kind: "channel" | "private_channel";
-  readonly name: string;
-}
-
-export interface SlackDM extends SlackConversation {
-  readonly kind: "im" | "mpim";
-}
-
-export interface SlackMessage extends HasTranscript {
+export interface SlackMessage extends SlackHasTranscript {
   readonly ts: string;
   readonly conversation: SlackConversation;
   readonly author: SlackParticipant;
@@ -222,7 +221,10 @@ export interface SlackMessage extends HasTranscript {
   reactions(): Promise<Array<{ emoji: string; by: SlackParticipant[] }>>;
 }
 
-export interface SlackThread extends HasTranscript {
+/** A thread: the replies to a message, or a thread in the agent / assistant split view. */
+export interface SlackThread extends SlackHasTranscript {
+  /** The `ts` of the message that starts the thread. */
+  readonly ts: string;
   readonly conversation: SlackConversation;
 
   /** The message that starts the thread, as it is now (its latest text and edits). */
@@ -234,6 +236,8 @@ export interface SlackThread extends HasTranscript {
   latestReply(options?: { from?: SlackParticipant | string } & QuietOptions): Promise<SlackMessage>;
   /** What the agent is doing in the thread right now. `toHaveStatus` and `toHaveStatusText` read this. */
   status(): Promise<SlackThreadStatus>;
+  /** In the agent split view: the suggested prompts the agent set (`assistant.threads.setSuggestedPrompts`). */
+  suggestedPrompts(): Promise<Array<{ title: string; message: string }>>;
 }
 
 export interface SlackThreadStatus {
@@ -243,13 +247,6 @@ export interface SlackThreadStatus {
   readonly text?: string;
   /** The agent session's lifecycle status (`agents.sessions.setStatus`), if the agent set one. */
   readonly sessionStatus?: "active" | "processing" | "suspended" | "closed";
-}
-
-/** A thread in the agent / assistant split view. */
-export interface SlackAgentThread extends SlackThread {
-  readonly user: SlackUser;
-  /** Suggested prompts the agent set (`assistant.threads.setSuggestedPrompts`). */
-  suggestedPrompts(): Promise<Array<{ title: string; message: string }>>;
 }
 
 export interface SlackStream {
@@ -304,6 +301,15 @@ export interface SlackDelivery extends Delivery<SlackDeliveryType> {
    * `X-Slack-Retry-Reason` set. `after` defaults to 3s, Slack's first retry delay.
    */
   retry(options?: { after?: Duration; reason?: "http_timeout" | "http_error" | "too_many_redirects" }): Promise<DeliveryAttempt>;
+
+  resend(options?: SlackResendOptions): Promise<DeliveryAttempt>;
+}
+
+export interface SlackResendOptions extends ResendOptions {
+  /** Send with a timestamp outside Slack's five-minute replay window. */
+  stale?: boolean;
+  /** Override or add headers for this attempt. */
+  headers?: Record<string, string>;
 }
 
 export type { ApiCall };

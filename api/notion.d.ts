@@ -9,7 +9,7 @@ import type {
 
 /** The `notion` test fixture: one in-memory workspace. */
 export interface NotionFixture extends Inspectable<NotionDelivery> {
-  /** The agent's integration from `channelstack.config.ts`. Connect it to pages explicitly. */
+  /** The agent's integration, built in as `my-agent`. Connect it to pages explicitly. */
   readonly app: NotionIntegration;
   /** Base URL to give the agent (`@notionhq/client` `baseUrl`), e.g. `https://notion.localhost`. */
   readonly apiUrl: string;
@@ -42,8 +42,6 @@ export interface NotionUserOptions {
    * Also read from `CHANNELSTACK_NOTION_USER_<NAME>_TOKEN`.
    */
   token?: string;
-  /** Live only: lets the browser actor do UI-only actions (Add connections). Sign-in is unattended. */
-  browser?: { storageState: string };
 }
 
 export interface NotionPageOptions {
@@ -183,6 +181,9 @@ export interface NotionDelivery extends Delivery {
   /** e.g. `comment.created`, `page.content_updated`, `page.properties_updated`. */
   readonly type: string;
   readonly entity: { type: "page" | "database" | "comment" | "block"; id: string };
+
+  /** Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. */
+  redeliver(): Promise<DeliveryAttempt>;
 }
 
 export type { DeliveryAttempt };

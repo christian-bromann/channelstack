@@ -5,7 +5,7 @@ import { SlackStore } from "./store.ts";
 import { createFakeWorld, type FakeSlackWorld } from "./world.ts";
 
 /**
- * The agent's app, until `channelstack.config.ts` describes it: a bot with the scopes and event
+ * The agent's app, built in (there is no config file): a bot with the scopes and event
  * subscriptions a conversational agent usually has.
  */
 const DEFAULT_APP = {

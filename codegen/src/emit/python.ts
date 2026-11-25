@@ -278,8 +278,9 @@ export function emitPython(ir: Ir): Map<string, string> {
       ...filters.map((option) => `${snakeCase(option.name)}: ${annotation(option)}${option.optional ? " = None" : ""}`),
       ...from,
       ...(w.text ? [`${snakeCase(w.text)}: Text | None = None`] : []),
-      'timeout: Duration = "10s"',
-      ...(w.mode === "latest" ? ['quiet_for: Duration = "750ms"'] : []),
+      // The defaults are the runtime's (`set_wait_defaults`), so a test framework's settings reach every wait.
+      "timeout: Duration | None = None",
+      ...(w.mode === "latest" ? ["quiet_for: Duration | None = None"] : []),
     ];
     const conditions = [
       ...(fromField ? [`from_matches(item.${snakeCase(w.from ?? "")}, from_)`] : []),
@@ -297,7 +298,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       const value = w.field === undefined ? "value" : `value.${snakeCase(w.field)}`;
       return [
         "",
-        `    async def ${snakeCase(w.name)}(self, wanted: ${typeOf(w.item)} | list[${typeOf(w.item)}], *, timeout: Duration = "10s") -> ${typeOf(w.item)}:`,
+        `    async def ${snakeCase(w.name)}(self, wanted: ${typeOf(w.item)} | list[${typeOf(w.item)}], *, timeout: Duration | None = None) -> ${typeOf(w.item)}:`,
         `        """Wait for ${w.what}: one of the values given. Resolves with the value as it is then."""`,
         "        values = wanted if isinstance(wanted, list) else [wanted]",
         "",
@@ -312,7 +313,7 @@ export function emitPython(ir: Ir): Map<string, string> {
       const pending = `value.${snakeCase(w.field ?? "")} in (${(w.not ?? []).map((value) => JSON.stringify(value)).join(", ")},)`;
       return [
         "",
-        `    async def ${snakeCase(w.name)}(self, *, timeout: Duration = "10s") -> ${typeOf(w.item)}:`,
+        `    async def ${snakeCase(w.name)}(self, *, timeout: Duration | None = None) -> ${typeOf(w.item)}:`,
         `        """Wait for ${w.what}, and resolve with the value as it is then."""`,
         "",
         `        async def settled() -> ${typeOf(w.item)} | None:`,

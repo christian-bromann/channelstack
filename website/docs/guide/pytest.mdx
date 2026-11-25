@@ -54,8 +54,8 @@ The plugin adds three settings of its own:
 | Setting                                                           | Default | What it does                                                                                                               |
 | ----------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `channelstack_mode`, or `--channelstack-mode` on the command line | `auto`  | `attach` fails when no server is running, `start` starts a private one, `auto` attaches if it can and starts one otherwise |
-| `channelstack_timeout`                                            | `10s`   | How long an `expect(...)` check waits                                                                                      |
-| `channelstack_quiet_for`                                          | `750ms` | How long the agent must be quiet before a negative or exact-count check reads                                              |
+| `channelstack_timeout`                                            | `10s`   | How long an `expect(...)` check, and every SDK wait, waits                                                                 |
+| `channelstack_quiet_for`                                          | `750ms` | How long the agent must be quiet before a negative or exact-count check, or a `latest_…` read, reads                       |
 
 The command-line flag wins over the ini file. The client finds the server the way every channelstack client does: `CHANNELSTACK_URL` with `CHANNELSTACK_TOKEN`, or else the `server.json` in `~/.channelstack` (or `CHANNELSTACK_HOME`). In `start` mode it runs `CHANNELSTACK_SERVER_BIN`, or `channelstack` from your `PATH`. A server started that way has no agent connected to it, so `attach` is the usual choice, and in CI it fails at once when the server isn't up.
 
@@ -201,7 +201,7 @@ await expect(msg.thread).to_have_reply_from("my-agent", timeout="30s")
 await expect(msg.thread).to_have_replies_from("my-agent", count=1, quiet_for="2s")
 ```
 
-A duration is a string (`"750ms"`, `"3s"`, `"1m"`) or milliseconds as a number. Without them, a check uses `channelstack_timeout` and `channelstack_quiet_for` from the ini file. The SDK's own waiting methods (`wait_for_reply`, `latest_reply`, `settled`) take `timeout=` too, and default to 10 seconds whatever the ini file says.
+A duration is a string (`"750ms"`, `"3s"`, `"1m"`) or milliseconds as a number. Without them, a check uses `channelstack_timeout` and `channelstack_quiet_for` from the ini file. The SDK's own waiting methods (`wait_for_reply`, `latest_reply`, `settled`, …) take `timeout=` too, and default to the same ini settings.
 
 ## Shared people with fixtures
 

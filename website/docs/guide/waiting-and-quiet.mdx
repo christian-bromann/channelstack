@@ -115,7 +115,7 @@ Durations are milliseconds as a number, or a string: `"250ms"`, `"3s"`, `"1m"`. 
 
 Raise `quietFor` when your agent pauses between steps longer than 750 ms without anything open, for example a model call between two messages that it makes after acknowledging the event. A pause like that looks like quiet, and a negative check can end inside it. GitHub agents that comment, then label, then comment again often need `quietFor: "2s"`. Raise `timeout` for slow work, and for live runs, where real platforms take seconds to deliver.
 
-Keep the test runner's own timeout above the longest wait in the test. Vitest's default test timeout is 5 seconds, below channelstack's 10-second default; set `testTimeout` in your Vitest config to 30 seconds or so.
+The test runner's own timeout has to stay above the longest wait in the test. The Vitest plugin sees to that: a project that sets no `testTimeout` gets 30 seconds, or three times `timeout` if that's longer, instead of Vitest's 5. A project's own `testTimeout` always wins, so if you set one, keep it above your waits.
 
 ## `waitFor…` and `latest…`
 

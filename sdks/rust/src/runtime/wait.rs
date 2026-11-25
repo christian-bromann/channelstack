@@ -8,6 +8,12 @@ use serde_json::Value;
 use super::duration::parse_duration;
 use super::error::{Error, Result};
 
+/// How long a wait gives up after when it isn't given a `timeout`: the one place this default lives.
+/// No test framework integration sets it in Rust, so it isn't settable here.
+pub const DEFAULT_TIMEOUT: &str = "10s";
+/// How long the agent must be quiet when a wait isn't given a `quietFor`.
+pub const DEFAULT_QUIET_FOR: &str = "750ms";
+
 /// Read until `read` answers `Some`, or the timeout passes.
 pub async fn wait_for<T, F, Fut>(what: &str, timeout: &Value, mut read: F) -> Result<T>
 where
@@ -42,20 +48,24 @@ where
     Fut: Future<Output = Result<Value>>,
 {
     let refusal = std::sync::Mutex::new(None::<Error>);
-    let accepted = wait_for("the call to be accepted", &Value::from("10s"), || {
-        let attempt = call();
-        let refusal = &refusal;
-        async move {
-            match attempt.await {
-                Ok(value) => Ok(Some(value)),
-                Err(error) if error.code().is_some_and(|code| codes.contains(&code)) => {
-                    *refusal.lock().expect("the last refusal") = Some(error);
-                    Ok(None)
+    let accepted = wait_for(
+        "the call to be accepted",
+        &Value::from(DEFAULT_TIMEOUT),
+        || {
+            let attempt = call();
+            let refusal = &refusal;
+            async move {
+                match attempt.await {
+                    Ok(value) => Ok(Some(value)),
+                    Err(error) if error.code().is_some_and(|code| codes.contains(&code)) => {
+                        *refusal.lock().expect("the last refusal") = Some(error);
+                        Ok(None)
+                    }
+                    Err(error) => Err(error),
                 }
-                Err(error) => Err(error),
             }
-        }
-    })
+        },
+    )
     .await;
     match accepted {
         Err(Error::Timeout { .. }) => match refusal.lock().expect("the last refusal").take() {
