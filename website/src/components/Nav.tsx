@@ -1,5 +1,6 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
+import { areaOfPath } from "../lib/docs";
 import { SITE } from "../lib/site";
 import { Moon, Sun } from "./Icons";
 import { Mark } from "./Mark";
@@ -18,6 +19,7 @@ function toggleTheme() {
 }
 
 export function Nav() {
+  const area = areaOfPath(useLocation().pathname);
   return (
     <header className="nav">
       <a className="skip" href="#main">
@@ -31,13 +33,17 @@ export function Nav() {
         <nav aria-label="Main">
           <ul className="nav-links">
             <li>
-              <NavLink to="/docs">Docs</NavLink>
+              <Link to="/docs" aria-current={area === "guide" ? "page" : undefined}>
+                Guide
+              </Link>
+            </li>
+            <li>
+              <Link to="/docs/reference" aria-current={area === "reference" ? "page" : undefined}>
+                Reference
+              </Link>
             </li>
             <li className="optional">
               <a href="/#examples">Examples</a>
-            </li>
-            <li className="optional">
-              <a href="/#quick-start">Quick start</a>
             </li>
           </ul>
         </nav>

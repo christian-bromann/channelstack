@@ -1,6 +1,6 @@
 ---
 title: "Matchers"
-order: 8
+order: 3
 description: "Every channelstack matcher: its subject, arguments and options, how it waits, what its failure message shows, and its pytest name."
 ---
 

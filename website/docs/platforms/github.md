@@ -8,6 +8,9 @@ description: "Test a GitHub App against channelstack's fake GitHub, from connect
 
 This page shows how to test a GitHub App: how to point it at the fake, which people and repositories a test creates, what those people do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
 
+> [!TIP]
+> Every method, option and wait of the GitHub fake, with each call in TypeScript, Python and Rust, is in the [GitHub API reference](/docs/reference/api/github).
+
 ```ts title="triage.test.ts"
 import { test, expect } from "vitest";
 
@@ -190,7 +193,7 @@ For the App's token, a repository it isn't installed on doesn't exist: every cal
 
 ## What people do
 
-Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery, or to `undefined` when the App isn't installed. A pull request is also an issue, so `{ issue }` accepts either. The [test API reference](/docs/reference/api/github) lists every method and option.
+Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery, or to `undefined` when the App isn't installed. A pull request is also an issue, so `{ issue }` accepts either. The [API reference](/docs/reference/api/github) lists every method and option.
 
 ### Issues and comments
 
@@ -367,4 +370,4 @@ await expect.poll(async () => (await github.deliveries({ type: "issue_comment", 
 }).toBeGreaterThan(0);
 ```
 
-Built live today: repositories, collaborators, issues, comments, labels, assignees, reactions, reads and the delivery log. Pushes, pull requests, reviews and check runs aren't live yet; live runs skip those steps and say why. `resend({ badSignature })` stays fake only. See [Live mode](/docs/guide/live-mode) and the [test API reference](/docs/reference/api/github).
+Built live today: repositories, collaborators, issues, comments, labels, assignees, reactions, reads and the delivery log. Pushes, pull requests, reviews and check runs aren't live yet; live runs skip those steps and say why. `resend({ badSignature })` stays fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/github).

@@ -8,6 +8,9 @@ description: "Test a Linear agent against channelstack's fake Linear, from conne
 
 This page shows how to test an agent built on Linear's agent APIs: how to point it at the fake, which people, teams and issues a test creates, what those people do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
 
+> [!TIP]
+> Every method, option and wait of the Linear fake, with each call in TypeScript, Python and Rust, is in the [Linear API reference](/docs/reference/api/linear).
+
 ```ts title="delegation.test.ts"
 import { test, expect } from "vitest";
 
@@ -175,7 +178,7 @@ Nothing to do. On Linear an app is installed workspace-wide, so the fake's app s
 
 ## What people do
 
-Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery. The [test API reference](/docs/reference/api/linear) lists every method and option.
+Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery. The [API reference](/docs/reference/api/linear) lists every method and option.
 
 ### Delegation and agent sessions
 
@@ -319,4 +322,4 @@ The [errors reference](/docs/reference/api/errors) lists every code.
 
 The same tests can run in a real Linear workspace. Set the OAuth app's token (`CHANNELSTACK_LINEAR_APP_TOKEN`), allowlist the workspace with `CHANNELSTACK_LIVE_LINEAR_WORKSPACES`, and give each person their personal API key (`CHANNELSTACK_LINEAR_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`). A person creates each session's teams, which are deleted when the session closes.
 
-Live, Linear delivers to your agent itself, so the agent's webhook must reach a running agent: Linear opens no session otherwise, and the live backend says so (`no_agent_session`) after 15 seconds. Delegation, comments, prompts, answers and every read work with the personal keys. Stop has no API, so it needs the browser actor, which isn't built for Linear yet. Redelivery, `resend` and `session.delivery` are fake only. See [Live mode](/docs/guide/live-mode) and the [test API reference](/docs/reference/api/linear).
+Live, Linear delivers to your agent itself, so the agent's webhook must reach a running agent: Linear opens no session otherwise, and the live backend says so (`no_agent_session`) after 15 seconds. Delegation, comments, prompts, answers and every read work with the personal keys. Stop has no API, so it needs the browser actor, which isn't built for Linear yet. Redelivery, `resend` and `session.delivery` are fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/linear).

@@ -8,6 +8,9 @@ description: "Test a Slack agent against channelstack's fake Slack, from connect
 
 This page shows how to test an agent built on Slack's APIs: how to point it at the fake, which people and channels a test creates, what those people can do, and what you can check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
 
+> [!TIP]
+> Every method, option and wait of the Slack fake, with each call in TypeScript, Python and Rust, is in the [Slack API reference](/docs/reference/api/slack).
+
 ```ts title="agent.test.ts"
 import { test, expect } from "vitest";
 
@@ -171,7 +174,7 @@ A DM needs no channel: `ana.say("hi", { to: slack.app })` opens one, and `ana.op
 
 ## What people do
 
-Every action is a method on the person who takes it. The content comes first, and where it happens is an option. Each one resolves to what it created: a message, a delivery or a modal. The [test API reference](/docs/reference/api/slack) lists every method and option.
+Every action is a method on the person who takes it. The content comes first, and where it happens is an option. Each one resolves to what it created: a message, a delivery or a modal. The [API reference](/docs/reference/api/slack) lists every method and option.
 
 ### Messages, threads, reactions and edits
 
@@ -367,4 +370,4 @@ The same tests can run against a real Slack sandbox workspace. Set the app's cre
 
 Slack marks every message posted through its API as an app's, so a person's `say` and `reply` are typed in Slack's own client by the browser actor, and so is `click`. Save each person's browser session once with `channelstack login slack --user ana`, or pass `browser: { storageState }` to `createUser`. Edits, deletes, reactions, invites and every read go through the user token.
 
-Still fake only: `select`, `shortcut`, `runCommand`, `stop`, the agent split view, `uninstallApp`, fixed ids, faults and the delivery checks (`retry`, `resend`, `toBeAccepted`). Live runs skip those steps and say why. See [Live mode](/docs/guide/live-mode) and the [test API reference](/docs/reference/api/slack).
+Still fake only: `select`, `shortcut`, `runCommand`, `stop`, the agent split view, `uninstallApp`, fixed ids, faults and the delivery checks (`retry`, `resend`, `toBeAccepted`). Live runs skip those steps and say why. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/slack).

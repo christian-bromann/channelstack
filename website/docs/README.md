@@ -17,7 +17,9 @@ A page that starts teaching in the middle of a how-to links to the explanation i
 
 ### The sidebar
 
-The folder is the section and the frontmatter's `order` is the position in it.
+The docs have two areas, each with its own sidebar and its own link in the top navigation: the **Guide** (Introduction, Quickstarts, Guide and Platforms) and the **Reference**. A platform has a page in each, a guide and an API page, and they link to each other; neither sidebar lists a platform twice.
+
+The folder is the section and the frontmatter's `order` is the position in it. A page can name another section of its area in its frontmatter (`section: "Platform APIs"`, which the generated platform pages do).
 
 **Introduction** (`docs/`)
 

@@ -8,6 +8,9 @@ description: "Test a Notion integration against channelstack's fake Notion, from
 
 This page shows how to test an integration built on Notion's API: how to point it at the fake, which people, pages and databases a test creates, what those people do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
 
+> [!TIP]
+> Every method, option and wait of the Notion fake, with each call in TypeScript, Python and Rust, is in the [Notion API reference](/docs/reference/api/notion).
+
 ```ts title="comments.test.ts"
 import { test, expect } from "vitest";
 
@@ -172,7 +175,7 @@ await ana.connect(notion.app, { page: notes });
 
 ## What people do
 
-Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery. The [test API reference](/docs/reference/api/notion) lists every method and option.
+Every action is a method on the person who takes it, with the content first and the place as an option. An action that sends one webhook resolves to that delivery. The [API reference](/docs/reference/api/notion) lists every method and option.
 
 ### Comments and discussions
 
@@ -299,4 +302,4 @@ The [errors reference](/docs/reference/api/errors) lists every code.
 
 The same tests can run in a real Notion workspace. Set the integration's token (`CHANNELSTACK_NOTION_TOKEN`), allowlist the workspace with `CHANNELSTACK_LIVE_NOTION_WORKSPACES`, and give each person a personal access token (`CHANNELSTACK_NOTION_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`), which acts as them. Connect the integration by hand, once, to one page (`CHANNELSTACK_NOTION_PAGE`); each session's pages go in a page of their own under it, which goes to the trash when the session closes. Pages the integration must not see go under `CHANNELSTACK_NOTION_UNSEEN_PAGE`.
 
-Live, Notion delivers to your integration itself. Pages, comments, replies, edits, mentions and every read on pages work with the personal tokens. Not live yet: databases and rows (`createDatabase`, `addRow`, `setProperty`, `toHavePropertyValue`), resolving and reopening discussions, and `connect` / `disconnect`, which have no API and need the browser actor, not built for Notion yet. Redelivery, `resend`, `sendVerification` and `setContentUpdateDelay` are fake only. See [Live mode](/docs/guide/live-mode) and the [test API reference](/docs/reference/api/notion).
+Live, Notion delivers to your integration itself. Pages, comments, replies, edits, mentions and every read on pages work with the personal tokens. Not live yet: databases and rows (`createDatabase`, `addRow`, `setProperty`, `toHavePropertyValue`), resolving and reopening discussions, and `connect` / `disconnect`, which have no API and need the browser actor, not built for Notion yet. Redelivery, `resend`, `sendVerification` and `setContentUpdateDelay` are fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/notion).

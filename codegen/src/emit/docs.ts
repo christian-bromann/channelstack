@@ -14,15 +14,19 @@ import { typeScriptTypes } from "./typescript.ts";
 const DIR = "website/docs/reference/api";
 const ROUTE = "/docs/reference/api";
 
-/** The pages, in sidebar order after the Vitest plugin's page. */
+/**
+ * The pages, in sidebar order. The client's and the errors page sit in the Reference section; the
+ * platforms' in "Platform APIs", each linked to its guide under /docs/platforms.
+ */
 const PAGES = [
   { slug: "client", title: "Client and sessions", prefix: undefined, fixture: undefined, order: 2 },
-  { slug: "slack", title: "Slack API", prefix: "Slack", fixture: "slack", order: 3 },
-  { slug: "github", title: "GitHub API", prefix: "GitHub", fixture: "github", order: 4 },
-  { slug: "linear", title: "Linear API", prefix: "Linear", fixture: "linear", order: 5 },
-  { slug: "notion", title: "Notion API", prefix: "Notion", fixture: "notion", order: 6 },
+  { slug: "slack", title: "Slack API", prefix: "Slack", fixture: "slack", order: 1 },
+  { slug: "github", title: "GitHub API", prefix: "GitHub", fixture: "github", order: 2 },
+  { slug: "linear", title: "Linear API", prefix: "Linear", fixture: "linear", order: 3 },
+  { slug: "notion", title: "Notion API", prefix: "Notion", fixture: "notion", order: 4 },
 ] as const;
-const ERRORS_ORDER = 7;
+const ERRORS_ORDER = 4;
+const PLATFORM_SECTION = "Platform APIs";
 
 type Page = (typeof PAGES)[number];
 
@@ -425,7 +429,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
     const intro =
       page.prefix === undefined
         ? "The client you connect with, and the session each test runs in. Every handle on the platform pages is reached from here."
-        : `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the people and objects a test creates on it, and what they read and wait for.`;
+        : `Every handle of the ${page.prefix} fake: the \`${page.fixture}\` fixture, the people and objects a test creates on it, and what they read and wait for. How to test a ${page.prefix} agent, step by step, is in the [${page.prefix} guide](/docs/platforms/${page.slug}).`;
     const body = [
       ...resources.flatMap((resource) => {
         anchor(page, `resource:${resource.name}`, resource.name);
@@ -447,6 +451,7 @@ export function emitDocs(ir: Ir): Map<string, string> {
         "---",
         `title: ${JSON.stringify(page.title)}`,
         `order: ${page.order}`,
+        ...(page.prefix === undefined ? [] : [`section: ${JSON.stringify(PLATFORM_SECTION)}`]),
         `description: ${JSON.stringify(page.prefix === undefined ? "The channelstack client and sessions: every method, in every SDK's language." : `Every handle, method and wait of the ${page.prefix} fake, in every SDK's language.`)}`,
         "---",
         "",
