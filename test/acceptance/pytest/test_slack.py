@@ -5,9 +5,21 @@ fixture, and `expect(...)` checks what a person would see, with the matchers' se
 """
 
 import re
+from pathlib import Path
 
 from channelstack import SlackFixture
 from pytest_channelstack import expect
+
+# The Vitest examples' snapshots: the port holds the same transcript to the same snapshot.
+SNAPSHOTS = Path(__file__).parents[3] / "api" / "examples" / "__snapshots__" / "slack.test.ts.snap"
+
+
+def vitest_snapshot(name: str) -> str:
+    """A string snapshot Vitest wrote for the test with this full name ("describe > test")."""
+    found = re.search(r"exports\[`" + re.escape(name) + r' 1`\] = `\n"(.*?)"\n`;', SNAPSHOTS.read_text(), re.S)
+    assert found, f"no Vitest snapshot for {name!r} in {SNAPSHOTS}"
+    return found.group(1)
+
 
 # Mentions and threads
 
@@ -166,3 +178,14 @@ async def test_api_calls_and_errors(slack: SlackFixture) -> None:
     assert post.response_status == 200
     await expect(slack).not_to_have_received_call(re.compile(".*"), error="not_in_channel")
     assert await slack.calls(error=True) == []
+
+
+async def test_a_transcript_snapshot_reads_like_the_conversation(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    msg = await ana.say("what's 2 + 2?", to=slack.app)
+    await msg.thread.latest_reply(from_="my-agent")
+
+    transcript = await msg.thread.transcript()
+    assert str(transcript) == vitest_snapshot(
+        "inspecting what the agent did > a transcript snapshot reads like the conversation"
+    )

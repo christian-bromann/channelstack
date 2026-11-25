@@ -34,6 +34,7 @@ Each pinned to an exact version. The Rust toolchain is pinned in `rust-toolchain
 | `@modelcontextprotocol/sdk` 1.32.2 (server, and the root for the test's client) | The protocol's own TypeScript SDK, for the stdio server and the test's client | MIT |
 | Rust SDK: `reqwest` =0.13.5 (`json`, `query`, `rustls`), `tokio` =1.54.1, `serde_json` =1.0.154, `thiserror` =2.0.21, `percent-encoding` =2.3.2 | HTTP with TLS (portless serves HTTPS), async, JSON, typed errors and path escaping: what Rust clients use | MIT / Apache-2.0 |
 | Rust smoke runner: `yaml-rust2` =0.13.0, `regex` =1.13.1 | The smoke scenarios are YAML, and their `matches` checks regular expressions | MIT / Apache-2.0 |
+| Rust SDK, after review: `regex` =1.13.1 (already in the workspace), `tempfile` =3.27.0 | Patterns are regular expressions with flags, as in the other SDKs; the launcher's private directory is created 0700 under a name nobody can guess, like `mkdtemp` | MIT / Apache-2.0 |
 | CI: `Swatinem/rust-cache` v2.9.3 (by commit) | Caches the Rust builds between runs | MIT |
 | pytest-channelstack: `pytest` ==8.4.2, `pytest-asyncio` ==1.4.1 | The framework it plugs into, and async tests and fixtures on one event loop (1.5.0 is under two weeks old) | MIT / Apache-2.0 |
 

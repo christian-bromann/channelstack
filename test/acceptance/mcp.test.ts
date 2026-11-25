@@ -72,13 +72,23 @@ test("an MCP client posts as a person and reads the agent's reply", async () => 
         expect(deliveries).toMatch(/^Ev\w+ {2}event_callback app_mention {2}acknowledged {2}\(attempts: 200\)$/m);
         const again = await client.callTool({ name: "redeliver", arguments: { channel: "slack", delivery } });
         expect(text(again)).toBe(`Retried ${delivery}\n`);
+        // The bot got it a second time: the delivery has a second attempt.
+        await waitFor("the delivery's second attempt", async () => {
+          const listed = text(await client.callTool({ name: "list_deliveries", arguments: { channel: "slack" } }));
+          return (
+            listed.includes(`${delivery}  event_callback app_mention  acknowledged  (attempts: 200, 200)`) || undefined
+          );
+        });
 
         // A mistake is the tool's error, in a sentence, and the token never shows.
         const mistake = await client.callTool({ name: "redeliver", arguments: { channel: "slack", delivery: "nope" } });
         expect(mistake.isError).toBe(true);
+        // A mistake keeps the attachment: `tail` goes on from where it was, with the retry and nothing before it.
+        const next = text(await client.callTool({ name: "tail", arguments: {} }));
+        expect(next).toMatch(/^\S+ → slack app_mention \(attempt 2\) {2}200\n$/);
         const { token } = JSON.parse(readFileSync(join(home, "server.json"), "utf8")) as { token: string };
         expect(token.length).toBeGreaterThan(16);
-        for (const output of [said, shown, tail, deliveries, mistake]) {
+        for (const output of [said, shown, tail, deliveries, mistake, next]) {
           expect(typeof output === "string" ? output : text(output)).not.toContain(token);
         }
       } finally {

@@ -109,12 +109,12 @@ fn server_binary() -> Result<String> {
 
 /// Start a private server on a free loopback port. Its token goes to a private file, never to the shared one.
 async fn start_server() -> Result<ServerConnection> {
-    let directory = std::env::temp_dir().join(format!(
-        "channelstack-{}-{}",
-        std::process::id(),
-        rand_suffix()
-    ));
-    std::fs::create_dir_all(&directory).map_err(|error| Error::Launch(error.to_string()))?;
+    // A new directory only this user can enter, under a name nobody can guess or create first.
+    let directory = tempfile::Builder::new()
+        .prefix("channelstack-")
+        .tempdir()
+        .map_err(|error| Error::Launch(format!("Couldn't create a private directory: {error}")))?
+        .keep();
     let server_file = directory.join("server.json");
     let mut child = Command::new(server_binary()?)
         .args(["start", "--no-portless", "--port", "0", "--server-file"])
@@ -151,15 +151,6 @@ async fn start_server() -> Result<ServerConnection> {
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
-}
-
-/// A name for a private directory that two clients started at once don't share.
-fn rand_suffix() -> String {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|time| time.subsec_nanos())
-        .unwrap_or(0);
-    format!("{nanos:x}")
 }
 
 pub async fn launch(

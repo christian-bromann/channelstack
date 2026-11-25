@@ -4,7 +4,7 @@
         ana = await slack.create_user(name="Ana")
         channel = await slack.create_channel(participants=[ana, slack.app])
         msg = await ana.say("@my-agent hi", channel=channel)
-        await assert_reply_from(msg.thread, "my-agent")
+        await expect(msg.thread).to_have_reply_from("my-agent")
 
 Tests and fixtures share one event loop for the whole run, so the client (and a server it
 started) lives as long as the run. Every test gets its own session, closed after it, which removes

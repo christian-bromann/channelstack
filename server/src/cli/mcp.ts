@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { attach, type Attached, type AttachFlags, CliError } from "./attach.ts";
+import { attach, type Attached, type AttachFlags, CliError, ServerGoneError } from "./attach.ts";
 import { CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
 import { runSlack } from "./slack.ts";
 import { readEvents, runShow } from "./watch.ts";
@@ -37,8 +37,9 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
       return { content: [{ type: "text", text: await run(server()) }] };
     } catch (error) {
       if (!(error instanceof CliError)) throw error;
-      // A server that wasn't reachable may be up next time: attach again then.
-      attached = undefined;
+      // A server that is gone (or restarted) may be back next time: attach again then. A mistake
+      // in the call keeps the attachment, and with it where `tail` got to.
+      if (error instanceof ServerGoneError) attached = undefined;
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
   };
@@ -117,8 +118,9 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
     ({ channel, delivery }) => tool((attached) => runRedeliver(attached, channel, delivery)),
   );
 
-  // `tail` remembers where it got to: each call returns what happened since the last one.
-  let cursor: string | undefined;
+  // `tail` remembers where it got to on each attachment: each call returns what happened since the
+  // last one. A new attachment (another server, or the same one restarted) starts from its beginning.
+  const cursors = new WeakMap<Attached, string>();
   mcp.registerTool(
     "tail",
     {
@@ -128,8 +130,8 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
     },
     () =>
       tool(async (attached) => {
-        const read = await readEvents(attached, cursor);
-        cursor = read.cursor;
+        const read = await readEvents(attached, cursors.get(attached));
+        cursors.set(attached, read.cursor);
         return read.text || "Nothing new.\n";
       }),
   );

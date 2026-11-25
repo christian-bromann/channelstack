@@ -11,7 +11,7 @@ const KEYWORDS = new Set(
 );
 const NOT_RAW = new Set(["self", "Self", "crate", "super"]);
 /** Names a handle already has from its traits or the generator: a field named so gets a `_`. */
-const TAKEN = new Set(["data", "ctx", "wrap", "wrap_opt", "wrap_vec", "from_wire", "close", "seen"]);
+const TAKEN = new Set(["data", "ctx", "wrap", "wrap_opt", "wrap_vec", "from_wire", "from_wire_in", "close", "seen"]);
 
 /** A Rust identifier for an IR name: snake_case, and never a keyword. */
 function ident(name: string): string {
@@ -201,13 +201,13 @@ export function emitRust(ir: Ir): Map<string, string> {
           ? [
               doc,
               `    pub fn ${name}(&self) -> Option<${type.name}> {`,
-              `        self.data.get(${key}).filter(|v| !v.is_null()).map(|v| ${type.name}::from_wire(&self.ctx, v.clone()))`,
+              `        self.data.get(${key}).filter(|v| !v.is_null()).map(|v| ${type.name}::from_wire_in(&self.ctx, v.clone(), self.seen.field(${key})))`,
               "    }",
             ]
           : [
               doc,
               `    pub fn ${name}(&self) -> ${type.name} {`,
-              `        ${type.name}::from_wire(&self.ctx, self.data.get(${key}).cloned().unwrap_or(Value::Null))`,
+              `        ${type.name}::from_wire_in(&self.ctx, self.data.get(${key}).cloned().unwrap_or(Value::Null), self.seen.field(${key}))`,
               "    }",
             ];
       case "array":
@@ -215,7 +215,7 @@ export function emitRust(ir: Ir): Map<string, string> {
           return [
             doc,
             `    pub fn ${name}(&self) -> Vec<${type.items.name}> {`,
-            `        self.data.get(${key}).and_then(Value::as_array).map(|items| items.iter().map(|v| ${type.items.name}::from_wire(&self.ctx, v.clone())).collect()).unwrap_or_default()`,
+            `        self.data.get(${key}).and_then(Value::as_array).map(|items| items.iter().enumerate().map(|(at, v)| ${type.items.name}::from_wire_in(&self.ctx, v.clone(), self.seen.field(&format!("{}.{at}", ${key})))).collect()).unwrap_or_default()`,
             "    }",
           ];
         }
@@ -326,7 +326,7 @@ export function emitRust(ir: Ir): Map<string, string> {
         ? `Some(&|item: &Value| item.get(${str(w.turn.field)}).and_then(Value::as_str) == Some(${str(w.turn.value)}))`
         : "None";
       body = [
-        `        let item = wait_for_next(&seen, ${key}, || ${readCall}, |item: &Value| ${conditions.join(" && ") || "{ let _ = item; true }"}, ${turn}, ${what}, &timeout).await?;`,
+        `        let item = wait_for_next(&seen.positions, ${key}, || ${readCall}, |item: &Value| ${conditions.join(" && ") || "{ let _ = item; true }"}, ${turn}, ${what}, &timeout).await?;`,
         `        ${wrap}(&ctx, item)`,
       ];
     } else if (w.mode === "latest") {
@@ -426,10 +426,15 @@ export function emitRust(ir: Ir): Map<string, string> {
       `impl ${resource.name} {`,
       "    #[doc(hidden)]",
       "    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {",
+      "        Self::from_wire_in(ctx, data, Seen::default())",
+      "    }",
+      "    /// A handle read from a field of another: it keeps the wait state that field's handle had.",
+      "    #[doc(hidden)]",
+      "    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {",
       sessionId
         ? `        let ctx = ctx.in_session(data.get(${str(sessionId)}).and_then(Value::as_str).map(str::to_owned));`
         : "        let ctx = ctx.clone();",
-      "        Self { ctx, data, seen: Seen::default() }",
+      "        Self { ctx, data, seen }",
       "    }",
       "    #[doc(hidden)]",
       "    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {",
@@ -550,8 +555,8 @@ export function emitRust(ir: Ir): Map<string, string> {
     `pub const VERSION: &str = ${str(ir.version)};`,
     `const BASE_PATH: &str = ${str(ir.basePath)};`,
     "",
-    "/// How far each `wait_for_…` of a handle has looked, so the next one waits for something new.",
-    "type Seen = std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, usize>>>;",
+    "/// A handle's wait state, shared by its clones.",
+    "type Seen = std::sync::Arc<crate::runtime::wait::WaitState>;",
     "",
     "/// The protocol's error codes, as `Error::Api { code, .. }` carries them.",
     "pub mod codes {",

@@ -66,6 +66,27 @@ async fn the_typed_api() -> channelstack::Result<()> {
         ),
     }
 
+    // A field's handle is the same handle every time: the second wait, through `thread()` again,
+    // waits for something new instead of returning the first reply again.
+    let dan = slack.create_user().name("Dan").await?;
+    carla.invite(&dan).channel(&channel).await?;
+    dan.reply("first").thread(&asked).await?;
+    dan.reply("second").thread(&asked).await?;
+    let first = asked.thread().wait_for_reply().from(&dan).await?;
+    let second = asked.thread().wait_for_reply().from(&dan).await?;
+    assert_eq!(
+        (first.text(), second.text()),
+        ("first".into(), "second".into())
+    );
+    // The latest reply is read once the session is quiet, after a first match.
+    let latest = asked
+        .thread()
+        .latest_reply()
+        .from("Dan")
+        .quiet_for("50ms")
+        .await?;
+    assert_eq!(latest.text(), "second");
+
     session.close().await?;
     client.close().await;
     Ok(())

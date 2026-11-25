@@ -29,7 +29,7 @@ says what the thread had and what the agent left open.
 
 - docs/devx.md section 5 named a placeholder helper (`assert_shows_once`); it now shows `expect(...)`.
 - phase 7 ports the conversation matchers (replies, channel messages, streaming, status, reactions, the agent's
-  calls). The rest of the matcher set follows the same pattern later (docs/phases.md, "After 1.0").
+  calls). The rest of the matcher set follows the same pattern later (docs/phases.md, "After 0.1").
 
 ## Alternatives considered
 

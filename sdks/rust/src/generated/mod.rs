@@ -26,8 +26,8 @@ use crate::runtime::wait::{
 pub const VERSION: &str = "0.0.0";
 const BASE_PATH: &str = "/_channelstack";
 
-/// How far each `wait_for_…` of a handle has looked, so the next one waits for something new.
-type Seen = std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, usize>>>;
+/// A handle's wait state, shared by its clones.
+type Seen = std::sync::Arc<crate::runtime::wait::WaitState>;
 
 /// The protocol's error codes, as `Error::Api { code, .. }` carries them.
 pub mod codes {
@@ -5963,12 +5963,13 @@ impl Handle for Channelstack {
 impl Channelstack {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6119,16 +6120,17 @@ impl Handle for Session {
 impl Session {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.in_session(
             data.get("sessionId")
                 .and_then(Value::as_str)
                 .map(str::to_owned),
         );
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6281,12 +6283,13 @@ impl Handle for EchoFixture {
 impl EchoFixture {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6310,9 +6313,10 @@ impl EchoFixture {
     }
     /// `app`.
     pub fn app(&self) -> EchoApp {
-        EchoApp::from_wire(
+        EchoApp::from_wire_in(
             &self.ctx,
             self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
         )
     }
     /// `apiUrl`.
@@ -6425,12 +6429,13 @@ impl Handle for EchoApp {
 impl EchoApp {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6495,12 +6500,13 @@ impl Handle for EchoUser {
 impl EchoUser {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6598,12 +6604,13 @@ impl Handle for EchoRoom {
 impl EchoRoom {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6709,12 +6716,13 @@ impl Handle for SlackFixture {
 impl SlackFixture {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -6738,9 +6746,10 @@ impl SlackFixture {
     }
     /// `app`.
     pub fn app(&self) -> SlackApp {
-        SlackApp::from_wire(
+        SlackApp::from_wire_in(
             &self.ctx,
             self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
         )
     }
     /// `apiUrl`.
@@ -7084,7 +7093,7 @@ impl SlackFixtureWaitForCall {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
             || run_slack_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -7128,12 +7137,13 @@ impl Handle for SlackApp {
 impl SlackApp {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -7237,12 +7247,13 @@ impl Handle for SlackUser {
 impl SlackUser {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -7951,7 +7962,7 @@ impl SlackUserWaitForModal {
             .unwrap_or_else(|| Value::from("10s"));
         let text = options.get("title").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForModal",
             || run_slack_user_modals(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -7997,12 +8008,13 @@ impl Handle for SlackConversation {
 impl SlackConversation {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -8161,7 +8173,7 @@ impl SlackConversationWaitForMessage {
             .unwrap_or_else(|| Value::from("10s"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForMessage",
             || run_slack_conversation_messages(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
@@ -8210,12 +8222,13 @@ impl Handle for SlackMessage {
 impl SlackMessage {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -8253,12 +8266,13 @@ impl SlackMessage {
     }
     /// `conversation`.
     pub fn conversation(&self) -> SlackConversation {
-        SlackConversation::from_wire(
+        SlackConversation::from_wire_in(
             &self.ctx,
             self.data
                 .get("conversation")
                 .cloned()
                 .unwrap_or(Value::Null),
+            self.seen.field("conversation"),
         )
     }
     /// `author`.
@@ -8301,13 +8315,14 @@ impl SlackMessage {
         self.data
             .get("visibleTo")
             .filter(|v| !v.is_null())
-            .map(|v| SlackUser::from_wire(&self.ctx, v.clone()))
+            .map(|v| SlackUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
     }
     /// `thread`.
     pub fn thread(&self) -> SlackThread {
-        SlackThread::from_wire(
+        SlackThread::from_wire_in(
             &self.ctx,
             self.data.get("thread").cloned().unwrap_or(Value::Null),
+            self.seen.field("thread"),
         )
     }
     /// `delivery`.
@@ -8315,14 +8330,14 @@ impl SlackMessage {
         self.data
             .get("delivery")
             .filter(|v| !v.is_null())
-            .map(|v| SlackDelivery::from_wire(&self.ctx, v.clone()))
+            .map(|v| SlackDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery")))
     }
     /// `stream`.
     pub fn stream(&self) -> Option<SlackStream> {
         self.data
             .get("stream")
             .filter(|v| !v.is_null())
-            .map(|v| SlackStream::from_wire(&self.ctx, v.clone()))
+            .map(|v| SlackStream::from_wire_in(&self.ctx, v.clone(), self.seen.field("stream")))
     }
 
     /// Re-read a message: its latest text, edits and deliveries. Experimental.
@@ -8412,12 +8427,13 @@ impl Handle for SlackThread {
 impl SlackThread {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -8455,12 +8471,13 @@ impl SlackThread {
     }
     /// `conversation`.
     pub fn conversation(&self) -> SlackConversation {
-        SlackConversation::from_wire(
+        SlackConversation::from_wire_in(
             &self.ctx,
             self.data
                 .get("conversation")
                 .cloned()
                 .unwrap_or(Value::Null),
+            self.seen.field("conversation"),
         )
     }
 
@@ -8590,7 +8607,7 @@ impl SlackThreadWaitForReply {
             .unwrap_or_else(|| Value::from("10s"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForReply",
             || run_slack_thread_replies(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
@@ -8715,12 +8732,13 @@ impl Handle for SlackDelivery {
 impl SlackDelivery {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -8965,12 +8983,13 @@ impl Handle for SlackStream {
 impl SlackStream {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -9128,12 +9147,13 @@ impl Handle for SlackModal {
 impl SlackModal {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -9164,9 +9184,10 @@ impl SlackModal {
     }
     /// `user`.
     pub fn user(&self) -> SlackUser {
-        SlackUser::from_wire(
+        SlackUser::from_wire_in(
             &self.ctx,
             self.data.get("user").cloned().unwrap_or(Value::Null),
+            self.seen.field("user"),
         )
     }
     /// `title`.
@@ -9246,12 +9267,13 @@ impl Handle for SlackFault {
 impl SlackFault {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -9307,12 +9329,13 @@ impl Handle for GitHubFixture {
 impl GitHubFixture {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -9336,9 +9359,10 @@ impl GitHubFixture {
     }
     /// `app`.
     pub fn app(&self) -> GitHubApp {
-        GitHubApp::from_wire(
+        GitHubApp::from_wire_in(
             &self.ctx,
             self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
         )
     }
     /// `apiUrl`.
@@ -9631,7 +9655,7 @@ impl GitHubFixtureWaitForCall {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
             || run_git_hub_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -9675,12 +9699,13 @@ impl Handle for GitHubApp {
 impl GitHubApp {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -9795,12 +9820,13 @@ impl Handle for GitHubUser {
 impl GitHubUser {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -10700,12 +10726,13 @@ impl Handle for GitHubRepo {
 impl GitHubRepo {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -10901,12 +10928,13 @@ impl Handle for GitHubDelivery {
 impl GitHubDelivery {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11118,12 +11146,13 @@ impl Handle for GitHubIssue {
 impl GitHubIssue {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11158,9 +11187,10 @@ impl GitHubIssue {
     }
     /// `repo`.
     pub fn repo(&self) -> GitHubRepo {
-        GitHubRepo::from_wire(
+        GitHubRepo::from_wire_in(
             &self.ctx,
             self.data.get("repo").cloned().unwrap_or(Value::Null),
+            self.seen.field("repo"),
         )
     }
     /// `url`.
@@ -11318,7 +11348,7 @@ impl GitHubIssueWaitForComment {
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForComment",
             || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -11449,12 +11479,13 @@ impl Handle for GitHubCommit {
 impl GitHubCommit {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11559,12 +11590,13 @@ impl Handle for GitHubCheckRun {
 impl GitHubCheckRun {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11663,12 +11695,13 @@ impl Handle for GitHubComment {
 impl GitHubComment {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11703,9 +11736,10 @@ impl GitHubComment {
     }
     /// `issue`.
     pub fn issue(&self) -> GitHubIssue {
-        GitHubIssue::from_wire(
+        GitHubIssue::from_wire_in(
             &self.ctx,
             self.data.get("issue").cloned().unwrap_or(Value::Null),
+            self.seen.field("issue"),
         )
     }
     /// `author`.
@@ -11728,10 +11762,9 @@ impl GitHubComment {
     }
     /// `delivery`.
     pub fn delivery(&self) -> Option<GitHubDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| GitHubDelivery::from_wire(&self.ctx, v.clone()))
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            GitHubDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
     /// Read a conversation comment again. Experimental.
@@ -11777,12 +11810,13 @@ impl Handle for GitHubReviewComment {
 impl GitHubReviewComment {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11810,9 +11844,10 @@ impl GitHubReviewComment {
     }
     /// `pr`.
     pub fn pr(&self) -> GitHubPullRequest {
-        GitHubPullRequest::from_wire(
+        GitHubPullRequest::from_wire_in(
             &self.ctx,
             self.data.get("pr").cloned().unwrap_or(Value::Null),
+            self.seen.field("pr"),
         )
     }
     /// `author`.
@@ -11846,10 +11881,9 @@ impl GitHubReviewComment {
     }
     /// `delivery`.
     pub fn delivery(&self) -> Option<GitHubDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| GitHubDelivery::from_wire(&self.ctx, v.clone()))
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            GitHubDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
     /// The replies in this comment's thread, once the agent is quiet. Experimental.
@@ -11906,12 +11940,13 @@ impl Handle for LinearFixture {
 impl LinearFixture {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -11935,9 +11970,10 @@ impl LinearFixture {
     }
     /// `app`.
     pub fn app(&self) -> LinearApp {
-        LinearApp::from_wire(
+        LinearApp::from_wire_in(
             &self.ctx,
             self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
         )
     }
     /// `apiUrl`.
@@ -12182,7 +12218,7 @@ impl LinearFixtureWaitForCall {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
             || run_linear_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -12226,12 +12262,13 @@ impl Handle for LinearApp {
 impl LinearApp {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -12331,12 +12368,13 @@ impl Handle for LinearUser {
 impl LinearUser {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -12923,12 +12961,13 @@ impl Handle for LinearTeam {
 impl LinearTeam {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -13004,12 +13043,13 @@ impl Handle for LinearIssue {
 impl LinearIssue {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -13054,9 +13094,10 @@ impl LinearIssue {
     }
     /// `team`.
     pub fn team(&self) -> LinearTeam {
-        LinearTeam::from_wire(
+        LinearTeam::from_wire_in(
             &self.ctx,
             self.data.get("team").cloned().unwrap_or(Value::Null),
+            self.seen.field("team"),
         )
     }
     /// `creator`.
@@ -13240,7 +13281,7 @@ impl LinearIssueWaitForComment {
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForComment",
             || run_linear_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -13371,12 +13412,13 @@ impl Handle for LinearDelivery {
 impl LinearDelivery {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -13593,12 +13635,13 @@ impl Handle for LinearAgentSession {
 impl LinearAgentSession {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -13629,31 +13672,33 @@ impl LinearAgentSession {
     }
     /// `issue`.
     pub fn issue(&self) -> LinearIssue {
-        LinearIssue::from_wire(
+        LinearIssue::from_wire_in(
             &self.ctx,
             self.data.get("issue").cloned().unwrap_or(Value::Null),
+            self.seen.field("issue"),
         )
     }
     /// `app`.
     pub fn app(&self) -> LinearApp {
-        LinearApp::from_wire(
+        LinearApp::from_wire_in(
             &self.ctx,
             self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
         )
     }
     /// `startedBy`.
     pub fn started_by(&self) -> LinearUser {
-        LinearUser::from_wire(
+        LinearUser::from_wire_in(
             &self.ctx,
             self.data.get("startedBy").cloned().unwrap_or(Value::Null),
+            self.seen.field("startedBy"),
         )
     }
     /// `delivery`.
     pub fn delivery(&self) -> Option<LinearDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| LinearDelivery::from_wire(&self.ctx, v.clone()))
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            LinearDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
     /// The session's status. Experimental.
@@ -13831,7 +13876,7 @@ impl LinearAgentSessionWaitForActivity {
             .unwrap_or_else(|| Value::from("10s"));
         let text = options.get("type").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForActivity",
             || run_linear_agent_session_activities(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -13877,12 +13922,13 @@ impl Handle for LinearComment {
 impl LinearComment {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -13913,9 +13959,10 @@ impl LinearComment {
     }
     /// `issue`.
     pub fn issue(&self) -> LinearIssue {
-        LinearIssue::from_wire(
+        LinearIssue::from_wire_in(
             &self.ctx,
             self.data.get("issue").cloned().unwrap_or(Value::Null),
+            self.seen.field("issue"),
         )
     }
     /// `author`.
@@ -13945,17 +13992,15 @@ impl LinearComment {
     }
     /// `session`.
     pub fn session(&self) -> Option<LinearAgentSession> {
-        self.data
-            .get("session")
-            .filter(|v| !v.is_null())
-            .map(|v| LinearAgentSession::from_wire(&self.ctx, v.clone()))
+        self.data.get("session").filter(|v| !v.is_null()).map(|v| {
+            LinearAgentSession::from_wire_in(&self.ctx, v.clone(), self.seen.field("session"))
+        })
     }
     /// `delivery`.
     pub fn delivery(&self) -> Option<LinearDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| LinearDelivery::from_wire(&self.ctx, v.clone()))
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            LinearDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
     /// The replies in a comment's thread, once the agent is quiet. Experimental.
@@ -14001,12 +14046,13 @@ impl Handle for LinearAgentActivity {
 impl LinearAgentActivity {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -14037,9 +14083,10 @@ impl LinearAgentActivity {
     }
     /// `session`.
     pub fn session(&self) -> LinearAgentSession {
-        LinearAgentSession::from_wire(
+        LinearAgentSession::from_wire_in(
             &self.ctx,
             self.data.get("session").cloned().unwrap_or(Value::Null),
+            self.seen.field("session"),
         )
     }
     /// `type`.
@@ -14099,12 +14146,13 @@ impl Handle for NotionFixture {
 impl NotionFixture {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -14128,9 +14176,10 @@ impl NotionFixture {
     }
     /// `app`.
     pub fn app(&self) -> NotionIntegration {
-        NotionIntegration::from_wire(
+        NotionIntegration::from_wire_in(
             &self.ctx,
             self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
         )
     }
     /// `apiUrl`.
@@ -14442,7 +14491,7 @@ impl NotionFixtureWaitForCall {
             .cloned()
             .unwrap_or_else(|| Value::from("10s"));
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
             || run_notion_fixture_calls(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {
@@ -14486,12 +14535,13 @@ impl Handle for NotionIntegration {
 impl NotionIntegration {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -14584,12 +14634,13 @@ impl Handle for NotionUser {
 impl NotionUser {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15115,12 +15166,13 @@ impl Handle for NotionPage {
 impl NotionPage {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15269,12 +15321,13 @@ impl Handle for NotionDatabase {
 impl NotionDatabase {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15357,12 +15410,13 @@ impl Handle for NotionDelivery {
 impl NotionDelivery {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15565,12 +15619,13 @@ impl Handle for NotionComment {
 impl NotionComment {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15601,9 +15656,10 @@ impl NotionComment {
     }
     /// `discussion`.
     pub fn discussion(&self) -> NotionDiscussion {
-        NotionDiscussion::from_wire(
+        NotionDiscussion::from_wire_in(
             &self.ctx,
             self.data.get("discussion").cloned().unwrap_or(Value::Null),
+            self.seen.field("discussion"),
         )
     }
     /// `author`.
@@ -15626,10 +15682,9 @@ impl NotionComment {
     }
     /// `delivery`.
     pub fn delivery(&self) -> Option<NotionDelivery> {
-        self.data
-            .get("delivery")
-            .filter(|v| !v.is_null())
-            .map(|v| NotionDelivery::from_wire(&self.ctx, v.clone()))
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            NotionDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 }
 
@@ -15653,12 +15708,13 @@ impl Handle for NotionDiscussion {
 impl NotionDiscussion {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15689,9 +15745,10 @@ impl NotionDiscussion {
     }
     /// `page`.
     pub fn page(&self) -> NotionPage {
-        NotionPage::from_wire(
+        NotionPage::from_wire_in(
             &self.ctx,
             self.data.get("page").cloned().unwrap_or(Value::Null),
+            self.seen.field("page"),
         )
     }
     /// `anchor`.
@@ -15794,7 +15851,7 @@ impl NotionDiscussionWaitForComment {
             .unwrap_or_else(|| Value::from("10s"));
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForComment",
             || run_notion_discussion_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
@@ -15919,12 +15976,13 @@ impl Handle for GitHubPullRequest {
 impl GitHubPullRequest {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
         let ctx = ctx.clone();
-        Self {
-            ctx,
-            data,
-            seen: Seen::default(),
-        }
+        Self { ctx, data, seen }
     }
     #[doc(hidden)]
     pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
@@ -15963,9 +16021,10 @@ impl GitHubPullRequest {
     }
     /// `repo`.
     pub fn repo(&self) -> GitHubRepo {
-        GitHubRepo::from_wire(
+        GitHubRepo::from_wire_in(
             &self.ctx,
             self.data.get("repo").cloned().unwrap_or(Value::Null),
+            self.seen.field("repo"),
         )
     }
     /// `url`.
@@ -16192,7 +16251,7 @@ impl GitHubPullRequestWaitForComment {
         let from = options.get("from").cloned().unwrap_or(Value::Null);
         let text = options.get("body").cloned().unwrap_or(Value::Null);
         let item = wait_for_next(
-            &seen,
+            &seen.positions,
             "waitForComment",
             || run_git_hub_issue_comments(&ctx, &me, vec![], filters.clone()),
             |item: &Value| {

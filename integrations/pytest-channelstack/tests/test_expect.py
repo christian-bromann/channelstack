@@ -1,13 +1,18 @@
 """`expect(...)` passes and fails the way the matchers do, on stand-in handles (no server)."""
 
 import re
+import secrets
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 import pytest
 
+from channelstack.runtime.client import HandleContext, quiet_of
+from channelstack.runtime.transport import Transport, on_refusal
 from channelstack.runtime.wait import QuietState
 from pytest_channelstack import expect, matchers
+from pytest_channelstack.plugin import _skip_live_refusal  # pyright: ignore[reportPrivateUsage]
 
 pytestmark = pytest.mark.asyncio
 
@@ -142,3 +147,25 @@ async def test_no_call_with_an_error() -> None:
     await expect(Fixture()).not_to_have_received_call(re.compile(".*"), error="not_in_channel", **FAST)
     with pytest.raises(AssertionError, match="found 1: reactions.add → already_reacted"):
         await expect(Fixture()).not_to_have_received_call(re.compile(".*"), error="already_reacted", **FAST)
+
+
+async def test_a_live_refusal_while_describing_a_failure_keeps_it_a_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Live, the open work a failure message adds may be refused: the check still fails, it isn't skipped."""
+
+    async def send(*_: object) -> httpx.Response:
+        return httpx.Response(501, json={"error": "action_requires", "message": "needs the browser", "data": {}})
+
+    transport = Transport(url="http://127.0.0.1:1", token=secrets.token_hex(8), base_path="/_channelstack", errors={})
+    monkeypatch.setattr(transport, "_send", send)
+    monkeypatch.setattr(matchers, "quiet_of", quiet_of)  # the real one, through the transport
+    thread = Thread(_ctx=HandleContext(transport=transport, session="ses_1"))
+    on_refusal(_skip_live_refusal)
+    try:
+        with pytest.raises(AssertionError, match="Expected a reply from my-agent"):
+            await expect(thread).to_have_reply_from("my-agent", **FAST)
+        # The same refusal anywhere else skips the test, as live mode should.
+        with pytest.raises(pytest.skip.Exception, match="live: needs the browser"):
+            await quiet_of(HandleContext(transport=transport, session="ses_1"))
+    finally:
+        on_refusal(None)
+        await transport.close()

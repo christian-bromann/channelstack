@@ -3,11 +3,12 @@
 //!
 //! The same YAML runs through every SDK's runner: here, each step calls the method by its name in
 //! the API through the SDK's generated `call_by_name`, with the handles and values the scenario
-//! saved.
+//! saved. A step with `until` repeats through the SDK's own polling loop (`wait_for`).
 
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
 
+use channelstack::runtime::wait::wait_for;
 use channelstack::{Dyn, Error, Mode, call_by_name, connect, field_resource};
 use regex::Regex;
 use serde_json::{Map, Value};
@@ -48,7 +49,8 @@ fn json(yaml: &Yaml) -> Value {
 }
 
 struct Runner {
-    variables: HashMap<String, Saved>,
+    /// The saved values. A step with `until` saves on every attempt, from inside the polling loop.
+    variables: RefCell<HashMap<String, Saved>>,
 }
 
 impl Runner {
@@ -85,6 +87,7 @@ impl Runner {
         let name = path.next().unwrap_or_default();
         let start = self
             .variables
+            .borrow()
             .get(name)
             .cloned()
             .ok_or_else(|| format!("Unknown variable ${name}"))?;
@@ -164,7 +167,8 @@ impl Runner {
 
     async fn call(&self, step: &Value) -> Result<Result<Dyn, Error>, String> {
         let call = step.get("call").and_then(Value::as_str).unwrap_or_default();
-        // `<variable>.<method>`, or a method on a handle inside one: `message.thread.waitForReply`.
+        // `<variable>.<method>`, or a method on a handle inside one: `message.thread.replies`. Only
+        // methods: the scenarios wait with `until`, not with the SDKs' own `wait_for_…`.
         let (target, method) = call
             .rsplit_once('.')
             .ok_or_else(|| format!("{call}: not a method call"))?;
@@ -186,7 +190,7 @@ impl Runner {
         Ok(call_by_name(&handle, method, args, options).await)
     }
 
-    async fn run(&mut self, step: &Value, number: usize) -> Result<(), String> {
+    async fn run(&self, step: &Value, number: usize) -> Result<(), String> {
         if let Some(checks) = step.get("expect")
             && let Some(failed) = self.first_failure(checks)?
         {
@@ -206,31 +210,49 @@ impl Runner {
                 )),
             };
         }
-        let until = step.get("until");
-        let deadline = Instant::now() + Duration::from_secs(10);
-        loop {
-            let result = self
-                .call(step)
-                .await?
-                .map_err(|error| format!("step {number}: {call}: {error}"))?;
+        let save = |result: Dyn| {
             let saved = if result.resource.is_some() {
                 Saved::Handle(result)
             } else {
                 Saved::Data(result.data)
             };
             if let Some(name) = step.get("as").and_then(Value::as_str) {
-                self.variables.insert(name.to_owned(), saved);
+                self.variables.borrow_mut().insert(name.to_owned(), saved);
             }
-            let Some(checks) = until else {
-                return Ok(());
-            };
-            match self.first_failure(checks)? {
-                None => return Ok(()),
-                Some(failed) if Instant::now() > deadline => {
-                    return Err(format!("step {number}: {failed}"));
+        };
+        let called = |result: Result<Result<Dyn, Error>, String>| {
+            result.and_then(|called| {
+                called.map_err(|error| format!("step {number}: {call}: {error}"))
+            })
+        };
+        let Some(checks) = step.get("until") else {
+            save(called(self.call(step).await)?);
+            return Ok(());
+        };
+        // Repeated until the checks hold, in the SDK's own polling loop; a failed call ends it.
+        let last = RefCell::new(None::<String>);
+        let outcome = wait_for(
+            &format!("step {number} ({call})"),
+            &Value::from("10s"),
+            || {
+                let (save, called, last) = (&save, &called, &last);
+                async move {
+                    save(called(self.call(step).await).map_err(Error::Invalid)?);
+                    let failed = self.first_failure(checks).map_err(Error::Invalid)?;
+                    let holds = failed.is_none();
+                    *last.borrow_mut() = failed;
+                    Ok(holds.then_some(()))
                 }
-                Some(_) => tokio::time::sleep(Duration::from_millis(50)).await,
-            }
+            },
+        )
+        .await;
+        match outcome {
+            Ok(()) => Ok(()),
+            Err(Error::Invalid(failed)) => Err(failed),
+            Err(error) => Err(format!(
+                "step {number}: {}",
+                last.borrow().clone().unwrap_or_else(|| error.to_string())
+            )),
         }
     }
 }
@@ -278,15 +300,12 @@ async fn main() {
     let session = call_by_name(&root, "openSession", vec![], Map::new())
         .await
         .unwrap_or_else(|error| panic!("openSession: {error}"));
-    let mut runner = Runner {
-        variables: HashMap::new(),
+    let runner = Runner {
+        variables: RefCell::new(HashMap::from([
+            ("channelstack".to_owned(), Saved::Handle(root)),
+            ("session".to_owned(), Saved::Handle(session.clone())),
+        ])),
     };
-    runner
-        .variables
-        .insert("channelstack".into(), Saved::Handle(root));
-    runner
-        .variables
-        .insert("session".into(), Saved::Handle(session.clone()));
 
     let mut outcome = Ok(());
     for (index, step) in steps.iter().enumerate() {

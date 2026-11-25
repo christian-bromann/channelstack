@@ -16,23 +16,23 @@ pub fn parse_duration(duration: &Value) -> Result<f64> {
             }
         }
         Value::String(text) => {
-            let (amount, unit) = if let Some(amount) = text.strip_suffix("ms") {
-                (amount, 1.0)
-            } else if let Some(amount) = text.strip_suffix('s') {
-                (amount, 1000.0)
-            } else if let Some(amount) = text.strip_suffix('m') {
-                (amount, 60_000.0)
-            } else {
-                ("", 0.0)
+            // The grammar every SDK accepts: digits, an optional fraction, and a unit.
+            let pattern =
+                regex::Regex::new(r"^(\d+(?:\.\d+)?)(ms|s|m)$").expect("the duration pattern");
+            let unit = |unit: &str| match unit {
+                "ms" => 1.0,
+                "s" => 1000.0,
+                _ => 60_000.0,
             };
-            match amount.parse::<f64>() {
-                Ok(value) if unit > 0.0 && value >= 0.0 && !amount.starts_with('+') => {
-                    Ok(value * unit)
-                }
-                _ => Err(Error::Invalid(format!(
-                    "Not a duration: \"{text}\". Use milliseconds, or \"250ms\", \"3s\", \"1m\"."
-                ))),
-            }
+            pattern
+                .captures(text)
+                .and_then(|found| Some(found[1].parse::<f64>().ok()? * unit(&found[2])))
+                .filter(|ms| ms.is_finite())
+                .ok_or_else(|| {
+                    Error::Invalid(format!(
+                        "Not a duration: \"{text}\". Use milliseconds, or \"250ms\", \"3s\", \"1m\"."
+                    ))
+                })
         }
         other => Err(Error::Invalid(format!("Not a duration: {other}"))),
     }
@@ -51,5 +51,10 @@ mod tests {
         assert_eq!(parse_duration(&json!(250)).unwrap(), 250.0);
         assert!(parse_duration(&json!("soon")).is_err());
         assert!(parse_duration(&json!(-1)).is_err());
+        assert_eq!(parse_duration(&json!("1.5s")).unwrap(), 1500.0);
+        // What the other SDKs refuse, this one refuses too.
+        for refused in ["1e3ms", "-0s", "infs", "NaNs", "+1s", "1 s", "s", "1h"] {
+            assert!(parse_duration(&json!(refused)).is_err(), "{refused}");
+        }
     }
 }

@@ -17,6 +17,7 @@ from typing import Any, Protocol
 from channelstack import ChannelstackError
 from channelstack.runtime.client import quiet_of
 from channelstack.runtime.duration import Duration
+from channelstack.runtime.transport import unreported_refusals
 from channelstack.runtime.wait import WaitTimeoutError, from_matches, text_matches, until_quiet, wait_for
 
 from .options import defaults
@@ -81,9 +82,12 @@ class Expectation:
         self._subject = subject
 
     async def _still_open(self) -> list[str]:
-        """What the agent left open in the subject's session, in words: it only adds to a failure's message."""
+        """What the agent left open in the subject's session, in words: it only adds to a failure's message.
+
+        Its refusal goes nowhere else: live, a refused read here must not turn the failure into a skip.
+        """
         try:
-            return list((await quiet_of(self._subject._ctx)).open)
+            return list((await unreported_refusals(lambda: quiet_of(self._subject._ctx))).open)
         except (ChannelstackError, AttributeError, RuntimeError):
             return []
 
