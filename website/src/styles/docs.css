@@ -405,6 +405,11 @@
   display: none;
 }
 
+/* A sample rendered by <Example>: its lines carry their own padding. */
+.prose pre.code {
+  padding-inline: 0;
+}
+
 /*
  * Callouts: > [!TIP], > [!NOTE], > [!WARNING]. A quiet panel tinted with the callout's color, a
  * line icon in a soft disc of the same color, and the label running into the first sentence.
