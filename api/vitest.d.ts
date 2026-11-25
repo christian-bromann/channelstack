@@ -14,6 +14,7 @@ import type { SlackFixture } from "./slack";
 import type { GitHubFixture } from "./github";
 import type { LinearFixture } from "./linear";
 import type { NotionFixture } from "./notion";
+import type { ResendFixture } from "./resend";
 import type { ChannelstackFixture, ChannelstackIntegrationOptions } from "./server";
 import type { ChannelstackMatchers } from "./matchers";
 
@@ -25,6 +26,7 @@ declare module "vitest" {
     github: GitHubFixture;
     linear: LinearFixture;
     notion: NotionFixture;
+    resend: ResendFixture;
   }
 
   // Vitest 5 declares `Matchers<R, T>`; the parameters have to be identical to merge with it.

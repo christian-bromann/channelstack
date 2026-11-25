@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.0.0"
 
@@ -1017,6 +1017,106 @@ class NotionApiCall:
 
 
 @dataclass(frozen=True)
+class ResendPrincipal:
+    id: str
+    name: str
+    kind: Literal["user", "app"]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> ResendPrincipal:
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            kind=data["kind"],
+        )
+
+
+type ResendInbox = list[ResendEmail]
+
+
+type ResendMessages = list[ResendEmail]
+
+
+type ResendReplies = list[ResendEmail]
+
+
+@dataclass(frozen=True)
+class ResendTranscript:
+    entries: list[ResendTranscriptEntry]
+    text: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> ResendTranscript:
+        return cls(
+            entries=[ResendTranscriptEntry._from_wire(ctx, item) for item in data["entries"]],
+            text=data["text"],
+        )
+
+    def __str__(self) -> str:
+        return self.text
+
+
+@dataclass(frozen=True)
+class ResendTranscriptEntry:
+    id: str
+    author: ResendPrincipal
+    at: str
+    text: str
+    controls: list[str]
+    edited: bool
+    depth: int
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> ResendTranscriptEntry:
+        return cls(
+            id=data["id"],
+            author=ResendPrincipal._from_wire(ctx, data["author"]),
+            at=data["at"],
+            text=data["text"],
+            controls=data["controls"],
+            edited=data["edited"],
+            depth=data["depth"],
+        )
+
+
+type ResendDeliveries = list[ResendDelivery]
+
+
+type ResendApiCalls = list[ResendApiCall]
+
+
+@dataclass(frozen=True)
+class ResendApiCall:
+    id: str
+    channel: Literal["resend"]
+    operation: str
+    method: str
+    path: str
+    at: str
+    duration_ms: float
+    response_status: int
+    request: Any | None = None
+    response: Any | None = None
+    error: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> ResendApiCall:
+        return cls(
+            id=data["id"],
+            channel=data["channel"],
+            operation=data["operation"],
+            method=data["method"],
+            path=data["path"],
+            at=data["at"],
+            duration_ms=data["durationMs"],
+            response_status=data["responseStatus"],
+            request=data.get("request"),
+            response=data.get("response"),
+            error=data.get("error"),
+        )
+
+
+@dataclass(frozen=True)
 class UiLoginLink:
     url: str
 
@@ -1114,6 +1214,12 @@ class Session:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion")
         return NotionFixture(ctx, data)
+
+    async def resend(self) -> ResendFixture:
+        """The Resend fixture: the agent's team, and where the agent reaches the fake. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend")
+        return ResendFixture(ctx, data)
 
     async def __aenter__(self) -> Self:
         return self
@@ -2782,6 +2888,177 @@ class NotionDiscussion:
         return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
 
 
+class ResendFixture:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.app: ResendApp = ResendApp(ctx, data["app"])
+        self.api_url: str = data["apiUrl"]
+
+    async def create_user(self, *, name: str, address: str | None = None, token: str | None = None) -> ResendUser:
+        """Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users", body={"name": name, "address": address, "token": credential("CHANNELSTACK_RESEND_USER_{name}_TOKEN", {"name": name}) if token is None else token})
+        return ResendUser(ctx, data)
+
+    async def deliveries(self, *, type: str | None = None, resource: ResendThread | None = None) -> ResendDeliveries:
+        """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        return [ResendDelivery(ctx, item) for item in data]
+
+    async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> ResendApiCalls:
+        """The REST calls the agent made about this session's emails, by the SDK's method name (`emails.send`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/calls", query={"operation": operation, "error": error})
+        return [ResendApiCall._from_wire(ctx, item) for item in data]
+
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> ResendApiCall:
+        """Wait for the next new API call from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
+
+
+class ResendApp:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.kind: Literal["app"] = data["kind"]
+        self.name: str = data["name"]
+        self.bot_user_id: str = data["botUserId"]
+        self.address: str = data["address"]
+
+
+class ResendUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.kind: Literal["user"] = data["kind"]
+        self.name: str = data["name"]
+        self.address: str = data["address"]
+
+    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> ResendEmail:
+        """The person emails someone: the agent (`resend.app`), or another person. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        return ResendEmail(ctx, data)
+
+    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> ResendEmail:
+        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        return ResendEmail(ctx, data)
+
+    async def inbox(self) -> ResendInbox:
+        """What reached the person's mailbox, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/inbox")
+        return [ResendEmail(ctx, item) for item in data]
+
+    async def wait_for_email(self, *, from_: ResendPrincipal | str | None = None, timeout: Duration | None = None) -> ResendEmail:
+        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
+
+
+class ResendEmail:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.thread: ResendThread = ResendThread(ctx, data["thread"])
+        self.author: ResendPrincipal = ResendPrincipal._from_wire(ctx, data["author"])
+        self.from_: str = data["from"]
+        self.to: list[str] = data["to"]
+        self.cc: list[str] = data["cc"]
+        self.subject: str = data["subject"]
+        self.text: str = data["text"]
+        self.at: str = data["at"]
+        self.message_id: str = data["messageId"]
+        self.delivery: ResendDelivery | None = None if data.get("delivery") is None else ResendDelivery(ctx, data["delivery"])
+
+    async def refresh(self) -> ResendEmail:
+        """Re-read an email. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/emails/{quote(str(self.id), safe='')}")
+        return ResendEmail(ctx, data)
+
+
+class ResendThread:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.subject: str = data["subject"]
+
+    async def messages(self) -> ResendMessages:
+        """Every email in the thread, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/threads/{quote(str(self.id), safe='')}/messages")
+        return [ResendEmail(ctx, item) for item in data]
+
+    async def replies(self) -> ResendReplies:
+        """The thread's answers: every email after the first, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/threads/{quote(str(self.id), safe='')}/replies")
+        return [ResendEmail(ctx, item) for item in data]
+
+    async def transcript(self) -> ResendTranscript:
+        """The thread as a person reads it: each email's own words, without the quoted history. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/threads/{quote(str(self.id), safe='')}/transcript")
+        return ResendTranscript._from_wire(ctx, data)
+
+    async def wait_for_reply(self, *, from_: ResendPrincipal | str | None = None, timeout: Duration | None = None) -> ResendEmail:
+        """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
+
+    async def latest_reply(self, *, from_: ResendPrincipal | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> ResendEmail:
+        """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
+
+
+class ResendDelivery:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.type: str = data["type"]
+        self.email: str = data["email"]
+        self.payload: Any | None = data.get("payload")
+        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
+        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
+
+    async def refresh(self) -> ResendDelivery:
+        """Re-read a delivery: its attempts and status. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries/{quote(str(self.id), safe='')}")
+        return ResendDelivery(ctx, data)
+
+    async def redeliver(self) -> DeliveryAttempt:
+        """Send the same webhook again, as Resend retries: the same `svix-id`, signed again. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries/{quote(str(self.id), safe='')}/redeliver")
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None) -> DeliveryAttempt:
+        """Send the webhook again, forged: signed with a secret that isn't the webhook's, or with a timestamp past the five minutes receivers accept. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration | None = None) -> ResendDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> ResendDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
+
+
 class GitHubPullRequest(GitHubIssue):
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         super().__init__(ctx, data)
@@ -2826,7 +3103,7 @@ class GitHubPullRequest(GitHubIssue):
         return data
 
 
-CHANNEL_NAMES: tuple[str, ...] = ("slack", "github", "linear", "notion")
+CHANNEL_NAMES: tuple[str, ...] = ("slack", "github", "linear", "notion", "resend")
 """Every channel, by name, in the server's order: what pytest-channelstack makes a fixture of."""
 
 

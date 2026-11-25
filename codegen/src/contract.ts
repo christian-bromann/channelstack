@@ -15,7 +15,7 @@ export interface ContractCheck {
   /** Modules whose exports implement it, e.g. the SDK's `client.ts` and the Vitest integration. */
   implementations: readonly string[];
   /** Contract interfaces nothing implements by that name: bases repeated in every handle, configuration, option bags. */
-  notImplemented: ReadonlySet<string>;
+  notImplemented: (name: string) => boolean;
   /** Contract interfaces implemented once per channel (`ApiCall` → `SlackApiCall`, …), with the channels' prefixes. */
   perChannel: Readonly<Record<string, readonly string[]>>;
   /** Gaps known and tracked: `Type.member` or `Type`, each with its issue. */
@@ -80,7 +80,7 @@ export function checkContract(check: ContractCheck): ContractResult {
     }
   };
   for (const [name, symbol] of exported(check.contract)) {
-    if (!(symbol.flags & ts.SymbolFlags.Interface) || check.notImplemented.has(name)) continue;
+    if (!(symbol.flags & ts.SymbolFlags.Interface) || check.notImplemented(name)) continue;
     const contractType = checker.getDeclaredTypeOfSymbol(symbol);
     const channels = check.perChannel[name];
     if (channels) for (const channel of channels) compare(contractType, `${channel}${name}`);

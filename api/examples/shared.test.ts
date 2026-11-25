@@ -1,10 +1,10 @@
 /**
  * Patterns shared by every channel: people as reusable fixtures, and the standard checks.
- * Per-channel examples: slack.test.ts, github.test.ts, linear.test.ts, notion.test.ts.
+ * Per-channel examples: slack.test.ts, github.test.ts, linear.test.ts, notion.test.ts, resend.test.ts.
  */
 import { expect } from "vitest";
 import { test } from "./fixtures";
-import { slackChecks, githubChecks, linearChecks, notionChecks } from "channelstack/checks";
+import { slackChecks, githubChecks, linearChecks, notionChecks, resendChecks } from "channelstack/checks";
 
 // People and places as fixtures: created per test, cleaned up after it.
 test("answers in #support", async ({ support, ana }) => {
@@ -23,3 +23,4 @@ slackChecks({ app: "my-agent" });
 githubChecks({ app: "my-agent", skip: ["github.check-run"] });
 linearChecks({ app: "my-agent" });
 notionChecks({ app: "my-agent", prompt: "@my-agent summarize this page" });
+resendChecks({ app: "my-agent", prompt: "Where is my refund?" });

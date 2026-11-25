@@ -12,17 +12,20 @@ transcript!(
     crate::LinearComment,
     crate::NotionPage,
     crate::NotionDiscussion,
+    crate::ResendThread,
     crate::GitHubPullRequest
 );
 deliveries!(
     crate::SlackDelivery,
     crate::GitHubDelivery,
     crate::LinearDelivery,
-    crate::NotionDelivery
+    crate::NotionDelivery,
+    crate::ResendDelivery
 );
 calls!(
     crate::SlackFixture,
     crate::GitHubFixture,
     crate::LinearFixture,
-    crate::NotionFixture
+    crate::NotionFixture,
+    crate::ResendFixture
 );

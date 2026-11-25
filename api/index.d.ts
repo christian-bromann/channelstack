@@ -11,3 +11,5 @@ export * from "./slack";
 export * from "./github";
 export * from "./linear";
 export * from "./notion";
+export * from "./email";
+export * from "./resend";

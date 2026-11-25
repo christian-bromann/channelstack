@@ -23,7 +23,7 @@ export type Duration = number | `${number}ms` | `${number}s` | `${number}m`;
 /** ISO 8601 timestamp string. */
 export type Timestamp = string;
 
-export type ChannelKind = "slack" | "github" | "linear" | "notion";
+export type ChannelKind = "slack" | "github" | "linear" | "notion" | "resend";
 
 /** Text that may contain `@name` mentions. */
 export type RichText = string;

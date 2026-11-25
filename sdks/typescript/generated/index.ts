@@ -744,6 +744,85 @@ export interface NotionApiCall {
   error?: string;
 }
 
+export interface ResendPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+export type ResendInbox = ResendEmail[];
+
+export type ResendInboxWire = ResendEmailData[];
+
+function decodeResendInbox(ctx: HandleContext, data: ResendInboxWire): ResendInbox {
+  return data.map((item) => new ResendEmail(ctx, item));
+}
+
+export type ResendMessages = ResendEmail[];
+
+export type ResendMessagesWire = ResendEmailData[];
+
+function decodeResendMessages(ctx: HandleContext, data: ResendMessagesWire): ResendMessages {
+  return data.map((item) => new ResendEmail(ctx, item));
+}
+
+export type ResendReplies = ResendEmail[];
+
+export type ResendRepliesWire = ResendEmailData[];
+
+function decodeResendReplies(ctx: HandleContext, data: ResendRepliesWire): ResendReplies {
+  return data.map((item) => new ResendEmail(ctx, item));
+}
+
+export interface ResendTranscript {
+  entries: ResendTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface ResendTranscriptWire {
+  entries: ResendTranscriptEntry[];
+  text: string;
+}
+
+function decodeResendTranscript(_ctx: HandleContext, data: ResendTranscriptWire): ResendTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface ResendTranscriptEntry {
+  id: string;
+  author: ResendPrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+}
+
+export type ResendDeliveries = ResendDelivery[];
+
+export type ResendDeliveriesWire = ResendDeliveryData[];
+
+function decodeResendDeliveries(ctx: HandleContext, data: ResendDeliveriesWire): ResendDeliveries {
+  return data.map((item) => new ResendDelivery(ctx, item));
+}
+
+export type ResendApiCalls = ResendApiCall[];
+
+export interface ResendApiCall {
+  id: string;
+  channel: "resend";
+  operation: string;
+  method: string;
+  path: string;
+  at: string;
+  durationMs: number;
+  request?: unknown;
+  responseStatus: number;
+  response?: unknown;
+  error?: string;
+}
+
 export interface UiLoginLink {
   url: string;
 }
@@ -867,6 +946,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion`)) as NotionFixtureData;
     return new NotionFixture(ctx, data);
+  }
+
+  /** The Resend fixture: the agent's team, and where the agent reaches the fake. Experimental. */
+  async resend(): Promise<ResendFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend`)) as ResendFixtureData;
+    return new ResendFixture(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3717,6 +3803,341 @@ export class NotionDiscussion {
   /** The latest comment matching `from`, once the agent is quiet. Waits for at least one. */
   async latestComment(options: { from?: NotionUser | NotionIntegration | string } & QuietOptions = {}): Promise<NotionComment> {
     return latestOnceQuiet(() => this.comments(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a comment", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link ResendFixture}. */
+export interface ResendFixtureData {
+  app: ResendAppData;
+  apiUrl: string;
+}
+
+export class ResendFixture {
+  readonly app: ResendApp;
+  readonly apiUrl: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendFixtureData) {
+    this.#ctx = ctx;
+    this.app = new ResendApp(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+  }
+
+  /** Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental. */
+  async createUser(options: { name: string; address?: string; token?: string }): Promise<ResendUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users`, { body: { name: options.name, address: options.address, token: options.token ?? credential("CHANNELSTACK_RESEND_USER_{name}_TOKEN", { name: options.name }) } })) as ResendUserData;
+    return new ResendUser(ctx, data);
+  }
+
+  /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: ResendThread } = {}): Promise<ResendDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as ResendDeliveriesWire;
+    return decodeResendDeliveries(ctx, data);
+  }
+
+  /** The REST calls the agent made about this session's emails, by the SDK's method name (`emails.send`). Experimental. */
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<ResendApiCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/calls`, { query: { operation: options.operation, error: options.error } })) as ResendApiCalls;
+    return data;
+  }
+
+  /** Wait for the next new API call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<ResendApiCall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link ResendApp}. */
+export interface ResendAppData {
+  id: string;
+  channel: "resend";
+  kind: "app";
+  name: string;
+  botUserId: string;
+  address: string;
+}
+
+export class ResendApp {
+  readonly id: string;
+  readonly channel: "resend";
+  readonly kind: "app";
+  readonly name: string;
+  readonly botUserId: string;
+  readonly address: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendAppData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.botUserId = data.botUserId;
+    this.address = data.address;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link ResendUser}. */
+export interface ResendUserData {
+  id: string;
+  channel: "resend";
+  kind: "user";
+  name: string;
+  address: string;
+}
+
+export class ResendUser {
+  readonly id: string;
+  readonly channel: "resend";
+  readonly kind: "user";
+  readonly name: string;
+  readonly address: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.address = data.address;
+  }
+
+  /** The person emails someone: the agent (`resend.app`), or another person. Experimental. */
+  async send(options: { to: Array<ResendUser | ResendApp>; cc?: Array<ResendUser | ResendApp>; subject: string; text?: string; html?: string }): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html } })) as ResendEmailData;
+    return new ResendEmail(ctx, data);
+  }
+
+  /** The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental. */
+  async reply(email: ResendEmail, options: { text?: string; html?: string; all?: boolean } = {}): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all } })) as ResendEmailData;
+    return new ResendEmail(ctx, data);
+  }
+
+  /** What reached the person's mailbox, oldest first. Experimental. */
+  async inbox(): Promise<ResendInbox> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/users/${segment(this.id)}/inbox`)) as ResendInboxWire;
+    return decodeResendInbox(ctx, data);
+  }
+
+  /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForEmail(options: { from?: ResendPrincipal | string } & WaitOptions = {}): Promise<ResendEmail> {
+    return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link ResendEmail}. */
+export interface ResendEmailData {
+  id: string;
+  channel: "resend";
+  thread: ResendThreadData;
+  author: ResendPrincipal;
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  text: string;
+  at: string;
+  messageId: string;
+  delivery?: ResendDeliveryData;
+}
+
+export class ResendEmail {
+  readonly id: string;
+  readonly channel: "resend";
+  readonly thread: ResendThread;
+  readonly author: ResendPrincipal;
+  readonly from: string;
+  readonly to: string[];
+  readonly cc: string[];
+  readonly subject: string;
+  readonly text: string;
+  readonly at: string;
+  readonly messageId: string;
+  readonly delivery: ResendDelivery | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendEmailData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.thread = new ResendThread(ctx, data.thread);
+    this.author = data.author;
+    this.from = data.from;
+    this.to = data.to;
+    this.cc = data.cc;
+    this.subject = data.subject;
+    this.text = data.text;
+    this.at = data.at;
+    this.messageId = data.messageId;
+    this.delivery = data.delivery === undefined ? undefined : new ResendDelivery(ctx, data.delivery);
+  }
+
+  /** Re-read an email. Experimental. */
+  async refresh(): Promise<ResendEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/emails/${segment(this.id)}`)) as ResendEmailData;
+    return new ResendEmail(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link ResendThread}. */
+export interface ResendThreadData {
+  id: string;
+  channel: "resend";
+  subject: string;
+}
+
+export class ResendThread {
+  readonly id: string;
+  readonly channel: "resend";
+  readonly subject: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendThreadData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.subject = data.subject;
+  }
+
+  /** Every email in the thread, oldest first. Experimental. */
+  async messages(): Promise<ResendMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/threads/${segment(this.id)}/messages`)) as ResendMessagesWire;
+    return decodeResendMessages(ctx, data);
+  }
+
+  /** The thread's answers: every email after the first, oldest first. Experimental. */
+  async replies(): Promise<ResendReplies> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/threads/${segment(this.id)}/replies`)) as ResendRepliesWire;
+    return decodeResendReplies(ctx, data);
+  }
+
+  /** The thread as a person reads it: each email's own words, without the quoted history. Experimental. */
+  async transcript(): Promise<ResendTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/threads/${segment(this.id)}/transcript`)) as ResendTranscriptWire;
+    return decodeResendTranscript(ctx, data);
+  }
+
+  /** Wait for the next new reply matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForReply(options: { from?: ResendPrincipal | string } & WaitOptions = {}): Promise<ResendEmail> {
+    return waitForNext(this.#seen, "waitForReply", () => this.replies(), (item) => fromMatches(item.author, options.from), describeWait("a reply", options.from), options);
+  }
+
+  /** The latest reply matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestReply(options: { from?: ResendPrincipal | string } & QuietOptions = {}): Promise<ResendEmail> {
+    return latestOnceQuiet(() => this.replies(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a reply", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link ResendDelivery}. */
+export interface ResendDeliveryData {
+  id: string;
+  channel: "resend";
+  type: string;
+  email: string;
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class ResendDelivery {
+  readonly id: string;
+  readonly channel: "resend";
+  readonly type: string;
+  readonly email: string;
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: ResendDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.type = data.type;
+    this.email = data.email;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<ResendDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries/${segment(this.id)}`)) as ResendDeliveryData;
+    return new ResendDelivery(ctx, data);
+  }
+
+  /** Send the same webhook again, as Resend retries: the same `svix-id`, signed again. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send the webhook again, forged: signed with a secret that isn't the webhook's, or with a timestamp past the five minutes receivers accept. Experimental. */
+  async resend(options: { badSignature?: boolean; stale?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/resend/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<ResendDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

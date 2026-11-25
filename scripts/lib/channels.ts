@@ -77,6 +77,13 @@ export const HARNESS = {
     agents: { "notion-sdk": "/webhooks/notion" },
     broken: { agent: "broken-notion", path: "/webhooks/notion" },
   },
+  resend: {
+    enabled: ["email conversations > ", "delivery and failures \\(fake only\\) > ", "inspecting what the agent did > "],
+    // The standard checks as a developer adds them (exit check 8.5).
+    suites: ["test/acceptance/checks/resend-checks.test.ts"],
+    agents: { "resend-node": "/webhooks/resend" },
+    broken: { agent: "broken-resend", path: "/webhooks/resend" },
+  },
 } as const satisfies Readonly<Record<string, ChannelHarness>>;
 
 export type HarnessChannel = keyof typeof HARNESS;

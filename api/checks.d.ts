@@ -56,3 +56,9 @@ export declare function linearChecks(options: ChecksOptions): void;
  * its own comments · stays silent on pages it isn't connected to.
  */
 export declare function notionChecks(options: ChecksOptions): void;
+
+/**
+ * Registers: answers an email in its thread · a webhook sent again doesn't answer twice ·
+ * rejects a bad webhook signature · rejects a stale webhook.
+ */
+export declare function resendChecks(options: ChecksOptions): void;
