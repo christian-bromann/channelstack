@@ -133,7 +133,10 @@ describe("live Notion: acting and reading back", () => {
     expect(page.body.title).toBe("Live smoke test");
     // In the session's own page, under the page the integration is connected to.
     const home = stub.page(stub.page(page.body.id)?.parent as string);
-    expect(home).toMatchObject({ title: "channelstack-run-unit3-1", parent: stub.root });
+    expect(home).toMatchObject({
+      title: expect.stringMatching(/^channelstack-run-unit3-[a-z]{4}-1$/),
+      parent: stub.root,
+    });
     expect(stub.calls.find((call) => call.method === "POST" && call.path === "pages")?.as).toBe("Ana");
     expect((await session.notion("GET", `/pages/${page.body.id}/markdown`)).body).toBe("Some **notes**");
     expect((await session.notion("GET", `/pages/${page.body.id}/connections`)).body).toHaveLength(1);
@@ -317,11 +320,14 @@ describe("exit check 5.2: Notion's doctor and sweep", () => {
     await session.notion("POST", "/users", { name: "Ana", token: ana.token });
     const page = await session.notion("POST", "/pages", { title: "Seed", connections: [stub.integration.botId] });
     const home = stub.page(page.body.id)?.parent as string;
+    // The session's home page, named for the run: `channelstack-run-unit3-<world>-1`.
+    const homeName = stub.page(home)?.title as string;
+    expect(homeName).toMatch(/^channelstack-run-unit3-[a-z]{4}-1$/);
     const entry: LedgerEntry = {
       id: "unit3-1-1",
       channel: "notion",
       kind: "page",
-      ref: { page: home, name: "channelstack-run-unit3-1" },
+      ref: { page: home, name: homeName },
       workspace: stub.workspace,
       by: "user:ANA",
       run: "unit3",
@@ -339,10 +345,10 @@ describe("exit check 5.2: Notion's doctor and sweep", () => {
       });
     // Listed once: the ledger names it, so the scan for tagged pages doesn't list it again.
     expect((await sweep({ check: true, entries: [entry], run: "unit3" })).left).toEqual([
-      "page channelstack-run-unit3-1 (run unit3)",
+      `page ${homeName} (run unit3)`,
     ]);
     // Without a ledger: found by its tag, for this run, and not before it is old enough for every run.
-    expect((await sweep({ check: true, entries: [], run: "unit3" })).left).toEqual(["page channelstack-run-unit3-1"]);
+    expect((await sweep({ check: true, entries: [], run: "unit3" })).left).toEqual([`page ${homeName}`]);
     expect((await sweep({ check: true, entries: [], olderThanMs: 3_600_000 })).left).toEqual([]);
     const swept = await sweep({ check: false, entries: [entry], run: "unit3" });
     expect(swept.done).toEqual([entry]);

@@ -262,7 +262,7 @@ GitHub drops, without a word, an assignee who can't be assigned, the App's bot a
 
 ## Live
 
-The same tests can run in a real test organization. Set the App's credentials (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`) and allowlist the org with `CHANNELSTACK_LIVE_GITHUB_ORGS`. The App must be installed on all of the org's repositories, with the Administration permission, because it creates and deletes each session's repositories (`channelstack-run-<run>-<n>`). Each person acts with their own fine-grained token from a machine account, `CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN`, and the `login` you pass must be that account's.
+The same tests can run in a real test organization. Set the App's credentials (`CHANNELSTACK_GITHUB_APP_ID`, `CHANNELSTACK_GITHUB_PRIVATE_KEY`) and allowlist the org with `CHANNELSTACK_LIVE_GITHUB_ORGS`. The App must be installed on all of the org's repositories, with the Administration permission, because it creates and deletes each session's repositories (`channelstack-run-<run>-<world>-<n>`). Each person acts with their own fine-grained token from a machine account, `CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN`, and the `login` you pass must be that account's.
 
 Live, GitHub delivers to your App itself. channelstack acts, reads the results back, and reads the App's delivery log, so `github.deliveries()`, `toBeAccepted()` and `redeliver()` work live too. The log lags a few seconds behind, so poll it:
 

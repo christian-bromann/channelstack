@@ -69,7 +69,7 @@ Allowlists are comma-separated. Live mode acts only where its allowlist names th
 | Variable | Default | Meaning |
 |---|---|---|
 | `CHANNELSTACK_REALITY` | unset | `fake`: every channel runs fake, credentials or not. `live`: nothing may fall back to fake; a person without a token is refused with `live_misconfigured`. Any other value is an error |
-| `CHANNELSTACK_RUN_ID` | random (10 characters) | The run's id, in the tag every live object carries (`channelstack-run-<id>`) and for `channelstack sweep --run`. 1 to 24 letters and digits, lowercased. CI sets it to the job's |
+| `CHANNELSTACK_RUN_ID` | random (10 characters) | The run's id, in the tag every live object carries (`channelstack-run-<id>`) and for `channelstack sweep --run`. 1 to 24 letters and digits, lowercased; 7 or more digits in a row are written in base 36 (Linear refuses names that look like phone numbers). CI sets it to the job's |
 | `CHANNELSTACK_NOTION_PAGE` | the only top-level page the integration sees | The page live Notion tests create their pages under. Needed when the integration sees more than one |
 | `CHANNELSTACK_NOTION_UNSEEN_PAGE` | none | A page the people can write in and the integration isn't connected to, for tests that create a page the integration can't see |
 

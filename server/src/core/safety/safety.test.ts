@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { ProtocolError } from "../errors/index.ts";
-import { Allowlist, isRunId, runId, runTag, taggedRun } from "./index.ts";
+import { Allowlist, isRunId, normalizeRunId, runId, runTag, taggedNames, taggedRun } from "./index.ts";
 
 describe("safety", () => {
   test("an allowlist holds the ids its variable lists, and refuses the rest", () => {
@@ -35,5 +35,24 @@ describe("safety", () => {
     expect(isRunId(made)).toBe(true);
     expect(runId({})).not.toBe(made);
     expect(isRunId("a".repeat(25))).toBe(false);
+    // A CI job's id: Linear refused a team named with its 11 digits as a phone number. The same id
+    // always gives the same tag, so the sweep finds the run by what the job was given.
+    expect(isRunId("gh45602242231")).toBe(false);
+    expect(runId({ CHANNELSTACK_RUN_ID: "gh45602242231" })).toBe("ghky6ebav");
+    expect(normalizeRunId("GH45602242231")).toBe("ghky6ebav");
+    expect(normalizeRunId("gh123456")).toBe("gh123456");
+    // Base 36 can still have 7 digits in a row: written again until none are left.
+    expect(normalizeRunId("x2821109907456")).toMatch(/^x[a-z0-9]+$/);
+    expect(isRunId(normalizeRunId("x2821109907456") ?? "")).toBe(true);
+    expect(normalizeRunId("gh-1")).toBeUndefined();
+  });
+
+  test("two worlds of one run never make the same name", () => {
+    const [first, second] = [taggedNames(runTag("gh1")), taggedNames(runTag("gh1"))];
+    const [a, b] = [first(), second()];
+    expect(a).toMatch(/^channelstack-run-gh1-[a-z]{4}-1$/);
+    expect(a).not.toBe(b);
+    expect(first("support")).toMatch(/^channelstack-run-gh1-[a-z]{4}-2-support$/);
+    expect([a, b].map(taggedRun)).toEqual(["gh1", "gh1"]);
   });
 });

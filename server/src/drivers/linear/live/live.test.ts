@@ -112,7 +112,7 @@ describe("live Linear: acting and reading back", () => {
     const team = await session.linear("POST", "/teams", { members: [ana.userId] });
     expect(team.status).toBe(200);
     // Unique in a real workspace: the run's tag in the name, a key of its own.
-    expect(team.body.name).toBe("channelstack-run-unit2-1");
+    expect(team.body.name).toMatch(/^channelstack-run-unit2-[a-z]{4}-1$/);
     expect(team.body.key).toMatch(/^[A-Z][A-Z0-9]{4}$/);
 
     const issue = await session.linear("POST", `/users/${ana.userId}/issues`, {

@@ -136,7 +136,7 @@ describe("live GitHub: acting and reading back", () => {
     });
     expect(repo.status).toBe(200);
     // Unique in a real org: the run's tag in the name.
-    expect(repo.body.name).toBe("channelstack-run-unit4-1");
+    expect(repo.body.name).toMatch(/^channelstack-run-unit4-[a-z]{4}-1$/);
     // Invited, and accepted as herself.
     expect(stub.repo(repo.body.name)).toMatchObject({ collaborators: ["ana-channelstack"], labels: ["bug"] });
     expect(stub.calls.find((call) => call.path.startsWith("/user/repository_invitations/"))?.as).toBe(
@@ -262,7 +262,7 @@ describe("exit check 5.2: GitHub cleanup", () => {
     const fixture = await session.github("GET", "");
     // A name GitHub rewrites (a space): the one it made is what gets deleted.
     const repo = await session.github("POST", "/repos", { apps: [fixture.body.app.id], name: "web app" });
-    expect(repo.body.name).toBe("channelstack-run-unit4-1-web-app");
+    expect(repo.body.name).toMatch(/^channelstack-run-unit4-[a-z]{4}-1-web-app$/);
     await server.call("DELETE", `/sessions/${session.id}`);
     expect(stub.repo(repo.body.name)?.deleted).toBe(true);
     expect(stub.calls.at(-1)).toEqual({
