@@ -5,7 +5,7 @@ import { BrowserActor, type Launch, storageStatePath, writeStorageState } from "
 import { pollUntil, systemClock, systemTimers } from "../core/clock/index.ts";
 import { readLedgers, rewriteLedger } from "../core/ledger/index.ts";
 import type { DriverDefinition, LiveCheck } from "../core/router/index.ts";
-import { isRunId } from "../core/safety/index.ts";
+import { normalizeRunId } from "../core/safety/index.ts";
 import { CliError } from "./attach.ts";
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -149,7 +149,11 @@ export async function runSweep(
     throw new CliError(`--older-than-hours takes a number of hours, got "${input.olderThanHours}"`);
   }
   const olderThanMs = hours * 3_600_000;
-  if (input.run !== undefined && !isRunId(input.run)) throw new CliError(`--run takes a run id, got "${input.run}"`);
+  // The id as the run was given it: a CI job's `gh<run number>` names the run the same way its server did.
+  const run = input.run === undefined ? undefined : normalizeRunId(input.run);
+  if (input.run !== undefined && run === undefined) {
+    throw new CliError(`--run takes a run id (1-24 letters and digits), got "${input.run}"`);
+  }
   const ledgers = readLedgers(input.home).filter((ledger) => !running(ledger.file));
   // What each file still lists, as the drivers remove theirs. Entries are matched as read from their
   // own file, so two servers' entries with the same id never stand in for each other.
@@ -161,7 +165,7 @@ export async function runSweep(
     const { missing } = liveState(definition, input.env);
     const entries = ledgers
       .flatMap((ledger) => ledger.entries)
-      .filter((entry) => entry.channel === definition.name && (input.run === undefined || entry.run === input.run));
+      .filter((entry) => entry.channel === definition.name && (run === undefined || entry.run === run));
     if (!maintenance || missing.length > 0) {
       // What a ledger lists and nothing here can look at is still there, as far as anyone knows.
       const why = maintenance ? `${missing.join(", ")} not set` : `live ${definition.name} isn't built`;
@@ -180,7 +184,7 @@ export async function runSweep(
       ...(input.apiBase?.[definition.name] ? { apiBase: input.apiBase[definition.name] } : {}),
       entries,
       check: input.check,
-      run: input.run,
+      run,
       olderThanMs,
       now: input.now ?? Date.now(),
     });

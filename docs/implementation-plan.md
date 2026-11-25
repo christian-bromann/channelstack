@@ -242,7 +242,7 @@ Per platform:
 | Platform | Real container | Real actor | Live gaps (no public API) |
 |---|---|---|---|
 | Slack | App in a sandbox workspace: `appId` and `botToken`. channelstack never changes the app's configuration live | User token (`xoxp`) per test user, installed once in the sandbox | Button clicks, Stop, modal submit. Browser actor (8.5) |
-| GitHub | GitHub App (`appId` and private key) installed on a test org. Repos are created per session, named `channelstack-<run>-<n>` | Fine-grained PAT of a machine user | App install and permission-acceptance flows. Redelivery works through `POST /app/hook/deliveries/{id}/attempts` |
+| GitHub | GitHub App (`appId` and private key) installed on a test org. Repos are created per session, named `channelstack-run-<run>-<world>-<n>` | Fine-grained PAT of a machine user | App install and permission-acceptance flows. Redelivery works through `POST /app/hook/deliveries/{id}/attempts` |
 | Linear | OAuth app with the agent actor, in a test workspace and team | Personal API key per test user | Stopping or dismissing an agent session from the UI is unverified (spike). Redelivery is unclear |
 | Notion | Integration (internal or public) connected by hand, once, to a test teamspace page. Child pages inherit access, and the API can't add connections | Personal access token (PAT) per test user, which acts as that person | Resolving discussions and adding connections are UI-only (browser actor). No webhook redelivery API, so redelivery is fake-only |
 

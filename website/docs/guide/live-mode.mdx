@@ -83,7 +83,7 @@ Finding out the workspace (Slack's `auth.test`) is the only call made before the
 
 ## Run tags and cleanup
 
-Everything a test creates live is named with the run's tag, `channelstack-run-<run>-<n>`, plus the name the test gave it, so names stay unique in a shared workspace. Each object goes into a cleanup ledger and is removed when its session closes, newest first:
+Everything a test creates live is named with the run's tag, `channelstack-run-<run>-<world>-<n>`, plus the name the test gave it, so names stay unique in a shared workspace. Each object goes into a cleanup ledger and is removed when its session closes, newest first:
 
 | Platform | What cleanup does                                                                                                                               |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,7 +92,7 @@ Everything a test creates live is named with the run's tag, `channelstack-run-<r
 | Linear   | Deletes the session's team, with its issues, comments and agent sessions                                                                        |
 | Notion   | Moves the session's page to the trash, with everything in it                                                                                    |
 
-`CHANNELSTACK_RUN_ID` names the run: 1 to 24 letters and digits. CI should set it per job (`gh${{ github.run_id }}`), so a re-run keeps it. Without it, each server makes one up.
+`CHANNELSTACK_RUN_ID` names the run: 1 to 24 letters and digits. CI should set it per job (`gh${{ github.run_id }}`), so a re-run keeps it. A run of 7 or more digits is written in base 36 (`gh45602242231` becomes `ghky6ebav`), because Linear refuses a name that looks like a phone number; `sweep --run` does the same with the id you give it. Without it, each server makes one up.
 
 Each server keeps its ledger in `<home>/ledger/`, so a crash leaves a list behind for `channelstack sweep`.
 

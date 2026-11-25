@@ -188,7 +188,7 @@ jobs:
 How it differs from the fake job:
 
 - **Credentials are job-level `env`,** so the server (app credentials, allowlists, `CHANNELSTACK_RUN_ID`), the test process (people's tokens) and `doctor` and `sweep` all see them. Allowlists aren't secret, so they can be repository variables.
-- **`CHANNELSTACK_RUN_ID`** tags everything the run creates, and a re-run of the job keeps it. It must be 1 to 24 letters and digits.
+- **`CHANNELSTACK_RUN_ID`** tags everything the run creates, and a re-run of the job keeps it. It must be 1 to 24 letters and digits. A run of 7 or more digits, like GitHub's run number, goes into names in base 36 (Linear takes it for a phone number otherwise), and `sweep --run` finds the run by the same id.
 - **The agent runs with its real app**, not with `channelstack env` (which prints nothing for a live channel). Real Slack delivers to it; Socket Mode means the runner needs no public URL.
 - **The browser actor** needs each person's saved session: run `channelstack login slack --user ana` once on your machine and store the file's contents as a secret. `ubuntu-latest` has Chrome.
 - **`doctor`** fails the job before the tests when a credential is wrong or a session has expired.
