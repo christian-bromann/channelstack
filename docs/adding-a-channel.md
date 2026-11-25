@@ -13,9 +13,10 @@ The kit the driver is built on, all in `server/src/core/`:
 | Tokens and signing secrets | the driver's `secrets.ts` (`SecretFormat`s, helpers from `core/secrets`), named by the definition's `secrets`; their shapes as `tokenPatterns`, real tokens the fake never makes as `liveTokens` |
 | Webhooks | the driver's `signing.ts` on `core/signing/hmac.ts`; `deliveryKit(context, { driver, timeoutMs, retry: fixedRetries([...]), stamp, sign, secret })` sends, resends and lists them |
 | Deliveries and calls routes | `registerInspectionRoutes(router, { title, delivery, filters, redeliver, resend, calls, … })` |
+| A REST platform's fake API | `restApi(context, { driver, authorize, refusal, invalidJson, notFound })` from `core/fake/endpoint.ts`: each endpoint authorized, its body parsed, a refusal answered in the platform's shape, the call on record |
 | Route helpers | `refTo`, `pathParam`, `Awaitable`, `DeliveryView` from `core/router`; `iso` from `core/clock` |
 | Live clients | `LivePlatformRefusal` (`core/errors`), `waitRetryAfter` and `RATE_LIMIT_RETRIES` (`core/clock`), and `core/reality`, `core/people`, `core/ledger`, `core/safety`, `core/maintenance` as the other drivers use them |
-| Schema checks | an entry in `server/test/schemas/index.ts` (`SCHEMAS`), which the acceptance run then applies to every test |
+| Schema checks | for a platform that publishes a description of its API (OpenAPI, GraphQL): the validators in `server/test/schemas/<name>.ts` and their entry in `SCHEMAS` (`index.ts`), which the acceptance run then applies to every test. A platform without one types its payloads with its SDK's types instead (Notion) |
 
 ## The order
 

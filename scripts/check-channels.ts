@@ -66,6 +66,25 @@ for (const channel of CHANNELS) {
     envDocs.includes(`CHANNELSTACK_${upper}_WEBHOOK_URL`),
     `${of}: website/docs/reference/environment-variables.md doesn't name CHANNELSTACK_${upper}_WEBHOOK_URL`,
   );
+  need(
+    existsSync(join(ROOT, `server/test/integration/${name}-delivery.test.ts`)),
+    `${of}: no delivery cases, server/test/integration/${name}-delivery.test.ts`,
+  );
+  // A platform that publishes a description of its API is held to it; one that doesn't (Notion
+  // types its payloads with its SDK instead) has no validator file to register.
+  if (existsSync(join(ROOT, `server/test/schemas/${name}.ts`))) {
+    need(
+      new RegExp(`\\n  ${name}: \\{`).test(read("server/test/schemas/index.ts") ?? ""),
+      `${of}: server/test/schemas/${name}.ts isn't registered in server/test/schemas/index.ts (SCHEMAS)`,
+    );
+  }
+  need((read("docs/code-map.md") ?? "").includes(`(${title})`), `${of}: no rows for its driver in docs/code-map.md`);
+  if (channel.live) {
+    need(
+      new RegExp(`\\n  async ${name}\\(`).test(read("scripts/lib/live-agents.ts") ?? ""),
+      `${of}: no way to start its reference agent live in scripts/lib/live-agents.ts (LIVE_AGENTS)`,
+    );
+  }
   for (const variable of [...(channel.live?.credentials ?? []), channel.live?.allowlist].filter(Boolean)) {
     need(live.includes(`${variable}:`), `${of}: .github/workflows/live.yml doesn't pass ${variable} to the live run`);
   }

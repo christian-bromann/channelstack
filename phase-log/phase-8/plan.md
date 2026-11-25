@@ -38,9 +38,13 @@ Each pinned to an exact version at least two weeks old.
 | Package | Version | Why a library and not our code | License | Maintained |
 |---|---|---|---|---|
 | `postal-mime` (server) | 4.2.1 | Parses MIME messages (multipart, encodings, headers): what the fakes receive as `raw` and what a test's email carries. No dependencies, runs in Bun, and the `resend` SDK uses it too | MIT-0 | Released 2026-11-10 |
-| `nodemailer` (server) | 10.5.0 | Its `MailComposer` builds RFC 5322 messages, for Gmail's `raw` and Resend's raw downloads. No dependencies | MIT-0 | Released 2026-11-10 |
 | `resend` (dev: reference agent and tests) | 6.38.0 | The official SDK, as the reference agent's client and the R1–R3 receiver | MIT | Released 2026-11-10 |
 | `resend-openapi` (vendored file, by commit) | pinned SHA | Resend's own OpenAPI description, to validate answers and webhooks | MIT | Updated with the API |
+
+## Changed while building
+
+- **MIME moved to phase 9.** Resend's API answers JSON, so this phase only parses addresses (`postal-mime`); `nodemailer` comes with Gmail's `raw` format. Resend's attachments and a received email's raw message are #64.
+- **The kit's names.** `providerEndpoint` is `restApi` (Notion, echo and Resend use it), `PlatformRefusal` is `LivePlatformRefusal` (core already had a `PlatformRefusal` type), `retryAfter` is `waitRetryAfter`. `defineFake` wasn't built: each fake's seeding is its platform's own.
 
 ## Docs to update
 

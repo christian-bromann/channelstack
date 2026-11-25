@@ -287,15 +287,15 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 - **The channel kit** ([adding-a-channel.md](adding-a-channel.md)): what every driver repeated moves into core, and Slack, GitHub, Linear and Notion move onto it in the same commits, with their own copies deleted. The kit holds:
   - one channel list derived from the driver registry;
   - id, secret and token formats declared by each driver;
-  - the delivery kit (retry schedules, the emitter, delivery accessors) and the inspection routes, written once;
-  - `defineFake`, `providerEndpoint`, `PlatformRefusal` and `retryAfter`;
+  - the delivery kit (`deliveryKit`, `fixedRetries`) and the inspection routes (`registerInspectionRoutes`), written once;
+  - a fake's REST API (`restApi`, which Notion, echo and Resend use), a live platform's refusal (`LivePlatformRefusal`) and waiting out a rate limit (`waitRetryAfter`). Each fake's own setup stays in its driver: seeding is platform-specific, so there is no shared `defineFake`;
   - the fixtures and SDK channel unions, generated;
   - one harness table for the acceptance, live and conformance scripts;
   - schema validators registered per channel.
 - `ResendOptions`, `SlackResendOptions` and `LinearResendOptions` become `DeliveryResendOptions`, `SlackDeliveryResendOptions` and `LinearDeliveryResendOptions`, so they don't read as the Resend channel's types.
-- **The email core** (`server/src/core/email/`, `api/email.d.ts`): MIME, threading by `Message-ID`, `In-Reply-To` and `References`, addresses, email threads as transcripts, and the contract's email bases.
+- **The email core** (`server/src/core/email/`, `api/email.d.ts`): addresses, threading by `Message-ID`, `In-Reply-To` and `References`, email threads as transcripts, and the contract's email bases. Building MIME comes with Gmail's `raw` format in phase 9; Resend's attachments and a received email's raw message wait for it (#64).
 - **The Resend fake:**
-  - The REST surface the `resend` SDK uses: sending, batches, receiving and attachments.
+  - The REST surface the `resend` SDK uses: sending, batches, receiving (attachments: #64).
   - `email.received` and the outbound events, signed the Svix way, with Resend's retry schedule.
   - The `@resend.dev` test addresses, idempotency keys, the rate limit and Resend's error shape.
 - `resendChecks()`, a reference agent on the `resend` SDK, and its broken variant.
