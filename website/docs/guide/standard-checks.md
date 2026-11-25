@@ -130,4 +130,13 @@ The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECK
 
 ## In live mode
 
-Most checks are about delivery: retries, redeliveries, forged signatures, acknowledgement times. Live, the real platform delivers to your agent and channelstack can't touch the delivery, so those checks are [skipped](/docs/guide/live-mode) with the reason, and the conversation checks run against the real platform. The fake run on every pull request runs them all.
+Most checks are about delivery: retries, redeliveries, forged signatures, acknowledgement times. Live, the real platform delivers to your agent, so a message or comment has no delivery to retry or forge, and the checks don't all skip:
+
+| Checks | Live |
+| --- | --- |
+| `slack.bad-signature`, `slack.ack`, `github.bad-signature`, `notion.bad-signature` | **Fail**, with "caused no delivery". List them in `skip` in a live run |
+| `slack.retry`, `slack.redelivery`, `github.redelivery`, `notion.redelivery` | Step over the delivery, then skip at their exact count, because waiting for quiet needs proxy mode live ([Live mode](/docs/guide/live-mode#what-skips-and-what-fails)) |
+| `linear.redelivery`, `linear.stale`, `linear.bad-signature` | Skip, with the reason |
+| `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason |
+
+The rest run against the real platform. Making every delivery check skip live with its own reason is [#46](https://github.com/christian-bromann/channelstack/issues/46). The fake run on every pull request runs them all.
