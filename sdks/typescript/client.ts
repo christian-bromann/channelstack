@@ -8,6 +8,7 @@ export { type FileInput, setFilesRoot } from "./runtime/files.ts";
 export { type InSession, QUIET } from "./runtime/client.ts";
 export type { LaunchOptions } from "./runtime/launcher.ts";
 export { ChannelstackError, onRefusal, unreportedRefusals } from "./runtime/transport.ts";
+export type * from "./types.ts";
 export {
   fromMatches,
   type QuietOptions,

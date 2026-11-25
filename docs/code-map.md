@@ -122,7 +122,7 @@ The same modules with the same names in every language.
 | Durations | `duration` | Parsing `"3s"`, `"750ms"` |
 | Files | `files` | Reading fixture files and directories a test hands over (`readTree`, `readChanges`), and where relative paths start (`setFilesRoot`) |
 
-The TypeScript SDK's entry is `sdks/typescript/client.ts`, exported as the package root (`channelstack`) and as `channelstack/client`, and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary. The Rust SDK is the `channelstack` crate (`sdks/rust`, in the repository's Cargo workspace, toolchain in `rust-toolchain.toml`); its errors are `runtime/error.rs`, and its launcher, like Python's, finds the binary at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH`; neither bundles nor downloads one.
+The TypeScript SDK's entry is `sdks/typescript/client.ts`, exported as the package root (`channelstack`) and as `channelstack/client`. With it go `sdks/typescript/types.ts`, the contract's type names the generated SDK has no type for (unions of handles, option bags), each read from the generated code; and `sdks/typescript/bin/channelstack.mjs` runs the platform's server binary. The Rust SDK is the `channelstack` crate (`sdks/rust`, in the repository's Cargo workspace, toolchain in `rust-toolchain.toml`); its errors are `runtime/error.rs`, and its launcher, like Python's, finds the binary at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH`; neither bundles nor downloads one.
 
 ## Scenarios (`scenarios/`)
 

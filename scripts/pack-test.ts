@@ -7,6 +7,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
+import ts from "typescript";
+
 import rootPackage from "../package.json" with { type: "json" };
 import sdkPackage from "../sdks/typescript/package.json" with { type: "json" };
 import serverPackage from "../server/package.json" with { type: "json" };
@@ -23,6 +25,30 @@ import {
 import { capture, run } from "./lib/process.ts";
 import { startBinary } from "./lib/server.ts";
 import { runSmoke } from "./smoke.ts";
+
+/**
+ * The type names the contract exports as `channelstack`, but the test framework's own, which
+ * `channelstack/vitest` has, and `SlackInjectedFault`, the SDK's `SlackFault` (#37).
+ */
+function contractTypeNames(): string[] {
+  const elsewhere = new Set([
+    "ChannelstackFixture",
+    "ChannelstackIntegrationOptions",
+    "ChannelstackMatchers",
+    "TextOptions",
+    "SlackInjectedFault",
+  ]);
+  const contract = join(ROOT, "api", "index.d.ts");
+  const program = ts.createProgram([contract], { noEmit: true });
+  const checker = program.getTypeChecker();
+  const module = checker.getSymbolAtLocation(program.getSourceFile(contract) as ts.SourceFile);
+  if (!module) throw new Error(`Can't read ${contract}`);
+  return checker
+    .getExportsOfModule(module)
+    .map((symbol) => symbol.name)
+    .filter((name) => !elsewhere.has(name))
+    .sort();
+}
 
 const host = hostTarget();
 if (!existsSync(binaryPath(host)) || !existsSync(join(ROOT, "sdks/typescript/dist/sdks/typescript/client.js"))) {
@@ -137,16 +163,26 @@ try {
     { cwd: project },
   ).trim();
   if (sameModule !== "true") throw new Error('`import "channelstack"` is not the client that `channelstack/client` is');
+  // Every type name the contract (`api/index.d.ts`) gives `channelstack`, imported from the installed package.
+  const names = contractTypeNames();
   writeFileSync(
     join(project, "types.ts"),
-    'import type { SlackConversation, SlackUser } from "channelstack";\nimport { connect } from "channelstack";\nexport type People = [SlackUser, SlackConversation];\nexport const open = connect;\n',
+    [
+      `import type { ${names.join(", ")} } from "channelstack";`,
+      'import { connect } from "channelstack";',
+      `export type Every = [${names.join(", ")}];`,
+      "export const open = connect;",
+      "",
+    ].join("\n"),
   );
   run(
     join(ROOT, "node_modules", ".bin", "tsc"),
     ["--noEmit", "--strict", "--skipLibCheck", "--module", "nodenext", "--moduleResolution", "nodenext", "types.ts"],
     { cwd: project },
   );
-  console.log('import type { SlackUser } from "channelstack" type-checks against the installed package');
+  console.log(
+    `import type { … } from "channelstack": the contract's ${names.length} type names type-check against the installed package`,
+  );
 
   // The scenario runner is copied in, so its `channelstack/client` import resolves to the installed package.
   const runner = join(project, "run.ts");
