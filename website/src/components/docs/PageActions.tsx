@@ -77,7 +77,7 @@ const MCP_ACTIONS: Action[] = [
   },
   {
     key: "vscode-mcp",
-    icon: "editor",
+    icon: "vscode",
     label: "Add to VS Code",
     hint: "Installs the docs' MCP server",
     href: () =>
