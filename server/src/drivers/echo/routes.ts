@@ -1,11 +1,10 @@
 import { z } from "@hono/zod-openapi";
 
-import type { CapabilityTable, DriverRouter } from "../../core/router/index.ts";
+import { type CapabilityTable, type DriverRouter, refTo } from "../../core/router/index.ts";
 import { renderTranscript } from "./transcript.ts";
 import type { EchoWorld } from "./world.ts";
 
 const resource = { "x-channelstack-resource": { id: "id" } };
-const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
 
 const EchoPrincipal = z
   .object({ id: z.string(), name: z.string(), kind: z.enum(["user", "app"]) })

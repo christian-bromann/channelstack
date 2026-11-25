@@ -1727,40 +1727,6 @@ fn run_slack_delivery_refresh<'a>(
     })
 }
 
-fn run_slack_delivery_retry<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_after = options.get("after").cloned().unwrap_or(Value::Null);
-        let p_reason = options.get("reason").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/slack/deliveries/{}/retry",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "POST",
-            path,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
-                wire.insert("reason".into(), p_reason.clone());
-                wire
-            }),
-            None,
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
 fn run_slack_delivery_resend<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -1787,6 +1753,40 @@ fn run_slack_delivery_resend<'a>(
                 wire.insert("badSignature".into(), p_bad_signature.clone());
                 wire.insert("stale".into(), p_stale.clone());
                 wire.insert("headers".into(), p_headers.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_delivery_retry<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_after = options.get("after").cloned().unwrap_or(Value::Null);
+        let p_reason = options.get("reason").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/deliveries/{}/retry",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
+                wire.insert("reason".into(), p_reason.clone());
                 wire
             }),
             None,
@@ -2056,7 +2056,7 @@ fn run_git_hub_fixture_deliveries<'a>(
     })
 }
 
-fn run_git_hub_fixture_app_calls<'a>(
+fn run_git_hub_fixture_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2067,10 +2067,7 @@ fn run_git_hub_fixture_app_calls<'a>(
         let mut args = args.into_iter();
         let p_operation = options.get("operation").cloned().unwrap_or(Value::Null);
         let p_error = options.get("error").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/github/app-calls",
-            encode_segment(ctx.session()?)
-        );
+        let path = format!("/sessions/{}/github/calls", encode_segment(ctx.session()?));
         send(
             ctx,
             "GET",
@@ -2089,7 +2086,7 @@ fn run_git_hub_fixture_app_calls<'a>(
     })
 }
 
-fn run_git_hub_fixture_calls<'a>(
+fn run_git_hub_fixture_app_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2100,7 +2097,10 @@ fn run_git_hub_fixture_calls<'a>(
         let mut args = args.into_iter();
         let p_operation = options.get("operation").cloned().unwrap_or(Value::Null);
         let p_error = options.get("error").cloned().unwrap_or(Value::Null);
-        let path = format!("/sessions/{}/github/calls", encode_segment(ctx.session()?));
+        let path = format!(
+            "/sessions/{}/github/app-calls",
+            encode_segment(ctx.session()?)
+        );
         send(
             ctx,
             "GET",
@@ -8852,17 +8852,6 @@ impl SlackDelivery {
         )
     }
 
-    /// Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental.
-    pub fn retry(&self) -> SlackDeliveryRetry {
-        SlackDeliveryRetry(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_delivery_retry,
-            as_value,
-        ))
-    }
-
     /// Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window. Experimental.
     pub fn resend(&self) -> SlackDeliveryResend {
         SlackDeliveryResend(Call::new(
@@ -8870,6 +8859,17 @@ impl SlackDelivery {
             &self.data,
             vec![],
             run_slack_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental.
+    pub fn retry(&self) -> SlackDeliveryRetry {
+        SlackDeliveryRetry(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_delivery_retry,
             as_value,
         ))
     }
@@ -8882,32 +8882,6 @@ impl SlackDelivery {
             seen: self.seen.clone(),
             options: Map::new(),
         }
-    }
-}
-
-/// The options of [`SlackDelivery::retry`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct SlackDeliveryRetry(Call<Value>);
-
-impl SlackDeliveryRetry {
-    /// `after`.
-    pub fn after(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("after", value))
-    }
-    /// `reason`.
-    pub fn reason(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("reason", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for SlackDeliveryRetry {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
     }
 }
 
@@ -8934,6 +8908,32 @@ impl SlackDeliveryResend {
 }
 
 impl IntoFuture for SlackDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackDelivery::retry`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackDeliveryRetry(Call<Value>);
+
+impl SlackDeliveryRetry {
+    /// `after`.
+    pub fn after(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("after", value))
+    }
+    /// `reason`.
+    pub fn reason(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("reason", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackDeliveryRetry {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {
@@ -9445,17 +9445,6 @@ impl GitHubFixture {
         ))
     }
 
-    /// The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental.
-    pub fn app_calls(&self) -> GitHubFixtureAppCalls {
-        GitHubFixtureAppCalls(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_git_hub_fixture_app_calls,
-            as_value,
-        ))
-    }
-
     /// The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session. Experimental.
     pub fn calls(&self) -> GitHubFixtureCalls {
         GitHubFixtureCalls(Call::new(
@@ -9463,6 +9452,17 @@ impl GitHubFixture {
             &self.data,
             vec![],
             run_git_hub_fixture_calls,
+            as_value,
+        ))
+    }
+
+    /// The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental.
+    pub fn app_calls(&self) -> GitHubFixtureAppCalls {
+        GitHubFixtureAppCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_fixture_app_calls,
             as_value,
         ))
     }
@@ -9592,32 +9592,6 @@ impl IntoFuture for GitHubFixtureDeliveries {
     }
 }
 
-/// The options of [`GitHubFixture::app_calls`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct GitHubFixtureAppCalls(Call<Value>);
-
-impl GitHubFixtureAppCalls {
-    /// `operation`.
-    pub fn operation(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("operation", value))
-    }
-    /// `error`.
-    pub fn error(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("error", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for GitHubFixtureAppCalls {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
 /// The options of [`GitHubFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct GitHubFixtureCalls(Call<Value>);
 
@@ -9637,6 +9611,32 @@ impl GitHubFixtureCalls {
 }
 
 impl IntoFuture for GitHubFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubFixture::app_calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubFixtureAppCalls(Call<Value>);
+
+impl GitHubFixtureAppCalls {
+    /// `operation`.
+    pub fn operation(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("operation", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubFixtureAppCalls {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {
@@ -16580,11 +16580,11 @@ pub async fn call_by_name(
         ("SlackDelivery", "refresh") => {
             run_slack_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
-        ("SlackDelivery", "retry") => {
-            run_slack_delivery_retry(&target.ctx, &target.data, args, options).await?
-        }
         ("SlackDelivery", "resend") => {
             run_slack_delivery_resend(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackDelivery", "retry") => {
+            run_slack_delivery_retry(&target.ctx, &target.data, args, options).await?
         }
         ("SlackStream", "refresh") => {
             run_slack_stream_refresh(&target.ctx, &target.data, args, options).await?
@@ -16610,11 +16610,11 @@ pub async fn call_by_name(
         ("GitHubFixture", "deliveries") => {
             run_git_hub_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
-        ("GitHubFixture", "appCalls") => {
-            run_git_hub_fixture_app_calls(&target.ctx, &target.data, args, options).await?
-        }
         ("GitHubFixture", "calls") => {
             run_git_hub_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubFixture", "appCalls") => {
+            run_git_hub_fixture_app_calls(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubApp", "installationId") => {
             run_git_hub_app_installation_id(&target.ctx, &target.data, args, options).await?

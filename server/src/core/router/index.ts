@@ -11,4 +11,5 @@ export type {
   SocketPeer,
   SocketSession,
 } from "./driver.ts";
+export { type Awaitable, type DeliveryView, pathParam, refTo, registerInspectionRoutes } from "./inspection.ts";
 export { DriverRouter, invalidArgument, registerRoute, SessionParams } from "./route.ts";

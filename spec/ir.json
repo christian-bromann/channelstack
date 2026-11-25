@@ -3818,72 +3818,6 @@
           }
         },
         {
-          "name": "retry",
-          "kind": "method",
-          "summary": "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
-          "stability": "experimental",
-          "http": {
-            "verb": "POST",
-            "path": "/sessions/{session}/slack/deliveries/{delivery}/retry",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [
-            {
-              "name": "after",
-              "type": {
-                "kind": "duration"
-              },
-              "optional": true,
-              "in": "body"
-            },
-            {
-              "name": "reason",
-              "type": {
-                "kind": "enum",
-                "values": [
-                  "http_timeout",
-                  "http_error",
-                  "too_many_redirects"
-                ]
-              },
-              "optional": true,
-              "in": "body"
-            }
-          ],
-          "returns": {
-            "kind": "named",
-            "name": "DeliveryAttempt"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false,
-          "live": {
-            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
-          }
-        },
-        {
           "name": "resend",
           "kind": "method",
           "summary": "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
@@ -3928,6 +3862,72 @@
                 "values": {
                   "kind": "string"
                 }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
+          "name": "retry",
+          "kind": "method",
+          "summary": "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/slack/deliveries/{delivery}/retry",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "after",
+              "type": {
+                "kind": "duration"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "reason",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "http_timeout",
+                  "http_error",
+                  "too_many_redirects"
+                ]
               },
               "optional": true,
               "in": "body"
@@ -4709,71 +4709,6 @@
           "dispose": false
         },
         {
-          "name": "appCalls",
-          "kind": "method",
-          "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/github/app-calls",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              }
-            ]
-          },
-          "args": [],
-          "options": [
-            {
-              "name": "operation",
-              "type": {
-                "kind": "string"
-              },
-              "optional": true,
-              "in": "query"
-            },
-            {
-              "name": "error",
-              "type": {
-                "kind": "union",
-                "types": [
-                  {
-                    "kind": "literal",
-                    "value": true
-                  },
-                  {
-                    "kind": "string"
-                  }
-                ]
-              },
-              "optional": true,
-              "in": "query"
-            }
-          ],
-          "returns": {
-            "kind": "named",
-            "name": "GitHubAppCalls"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential"
-          ],
-          "dispose": false,
-          "live": {
-            "requires": "proxy",
-            "reason": "GitHub doesn't report the App's calls; proxy mode sees them"
-          }
-        },
-        {
           "name": "calls",
           "kind": "method",
           "summary": "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
@@ -4819,6 +4754,71 @@
           "returns": {
             "kind": "named",
             "name": "GitHubApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "requires": "proxy",
+            "reason": "GitHub doesn't report the App's calls; proxy mode sees them"
+          }
+        },
+        {
+          "name": "appCalls",
+          "kind": "method",
+          "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/app-calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubAppCalls"
           },
           "errors": [
             "unauthorized",
@@ -15952,7 +15952,7 @@
       }
     },
     {
-      "name": "GitHubAppCalls",
+      "name": "GitHubApiCalls",
       "type": {
         "kind": "array",
         "items": {
@@ -16048,7 +16048,7 @@
       }
     },
     {
-      "name": "GitHubApiCalls",
+      "name": "GitHubAppCalls",
       "type": {
         "kind": "array",
         "items": {

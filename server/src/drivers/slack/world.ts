@@ -1,4 +1,5 @@
 import { ProtocolError } from "../../core/errors/index.ts";
+import type { Awaitable } from "../../core/router/index.ts";
 
 /** The Slack fake's nouns, as the control API and the transcript see them. */
 
@@ -166,9 +167,6 @@ export interface SlackMessageInput {
   blocks?: unknown[] | undefined;
   metadata?: unknown;
 }
-
-/** A value now (the fake), or once the platform answered (live). */
-type Awaitable<T> = T | Promise<T>;
 
 /** The same world answering everything at once: the fake, which never waits for a platform. */
 export type Immediate<World> = {

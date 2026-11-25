@@ -9,7 +9,7 @@ import {
   type Reality,
   unsupportedInLive,
 } from "../../core/reality/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
+import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -33,8 +33,6 @@ import type {
   SlackViewRecord,
   SlackWorld,
 } from "./world.ts";
-
-const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
 
 const SlackUser = z
   .object({
@@ -1121,32 +1119,29 @@ export function registerSlackRoutes(
         .deliveries.map((id) => deliveryWire(fake.delivery(session.id, id))),
   });
 
-  const DeliveryParams = z.object({ delivery: z.string().openapi({ param: { name: "delivery", in: "path" } }) });
-
-  router.route({
-    method: "get",
-    path: "/deliveries",
-    summary: "Every event channelstack sent the agent for this session, with every attempt",
-    response: z.array(SlackDelivery).openapi("SlackDeliveries"),
-    sdkMethod: { on: "SlackFixture", name: "deliveries" },
-    live: DELIVERY_IS_THE_PLATFORMS,
+  registerInspectionRoutes(router, {
+    title: "Slack",
+    events: deps.events,
     stability,
-    handler: ({ session }) => fake.deliveries(session.id).map(deliveryWire),
+    deliveries: fake,
+    delivery: { schema: SlackDelivery, wire: deliveryWire },
+    listSummary: "Every event channelstack sent the agent for this session, with every attempt",
+    // Slack's own word is retry, with its options: registered below.
+    redeliver: false,
+    resend: {
+      summary:
+        "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
+      options: ["badSignature", "stale", "headers"],
+    },
+    calls: {
+      schema: SlackApiCall,
+      summary:
+        "The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session",
+      live: AGENT_SIDE,
+    },
   });
 
-  router.route({
-    method: "get",
-    path: "/deliveries/{delivery}",
-    summary: "Re-read a delivery: its attempts and status",
-    params: DeliveryParams,
-    response: SlackDelivery,
-    errors: ["not_found"],
-    sdkMethod: { on: "SlackDelivery", name: "refresh" },
-    waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params }) => deliveryWire(fake.delivery(session.id, params.delivery)),
-  });
+  const DeliveryParams = z.object({ delivery: pathParam("delivery") });
 
   router.route({
     method: "post",
@@ -1168,41 +1163,6 @@ export function registerSlackRoutes(
     stability,
     handler: ({ session, params, body }) =>
       fake.retry(session.id, params.delivery, { afterMs: body.after, reason: body.reason }),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/resend",
-    summary:
-      "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
-    params: DeliveryParams,
-    body: z
-      .object({
-        badSignature: z.boolean().default(false),
-        stale: z.boolean().default(false),
-        headers: z.record(z.string(), z.string()).optional(),
-      })
-      .openapi("SlackResendBody"),
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "SlackDelivery", name: "resend", options: ["badSignature", "stale", "headers"] },
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
-  });
-
-  router.route({
-    method: "get",
-    path: "/calls",
-    summary:
-      "The Web API calls the agent made about this session's conversations, people and files. Calls about nothing a session owns (auth.test, users.list) are in no session",
-    query: CallsQuery,
-    response: z.array(SlackApiCall).openapi("SlackApiCalls"),
-    sdkMethod: { on: "SlackFixture", name: "calls", options: ["operation", "error"] },
-    waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
-    live: AGENT_SIDE,
-    stability,
-    handler: ({ session, query }) => readCalls(deps.events, session.id, "slack", query),
   });
 
   router.route({

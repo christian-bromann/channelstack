@@ -5,7 +5,7 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
+import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -27,8 +27,6 @@ import type {
   LinearUserRecord,
 } from "./world.ts";
 
-const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
-const pathParam = (name: string) => z.string().openapi({ param: { name, in: "path" } });
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const LinearUser = z
@@ -968,96 +966,35 @@ export function registerLinearRoutes(
 
   // --- Deliveries and calls ---------------------------------------------------------------------
 
-  const DeliveryParams = z.object({ delivery: pathParam("delivery") });
-
-  router.route({
-    method: "get",
-    path: "/deliveries",
-    summary: "Every webhook channelstack sent the agent for this session, with every attempt",
-    query: z.object({
-      type: z
-        .string()
-        .optional()
-        .openapi({
-          param: { name: "type", in: "query" },
-          description: "Only this resource type, e.g. `AgentSessionEvent`.",
-        }),
-      resource: z
-        .string()
-        .optional()
-        .openapi({
-          param: { name: "resource", in: "query" },
-          description: "Only deliveries about this issue.",
-          ...refTo("LinearIssue"),
-        }),
-    }),
-    response: z.array(LinearDelivery).openapi("LinearDeliveries"),
-    sdkMethod: { on: "LinearFixture", name: "deliveries", options: ["type", "resource"] },
-    live: DELIVERY_IS_THE_PLATFORMS,
+  registerInspectionRoutes(router, {
+    title: "Linear",
+    events: deps.events,
     stability,
-    handler: ({ session, query }) =>
-      fake
-        .deliveries(session.id)
-        .filter(({ request }) => query.type === undefined || request.type === query.type)
-        .filter(({ request }) => query.resource === undefined || request.meta?.issue === query.resource)
-        .map(deliveryWire),
-  });
-
-  router.route({
-    method: "get",
-    path: "/deliveries/{delivery}",
-    summary: "Re-read a delivery: its attempts and status",
-    params: DeliveryParams,
-    response: LinearDelivery,
-    errors: ["not_found"],
-    sdkMethod: { on: "LinearDelivery", name: "refresh" },
-    waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params }) => deliveryWire(fake.delivery(session.id, params.delivery)),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/redeliver",
-    summary: "Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature",
-    params: DeliveryParams,
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "LinearDelivery", name: "redeliver" },
-    live: NO_REDELIVERY,
-    stability,
-    handler: ({ session, params }) => fake.redeliver(session.id, params.delivery),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/resend",
-    summary:
-      "Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's",
-    params: DeliveryParams,
-    body: z
-      .object({ badSignature: z.boolean().default(false), stale: z.boolean().default(false) })
-      .openapi("LinearResendBody"),
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "LinearDelivery", name: "resend", options: ["badSignature", "stale"] },
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
-  });
-
-  router.route({
-    method: "get",
-    path: "/calls",
-    summary:
-      "The GraphQL operations the agent sent about this session's issues and sessions, by root field (`agentActivityCreate`)",
-    query: CallsQuery,
-    response: z.array(LinearApiCall).openapi("LinearApiCalls"),
-    sdkMethod: { on: "LinearFixture", name: "calls", options: ["operation", "error"] },
-    waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
-    live: AGENT_SIDE,
-    stability,
-    handler: ({ session, query }) => readCalls(deps.events, session.id, "linear", query),
+    deliveries: fake,
+    delivery: { schema: LinearDelivery, wire: deliveryWire },
+    listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
+    filters: {
+      type: "Only this resource type, e.g. `AgentSessionEvent`.",
+      resource: {
+        description: "Only deliveries about this issue.",
+        ref: "LinearIssue",
+        matches: ({ request }, issue) => request.meta?.issue === issue,
+      },
+    },
+    live: { redeliver: NO_REDELIVERY },
+    redeliver: {
+      summary: "Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature",
+    },
+    resend: {
+      summary:
+        "Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's",
+      options: ["badSignature", "stale"],
+    },
+    calls: {
+      schema: LinearApiCall,
+      summary:
+        "The GraphQL operations the agent sent about this session's issues and sessions, by root field (`agentActivityCreate`)",
+      live: AGENT_SIDE,
+    },
   });
 }

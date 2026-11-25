@@ -523,7 +523,7 @@ function decodeGitHubDeliveries(ctx: HandleContext, data: GitHubDeliveriesWire):
   return data.map((item) => new GitHubDelivery(ctx, item));
 }
 
-export type GitHubAppCalls = GitHubApiCall[];
+export type GitHubApiCalls = GitHubApiCall[];
 
 export interface GitHubApiCall {
   id: string;
@@ -539,7 +539,7 @@ export interface GitHubApiCall {
   error?: string;
 }
 
-export type GitHubApiCalls = GitHubApiCall[];
+export type GitHubAppCalls = GitHubApiCall[];
 
 export interface LinearIssueState {
   name: string;
@@ -1601,17 +1601,17 @@ export class SlackDelivery {
     return new SlackDelivery(ctx, data);
   }
 
-  /** Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental. */
-  async retry(options: { after?: Duration; reason?: "http_timeout" | "http_error" | "too_many_redirects" } = {}): Promise<DeliveryAttempt> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries/${segment(this.id)}/retry`, { body: { after: options.after === undefined ? undefined : parseDuration(options.after), reason: options.reason } })) as DeliveryAttempt;
-    return data;
-  }
-
   /** Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window. Experimental. */
   async resend(options: { badSignature?: boolean; stale?: boolean; headers?: Record<string, string> } = {}): Promise<DeliveryAttempt> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale, headers: options.headers } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental. */
+  async retry(options: { after?: Duration; reason?: "http_timeout" | "http_error" | "too_many_redirects" } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/deliveries/${segment(this.id)}/retry`, { body: { after: options.after === undefined ? undefined : parseDuration(options.after), reason: options.reason } })) as DeliveryAttempt;
     return data;
   }
 
@@ -1811,17 +1811,17 @@ export class GitHubFixture {
     return decodeGitHubDeliveries(ctx, data);
   }
 
-  /** The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental. */
-  async appCalls(options: { operation?: string; error?: true | string } = {}): Promise<GitHubAppCalls> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/app-calls`, { query: { operation: options.operation, error: options.error } })) as GitHubAppCalls;
-    return data;
-  }
-
   /** The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session. Experimental. */
   async calls(options: { operation?: string; error?: true | string } = {}): Promise<GitHubApiCalls> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/calls`, { query: { operation: options.operation, error: options.error } })) as GitHubApiCalls;
+    return data;
+  }
+
+  /** The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental. */
+  async appCalls(options: { operation?: string; error?: true | string } = {}): Promise<GitHubAppCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/app-calls`, { query: { operation: options.operation, error: options.error } })) as GitHubAppCalls;
     return data;
   }
 

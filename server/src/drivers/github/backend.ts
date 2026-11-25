@@ -1,4 +1,5 @@
 import type { DeliveryAttempt, DeliveryRecord } from "../../core/delivery/index.ts";
+import type { Awaitable, DeliveryView } from "../../core/router/index.ts";
 import type { GitHubIssueChanges, GitHubIssueInput } from "./fake/issues.ts";
 import type { GitHubRepoInput, GitHubUserInput } from "./fake/repos.ts";
 import type { GitHubStore } from "./fake/store.ts";
@@ -9,14 +10,6 @@ import type {
   GitHubRepoRecord,
   GitHubUserRecord,
 } from "./world.ts";
-
-/** A value now (the fake), or once GitHub answered (live). */
-type Awaitable<T> = T | Promise<T>;
-
-/** A delivery as the routes show it: the fake's own, or one of the App's delivery log on GitHub. */
-export type GitHubDeliveryView = Pick<DeliveryRecord, "attempts"> & {
-  request: Pick<DeliveryRecord["request"], "id" | "type" | "meta">;
-};
 
 /**
  * What people do on GitHub that works live, written once. The fake implements it over its world
@@ -56,8 +49,8 @@ export interface GitHubWorld {
   refresh(session: string, issue: GitHubIssueRecord): Awaitable<void>;
 
   /** The deliveries to the agent about this session's repositories, oldest first. */
-  deliveries(session: string): Awaitable<GitHubDeliveryView[]>;
-  delivery(session: string, guid: string): Awaitable<GitHubDeliveryView>;
+  deliveries(session: string): Awaitable<DeliveryView[]>;
+  delivery(session: string, guid: string): Awaitable<DeliveryView>;
   /** Redeliver from the App's delivery log: the same GUID, a new attempt. */
   redeliver(session: string, guid: string): Awaitable<DeliveryAttempt>;
 }

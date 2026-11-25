@@ -1358,35 +1358,6 @@ let updated = delivery.refresh().await?;
 
 **Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
 
-### retry()
-
-Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const deliveryAttempt = await delivery.retry({ after });
-```
-
-```python title="Python"
-delivery_attempt = await delivery.retry(after=after)
-```
-
-```rust title="Rust"
-let delivery_attempt = delivery.retry().after(after).await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `after` | `after` | `Duration` | no | option |
-| `reason` | `reason` | `"http_timeout" \| "http_error" \| "too_many_redirects"` | no | option |
-
-**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
-
 ### resend()
 
 Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window.
@@ -1412,6 +1383,35 @@ let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
 | `badSignature` | `bad_signature` | `boolean` | no | option |
 | `stale` | `stale` | `boolean` | no | option |
 | `headers` | `headers` | `Record<string, string>` | no | option |
+
+**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### retry()
+
+Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const deliveryAttempt = await delivery.retry({ after });
+```
+
+```python title="Python"
+delivery_attempt = await delivery.retry(after=after)
+```
+
+```rust title="Rust"
+let delivery_attempt = delivery.retry().after(after).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python · Rust | Type | Required | |
+|---|---|---|---|---|
+| `after` | `after` | `Duration` | no | option |
+| `reason` | `reason` | `"http_timeout" \| "http_error" \| "too_many_redirects"` | no | option |
 
 **Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
 

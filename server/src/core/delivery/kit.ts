@@ -53,7 +53,7 @@ export interface PlatformDeliveries {
 }
 
 /** One delivery to send. What the platform always sends the same way comes from `PlatformDeliveries`. */
-export type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "retry" | "stamp"> & {
+type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "retry" | "stamp"> & {
   /** Sign this one differently: a request the platform doesn't sign (Notion's verification). */
   readonly sign?: DeliveryRequest["sign"];
   /** `false`: the platform doesn't retry this one (Slack's interactions). */
@@ -63,7 +63,7 @@ export type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "
 };
 
 /** How a test sends a delivery again: forged, stale, or with extra headers. */
-export interface ForgeOptions {
+interface ForgeOptions {
   readonly badSignature?: boolean;
   readonly stale?: boolean;
   readonly headers?: Readonly<Record<string, string>> | undefined;

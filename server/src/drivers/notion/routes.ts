@@ -4,7 +4,7 @@ import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
 import type { EventLog } from "../../core/events/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
+import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -30,8 +30,6 @@ import type {
   NotionUserRecord,
 } from "./world.ts";
 
-const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
-const pathParam = (name: string) => z.string().openapi({ param: { name, in: "path" } });
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const NotionUser = z
@@ -857,91 +855,34 @@ export function registerNotionRoutes(
 
   // --- Deliveries and calls ---------------------------------------------------------------------
 
-  router.route({
-    method: "get",
-    path: "/deliveries",
-    summary: "Every webhook channelstack sent the agent for this session, with every attempt",
-    query: z.object({
-      type: z
-        .string()
-        .optional()
-        .openapi({
-          param: { name: "type", in: "query" },
-          description: "Only this event type, e.g. `comment.created`.",
-        }),
-      resource: z
-        .string()
-        .optional()
-        .openapi({
-          param: { name: "resource", in: "query" },
-          description: "Only deliveries about this page.",
-          ...refTo("NotionPage"),
-        }),
-    }),
-    response: z.array(NotionDelivery).openapi("NotionDeliveries"),
-    sdkMethod: { on: "NotionFixture", name: "deliveries", options: ["type", "resource"] },
-    live: DELIVERY_IS_THE_PLATFORMS,
+  registerInspectionRoutes(router, {
+    title: "Notion",
+    events: deps.events,
     stability,
-    handler: ({ session, query }) =>
-      fake
-        .deliveries(session.id)
-        .filter(({ request }) => query.type === undefined || request.type === query.type)
-        .filter(({ request }) => query.resource === undefined || request.meta?.page === query.resource)
-        .map(deliveryWire),
-  });
-
-  router.route({
-    method: "get",
-    path: "/deliveries/{delivery}",
-    summary: "Re-read a delivery: its attempts and status",
-    params: DeliveryParams,
-    response: NotionDelivery,
-    errors: ["not_found"],
-    sdkMethod: { on: "NotionDelivery", name: "refresh" },
-    waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params }) => deliveryWire(fake.delivery(session.id, params.delivery)),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/redeliver",
-    summary: "Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again",
-    params: DeliveryParams,
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "NotionDelivery", name: "redeliver" },
-    live: NO_REDELIVERY,
-    stability,
-    handler: ({ session, params }) => fake.redeliver(session.id, params.delivery),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/resend",
-    summary: "Send the delivery again, signed with a token that isn't the subscription's",
-    params: DeliveryParams,
-    body: z.object({ badSignature: z.boolean().default(false) }).openapi("NotionResendBody"),
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "NotionDelivery", name: "resend", options: ["badSignature"] },
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
-  });
-
-  router.route({
-    method: "get",
-    path: "/calls",
-    summary:
-      "The REST calls the agent made about this session's pages, by the client's method name (`comments.create`)",
-    query: CallsQuery,
-    response: z.array(NotionApiCall).openapi("NotionApiCalls"),
-    sdkMethod: { on: "NotionFixture", name: "calls", options: ["operation", "error"] },
-    waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
-    live: AGENT_SIDE,
-    stability,
-    handler: ({ session, query }) => readCalls(deps.events, session.id, "notion", query),
+    deliveries: fake,
+    delivery: { schema: NotionDelivery, wire: deliveryWire },
+    listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
+    filters: {
+      type: "Only this event type, e.g. `comment.created`.",
+      resource: {
+        description: "Only deliveries about this page.",
+        ref: "NotionPage",
+        matches: ({ request }, page) => request.meta?.page === page,
+      },
+    },
+    live: { redeliver: NO_REDELIVERY },
+    redeliver: {
+      summary: "Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again",
+    },
+    resend: {
+      summary: "Send the delivery again, signed with a token that isn't the subscription's",
+      options: ["badSignature"],
+    },
+    calls: {
+      schema: NotionApiCall,
+      summary:
+        "The REST calls the agent made about this session's pages, by the client's method name (`comments.create`)",
+      live: AGENT_SIDE,
+    },
   });
 }

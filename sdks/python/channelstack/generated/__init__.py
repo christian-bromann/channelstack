@@ -742,7 +742,7 @@ type GitHubReviewCommentReplies = list[GitHubReviewComment]
 type GitHubDeliveries = list[GitHubDelivery]
 
 
-type GitHubAppCalls = list[GitHubApiCall]
+type GitHubApiCalls = list[GitHubApiCall]
 
 
 @dataclass(frozen=True)
@@ -776,7 +776,7 @@ class GitHubApiCall:
         )
 
 
-type GitHubApiCalls = list[GitHubApiCall]
+type GitHubAppCalls = list[GitHubApiCall]
 
 
 @dataclass(frozen=True)
@@ -1540,16 +1540,16 @@ class SlackDelivery:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(str(self.id), safe='')}")
         return SlackDelivery(ctx, data)
 
-    async def retry(self, *, after: Duration | None = None, reason: Literal["http_timeout", "http_error", "too_many_redirects"] | None = None) -> DeliveryAttempt:
-        """Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(str(self.id), safe='')}/retry", body={"after": None if after is None else parse_duration(after), "reason": reason})
-        return DeliveryAttempt._from_wire(ctx, data)
-
     async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None, headers: dict[str, str] | None = None) -> DeliveryAttempt:
         """Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale, "headers": headers})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def retry(self, *, after: Duration | None = None, reason: Literal["http_timeout", "http_error", "too_many_redirects"] | None = None) -> DeliveryAttempt:
+        """Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/deliveries/{quote(str(self.id), safe='')}/retry", body={"after": None if after is None else parse_duration(after), "reason": reason})
         return DeliveryAttempt._from_wire(ctx, data)
 
     async def settled(self, *, timeout: Duration | None = None) -> SlackDelivery:
@@ -1660,16 +1660,16 @@ class GitHubFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
         return [GitHubDelivery(ctx, item) for item in data]
 
-    async def app_calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubAppCalls:
-        """The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/app-calls", query={"operation": operation, "error": error})
-        return [GitHubApiCall._from_wire(ctx, item) for item in data]
-
     async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubApiCalls:
         """The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/calls", query={"operation": operation, "error": error})
+        return [GitHubApiCall._from_wire(ctx, item) for item in data]
+
+    async def app_calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> GitHubAppCalls:
+        """The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/app-calls", query={"operation": operation, "error": error})
         return [GitHubApiCall._from_wire(ctx, item) for item in data]
 
     async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> GitHubApiCall:

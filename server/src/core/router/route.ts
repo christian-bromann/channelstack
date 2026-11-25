@@ -195,6 +195,11 @@ export class DriverRouter {
   readonly #sessions: Sessions;
   readonly #reality: (() => DriverReality) | undefined;
 
+  /** The driver whose routes these are (`notion`). */
+  get driver(): string {
+    return this.#driver;
+  }
+
   /** `reality` is for a driver that can be live: its routes then also list what live refuses with. */
   constructor(app: OpenAPIHono, driver: string, sessions: Sessions, reality?: () => DriverReality) {
     this.#app = app;
