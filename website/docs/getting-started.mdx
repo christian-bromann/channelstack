@@ -121,11 +121,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [channelstack()],
-  test: { testTimeout: 30_000 },
 });
 ```
-
-`testTimeout` keeps Vitest's own limit, 5 seconds by default, above the 10 seconds a channelstack check waits. Without it, Vitest stops a failing test before the check can say what went wrong.
 
 And the test:
 

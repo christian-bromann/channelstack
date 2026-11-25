@@ -47,12 +47,14 @@ interface ChannelstackIntegrationOptions {
 |---|---|---|---|
 | `server` | `string` | `CHANNELSTACK_URL`, else the URL in `<home>/server.json` | Attach to the server at this URL. Its token comes from `CHANNELSTACK_TOKEN`, or from `server.json` when the URLs match |
 | `mode` | `"auto" \| "attach" \| "start"` | `"auto"` | How the run finds its server. See [Modes](#modes) |
-| `timeout` | `Duration` | `"10s"` | Default timeout of every matcher, and of `channelstack.quiet()` |
-| `quietFor` | `Duration` | `"750ms"` | Default quiet window of negative and exact-count matchers, and of `channelstack.quiet()` |
+| `timeout` | `Duration` | `"10s"` | Default timeout of every matcher, of `channelstack.quiet()`, and of every SDK wait |
+| `quietFor` | `Duration` | `"750ms"` | Default quiet window of negative and exact-count matchers, of `channelstack.quiet()`, and of the SDK's `latest…` reads |
 
 A `Duration` is milliseconds as a number, or a string such as `"250ms"`, `"3s"`, `"1m"`.
 
-`timeout` sets the matchers' default only. The SDK's own waits (`waitForReply`, `waitForComment`, `latestReply`, `settled`, …) keep their default of `10s` unless a call passes `timeout`.
+`timeout` and `quietFor` are the defaults of the SDK's own waits too (`waitForReply`, `waitForComment`, `latestReply`, `settled`, …): the setup file sets them in every worker. A call that passes its own `timeout` or `quietFor` wins.
+
+A project that sets no `testTimeout` gets one from the plugin: 30 seconds, or three times `timeout` if that's longer, so a failing check can report its own message before Vitest's 5-second limit stops the test. A project's own `testTimeout`, and Vitest's `--testTimeout` flag, always win.
 
 ## Modes
 
@@ -71,9 +73,10 @@ A private server is the binary of the installed platform package (`@channelstack
 | Piece | What it does |
 |---|---|
 | Global setup | Runs once per run: attaches to or starts the server (by `mode`), and hands its URL, its token, `timeout` and `quietFor` to the test workers through Vitest's `provide`. Stops a server it started when the run ends |
-| Setup file | Runs in every worker, before the project's own `setupFiles`: one client per worker, one session per test, the fixtures below, and the matchers registered with `expect.extend` |
+| Setup file | Runs in every worker, before the project's own `setupFiles`: one client per worker, one session per test, the fixtures below, the matchers registered with `expect.extend`, and `timeout` and `quietFor` as the SDK's wait defaults |
 | Types | Augments `vitest`: `TestContext` gets the fixtures, `Matchers` gets every [matcher](/docs/reference/matchers), `ProvidedContext` gets `channelstack` |
 | `test.env` | Sets `CHANNELSTACK_VITEST_OPTIONS` to the plugin's options as JSON, for the global setup to read |
+| `test.testTimeout` | Set when the project sets none: 30 seconds, or three times `timeout` |
 
 The setup file comes first in `setupFiles`, so its `beforeEach` work (opening the session, the fixtures) runs before the project's hooks, and its cleanup runs after them. A project's own hooks can use the fixtures.
 
@@ -115,7 +118,7 @@ A suite builds its own fixtures on these with `test.extend`:
 
 ```ts title="fixtures.ts"
 import { test as base } from "vitest";
-import type { SlackConversation, SlackUser } from "channelstack/client";
+import type { SlackConversation, SlackUser } from "channelstack";
 
 export const test = base.extend<{ ana: SlackUser; support: SlackConversation }>({
   ana: async ({ slack }, use) => use(await slack.createUser({ name: "Ana" })),

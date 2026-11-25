@@ -25,12 +25,12 @@ export default defineConfig({
 
 The plugin adds a global setup that finds the server, a setup file that gives each test its session and fixtures and registers the matchers on `expect`, and the types for both. You keep importing `test` and `expect` from `vitest`.
 
-| Option     | Default                            | What it does                                                                                                                             |
-| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`     | `"auto"`                           | `"attach"` fails when no server is running. `"start"` always starts a private one. `"auto"` attaches if it can, and starts one otherwise |
-| `server`   | from `~/.channelstack/server.json` | The server to attach to. Also `CHANNELSTACK_URL`, with `CHANNELSTACK_TOKEN`                                                              |
-| `timeout`  | `"10s"`                            | How long a matcher and `channelstack.quiet()` give up after. The SDK's waits (`waitForReply`, `settled`, …) take their own `timeout`     |
-| `quietFor` | `"750ms"`                          | How long the agent must be quiet before a negative or exact-count matcher checks                                                         |
+| Option     | Default                            | What it does                                                                                                                                                                                                        |
+| ---------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`     | `"auto"`                           | `"attach"` fails when no server is running. `"start"` always starts a private one. `"auto"` attaches if it can, and starts one otherwise                                                                            |
+| `server`   | from `~/.channelstack/server.json` | The server to attach to. Also `CHANNELSTACK_URL`, with `CHANNELSTACK_TOKEN`                                                                                                                                         |
+| `timeout`  | `"10s"`                            | How long a matcher, `channelstack.quiet()` and every SDK wait (`waitForReply`, `latestReply`, `settled`, …) give up after. A project without its own `testTimeout` gets one above it: 30s, or three times `timeout` |
+| `quietFor` | `"750ms"`                          | How long the agent must be quiet before a negative or exact-count matcher checks, or a `latest…` read reads                                                                                                         |
 
 Your agent is configured from the server you started yourself (`npx channelstack`), so attaching to that server is the usual setup. A server the plugin starts on its own has no agent connected to it. In CI, `mode: "attach"` makes a missing server fail at once instead of later. The [plugin reference](/docs/reference/vitest-plugin) lists every option.
 
@@ -170,7 +170,7 @@ expect(answer.text).toMatch(/api/i);
 People and places you use in many tests belong in a fixtures file of your own. That's plain Vitest `test.extend`, built on channelstack's fixtures:
 
 ```ts title="test/fixtures.ts"
-import type { SlackConversation, SlackUser } from "channelstack/client";
+import type { SlackConversation, SlackUser } from "channelstack";
 import { test as base } from "vitest";
 
 export const test = base.extend<{ ana: SlackUser; ben: SlackUser; support: SlackConversation }>({

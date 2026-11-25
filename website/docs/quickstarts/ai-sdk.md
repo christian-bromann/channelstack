@@ -162,11 +162,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [channelstack()],
-  test: { testTimeout: 30_000 },
 });
 ```
-
-`testTimeout` keeps Vitest's own limit above the 10 seconds a channelstack check waits, so a failing check can say what went wrong before Vitest stops the test.
 
 And two tests: one watches the answer from the status line to the end of the stream, the other presses Stop halfway:
 
