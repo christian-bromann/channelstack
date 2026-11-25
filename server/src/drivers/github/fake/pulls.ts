@@ -369,7 +369,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     },
 
     deleteReviewComment(pull: Pull, comment: GitHubReviewCommentRecord): string | undefined {
-      store.forget(store.reviewComments, store.sessionOf(store.repo(pull.repo)), comment.id);
+      store.forgetReviewComment(store.sessionOf(store.repo(pull.repo)), comment);
       return commentEvent(pull, comment, "deleted");
     },
 

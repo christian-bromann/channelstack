@@ -227,6 +227,14 @@ export class GitHubStore {
     );
   }
 
+  /** Forget a comment on the diff. A thread whose last comment is gone is gone too, and with it whether it was resolved. */
+  forgetReviewComment(session: string, comment: GitHubReviewCommentRecord): void {
+    this.forget(this.reviewComments, session, comment.id);
+    if (!this.list(this.reviewComments, session).some((other) => other.thread === comment.thread)) {
+      this.resolvedThreads.delete(comment.thread);
+    }
+  }
+
   /** Forget a closed session's indexes. Answers with what the caller still has to clean up. */
   release(session: string): { users: GitHubUserRecord[]; repos: GitHubRepoRecord[] } {
     const released = { users: this.list(this.users, session), repos: this.list(this.repos, session) };

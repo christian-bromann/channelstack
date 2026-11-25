@@ -72,10 +72,13 @@ export function createRepos(kit: GitHubKit) {
     if (head) pull.headSha = head;
     if (base) pull.baseSha = base;
     const from = (await git.mergeBase(kit.dir(repo), pull.baseSha, pull.headSha)) ?? pull.baseSha;
-    const [commits, changes] = await Promise.all([
+    const [commits, changes, merged] = await Promise.all([
       git.ahead(kit.dir(repo), pull.baseSha, pull.headSha),
       git.changes(kit.dir(repo), from, pull.headSha),
+      // The same three-way merge `merge` does: a conflict there is a 405 and `mergeable: false` here.
+      git.merged(kit.dir(repo), from, pull.baseSha, pull.headSha),
     ]);
+    pull.mergeable = merged !== undefined;
     pull.stats = {
       commits: commits.length,
       additions: changes.reduce((sum, change) => sum + change.additions, 0),

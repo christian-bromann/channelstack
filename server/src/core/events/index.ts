@@ -4,32 +4,51 @@ import type { Redactor } from "../redact/index.ts";
 
 const CURSOR = /^c_([0-9a-z]+)$/;
 
-/** An append-only list read by cursor: "what's new since my last read". */
+/**
+ * An append-only list read by cursor: "what's new since my last read". With a `limit`, it keeps
+ * only the newest items; cursors still count every item ever appended, so a reader that fell
+ * behind gets what is left and goes on from there.
+ */
 export class CursorList<T> {
   readonly #items: T[] = [];
+  readonly #limit: number;
+  /** How many of the oldest items were dropped to stay within the limit. */
+  #dropped = 0;
+
+  constructor(options: { limit?: number } = {}) {
+    this.#limit = options.limit ?? Number.POSITIVE_INFINITY;
+  }
 
   append(item: T): T {
     this.#items.push(item);
+    if (this.#items.length > this.#limit) {
+      const over = this.#items.length - this.#limit;
+      this.#items.splice(0, over);
+      this.#dropped += over;
+    }
     return item;
   }
 
-  /** Everything after `since` (all of it without one), and the cursor for the next read. */
+  /** Everything after `since` (all that is kept without one), and the cursor for the next read. */
   read(since?: string): { items: T[]; cursor: string } {
-    let from = 0;
+    const end = this.#dropped + this.#items.length;
+    let from = this.#dropped;
     if (since !== undefined) {
       const match = CURSOR.exec(since);
       if (!match?.[1]) throw new ProtocolError("invalid_argument", "Not a cursor from this server", { since });
-      from = Math.min(Number.parseInt(match[1], 36), this.#items.length);
+      from = Math.min(Math.max(Number.parseInt(match[1], 36), this.#dropped), end);
     }
-    return { items: this.#items.slice(from), cursor: `c_${this.#items.length.toString(36)}` };
+    return { items: this.#items.slice(from - this.#dropped), cursor: `c_${end.toString(36)}` };
   }
 }
 
 /**
  * The scope of what belongs to no session: an app's calls about nothing a session owns (a GitHub
- * App's own endpoints). It is a log like a session's, read the same way, and lives until the world is reset.
+ * App's own endpoints). It is a log like a session's, read the same way. No session's close ends
+ * it, so it keeps only its newest `WORLD_SCOPE_LIMIT` events, and a reset empties it.
  */
 export const WORLD_SCOPE = "world";
+const WORLD_SCOPE_LIMIT = 10_000;
 
 export type EventKind = "action" | "delivery" | "delivery_attempt" | "api_call";
 
@@ -95,7 +114,7 @@ export class EventLog {
   append(session: string, driver: string, kind: EventKind, data: Record<string, unknown>): void {
     let log = this.#logs.get(session);
     if (!log) {
-      log = new CursorList();
+      log = new CursorList(session === WORLD_SCOPE ? { limit: WORLD_SCOPE_LIMIT } : {});
       this.#logs.set(session, log);
     }
     let types = this.#deliveryTypes.get(session);

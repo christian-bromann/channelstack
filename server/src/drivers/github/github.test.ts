@@ -847,7 +847,14 @@ describe("pull requests", () => {
     });
     const one = await post(`/users/${ana.id}/pulls`, change("one", "# one\n"));
     const two = await post(`/users/${ana.id}/pulls`, change("two", "# two\n"));
+    // What the agent reads: GitHub computes whether a pull request merges, and says `dirty` when it can't.
+    const mergeability = async (number: number) => {
+      const { mergeable, rebaseable, mergeable_state } = (await api("GET", `${path}/pulls/${number}`)).body;
+      return { mergeable, rebaseable, mergeable_state };
+    };
+    expect(await mergeability(two.number)).toEqual({ mergeable: true, rebaseable: true, mergeable_state: "clean" });
     await post(`/users/${ana.id}/merge`, { pr: { repoId: repo.id, number: one.number } });
+    expect(await mergeability(two.number)).toEqual({ mergeable: false, rebaseable: false, mergeable_state: "dirty" });
     const [mergeCommit] = await get(`/repos/${repo.id}/commits`);
     expect((await api("GET", `${path}/git/commits/${mergeCommit.sha}`)).body.parents).toHaveLength(2);
     expect((await api("PUT", `${path}/pulls/${two.number}/merge`, {})).status).toBe(405);
