@@ -4,6 +4,8 @@ All notable changes to channelstack. The format follows [Keep a Changelog](https
 
 ## Unreleased
 
+## [0.1.1] - 2026-11-26
+
 ## [0.1.0] - 2026-11-26
 
 The first version of channelstack, a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail. Everything below is new.

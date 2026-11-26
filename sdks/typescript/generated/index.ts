@@ -8,7 +8,7 @@ import { ChannelstackError, type ErrorClasses, segment, type Transport } from ".
 import { describeWait, fromMatches, textMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, retryWhile, untilQuiet, patternOnWire, type QuietState } from "../runtime/wait.ts";
 
 /** The server version this SDK was generated for. */
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 export class AccountInactiveError extends ChannelstackError {}
 export class ActionRequiresError extends ChannelstackError {}
