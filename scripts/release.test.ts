@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
+import { parse } from "yaml";
 
 import { changelogSection, draft, lastTag, nextVersion, pep440, problems, released, versions } from "./release.ts";
 
@@ -102,6 +103,8 @@ describe("the changelog draft, from the pull requests' titles", () => {
         "refactor(server)!: drop the --old flag (#102)",
         "feat(pytest): a fixture for Gmail (#103)",
         "test(slack): one more (#104)",
+        "feat(docs): the website's search (#105)",
+        "fix(deps, ci): hono 5.2 (#106)",
       ],
       1,
     );
@@ -147,6 +150,10 @@ describe("the changelog draft, from the pull requests' titles", () => {
     expect(nextVersion(repository(["Phase 9 (#88)", "fix(slack): a (#1)", "feat(github): b (#2)"], 1))).toBe("0.2.0");
     expect(nextVersion(repository(["Phase 9 (#88)", "fix(server)!: a (#1)"], 1))).toBe("0.2.0");
     expect(() => nextVersion(repository(["Phase 9 (#88)"], 1))).toThrow("Nothing to release");
+    // An internal scope bumps nothing, as it lists nothing.
+    expect(() => nextVersion(repository(["Phase 9 (#88)", "fix(deps): a (#1)", "feat(docs,ci): b (#2)"], 1))).toThrow(
+      "Nothing to release",
+    );
   });
 
   test("the hand-written Unreleased lines stay, with the draft below them, as the version's section", () => {
@@ -166,5 +173,43 @@ describe("the changelog draft, from the pull requests' titles", () => {
       "# Changelog\n\n## Unreleased\n\n## [0.1.1] - 2026-12-01\n\n- Drafted\n",
     );
     expect(() => released("# Changelog\n", "0.2.0", "2026-12-15")).toThrow('no "## Unreleased" section');
+  });
+});
+
+describe("the title's types and scopes", () => {
+  const root = new URL("..", import.meta.url);
+  const text = (path: string) => readFileSync(new URL(path, root), "utf8");
+  const words = (line: string) => [...line.matchAll(/`([a-z-]+)`/g)].map((found) => found[1]).sort();
+
+  test("are the same in the check, CONTRIBUTING.md and cliff.toml", () => {
+    const workflow = parse(text(".github/workflows/pr-title.yml")) as {
+      jobs: { title: { steps: { with: { types: string; scopes: string } }[] } };
+    };
+    const lines = (list: string) =>
+      list
+        .split("\n")
+        .filter((line) => line !== "")
+        .sort();
+    const check = workflow.jobs.title.steps[0]?.with;
+    if (check === undefined) throw new Error("pr-title.yml has no step");
+
+    // CONTRIBUTING.md, "The title": the type line, and the scope lines under it.
+    const contributing = text("CONTRIBUTING.md");
+    const title = contributing.slice(contributing.indexOf("### The title"));
+    // The type line's first sentence lists them all; the next says which the changelog lists.
+    const types = /^- \*\*Type:\*\*([^.]*)\./m.exec(title)?.[1] ?? "";
+    const scopeLines = /^- \*\*Scope,\*\*.*\n((?: {2}- .*\n)+)/m.exec(title)?.[1] ?? "";
+    expect(words(types)).toEqual(lines(check.types));
+    expect(words(scopeLines)).toEqual(lines(check.scopes));
+
+    // cliff.toml: the listed scopes and the internal ones; the listed types and the skipped ones.
+    const cliff = text("cliff.toml");
+    const listed = [...(/set listed = \[([^\]]*)\]/.exec(cliff)?.[1] ?? "").matchAll(/"([a-z-]+)"/g)].map(
+      (found) => found[1],
+    );
+    const internal = /field = "scope", pattern = "\^ \*\(([a-z|-]+)\)/.exec(cliff)?.[1]?.split("|") ?? [];
+    expect([...listed, ...internal].sort()).toEqual(lines(check.scopes));
+    const skipped = /message = "\^\(([a-z|]+)\)/.exec(cliff)?.[1]?.split("|") ?? [];
+    expect(["feat", "fix", "perf", ...skipped].sort()).toEqual(lines(check.types));
   });
 });
