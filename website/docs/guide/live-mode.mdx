@@ -36,14 +36,16 @@ A channel is live when **all** of its app credentials are set in the server's en
 | Linear  | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token)               | `CHANNELSTACK_LIVE_LINEAR_WORKSPACES` | `CHANNELSTACK_LINEAR_USER_ANA_TOKEN` (personal API key)      |
 | Notion  | `CHANNELSTACK_NOTION_TOKEN` (the integration's token)                 | `CHANNELSTACK_LIVE_NOTION_WORKSPACES` | `CHANNELSTACK_NOTION_USER_ANA_TOKEN` (personal access token) |
 | Resend  | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key)                | `CHANNELSTACK_LIVE_RESEND_DOMAINS`    | `CHANNELSTACK_RESEND_USER_ANA_TOKEN` (her own team's key)    |
+| Google  | `CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET`, `CHANNELSTACK_GOOGLE_REFRESH_TOKEN` (the agent's OAuth client and mailbox) | `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES` | `CHANNELSTACK_GOOGLE_USER_ANA_TOKEN` (her own Gmail account's refresh token) |
 
-- **App credentials and allowlists** are read by the server when it starts. Allowlists are comma-separated workspace, org or team ids; Resend's are domains.
+- **App credentials and allowlists** are read by the server when it starts. Allowlists are comma-separated workspace, org or team ids; Resend's are domains, Google's addresses.
 - **People's tokens** are read by the SDK in the test process: `createUser({ name: "Ana" })` reads `CHANNELSTACK_SLACK_USER_ANA_TOKEN` when the test passes no `token`. The name is upper-cased with every other character turned into `_`, so `ana-smith` reads `..._USER_ANA_SMITH_TOKEN`. On GitHub it's the account's login.
 - **On Slack,** a person's token comes from a separate Slack app for the sandbox's people, never from your app's own app.
 - **On Notion,** a session's pages go under the one top-level page the integration is connected to, or under `CHANNELSTACK_NOTION_PAGE`.
 - **On Resend,** each person is a Resend team of their own, with a verified domain that receives email, and the agent's answers are read back from their received mail. `CHANNELSTACK_RESEND_ADDRESS` sets the agent's address when its team has more than one domain. Sent email can't be taken back, so every recipient must be at an allowlisted domain (or a `@resend.dev` test address), checked before anything is sent.
+- **On Google,** each person is a Gmail account of their own, with a refresh token from the agent's OAuth client, and the agent's answers are read back from their mail. Every recipient, and every mailbox, must be an address in `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`, checked before anything is sent. Gmail pushes to the agent through the agent's own Pub/Sub topic and subscription.
 
-Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack), [GitHub](/docs/platforms/github), [Linear](/docs/platforms/linear), [Notion](/docs/platforms/notion), [Resend](/docs/platforms/resend).
+Each platform page lists what its sandbox needs: [Slack](/docs/platforms/slack), [GitHub](/docs/platforms/github), [Linear](/docs/platforms/linear), [Notion](/docs/platforms/notion), [Resend](/docs/platforms/resend), [Google](/docs/platforms/google).
 
 > [!WARNING]
 > Some of a channel's app credentials set and not all is an error, not a fallback: every action on that channel fails with `live_misconfigured`, naming what is missing. A typo in a variable name must not run silently fake.
@@ -85,6 +87,7 @@ Everything a test creates live is named with the run's tag, `channelstack-run-<r
 | Linear   | Deletes the session's team, with its issues, comments and agent sessions                                                                        |
 | Notion   | Moves the session's page to the trash, with everything in it                                                                                    |
 | Resend   | Nothing: sent email can't be unsent. That's why every recipient is checked against the allowlist before anything is sent                         |
+| Google   | Trashes the run's threads, labelled `channelstack-run-…`, in each mailbox: the person's and the agent's. Sent email can't be unsent, so every recipient is checked against the allowlist first |
 
 `CHANNELSTACK_RUN_ID` names the run: 1 to 24 letters and digits. CI should set it per job (`gh${{ github.run_id }}`), so a re-run keeps it. A run of 7 or more digits is written in base 36 (`gh45602242231` becomes `ghky6ebav`), because Linear refuses a name that looks like a phone number; `sweep --run` does the same with the id you give it. Without it, each server makes one up.
 
@@ -156,6 +159,8 @@ notion
   fake  set CHANNELSTACK_NOTION_TOKEN to run it live
 resend
   fake  set CHANNELSTACK_RESEND_API_KEY to run it live
+google
+  fake  set CHANNELSTACK_GOOGLE_CLIENT_ID, CHANNELSTACK_GOOGLE_CLIENT_SECRET and CHANNELSTACK_GOOGLE_REFRESH_TOKEN to run it live
 browser sessions
   ok    /Users/you/.channelstack/browser/slack-ana.json: signed in, the first cookie expires 2026-12-24T09:12:00.000Z
 ```

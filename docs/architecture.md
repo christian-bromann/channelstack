@@ -4,7 +4,7 @@
 
 ## 1. The big picture
 
-One server process fakes Slack, GitHub, Linear, Notion and Resend in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
+One server process fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail) in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
  Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)
@@ -83,6 +83,10 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | Resend | Email, domain, webhook | UUIDs (v4). A webhook message is Svix's `msg_` and 27 base-62 characters (`svix-id`); a `Message-ID` is Amazon SES's, as Resend sends through it: `<0100019a` and 8 hex characters, `-`, a UUID, `-000000@email.amazonses.com>` |
 | | People | A person is their mailbox: their id is their address |
 | | Tokens | `re_<8>_<24>` API keys, `whsec_…` webhook secrets (base64 of 24 bytes) |
+| Google | Message, thread | 16 hex characters, as Gmail gives them now: `19` and 14 more |
+| | History | Decimal strings that grow with gaps; Pub/Sub message ids are 16 digits; user labels are `Label_<n>` |
+| | Mail | A `Message-ID` Gmail gives: `<CA` and 40 base-62 characters `@mail.gmail.com>`. A person is their mailbox: their id is their address |
+| | Tokens | Access tokens `ya29.…`, refresh tokens `1//0…`, client secrets `GOCSPX-…`, client ids `<12 digits>-<32>.apps.googleusercontent.com`; push tokens are RS256 JWTs signed with a per-install RSA key |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
 - **Sequential where the platform is:** GitHub issue numbers, Linear identifiers, Slack `ts`.

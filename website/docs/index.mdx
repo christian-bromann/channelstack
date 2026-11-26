@@ -1,12 +1,12 @@
 ---
 title: "Overview"
 order: 0
-description: "channelstack is a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion and Resend: fake platforms on localhost, scripted people, honest assertions."
+description: "channelstack is a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail: fake platforms on localhost, scripted people, honest assertions."
 ---
 
 # Overview
 
-channelstack tests the apps and agents you build for Slack, GitHub, Linear, Notion and Resend: a Slack bot, a GitHub App, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. It runs those platforms as fakes on your machine, so a test can play the people in a conversation and check what they would see.
+channelstack tests the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail: a Slack bot, a GitHub App, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. It runs those platforms as fakes on your machine, so a test can play the people in a conversation and check what they would see.
 
 <Example id="slack-mention-one-reply" />
 
@@ -16,7 +16,7 @@ The test never touches your app. Ana's message goes into a fake Slack workspace,
 
 ## What you get
 
-- **Fakes of five platforms** on localhost: Slack, GitHub, Linear, Notion and Resend, with their real APIs, webhooks, signatures, ids and error codes. Your app runs unchanged; one environment variable per platform points it at the fake.
+- **Fakes of six platforms** on localhost: Slack, GitHub, Linear, Notion, Resend and Google (Gmail), with their real APIs, webhooks, signatures, ids and error codes. Your app runs unchanged; one environment variable per platform points it at the fake.
 - **Tests that read like the conversation.** Every action belongs to the person who takes it (`ana.say(…)`, `ben.click("Approve", …)`, `mo.comment(…)`), and every check is about what a person would see.
 - **Checks that wait for your app.** Replies arrive when they arrive. Positive checks wait until they hold; negative and exact-count checks wait until the app has gone quiet. A test never sleeps.
 - **The failures that matter, on demand.** Slack's 3-second retry, redelivered webhooks, bad signatures, rate limits and dropped sockets, so you can test what happens on a bad day.

@@ -1,18 +1,18 @@
 ---
 title: "How it works"
 order: 1
-description: "One server fakes Slack, GitHub, Linear, Notion and Resend; tests, the CLI, MCP and the UI drive it through one control API."
+description: "One server fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail); tests, the CLI, MCP and the UI drive it through one control API."
 ---
 
 # How it works
 
-This page explains the parts of channelstack and how they fit together: the server and its five fakes, the control API every client uses, sessions, and the transcript the matchers read. Read it when you want to know why a test behaves the way it does.
+This page explains the parts of channelstack and how they fit together: the server and its six fakes, the control API every client uses, sessions, and the transcript the matchers read. Read it when you want to know why a test behaves the way it does.
 
 <RequestFlow />
 
-## One server, five fakes
+## One server, six fakes
 
-channelstack is one server process. It fakes Slack, GitHub, Linear, Notion and Resend in memory and serves each fake at a stable local address:
+channelstack is one server process. It fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail) in memory and serves each fake at a stable local address:
 
 | Address                          | What it is                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------- |
@@ -22,12 +22,13 @@ channelstack is one server process. It fakes Slack, GitHub, Linear, Notion and R
 | `https://linear.localhost`       | Linear's GraphQL API at `/graphql`; sends webhooks and Agent Session events           |
 | `https://notion.localhost`       | Notion's API; sends integration webhooks                                              |
 | `https://resend.localhost`       | Resend's REST API; sends its webhooks, signed the Svix way                            |
+| `https://google.localhost`       | Gmail's API, Google's token endpoint and certificates; sends Pub/Sub pushes            |
 
 The `*.localhost` names come from [portless](https://github.com/vercel-labs/portless). Without it, the server listens on one loopback port and puts each fake under a path prefix (`http://127.0.0.1:4500/slack`, `/github`, and so on). The [connecting your app](/docs/guide/connecting-your-agent) page shows both.
 
 Your app talks to a fake as if it were the real platform. It uses the platform's own SDK, unchanged, with only the base URL pointed at channelstack. The fakes behave like the platforms in the ways an app notices:
 
-- **Ids look real.** A Slack user is `U08B5K2M9QX`, a channel `C08E1F2G3H4`, a message `ts` like `1732101234.567899`. GitHub uses numeric ids and 40-hex commit SHAs from an in-memory git store, Linear, Notion and Resend use UUIDs (and a Resend person is their email address), and tokens have the platform's prefixes (`xoxb-…`, `ghs_…`, `lin_oauth_…`, `ntn_…`, `re_…`). Your app's logs and your failing tests read like production.
+- **Ids look real.** A Slack user is `U08B5K2M9QX`, a channel `C08E1F2G3H4`, a message `ts` like `1732101234.567899`. GitHub uses numeric ids and 40-hex commit SHAs from an in-memory git store, Linear, Notion and Resend use UUIDs, Gmail 16 hex characters for messages and threads and decimal history ids (and an email person is their address), and tokens have the platform's prefixes (`xoxb-…`, `ghs_…`, `lin_oauth_…`, `ntn_…`, `re_…`, `ya29.…`, `1//0…`). Your app's logs and your failing tests read like production.
 - **Refusals are real.** A fake refuses what the platform refuses, with the same error code: `not_in_channel` when the bot posts where it isn't a member, `missing_scope`, `msg_too_long`.
 - **Deliveries are real.** Events arrive signed the way each platform signs them, within the same ack windows, and Slack retries the way Slack does. See [delivery and failures](/docs/guide/delivery-and-failures).
 
@@ -66,7 +67,7 @@ By default the app reaches the fakes because its SDK's base URL points at them (
 
 ## Sessions: scopes in one shared world
 
-Your app is configured once: one bot token and one base URL per platform. So there is only one fake Slack workspace, one GitHub org, one Linear workspace, one Notion workspace and one Resend team per server. Tests don't get separate worlds. Each test gets a **session**, a scope inside the shared one.
+Your app is configured once: one bot token and one base URL per platform. So there is only one fake Slack workspace, one GitHub org, one Linear workspace, one Notion workspace, one Resend team and one Gmail mailbox per server. Tests don't get separate worlds. Each test gets a **session**, a scope inside the shared one.
 
 <SessionScopes />
 

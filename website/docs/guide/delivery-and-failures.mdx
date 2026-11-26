@@ -19,6 +19,7 @@ Each fake delivers events the way its platform does: signed over the exact bytes
 | Linear   | `Linear-Signature`, a hex HMAC-SHA256 of the body                                            | `webhookTimestamp` in the body; receivers refuse one more than a minute old | 5 s        | After 1 minute, 1 hour and 6 hours, stamped and signed again                                                                                                  | Same `Linear-Delivery` id     |
 | Notion   | `X-Notion-Signature: sha256=…` with the verification token                                   | None                                                                        | 5 s        | Up to 8 times over about a day, with `attempt_number` in the body                                                                                             | Same event id                 |
 | Resend   | Svix's: `svix-signature: v1,…`, a base64 HMAC-SHA256 of `<svix-id>.<svix-timestamp>.<body>` with the `whsec_` secret | `svix-timestamp`; receivers refuse one more than 5 minutes old | 15 s | After 5 seconds, 5 and 30 minutes, 2, 5, 10 and 10 hours, signed again each time | Same `svix-id` |
+| Google   | `Authorization: Bearer <OIDC token>`, RS256, from Pub/Sub's push service account, for the push endpoint as audience; checked with `verifyIdToken` against `GOOGLE_CERTS_URL` | The token's `exp`: an hour after it was issued, with 5 minutes' skew | 10 s | Pub/Sub's push backoff, from 100 ms up to a minute. Gmail pushes at most once a second per mailbox ([Google](/docs/platforms/google#one-push-a-second)) | Same Pub/Sub message id |
 
 Over Slack's Socket Mode there is no signature, because the connection is the app's own, and a retry carries `retry_attempt` and `retry_reason` in the envelope.
 
@@ -54,7 +55,7 @@ The test proves the app is idempotent on `event_id`. The usual fix is to acknowl
 
 ## Redelivery
 
-A redelivery is the same event again, without anything that marks it as a retry. GitHub sends one when someone clicks Redeliver in the App's settings, Linear, Notion and Resend when the first delivery failed:
+A redelivery is the same event again, without anything that marks it as a retry. GitHub sends one when someone clicks Redeliver in the App's settings, Linear, Notion and Resend when the first delivery failed, and Pub/Sub when a push wasn't acknowledged:
 
 <Example id="delivery-github-redeliver" />
 
@@ -65,6 +66,7 @@ A redelivery is the same event again, without anything that marks it as a retry.
 | Linear   | `delivery.redeliver()` | The same webhook, stamped with a new `webhookTimestamp` and signed again          |
 | Notion   | `delivery.redeliver()` | The same event again                                                              |
 | Resend   | `delivery.redeliver()` | The same webhook with the same `svix-id`, signed again at its own time            |
+| Google   | `delivery.redeliver()` | The same push with the same message id, with a fresh token                        |
 
 For Linear, check that the work doesn't start over:
 
@@ -78,8 +80,9 @@ An app must refuse a request it can't verify. `resend` sends the delivery again 
 
 | Option               | What it sends                                                                                            | Platforms                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `badSignature: true` | The same body, signed with a secret that isn't the app's                                                 | Slack, GitHub, Linear, Notion, Resend |
-| `stale: true`        | Signed correctly, but with a time outside the replay window: 6 minutes old on Slack and Resend, 2 minutes on Linear | Slack, Linear, Resend         |
+| `badSignature: true` | The same body, signed with a secret that isn't the app's                                                 | Slack, GitHub, Linear, Notion, Resend, Google (a token another key signed) |
+| `stale: true`        | Signed correctly, but with a time outside the replay window: 6 minutes old on Slack and Resend, 2 minutes on Linear; on Google, a token that has expired | Slack, Linear, Resend, Google |
+| `wrongAudience: true` | Signed correctly, but a token for another endpoint than the app's | Google |
 | `headers`            | Extra or replaced headers for this attempt                                                               | Slack                         |
 
 `toBeRejected` reads the latest forged attempt. It fails when the app answered 2xx, and it tells you to call `resend` first when no forged attempt was sent. A forged attempt never counts toward `toBeAccepted` or `toBeRetried`.
@@ -135,7 +138,7 @@ Live, the real platform delivers to your app and channelstack isn't in the path.
 The rest is refused, and Vitest and pytest skip the test with the reason:
 
 - `slack.fault()` and `fault.undo()` with `action_requires`: a fault needs proxy mode, which live doesn't read the app's calls back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)).
-- `slack.uninstallApp()`, and reading or resending deliveries (`slack.deliveries()`, `linear.deliveries()`, `notion.deliveries()`, `resend.deliveries()`, `delivery.retry()`, `delivery.resend()`), with `unsupported_in_live`.
+- `slack.uninstallApp()`, and reading or resending deliveries (`slack.deliveries()`, `linear.deliveries()`, `notion.deliveries()`, `resend.deliveries()`, `google.deliveries()`, `delivery.retry()`, `delivery.resend()`), with `unsupported_in_live`.
 
 The same test runs in full against the fake on every pull request.
 

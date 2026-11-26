@@ -26,6 +26,7 @@ channelstack 0.0.0 · in-memory
   linear   https://linear.localhost
   notion   https://notion.localhost
   resend   https://resend.localhost
+  google   https://google.localhost
   UI       https://channelstack.localhost/?login=…
 
   `channelstack env` prints tokens and URLs as .env lines
@@ -43,7 +44,7 @@ If portless isn't installed, the server stops with `portless isn't installed. In
 npx channelstack start --no-portless --port 4500
 ```
 
-The fakes are then at `http://127.0.0.1:4500/slack`, `/github`, `/linear`, `/notion` and `/resend`, and `channelstack env` prints those URLs instead. `--port` defaults to 4500 without portless; `--port 0` picks a free port. Plain HTTP on loopback needs no certificate, so this is also the simplest way around [TLS trust](#tls-trust-per-runtime) problems.
+The fakes are then at `http://127.0.0.1:4500/slack`, `/github`, `/linear`, `/notion`, `/resend` and `/google`, and `channelstack env` prints those URLs instead. (`googleapis` keeps Gmail's paths at the root of whatever host it is given, so without portless Gmail's API is served at the server's root too, and `GOOGLE_API_URL` is `http://127.0.0.1:4500/`.) `--port` defaults to 4500 without portless; `--port 0` picks a free port. Plain HTTP on loopback needs no certificate, so this is also the simplest way around [TLS trust](#tls-trust-per-runtime) problems.
 
 ## Give the app its environment
 
@@ -72,6 +73,7 @@ What it prints, per platform:
 | Linear   | `LINEAR_API_URL` (ends in `/graphql`), `LINEAR_ACCESS_TOKEN` (`lin_oauth_…`), `LINEAR_WEBHOOK_SECRET`, `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`                |
 | Notion   | `NOTION_BASE_URL`, `NOTION_TOKEN` (`ntn_…`), `NOTION_VERIFICATION_TOKEN`                                                                                         |
 | Resend   | `RESEND_BASE_URL`, `RESEND_API_KEY` (`re_…`), `RESEND_WEBHOOK_SECRET` (`whsec_…`), `RESEND_FROM` (`my-agent <my-agent@acme.example>`, the address it sends from) |
+| Google   | `GOOGLE_API_URL` (the root for `googleapis`), `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (`GOCSPX-…`), `GOOGLE_REFRESH_TOKEN` (`1//0…`), `GMAIL_ADDRESS`, `GOOGLE_PUBSUB_TOPIC`, `GOOGLE_PUSH_SERVICE_ACCOUNT`, `GOOGLE_PUSH_AUDIENCE` |
 
 It also prints three `ECHO_*` lines for the internal driver. A platform that runs [live](/docs/guide/live-mode) prints nothing: there, the app uses its own real configuration.
 
@@ -92,6 +94,8 @@ Every platform SDK already has a base-URL option. These are the ones the [refere
 | `@linear/sdk`                                                   | `apiUrl`                               | `LINEAR_API_URL`                                    |
 | `@notionhq/client`                                              | `baseUrl`                              | `NOTION_BASE_URL`                                   |
 | `resend`                                                        | none: it reads the variable itself     | `RESEND_BASE_URL`                                   |
+| `googleapis`                                                    | `rootUrl` in `google.gmail({ … })`     | `GOOGLE_API_URL`                                    |
+| `google-auth-library`                                           | `endpoints` in `new OAuth2Client(…)`   | `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL`              |
 | Chat SDK adapters (`@chat-adapter/slack`, `/github`, `/linear`) | `apiUrl`, or read from the environment | `SLACK_API_URL`, `GITHUB_API_URL`, `LINEAR_API_URL` |
 
 ### Slack with Bolt
@@ -199,6 +203,29 @@ const resend = new Resend(RESEND_API_KEY);
 
 Verify each webhook with `resend.webhooks.verify` and `RESEND_WEBHOOK_SECRET`: the fake signs the way Svix does, with `svix-id`, `svix-timestamp` and `svix-signature`. An `email.received` event carries the email's metadata only, so read the email with `resend.emails.receiving.get(id)`, and answer with `In-Reply-To` and `References` set ([Resend](/docs/platforms/resend)).
 
+### Google (Gmail)
+
+Give `OAuth2Client` the token endpoint and the certificates, and `googleapis` the root, per API: `googleapis` ignores `google.options({ rootUrl })`.
+
+```ts title="agent.ts"
+import { OAuth2Client } from "google-auth-library";
+import { google } from "googleapis";
+
+const env = process.env;
+const auth = new OAuth2Client({
+  clientId: env.GOOGLE_CLIENT_ID,
+  clientSecret: env.GOOGLE_CLIENT_SECRET,
+  endpoints: {
+    ...(env.GOOGLE_TOKEN_URL ? { oauth2TokenUrl: env.GOOGLE_TOKEN_URL } : {}),
+    ...(env.GOOGLE_CERTS_URL ? { oauth2FederatedSignonPemCertsUrl: env.GOOGLE_CERTS_URL } : {}),
+  },
+});
+auth.setCredentials({ refresh_token: env.GOOGLE_REFRESH_TOKEN });
+const gmail = google.gmail({ version: "v1", auth, ...(env.GOOGLE_API_URL ? { rootUrl: env.GOOGLE_API_URL } : {}) });
+```
+
+Watch the inbox with `users.watch` and `GOOGLE_PUBSUB_TOPIC`, check each push's token with `auth.verifyIdToken({ idToken, audience: GOOGLE_PUSH_AUDIENCE })` and its `email` against `GOOGLE_PUSH_SERVICE_ACCOUNT`, and send with `requestBody: { raw, threadId }`: a media upload goes to Google's own host whatever `rootUrl` says ([Google](/docs/platforms/google)).
+
 ### Chat SDK
 
 The Chat SDK's Slack, GitHub and Linear adapters read `SLACK_API_URL`, `GITHUB_API_URL` and `LINEAR_API_URL` from the environment on their own, or take an `apiUrl` option. With the lines from `channelstack env` in the app's environment, an app on the Chat SDK needs no change at all.
@@ -213,6 +240,7 @@ CHANNELSTACK_GITHUB_WEBHOOK_URL=http://localhost:3001/api/github/webhooks \
 CHANNELSTACK_LINEAR_WEBHOOK_URL=http://localhost:3002/webhooks/linear \
 CHANNELSTACK_NOTION_WEBHOOK_URL=http://localhost:3003/webhooks/notion \
 CHANNELSTACK_RESEND_WEBHOOK_URL=http://localhost:3004/webhooks/resend \
+CHANNELSTACK_GOOGLE_WEBHOOK_URL=http://localhost:3005/webhooks/google \
 npx channelstack
 ```
 
@@ -223,6 +251,7 @@ npx channelstack
 | `CHANNELSTACK_LINEAR_WEBHOOK_URL` | Webhooks and `AgentSessionEvent`s, signed with `Linear-Signature`                                                                                                 |
 | `CHANNELSTACK_NOTION_WEBHOOK_URL` | Integration webhooks, signed with `X-Notion-Signature`                                                                                                            |
 | `CHANNELSTACK_RESEND_WEBHOOK_URL` | `email.received` for mail to the agent, and `email.sent`, `email.delivered` and what else became of the mail it sent, signed the Svix way (`svix-signature`)      |
+| `CHANNELSTACK_GOOGLE_WEBHOOK_URL` | Pub/Sub pushes of Gmail's notifications, once the agent has called `users.watch`, each with an OIDC token for this URL in `Authorization`                         |
 
 Set only the ones your app uses. Any URL the server can reach works; a loopback URL is the simplest. The server reads these variables once, at start, so restart it to change one.
 

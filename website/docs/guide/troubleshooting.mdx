@@ -24,7 +24,7 @@ The person's message is in the transcript, but the app never answers, and its lo
 | Status `timed_out`                                 | The app took longer than Slack's 3 seconds to answer the request                                             | Acknowledge first, then work. This is also what makes Slack retry                                                  |
 | Status `failed` with `401` or `403`                | The app rejected the signature, usually because its signing secret is stale                                  | See [stale secrets](#the-app-gets-invalid-auth-or-rejects-every-delivery)                                          |
 
-The same rules hold for GitHub, Linear, Notion and Resend with their own variables (`CHANNELSTACK_GITHUB_WEBHOOK_URL`, …). [Delivery and failures](/docs/guide/delivery-and-failures) explains each status.
+The same rules hold for GitHub, Linear, Notion, Resend and Google with their own variables (`CHANNELSTACK_GITHUB_WEBHOOK_URL`, …). [Delivery and failures](/docs/guide/delivery-and-failures) explains each status.
 
 ### Socket Mode doesn't connect
 

@@ -1,0 +1,110 @@
+---
+title: "Google"
+order: 6
+description: "Test an agent people email at its Gmail address: point googleapis and google-auth-library at the fake, send it email as people, and check its answers arrive in the thread."
+---
+
+# Google
+
+This page shows how to test an agent that answers email in a Gmail mailbox: how to point it at the fake, who the people in a test are, what they send, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+
+> [!TIP]
+> Every method, option and wait of the Google fake, with each call in TypeScript, Python and Rust, is in the [Google API reference](/docs/reference/api/google).
+
+## How a Gmail agent works
+
+The agent has a Gmail mailbox, an OAuth client with the mailbox's refresh token, and a Pub/Sub topic. It calls `users.watch` with that topic, and from then on Gmail publishes a notification there whenever the mailbox changes. A push subscription sends each one to the agent's endpoint: a JSON body whose `message.data` is `{ "emailAddress", "historyId" }`, and an OIDC token in `Authorization` that the agent checks with `OAuth2Client.verifyIdToken`.
+
+The notification only says the mailbox moved on. The agent lists what changed with `users.history.list` from the last history id it handled, reads each new message with `users.messages.get`, and answers with `users.messages.send`, giving the message's `threadId` and setting `In-Reply-To` and `References`, so the answer lands in the person's thread.
+
+## Connecting the agent
+
+`channelstack env` prints what the agent needs:
+
+```bash
+GOOGLE_API_URL=https://google.localhost/
+GOOGLE_TOKEN_URL=https://google.localhost/token
+GOOGLE_CERTS_URL=https://google.localhost/oauth2/v1/certs
+GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-…
+GOOGLE_REFRESH_TOKEN=1//0…
+GMAIL_ADDRESS=my-agent@acme.example
+GOOGLE_PUBSUB_TOPIC=projects/channelstack-fake/topics/gmail
+GOOGLE_PUSH_SERVICE_ACCOUNT=gmail-push@channelstack-fake.iam.gserviceaccount.com
+GOOGLE_PUSH_AUDIENCE=http://localhost:3000/webhooks/google
+```
+
+Google's libraries take these as options, so use each only when it is set: then the same code talks to the fake in tests and to Google in production.
+
+```ts title="agent.ts"
+import { OAuth2Client } from "google-auth-library";
+import { google } from "googleapis";
+
+const env = process.env;
+const auth = new OAuth2Client({
+  clientId: env.GOOGLE_CLIENT_ID,
+  clientSecret: env.GOOGLE_CLIENT_SECRET,
+  endpoints: {
+    ...(env.GOOGLE_TOKEN_URL ? { oauth2TokenUrl: env.GOOGLE_TOKEN_URL } : {}),
+    ...(env.GOOGLE_CERTS_URL ? { oauth2FederatedSignonPemCertsUrl: env.GOOGLE_CERTS_URL } : {}),
+  },
+});
+auth.setCredentials({ refresh_token: env.GOOGLE_REFRESH_TOKEN });
+const gmail = google.gmail({ version: "v1", auth, ...(env.GOOGLE_API_URL ? { rootUrl: env.GOOGLE_API_URL } : {}) });
+```
+
+> [!NOTE]
+> Give `rootUrl` to `google.gmail(…)` itself: `googleapis` ignores it in `google.options({ rootUrl })`. Send with `requestBody: { raw }`: `googleapis` sends a media upload (`media: { body }`) to Google's own host whatever `rootUrl` says. An agent that can't do either runs in [proxy mode](/docs/guide/proxy-mode).
+
+Start the server with `CHANNELSTACK_GOOGLE_WEBHOOK_URL` set to the agent's push endpoint, for example `http://localhost:3000/webhooks/google`. Every push token is for that URL as its audience, as a Pub/Sub push subscription's are by default. Check each push the way Google's guide says: the token with `verifyIdToken({ idToken, audience: GOOGLE_PUSH_AUDIENCE })`, then that its `email` is `GOOGLE_PUSH_SERVICE_ACCOUNT` and `email_verified` is true.
+
+## What the fake covers
+
+The fake is one mailbox, `my-agent@acme.example`, that the agent reads and sends from. People are mailboxes in the world outside it.
+
+| Area | What's there |
+|---|---|
+| Messages | `users.messages.list` (with `q`'s `from:`, `to:`, `cc:`, `subject:`, `is:`, `in:`, `label:`, `after:`, `before:`, `rfc822msgid:`, and `labelIds`), `get` (`full`, `metadata`, `minimal`, `raw`), `send` (`raw`, with `threadId`), `modify`, `trash`, `untrash` |
+| Threads and labels | `users.threads.list`, `get`, `modify`, `trash`; `users.labels.list`, `get`, `create`, with Gmail's system labels (`INBOX`, `UNREAD`, `SENT`, …) |
+| History and pushes | `users.history.list` (`messageAdded`, `labelAdded`, `labelRemoved`; 404 for a `startHistoryId` that's too old), `users.watch` and `users.stop`, `users.getProfile` |
+| OAuth | Google's token endpoint for the `refresh_token` grant, with a fresh `ya29.` token for an hour; the push certificates at `/oauth2/v1/certs` (PEM) and `/oauth2/v3/certs` (JWK) |
+| Pushes | Pub/Sub's wrapped push format, an RS256 OIDC token from a per-install key, Pub/Sub's ack codes and 10-second ack deadline, its push backoff (100 ms up to a minute) |
+
+Answers and errors have Gmail's shapes, held to its discovery document: messages, threads, labels and history are what the document describes, and a refusal is Google's envelope (`{ error: { code, message, errors, status } }`), with `WWW-Authenticate` on a 401. Ids are Gmail's: 16 hex characters for messages and threads, decimal history ids. A watch on any topic but `GOOGLE_PUBSUB_TOPIC` is refused as Gmail refuses a topic it can't publish to.
+
+Attachments and drafts aren't built yet.
+
+### One push a second
+
+Gmail sends at most one push a second for a mailbox, and one notification can stand for several changes. The fake does the same, per test session: a change within the second is held and pushed when it's over, with the newest history id ([decision 0022](https://github.com/christian-bromann/channelstack/blob/main/docs/decisions/0022-gmail-push-rate.md)). Two emails sent together reach the agent as one push. An agent that lists history from its last id answers both; one that reads only the newest message answers one, which is the bug `google.history` catches.
+
+## People and what they do
+
+```ts
+test("an email to the agent gets one reply, in its thread", async ({ google }) => {
+  const ana = await google.createUser({ name: "Ana" });
+
+  const email = await ana.send({ to: [google.app], subject: "Refund", text: "Where is my refund?" });
+
+  await expect(email.thread).toHaveReplyFrom("my-agent", { text: /refund/i });
+  await expect(email.thread).toHaveRepliesFrom(google.app, { count: 1 });
+});
+```
+
+A person's `id` is their address: `ana@example.com` unless the test gives one. They `send` email to the app or to other people, `reply` to an email in its thread (to everyone on it with `all: true`), and read their `inbox`. Email to the agent lands in its inbox, unread, and its watch hears of it. Email between people never reaches the agent: its mailbox is all the Gmail API shows it.
+
+## What a test checks
+
+- `email.thread.replies()` and `toHaveReplyFrom` / `toHaveRepliesFrom`: the answers, read as a person reads them, without the quoted history a reply carries.
+- `ana.waitForEmail({ from: google.app })`: the answer in Ana's mailbox, with its subject and thread.
+- `email.labels`: the labels of the agent's copy (`INBOX`, `UNREAD`, `SENT`, its own), so a test sees whether the agent marked what it answered as read.
+- `email.delivery`: the push that told the agent of the email, with every attempt. `resend({ badSignature: true })` sends it again with a token another key signed, `resend({ stale: true })` with one that has expired, and `resend({ wrongAudience: true })` with one for another endpoint: the agent must refuse each. `redeliver()` pushes it again with the same message id, as Pub/Sub does.
+- `google.calls()` and `toHaveReceivedCall("users.messages.send")`: what the agent asked of Gmail.
+
+The standard checks register the same in one line: `googleChecks({ app: "my-agent" })`.
+
+## Live mode
+
+With the agent's OAuth client and refresh token set (`CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET`, `CHANNELSTACK_GOOGLE_REFRESH_TOKEN`), the same tests run against real Gmail. Each person is a Gmail account of their own, with a refresh token from the same OAuth client in `CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN`. Gmail pushes to the agent through its own Pub/Sub topic and subscription: channelstack never pushes live.
+
+Sent email can't be taken back, so live mode refuses any address outside `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`, the agent's mailbox and the people's included, before anything is sent. Every thread a run touches is labelled `channelstack-run-<id>` in the person's mailbox and in the agent's; its session trashes them when it closes, and `channelstack sweep` finds any a crash left. See [Live mode](/docs/guide/live-mode).
