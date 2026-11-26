@@ -98,6 +98,15 @@ export const GOOGLE_CHECKS = [
 ] as const;
 
 /**
+ * The delivery a check retries, redelivers, forges or times: the one thing every delivery check
+ * needs, on every channel. Live, the platform delivers to the agent itself and channelstack has no
+ * delivery to show (reality-matrix.md), so the check skips with that reason, through the test's own
+ * `skip` as every live refusal does, before it waits for anything else.
+ */
+const deliveryOf = <D>(subject: { readonly delivery?: D | undefined }, { skip }: TestContext, platform: string): D =>
+  subject.delivery ?? skip(`live: ${platform} delivers to the agent itself, so delivery checks are fake-only`);
+
+/**
  * Registers one check as a test, with its id in the name. A check that was skipped, or whose
  * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
  */
@@ -181,22 +190,25 @@ export function slackChecks(options: ChecksOptions): void {
       await expect(channel).not.toHaveChannelMessageFrom(app, wait);
     });
 
-    check("slack.retry", "survives Slack's retry after 3 seconds", async ({ slack }) => {
+    check("slack.retry", "survives Slack's retry after 3 seconds", async (context) => {
+      const { slack } = context;
       const ana = await slack.createUser({ name: "Ana" });
       const channel = await slack.createChannel({ participants: [ana, slack.app] });
       const msg = await ana.say(prompt, { channel });
       // Slack retries what it thinks wasn't acknowledged in time, and says so in the retry headers.
-      await msg.delivery?.retry({ after: "3s", reason: "http_timeout" });
+      await deliveryOf(msg, context, "Slack").retry({ after: "3s", reason: "http_timeout" });
       await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
-    check("slack.redelivery", "handles the same event delivered twice", async ({ slack }) => {
+    check("slack.redelivery", "handles the same event delivered twice", async (context) => {
+      const { slack } = context;
       const ana = await slack.createUser({ name: "Ana" });
       const channel = await slack.createChannel({ participants: [ana, slack.app] });
       const msg = await ana.say(prompt, { channel });
+      const delivery = deliveryOf(msg, context, "Slack");
       await expect(msg.thread).toHaveReplyFrom(app, wait);
       // The same event again, with nothing that marks it as a retry: only its event_id tells.
-      await msg.delivery?.resend();
+      await delivery.resend();
       await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
@@ -207,11 +219,11 @@ export function slackChecks(options: ChecksOptions): void {
       await expect(msg.thread).not.toHaveReplyFrom(app, wait);
     });
 
-    check("slack.bad-signature", "rejects a delivery with a bad signature", async ({ slack }) => {
+    check("slack.bad-signature", "rejects a delivery with a bad signature", async (context) => {
+      const { slack } = context;
       const ana = await slack.createUser({ name: "Ana" });
       const msg = await ana.say(prompt, { to: slack.app });
-      const delivery = msg.delivery;
-      if (!delivery) throw new Error("The message caused no delivery to the agent");
+      const delivery = deliveryOf(msg, context, "Slack");
       const first = await delivery.settled(wait);
       // Over Socket Mode there is no signature to check: the connection is the app's own.
       if (first.attempts[0]?.transport !== "http") return;
@@ -219,12 +231,11 @@ export function slackChecks(options: ChecksOptions): void {
       await expect(delivery).toBeRejected(wait);
     });
 
-    check("slack.ack", "acknowledges within 3 seconds", async ({ slack }) => {
+    check("slack.ack", "acknowledges within 3 seconds", async (context) => {
+      const { slack } = context;
       const ana = await slack.createUser({ name: "Ana" });
       const msg = await ana.say(prompt, { to: slack.app });
-      const delivery = msg.delivery;
-      if (!delivery) throw new Error("The message caused no delivery to the agent");
-      await expect(delivery).toBeAccepted({ within: "3s", ...wait });
+      await expect(deliveryOf(msg, context, "Slack")).toBeAccepted({ within: "3s", ...wait });
     });
 
     check("slack.msg-too-long", "still answers when Slack refuses its message as too long", async ({ slack }) => {
@@ -372,9 +383,10 @@ export function githubChecks(options: ChecksOptions): void {
       const { ana, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Delivered twice" }, { repo });
       const comment = await ana.comment(prompt, { issue });
+      const delivery = deliveryOf(comment, context, "GitHub");
       await expect(issue).toHaveCommentFrom(app, wait);
       // GitHub redelivers with the same `X-GitHub-Delivery`, from its UI and its API.
-      await comment.delivery?.redeliver();
+      await delivery.redeliver();
       await expect(issue).toHaveCommentsFrom(app, { count: 1, ...wait });
     });
 
@@ -389,9 +401,7 @@ export function githubChecks(options: ChecksOptions): void {
     check("github.bad-signature", "rejects a webhook with a bad signature", async (context) => {
       const { ana, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Signed by someone else" }, { repo });
-      const comment = await ana.comment(prompt, { issue });
-      const delivery = comment.delivery;
-      if (!delivery) throw new Error("The comment caused no delivery: is the agent's webhook URL set?");
+      const delivery = deliveryOf(await ana.comment(prompt, { issue }), context, "GitHub");
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -416,10 +426,6 @@ export function linearChecks(options: ChecksOptions): void {
     return { ana, issue, session };
   };
   const ended = ["complete", "awaitingInput", "error"] as const;
-  /** The delivery that opened a session. Live, Linear delivers to the agent itself: these checks are fake-only, and skip. */
-  type Opening = NonNullable<Awaited<ReturnType<typeof delegated>>["session"]["delivery"]>;
-  const opening = (session: { delivery?: Opening | undefined }, context: TestContext): Opening =>
-    session.delivery ?? context.skip("live: Linear delivers to the agent itself, so delivery checks are fake-only");
 
   describe(`linear checks: ${app}`, () => {
     check("linear.first-activity", "acknowledges a new session within 10 seconds", async (context) => {
@@ -443,8 +449,9 @@ export function linearChecks(options: ChecksOptions): void {
 
     check("linear.redelivery", "a redelivered webhook doesn't start the work again", async (context) => {
       const { session } = await delegated(context);
+      const delivery = deliveryOf(session, context, "Linear");
       await session.waitForState([...ended], wait);
-      await opening(session, context).redeliver();
+      await delivery.redeliver();
       await context.channelstack.quiet(wait);
       const responses = (await session.activities()).filter((activity) => activity.type === "response");
       expect(responses.length).toBeLessThanOrEqual(1);
@@ -452,14 +459,14 @@ export function linearChecks(options: ChecksOptions): void {
 
     check("linear.stale", "rejects a webhook whose timestamp is more than a minute old", async (context) => {
       const { session } = await delegated(context);
-      const delivery = opening(session, context);
+      const delivery = deliveryOf(session, context, "Linear");
       await delivery.resend({ stale: true });
       await expect(delivery).toBeRejected(wait);
     });
 
     check("linear.bad-signature", "rejects a webhook with a bad signature", async (context) => {
       const { session } = await delegated(context);
-      const delivery = opening(session, context);
+      const delivery = deliveryOf(session, context, "Linear");
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -500,16 +507,15 @@ export function notionChecks(options: ChecksOptions): void {
 
     check("notion.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
       const { comment } = await commented(context);
+      const delivery = deliveryOf(comment, context, "Notion");
       await expect(comment.discussion).toHaveCommentFrom(app, wait);
       // Notion retries with the same event id.
-      await comment.delivery?.redeliver();
+      await delivery.redeliver();
       await expect(comment.discussion).toHaveCommentsFrom(app, { count: 1, ...wait });
     });
 
     check("notion.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const { comment } = await commented(context);
-      const delivery = comment.delivery;
-      if (!delivery) throw new Error("The comment caused no delivery: is the agent's webhook URL set?");
+      const delivery = deliveryOf((await commented(context)).comment, context, "Notion");
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -544,26 +550,21 @@ export function resendChecks(options: ChecksOptions): void {
 
     check("resend.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
       const { email } = await emailed(context);
+      const delivery = deliveryOf(email, context, "Resend");
       await expect(email.thread).toHaveReplyFrom(app, wait);
       // Resend retries with the same svix-id and the same email_id.
-      const delivery = email.delivery;
-      if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
       await delivery.redeliver();
       await expect(email.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("resend.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const { email } = await emailed(context);
-      const delivery = email.delivery;
-      if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
+      const delivery = deliveryOf((await emailed(context)).email, context, "Resend");
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
 
     check("resend.stale", "rejects a webhook signed more than five minutes ago", async (context) => {
-      const { email } = await emailed(context);
-      const delivery = email.delivery;
-      if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
+      const delivery = deliveryOf((await emailed(context)).email, context, "Resend");
       await delivery.resend({ stale: true });
       await expect(delivery).toBeRejected(wait);
     });
@@ -584,11 +585,6 @@ export function googleChecks(options: ChecksOptions): void {
     const ana = await google.createUser({ name: "Ana" });
     const email = await ana.send({ to: [google.app], subject: "A question", text: prompt });
     return { ana, email };
-  };
-  /** The push that told the agent of an email. */
-  const pushOf = (email: Awaited<ReturnType<typeof emailed>>["email"]) => {
-    if (!email.delivery) throw new Error("The email caused no push: is the agent watching, and its push URL set?");
-    return email.delivery;
   };
 
   describe(`google checks: ${app}`, () => {
@@ -615,29 +611,27 @@ export function googleChecks(options: ChecksOptions): void {
 
     check("google.redelivery", "a push sent again doesn't produce a second answer", async (context) => {
       const { email } = await emailed(context);
+      const push = deliveryOf(email, context, "Gmail");
       await expect(email.thread).toHaveReplyFrom(app, wait);
       // Pub/Sub delivers at least once: the same message id again.
-      await pushOf(email).redeliver();
+      await push.redeliver();
       await expect(email.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("google.bad-signature", "rejects a push whose token another key signed", async (context) => {
-      const { email } = await emailed(context);
-      const push = pushOf(email);
+      const push = deliveryOf((await emailed(context)).email, context, "Gmail");
       await push.resend({ badSignature: true });
       await expect(push).toBeRejected(wait);
     });
 
     check("google.wrong-audience", "rejects a push whose token is for another audience", async (context) => {
-      const { email } = await emailed(context);
-      const push = pushOf(email);
+      const push = deliveryOf((await emailed(context)).email, context, "Gmail");
       await push.resend({ wrongAudience: true });
       await expect(push).toBeRejected(wait);
     });
 
     check("google.stale", "rejects a push whose token has expired", async (context) => {
-      const { email } = await emailed(context);
-      const push = pushOf(email);
+      const push = deliveryOf((await emailed(context)).email, context, "Gmail");
       await push.resend({ stale: true });
       await expect(push).toBeRejected(wait);
     });
