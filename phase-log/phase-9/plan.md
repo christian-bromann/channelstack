@@ -116,3 +116,10 @@ platform page and the API reference (generated), the guides that list the channe
 - **The pinned descriptions share one script**, `scripts/pinned-schema.ts` (`resend:schema`,
   `google:schema`).
 - **`google.history` doesn't run live**: it counts replies exactly, which needs proxy mode live.
+- **Labels live.** The plan read the agent's labels as fake-only. But live mode already reads the
+  agent's mailbox, with its token, to label the run's threads. So an email's `labels` are its
+  copy's there live too, without the run's own label. Conformance against Gmail then showed no
+  difference.
+- **Shapes keyed by ids.** Google's `/oauth2/v1/certs` is keyed by key id, and Google rotates them.
+  The shape recorder treats a key that is a digest's hex as one `<id>` key, so the shape compares
+  whichever keys Google has.
