@@ -19,7 +19,7 @@ Besides the errors listed with each method, most methods can fail with [`action_
 
 Returned by [`Session.notion()`](/docs/reference/api/client#notion).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `app` | `app` | `NotionIntegration` |
 | `apiUrl` | `api_url` | `string` |
@@ -44,7 +44,7 @@ let user = notion.create_user().name("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `name` | `name` | `string` | yes | option |
 | `id` | `id` | `string` | no | option |
@@ -74,7 +74,7 @@ let page = notion.create_page().title("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `title` | `title` | `string` | yes | option |
 | `parent` | `parent` | `NotionPage` | no | option |
@@ -105,13 +105,13 @@ let database = notion.create_database().title("…").properties(properties).awai
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `title` | `title` | `string` | yes | option |
-| `parent` | `parent` | `NotionPage` | no | option |
-| `properties` | `properties` | `Record<string, NotionPropertySchema>` | yes | option |
-| `rows` | `rows` | `Array<Record<string, NotionPropertyValue>>` | no | option |
-| `connections` | `connections` | `NotionIntegration[]` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `title` | `string` | yes | option |
+| `parent` | `NotionPage` | no | option |
+| `properties` | `Record<string, NotionPropertySchema>` | yes | option |
+| `rows` | `Array<Record<string, NotionPropertyValue>>` | no | option |
+| `connections` | `NotionIntegration[]` | no | option |
 
 **Returns** [`NotionDatabase`](/docs/reference/api/notion#notiondatabase).
 
@@ -137,9 +137,9 @@ notion.set_content_update_delay(delay).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `delay` | `delay` | `Duration` | yes | positional |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `delay` | `Duration` | yes | positional |
 
 **Returns** nothing.
 
@@ -189,7 +189,7 @@ let deliveries = notion.deliveries().r#type("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `NotionPage` | no | option |
@@ -218,10 +218,10 @@ let api_calls = notion.calls().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | option |
-| `error` | `error` | `true \| string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | option |
+| `error` | `true \| string` | no | option |
 
 **Returns** [`NotionApiCalls`](/docs/reference/api/notion#notionapicalls).
 
@@ -247,17 +247,17 @@ let api_call = notion.wait_for_call().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | filter |
-| `error` | `error` | `true \| string` | no | filter |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | filter |
+| `error` | `true \| string` | no | filter |
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`NotionApiCall`](/docs/reference/api/notion#notionapicall). When the time is up, it fails with what it was waiting for.
 
 ## NotionIntegration
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -271,13 +271,13 @@ let api_call = notion.wait_for_call().operation("…").await?;
 
 Returned by [`NotionFixture.createUser()`](/docs/reference/api/notion#createuser).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `name` | `name` | `string` |
-| `kind` | `kind` | `"user"` |
-| `channel` | `channel` | `"notion"` |
-| `email` | `email` | `string \| undefined` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user"` |
+| `channel` | `"notion"` |
+| `email` | `string \| undefined` |
 
 ### comment()
 
@@ -299,11 +299,11 @@ let comment = user.comment("…").page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `text` | `text` | `string` | yes | positional |
-| `page` | `page` | `NotionPage` | yes | option |
-| `anchor` | `anchor` | `string \| RegExp` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string` | yes | positional |
+| `page` | `NotionPage` | yes | option |
+| `anchor` | `string \| RegExp` | no | option |
 
 **Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment).
 
@@ -327,10 +327,10 @@ let comment = user.reply("…").discussion(&discussion).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `text` | `text` | `string` | yes | positional |
-| `discussion` | `discussion` | `NotionDiscussion` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string` | yes | positional |
+| `discussion` | `NotionDiscussion` | yes | option |
 
 **Returns** [`NotionComment`](/docs/reference/api/notion#notioncomment).
 
@@ -354,10 +354,10 @@ let delivery = user.edit_comment("…").comment(&comment).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `text` | `text` | `string` | yes | positional |
-| `comment` | `comment` | `NotionComment` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `text` | `string` | yes | positional |
+| `comment` | `NotionComment` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -383,9 +383,9 @@ let delivery = user.delete_comment().comment(&comment).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `comment` | `comment` | `NotionComment` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `comment` | `NotionComment` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -411,9 +411,9 @@ let delivery = user.resolve().discussion(&discussion).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `discussion` | `discussion` | `NotionDiscussion` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `discussion` | `NotionDiscussion` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -439,9 +439,9 @@ let delivery = user.reopen().discussion(&discussion).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `discussion` | `discussion` | `NotionDiscussion` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `discussion` | `NotionDiscussion` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -467,9 +467,9 @@ let result = user.create_page(page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `page` | `page` | `{ title: string; parent?: NotionPage; content?: string \| { path: string } \| unknown[]; icon?: string; connections?: NotionIntegration[] }` | yes | positional |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `page` | `{ title: string; parent?: NotionPage; content?: string \| { path: string } \| unknown[]; icon?: string; connections?: NotionIntegration[] }` | yes | positional |
 
 **Returns** [`NotionPage`](/docs/reference/api/notion#notionpage).
 
@@ -493,10 +493,10 @@ let delivery = user.edit(change).page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `change` | `change` | `{ append?: string \| { path: string } \| unknown[]; replace?: string \| { path: string } \| unknown[] }` | yes | positional |
-| `page` | `page` | `NotionPage` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `change` | `{ append?: string \| { path: string } \| unknown[]; replace?: string \| { path: string } \| unknown[] }` | yes | positional |
+| `page` | `NotionPage` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -520,10 +520,10 @@ let delivery = user.rename("…").page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `title` | `title` | `string` | yes | positional |
-| `page` | `page` | `NotionPage` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `title` | `string` | yes | positional |
+| `page` | `NotionPage` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -547,7 +547,7 @@ let delivery = user.mention(&integration).page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `integration` | `integration` | `NotionIntegration` | yes | positional |
 | `page` | `page` | `NotionPage` | yes | option |
@@ -575,11 +575,11 @@ let delivery = user.set_property("…", value).page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `name` | `name` | `string` | yes | positional |
-| `value` | `value` | `NotionPropertyValue` | yes | positional |
-| `page` | `page` | `NotionPage` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | positional |
+| `value` | `NotionPropertyValue` | yes | positional |
+| `page` | `NotionPage` | yes | option |
 
 **Returns** [`NotionDelivery | undefined`](/docs/reference/api/notion#notiondelivery).
 
@@ -605,10 +605,10 @@ let page = user.add_row(values).database(&database).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `values` | `values` | `Record<string, NotionPropertyValue>` | yes | positional |
-| `database` | `database` | `NotionDatabase` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `values` | `Record<string, NotionPropertyValue>` | yes | positional |
+| `database` | `NotionDatabase` | yes | option |
 
 **Returns** [`NotionPage`](/docs/reference/api/notion#notionpage).
 
@@ -634,10 +634,10 @@ user.connect(&integration).page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `integration` | `integration` | `NotionIntegration` | yes | positional |
-| `page` | `page` | `NotionPage` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `integration` | `NotionIntegration` | yes | positional |
+| `page` | `NotionPage` | yes | option |
 
 **Returns** nothing.
 
@@ -663,10 +663,10 @@ user.disconnect(&integration).page(&page).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `integration` | `integration` | `NotionIntegration` | yes | positional |
-| `page` | `page` | `NotionPage` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `integration` | `NotionIntegration` | yes | positional |
+| `page` | `NotionPage` | yes | option |
 
 **Returns** nothing.
 
@@ -676,12 +676,12 @@ user.disconnect(&integration).page(&page).await?;
 
 Returned by [`NotionFixture.createPage()`](/docs/reference/api/notion#createpage), [`NotionUser.createPage()`](/docs/reference/api/notion#createpage-1), [`NotionUser.addRow()`](/docs/reference/api/notion#addrow).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"notion"` |
-| `title` | `title` | `string` |
-| `url` | `url` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"notion"` |
+| `title` | `string` |
+| `url` | `string` |
 
 ### discussions()
 
@@ -769,9 +769,9 @@ let property_value = page.property("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `name` | `name` | `string` | yes | positional |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | positional |
 
 **Returns** [`NotionPropertyValue`](/docs/reference/api/notion#notionpropertyvalue).
 
@@ -847,12 +847,12 @@ let transcript = page.transcript().await?;
 
 Returned by [`NotionFixture.createDatabase()`](/docs/reference/api/notion#createdatabase).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"notion"` |
-| `title` | `title` | `string` |
-| `url` | `url` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"notion"` |
+| `title` | `string` |
+| `url` | `string` |
 
 ### rows()
 
@@ -874,9 +874,9 @@ let rows = database.rows().await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `filter` | `filter` | `Record<string, NotionPropertyValue>` | no | positional |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `filter` | `Record<string, NotionPropertyValue>` | no | positional |
 
 **Returns** [`NotionRows`](/docs/reference/api/notion#notionrows).
 
@@ -886,7 +886,7 @@ let rows = database.rows().await?;
 
 Returned by [`NotionFixture.sendVerification()`](/docs/reference/api/notion#sendverification), [`NotionUser.editComment()`](/docs/reference/api/notion#editcomment), [`NotionUser.deleteComment()`](/docs/reference/api/notion#deletecomment), [`NotionUser.resolve()`](/docs/reference/api/notion#resolve).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"notion"` |
@@ -964,7 +964,7 @@ let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `badSignature` | `bad_signature` | `boolean` | no | option |
 
@@ -992,9 +992,9 @@ let updated = delivery.settled().await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`NotionDelivery`](/docs/reference/api/notion#notiondelivery). When the time is up, it fails with what it was waiting for.
 
@@ -1002,7 +1002,7 @@ let updated = delivery.settled().await?;
 
 Returned by [`NotionUser.comment()`](/docs/reference/api/notion#comment), [`NotionUser.reply()`](/docs/reference/api/notion#reply).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `discussion` | `discussion` | `NotionDiscussion` |
@@ -1013,11 +1013,11 @@ Returned by [`NotionUser.comment()`](/docs/reference/api/notion#comment), [`Noti
 
 ## NotionDiscussion
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `page` | `page` | `NotionPage` |
-| `anchor` | `anchor` | `string \| undefined` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `page` | `NotionPage` |
+| `anchor` | `string \| undefined` |
 
 ### comments()
 
@@ -1107,7 +1107,7 @@ let comment = discussion.wait_for_comment().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `NotionUser \| NotionIntegration \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -1134,7 +1134,7 @@ let comment = discussion.latest_comment().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `NotionUser \| NotionIntegration \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -1184,30 +1184,30 @@ type NotionConnections = NotionIntegration[];
 
 ### NotionTranscript
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `entries` | `entries` | `NotionTranscriptEntry[]` |
-| `text` | `text` | `string` |
+| Field | Type |
+|---|---|
+| `entries` | `NotionTranscriptEntry[]` |
+| `text` | `string` |
 
 ### NotionTranscriptEntry
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `author` | `author` | `NotionPrincipal` |
-| `at` | `at` | `string` |
-| `text` | `text` | `string` |
-| `controls` | `controls` | `string[]` |
-| `edited` | `edited` | `boolean` |
-| `depth` | `depth` | `number` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `author` | `NotionPrincipal` |
+| `at` | `string` |
+| `text` | `string` |
+| `controls` | `string[]` |
+| `edited` | `boolean` |
+| `depth` | `number` |
 
 ### NotionPrincipal
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `name` | `name` | `string` |
-| `kind` | `kind` | `"user" \| "app"` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user" \| "app"` |
 
 ### NotionRows
 
@@ -1235,7 +1235,7 @@ type NotionApiCalls = NotionApiCall[];
 
 ### NotionApiCall
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"notion"` |

@@ -313,9 +313,10 @@ describe("emitters", () => {
     expect(client).toContain('const result = await widget.update("…", { parent });');
     expect(client).toContain('result = await widget.update("…", parent=parent)');
     expect(client).toContain('let result = widget.update("…").parent(&parent).await?;');
-    expect(client).toContain("| `label` | `label` | `string` | yes | positional |");
-    expect(client).toContain("| Parameter | Python · Rust | Type | Required | |");
-    expect(client).toContain('| `mode` | `mode` | `"a" \\| "b"` | no | option |');
+    // Every name is the same in Python and Rust, so the table leaves that column out.
+    expect(client).toContain("| `label` | `string` | yes | positional |");
+    expect(client).toContain("| Parameter | Type | Required |  |");
+    expect(client).toContain('| `mode` | `"a" \\| "b"` | no | option |');
     const errors = pages.get("website/docs/reference/api/errors.mdx") ?? "";
     expect(errors).toContain("### not_found\n\nHTTP 404. It isn't there.");
     expect(errors).toContain("SDK class: `NotFoundError`");

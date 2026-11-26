@@ -71,6 +71,18 @@ const otherNames = (name: string) => {
   return python === rust ? code(python) : `${code(python)} · ${code(rust)}`;
 };
 
+/** The Python and Rust column earns its place only when some name there differs from the TypeScript one. */
+const namesDiffer = (names: readonly string[]) =>
+  names.some((name) => pythonName(name) !== name || rustName(name) !== name);
+
+/** A Markdown table: a header row, its rule and the rows. */
+const table = (header: readonly string[], rows: ReadonlyArray<readonly string[]>) => [
+  `| ${header.join(" | ")} |`,
+  `|${header.map(() => "---|").join("")}`,
+  ...rows.map((row) => `| ${row.join(" | ")} |`),
+  "",
+];
+
 /** Rust: a handle by reference, anything else as it is. */
 const rustValue = (value: Value) => value.literal ?? `${value.handle ? "&" : ""}${rustName(value.name)}`;
 
@@ -227,13 +239,20 @@ export function emitDocs(ir: Ir): Map<string, string> {
     ];
   };
 
-  const paramRow = (param: { name: string; type: string; required: boolean; note?: string }) =>
-    `| ${code(param.name)} | ${otherNames(param.name)} | ${cell(code(param.type))} | ${param.required ? "yes" : "no"} | ${cell(param.note ?? "")} |`;
-
-  const paramTable = (rows: Array<{ name: string; type: string; required: boolean; note?: string }>) =>
-    rows.length === 0
-      ? []
-      : ["| Parameter | Python · Rust | Type | Required | |", "|---|---|---|---|---|", ...rows.map(paramRow), ""];
+  const paramTable = (rows: Array<{ name: string; type: string; required: boolean; note?: string }>) => {
+    if (rows.length === 0) return [];
+    const names = namesDiffer(rows.map((row) => row.name));
+    return table(
+      ["Parameter", ...(names ? ["Python / Rust"] : []), "Type", "Required", ""],
+      rows.map((param) => [
+        code(param.name),
+        ...(names ? [otherNames(param.name)] : []),
+        cell(code(param.type)),
+        param.required ? "yes" : "no",
+        cell(param.note ?? ""),
+      ]),
+    );
+  };
 
   const paramOf = (param: IrParam, positional: boolean) => ({
     name: param.name,
@@ -348,18 +367,18 @@ export function emitDocs(ir: Ir): Map<string, string> {
     ];
   };
 
-  const fieldTable = (fields: ReadonlyArray<{ name: string; type: IrType; optional: boolean }>) =>
-    fields.length === 0
-      ? []
-      : [
-          "| Field | Python · Rust | Type |",
-          "|---|---|---|",
-          ...fields.map(
-            (field) =>
-              `| ${code(field.name)} | ${otherNames(field.name)} | ${cell(code(`${ts(field.type)}${field.optional ? " | undefined" : ""}`))} |`,
-          ),
-          "",
-        ];
+  const fieldTable = (fields: ReadonlyArray<{ name: string; type: IrType; optional: boolean }>) => {
+    if (fields.length === 0) return [];
+    const names = namesDiffer(fields.map((field) => field.name));
+    return table(
+      ["Field", ...(names ? ["Python / Rust"] : []), "Type"],
+      fields.map((field) => [
+        code(field.name),
+        ...(names ? [otherNames(field.name)] : []),
+        cell(code(`${ts(field.type)}${field.optional ? " | undefined" : ""}`)),
+      ]),
+    );
+  };
 
   /** Who hands out this handle: its factories and the methods that return it. */
   const madeBy = (name: string): string[] => {

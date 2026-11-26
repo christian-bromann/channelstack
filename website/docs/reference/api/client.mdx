@@ -59,9 +59,9 @@ let session = channelstack.open_session().name("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `name` | `name` | `string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | no | option |
 
 **Returns** [`Session`](/docs/reference/api/client#session).
 
@@ -107,9 +107,9 @@ let env = channelstack.env().proxy(proxy).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `proxy` | `proxy` | `boolean` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `proxy` | `boolean` | no | option |
 
 **Returns** [`Env`](/docs/reference/api/client#env-1).
 
@@ -139,7 +139,7 @@ let ui_login_link = channelstack.ui_login_link().await?;
 
 Returned by [`Channelstack.openSession()`](/docs/reference/api/client#opensession).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `sessionId` | `session_id` | `string` |
 | `drivers` | `drivers` | `string[]` |
@@ -186,9 +186,9 @@ let event_page = session.events().since("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `since` | `since` | `string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `since` | `string` | no | option |
 
 **Returns** [`EventPage`](/docs/reference/api/client#eventpage).
 
@@ -374,32 +374,32 @@ Plain values the handles return and take.
 
 ### Status
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `ready` | `ready` | `boolean` |
-| `version` | `version` | `string` |
-| `drivers` | `drivers` | `string[]` |
+| Field | Type |
+|---|---|
+| `ready` | `boolean` |
+| `version` | `string` |
+| `drivers` | `string[]` |
 
 ### EventPage
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `events` | `events` | `LogEvent[]` |
-| `cursor` | `cursor` | `string` |
+| Field | Type |
+|---|---|
+| `events` | `LogEvent[]` |
+| `cursor` | `string` |
 
 ### LogEvent
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `at` | `at` | `string` |
-| `driver` | `driver` | `string` |
-| `kind` | `kind` | `"action" \| "delivery" \| "delivery_attempt" \| "api_call"` |
-| `data` | `data` | `Record<string, unknown>` |
-| `summary` | `summary` | `{ text: string; outcome: string; ok: boolean } \| undefined` |
+| Field | Type |
+|---|---|
+| `at` | `string` |
+| `driver` | `string` |
+| `kind` | `"action" \| "delivery" \| "delivery_attempt" \| "api_call"` |
+| `data` | `Record<string, unknown>` |
+| `summary` | `{ text: string; outcome: string; ok: boolean } \| undefined` |
 
 ### Quiet
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `busy` | `busy` | `boolean` |
 | `quietForMs` | `quiet_for_ms` | `number` |
@@ -419,7 +419,7 @@ type Capabilities = Record<string, Capability>;
 
 ### Capability
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `fake` | `fake` | `boolean` |
 | `live` | `live` | `boolean` |
@@ -427,7 +427,7 @@ type Capabilities = Record<string, Capability>;
 
 ### DeliveryAttempt
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `number` | `number` | `number` |
 | `sentAt` | `sent_at` | `string` |
@@ -442,6 +442,6 @@ type Capabilities = Record<string, Capability>;
 
 ### UiLoginLink
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `url` | `url` | `string` |
+| Field | Type |
+|---|---|
+| `url` | `string` |
