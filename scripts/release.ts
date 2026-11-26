@@ -51,8 +51,15 @@ function cliff(args: readonly string[], repository = ROOT): string {
   return result.stdout;
 }
 
-/** The last `v*` tag before the repository's HEAD, if there is one. */
+/**
+ * The last `v*` tag before the repository's HEAD, if there is one. A shallow clone has neither the
+ * history nor the tags, so it would draft nothing: it's refused.
+ */
 export function lastTag(repository = ROOT): string | undefined {
+  const shallow = spawnSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: repository, encoding: "utf8" });
+  if (shallow.stdout.trim() === "true") {
+    throw new Error(`${repository} is a shallow clone: fetch the whole history and the tags (fetch-depth: 0)`);
+  }
   const result = spawnSync("git", ["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"], {
     cwd: repository,
     encoding: "utf8",

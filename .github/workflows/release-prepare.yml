@@ -1,8 +1,10 @@
 name: Prepare a release
 
-# Step one of a release (docs/release.md): run it from the Actions tab with the version. It sets
-# that version in every package, regenerates what follows from it, moves the changelog's
-# "Unreleased" section under the version, and opens the version pull request. Merging that pull
+# Step one of a release (docs/release.md): run it from the Actions tab, with the version or without
+# one (then the pull requests merged since the last `v*` tag decide it, cliff.toml). It sets that
+# version in every package, regenerates what follows from it, moves the changelog's "Unreleased"
+# section under the version with a draft from those pull requests' titles, and opens the version
+# pull request. Merging that pull
 # request tags it (release-tag.yml), and the tag releases it (release.yml).
 #
 # The pull request is opened with the release App's token, not GITHUB_TOKEN: a pull request that
@@ -12,8 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "The version to release: X.Y.Z, or X.Y.Z-alpha.N, -beta.N or -rc.N"
-        required: true
+        description: "The version to release: X.Y.Z, or X.Y.Z-alpha.N, -beta.N or -rc.N. Empty: the next one, from the pull requests since the last tag"
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -36,25 +39,35 @@ jobs:
     timeout-minutes: 20
     environment: release-bot
     steps:
-      - name: The version is one a release can have, and isn't released yet
+      - name: The version is one a release can have
         env:
           VERSION: ${{ inputs.version }}
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
+          if [ -n "$VERSION" ] && ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$ ]]; then
             echo "::error::\"$VERSION\" isn't X.Y.Z or X.Y.Z-(alpha|beta|rc).N"; exit 1
           fi
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" > /dev/null 2>&1; then
-            echo "::error::v$VERSION is released already"; exit 1
-          fi
+      # The whole history and the tags: the changelog draft and the next version are the pull
+      # requests merged since the last `v*` tag.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup
-      - name: Every package at the version, the spec, SDKs and lock files regenerated
+      - name: Every package at the version, the spec, SDKs and lock files regenerated, the changelog drafted
         env:
           VERSION: ${{ inputs.version }}
-        run: pnpm release:version "$VERSION"
+        run: |
+          if [ -n "$VERSION" ]; then pnpm release:version "$VERSION"; else pnpm release:version; fi
+      - name: The version isn't released yet
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p 'require("./sdks/typescript/package.json").version')"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" > /dev/null 2>&1; then
+            echo "::error::v$version is released already"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # The App's token comes last, after every step that runs the dependencies' code.
       - id: app
@@ -66,7 +79,7 @@ jobs:
           permission-pull-requests: write
       - name: Commit, push and open the pull request
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.app.outputs.token }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
@@ -79,17 +92,18 @@ jobs:
           gh auth setup-git
           git switch -c "$branch"
           git add -A
-          git commit -q -m "chore: release v$VERSION"
+          git commit -q -m "chore(ci): release v$VERSION"
           git push origin "$branch"
           first=""
           if [ "$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq length)" = 0 ]; then
             first="- [ ] The first release: take the note that channelstack isn't on npm yet out of README.md."
           fi
-          gh pr create --base main --head "$branch" --title "chore: release v$VERSION" --body "$(cat <<EOF
+          gh pr create --base main --head "$branch" --title "chore(ci): release v$VERSION" --body "$(cat <<EOF
           Sets every package to $VERSION, regenerates the spec, the SDKs and the lock files, and moves
-          the changelog's "Unreleased" section under $VERSION. Opened by the **Prepare a release** workflow.
+          the changelog's "Unreleased" section under $VERSION, with a draft from the titles of the pull
+          requests since the last tag below the hand-written lines. Opened by the **Prepare a release** workflow.
 
-          - [ ] The changelog's $VERSION section reads well (edit it on this branch).
+          - [ ] The changelog's $VERSION section reads well: merge the draft into the hand-written lines (edit it on this branch).
           $first
 
           Merging this tags the merge commit \`v$VERSION\`, and the tag starts the release. Its

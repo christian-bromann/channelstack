@@ -78,6 +78,16 @@ describe("the changelog draft, from the pull requests' titles", () => {
     expect(() => nextVersion(dir)).toThrow("There's no v* tag to bump yet");
   });
 
+  test("a shallow clone, which has neither the history nor the tags, is refused", () => {
+    const dir = repository(["Phase 9: Google (Gmail) (#88)", "feat(slack): files (#96)", "fix(slack): more (#97)"], 1);
+    const shallow = mkdtempSync(join(tmpdir(), "channelstack-release-"));
+    repositories.push(shallow);
+    const cloned = spawnSync("git", ["clone", "-q", "--depth", "1", `file://${dir}`, shallow], { encoding: "utf8" });
+    expect(cloned.status, cloned.stderr).toBe(0);
+    expect(() => draft(shallow)).toThrow("is a shallow clone");
+    expect(() => nextVersion(shallow)).toThrow("is a shallow clone");
+  });
+
   test("the titles since the tag, by section and platform, each linked to its pull request", () => {
     const dir = repository(
       [
