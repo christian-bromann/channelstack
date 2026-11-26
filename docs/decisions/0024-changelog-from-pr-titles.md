@@ -33,8 +33,8 @@ Status: proposed, 2026-11-26. The maintainer confirms it in the PR that adds `cl
 - MIT or Apache-2.0, released every few months (2.14.2 on 2026-09-18), and widely used.
 - The npm package `git-cliff` ships a prebuilt binary per platform as optional dependencies, so it
   installs with the other dev dependencies, with no Rust toolchain, no install script, and no native
-  Node module. Only `release.ts version` runs it, on the maintainer's machine; it isn't part of the
-  server or its compiled binary.
+  Node module. Only `release.ts` runs it: `version` in the **Prepare a release** workflow on GitHub, and
+  `draft` wherever someone previews the draft. It isn't part of the server or its compiled binary.
 - Its configuration is one file, its templates can group by scope, and it computes the next version
   from the same commits.
 

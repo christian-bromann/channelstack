@@ -57,6 +57,9 @@ requests merged since the last `v*` tag (CONTRIBUTING.md, "The title"):
 - A title without one of the listed scopes, such as one from before the convention, is under
   "Other".
 - Before the first tag there is nothing to draft from, so 0.1.0's section is all hand-written.
+- A prerelease's tag counts as the last tag. After `v0.2.0-rc.1`, the draft has only what was
+  merged since the rc, and the next version is `0.2.0-rc.2`: name `0.2.0` to release it, and copy
+  the rc's section into it.
 
 To see the draft without changing anything (it needs the history and the tags, so not a shallow
 clone):

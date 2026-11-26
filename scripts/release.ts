@@ -4,6 +4,7 @@
  * the gate run.
  *
  *   node scripts/release.ts version [<version>] # every manifest, the spec, the SDKs, the lock files, the changelog
+ *   node scripts/release.ts draft               # the changelog draft since the last `v*` tag, changing nothing
  *   node scripts/release.ts check [--tag <tag>] # all agree (and match the tag, with its changelog section)
  *   node scripts/release.ts notes <version>     # the changelog section of a version, for the GitHub release
  *
@@ -243,12 +244,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       process.exit(1);
     }
     console.log(`release: every package is at ${versions()[NPM[1]]}${tag ? `, as ${tag} says` : ""}`);
+  } else if (command === "draft") {
+    const last = lastTag();
+    console.log(
+      last === undefined ? "No v* tag yet, so nothing to draft: the first release is hand-written." : draft(),
+    );
   } else if (command === "notes" && value !== undefined) {
     const section = changelogSection(read("CHANGELOG.md"), value);
     if (section === undefined) throw new Error(`CHANGELOG.md has no "## [${value}]" section`);
     console.log(section);
   } else {
-    console.error("Usage: node scripts/release.ts version [<version>] | check [--tag <tag>] | notes <version>");
+    console.error("Usage: node scripts/release.ts version [<version>] | draft | check [--tag <tag>] | notes <version>");
     process.exit(2);
   }
 }

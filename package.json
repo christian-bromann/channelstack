@@ -42,7 +42,7 @@
     "check:unused": "knip",
     "verify:phase": "node scripts/verify-phase.ts",
     "release:check": "node scripts/release.ts check",
-    "release:draft": "git-cliff --unreleased --strip all",
+    "release:draft": "node scripts/release.ts draft",
     "release:version": "node scripts/release.ts version"
   },
   "devDependencies": {

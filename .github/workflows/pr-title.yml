@@ -56,6 +56,3 @@ jobs:
             codegen
             deps
           requireScope: true
-          subjectPatternError: |
-            The summary "{subject}" of "{title}" is missing. The title is
-            <type>(<scope>)<!>: <summary>, for example "feat(slack): a person shares files with say and reply".

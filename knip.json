@@ -22,7 +22,8 @@
         "integrations/**/*.ts",
         "examples/**/*.ts",
         "test/**/*.ts"
-      ]
+      ],
+      "ignoreDependencies": ["git-cliff"]
     },
     "server": {
       "entry": ["src/cli.ts", "src/**/*.test.ts", "test/**/*.test.ts"],
