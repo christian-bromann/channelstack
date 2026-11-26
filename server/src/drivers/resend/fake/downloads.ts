@@ -50,12 +50,12 @@ export function createDownloads(context: DriverContext, store: ResendStore) {
     /** A link to an email's raw message or one of its attachments, working for an hour from now. */
     link(email: ResendEmailRecord, file: File): DownloadLink {
       const path = pathOf(email, file);
-      const expiresMs = clock() + LINK_MS;
-      const expires = Math.floor(expiresMs / 1000);
+      // In whole seconds, as the link's `Expires`: `expires_at` is the moment it stops working.
+      const expires = Math.floor((clock() + LINK_MS) / 1000);
       const url = new URL(`${context.apiUrl()}${path}`);
       url.searchParams.set("Expires", String(expires));
       url.searchParams.set("Signature", signature(path, expires));
-      return { download_url: url.toString(), expires_at: iso(expiresMs) };
+      return { download_url: url.toString(), expires_at: iso(expires * 1000) };
     },
 
     /**

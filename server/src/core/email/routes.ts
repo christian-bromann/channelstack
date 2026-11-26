@@ -151,7 +151,10 @@ export function registerEmailRoutes<Email extends EmailRecord>(
     at: iso(email.createdAt),
     text: email.text,
     html: email.html,
-    attachments: email.attachments.map((attachment) => attachment.filename),
+    // A part the HTML shows by its `Content-ID` (`cid:logo`) is in the body a person reads, not a file of the email.
+    attachments: email.attachments.flatMap((attachment) =>
+      attachment.contentId === undefined ? [attachment.filename] : [],
+    ),
   });
   const emailWire = (session: string, email: Email) => {
     const delivery = email.delivery === undefined ? undefined : spec.delivery.wire(session, email);
