@@ -1,10 +1,10 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { App, LogLevel } from "@slack/bolt";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, onTestFinished, test } from "vitest";
 
 import { freePort } from "../../../scripts/lib/process.ts";
 import { connect } from "../../../sdks/typescript/client.ts";
@@ -260,6 +260,7 @@ describe("exit check 2.2: interactions reach Bolt's handlers, and its answers co
 describe("a person's files reach Bolt", () => {
   test("the SDK reads a fixture from disk, and Bolt reads it back from url_private with the bot token", async () => {
     const directory = mkdtempSync(join(tmpdir(), "channelstack-files-"));
+    onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
     writeFileSync(join(directory, "crash.log"), "Error: disk full\n");
     const client = await connect({ mode: "attach", server: server.url, token: server.token });
     await using session = await client.openSession();
