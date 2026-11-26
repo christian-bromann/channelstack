@@ -40,6 +40,20 @@ export function readPrivateJsonFile(path: string): unknown {
   }
 }
 
+/**
+ * Is the process that wrote a state file still running? One that exists but isn't ours to signal
+ * (EPERM) is. A file whose writer is gone is what a crash or a kill left behind.
+ */
+export function processRunning(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 export function removeFile(path: string): void {
   rmSync(path, { force: true });
 }

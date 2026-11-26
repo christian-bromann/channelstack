@@ -1,6 +1,7 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { once } from "node:events";
 import { readdirSync } from "node:fs";
+import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
@@ -76,9 +77,10 @@ test(
 test("the claims of a process that is gone lapse", { timeout: 30_000 }, async () => {
   const killed = taker();
   await portsOf(killed);
+  // While it runs, nothing removes its claims.
+  expect(claimsOf(killed.pid)).toHaveLength(COUNT);
   killed.kill("SIGKILL");
   await once(killed, "exit");
-  expect(claimsOf(killed.pid)).toHaveLength(COUNT);
   const next = taker();
   try {
     await portsOf(next);
@@ -86,5 +88,29 @@ test("the claims of a process that is gone lapse", { timeout: 30_000 }, async ()
   } finally {
     next.stdin.end();
     if (next.exitCode === null) await once(next, "exit");
+  }
+});
+
+// A claim whose port turns out to be in use is given up: it would only hold a port nobody can have.
+test("a port that is in use leaves no claim behind", { timeout: 30_000 }, async () => {
+  // Listeners on about one port in 40 of the range, so the taker's probe finds some of them in use.
+  const listeners: Server[] = [];
+  for (let port = 20_000; port <= 32_767; port += 40) {
+    const server = createServer();
+    const listened = await new Promise<boolean>((resolve) => {
+      server.once("error", () => resolve(false));
+      server.listen(port, () => resolve(true));
+    });
+    if (listened) listeners.push(server);
+  }
+  const child = taker();
+  try {
+    const ports = await portsOf(child);
+    expect(ports.filter((port) => (port - 20_000) % 40 === 0)).toEqual([]);
+    expect(claimsOf(child.pid)).toHaveLength(COUNT);
+  } finally {
+    child.stdin.end();
+    if (child.exitCode === null) await once(child, "exit");
+    for (const server of listeners) server.close();
   }
 });

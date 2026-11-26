@@ -5,6 +5,8 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { processRunning } from "../../server/src/core/home/index.ts";
+
 /** Run a command to completion, with its output on this terminal. Throws when it fails. */
 export function run(
   command: string,
@@ -85,19 +87,9 @@ const CLAIM_MS = 5 * 60_000;
  */
 const RANGE = { from: 20_000, to: 32_767 } as const;
 
-/** This process's claims. */
-const mine = new Set<string>();
+/** This process's claims, by port. */
+const mine = new Map<number, string>();
 let swept = false;
-
-/** Is this process still running? One that exists but isn't ours to signal is. */
-const alive = (pid: number) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-};
 
 /**
  * Has a claim (`<port>-<pid>-<uuid>`) lapsed? It has once it is older than `CLAIM_MS` or its
@@ -105,7 +97,7 @@ const alive = (pid: number) => {
  * its claims up itself. A claim that was removed meanwhile has lapsed too.
  */
 const lapsed = (name: string, now: number) => {
-  if (!alive(Number(name.split("-")[1]))) return true;
+  if (!processRunning(Number(name.split("-")[1]))) return true;
   try {
     return now - statSync(join(CLAIMS, name)).mtimeMs >= CLAIM_MS;
   } catch {
@@ -126,7 +118,7 @@ function claim(port: number): boolean {
   if (!swept) {
     swept = true;
     process.once("exit", () => {
-      for (const name of mine) rmSync(join(CLAIMS, name), { force: true });
+      for (const name of mine.values()) rmSync(join(CLAIMS, name), { force: true });
     });
     for (const name of readdirSync(CLAIMS)) if (lapsed(name, now)) rmSync(join(CLAIMS, name), { force: true });
   }
@@ -137,8 +129,16 @@ function claim(port: number): boolean {
     rmSync(join(CLAIMS, own), { force: true });
     return false;
   }
-  mine.add(own);
+  mine.set(port, own);
   return true;
+}
+
+/** Give a claim up: the port turned out to be in use. */
+function release(port: number): void {
+  const name = mine.get(port);
+  if (name === undefined) return;
+  mine.delete(port);
+  rmSync(join(CLAIMS, name), { force: true });
 }
 
 /** Can a server listen on this port, on every address, the way an agent that names no host does? */
@@ -157,6 +157,8 @@ const bindable = (port: number) =>
 export async function freePort(): Promise<number> {
   for (;;) {
     const port = randomInt(RANGE.from, RANGE.to + 1);
-    if (claim(port) && (await bindable(port))) return port;
+    if (!claim(port)) continue;
+    if (await bindable(port)) return port;
+    release(port);
   }
 }
