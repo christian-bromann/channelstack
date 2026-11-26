@@ -15014,7 +15014,7 @@ impl NotionFixture {
         ))
     }
 
-    /// Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. Use `user.createPage` to send the event in both worlds. Experimental.
+    /// Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds. Experimental.
     pub fn create_page(&self) -> NotionFixtureCreatePage {
         NotionFixtureCreatePage(Call::new(
             &self.ctx,

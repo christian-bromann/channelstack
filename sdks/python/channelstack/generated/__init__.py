@@ -2699,7 +2699,7 @@ class NotionFixture:
         return NotionUser(ctx, data)
 
     async def create_page(self, *, title: str, parent: NotionPage | None = None, content: DocumentInput | None = None, icon: str | None = None, connections: list[NotionIntegration] | None = None, created_by: NotionUser | None = None) -> NotionPage:
-        """Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. Use `user.createPage` to send the event in both worlds. Experimental."""
+        """Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/pages", body={"title": title, "parent": None if parent is None else parent.id, "content": None if content is None else read_document(content), "icon": icon, "connections": None if connections is None else [item.id for item in connections], "createdBy": None if created_by is None else created_by.id})
         return NotionPage(ctx, data)

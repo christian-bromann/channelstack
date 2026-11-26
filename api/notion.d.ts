@@ -21,8 +21,9 @@ export interface NotionFixture extends Inspectable<NotionDelivery> {
    * webhooks for it, when it's listed in `connections` or inherits a connection from
    * its parent (Notion's real rule).
    *
-   * In the fake, a seed page sends no event. Live, the session's first person makes it,
-   * so Notion sends `page.created` to a connected integration, and an agent that acts
+   * In the fake, a seed page sends no event. Live, a real person makes it (`createdBy`,
+   * or else the session's first person), so Notion sends `page.created` to a connected
+   * integration, and an agent that acts
    * on new pages (writes a summary into them, say) may change the page before the test
    * reads it. Use `user.createPage` when the creation itself should reach the agent as
    * an event: it sends `page.created` in both worlds.
@@ -56,7 +57,7 @@ export interface NotionPageOptions {
   content?: string | { path: string } | unknown[];
   icon?: string;
   connections?: NotionIntegration[];
-  /** Shown as the page's creator. Defaults to a generated workspace owner. */
+  /** Shown as the page's creator. Defaults to a generated workspace owner in the fake, and to the session's first person live. */
   createdBy?: NotionUser;
 }
 
@@ -103,7 +104,7 @@ export interface NotionUser extends User {
   reopen(target: { discussion: NotionDiscussion }): Promise<NotionDelivery | undefined>;
 
   // ------------------------------------------------------------ pages
-  /** Create a page as this person. Unlike `notion.createPage`, this sends `page.created`. */
+  /** Create a page as this person. Sends `page.created` in both worlds; `notion.createPage` sends it only live. */
   createPage(page: Omit<NotionPageOptions, "createdBy">): Promise<NotionPage>;
   /** Edit the body. Sends `page.content_updated`. */
   edit(change: { append?: string | unknown[]; replace?: string | unknown[] }, target: { page: NotionPage }): Promise<NotionDelivery | undefined>;

@@ -3397,7 +3397,7 @@ export class NotionFixture {
     return new NotionUser(ctx, data);
   }
 
-  /** Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. Use `user.createPage` to send the event in both worlds. Experimental. */
+  /** Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds. Experimental. */
   async createPage(options: { title: string; parent?: NotionPage; content?: string | { path: string } | unknown[]; icon?: string; connections?: NotionIntegration[]; createdBy?: NotionUser }): Promise<NotionPage> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/notion/pages`, { body: { title: options.title, parent: options.parent === undefined ? undefined : options.parent.id, content: options.content === undefined ? undefined : readDocument(options.content), icon: options.icon, connections: options.connections === undefined ? undefined : options.connections.map((item) => item.id), createdBy: options.createdBy === undefined ? undefined : options.createdBy.id } })) as NotionPageData;
