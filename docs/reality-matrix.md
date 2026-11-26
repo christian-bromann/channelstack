@@ -234,7 +234,7 @@ Sent email can't be taken back. Live, every recipient must be an address in `CHA
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
 | `google.createUser({ name, address, token })` | Done | Built | The person's own account's refresh token; their address is the account's | A person is their mailbox: their `id` is their address. In the fake, `<name>@example.com` |
-| `ana.send({ to, cc, subject, text, html })` | Done | Built | `users.messages.send` with the person's token, labelled with the run's tag | To the agent's address a copy lands in the agent's inbox, unread, and its watch hears of it. Attachments aren't built, fake or live |
+| `ana.send({ to, cc, subject, text, html })` | Done | Built | `users.messages.send` with the person's token, labelled with the run's tag | To the agent's address a copy lands in the agent's inbox, unread, and its watch hears of it. Attachments aren't built, fake or live (#84, #89) |
 | `ana.reply(email, { text, all })` | Done | Built | `users.messages.send` on the person's thread, with `In-Reply-To` and `References` | `Re:` its subject, to its sender (`Reply-To` first), and with `all` to everyone on it |
 | `ana.inbox()`, `waitForEmail` | Done | Built | `users.messages.list` and `get` in the person's mailbox | Read again before each read (cached for a second) |
 | `thread.messages()`, `replies()`, `transcript()`, `toHaveReplyFrom` | Done | Built | Each person's mail | A thread is the emails joined by `In-Reply-To` and `References`. In the agent's mailbox, Gmail threads them by `threadId`, references and a matching subject. An email's `labels` are its copy's there (`INBOX`, `UNREAD`, `SENT`, the agent's own), fake and live: live, read with the agent's token, without the run's own label |
