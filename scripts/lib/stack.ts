@@ -116,7 +116,9 @@ export async function withStack(
         { path: options.agent, child: agent.child },
         ...companions.map((other) => ({ path: other.agent, child: other.started.child })),
       ])
-        if (child.exitCode !== null) return `The agent ${path} exited with ${child.exitCode}`;
+        // A signal counts too: an agent the system killed (out of memory, say) is gone all the same.
+        if (child.exitCode !== null || child.signalCode !== null)
+          return `The agent ${path} exited with ${child.exitCode ?? child.signalCode}`;
       return undefined;
     };
     const running = () => {
