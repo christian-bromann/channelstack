@@ -26,7 +26,8 @@ divergences:
     reason: >-
       Live mode makes each session's repository with a description saying it is channelstack's and
       goes away with the session; the fake's repositories have none (`null`), as one made without a
-      description has. Where live mode makes repositories, not drift.
+      description has. The difference comes from how live mode makes repositories, not from drift
+      in the fake.
     expires: 2027-02-28
   - scenario: shapes/linear
     path:
