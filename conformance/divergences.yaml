@@ -106,17 +106,13 @@ divergences:
     expires: 2027-02-28
   - scenario: shapes/notion
     path:
-      - "api GET /v1/comments/{id} rich_text.[].mention.user.avatar_url"
-      - "api GET /v1/comments/{id} rich_text.[].mention.user.bot"
-      - "api GET /v1/comments/{id} rich_text.[].mention.user.name"
-      - "api GET /v1/comments/{id} rich_text.[].mention.user.type"
       - "api GET /v1/blocks/{id}/children results.[].child_page"
       - "api GET /v1/blocks/{id}/children results.[].paragraph.icon"
       - "api PATCH /v1/blocks/{id}/children results.[].paragraph.icon"
       - "api GET /v1/blocks/{id}/children results.[].type"
     reason: >-
-      Real Notion's mention of a bot in rich text carries the bot user's name, avatar_url, type and
-      bot; the fake's has its id only. To add to the fake: #27.
+      Real Notion lists a page's child pages among its blocks as child_page blocks, and a paragraph
+      block has an icon (null); the fake's lists have neither. To look at: #70.
     expires: 2027-02-28
   - scenario: shapes/notion
     path: webhook page.created data.parent.type
