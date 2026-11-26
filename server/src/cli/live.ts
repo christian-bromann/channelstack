@@ -3,6 +3,7 @@ import { basename, join, resolve } from "node:path";
 
 import { BrowserActor, type Launch, storageStatePath, writeStorageState } from "../core/browser/index.ts";
 import { pollUntil, systemClock, systemTimers } from "../core/clock/index.ts";
+import { processRunning } from "../core/home/index.ts";
 import { readLedgers, rewriteLedger } from "../core/ledger/index.ts";
 import type { DriverDefinition, LiveCheck } from "../core/router/index.ts";
 import { normalizeRunId } from "../core/safety/index.ts";
@@ -126,13 +127,7 @@ export async function runDoctor(input: LiveCommandInput & { storageStates: reado
 /** Is the server that wrote this ledger file still running? Its own sessions remove what they made. */
 function running(file: string): boolean {
   const pid = Number(basename(file).split("-")[0]);
-  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+  return pid !== process.pid && processRunning(pid);
 }
 
 /**
