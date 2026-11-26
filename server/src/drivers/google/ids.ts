@@ -11,8 +11,6 @@ export const GOOGLE_IDS = idFormats("google", {
   thread: { pattern: /^[0-9a-f]{16}$/, generate: (draw) => `19${draw.chars(14, HEX)}` },
   // Where a mailbox's history starts: a 7-digit history id.
   history: numeric(1_000_000, 9_999_999, /^[1-9]\d{6,19}$/),
-  // How far the next history id is from the last: history ids grow, with gaps.
-  historyGap: numeric(1, 40, /^[1-9]\d?$/),
   // A Pub/Sub message's id: 16 digits.
   pushMessage: { pattern: /^[1-9]\d{15}$/, generate: (draw) => `1${draw.chars(15, DIGITS)}` },
   // A Google account's numeric id (`sub`), as the push service account's: 21 digits.

@@ -169,9 +169,13 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
     );
   };
 
-  /** The mailbox's next history id: larger than the last, with a gap, as Gmail's are. */
+  /**
+   * The mailbox's next history id: larger than the last, with a gap, as Gmail's are. The gap
+   * varies with the count (7 to 19), not with a draw: ids drawn must be unique, gaps needn't be.
+   */
   const nextHistoryId = () => {
-    store.historyId = String(BigInt(store.historyId) + BigInt(ids.next(GOOGLE_IDS.historyGap)));
+    const count = ids.sequence("google.history");
+    store.historyId = String(BigInt(store.historyId) + BigInt(7 + ((count * count) % 13)));
     return store.historyId;
   };
 
