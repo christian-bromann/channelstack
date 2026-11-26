@@ -79,10 +79,3 @@ divergences:
       tokens last 7 days), as the sandbox's is. The fake's client is a published one, whose tokens
       don't expire.
     expires: 2027-02-28
-  - scenario: shapes/notion
-    path: webhook page.created data.parent.type
-    reason: >-
-      Live, a session's pages go under a page of its own (so they are tagged and trashed with the
-      session), and their parent is a page; in the fake, a page without a parent is at the
-      workspace's top level. Where live mode puts pages, not drift.
-    expires: 2027-02-28
