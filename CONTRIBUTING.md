@@ -41,6 +41,27 @@ them too.
 - **Format and check** with `pnpm format`, then `pnpm lint`.
 - **Docs:** update the ones your change touches, in the same pull request.
 
+### The title
+
+A pull request is squash-merged with its title as the commit title, and the changelog is drafted
+from those titles, so the title is a [Conventional Commit](https://www.conventionalcommits.org/):
+
+```text
+<type>(<scope>)<!>: <summary>
+```
+
+- **Type:** `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `ci`, `build` or `chore`. The
+  changelog lists `feat`, `fix` and `perf`.
+- **Scope,** one or more separated by commas (`fix(slack,github): …`):
+  - the fakes: `slack`, `github`, `linear`, `notion`, `resend`, `gmail`;
+  - the packages: `server`, `sdk-ts`, `sdk-python`, `pytest`, `sdk-rust`;
+  - internal, left out of the changelog: `docs`, `ci`, `codegen`, `deps`.
+- **`!`** marks a breaking change, which the changelog lists whatever its type.
+- **The summary** is what the changelog says, so write it for someone who uses channelstack:
+  `feat(slack): a person shares files with say and reply`.
+
+The `PR title` check fails on any other title; edit the title and it runs again.
+
 ## Releases
 
 Maintainers release with one tag; see [docs/release.md](docs/release.md).

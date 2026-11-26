@@ -9,8 +9,13 @@ checks and publishes it all, and makes the GitHub release.
 1. **The version, in a pull request.** On a branch from `main`:
 
    ```bash
-   pnpm release:version 0.1.0
+   pnpm release:version
    ```
+
+   Without a version, it takes the next one from the pull requests merged since the last `v*` tag
+   (git-cliff's `--bumped-version`). Before 1.0, a breaking change (`!`) or a `feat` bumps the minor
+   version, and a `fix` or `perf` the patch version. Name the version to choose it yourself, as for
+   the first release or a prerelease: `pnpm release:version 0.1.0`.
 
    This sets the version in every published manifest:
    - `server/package.json` and `sdks/typescript/package.json`, with its platform packages;
@@ -21,7 +26,20 @@ checks and publishes it all, and makes the GitHub release.
    updates `Cargo.lock` and both `uv.lock` files, and moves the changelog's "Unreleased" section
    under `## [0.1.0] - <today>`.
 
-   Read the diff, edit the changelog's section if it needs it, and open a pull request. Its CI
+   **The changelog's section** is the hand-written "Unreleased" lines, then a draft from the titles
+   of the pull requests merged since the last `v*` tag, which it prints too. `cliff.toml` sorts the
+   draft into the changelog's sections ("The fakes" with a bullet per platform, "Testing", "Tools",
+   "Packages"), links each entry to its pull request, and leaves out the internal scopes and the
+   types that aren't `feat`, `fix` or `perf`. A title without one of the listed scopes, such as one
+   from before the convention, is under "Other". Before the first tag there is nothing to draft
+   from, so 0.1.0's section is all hand-written. To see the draft without changing anything:
+
+   ```bash
+   pnpm release:draft
+   ```
+
+   Read the diff, edit the changelog's section into sentences a user reads (merge the draft into
+   the hand-written lines, drop what isn't worth saying), and open a pull request. Its CI
    includes the release workflow's dry run, which builds every package and binary.
 2. **Merge it.**
 3. **Tag the merge commit** and push the tag:
@@ -68,6 +86,10 @@ These need the maintainer's accounts, so the workflow can't do them:
   - An API token that may publish it is stored as `CARGO_REGISTRY_TOKEN` in the `release`
     environment.
 - [ ] **GitHub:**
+  - Add a branch ruleset on `main` (Settings → Rules → Rulesets → New branch ruleset, target the
+    default branch) with **Require status checks to pass** and the check `PR title`, so a pull
+    request whose title the changelog can't use isn't merged. The check runs on
+    `pull_request_target`, from `main`'s copy of `.github/workflows/pr-title.yml`.
   - Create the environments `release` and `pypi` (Settings → Environments).
   - Limit both to tags `v*`, and add yourself as a required reviewer, so a release waits for your
     approval.
