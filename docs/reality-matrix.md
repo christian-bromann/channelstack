@@ -186,10 +186,10 @@ Notion now has **personal access tokens** that act as the person who created the
 
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
-| `notion.createPage({ content, connections })` (seed) | Done | Built | The session's first person's token, in the session's own page under the page the integration is connected to once, by hand | Confirmed: sharing a parent gives access to all child pages, which is how `connections: [notion.app]` works live. Without a real person in the session, `action_requires` |
+| `notion.createPage({ content, connections })` (seed) | Done | Built | The session's first person's token, in the session's own page under the page the integration is connected to once, by hand | Confirmed: sharing a parent gives access to all child pages, which is how `connections: [notion.app]` works live. Without a real person in the session, `action_requires`. Live, a person makes the page, so Notion sends `page.created` to the integration, and an agent that acts on new pages may change it before the test reads it; the fake's seed sends nothing (documented in [#29](https://github.com/christian-bromann/channelstack/issues/29); closing the gap is [#79](https://github.com/christian-bromann/channelstack/issues/79)). Use `ana.createPage` to send the event in both worlds |
 | `notion.createPage({ connections: [] })` (agent not connected) | Done | Built | The session's first person's token, under `CHANNELSTACK_NOTION_UNSEEN_PAGE` | Without that page, `live_misconfigured` |
 | `notion.createDatabase({ properties, rows })` | Done | Not yet | — | With databases |
-| `ana.createPage(...)` (as a person) | Done | Built | User token (PAT) | |
+| `ana.createPage(...)` (as a person) | Done | Built | User token (PAT) | Sends `page.created` in both worlds |
 | `ana.comment(text, { page, anchor })` | Done | Built | User token (PAT) | Confirmed: a PAT-made comment's `created_by` is the person. `anchor` comments on the block with that text (`parent.block_id`) |
 | `ana.reply(text, { discussion })` | Done | Built | User token (PAT, comment with `discussion_id`) | |
 | `ana.editComment` / `deleteComment` | Done | Built | User token (PAT) | Content only |
