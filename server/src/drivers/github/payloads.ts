@@ -7,6 +7,7 @@ import type {
   GitHubFileChange,
   GitHubIssueRecord,
   GitHubLabelRecord,
+  GitHubMinimizeReason,
   GitHubOrgRecord,
   GitHubReactionRecord,
   GitHubRepoRecord,
@@ -22,6 +23,9 @@ type Json = Record<string, unknown>;
 /** GitHub writes times in UTC to the second: `2026-11-21T19:01:12Z`. */
 export const githubTime = (ms: number): string => `${new Date(ms).toISOString().slice(0, 19)}Z`;
 const maybeTime = (ms: number | undefined): string | null => (ms === undefined ? null : githubTime(ms));
+
+/** Why a comment is hidden, as GitHub writes it back: `OFF_TOPIC` is `off-topic`. */
+export const minimizedReason = (reason: GitHubMinimizeReason): string => reason.toLowerCase().replaceAll("_", "-");
 
 /** What the builders need to know beyond the record they are given. */
 export interface GitHubLookups {
@@ -233,6 +237,10 @@ export function githubObjects(lookups: GitHubLookups) {
       open_issues: open,
       watchers: 0,
       default_branch: repo.defaultBranch,
+      // What a repository nobody changed the settings of has: pull requests on, anyone may open one, no custom properties.
+      has_pull_requests: true,
+      pull_request_creation_policy: "all",
+      custom_properties: {},
     };
   };
 
@@ -330,8 +338,14 @@ export function githubObjects(lookups: GitHubLookups) {
       body: record.body,
       reactions: reactionRollup(base, record.reactions),
       timeline_url: `${base}/timeline`,
-      performed_via_github_app: null,
+      performed_via_github_app: via(record.author),
       state_reason: record.stateReason,
+      // An issue with no type, sub-issues, dependencies, field values or pinned comment.
+      type: null,
+      sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 },
+      issue_dependencies_summary: { blocked_by: 0, total_blocked_by: 0, blocking: 0, total_blocking: 0 },
+      issue_field_values: [],
+      pinned_comment: null,
     };
   };
 
@@ -438,7 +452,9 @@ export function githubObjects(lookups: GitHubLookups) {
       author_association: lookups.association(repo, record.author),
       body: record.body,
       reactions: reactionRollup(base, record.reactions),
-      performed_via_github_app: null,
+      performed_via_github_app: via(record.author),
+      pin: null,
+      minimized: record.minimized === undefined ? null : { reason: minimizedReason(record.minimized) },
     };
   };
 
@@ -514,6 +530,9 @@ export function githubObjects(lookups: GitHubLookups) {
       events: [...app.events],
     };
   };
+
+  /** `performed_via_github_app`: the App, on what its bot wrote with the installation's token; null on what a person wrote. */
+  const via = (author: number): Json | null => (author === lookups.app().botId ? integration() : null);
 
   const installation = (): Json => {
     const app = lookups.app();
