@@ -152,7 +152,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     const guid = ids.next(GITHUB_IDS.delivery);
     const full = {
       ...payload,
-      ...(installing ? {} : { repository: objects.repository(repo) }),
+      ...(installing ? {} : { repository: objects.propertiedRepository(repo) }),
       organization: objects.organization(),
       // What an org owner does to the App's installation comes from the org itself in the fake.
       sender: sender === "org" ? objects.orgOwner() : objects.actor(sender),

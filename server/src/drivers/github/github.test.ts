@@ -110,6 +110,8 @@ describe("installation", () => {
       action: "added",
       repositories_added: [{ name: quiet.name, full_name: `acme/${quiet.name}` }],
       repository_selection: "selected",
+      // Installing on a repository that is already there is the org's doing, not the App's.
+      sender: { login: "acme", type: "Organization" },
     });
     expect(await refusal(post(`/repos/${quiet.id}/install`, { app: app.id }))).toBe("validation_failed");
     expect((await post(`/repos/${quiet.id}/uninstall`, { app: app.id })).action).toBe("removed");
@@ -1122,12 +1124,20 @@ describe("what GitHub sends that it added lately", () => {
   });
 
   test("a repository has pull requests on, open to all, and no custom properties", async () => {
-    const { h, api, path, issue, webhooks } = await workspace();
+    const { h, api, path, issue, pull, webhooks } = await workspace();
     await issue();
     await h.app.settled();
     const settings = { has_pull_requests: true, pull_request_creation_policy: "all", custom_properties: {} };
     expect((await api("GET", path)).body).toMatchObject(settings);
     expect(webhooks().find((hook) => hook.event === "issues")?.payload.repository).toMatchObject(settings);
+    expect((await api("GET", "/installation/repositories")).body.repositories[0]).toMatchObject(settings);
+    // A pull request's sides name the repository without its custom properties, as GitHub's schemas have it.
+    const { number } = await pull();
+    const { head, base } = (await api("GET", `${path}/pulls/${number}`)).body;
+    for (const side of [head.repo, base.repo]) {
+      expect(side).toMatchObject({ has_pull_requests: true, pull_request_creation_policy: "all" });
+      expect(side).not.toHaveProperty("custom_properties");
+    }
   });
 
   test("the installation and its tokens have Administration, and the App's bot added the repository it made", async () => {

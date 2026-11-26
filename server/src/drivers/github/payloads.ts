@@ -237,16 +237,22 @@ export function githubObjects(lookups: GitHubLookups) {
       open_issues: open,
       watchers: 0,
       default_branch: repo.defaultBranch,
-      // What a repository nobody changed the settings of has: pull requests on, anyone may open one, no custom properties.
+      // What a repository nobody changed the settings of has: pull requests on, and anyone may open one.
       has_pull_requests: true,
       pull_request_creation_policy: "all",
-      custom_properties: {},
     };
   };
 
+  /**
+   * The repository with its custom properties (an org's repository has them, none set here), where
+   * GitHub sends them: a webhook's `repository`, `GET /repos/{owner}/{repo}`, the installation's
+   * repositories and a combined status. A pull request's `head.repo` and `base.repo` have none.
+   */
+  const propertiedRepository = (repo: GitHubRepoRecord): Json => ({ ...repository(repo), custom_properties: {} });
+
   /** `GET /repos/{owner}/{repo}`: the repository with what only the full view has. */
   const fullRepository = (repo: GitHubRepoRecord): Json => ({
-    ...repository(repo),
+    ...propertiedRepository(repo),
     permissions: { admin: false, maintain: false, push: true, triage: true, pull: true },
     allow_squash_merge: true,
     allow_merge_commit: true,
@@ -744,6 +750,7 @@ export function githubObjects(lookups: GitHubLookups) {
     orgOwner,
     organization,
     repository,
+    propertiedRepository,
     fullRepository,
     label,
     reaction,
