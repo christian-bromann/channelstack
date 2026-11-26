@@ -1,3 +1,4 @@
+import { htmlToText } from "../../core/email/index.ts";
 import type { MimeHeader } from "../../core/email/mime.ts";
 import type { GmailHistoryRecord, GmailLabelRecord, GmailMessageRecord, GoogleEmailRecord } from "./world.ts";
 
@@ -50,9 +51,12 @@ function payloadOf(email: GoogleEmailRecord, headers: readonly MimeHeader[]): Js
   return leaf("", html ? "text/html" : "text/plain", (html ? email.html : email.text) ?? "", headers);
 }
 
-/** Gmail's snippet: the start of the text, whitespace folded, HTML-escaped as Gmail escapes it. */
+/**
+ * Gmail's snippet: the start of the text (an HTML-only email's as a person reads it, without link
+ * addresses), whitespace folded, HTML-escaped as Gmail escapes it.
+ */
 function snippetOf(email: GoogleEmailRecord): string {
-  const text = (email.text ?? (email.html ?? "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+  const text = (email.text ?? htmlToText(email.html ?? "", { links: false })).replace(/\s+/g, " ").trim();
   return text
     .slice(0, 200)
     .replace(/&/g, "&amp;")

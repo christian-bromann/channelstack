@@ -388,7 +388,7 @@ export function createLiveNotionWorld(deps: {
     return made;
   };
 
-  const mentionOfApp = () => userMention(store.bot.id, store.bot.name);
+  const mentionOfApp = () => userMention(store.bot.id, store.bot.name, true);
 
   return {
     ...reads,
