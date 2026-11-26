@@ -150,7 +150,8 @@ export function linearResolvers(world: FakeLinearWorld) {
     commentUpdate: ({ id, input }: Args, context: LinearCallContext) => {
       const comment = commentBy(id);
       mark(context, store.comments.owner(comment.id));
-      if (comment.user !== app())
+      // Linear's own comment (a delegated session's thread) isn't the app's, though the fake files it under the app.
+      if (comment.user !== app() || comment.byLinear)
         throw new LinearError("You can only edit your own comments", "FORBIDDEN", "forbidden");
       if (typeof input.body === "string") world.editComment(comment, app(), input.body);
       return { lastSyncId: sync(), success: true, comment: () => models.comment(comment) };
@@ -158,7 +159,8 @@ export function linearResolvers(world: FakeLinearWorld) {
     commentDelete: ({ id }: Args, context: LinearCallContext) => {
       const comment = commentBy(id);
       mark(context, store.comments.owner(comment.id));
-      if (comment.user !== app())
+      // Linear's own comment (a delegated session's thread) isn't the app's, though the fake files it under the app.
+      if (comment.user !== app() || comment.byLinear)
         throw new LinearError("You can only delete your own comments", "FORBIDDEN", "forbidden");
       world.deleteComment(comment, app());
       return { lastSyncId: sync(), success: true, entityId: id };

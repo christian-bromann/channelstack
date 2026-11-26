@@ -44,11 +44,15 @@ export function renderTranscript(
       0,
     );
 
+  // Linear's own comment, which opens a delegated session's thread: no one wrote it.
+  const byLinear = new Set(input.comments.filter((comment) => comment.byLinear).map((comment) => comment.id));
   const activitiesOf = (session: LinearSessionRecord) => {
     const all = input.activities(session);
-    // A prompt that came in as a comment is already in the thread as that comment.
+    // What came in as a comment, or went out as one, is already in the thread as that comment.
     return all.filter(
-      (activity, index) => !(activity.ephemeral && index < all.length - 1) && activity.sourceComment === null,
+      (activity, index) =>
+        !(activity.ephemeral && index < all.length - 1) &&
+        (activity.sourceComment === null || byLinear.has(activity.sourceComment)),
     );
   };
   const activityLine = (activity: LinearActivityRecord, depth: number) => ({
@@ -73,11 +77,29 @@ export function renderTranscript(
 
   // The page reads in time order: top-level comments, and the activities of sessions without a
   // thread. Under each comment: its replies, and the activities of the session on it. A delegated
-  // session gets its thread from its first answer, so what it did before reads just above that.
+  // session's thread is Linear's, so what is in it reads as the page's own lines.
   const top: Array<{ at: number; line: () => void }> = [];
   const threaded = new Set<string>();
   for (const root of input.comments.filter((comment) => comment.parent === null)) {
     const session = input.sessions.find((candidate) => candidate.thread === root.id);
+    if (root.byLinear) {
+      // In the session's order: each turn as its comment where it is one, else as the activity
+      // (a comment and the activity it is can share a millisecond with the turn before).
+      const replies = input.comments.filter((comment) => comment.parent === root.id);
+      const placed = new Set<string>();
+      if (session) {
+        threaded.add(session.id);
+        const shown = new Set(activitiesOf(session));
+        for (const activity of input.activities(session)) {
+          const reply = replies.find((comment) => comment.id === activity.sourceComment);
+          if (reply) placed.add(reply.id);
+          if (reply) top.push({ at: activity.createdAt, line: commentLine(reply, 0).line });
+          else if (shown.has(activity)) top.push(activityLine(activity, 0));
+        }
+      }
+      top.push(...replies.filter((reply) => !placed.has(reply.id)).map((reply) => commentLine(reply, 0)));
+      continue;
+    }
     const all = session ? input.activities(session) : [];
     const opened = all.findIndex((activity) => activity.sourceComment === root.id);
     const shown = session ? activitiesOf(session) : [];

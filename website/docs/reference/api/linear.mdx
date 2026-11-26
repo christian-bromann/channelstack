@@ -817,7 +817,7 @@ let items = issue.labels().await?;
 
 ### comments()
 
-The comments on the issue, oldest first.
+The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread.
 
 <CodeGroup>
 
@@ -1334,7 +1334,7 @@ Plain values the handles return and take.
 | Field | Python · Rust | Type |
 |---|---|---|
 | `name` | `name` | `string` |
-| `type` | `type` · `r#type` | `"backlog" \| "unstarted" \| "started" \| "completed" \| "canceled" \| "triage"` |
+| `type` | `type` · `r#type` | `"backlog" \| "unstarted" \| "started" \| "completed" \| "canceled" \| "triage" \| "duplicate"` |
 
 ### LinearComments
 

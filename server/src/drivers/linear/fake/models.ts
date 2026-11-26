@@ -133,6 +133,8 @@ export function linearModels(world: FakeLinearWorld) {
   });
 
   const teamModel = (record: LinearTeamRecord): Model => {
+    const canceled = record.states.find((entry) => entry.type === "canceled");
+    const duplicate = record.states.find((entry) => entry.type === "duplicate");
     return {
       [OWNER]: store.teams.owner(record.id),
       __typename: "Team",
@@ -142,6 +144,16 @@ export function linearModels(world: FakeLinearWorld) {
       displayName: record.name,
       private: false,
       visibility: "public",
+      // Linear picks a new team's color at random: here, from its id.
+      color: `#${record.id.replaceAll("-", "").slice(0, 6)}`,
+      // A new team's settings, as Linear sets them up: open to everyone, issues closed and archived after six months.
+      allMembersCanJoin: true,
+      autoClosePeriod: 6,
+      autoArchivePeriod: 6,
+      // "Defaults to the first canceled state."
+      autoCloseStateId: canceled?.id ?? null,
+      defaultIssueState: () => state(record, world.defaultStateOf(record)),
+      markedAsDuplicateWorkflowState: duplicate ? () => state(record, duplicate) : null,
       createdAt: iso(record.createdAt),
       updatedAt: iso(record.createdAt),
       organization: () => organization(),
@@ -178,9 +190,14 @@ export function linearModels(world: FakeLinearWorld) {
         .slice(0, 40)}`.replace(/-$/, ""),
       createdAt: iso(record.createdAt),
       updatedAt: iso(record.updatedAt),
+      // Issues stay in the team they were created in.
+      addedToTeamAt: iso(record.createdAt),
       startedAt: maybe(record.startedAt),
       completedAt: maybe(record.completedAt),
       canceledAt: maybe(record.canceledAt),
+      // A new workspace counts SLA days as calendar days, and nothing syncs the fake's issues elsewhere.
+      slaType: "all",
+      syncedWith: [],
       labelIds: [...record.labels],
       previousIdentifiers: [],
       reactionData: [],
@@ -233,8 +250,19 @@ export function linearModels(world: FakeLinearWorld) {
       reactionData: reactionData(record.reactions),
       issueId: issueRecord.id,
       parentId: record.parent,
-      user: () => user(author),
-      botActor: null,
+      // A comment Linear wrote (a delegated session's thread) has no user: Linear's workflow wrote it.
+      user: record.byLinear ? null : () => user(author),
+      botActor: record.byLinear
+        ? {
+            __typename: "ActorBot",
+            id: null,
+            type: "workflow",
+            subType: null,
+            name: "Linear",
+            userDisplayName: null,
+            avatarUrl: "https://static.linear.app/assets/pwa/icon_maskable_512.png",
+          }
+        : null,
       issue: () => issue(issueRecord),
       parent:
         record.parent === null
@@ -282,6 +310,7 @@ export function linearModels(world: FakeLinearWorld) {
       startedAt: maybe(record.startedAt),
       endedAt: maybe(record.endedAt),
       context: [],
+      sourceMetadata: null,
       plan: record.plan ? { entries: record.plan.entries, updatedAt: iso(record.plan.updatedAt) } : null,
       externalUrls: JSON.stringify(record.externalUrls),
       externalLinks: record.externalUrls.map((link) => ({ __typename: "AgentSessionExternalLink", ...link })),

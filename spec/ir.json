@@ -10597,7 +10597,7 @@
         {
           "name": "comments",
           "kind": "method",
-          "summary": "The comments on the issue, oldest first",
+          "summary": "The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -18407,7 +18407,8 @@
                 "started",
                 "completed",
                 "canceled",
-                "triage"
+                "triage",
+                "duplicate"
               ]
             },
             "optional": false
