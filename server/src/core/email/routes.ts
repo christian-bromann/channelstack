@@ -151,7 +151,7 @@ export function registerEmailRoutes<Email extends EmailRecord>(
     at: iso(email.createdAt),
     text: email.text,
     html: email.html,
-    attachments: [],
+    attachments: email.attachments.map((attachment) => attachment.filename),
   });
   const emailWire = (session: string, email: Email) => {
     const delivery = email.delivery === undefined ? undefined : spec.delivery.wire(session, email);
@@ -164,7 +164,8 @@ export function registerEmailRoutes<Email extends EmailRecord>(
       to: email.to.map((mailbox) => mailbox.address),
       cc: email.cc.map((mailbox) => mailbox.address),
       subject: email.subject,
-      text: threadTranscript([messageOf(email)]).entries[0]?.text ?? "",
+      // What its writer wrote: the transcript names the attachments, the text doesn't.
+      text: threadTranscript([{ ...messageOf(email), attachments: [] }]).entries[0]?.text ?? "",
       at: iso(email.createdAt),
       messageId: email.messageId,
       ...(spec.emailFields?.wire(email) ?? {}),

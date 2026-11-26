@@ -14,6 +14,19 @@ export interface Mailbox {
   readonly name: string;
 }
 
+/** A file an email carries, by the platform's id for it. */
+export interface EmailAttachment {
+  readonly id: string;
+  readonly filename: string;
+  readonly contentType: string;
+  /** Its size in bytes. */
+  readonly size: number;
+  /** Its bytes. Undefined for one a live world read back without downloading it. */
+  readonly content: Uint8Array | undefined;
+  /** The `Content-ID` an HTML body names it by (`cid:logo`): shown inline, not as a file. */
+  readonly contentId: string | undefined;
+}
+
 /**
  * The mailboxes in an address field: one address or a list, each `addr` or `Name <addr>`. Group
  * syntax is flattened, as mail clients show it. An entry with no address in it is left out.

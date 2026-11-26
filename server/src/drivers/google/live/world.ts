@@ -184,6 +184,7 @@ export function createLiveGoogleWorld(deps: {
       subject: header("subject") ?? "",
       text: partText(wire.payload, "text/plain"),
       html: partText(wire.payload, "text/html"),
+      attachments: [],
       messageId: messageIdsIn(header("message-id"))[0] ?? "",
       inReplyTo: messageIdsIn(header("in-reply-to"))[0],
       references: messageIdsIn(header("references")),

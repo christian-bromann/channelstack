@@ -1,6 +1,6 @@
 import { ProtocolError } from "../errors/index.ts";
 import type { Collection, Registry } from "../registry/index.ts";
-import { localPartOf, type Mailbox, parseAddresses, threadOf } from "./index.ts";
+import { type EmailAttachment, localPartOf, type Mailbox, parseAddresses, threadOf } from "./index.ts";
 
 /**
  * What every email channel keeps (Resend, Gmail): the agent's mailbox, people's mailboxes, every
@@ -36,6 +36,7 @@ export interface EmailRecord {
   readonly subject: string;
   readonly text: string | undefined;
   readonly html: string | undefined;
+  readonly attachments: readonly EmailAttachment[];
   readonly messageId: string;
   readonly inReplyTo: string | undefined;
   readonly references: readonly string[];

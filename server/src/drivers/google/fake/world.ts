@@ -266,6 +266,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       const raw = await composeMime(message, at);
       const email: GoogleEmailRecord = {
         ...message,
+        // Gmail's attachments come later: a person's email has none yet.
+        attachments: [],
         id,
         author: person.id,
         thread: conversationOf({ id, inReplyTo: input.inReplyTo, references }),
@@ -337,6 +339,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
         subject: parsed.subject,
         text: parsed.text,
         html: parsed.html,
+        // Kept in its raw message, which the agent reads back; the record lists none yet.
+        attachments: [],
         messageId: ownId,
         inReplyTo: parsed.inReplyTo,
         references: parsed.references,
