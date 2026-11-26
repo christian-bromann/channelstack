@@ -53,6 +53,18 @@ describe("an HTML-only email as a person reads it", () => {
     );
   });
 
+  test("a link with no text reads as its address, or with no addresses as nothing", () => {
+    const html =
+      '<p><a href="https://click.example/t/1"><img src="https://cdn.example/logo.png" alt=""></a></p><p>Hi</p>';
+    expect(htmlToText(html, { links: true })).toBe("https://click.example/t/1\n\nHi");
+    expect(htmlToText(html, { links: false })).toBe("Hi");
+  });
+
+  test("answers between quotes are paragraphs, the quotes' blank lines folded", () => {
+    const html = "<p>A1</p><blockquote>Q1</blockquote><p>A2</p><blockquote>Q2</blockquote><p>A3</p>";
+    expect(read({ html })).toBe("A1\n\nA2\n\nA3");
+  });
+
   test("a Gmail reply is its own words, without the quoted history", () => {
     const html =
       '<div dir="ltr">Thanks, that worked.<br></div><br><div class="gmail_quote"><div dir="ltr" class="gmail_attr">' +

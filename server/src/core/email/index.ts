@@ -150,7 +150,11 @@ function ownText(text: string): string {
       continue;
     kept.push(line);
   }
-  return kept.join("\n").trim();
+  // The blank lines around a dropped quote fold into one, as between paragraphs.
+  return kept
+    .join("\n")
+    .replace(/\n\s*\n(\s*\n)+/g, "\n\n")
+    .trim();
 }
 
 /** A line break before and after: a table's rows and cells, which mail lays out with, read as lines. */
@@ -162,7 +166,8 @@ const LINE = { leadingLineBreaks: 1, trailingLineBreaks: 1 };
  * items as ` 1. ` (the library's prefix, its space included), a quote as `> ` lines (so `ownText`
  * drops it as it does in text mail), an image as its alt text, no scripts or styles, and lines as
  * long as they were written. With `links`, a link reads as its text and its address (the address
- * once, when it is the text); without, as its text.
+ * once, when it is the text); without, as its text. A link with no text at all (an image with no
+ * alt text in it, say) reads as its address, as the library writes it, or with no addresses, as nothing.
  */
 const converter = (links: boolean) =>
   compile({
