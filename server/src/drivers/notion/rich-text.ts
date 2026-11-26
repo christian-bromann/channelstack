@@ -27,11 +27,18 @@ export function textItem(content: string, marks: Partial<Annotations> = {}, link
   };
 }
 
-/** A mention of a person or the integration's bot: `@Name` to whoever reads it. */
-export function userMention(id: string, name: string): RichTextItem {
+/**
+ * A mention of a person or the integration's bot: `@Name` to whoever reads it. The bot's user is
+ * filled in as real Notion answers it (its name, no avatar, `type: "bot"`, an empty `bot`); a
+ * person's is their id.
+ */
+export function userMention(id: string, name: string, bot = false): RichTextItem {
   return {
     type: "mention",
-    mention: { type: "user", user: { object: "user", id } },
+    mention: {
+      type: "user",
+      user: bot ? { object: "user", id, name, avatar_url: null, type: "bot", bot: {} } : { object: "user", id },
+    },
     annotations: { ...PLAIN },
     plain_text: `@${name}`,
     href: null,

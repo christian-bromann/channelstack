@@ -129,6 +129,25 @@ describe("the REST API", () => {
         entry.rich_text.map((item) => item.plain_text).join(""),
       ),
     ).toEqual(["@my-agent hi", "Hello Ana"]);
+    // A mention of the bot carries its user as Notion fills it in; a person's is their id.
+    const me = (await api("GET", "users/me")).body;
+    const botUser = { object: "user", id: me.id, name: "my-agent", avatar_url: null, type: "bot", bot: {} };
+    expect(listed.body.results[0].rich_text[0]).toMatchObject({
+      type: "mention",
+      mention: { type: "user", user: botUser },
+      plain_text: "@my-agent",
+    });
+    const mentions = await api("POST", "comments", {
+      discussion_id: comment.discussion.id,
+      rich_text: [
+        { type: "mention", mention: { user: { id: me.id } } },
+        { type: "mention", mention: { user: { id: ana.id } } },
+      ],
+    });
+    expect(mentions.body.rich_text.map((item: { mention: { user: unknown } }) => item.mention.user)).toEqual([
+      botUser,
+      { object: "user", id: ana.id },
+    ]);
     await post(`/users/${ana.id}/resolve`, { discussion: comment.discussion.id });
     expect((await api("GET", `comments?block_id=${page.id}`)).body.results).toEqual([]);
     expect(await get(`/discussions/${comment.discussion.id}/resolved`)).toBe(true);
