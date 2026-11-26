@@ -37,12 +37,16 @@ export interface LinearTeamOptions {
   key?: string;
   name?: string;
   members?: LinearUser[];
-  /** Workflow states. Default: Backlog, Todo, In Progress, In Review, Done, Canceled. */
-  states?: Array<{ name: string; type: LinearStateType }>;
+  /**
+   * Workflow states. Default: Backlog, Todo, In Progress, In Review, Done, Canceled. Every team
+   * also has Linear's own Duplicate state, which can't be created.
+   */
+  states?: Array<{ name: string; type: Exclude<LinearStateType, "duplicate"> }>;
   labels?: string[];
 }
 
-export type LinearStateType = "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage";
+/** A workflow state's type, as Linear's schema lists them. `duplicate` is Linear's own Duplicate state. */
+export type LinearStateType = "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage" | "duplicate";
 export type LinearPriority = 0 | 1 | 2 | 3 | 4;
 
 // ---------------------------------------------------------------------------

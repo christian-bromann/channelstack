@@ -35,7 +35,11 @@ export interface LinearUserRecord {
   createdAt: number;
 }
 
-export type LinearStateType = "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage";
+/**
+ * A workflow state's type, as Linear's schema lists them. `duplicate` is Linear's own: every team
+ * has one Duplicate state, and none can be created (`workflowStateCreate` refuses the type).
+ */
+export type LinearStateType = "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage" | "duplicate";
 
 export interface LinearStateRecord {
   id: string;
@@ -115,6 +119,12 @@ export interface LinearCommentRecord {
   session: string | undefined;
   /** The `Comment` delivery this comment caused. */
   delivery: string | undefined;
+  /**
+   * Written by Linear itself: the comment that opens a delegated session's thread. It has no user
+   * and Linear's workflow as its `botActor`; `user` is then the app's, whose session it opens, as
+   * the live mirror reads every comment without a user.
+   */
+  byLinear?: boolean;
   /** For a reply in a session's thread: the `AgentSessionEvent` (`prompted`) delivery it caused. */
   prompted: string | undefined;
 }
@@ -133,11 +143,12 @@ export interface LinearSessionRecord {
   appUser: string;
   /** The person responsible for the session: whoever delegated or mentioned the app. */
   creator: string;
-  /** The comment that opened the session (a mention), as `AgentSession.comment`. */
+  /** The comment that opened the session (a mention, or Linear's own for a delegation), as `AgentSession.comment`. */
   comment: string | null;
   /**
    * The root comment of the thread the session's comments are in: the mention, or for a
-   * delegation the first comment Linear wrote for the session. A reply there prompts the session.
+   * delegation the comment Linear writes to open it. A reply there prompts the session. Null
+   * only live, for a session whose thread the mirror hasn't read.
    */
   thread: string | null;
   status: LinearSessionStatus;
