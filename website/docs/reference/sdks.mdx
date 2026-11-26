@@ -126,7 +126,7 @@ A refusal of the control API carries a stable error code.
 | Python     | `ChannelstackError`: `code`, `status`, `message`, `data`     | The same class names                                                 |
 | Rust       | `Error::Api { code, status, message, data }`, `error.code()` | `channelstack::codes::NOT_IN_CHANNEL`, …                             |
 
-Rust's `Error` also has `Http` (the server couldn't be reached), `Launch` (finding or starting the server failed), `Timeout` and `Invalid` (an argument it can't send). A connection that is refused while the server starts is retried for 5 seconds. Every code is listed in [Errors](/docs/reference/api/errors).
+Rust's `Error` also has `Http` (the server couldn't be reached), `Launch` (finding or starting the server failed), `Timeout`, `Invalid` (an argument it can't send) and `Files` (a fixture file or directory a test named that isn't there, or a file where a directory belongs). A connection that is refused while the server starts is retried for 5 seconds. Every code is listed in [Errors](/docs/reference/api/errors).
 
 ## Disposal
 
