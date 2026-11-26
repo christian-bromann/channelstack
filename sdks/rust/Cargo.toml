@@ -7,6 +7,7 @@ description = "Test AI agents that live in Slack, GitHub, Linear and Notion: the
 repository = "https://github.com/christian-bromann/channelstack"
 
 [dependencies]
+base64 = "=0.23.1"
 percent-encoding = "=2.3.2"
 regex = "=1.13.1"
 reqwest = { version = "=0.13.5", default-features = false, features = ["json", "query", "rustls"] }

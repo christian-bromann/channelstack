@@ -109,6 +109,7 @@ dependencies = [
 name = "channelstack"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "percent-encoding",
  "regex",
  "reqwest",
