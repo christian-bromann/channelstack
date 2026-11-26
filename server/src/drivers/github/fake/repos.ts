@@ -179,8 +179,16 @@ export function createRepos(kit: GitHubKit) {
     return record;
   };
 
-  /** `installation_repositories`: the App was given a repository, or lost one. */
-  const installationChanged = (repo: GitHubRepoRecord, action: "added" | "removed"): string | undefined => {
+  /**
+   * `installation_repositories`: the App was given a repository, or lost one. A repository made with
+   * the App on it was made by the installation (live mode makes it with the installation's token), so
+   * the App's bot sent it; an org owner adds or removes one afterwards.
+   */
+  const installationChanged = (
+    repo: GitHubRepoRecord,
+    action: "added" | "removed",
+    sender: number | "org",
+  ): string | undefined => {
     const listed = [
       {
         id: repo.id,
@@ -190,7 +198,7 @@ export function createRepos(kit: GitHubKit) {
         private: repo.private,
       },
     ];
-    return kit.emit(repo, "installation_repositories", "org", {
+    return kit.emit(repo, "installation_repositories", sender, {
       action,
       installation: objects.installation(),
       repository_selection: "selected",
@@ -275,7 +283,7 @@ export function createRepos(kit: GitHubKit) {
       await git.setBranch(dir, repo.defaultBranch, first);
       if (input.installed) {
         repo.installed = true;
-        installationChanged(repo, "added");
+        installationChanged(repo, "added", store.bot.id);
       }
       return repo;
     },
@@ -290,7 +298,7 @@ export function createRepos(kit: GitHubKit) {
       }
       repo.installed = installed;
       kit.action(repo, installed ? "installApp" : "uninstallApp", { repo: `${repo.owner}/${repo.name}` });
-      return installationChanged(repo, installed ? "added" : "removed");
+      return installationChanged(repo, installed ? "added" : "removed", "org");
     },
 
     /** A file's bytes at a branch or commit. */
