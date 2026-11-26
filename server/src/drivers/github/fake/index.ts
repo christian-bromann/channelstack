@@ -7,11 +7,21 @@ import { createFakeWorld, type FakeGitHubWorld } from "./world.ts";
 
 /**
  * The agent's App, built in (there is no config file): the permissions and webhook
- * events an agent that works on issues, pull requests and checks usually has.
+ * events an agent that works on issues, pull requests and checks usually has, and
+ * Administration, which the test org's App has live to make each session's repositories.
+ * GitHub sends an App `installation_repositories` without a subscription, and doesn't
+ * list it among the App's events.
  */
 const DEFAULT_APP = {
   slug: "my-agent",
-  permissions: { issues: "write", pull_requests: "write", contents: "write", checks: "write", statuses: "write" },
+  permissions: {
+    administration: "write",
+    issues: "write",
+    pull_requests: "write",
+    contents: "write",
+    checks: "write",
+    statuses: "write",
+  },
   events: [
     "issues",
     "issue_comment",
@@ -21,7 +31,6 @@ const DEFAULT_APP = {
     "pull_request_review_thread",
     "push",
     "check_run",
-    "installation_repositories",
   ],
 } as const;
 

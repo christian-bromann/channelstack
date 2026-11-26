@@ -143,18 +143,20 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
   });
 
   const emit: GitHubKit["emit"] = (repo, event, sender, payload) => {
-    // The App hears about a repository it is installed on; being added to or removed from one is the exception.
-    const about = event === "installation_repositories" || repo.installed;
-    if (context.webhookUrl === undefined || !about || !store.app.events.includes(event)) return undefined;
+    // The App hears about a repository it is installed on, for the events it subscribed to. Being
+    // added to or removed from one is the exception: GitHub sends that to every App.
+    const installing = event === "installation_repositories";
+    const subscribed = installing || (repo.installed && store.app.events.includes(event));
+    if (context.webhookUrl === undefined || !subscribed) return undefined;
     const session = store.sessionOf(repo);
     const guid = ids.next(GITHUB_IDS.delivery);
     const full = {
       ...payload,
-      ...(event === "installation_repositories" ? {} : { repository: objects.repository(repo) }),
+      ...(installing ? {} : { repository: objects.propertiedRepository(repo) }),
       organization: objects.organization(),
       // What an org owner does to the App's installation comes from the org itself in the fake.
       sender: sender === "org" ? objects.orgOwner() : objects.actor(sender),
-      installation: event === "installation_repositories" ? payload.installation : objects.installationLite(),
+      installation: installing ? payload.installation : objects.installationLite(),
     };
     const action = typeof payload.action === "string" ? payload.action : null;
     store.hookDeliveries.push({

@@ -26,7 +26,7 @@ The fake GitHub is one organization (`acme`) with one GitHub App in it, `my-agen
 | Checks        | Check runs with annotations and requested actions, commit statuses                                                                                                                                                    |
 | Webhooks      | `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, `push`, `check_run`, `installation_repositories`                                       |
 
-The App has `issues`, `pull_requests`, `contents`, `checks` and `statuses` write permissions. Every response and webhook is checked in channelstack's own tests against GitHub's published schemas (`@octokit/openapi` and `@octokit/openapi-webhooks`).
+The App has `issues`, `pull_requests`, `contents`, `checks` and `statuses` write permissions, and `administration` write, as the live test org's App has to make each session's repositories. Every response and webhook is checked in channelstack's own tests against GitHub's published schemas (`@octokit/openapi` and `@octokit/openapi-webhooks`).
 
 Not covered: the GraphQL API (`POST /graphql` answers 404), Actions and workflow runs, check suites, releases, milestones, discussions, teams and projects. A path the fake doesn't serve answers GitHub's own 404.
 

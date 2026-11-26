@@ -164,7 +164,7 @@ export function registerChecks(register: Register): void {
       }),
       sha,
       total_count: statuses.length,
-      repository: world.kit.objects.repository(repo),
+      repository: world.kit.objects.propertiedRepository(repo),
       commit_url: `${api}/commits/${sha}`,
       url: `${api}/commits/${sha}/status`,
       // The combined status has no time of its own in the fake; GitHub's schema doesn't ask for one.
