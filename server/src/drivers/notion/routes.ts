@@ -336,7 +336,7 @@ export function registerNotionRoutes(
     method: "post",
     path: "/pages",
     summary:
-      "Create a page as seed data: it sends no event. The integration sees it only through `connections`, its own or a parent's",
+      "Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds",
     body: PageOptions.extend({ createdBy: userRef.optional() }).openapi("NotionPageOptions"),
     response: NotionPage,
     errors: ["not_found"],
