@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent } from "../../../test/app-harness.ts";
 import { fakeDriverContext } from "../../../test/driver-context.ts";
@@ -155,20 +155,35 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
         const chunk = Buffer.alloc(1024 * 1024);
         const write = (left: number) => (left === 0 ? response.end() : response.write(chunk, () => write(left - 1)));
         write(Math.ceil(LARGE / chunk.length));
+      } else if (request.url === "/dropped.bin") {
+        // The connection drops halfway through the file.
+        response.writeHead(200, { "content-length": "1000" });
+        response.write(Buffer.alloc(10), () => response.destroy());
+      } else if (request.url === "/slow.pdf") {
+        // The file starts, and the rest comes when the test says so.
+        response.writeHead(200, { "content-length": String(PDF.length) });
+        response.write(PDF.subarray(0, 4));
+        release = () => response.end(PDF.subarray(4));
       } else response.writeHead(404).end();
     });
+    let release = () => {};
     const fetched: string[] = [];
     // 31 MB is over 40 MB in base64, which is how Resend counts its limit.
     const LARGE = 31 * 1024 * 1024;
     await new Promise<void>((resolve) => files.listen(0, "127.0.0.1", resolve));
     const origin = `http://127.0.0.1:${(files.address() as AddressInfo).port}`;
     try {
-      const { api, read, download, email } = await team();
+      const { h, api, read, download, email } = await team();
       const { id } = await read("POST", "/emails", email({ attachments: [{ path: `${origin}/receipt.pdf` }] }));
       const [attachment] = (await read("GET", `/emails/${id}/attachments`)).data;
       expect(attachment).toMatchObject({ filename: "attachment-0", size: PDF.length });
       expect(Buffer.from(await (await download(attachment.download_url)).arrayBuffer())).toEqual(PDF);
-      for (const path of [`${origin}/missing.pdf`, "ftp://127.0.0.1/receipt.pdf", "not a url"]) {
+      for (const path of [
+        `${origin}/missing.pdf`,
+        `${origin}/dropped.bin`,
+        "ftp://127.0.0.1/receipt.pdf",
+        "not a url",
+      ]) {
         const refused = await api("POST", "/emails", email({ attachments: [{ path }] }));
         expect(refused.status, path).toBe(422);
         expect(refused.body.name).toBe("invalid_attachment");
@@ -188,6 +203,20 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
       const unverified = await api("POST", "/emails", { ...once, from: "x@elsewhere.example" });
       expect(unverified.status).toBe(403);
       expect(fetched).toEqual(["/receipt.pdf"]);
+
+      // While a send with a key is under way, the same key again is refused, as Resend refuses it: not sent twice.
+      // A second on first: the calls above used up the rate limit of 10 a second.
+      h.clock.advance(1_100);
+      const slow = email({ attachments: [{ path: `${origin}/slow.pdf` }] });
+      const pending = api("POST", "/emails", slow, { "idempotency-key": "slow" });
+      await vi.waitFor(() => expect(fetched).toContain("/slow.pdf"));
+      const meanwhile = await api("POST", "/emails", slow, { "idempotency-key": "slow" });
+      expect(meanwhile.status).toBe(409);
+      expect(meanwhile.body.name).toBe("concurrent_idempotent_requests");
+      release();
+      const sent = await pending;
+      expect(sent.status).toBe(200);
+      expect((await api("POST", "/emails", slow, { "idempotency-key": "slow" })).body).toEqual(sent.body);
     } finally {
       files.close();
     }

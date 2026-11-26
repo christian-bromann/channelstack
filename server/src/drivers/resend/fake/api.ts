@@ -107,12 +107,16 @@ async function fetchFile(path: string, budget: number): Promise<Uint8Array> {
   // Read as it comes, and stop once it is over the limit: a body without a length can be any size.
   const chunks: Uint8Array[] = [];
   let read = 0;
-  for await (const chunk of response.body ?? []) {
-    read += chunk.byteLength;
-    if (encodedLength(read) > budget) {
-      throw overLimit();
+  try {
+    for await (const chunk of response.body ?? []) {
+      read += chunk.byteLength;
+      if (encodedLength(read) > budget) throw overLimit();
+      chunks.push(chunk);
     }
-    chunks.push(chunk);
+  } catch (error) {
+    // The connection dropped, or the time ran out, while the file came.
+    if (error instanceof ResendApiError) throw error;
+    throw invalidAttachment(`The fake couldn't fetch the attachment at ${url.origin}${url.pathname}.`);
   }
   return Buffer.concat(chunks);
 }
@@ -182,6 +186,8 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
   /** Each session's calls in the last second: Resend's limit is per team; here each test is its own. */
   const recent = new Map<string, number[]>();
   const used = new Map<string, { request: string; answer: RestAnswer; at: number }>();
+  /** The keys of sends still under way: their files are being fetched. */
+  const sending = new Set<string>();
 
   const { api, endpoint, finish } = restApi(context, {
     driver: "resend",
@@ -250,9 +256,22 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
       }
       return earlier.answer;
     }
-    const answer = await send();
-    used.set(key, { request, answer, at: clock() });
-    return answer;
+    if (sending.has(key)) {
+      throw new ResendApiError(
+        409,
+        "concurrent_idempotent_requests",
+        "Same idempotency key used while original request is still in progress.",
+      );
+    }
+    // Until it is sent, or refused, the same key again is refused: it would send twice.
+    sending.add(key);
+    try {
+      const answer = await send();
+      used.set(key, { request, answer, at: clock() });
+      return answer;
+    } finally {
+      sending.delete(key);
+    }
   };
 
   const sentEmail = (id: string) => {
