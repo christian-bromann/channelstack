@@ -50,24 +50,23 @@ These need the maintainer's accounts, so the workflow can't do them:
   11.6.2). It trusts the repository `christian-bromann/channelstack`, the workflow `release.yml`
   and the environment `release`.
   - [x] `channelstack`, reserved as `0.0.0-placeholder.0`, trusts the workflow.
-  - [ ] The five `@channelstack/server-*` packages: npm sets up trusted publishing only for a
-    package that exists. Create the organization `channelstack`, then either publish a placeholder
-    of each and let it trust the workflow, or store a granular token that may publish
-    `@channelstack/*` as `NPM_TOKEN` in the `release` environment for the first release. The
-    workflow uses the token only for a package that doesn't trust it.
+  - [ ] The five `@channelstack/server-*` packages, reserved as `0.0.0-placeholder.0` in the
+    organization `channelstack`: each needs the trusted publisher above (npm sets it up only for a
+    package that exists). Until then, a granular token that may publish `@channelstack/*`, stored
+    as `NPM_TOKEN` in the `release` environment, stands in: the workflow uses it only for a
+    package that doesn't trust it.
 - [x] **PyPI:** a trusted publisher for each project:
   - for `channelstack`, which is reserved already (`0.0.0.dev0`), under its settings;
   - for `pytest-channelstack`, a pending publisher, under the account's publishing settings. A
-    pending publisher doesn't reserve the name, so it is reserved as `0.0.0.dev0` too. After that
-    upload, check that the project's publishing settings still list the trusted publisher.
+    pending publisher doesn't reserve the name, so it is reserved as `0.0.0.dev0` too, and trusts
+    the workflow under its settings.
 
   Both trust the repository `christian-bromann/channelstack`, the workflow `release.yml` and the
   environment `pypi`.
-- [ ] **crates.io:**
-  - Reserve the name: publish the placeholder `channelstack` `0.0.0-placeholder.0`, which has no
-    code, from your machine (`cargo login`, then `cargo publish`).
-  - Create an API token with the `publish-update` scope, for `channelstack`.
-  - Store it as `CARGO_REGISTRY_TOKEN` in the `release` environment.
+- [x] **crates.io:**
+  - `channelstack` is reserved as `0.0.0-placeholder.0`, which has no code.
+  - An API token that may publish it is stored as `CARGO_REGISTRY_TOKEN` in the `release`
+    environment.
 - [ ] **GitHub:**
   - Create the environments `release` and `pypi` (Settings → Environments).
   - Limit both to tags `v*`, and add yourself as a required reviewer, so a release waits for your
