@@ -1,9 +1,9 @@
 # Logos
 
 Third-party logos on the site, each the unmodified official file, byte for byte, taken from its
-owner's own brand or media kit on 2026-11-20:
+owner's own brand or media kit on 2026-11-20 (Resend's on 2026-11-25):
 
-- the four platform marks on the channel cards of the home page, to say "channelstack works with
+- the five platform marks on the channel cards of the home page, to say "channelstack works with
   this platform";
 - the TypeScript and Python marks on the language switch of the example player.
 
@@ -15,6 +15,8 @@ owner's own brand or media kit on 2026-11-20:
 | `linear.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-dark.svg` | light | `e683e95a5eb9b360ae06360c0350fd1b5fcf3d2222ef9de8e71fa0bc413dccc3` |
 | `linear-light.svg` | Linear | https://static.linear.app/design-assets/Linear-Brand-Assets.zip | `logo-light.svg` | dark | `32f9883452188b39787f8242c7bfce723ded255f35f13254e727871d3dae2fd1` |
 | `notion.svg` | Notion | `NotionLogoFiles.zip` on https://notion.notion.site/Media-Kit-205535b1d9c4440497a3d7a2ac096286 | `notion-logo-block-main.svg` | light and dark | `840a6f78e87f39cc4a4b0743a00cc6fd82c07ba5dc51d778d7976b6575bcf4fb` |
+| `resend.svg` | Resend | https://cdn.resend.com/brand/resend-brand-assets.zip, linked from https://resend.com/brand | `resend-brand-assets/resend-icon-black.svg` | light | `7251dba7137e25a4117154bfdaef8333128a9dcc67446912ddcf6d6048573b12` |
+| `resend-white.svg` | Resend | https://cdn.resend.com/brand/resend-brand-assets.zip, linked from https://resend.com/brand | `resend-brand-assets/resend-icon-white.svg` | dark | `9d6a386b319b8d0f421918e270f843d9996e31021fad9e41bc4c10a8882b9908` |
 | `typescript.svg` | TypeScript (TS \| Py switch) | Asset pack on https://www.typescriptlang.org/branding/ | `ts-logo-128.svg` | light and dark | `25e995fa85ae9ff6b5749f4ffeb21b2fe71d74e9b8d8db8eac4b9732cd9ef287` |
 | `python.svg` | Python (TS \| Py switch) | "SVG format of only two snakes" on https://www.python.org/community/logos/ | `python-logo-only.svg` | light and dark | `baec8662a1461c2cacc326b54d2727cb2f1ce07ba02d00f5b826d035104f649f` |
 
@@ -30,10 +32,11 @@ Summaries are paraphrased; read the linked page before changing how a mark is us
 | GitHub | https://brand.github.com/foundations/logo, https://docs.github.com/en/site-policy/other-site-policies/github-logo-policy | "Show integration" is listed as an allowed use of a permitted logo; the same page also asks for prior written permission. Black or white mark only. |
 | Linear | https://linear.app/brand | Allowed when the file is unaltered, has room around it and implies no endorsement. |
 | Notion | https://notion.notion.site/Notion-s-brand-usage-guidelines-How-to-use-Notion-s-brand-in-your-marketing-689045e1761348f887a3c5c80295e00f | Text statements that an integration works with Notion are allowed. The guidelines say not to use the standalone Notion logo. |
+| Resend | https://resend.com/brand | Use the files unaltered. The page recommends the wordmark "for stronger brand recognition"; the kit's icon is used here because every card shows a square mark next to the platform's name. |
 | TypeScript | https://www.typescriptlang.org/branding/ | Allowed: the blue mark is the logo to use when referring to TypeScript. Don't use it as your own product's logo, modify its shape or imply endorsement. |
 | Python | https://www.python.org/community/logos/ and the PSF Trademark Usage Policy | Allowed: the PSF wants the logo used widely to indicate use of, or suitability for, Python. Ask first for derived versions. |
 
-**Decision.** The maintainer chose to show all four marks on the channel cards, knowing that
+**Decision.** The maintainer chose to show all five marks on the channel cards, knowing that
 Slack's and Notion's guidelines don't grant this use and GitHub's are ambiguous. Asking Slack and
 Notion for permission, or replacing those two marks with names, are the ways to close that gap.
 
@@ -42,5 +45,5 @@ Notion for permission, or replacing those two marks with names, are the ways to 
 - Unmodified files, rendered with `<img>` at 32 px: no recolouring, cropping, rotation, effects or animation of a mark.
 - "Works with" use only: one platform mark per channel card, next to the platform's name, and nowhere else on the site.
 - The TypeScript and Python marks appear only on the language switch of the example player, at 18 px, to name the language of the sample.
-- GitHub and Linear use their official dark-background files in the dark theme; Slack and Notion have one file for both.
-- The footer states that channelstack is not affiliated with or endorsed by the four platforms, and that all names and logos shown, including TypeScript (Microsoft) and Python (Python Software Foundation), are trademarks of their owners (`src/components/Footer.tsx`).
+- GitHub, Linear and Resend use their official dark-background files in the dark theme; Slack and Notion have one file for both.
+- The footer states that channelstack is not affiliated with or endorsed by the five platforms, and that all names and logos shown, including TypeScript (Microsoft) and Python (Python Software Foundation), are trademarks of their owners (`src/components/Footer.tsx`).
