@@ -30,6 +30,16 @@ describe("redaction", () => {
     expect(out).toBe("Authorization: Bearer [redacted] from [redacted] using [redacted]");
   });
 
+  test("an address in a URL is scrubbed too, and error data is scrubbed like text", () => {
+    const redactor = new Redactor(PATTERNS);
+    expect(redactor.text("GET /resend/users/ana.mar%40example.com/inbox")).toBe("GET /resend/users/[redacted]/inbox");
+    expect(redactor.data({ id: "ana@example.com", path: ["/users/ana%40example.com"], n: 1 })).toEqual({
+      id: "[redacted]",
+      path: ["/users/[redacted]"],
+      n: 1,
+    });
+  });
+
   test("recorded payloads keep ordinary text that mentions bearer tokens", () => {
     const redactor = new Redactor(PATTERNS);
     const said = { text: "please use bearer authentication", header: "Authorization: Bearer abcdefgh12345678" };

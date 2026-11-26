@@ -83,8 +83,8 @@ export function createLiveResendWorld(deps: {
 
   /**
    * Everyone an email goes to must be at an allowlisted domain (or a Resend test address): sent mail
-   * can't be taken back. A second guard: the people and the agent were checked when they joined, and
-   * this catches an address a test names by hand.
+   * can't be taken back. The people and the agent were checked when they joined; what this catches is
+   * an address the agent's answer named (its `Reply-To`, or a `Cc` a reply to all goes to).
    */
   const allowed = (mailboxes: readonly Mailbox[]) => {
     for (const { address } of mailboxes) {

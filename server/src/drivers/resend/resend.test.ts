@@ -8,6 +8,16 @@ import { resendResponseProblems, resendWebhookProblems } from "../../../test/sch
  * address does, and that every answer and webhook is what Resend's description says (exit check 8.3).
  */
 let agent: RecordingAgent | undefined;
+
+/**
+ * Resend's refusal: `{ statusCode, name, message }` and nothing else, as its errors page shows.
+ * Its API description has no schema for an error, so this is what holds the fake's to Resend's.
+ */
+function expectRefusal(reply: { status: number; body: Record<string, unknown> }, status: number, name: string) {
+  expect(reply.status).toBe(status);
+  expect(Object.keys(reply.body).sort()).toEqual(["message", "name", "statusCode"]);
+  expect(reply.body).toMatchObject({ statusCode: status, name, message: expect.any(String) });
+}
 afterEach(() => agent?.close());
 
 async function team() {
@@ -46,14 +56,21 @@ async function team() {
     text: "Hi there",
     ...extra,
   });
-  return { h, api, send, webhooks, email };
+  /** Call, and hold a successful answer to Resend's description. */
+  const read = async (method: string, path: string, body?: unknown) => {
+    const reply = await api(method, path, body);
+    expect(reply.status, JSON.stringify(reply.body)).toBeLessThan(400);
+    expect(resendResponseProblems(method, path.split("?")[0] ?? path, reply.status, reply.body)).toEqual([]);
+    return reply.body;
+  };
+  return { h, api, send, webhooks, email, read, sessionId, ana };
 }
 
 describe("what the Resend fake refuses, as Resend does", () => {
   test("no key, a wrong key", async () => {
     const { api, email } = await team();
     const none = await api("POST", "/emails", email("delivered@resend.dev"), {}, null);
-    expect(none).toMatchObject({ status: 401, body: { name: "missing_api_key" } });
+    expectRefusal(none, 401, "missing_api_key");
     const wrong = await api(
       "POST",
       "/emails",
@@ -61,25 +78,23 @@ describe("what the Resend fake refuses, as Resend does", () => {
       {},
       "re_wrong123_abcdefghijklmnopqrstuvwx",
     );
-    expect(wrong).toMatchObject({ status: 400, body: { statusCode: 400, name: "validation_error" } });
+    expectRefusal(wrong, 400, "validation_error");
   });
 
   test("a domain the team hasn't verified, missing fields, too many recipients", async () => {
     const { api, webhooks, email } = await team();
     const unverified = await api("POST", "/emails", email("delivered@resend.dev", { from: "x@elsewhere.example" }));
-    expect(unverified).toMatchObject({ status: 403, body: { name: "validation_error" } });
+    expectRefusal(unverified, 403, "validation_error");
     expect(unverified.body.message).toContain("elsewhere.example domain is not verified");
     const { subject: _subject, ...noSubject } = email("delivered@resend.dev");
-    expect(await api("POST", "/emails", noSubject)).toMatchObject({
-      status: 422,
-      body: { name: "missing_required_field" },
-    });
-    expect(await api("POST", "/emails", email("delivered@resend.dev", { text: undefined }))).toMatchObject({
-      status: 422,
-      body: { name: "validation_error" },
-    });
+    expectRefusal(await api("POST", "/emails", noSubject), 422, "missing_required_field");
+    expectRefusal(
+      await api("POST", "/emails", email("delivered@resend.dev", { text: undefined })),
+      422,
+      "validation_error",
+    );
     const many = Array.from({ length: 51 }, (_, at) => `delivered+${at}@resend.dev`);
-    expect(await api("POST", "/emails", email(many))).toMatchObject({ status: 422 });
+    expectRefusal(await api("POST", "/emails", email(many)), 422, "validation_error");
     // Nothing refused was sent.
     expect(await webhooks()).toEqual([]);
   });
@@ -90,7 +105,7 @@ describe("what the Resend fake refuses, as Resend does", () => {
     const again = await send(email("delivered@resend.dev"), { "idempotency-key": "order-1" });
     expect(again.body).toEqual(first.body);
     const other = await api("POST", "/emails", email("bounced@resend.dev"), { "idempotency-key": "order-1" });
-    expect(other).toMatchObject({ status: 409, body: { name: "invalid_idempotent_request" } });
+    expectRefusal(other, 409, "invalid_idempotent_request");
   });
 
   test("over 10 requests a second nothing more is sent, and the agent may send the same again later", async () => {
@@ -98,7 +113,7 @@ describe("what the Resend fake refuses, as Resend does", () => {
     for (let at = 0; at < 10; at++) await send(email(`delivered+${at}@resend.dev`));
     const sentBefore = (await webhooks()).filter((event) => event.type === "email.sent").length;
     const refused = await api("POST", "/emails", email("delivered+late@resend.dev"), { "idempotency-key": "late" });
-    expect(refused).toMatchObject({ status: 429, body: { name: "rate_limit_exceeded" } });
+    expectRefusal(refused, 429, "rate_limit_exceeded");
     expect((await webhooks()).filter((event) => event.type === "email.sent").length).toBe(sentBefore);
     // A second later, the same request with the same key goes through: the 429 didn't use the key up.
     h.clock.advance(1_100);
@@ -108,7 +123,7 @@ describe("what the Resend fake refuses, as Resend does", () => {
   test("a batch is checked whole: one bad email and none is sent", async () => {
     const { api, webhooks, email } = await team();
     const batch = [email("delivered@resend.dev"), email("delivered@resend.dev", { from: "x@elsewhere.example" })];
-    expect((await api("POST", "/emails/batch", batch)).status).toBe(403);
+    expectRefusal(await api("POST", "/emails/batch", batch), 403, "validation_error");
     expect(await webhooks()).toEqual([]);
   });
 });
@@ -137,5 +152,24 @@ describe("Resend's test addresses do what they are for", () => {
     const read = await api("GET", `/emails/${body.id}`);
     expect(read.body).not.toHaveProperty("text");
     expect(resendResponseProblems("GET", `/emails/${body.id}`, read.status, read.body)).toEqual([]);
+  });
+});
+
+describe("what the fake answers fits Resend's description", () => {
+  test("a batch that is sent, the domains, and mail a person sent the agent with its attachments", async () => {
+    const { h, read, email, sessionId, ana } = await team();
+    const sent = await read("POST", "/emails/batch", [email("delivered@resend.dev"), email("bounced@resend.dev")]);
+    expect(sent.data).toHaveLength(2);
+    const domains = await read("GET", "/domains");
+    expect(domains.data[0]).toMatchObject({ name: "acme.example", status: "verified" });
+
+    const { app } = (await h.call("GET", `/sessions/${sessionId}/resend`)).body;
+    const user = `/sessions/${sessionId}/resend/users/${encodeURIComponent(ana.id)}`;
+    await h.call("POST", `${user}/send`, { to: [app.id], subject: "Refund", text: "Where is my refund?" });
+    const received = await read("GET", "/emails/receiving?limit=10");
+    expect(received.data).toHaveLength(1);
+    const [{ id }] = received.data;
+    await read("GET", `/emails/receiving/${id}`);
+    expect((await read("GET", `/emails/receiving/${id}/attachments`)).data).toEqual([]);
   });
 });

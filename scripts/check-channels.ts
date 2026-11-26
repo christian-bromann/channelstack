@@ -5,7 +5,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 import * as checks from "../integrations/checks/index.ts";
 import { CHANNELS, DRIVERS } from "../server/src/drivers/index.ts";
@@ -132,10 +132,22 @@ const BYPASSES: ReadonlyArray<readonly [RegExp, string]> = [
     "writes a helper core has (refTo, pathParam, iso, Awaitable)",
   ],
 ];
+/**
+ * The fakes whose API isn't REST, and so records its calls itself: Slack's Web API is methods
+ * posted as forms, Linear's is one GraphQL endpoint. Every REST fake records through restApi.
+ */
+const NOT_REST: Readonly<Record<string, string>> = {
+  slack: "Web API methods, posted as forms",
+  linear: "one GraphQL endpoint",
+};
 for (const file of sources(join(ROOT, "server", "src", "drivers"))) {
   const text = readFileSync(file, "utf8");
   for (const [pattern, says] of BYPASSES) {
     if (pattern.test(text)) problems.push(`${relative(ROOT, file)} ${says}`);
+  }
+  const driver = relative(join(ROOT, "server", "src", "drivers"), file).split(sep)[0] ?? "";
+  if (/\brecordCall\(/.test(text) && !(driver in NOT_REST)) {
+    problems.push(`${relative(ROOT, file)} records its calls itself: a REST fake uses restApi (core/fake/endpoint.ts)`);
   }
 }
 // Core names no platform: each driver declares its ids, secrets and token shapes.

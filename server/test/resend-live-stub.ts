@@ -14,7 +14,8 @@ export interface ResendStub {
   readonly calls: Array<{ method: string; path: string; as: string }>;
   /** What every team sent, oldest first. */
   readonly sent: Email[];
-  agentReplies(to: Email, text: string): void;
+  /** The agent's answer to an email, with whoever else it names (`cc`, `replyTo`). */
+  agentReplies(to: Email, text: string, also?: { cc?: string[]; replyTo?: string[] }): void;
 }
 
 interface Team {
@@ -28,6 +29,8 @@ interface Email {
   team: string;
   from: string;
   to: string[];
+  cc: string[];
+  replyTo: string[];
   subject: string;
   text: string;
   messageId: string;
@@ -58,13 +61,23 @@ export function resendStub(): ResendStub {
     new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
   const send = (
     by: Team,
-    body: { from: string; to: string[]; subject: string; text?: string; headers?: Record<string, string> },
+    body: {
+      from: string;
+      to: string[];
+      cc?: string[];
+      reply_to?: string[];
+      subject: string;
+      text?: string;
+      headers?: Record<string, string>;
+    },
   ) => {
     const email: Email = {
       id: uuid(),
       team: by.name,
       from: body.from,
       to: body.to.map(address),
+      cc: (body.cc ?? []).map(address),
+      replyTo: (body.reply_to ?? []).map(address),
       subject: body.subject,
       text: body.text ?? "",
       messageId: `<${randomString(16, hex)}@${by.domain}>`,
@@ -82,10 +95,12 @@ export function resendStub(): ResendStub {
     team,
     calls,
     sent,
-    agentReplies(to, text) {
+    agentReplies(to, text, also = {}) {
       send(agent, {
         from: `my-agent <my-agent@${agent.domain}>`,
         to: [address(to.from)],
+        ...(also.cc ? { cc: also.cc } : {}),
+        ...(also.replyTo ? { reply_to: also.replyTo } : {}),
         subject: `Re: ${to.subject}`,
         text,
         headers: { "In-Reply-To": to.messageId, References: to.messageId },
@@ -139,6 +154,8 @@ export function resendStub(): ResendStub {
         id: email.id,
         from: email.from,
         to: email.to,
+        cc: email.cc,
+        reply_to: email.replyTo,
         subject: email.subject,
         message_id: email.messageId,
         created_at: email.at,

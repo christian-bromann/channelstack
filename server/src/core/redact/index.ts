@@ -1,7 +1,8 @@
 const REDACTED = "[redacted]";
 
 const BEARER_PATTERN = /\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
-const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
+/** An address, as written or as a URL carries it (`ana%40example.com`). */
+const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+(?:@|%40)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gi;
 
 /**
  * Scrubs tokens, signing secrets and emails. Everything that leaves the server as a log line or

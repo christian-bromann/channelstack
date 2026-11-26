@@ -124,6 +124,7 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
   for (const secret of uiSecrets) expect(logs, "logs").not.toContain(secret);
   // Emails are scrubbed from logs and errors. The event log keeps message content, which is what tests read.
   expect(logs).not.toContain(email);
+  expect(logs).not.toContain(encodeURIComponent(email));
   expect(JSON.stringify(errors)).not.toContain(email);
   expect(JSON.stringify(errors)).not.toContain(encodeURIComponent(email));
 });

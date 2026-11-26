@@ -288,7 +288,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
   - one channel list derived from the driver registry;
   - id, secret and token formats declared by each driver;
   - the delivery kit (`deliveryKit`, `fixedRetries`) and the inspection routes (`registerInspectionRoutes`), written once;
-  - a fake's REST API (`restApi`, which Notion, echo and Resend use), a live platform's refusal (`LivePlatformRefusal`) and waiting out a rate limit (`waitRetryAfter`). Each fake's own setup stays in its driver: seeding is platform-specific, so there is no shared `defineFake`;
+  - a fake's REST API (`restApi`: Notion, echo and Resend through its endpoints, GitHub by wrapping its own routes; Slack's form-posted Web API and Linear's GraphQL endpoint aren't REST), a live platform's refusal (`LivePlatformRefusal`) and waiting out a rate limit (`waitRetryAfter`). Each fake's own setup stays in its driver: seeding is platform-specific, so there is no shared `defineFake`;
   - the fixtures and SDK channel unions, generated;
   - one harness table for the acceptance, live and conformance scripts;
   - schema validators registered per channel.

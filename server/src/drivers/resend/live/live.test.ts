@@ -50,6 +50,30 @@ describe("exit check 8.7: Resend live", () => {
     expect(stub.sent).toEqual([]);
   });
 
+  test("a person's reply to an address the agent's answer names outside the allowlist is refused, and nothing is sent", async () => {
+    const stub = resendStub();
+    const ana = stub.team("ana", "people.example.org");
+    const resend = await liveResend(stub, "agent.example.org,people.example.org").open();
+    const { app } = (await resend("GET", "")).body;
+    const person = (await resend("POST", "/users", { name: "Ana", token: ana.key })).body;
+    const user = `/users/${encodeURIComponent(person.id)}`;
+    const email = (await resend("POST", `${user}/send`, { to: [app.id], subject: "Refund", text: "Where?" })).body;
+    // The agent answers with a Reply-To and a Cc on a domain no one allowlisted.
+    stub.agentReplies(stub.sent[0] as NonNullable<(typeof stub.sent)[0]>, "Billing will answer.", {
+      replyTo: ["billing@elsewhere.example"],
+      cc: ["boss@elsewhere.example"],
+    });
+    const [answer] = (await resend("GET", `/threads/${email.thread.id}/replies`)).body;
+    const before = stub.sent.length;
+    for (const all of [false, true]) {
+      const refused = await resend("POST", `${user}/reply`, { email: answer.id, text: "Thanks", all });
+      expect(refused.body.error).toBe("live_not_allowlisted");
+      // Which address, redacted: it names the allowlist to change.
+      expect(refused.body.message).toContain("CHANNELSTACK_LIVE_RESEND_DOMAINS");
+    }
+    expect(stub.sent).toHaveLength(before);
+  });
+
   test("an agent address outside the allowlist is refused before anything is sent", async () => {
     const stub = resendStub();
     const server = harness(
