@@ -147,10 +147,9 @@ describe("freePort", () => {
   it("probes every interface, not loopback alone", async () => {
     probed.length = 0;
     await freePort();
-    // More than one probe when a port it drew was in use; each of them on every interface.
-    expect(probed.length).toBeGreaterThan(0);
+    expect(probed).toHaveLength(1);
     // `::` where IPv6 is on, `0.0.0.0` where it is off: never a single interface like 127.0.0.1.
-    for (const address of probed) expect(["::", "0.0.0.0"]).toContain(address);
+    expect(["::", "0.0.0.0"]).toContain(probed[0]);
   });
 
   it("hands out each port once, and each one can be bound", async () => {
