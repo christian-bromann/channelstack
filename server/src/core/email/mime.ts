@@ -1,7 +1,7 @@
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import PostalMime, { type Address, decodeWords } from "postal-mime";
 
-import { formatMailbox, type Mailbox, messageIdsIn } from "./index.ts";
+import { type EmailAttachment, formatMailbox, type Mailbox, messageIdsIn } from "./index.ts";
 
 /**
  * Email as it travels: RFC 5322 messages, built with `nodemailer`'s composer and read with
@@ -30,9 +30,13 @@ export interface MimeMessage {
   readonly references: readonly string[];
 }
 
-/** Build a message: the bytes a mail server would send, CRLF line ends, `Date` at `at`, and any `headers` of its own. */
+/**
+ * Build a message: the bytes a mail server would send, CRLF line ends, `Date` at `at`, and any
+ * `headers` of its own. Its attachments are parts of their own (`multipart/mixed`), one with a
+ * `Content-ID` inline beside the HTML that names it (`multipart/related`).
+ */
 export function composeMime(
-  message: MimeMessage,
+  message: MimeMessage & { readonly attachments?: readonly EmailAttachment[] },
   at: number,
   headers: Readonly<Record<string, string>> = {},
 ): Promise<string> {
@@ -50,6 +54,17 @@ export function composeMime(
     // The composer writes no Bcc header: who got a blind copy is the sender's to know.
     date: new Date(at),
     headers: { ...headers },
+    attachments: (message.attachments ?? []).map((attachment) => {
+      if (attachment.content === undefined) throw new Error(`${attachment.filename} has no content to send`);
+      return {
+        filename: attachment.filename,
+        content: Buffer.from(attachment.content),
+        contentType: attachment.contentType,
+        ...(attachment.contentId === undefined
+          ? { contentDisposition: "attachment" as const }
+          : { cid: attachment.contentId, contentDisposition: "inline" as const }),
+      };
+    }),
   });
   return new Promise((resolve, reject) => {
     composer.compile().build((error, bytes) => (error ? reject(error) : resolve(bytes.toString("utf8"))));
