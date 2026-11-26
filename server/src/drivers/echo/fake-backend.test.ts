@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
-import { fakeDriverContext } from "../../../test/driver-context.ts";
+import { driverContext } from "../../../test/driver-context.ts";
 import type { FakeBackend } from "../../core/router/index.ts";
 import { createEchoFake } from "./fake/index.ts";
 
@@ -14,6 +14,8 @@ function fakeBackendMembers(source: string): string[] {
   if (body === undefined) throw new Error("no `interface FakeBackend` found");
   return [...body.matchAll(/^\s*(?:readonly )?(\w+)[(:]/gm)].map((match) => match[1] as string);
 }
+
+const context = () => driverContext({ apiUrl: () => "http://127.0.0.1:4500/echo" });
 
 describe("exit check 0.7: the fake store design is locked", () => {
   test("docs/decisions/0001-fake-backend.md describes the interface the code has", () => {
@@ -29,7 +31,7 @@ describe("exit check 0.7: the fake store design is locked", () => {
 
   test("the echo fake implements FakeBackend", async () => {
     // `satisfies` makes this a compile-time check too: `pnpm typecheck` fails if the echo fake drifts.
-    const fake = createEchoFake(fakeDriverContext("echo")) satisfies FakeBackend;
+    const fake = createEchoFake(context()) satisfies FakeBackend;
 
     const unauthenticated = await fake.api.fetch(new Request("http://echo.localhost/api/messages", { method: "POST" }));
     expect(unauthenticated.status).toBe(401);
@@ -37,7 +39,7 @@ describe("exit check 0.7: the fake store design is locked", () => {
   });
 
   test("seeding creates the app, a reset re-seeds it, and a closed session's rooms are released", () => {
-    const ctx = fakeDriverContext("echo");
+    const ctx = context();
     const fake = createEchoFake(ctx);
     const app = fake.world.app();
     expect(app).toMatchObject({ name: "echo-agent", kind: "app" });

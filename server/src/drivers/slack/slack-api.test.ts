@@ -457,7 +457,20 @@ describe("reactions, conversations and users", () => {
     });
     expect((await api("conversations.join", { channel: open.id })).warning).toBe("already_in_channel");
     await h.app.settled();
-    expect(eventTypes(agent)).toEqual(["member_joined_channel"]);
+    // Joining on its own: no inviter, on either event (#58).
+    expect(eventTypes(agent)).toEqual(["member_joined_channel", "channel_join"]);
+    const [joinedEvent, joinMessage] = agent.received.map((delivery) => JSON.parse(delivery.body).event);
+    expect(joinedEvent).not.toHaveProperty("inviter");
+    expect(joinMessage).toEqual({
+      type: "message",
+      subtype: "channel_join",
+      user: app.botUserId,
+      text: `<@${app.botUserId}> has joined the channel`,
+      ts: joinMessage.ts,
+      channel: open.id,
+      event_ts: joinMessage.ts,
+      channel_type: "channel",
+    });
 
     const dm = await api("conversations.open", { users: ana.id });
     expect((await api("conversations.info", { channel: dm.channel.id })).channel).toMatchObject({

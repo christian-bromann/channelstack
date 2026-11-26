@@ -232,7 +232,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         return textItem(item.text.content, item.annotations ?? {}, link);
       }
       const mentioned = typeof item?.mention?.user?.id === "string" ? store.user(item.mention.user.id) : undefined;
-      if (mentioned) return userMention(mentioned.id, mentioned.name);
+      if (mentioned) return userMention(mentioned.id, mentioned.name, isBot(mentioned.id));
       throw invalid(`body failed validation: rich_text[${index}] should be \`text\` or a user \`mention\``);
     });
   };
@@ -805,7 +805,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     },
     /** A person mentions the integration in the page body: in the block with this text, or a new paragraph. */
     mention(session: string, page: NotionPageRecord, inBlock: TextPattern | undefined, actor: string) {
-      const mention = userMention(store.bot.id, store.bot.name);
+      const mention = userMention(store.bot.id, store.bot.name, true);
       if (inBlock === undefined) {
         append(session, { page }, [{ type: "paragraph", paragraph: { rich_text: [] } }], actor);
         const last = store.block(page.children.at(-1) as string);

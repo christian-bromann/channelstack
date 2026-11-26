@@ -12,11 +12,11 @@ import { Allowlist } from "../src/core/safety/index.ts";
 import { LiveVault } from "../src/core/secrets/index.ts";
 
 /**
- * What a driver's fake is built with, for a unit test of the fake alone: core's parts on the system
- * clock, each secret `secret-for-<name>`, no webhook URL, and live mode off. `name` is the driver's,
- * its fake reached at `http://127.0.0.1:4500/<name>`.
+ * What core hands a driver, for a test that builds one fake on its own, without the app around it:
+ * the system clock, fake secrets (`secret-for-<name>`), no live platform. `overrides` replaces any
+ * part, e.g. `webhookUrl` to deliver to a stand-in agent.
  */
-export function fakeDriverContext(name: string): DriverContext {
+export function driverContext(overrides: Partial<DriverContext> = {}): DriverContext {
   const redactor = new Redactor();
   const log = createLogger({ level: "silent", redactor, write: () => {} });
   const events = new EventLog(systemClock, redactor);
@@ -30,8 +30,8 @@ export function fakeDriverContext(name: string): DriverContext {
     log,
     expectMore: () => {},
     arrived: () => {},
-    secret: (secret) => `secret-for-${secret}`,
-    apiUrl: () => `http://127.0.0.1:4500/${name}`,
+    secret: (name) => `secret-for-${name}`,
+    apiUrl: () => "http://127.0.0.1:4500/fake",
     webhookUrl: undefined,
     live: {
       active: false,
@@ -45,5 +45,6 @@ export function fakeDriverContext(name: string): DriverContext {
       home: undefined,
       apiBase: undefined,
     },
+    ...overrides,
   };
 }

@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent } from "../../../test/app-harness.ts";
-import { fakeDriverContext } from "../../../test/driver-context.ts";
+import { driverContext } from "../../../test/driver-context.ts";
 import { resendResponseProblems, resendWebhookProblems } from "../../../test/schemas/resend.ts";
 import { parseMime } from "../../core/email/mime.ts";
 import { createResendFake } from "./fake/index.ts";
@@ -260,7 +260,7 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
 describe("a received email's attachments and raw message", () => {
   /** The fake alone, with a person who emails the team: its API reached as the agent reaches it. */
   async function received(attachments: Array<{ filename: string; content: Uint8Array; contentType: string }>) {
-    const context = fakeDriverContext("resend");
+    const context = driverContext({ apiUrl: () => "http://127.0.0.1:4500/resend" });
     const fake = createResendFake(context);
     const ana = fake.world.createUser("ses_a", { name: "Ana Lima" });
     const app = { address: fake.store.app.address, name: fake.store.app.name };
