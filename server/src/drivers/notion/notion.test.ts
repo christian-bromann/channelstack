@@ -103,6 +103,13 @@ describe("the REST API", () => {
     expect(paragraph.body.results[0].paragraph).toEqual(expect.objectContaining({ icon: null, color: "default" }));
     const prose = await post("/pages", { title: "Prose", content: "Just words.", connections: [app.id] });
     expect((await api("GET", `blocks/${prose.id}/children`)).body.results[0].paragraph).toHaveProperty("icon", null);
+    // One that is set is kept, and other blocks have none.
+    const icon = { type: "emoji", emoji: "💡" };
+    const iconed = await api("PATCH", `blocks/${page.id}/children`, {
+      children: [{ type: "paragraph", paragraph: { rich_text: [], icon } }],
+    });
+    expect(iconed.body.results[0].paragraph.icon).toEqual(icon);
+    expect(appended.body.results[0].to_do).not.toHaveProperty("icon");
     const comment = await post(`/users/${ana.id}/comment`, { text: "@my-agent hi", page: page.id });
     expect(comment.text).toBe("@my-agent hi");
     // Anchored by a pattern, as the SDKs send a RegExp.

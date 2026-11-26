@@ -35,7 +35,7 @@ const partialUser = (id: string) => ({ object: "user" as const, id });
 type PropertyValue = PageObjectResponse["properties"][string];
 type DataSourceProperty = DataSourceObjectResponse["properties"][string];
 
-/** What a paragraph has that a request may leave out: its icon, none unless one is set. */
+/** A paragraph's icon, none unless one is set: here, so every block record has it however it was made. */
 const PARAGRAPH: Pick<ParagraphBlockObjectResponse["paragraph"], "icon"> = { icon: null };
 
 export interface NotionObjectsDeps {
