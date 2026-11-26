@@ -1490,16 +1490,16 @@ class SlackUser:
         self.is_admin: bool = data["isAdmin"]
         self.is_bot: bool = data["isBot"]
 
-    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: SlackUser | SlackApp | list[SlackUser | SlackApp] | None = None) -> SlackMessage:
+    async def say(self, message: str | SlackMessageInput, *, channel: SlackConversation | None = None, to: SlackUser | SlackApp | list[SlackUser | SlackApp] | None = None, files: TreeInput | None = None) -> SlackMessage:
         """Post a top-level message in a conversation, or in a DM with the people in `to`. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/say", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])], "files": None if files is None else read_tree(files)})
         return SlackMessage(ctx, data)
 
-    async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage, also_send_to_channel: bool | None = None) -> SlackMessage:
+    async def reply(self, message: str | SlackMessageInput, *, thread: SlackThread | SlackMessage, also_send_to_channel: bool | None = None, files: TreeInput | None = None) -> SlackMessage:
         """Reply in a thread: pass the message that starts it, or any reply in it. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/reply", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "thread": {"channel": thread.channel, "ts": thread.ts}, "alsoSendToChannel": also_send_to_channel})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/slack/users/{quote(str(self.id), safe='')}/reply", body={"message": {"text": message} if isinstance(message, str) else message._to_wire(), "thread": {"channel": thread.channel, "ts": thread.ts}, "alsoSendToChannel": also_send_to_channel, "files": None if files is None else read_tree(files)})
         return SlackMessage(ctx, data)
 
     async def edit(self, text: str | SlackMessageInput, *, message: SlackMessage) -> SlackMessage:

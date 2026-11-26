@@ -638,3 +638,140 @@ describe("files (upload v2, the basics)", () => {
     expect((await api("files.completeUploadExternal", { files: [] })).error).toBe("invalid_arguments");
   });
 });
+
+describe("files a person shares", () => {
+  const b64 = (text: string) => Buffer.from(text).toString("base64");
+
+  test("a person's message shares files the agent reads from url_private with its bot token", async () => {
+    const { h, agent, app, ana, channel, post, api, get } = await workspace();
+    const log = "Error: disk full\n";
+    const said = await post(`/users/${ana.id}/say`, {
+      message: { text: "@my-agent why does it crash?" },
+      channel: channel.id,
+      files: [{ path: "crash.log", content: b64(log) }],
+    });
+    await h.app.settled();
+
+    // Slack sends the mention, and the message as a file share, both with the file on them.
+    const events = agent.received.map((delivery) => JSON.parse(delivery.body).event);
+    const file = { name: "crash.log", user: ana.id, size: log.length, mimetype: "application/octet-stream" };
+    expect(events.find((event) => event.type === "app_mention")).toMatchObject({ files: [file] });
+    const shared = events.find((event) => event.type === "message");
+    expect(shared).toMatchObject({ subtype: "file_share", user: ana.id, files: [file] });
+    const [{ id, url_private, url_private_download }] = shared.files;
+    expect(id).toMatch(/^F0[0-9A-Z]{9}$/);
+    expect((await api("files.info", { file: id })).file).toMatchObject({ ...file, url_private });
+
+    const download = async (url: string, token: string | undefined) =>
+      h.app.fetch(new Request(url, token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } }));
+    const read = await download(url_private, app.botToken);
+    expect([read.status, await read.text()]).toEqual([200, log]);
+    const attachment = await download(url_private_download, app.botToken);
+    expect(attachment.headers.get("content-disposition")).toBe("attachment; filename*=UTF-8''crash.log");
+    expect(await attachment.text()).toBe(log);
+    // Only the bot token reads it.
+    expect((await download(url_private, undefined)).status).toBe(403);
+    expect((await download(url_private, app.appToken)).status).toBe(403);
+
+    // A reply shares files too, with no text, and a person reads the names in the transcript.
+    await post(`/users/${ana.id}/reply`, {
+      message: {},
+      thread: { channel: channel.id, ts: said.ts },
+      files: [{ path: "a.png", content: b64("png") }],
+    });
+    expect((await get(`/conversations/${channel.id}/transcript`)).text).toBe(
+      "Ana: @my-agent why does it crash? [file: crash.log]\n  Ana: [file: a.png]",
+    );
+  });
+
+  test("the bot reads no file shared where it is no longer a member, nor once the app is uninstalled", async () => {
+    const { h, agent, app, ana, channel, post, api } = await workspace();
+    await post(`/users/${ana.id}/say`, {
+      message: {},
+      channel: channel.id,
+      files: [{ path: "secret.txt", content: b64("between us") }],
+    });
+    await h.app.settled();
+    const [{ id, url_private }] = JSON.parse(agent.received.at(-1)?.body ?? "{}").event.files;
+    const read = () => h.app.fetch(new Request(url_private, { headers: { authorization: `Bearer ${app.botToken}` } }));
+    expect((await read()).status).toBe(200);
+    await post(`/users/${ana.id}/kick`, { participant: app.id, channel: channel.id });
+    expect((await read()).status).toBe(404);
+    // `files.info` knows it no more than the download does.
+    expect((await api("files.info", { file: id })).error).toBe("file_not_found");
+
+    const other = await workspace();
+    await other.post(`/users/${other.ana.id}/say`, {
+      message: {},
+      channel: other.channel.id,
+      files: [{ path: "a.txt", content: b64("a") }],
+    });
+    await other.h.app.settled();
+    const url = JSON.parse(other.agent.received.at(-1)?.body ?? "{}").event.files[0].url_private;
+    await other.post("/uninstall");
+    const after = await other.h.app.fetch(
+      new Request(url, { headers: { authorization: `Bearer ${other.app.botToken}` } }),
+    );
+    expect(after.status).toBe(403);
+  });
+
+  test("a name with spaces and accents downloads by its escaped URL; another team's or name's path is not found", async () => {
+    const { h, agent, app, ana, channel, post } = await workspace();
+    const name = "Screenshot 2026-11-26 at 09.00 naïve.txt";
+    await post(`/users/${ana.id}/say`, {
+      message: {},
+      channel: channel.id,
+      files: [{ path: name, content: b64("x") }],
+    });
+    await h.app.settled();
+    const [{ url_private, url_private_download }] = JSON.parse(agent.received.at(-1)?.body ?? "{}").event.files;
+    const read = (url: string) =>
+      h.app.fetch(new Request(url, { headers: { authorization: `Bearer ${app.botToken}` } }));
+    const attachment = await read(url_private_download);
+    expect(attachment.status).toBe(200);
+    expect(attachment.headers.get("content-disposition")).toBe(
+      `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+    );
+    expect((await read(url_private)).headers.get("content-disposition")).toBeNull();
+    expect((await read(url_private.replace(/\/files-pri\/T[0-9A-Z]+-/, "/files-pri/T0OTHER0000-"))).status).toBe(404);
+    expect((await read(url_private.replace(/[^/]+$/, "other.txt"))).status).toBe(404);
+  });
+
+  test("a reply also sent to the channel with files stays a thread_broadcast, and carries them", async () => {
+    const { h, agent, ana, channel, post, say } = await workspace();
+    const root = await say("first");
+    await post(`/users/${ana.id}/reply`, {
+      message: { text: "the log" },
+      thread: { channel: channel.id, ts: root.ts },
+      alsoSendToChannel: true,
+      files: [{ path: "a.log", content: b64("x") }],
+    });
+    await h.app.settled();
+    expect(JSON.parse(agent.received.at(-1)?.body ?? "{}").event).toMatchObject({
+      subtype: "thread_broadcast",
+      files: [{ name: "a.log" }],
+    });
+  });
+
+  test("what the control API refuses: a message with neither text nor files, a file over the fake's limit", async () => {
+    const { ana, channel, post } = await workspace();
+    expect(await post(`/users/${ana.id}/say`, { message: {}, channel: channel.id })).toMatchObject({
+      error: "no_text",
+    });
+    const big = Buffer.alloc(10 * 1024 * 1024 + 1).toString("base64");
+    expect(
+      await post(`/users/${ana.id}/say`, {
+        message: {},
+        channel: channel.id,
+        files: [{ path: "big.bin", content: big }],
+      }),
+    ).toMatchObject({ error: "invalid_argument" });
+    expect(
+      await post(`/users/${ana.id}/say`, {
+        message: {},
+        channel: channel.id,
+        files: [{ path: "a.txt", content: "not base64!" }],
+      }),
+    ).toMatchObject({ error: "invalid_argument" });
+  });
+});

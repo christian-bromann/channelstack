@@ -88,9 +88,11 @@ export interface SlackMessageRecord {
   readonly files: readonly SlackFileRecord[];
 }
 
-/** A file the app uploaded (files upload v2). It has no bytes until the upload arrived. */
+/** A file a person shared, or the app uploaded (files upload v2): it has no bytes until the upload arrived. */
 export interface SlackFileRecord {
   readonly id: string;
+  /** Where the fake serves its bytes to a bot token (`url_private`); live, nothing does. */
+  readonly url?: string | undefined;
   readonly name: string;
   title: string;
   /** The size the app announced, then the size of what arrived. */
@@ -166,6 +168,8 @@ export interface SlackMessageInput {
   text?: string | undefined;
   blocks?: unknown[] | undefined;
   metadata?: unknown;
+  /** Files a person shares with the message, each by its name. */
+  files?: ReadonlyArray<{ name: string; bytes: Uint8Array }> | undefined;
 }
 
 /** The same world answering everything at once: the fake, which never waits for a platform. */

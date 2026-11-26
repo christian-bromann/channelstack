@@ -134,6 +134,8 @@ A GitHub repository can start from a directory of files, and a Notion page from 
 
 <Example id="writing-tests-fixture-files" />
 
+A Slack person shares files with a message the same way: `ana.say("here's the log", { channel, files: [{ path: "./fixtures/crash.log" }] })`, and the agent reads each from its `url_private` with the bot token.
+
 `files` takes a directory path or a list of files. Each file is either inline, `{ name, content }`, or on disk, `{ path }`. `changes` on a pull request or a push maps paths to new contents, and `null` deletes a file.
 
 ## Cleanup

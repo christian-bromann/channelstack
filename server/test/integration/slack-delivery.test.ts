@@ -1,9 +1,13 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { App, LogLevel } from "@slack/bolt";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, onTestFinished, test } from "vitest";
 
 import { freePort } from "../../../scripts/lib/process.ts";
+import { connect } from "../../../sdks/typescript/client.ts";
 import { waitFor } from "../../../sdks/typescript/runtime/wait.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 import { slackSession, SUMMARY_VIEW } from "./slack-fixtures.ts";
@@ -27,6 +31,8 @@ let listener: Server;
 const seen: Seen[] = [];
 /** What Bolt's interaction handlers were called with. */
 const interactions: Array<{ kind: string; detail: string }> = [];
+/** The files Bolt read from a person's `file_share`, by name: what `url_private` served it with the bot token. */
+const downloaded: Array<{ name: string; content: string }> = [];
 
 beforeAll(async () => {
   const port = await freePort();
@@ -67,6 +73,16 @@ beforeAll(async () => {
   bolt.event("agent_session_stopped", async ({ event }) => {
     const stopped = event as unknown as { channel: string; thread_ts: string; user: string };
     interactions.push({ kind: "stopped", detail: `${stopped.channel} ${stopped.thread_ts} by ${stopped.user}` });
+  });
+  // A person shares a file: the app reads it from `url_private` with its bot token, as Slack's docs say.
+  bolt.message(async ({ message, context }) => {
+    if (message.subtype !== "file_share") return;
+    for (const file of message.files ?? []) {
+      const response = await fetch(file.url_private ?? "", {
+        headers: { authorization: `Bearer ${context.botToken}` },
+      });
+      downloaded.push({ name: file.name ?? "", content: await response.text() });
+    }
   });
   listener = (await bolt.start(port)) as Server;
 });
@@ -238,5 +254,28 @@ describe("exit check 2.2: interactions reach Bolt's handlers, and its answers co
     const stop = await act(`/users/${ana.id}/stop`, { thread: { channel: channel.id, ts: question.ts } });
     expect(await settled(stop.id)).toMatchObject({ eventType: "agent_session_stopped", status: "acknowledged" });
     expect(await handled("stopped")).toEqual({ kind: "stopped", detail: `${channel.id} ${question.ts} by ${ana.id}` });
+  });
+});
+
+describe("a person's files reach Bolt", () => {
+  test("the SDK reads a fixture from disk, and Bolt reads it back from url_private with the bot token", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "channelstack-files-"));
+    onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+    writeFileSync(join(directory, "crash.log"), "Error: disk full\n");
+    const client = await connect({ mode: "attach", server: server.url, token: server.token });
+    await using session = await client.openSession();
+    const slack = await session.slack();
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app] });
+    await ana.say("the log", {
+      channel,
+      files: [{ path: join(directory, "crash.log") }, { name: "b.txt", content: "b" }],
+    });
+
+    expect(await waitFor("Bolt's downloads", async () => (downloaded.length >= 2 ? downloaded : undefined))).toEqual([
+      { name: "crash.log", content: "Error: disk full\n" },
+      { name: "b.txt", content: "b" },
+    ]);
+    expect(String(await channel.transcript())).toBe("Ana: the log [file: crash.log] [file: b.txt]");
   });
 });

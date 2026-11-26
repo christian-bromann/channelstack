@@ -337,6 +337,7 @@ let message = user.say("…").channel(&channel).await?;
 | `message` | `string \| SlackMessageInput` | yes | positional |
 | `channel` | `SlackConversation` | no | option |
 | `to` | `SlackUser \| SlackApp \| Array<SlackUser \| SlackApp>` | no | option |
+| `files` | `string \| FileInput[]` | no | option |
 
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
 
@@ -367,6 +368,7 @@ let message = user.reply("…").thread(&thread).await?;
 | `message` | `message` | `string \| SlackMessageInput` | yes | positional |
 | `thread` | `thread` | `SlackThread \| SlackMessage` | yes | option |
 | `alsoSendToChannel` | `also_send_to_channel` | `boolean` | no | option |
+| `files` | `files` | `string \| FileInput[]` | no | option |
 
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
 

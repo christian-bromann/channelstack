@@ -1682,6 +1682,15 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "files",
+              "type": {
+                "kind": "files",
+                "mode": "tree"
+              },
+              "optional": true,
+              "in": "body"
             }
           ],
           "returns": {
@@ -1755,6 +1764,15 @@
               "name": "alsoSendToChannel",
               "type": {
                 "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "files",
+              "type": {
+                "kind": "files",
+                "mode": "tree"
               },
               "optional": true,
               "in": "body"

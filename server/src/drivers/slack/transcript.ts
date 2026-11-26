@@ -58,8 +58,11 @@ export function renderTranscript(
       entry.streaming === "open" ? "streaming" : "",
       entry.visibleTo ? `only ${entry.visibleTo.name} sees this` : "",
     ],
+    // Buttons and files after the text; a message that only shares files shows them alone.
     after: (entry) =>
-      [...entry.controls, ...entry.files.map((file) => `file: ${file}`)].map((control) => ` [${control}]`).join(""),
+      [...entry.controls, ...entry.files.map((file) => `file: ${file}`)]
+        .map((control, index) => `${index === 0 && entry.text === "" ? "" : " "}[${control}]`)
+        .join(""),
   });
   return { entries, text };
 }

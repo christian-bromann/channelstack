@@ -62,6 +62,22 @@ const CASES: Record<string, Case | Case[]> = {
     body: { shared: true, participants: [] },
     reason: /Slack Connect/,
   },
+  "`ana.say(text, { channel, files })`, `ana.reply(text, { thread, files })`": [
+    {
+      channel: "slack",
+      method: "POST",
+      path: "/users/U0X/say",
+      body: { message: { text: "the log" }, channel: "C0X", files: [{ path: "a.log", content: "" }] },
+      reason: /attach files/,
+    },
+    {
+      channel: "slack",
+      method: "POST",
+      path: "/users/U0X/reply",
+      body: { message: {}, thread: { channel: "C0X", ts: "1.2" }, files: [{ path: "a.log", content: "" }] },
+      reason: /attach files/,
+    },
+  ],
   "`slack.uninstallApp()`": { channel: "slack", method: "POST", path: "/uninstall", reason: /OAuth consent/ },
   '`delivery.retry({ after: "3s" })`': { channel: "slack", method: "POST", path: "/deliveries/E0X/retry", body: {} },
   // The App's bot as an assignee is refused before anything else (the stub's App has id 1).

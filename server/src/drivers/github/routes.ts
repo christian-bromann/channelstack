@@ -6,6 +6,7 @@ import { type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts
 import {
   type DeliveryView,
   type DriverRouter,
+  fileTree,
   pathParam,
   refTo,
   registerInspectionRoutes,
@@ -204,9 +205,6 @@ const commentRef = z.number().int().openapi(refTo("GitHubComment", "GitHubReview
 const reviewCommentRef = z.number().int().openapi(refTo("GitHubReviewComment"));
 const checkRunRef = z.number().int().openapi(refTo("GitHubCheckRun"));
 
-/** A file as it travels: its path in the repository and its bytes in base64. SDKs read files and directories into this. */
-const FileOnWire = z.object({ path: z.string().min(1), content: z.string() });
-const files = () => z.array(FileOnWire).openapi({ "x-channelstack-files": "tree" });
 /** Changes to a branch: files with their new contents, or `null` for a file that goes away. */
 const changes = () =>
   z
@@ -498,7 +496,7 @@ export function registerGitHubRoutes(
         name: z.string().min(1).optional(),
         private: z.boolean().optional(),
         defaultBranch: z.string().min(1).optional(),
-        files: files().optional(),
+        files: fileTree().optional(),
         collaborators: z
           .array(
             z

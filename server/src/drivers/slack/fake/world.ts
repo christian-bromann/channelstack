@@ -42,6 +42,12 @@ const ACK_WINDOW_MS = 3000;
 const STALE_MS = 6 * 60_000;
 /** Slack's limit for a message's text. */
 const MAX_TEXT_LENGTH = 40_000;
+/** The fake keeps files in memory, so it takes small ones only. */
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+/** Where the fake serves a file's bytes (`url_private`): a path like Slack's `files.slack.com/files-pri/T…-F…/<name>`. */
+export const fileUrl = (apiUrl: string, team: string, id: string, name: string) =>
+  `${apiUrl}/files-pri/${team}-${id}/${encodeURIComponent(name)}`;
 
 /** A refusal with Slack's own error code. The control API surfaces it; the fake Web API answers with the code. */
 const refuse = (code: string, message: string, data: Record<string, unknown> = {}) =>
@@ -234,8 +240,41 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
 
   const content = (session: string, input: SlackMessageInput): { text: string; blocks: unknown[] } => {
     const text = resolveMentions(input.text ?? "", (name) => resolveName(session, name));
-    checkContent(text, input.blocks);
+    // A message that shares files needs no text.
+    if ((input.files?.length ?? 0) === 0 || text !== "") checkContent(text, input.blocks);
     return { text, blocks: blocksOf(text, input.blocks) };
+  };
+
+  /** The files a person shares with a message, as Slack keeps them: theirs, and shared where the message is. */
+  const shared = (
+    userId: string,
+    conversation: SlackConversationRecord,
+    input: SlackMessageInput,
+  ): SlackFileRecord[] => {
+    const files = input.files ?? [];
+    // Every file is checked before any is kept, so a refused message leaves none behind.
+    for (const { name, bytes } of files) {
+      if (name.trim() === "") throw new ProtocolError("invalid_argument", "A file needs a name");
+      if (bytes.length > MAX_FILE_BYTES) {
+        throw new ProtocolError("invalid_argument", `The fake keeps files in memory: ${name} is over 10 MB`);
+      }
+    }
+    return files.map(({ name, bytes }) => {
+      const id = ids.next(SLACK_IDS.file);
+      const file: SlackFileRecord = {
+        id,
+        url: fileUrl(context.apiUrl(), store.team.id, id, name),
+        name,
+        title: name,
+        size: bytes.length,
+        user: userId,
+        created: Math.floor(clock() / 1000),
+        bytes,
+        conversation: conversation.id,
+      };
+      store.files.set(id, file);
+      return file;
+    });
   };
 
   /** Write a message and tell the app: `message`, and `app_mention` when the text mentions it. */
@@ -411,7 +450,11 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       const conversation =
         "channel" in where ? store.conversations.get(session, where.channel) : open(session, user.id, where.to);
       member(session, user.id, conversation);
-      const message = post(conversation, user.id, content(session, input), { metadata: input.metadata });
+      const body = content(session, input);
+      const message = post(conversation, user.id, body, {
+        metadata: input.metadata,
+        files: shared(user.id, conversation, input),
+      });
       action(session, "say", { user: user.id, channel: conversation.id, ts: message.ts });
       return message;
     },
@@ -423,6 +466,7 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       const message = post(conversation, user.id, content(session, input), {
         threadTs: root.threadTs ?? root.ts,
         metadata: input.metadata,
+        files: shared(user.id, conversation, input),
         broadcast: alsoSendToChannel,
       });
       action(session, "reply", {

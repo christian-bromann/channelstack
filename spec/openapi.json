@@ -1019,6 +1019,26 @@
             },
             "minItems": 1,
             "x-channelstack-one-or-many": true
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ]
+            },
+            "x-channelstack-files": "tree"
           }
         },
         "required": [
@@ -1084,6 +1104,26 @@
           },
           "alsoSendToChannel": {
             "type": "boolean"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ]
+            },
+            "x-channelstack-files": "tree"
           }
         },
         "required": [
@@ -8409,7 +8449,8 @@
           ],
           "options": [
             "channel",
-            "to"
+            "to",
+            "files"
           ]
         },
         "x-channelstack-error-codes": [
@@ -8498,7 +8539,8 @@
           ],
           "options": [
             "thread",
-            "alsoSendToChannel"
+            "alsoSendToChannel",
+            "files"
           ]
         },
         "x-channelstack-error-codes": [

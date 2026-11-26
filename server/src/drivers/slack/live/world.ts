@@ -100,6 +100,13 @@ export interface LiveSlackWorld extends SlackWorld {
   credentials(session: string): SlackCredentials;
 }
 
+/** A person's files reach Slack only through its client's upload, which the browser actor doesn't do yet. */
+const noFiles = (operation: string, message: SlackMessageInput) => {
+  if ((message.files?.length ?? 0) > 0) {
+    throw unsupportedInLive(operation, "not yet: the browser actor doesn't attach files in Slack's client");
+  }
+};
+
 /** A name a channel can have: lowercase letters, digits, `-` and `_`. */
 const channelSlug = (name: string) =>
   name
@@ -640,6 +647,7 @@ export function createLiveWorld(deps: {
     // A person's message is typed in Slack's client by the browser actor: through the API, Slack
     // marks it with the posting app's bot, and agents ignore it (decision 0015).
     async postAsUser(session, user, message, where) {
+      noFiles("SlackUser.say({ files })", message);
       const target = "channel" in where ? conversation(session, where.channel) : await open(session, user, where.to);
       return typedMessage(
         session,
@@ -653,6 +661,7 @@ export function createLiveWorld(deps: {
     },
 
     async replyAsUser(session, user, message, thread, alsoSendToChannel) {
+      noFiles("SlackUser.reply({ files })", message);
       if (alsoSendToChannel) {
         throw unsupportedInLive(
           "SlackUser.reply({ alsoSendToChannel })",
