@@ -58,20 +58,25 @@ describe("exit check 8.7: Resend live", () => {
     const person = (await resend("POST", "/users", { name: "Ana", token: ana.key })).body;
     const user = `/users/${encodeURIComponent(person.id)}`;
     const email = (await resend("POST", `${user}/send`, { to: [app.id], subject: "Refund", text: "Where?" })).body;
-    // The agent answers with a Reply-To and a Cc on a domain no one allowlisted.
-    stub.agentReplies(stub.sent[0] as NonNullable<(typeof stub.sent)[0]>, "Billing will answer.", {
-      replyTo: ["billing@elsewhere.example"],
-      cc: ["boss@elsewhere.example"],
-    });
-    const [answer] = (await resend("GET", `/threads/${email.thread.id}/replies`)).body;
+    // The agent answers twice: once with a Reply-To, once with a Cc, each on a domain no one allowlisted.
+    const first = stub.sent[0] as NonNullable<(typeof stub.sent)[0]>;
+    stub.agentReplies(first, "Billing will answer.", { replyTo: ["billing@elsewhere.example"] });
+    stub.agentReplies(first, "I asked my boss.", { cc: ["boss@elsewhere.example"] });
+    const [toReplyTo, withCc] = (await resend("GET", `/threads/${email.thread.id}/replies`)).body;
     const before = stub.sent.length;
-    for (const all of [false, true]) {
+    // A reply goes to the Reply-To; a reply to all, to the Cc too.
+    for (const [answer, all] of [
+      [toReplyTo, false],
+      [withCc, true],
+    ] as const) {
       const refused = await resend("POST", `${user}/reply`, { email: answer.id, text: "Thanks", all });
       expect(refused.body.error).toBe("live_not_allowlisted");
       // Which address, redacted: it names the allowlist to change.
       expect(refused.body.message).toContain("CHANNELSTACK_LIVE_RESEND_DOMAINS");
     }
-    expect(stub.sent).toHaveLength(before);
+    // Only to the agent, the same answer's reply goes out.
+    expect((await resend("POST", `${user}/reply`, { email: withCc.id, text: "Thanks" })).body.error).toBeUndefined();
+    expect(stub.sent).toHaveLength(before + 1);
   });
 
   test("an agent address outside the allowlist is refused before anything is sent", async () => {

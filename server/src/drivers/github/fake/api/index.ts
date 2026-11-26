@@ -2,7 +2,7 @@ import { type Context, Hono } from "hono";
 
 import { bearerFrom } from "../../../../core/auth/index.ts";
 import { ProtocolError } from "../../../../core/errors/index.ts";
-import { bodyOf, restApi } from "../../../../core/fake/endpoint.ts";
+import { bodyOf, wrapRest } from "../../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
 import { GITHUB_IDS } from "../../ids.ts";
@@ -241,10 +241,13 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   // --- What wraps every request ------------------------------------------------------------
 
   const answer = (status: number, body: Json) => ({ status, body, sessions: [] });
-  const rest = restApi(context, {
+  // Only what authenticated as the App or its installation is on record. A call about a
+  // repository belongs to the session that owns it; one about a delivery, to the delivery's
+  // session; the rest (the App's own endpoints, the token exchange) to no session, and the
+  // core event log keeps those in the scope every session reads. GitHub Enterprise serves the
+  // same API under `/api/v3`; SDKs that are given a host assume that layout.
+  const github: Parameters<typeof wrapRest>[1] = {
     driver: "github",
-    // Each route checks its own credential: the App's JWT, or the installation's token.
-    authorize: () => undefined,
     refusal: (error) => {
       if (error instanceof GitHubRefusal) {
         const status = error.githubStatus;
@@ -259,8 +262,6 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
       if (error instanceof ProtocolError && error.code === "not_found") return answer(404, NOT_FOUND);
       return undefined;
     },
-    invalidJson: () => answer(400, { message: "Problems parsing JSON", documentation_url: DOCS, status: "400" }),
-    notFound: () => answer(404, NOT_FOUND),
     internal: () => answer(500, { message: "Server Error", documentation_url: DOCS }),
     decorate: (answered) => ({
       ...answered,
@@ -279,14 +280,8 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
         "x-ratelimit-resource": "core",
       },
     }),
-  });
-
-  // Only what authenticated as the App or its installation is on record. A call about a
-  // repository belongs to the session that owns it; one about a delivery, to the delivery's
-  // session; the rest (the App's own endpoints, the token exchange) to no session, and the
-  // core event log keeps those in the scope every session reads. GitHub Enterprise serves the
-  // same API under `/api/v3`; SDKs that are given a host assume that layout.
-  return rest.wrap(routes, {
+  };
+  return wrapRest(context, github, routes, {
     recorded: (c) => c.get("authenticated") === true,
     sessions: (c) => {
       const repo = c.get("repo") as GitHubRepoRecord | undefined;

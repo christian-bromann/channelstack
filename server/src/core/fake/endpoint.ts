@@ -12,24 +12,26 @@ export interface RestAnswer {
   readonly headers?: Readonly<Record<string, string>>;
 }
 
-/** How one platform's REST API answers around its endpoints: who may call, and its error shape. */
-export interface RestPlatform {
+/** How one platform's REST API answers: its refusals' shape, what it adds to every answer, whose calls these are. */
+export interface RestShape {
   /** The driver whose calls these are. */
   readonly driver: string;
-  /** Who may call this endpoint: undefined to go on, or the platform's refusal (no key, a wrong one). */
-  authorize(c: Context, operation: string): RestAnswer | undefined;
   /** A refusal the handlers throw, as the platform answers it; undefined for anything else, which is a bug. */
   refusal(error: unknown): RestAnswer | undefined;
+  /** What the platform adds to every answer (a request id). */
+  decorate?(answer: RestAnswer): RestAnswer;
+  /** A call about nothing in a session: on record for every session (`world`, the default), or for none. */
+  readonly unattributed?: "world" | "drop";
+}
+
+/** A platform whose endpoints `restApi` authorizes and parses: also who may call, and what it answers a bad body or path. */
+export interface RestPlatform extends RestShape {
+  /** Who may call this endpoint: undefined to go on, or the platform's refusal (no key, a wrong one). */
+  authorize(c: Context, operation: string): RestAnswer | undefined;
   /** A body that isn't JSON. */
   invalidJson(): RestAnswer;
   /** A path the API doesn't have. */
   notFound(c: Context): RestAnswer;
-  /** What the platform adds to every answer (a request id). */
-  decorate?(answer: RestAnswer): RestAnswer;
-  /** What the platform answers when the fake itself fails, which is a bug: logged, and this answered. */
-  internal?(): RestAnswer;
-  /** A call about nothing in a session: on record for every session (`world`, the default), or for none. */
-  readonly unattributed?: "world" | "drop";
 }
 
 type Method = "get" | "post" | "put" | "patch" | "delete";
@@ -61,7 +63,7 @@ export async function bodyOf(
 /** The call on record: its operation and the platform's own path, what was asked and answered. */
 function recordRest(
   context: DriverContext,
-  platform: RestPlatform,
+  platform: RestShape,
   c: Context,
   call: { operation?: string; request: unknown; status: number; response: unknown; startedAt: number },
   sessions: Iterable<string | undefined>,
@@ -148,62 +150,9 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
       return c.json(result.body, status as 200);
     });
 
-  /**
-   * For a platform whose handlers answer Hono responses themselves and check its own credentials
-   * per route (GitHub: the App's JWT, the installation token, a permission per endpoint): `router`
-   * served at `/` and at each of `mounts`, every answer decorated, a thrown refusal answered in the
-   * platform's shape, and each call `recorded` for the `sessions` it touched.
-   */
-  const wrap = (
-    router: Hono<any>,
-    options: {
-      sessions(c: Context): Iterable<string | undefined>;
-      /** Whether this call goes on record (a platform may keep unauthenticated calls off it). Default: every call. */
-      recorded?(c: Context): boolean;
-      /** Other prefixes the API is served under (GitHub Enterprise's `/api/v3`). */
-      mounts?: readonly string[];
-    },
-  ): Hono => {
-    const outer = new Hono();
-    outer.use(async (c, next) => {
-      const startedAt = clock();
-      await next();
-      const status = c.res.status;
-      const raw = status === 204 ? "" : await c.res.clone().text();
-      let response: unknown = raw;
-      try {
-        response = raw === "" ? undefined : JSON.parse(raw);
-      } catch {
-        response = raw;
-      }
-      const decorated = platform.decorate?.({ body: response, sessions: [], status });
-      for (const [name, value] of Object.entries(decorated?.headers ?? {})) c.header(name, value);
-      if (options.recorded && !options.recorded(c)) return;
-      recordRest(
-        context,
-        platform,
-        c,
-        { request: c.get(PARSED_BODY as never), status, response, startedAt },
-        options.sessions(c),
-        options.mounts,
-      );
-    });
-    outer.onError((error, c) => {
-      const refusal = platform.refusal(error);
-      if (refusal) return c.json(refusal.body, (refusal.status ?? 400) as 400);
-      context.log.error(`${platform.driver} api`, { error: error instanceof Error ? error.message : String(error) });
-      const internal = platform.internal?.() ?? { body: { error: "internal" }, sessions: [], status: 500 };
-      return c.json(internal.body, (internal.status ?? 500) as 500);
-    });
-    for (const mount of options.mounts ?? []) outer.route(mount, router);
-    outer.route("/", router);
-    return outer;
-  };
-
   return {
     api,
     endpoint,
-    wrap,
     /** Answer every other path the way the platform answers a path it doesn't have. */
     finish() {
       api.all("*", (c) => {
@@ -213,4 +162,63 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
       return api;
     },
   };
+}
+
+/**
+ * `restApi` for a platform whose routes answer Hono responses themselves, check their own
+ * credentials and parse their own bodies (with `bodyOf`), as GitHub's do (the App's JWT, the
+ * installation token, a permission per endpoint): `router` served at `/` and at each of `mounts`,
+ * every answer decorated, a thrown refusal answered in the platform's shape (and anything else as
+ * its `internal` answer, logged), and each call `recorded` for the `sessions` it touched.
+ */
+export function wrapRest(
+  context: DriverContext,
+  platform: RestShape & {
+    /** What the platform answers when the fake itself fails, which is a bug. */
+    internal(): RestAnswer;
+  },
+  router: Hono<any>,
+  options: {
+    sessions(c: Context): Iterable<string | undefined>;
+    /** Whether this call goes on record (a platform may keep unauthenticated calls off it). Default: every call. */
+    recorded?(c: Context): boolean;
+    /** Other prefixes the API is served under (GitHub Enterprise's `/api/v3`). */
+    mounts?: readonly string[];
+  },
+): Hono {
+  const { clock } = context;
+  const outer = new Hono();
+  outer.use(async (c, next) => {
+    const startedAt = clock();
+    await next();
+    const status = c.res.status;
+    const raw = status === 204 ? "" : await c.res.clone().text();
+    let response: unknown = raw;
+    try {
+      response = raw === "" ? undefined : JSON.parse(raw);
+    } catch {
+      response = raw;
+    }
+    const decorated = platform.decorate?.({ body: response, sessions: [], status });
+    for (const [name, value] of Object.entries(decorated?.headers ?? {})) c.header(name, value);
+    if (options.recorded && !options.recorded(c)) return;
+    recordRest(
+      context,
+      platform,
+      c,
+      { request: c.get(PARSED_BODY as never), status, response, startedAt },
+      options.sessions(c),
+      options.mounts,
+    );
+  });
+  outer.onError((error, c) => {
+    const refusal = platform.refusal(error);
+    if (refusal) return c.json(refusal.body, (refusal.status ?? 400) as 400);
+    context.log.error(`${platform.driver} api`, { error: error instanceof Error ? error.message : String(error) });
+    const internal = platform.internal();
+    return c.json(internal.body, (internal.status ?? 500) as 500);
+  });
+  for (const mount of options.mounts ?? []) outer.route(mount, router);
+  outer.route("/", router);
+  return outer;
 }
