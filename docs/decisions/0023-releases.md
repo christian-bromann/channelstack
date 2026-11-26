@@ -47,13 +47,29 @@ new major version, the range moves with it.
 - **crates.io:** a token in the `release` environment (`CARGO_REGISTRY_TOKEN`). Trusted publishing can
   replace it once the crate exists.
 
-The publishing jobs run only for a pushed tag, in those environments. A pull request that changes
-the release runs everything else as a dry run, with no secrets.
+The publishing jobs run only for a pushed tag, in those environments, and wait for the maintainer's
+approval there. A pull request that changes the release runs everything else as a dry run, with no
+secrets.
+
+## Released from GitHub only
+
+No one releases from their own machine. A workflow started from the Actions tab opens the version
+pull request (`release-prepare.yml`); merging it makes another tag the merge commit
+(`release-tag.yml`), and the tag starts `release.yml`. Both use a GitHub App's token: a pull request
+or tag that `GITHUB_TOKEN` creates starts no workflow, and the tag ruleset lets only the App create
+`v*` tags, so a tag can't come from a laptop. The App can write contents and pull requests and
+nothing else, and its key is a secret of the `release-bot` environment, which only `main` can use.
+No laptop holds a registry token either: npm and PyPI trust the workflow, and crates.io's token is a
+secret of the `release` environment.
 
 ## Alternatives
 
 - **Publishing from a maintainer's machine:** no provenance, and nothing ties a package to the
   commit it came from.
+- **Tagging from a maintainer's machine,** with the workflow publishing: the release would still
+  depend on a laptop's git setup, and on whoever holds a tag-creating role.
+- **A personal access token** for the version pull request and the tag: tied to a person, broader
+  than the two permissions the App has, and long-lived.
 - **One workflow per registry:** the versions could drift, and a release could be half done
   without anyone seeing it in one place.
 - **Exact pins in published manifests**, as in the repository: rejected for the reason above.

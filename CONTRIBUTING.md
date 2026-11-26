@@ -43,7 +43,7 @@ them too.
 
 ## Releases
 
-Maintainers release with one tag; see [docs/release.md](docs/release.md).
+Maintainers release from GitHub's Actions tab; see [docs/release.md](docs/release.md).
 
 ## Code of conduct
 

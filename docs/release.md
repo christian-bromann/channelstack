@@ -1,41 +1,37 @@
 # Releasing channelstack
 
 One tag releases the server, the spec and every SDK at the same version
-([decision 0023](decisions/0023-releases.md)). The workflow `.github/workflows/release.yml` builds,
-checks and publishes it all, and makes the GitHub release.
+([decision 0023](decisions/0023-releases.md)). Everything happens on GitHub: no one releases from
+their own machine, and no machine but GitHub's holds what publishing needs.
+
+| Workflow | Started by | What it does |
+|---|---|---|
+| `release-prepare.yml` | you, from the Actions tab | opens the version pull request |
+| `release-tag.yml` | that pull request's merge | tags the merge commit `vX.Y.Z` |
+| `release.yml` | the tag | builds, checks and, after your approval, publishes, then makes the GitHub release |
 
 ## A release
 
-1. **The version, in a pull request.** On a branch from `main`:
+1. **Prepare it.** Actions → **Prepare a release** → **Run workflow** on `main`, with the version
+   (`0.1.0`, or a prerelease such as `0.2.0-rc.1`). The workflow runs `pnpm release:version`,
+   which:
+   - sets the version in every published manifest: `server/package.json` and
+     `sdks/typescript/package.json` with its platform packages, both `pyproject.toml` files and the
+     plugin's pin of the SDK, and `sdks/rust/Cargo.toml`;
+   - regenerates the spec and the SDKs (they carry the version they check on connect), and updates
+     `Cargo.lock` and both `uv.lock` files;
+   - moves the changelog's "Unreleased" section under `## [0.1.0] - <today>`.
 
-   ```bash
-   pnpm release:version 0.1.0
-   ```
-
-   This sets the version in every published manifest:
-   - `server/package.json` and `sdks/typescript/package.json`, with its platform packages;
-   - both `pyproject.toml` files, and the plugin's pin of the SDK;
-   - `sdks/rust/Cargo.toml`.
-
-   It then regenerates the spec and the SDKs (they carry the version they check on connect),
-   updates `Cargo.lock` and both `uv.lock` files, and moves the changelog's "Unreleased" section
-   under `## [0.1.0] - <today>`.
-
-   Read the diff, edit the changelog's section if it needs it, and open a pull request. Its CI
+   It then opens the pull request `chore: release v0.1.0` from the branch `release/v0.1.0`. Its CI
    includes the release workflow's dry run, which builds every package and binary.
-2. **Merge it.**
-3. **Tag the merge commit** and push the tag:
-
-   ```bash
-   git switch main && git pull
-   git tag -s v0.1.0 -m "channelstack 0.1.0"
-   git push origin v0.1.0
-   ```
-
-   The workflow checks the tag first. It must name the version every package has, it must be on
-   `main`, and the changelog must have its section. Then it builds the five binaries, each run once
-   on its platform, and every package. It publishes to npm, PyPI and crates.io, and makes the GitHub
-   release last.
+2. **Review it.** Edit the changelog's section on the branch if it needs it, and merge the pull
+   request once CI is green.
+3. **Approve it.** The merge makes `release-tag.yml` tag the merge commit `v0.1.0`; only the release
+   App may create `v*` tags. The tag starts `release.yml`, which checks it first: it must name the
+   version every package has, it must be on `main`, and the changelog must have its section. Then it
+   builds the five binaries, each run once on its platform, and every package. The publishing jobs
+   wait for your approval: open the run, then **Review deployments**, tick `release` and `pypi`, and
+   approve. It publishes to npm, PyPI and crates.io, and makes the GitHub release last.
 
 A run that fails partway can be run again from the Actions tab. What a registry has already is
 skipped, since none of them takes the same version twice.
@@ -74,7 +70,24 @@ These need the maintainer's accounts, so the workflow can't do them:
   - Add a tag ruleset that lets only maintainers create `v*` tags.
   - Turn on private vulnerability reporting (Settings → Security), which
     [SECURITY.md](../SECURITY.md) points reporters to. It's off today.
-- [ ] **The first release's pull request:** take the README's "not on npm yet" note out.
+- [ ] **The release App,** which opens the version pull request and creates the tag (a pull
+  request or tag `GITHUB_TOKEN` creates starts no workflow, and the tag ruleset lets only this App
+  create tags):
+  - Create a GitHub App (Settings → Developer settings → GitHub Apps → New GitHub App), named for
+    example `channelstack-release`, with no webhook and the repository permissions **Contents:
+    Read and write** and **Pull requests: Read and write**. Install it on this repository only.
+  - Create the environment `release-bot`, limited to the branch `main`. Store the App's client id
+    as its variable `RELEASE_APP_CLIENT_ID`, and a private key you generate on the App's page as its
+    secret `RELEASE_APP_PRIVATE_KEY`. Delete the downloaded key file afterwards.
+  - In the tag ruleset, replace **Repository admin** in the bypass list with the App, so a `v*` tag
+    can only come from `release-tag.yml`.
+- [ ] **No publishing from a laptop:**
+  - crates.io: `cargo logout`, and revoke any token but the one in the `release` environment.
+  - npm: under each package's settings, set publishing access to **Require two-factor
+    authentication and disallow tokens**; trusted publishing still works.
+  - PyPI: revoke the API token the placeholder was uploaded with.
+- [ ] **The first release's pull request:** take the README's "not on npm yet" note out. The
+  version pull request lists it.
 
 Once every npm package trusts the workflow, `NPM_TOKEN` can be deleted. crates.io's trusted
 publishing can replace `CARGO_REGISTRY_TOKEN` the same way.
