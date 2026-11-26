@@ -1,7 +1,7 @@
 # channelstack: interface and developer experience (draft)
 
 > Status: draft v2, 2026-11-19. Nothing is built.
-> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear and Notion (no Teams for now) · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
+> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear, Notion and email, Resend and Google ([decision 0021](decisions/0021-email-channels.md); no Teams for now) · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
 > Also decided: tests use an actor-first API (`ana.say("…", { channel })`). The UI is functional, not a faithful copy of each product ([section 7](#7-the-ui-is-functional-not-faithful)).
 > How it's built (server, protocol, SDK generation, live verification) is in [implementation-plan.md](implementation-plan.md); its section 1.1 lists the decisions both documents share. The architecture in short: [architecture.md](architecture.md).
 
@@ -27,7 +27,7 @@ The names don't collide with emulate: its portless mode uses `*.emulate.localhos
 
 ### Scope
 
-- **Channels:** Slack, GitHub, Linear and Notion. No Teams for now.
+- **Channels:** Slack, GitHub, Linear, Notion, and email: Resend and Google (Gmail), [decision 0021](decisions/0021-email-channels.md). No Teams for now.
 - **One workspace or org per channel:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. Multi-workspace installs are out of scope until a real test case needs them.
 - **State lives in memory.** Restarting the server gives a fresh world.
 - **No model mocking.** channelstack fakes the channel, not the LLM. Use your framework's own fake model, or a real one (see [section 6](#6-the-model-is-yours)).
@@ -317,7 +317,7 @@ Each test still gets fresh users and a fresh channel (fixtures are created per t
 |---|---|
 | People exist for the UI and CLI before any test runs | The CLI and UI create users on first use (`--as ana`, or the user picker) |
 | Stable user IDs, for agents that allowlist admins by ID (`ADMINS=U0ADMIN01`) | `createUser({ name: "Cara", id: "U0ADMIN01" })` accepts a fixed ID |
-| The same person across Slack, GitHub, Linear and Notion | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
+| The same person across Slack, GitHub, Linear, Notion and Resend | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
 | Less setup per test | Shared fixtures (above) are one line per test and visible where they're used |
 
 So predefined users would add nothing worth keeping, and they'd bring hidden shared state, which parallel tests can't afford.
@@ -433,7 +433,7 @@ A test can use one of those, or a real model. The matchers are designed for this
 
 ## 7. The UI is functional, not faithful
 
-Nobody needs the UI to look like Slack, GitHub, Linear or Notion. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for all four channels and shows the same transcript the matchers read:
+Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for all four channels and shows the same transcript the matchers read:
 
 - **Threads and conversations as text:** who said what, in which thread, edited or deleted, streaming or done, and the agent's status ("thinking…", "stopped").
 - **Interactive elements that work:** a button is a button, a select is a select, and a modal opens as a plain form. Clicking one sends the real `block_actions` or `view_submission` delivery. The same goes for GitHub review comments (shown with path and line), Linear Stop, and Notion comment replies.

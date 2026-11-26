@@ -50,6 +50,7 @@ Every test gets these fixtures from its context:
 | `github`       | The fake GitHub org: `createUser`, `createRepo`, the built-in `app` (a GitHub App)                                                               |
 | `linear`       | The fake Linear workspace: `createUser`, `createTeam`, the built-in `app`                                                                        |
 | `notion`       | The fake Notion workspace: `createUser`, `createPage`, `createDatabase`, the built-in integration as `app`                                       |
+| `resend`       | The fake Resend team: `createUser` (a mailbox outside it), the built-in team's address as `app`                                                  |
 | `channelstack` | The server itself: `url`, `env()` (what `channelstack env` prints), `quiet()` (resolves when the app is quiet in this test's session), `reset()` |
 
 The fixtures are scoped to the test's own [session](/docs/guide/how-it-works#sessions-scopes-in-one-shared-world), which opens before the test's hooks and closes after them, whether the test names a fixture or not. Two tests that run at the same moment never see each other's people, channels or deliveries.
@@ -62,7 +63,7 @@ Every action is a method on the person who takes it. The content comes first, an
 
 <Example id="writing-tests-actors" />
 
-The people of each platform have that platform's actions, and only those: a Slack user can `say`, `reply`, `react`, `click` and `stop`; a GitHub user can `openIssue`, `openPullRequest`, `comment`, `review` and `push`; a Linear user can `createIssue`, `delegate`, `prompt` and `stop`; a Notion user can `comment`, `reply`, `edit` and `setProperty`. A Slack user has no `comment`, so mixing them up is a type error. The [platform pages](/docs/platforms/slack) list every action.
+The people of each platform have that platform's actions, and only those: a Slack user can `say`, `reply`, `react`, `click` and `stop`; a GitHub user can `openIssue`, `openPullRequest`, `comment`, `review` and `push`; a Linear user can `createIssue`, `delegate`, `prompt` and `stop`; a Notion user can `comment`, `reply`, `edit` and `setProperty`; a Resend person can `send`, `reply` and read their `inbox`. A Slack user has no `comment`, so mixing them up is a type error. The [platform pages](/docs/platforms/slack) list every action.
 
 Every action resolves to what it created, so the next step needs no lookup. `say` gives you the message, with its `thread`, its `conversation` and the `delivery` it caused; `comment` on Linear gives you the comment and the agent `session` it opened.
 
@@ -80,12 +81,13 @@ Nothing grants your app access behind your back. Each platform's real rule appli
 | GitHub   | An App gets webhooks only for repositories it's installed on                                             | `createRepo({ apps: [github.app] })`, or later `repo.installApp(github.app)`                       |
 | Notion   | An integration sees only pages connected to it, and their children                                       | `createPage({ connections: [notion.app] })`, or later `ana.connect(notion.app, { page })`          |
 | Linear   | An app is installed for the whole workspace                                                              | Nothing to do                                                                                      |
+| Resend   | A team gets only the mail sent to its own address                                                        | `ana.send({ to: [resend.app], … })`; email between people never reaches it                         |
 
 Leaving the app out is how you test the uninvited case:
 
 <Example id="writing-tests-invite" />
 
-On GitHub and Notion, an action that reaches no app causes no delivery, so `comment.delivery` is `undefined` there.
+On GitHub, Notion and Resend, an action that reaches no app causes no delivery, so `comment.delivery` is `undefined` there.
 
 ## Read what happened
 
@@ -102,7 +104,7 @@ Resources are only read and waited on. For a check, use a matcher; when you need
 | What the app called                   | `slack.calls({ operation, error })`, `slack.waitForCall({ operation })`                                                                                                                |
 | What the server sent the app          | `msg.delivery`, `github.deliveries({ type, resource })`                                                                                                                                |
 
-[Waiting and quiet](/docs/guide/waiting-and-quiet) explains how the `waitFor…` and `latest…` methods differ, and the API reference ([Slack](/docs/reference/api/slack), [GitHub](/docs/reference/api/github), [Linear](/docs/reference/api/linear), [Notion](/docs/reference/api/notion)) lists every read.
+[Waiting and quiet](/docs/guide/waiting-and-quiet) explains how the `waitFor…` and `latest…` methods differ, and the API reference ([Slack](/docs/reference/api/slack), [GitHub](/docs/reference/api/github), [Linear](/docs/reference/api/linear), [Notion](/docs/reference/api/notion), [Resend](/docs/reference/api/resend)) lists every read.
 
 ## Shared people with `test.extend`
 
@@ -120,7 +122,7 @@ Generated ids are realistic and unique. When your app allowlists people by id, f
 
 <Example id="writing-tests-fixed-ids" />
 
-GitHub takes a numeric `id`, and Linear and Notion take a UUID. The id must have the platform's format.
+GitHub takes a numeric `id`, and Linear and Notion take a UUID. The id must have the platform's format. A Resend person's id is their address, so fix one with `address`.
 
 A fixed id is unique in the whole world, not only in the test, because the app can't tell two `U0ADMIN01` apart. While one session holds it, another session that asks for it is refused with `invalid_argument`, and the id is free again when the first session closes. Tests that fix the same id must not run at the same time.
 

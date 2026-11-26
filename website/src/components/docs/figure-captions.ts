@@ -36,7 +36,7 @@ export const FIGURE_CAPTIONS = {
   ProxyRouting: {
     steps: [
       "The app calls the platform's real host. The proxy in its environment takes the connection.",
-      "slack.com, api.github.com, api.linear.app and api.notion.com go to the fakes, under a certificate only the app trusts.",
+      "slack.com, api.github.com, api.linear.app, api.notion.com and api.resend.com go to the fakes, under a certificate only the app trusts.",
       "The fakes answer exactly as they do on *.localhost.",
       "Every other host, such as the model's API, passes through untouched.",
     ],

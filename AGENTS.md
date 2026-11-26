@@ -4,7 +4,7 @@ Instructions for coding agents implementing channelstack. Read this first.
 
 ## What channelstack is
 
-A test harness for AI agents that live in Slack, GitHub, Linear and Notion. One server fakes those platforms in memory. Tests script people (`ana.say("@my-agent hi", { channel })`) and assert on what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same API can also act on the real platforms (live mode).
+A test harness for AI agents that live in Slack, GitHub, Linear, Notion and email (Resend, and Google next). One server fakes those platforms in memory. Tests script people (`ana.say("@my-agent hi", { channel })`) and assert on what a person would see (`expect(thread).toHaveReplyFrom("my-agent")`). The same API can also act on the real platforms (live mode).
 
 ## Reading order
 

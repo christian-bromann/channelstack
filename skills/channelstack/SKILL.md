@@ -5,7 +5,7 @@ description: Try a Slack bot you are building against channelstack's fake Slack,
 
 # channelstack
 
-channelstack fakes Slack, GitHub, Linear and Notion in memory. Your bot talks to the fake as if it were the real platform; you act as people in it and read what a person would see.
+channelstack fakes Slack, GitHub, Linear, Notion and Resend in memory. Your bot talks to the fake as if it were the real platform; you act as people in it and read what a person would see.
 
 ## Set up, once
 

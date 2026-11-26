@@ -12,7 +12,7 @@ Proxy mode is for apps whose platform URL you can't change: an app that hard-cod
 
 ## When you need it
 
-If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
+If your app's SDK takes a base URL (`SLACK_API_URL`, Octokit's `baseUrl`, `LINEAR_API_URL`, `NOTION_BASE_URL`, `RESEND_BASE_URL`), use that instead: it's simpler and needs no CA ([Connecting your app](/docs/guide/connecting-your-agent)). Reach for proxy mode when:
 
 - the app or a library it uses calls `https://slack.com/api/…` (or another platform host) directly;
 - you can set environment variables for the app, but not its code or config;
@@ -46,6 +46,7 @@ The proxy routes exactly these hosts to the fakes, over HTTPS:
 | `api.github.com` | The GitHub fake |
 | `api.linear.app` | The Linear fake |
 | `api.notion.com` | The Notion fake |
+| `api.resend.com` | The Resend fake |
 
 Every other host, including subdomains of these such as `app.slack.com`, is a plain tunnel to the real host: your model provider, package registries, anything else the app calls. Plain `http://` to a routed host is refused with `403`, since the platforms are HTTPS only. The proxy doesn't tell sessions apart: the app's calls reach the fakes as they would through base-URL mode, so tests and the dev loop work as usual.
 

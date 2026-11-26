@@ -4,7 +4,7 @@
 
 ## 1. The big picture
 
-One server process fakes Slack, GitHub, Linear and Notion in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
+One server process fakes Slack, GitHub, Linear, Notion and Resend in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
  Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)

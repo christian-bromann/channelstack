@@ -11,7 +11,7 @@ The standard checks are a set of tests for the bugs apps and agents commonly hav
 ## Add the checks
 
 ```ts title="test/checks.test.ts"
-import { githubChecks, linearChecks, notionChecks, slackChecks } from "channelstack/checks";
+import { githubChecks, linearChecks, notionChecks, resendChecks, slackChecks } from "channelstack/checks";
 
 slackChecks({
   app: "my-agent",
@@ -21,6 +21,7 @@ slackChecks({
 githubChecks({ app: "my-agent" });
 linearChecks({ app: "my-agent" });
 notionChecks({ app: "my-agent", prompt: "@my-agent summarize this page" });
+resendChecks({ app: "my-agent", prompt: "Where is my refund?" });
 ```
 
 Each call registers ordinary Vitest tests in the file it's called from, on the fixtures and matchers of `channelstack/vitest`, so the [plugin](/docs/guide/writing-tests#add-the-plugin) must be set up. The tests are grouped in a `describe` named after the platform and the app (`slack checks: my-agent`), and each test name ends in the check's id:
@@ -109,6 +110,17 @@ Each check has Ana post `prompt` as a comment on a page connected to the integra
 | `notion.redelivery`           | Sends the comment's webhook again; expects one comment                   | Handling Notion's retry as a new comment                                            |
 | `notion.bad-signature`        | Resends the webhook with a wrong signature; expects a 4xx                | Turned-off `X-Notion-Signature` checks                                              |
 
+## Resend checks
+
+Each check has Ana email `prompt` (default `hello`) to the agent's address.
+
+| Id                       | What the test does                                                               | What it catches                                                           |
+| ------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `resend.reply-in-thread` | Expects the answer in Ana's mailbox, in the thread her email started             | An answer without `In-Reply-To` and `References`, which starts a new thread |
+| `resend.redelivery`      | Sends the `email.received` webhook again, as Resend retries; expects one answer | Handling Resend's retry (the same `svix-id`) as a new email                |
+| `resend.bad-signature`   | Resends the webhook with a wrong signature; expects a 4xx                        | Turned-off `resend.webhooks.verify`                                       |
+| `resend.stale`           | Resends it signed more than five minutes ago; expects a 4xx                      | Missing replay protection on `svix-timestamp`                             |
+
 ## Skipping a check
 
 List the ids in `skip`:
@@ -126,7 +138,7 @@ To run a single check while you work on its bug, filter by its id, which is part
 npx vitest run test/checks.test.ts -t "slack.retry"
 ```
 
-The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS` and `NOTION_CHECKS`, for a script that builds `skip` from them.
+The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS`, `NOTION_CHECKS` and `RESEND_CHECKS`, for a script that builds `skip` from them.
 
 ## In live mode
 
@@ -134,11 +146,11 @@ Most checks are about delivery: retries, redeliveries, forged signatures, acknow
 
 | Checks                                                                                     | Live                                                                                                                                                                   |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slack.bad-signature`, `slack.ack`, `github.bad-signature`, `notion.bad-signature`         | **Fail**, with "caused no delivery". List them in `skip` in a live run                                                                                                 |
+| `slack.bad-signature`, `slack.ack`, `github.bad-signature`, `notion.bad-signature`, and `resend.redelivery`, `resend.bad-signature` and `resend.stale` | **Fail**, with "caused no delivery". List them in `skip` in a live run                                                                                                 |
 | `slack.retry`, `slack.redelivery`, `github.redelivery`, `notion.redelivery`                | Step over the delivery, then skip at their exact count, because waiting for quiet needs proxy mode live ([Live mode](/docs/guide/live-mode#what-skips-and-what-fails)) |
 | `linear.redelivery`, `linear.stale`, `linear.bad-signature`                                | Skip, with the reason                                                                                                                                                  |
 | `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason                                                                                                                                                  |
 | `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop`                               | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet                                                    |
 | `github.review-thread`, `github.check-run`                                                 | Skip, with the reason: they open a pull request, and pull requests aren't built live yet                                                                               |
 
-Three run against the real platform: `linear.first-activity`, `linear.ends-turn` and `notion.reply-in-discussion`. Making every delivery check skip live with its own reason is [#46](https://github.com/christian-bromann/channelstack/issues/46). The fake run on every pull request runs them all.
+Four run against the real platform: `linear.first-activity`, `linear.ends-turn`, `notion.reply-in-discussion` and `resend.reply-in-thread`. Making every delivery check skip live with its own reason is [#46](https://github.com/christian-bromann/channelstack/issues/46). The fake run on every pull request runs them all.

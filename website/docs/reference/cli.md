@@ -41,7 +41,7 @@ npx channelstack show
 | `channelstack --version`, `-v` | Print the version |
 | `channelstack --help`, `-h` | Print the usage |
 
-The attach CLI has Slack commands only. GitHub, Linear and Notion are driven from tests.
+The attach CLI has Slack commands only. GitHub, Linear, Notion and Resend are driven from tests.
 
 ## Exit codes
 
@@ -84,7 +84,7 @@ channelstack [start] [--no-portless] [--port <n>] [--server-file <path>] [--log-
 | `--port <n>` | `0` with portless (a free port), `4500` without | The loopback port. `0` picks a free one |
 | `--server-file <path>` | `CHANNELSTACK_SERVER_FILE`, else `<home>/server.json` | Where to write the control API's URL and token (0600) |
 | `--log-level <level>` | `CHANNELSTACK_LOG_LEVEL`, else `info` | `debug`, `info`, `warn`, `error` or `silent`. Logs go to stderr |
-| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app` and `api.notion.com` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
+| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com` and `api.resend.com` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
 | `--proxy-port <n>` | `7464` | The proxy's loopback port. `0` picks a free one. Needs `--proxy` |
 | `--record <dir>` | none | Write the shape of every exchange with those hosts, and of every webhook, to `<dir>/shapes.jsonl`: structure only, never a value. Needs `--proxy` |
 
@@ -101,6 +101,7 @@ channelstack <version> · in-memory
   github   https://github.localhost
   linear   https://linear.localhost
   notion   https://notion.localhost
+  resend   https://resend.localhost
   UI       https://channelstack.localhost/?login=…
 
   `channelstack env` prints tokens and URLs as .env lines
@@ -224,7 +225,7 @@ Prints the `dev` session's events as they happen, one line each: `<HH:MM:SS.mmm>
 channelstack deliveries [<channel>]
 ```
 
-Prints one line per delivery in the `dev` session, oldest first. `<channel>` is `slack`, `github`, `linear` or `notion`; with one, only that channel's:
+Prints one line per delivery in the `dev` session, oldest first. `<channel>` is `slack`, `github`, `linear`, `notion` or `resend`; with one, only that channel's:
 
 ```
 <id>  <type> <event type or action>  <status>  (attempts: <HTTP status of each attempt, or ->)
@@ -232,7 +233,7 @@ Prints one line per delivery in the `dev` session, oldest first. `<channel>` is 
 
 Without a channel, every channel's deliveries, in the order they were sent, each line starting with its channel (`slack  Ev0A1B2C3D4E  event_callback app_mention  acknowledged  (attempts: 200)`). A channel the server can't list, such as one running live, is left out.
 
-Prints `Nothing was delivered to the agent on <channel> yet.`, or without a channel `Nothing was delivered to the agent yet.`, when there is none. An unknown channel fails with `say which channel: slack, github, linear, notion, not "<channel>".`
+Prints `Nothing was delivered to the agent on <channel> yet.`, or without a channel `Nothing was delivered to the agent yet.`, when there is none. An unknown channel fails with `say which channel: slack, github, linear, notion, resend, not "<channel>".`
 
 ## `channelstack redeliver`
 

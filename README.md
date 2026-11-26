@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A test harness for the apps and agents you build for Slack, GitHub, Linear and Notion.
+  A test harness for the apps and agents you build for Slack, GitHub, Linear, Notion and Resend.
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
 > [!NOTE]
 > channelstack is under construction and not on npm yet. See [Status](#status).
 
-channelstack runs fake versions of Slack, GitHub, Linear and Notion on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
+channelstack runs fake versions of Slack, GitHub, Linear, Notion and Resend on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
 
 ```ts
 test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
@@ -98,7 +98,7 @@ There is no config file. Each fake has a built-in app named `my-agent`, and wher
 
 ## Status
 
-Under construction, phase by phase. Phases 0 to 7 are merged: the server and the SDK generator, the Slack, GitHub, Linear and Notion fakes, live mode, proxy mode and conformance, and the TypeScript, Python and Rust SDKs with the Vitest and pytest integrations and MCP. [docs/phases.md](docs/phases.md) has each phase and the check that proves it is done.
+Under construction, phase by phase. Phases 0 to 8 are merged: the server and the SDK generator, the Slack, GitHub, Linear and Notion fakes, live mode, proxy mode and conformance, the TypeScript, Python and Rust SDKs with the Vitest and pytest integrations and MCP, and the channel kit with Resend, the first email channel. Google (Gmail) is phase 9. [docs/phases.md](docs/phases.md) has each phase and the check that proves it is done.
 
 ## In this repository
 

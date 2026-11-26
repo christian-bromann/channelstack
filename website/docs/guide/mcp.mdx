@@ -44,7 +44,7 @@ Every tool acts in the shared `dev` session, the same one the CLI and the UI use
 | `slack_stop`      | `as`?, `thread`?                                                                | `channelstack slack stop`                                                                                     |
 | `show_thread`     | `thread`?, `json`?                                                              | `channelstack show`                                                                                           |
 | `tail`            | none                                                                            | `channelstack tail`, but each call returns only what happened since the last one (everything, the first time) |
-| `list_deliveries` | `channel`?: `slack`, `github`, `linear` or `notion`; every channel's without it | `channelstack deliveries`                                                                                     |
+| `list_deliveries` | `channel`?: `slack`, `github`, `linear`, `notion` or `resend`; every channel's without it | `channelstack deliveries`                                                                                     |
 | `redeliver`       | `channel`?, `delivery`? (`last`, the default, or an id from `list_deliveries`)  | `channelstack redeliver`                                                                                      |
 
 - **`as`** is a person's name, such as `ana`. The person is created the first time the name is used.
@@ -86,7 +86,7 @@ channelstack's repository has a skill for coding agents in [`skills/channelstack
 
 ## Slack only
 
-The tools that act as a person are Slack's. `list_deliveries` and `redeliver` take every channel, but nothing acts on GitHub, Linear or Notion in the dev session: drive those from a test.
+The tools that act as a person are Slack's. `list_deliveries` and `redeliver` take every channel, but nothing acts on GitHub, Linear, Notion or Resend in the dev session: drive those from a test.
 
 ## The docs, for your coding agent
 
