@@ -30,7 +30,9 @@ their own machine, and no machine but GitHub's holds what publishing needs.
    includes the release workflow's dry run, which builds every package and binary.
 2. **Review it.** Edit the changelog's section on the branch into sentences a user reads (merge the
    draft into the hand-written lines, drop what isn't worth saying), and merge the pull request
-   once CI is green.
+   once CI is green. Merge nothing else in the meantime: a pull request merged after the draft
+   ships in the release but is in no draft, since the tag lands on top of it. If one does, close
+   the version pull request and run **Prepare a release** again.
 3. **Approve it.** The merge makes `release-tag.yml` tag the merge commit `v0.1.0`; only the release
    App may create `v*` tags. The tag starts `release.yml`, which checks it first: it must name the
    version every package has, it must be on `main`, and the changelog must have its section. Then it
@@ -57,6 +59,9 @@ requests merged since the last `v*` tag (CONTRIBUTING.md, "The title"):
 - A title without one of the listed scopes, such as one from before the convention, is under
   "Other".
 - Before the first tag there is nothing to draft from, so 0.1.0's section is all hand-written.
+- A release of only internal changes (say, `fix(deps): …` for a vulnerability) has nothing that
+  bumps the version, so **Prepare a release** with an empty version fails with "Nothing to
+  release". Name the version (`0.2.1`), and write its section by hand.
 - A prerelease's tag counts as the last tag. After `v0.2.0-rc.1`, the draft has only what was
   merged since the rc, and the next version is `0.2.0-rc.2`: name `0.2.0` to release it, and copy
   the rc's section into it.
@@ -97,7 +102,13 @@ These need the maintainer's accounts, so the workflow can't do them:
   - Add a branch ruleset on `main` (Settings → Rules → Rulesets → New branch ruleset, target the
     default branch) with **Require status checks to pass** and the check `PR title`, so a pull
     request whose title the changelog can't use isn't merged. The check runs on
-    `pull_request_target`, from `main`'s copy of `.github/workflows/pr-title.yml`.
+    `pull_request_target`, from `main`'s copy of `.github/workflows/pr-title.yml`. In the same
+    ruleset, **Require a pull request before merging** with **Allowed merge methods: Squash** only.
+  - Make the checked title the commit's title (Settings → General → Pull Requests): allow squash
+    merging only, with the default commit message **Pull request title**, or **Pull request title
+    and description**. Today a pull request with one commit is squashed under that commit's own
+    title (`COMMIT_OR_PR_TITLE`), which the check never saw, and merge commits and rebase merges
+    are allowed too.
   - Create the environments `release` and `pypi` (Settings → Environments).
   - Limit both to tags `v*`, and add yourself as a required reviewer, so a release waits for your
     approval.

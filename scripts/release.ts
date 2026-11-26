@@ -82,7 +82,10 @@ export function nextVersion(repository = ROOT): string {
   if (last === undefined) throw new Error("There's no v* tag to bump yet: name the version, as in `version 0.1.0`");
   const next = cliff(["--bumped-version"], repository).trim().replace(/^v/, "");
   pep440(next);
-  if (next === last.replace(/^v/, "")) throw new Error(`Nothing to release: no change since ${last} bumps the version`);
+  if (next === last.replace(/^v/, ""))
+    throw new Error(
+      `Nothing to release: no change since ${last} bumps the version (internal scopes don't). To release anyway, name the version.`,
+    );
   return next;
 }
 
