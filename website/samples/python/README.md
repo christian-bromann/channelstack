@@ -1,6 +1,7 @@
 # Python samples
 
-The Python versions of the home page examples, shown by the TS | Py switch. They mirror the
+The Python versions of the home page examples, shown by the player's language switch. The Rust
+versions are `website/examples/rust/src/home_*.rs`, compiled with the docs' Rust examples. They mirror the
 TypeScript samples one to one, step for step, using `pytest-channelstack`'s `expect(...)` and the
 Python SDK.
 

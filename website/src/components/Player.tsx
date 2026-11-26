@@ -1,5 +1,9 @@
 import { type ComponentType, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
+import githubRs from "../../examples/rust/src/home_github.rs?sample";
+import linearRs from "../../examples/rust/src/home_linear.rs?sample";
+import notionRs from "../../examples/rust/src/home_notion.rs?sample";
+import slackRs from "../../examples/rust/src/home_slack.rs?sample";
 import type { Sample } from "../../plugins/samples-plugin";
 import github from "../../samples/github.test.ts?sample";
 import slack from "../../samples/hero.test.ts?sample";
@@ -14,11 +18,12 @@ import { CopyButton } from "./Code";
 import { Check, Pause, Play, Replay } from "./Icons";
 import { GitHubMock, LinearMock, type MockProps, NotionMock, SlackMock } from "./Mocks";
 
-type Lang = "ts" | "py";
-/** The switch shows each language's official logo, unmodified (public/logos/SOURCES.md). */
-const LANGS: Array<{ id: Lang; name: string; logo: string }> = [
-  { id: "ts", name: "TypeScript", logo: "/logos/typescript.svg" },
-  { id: "py", name: "Python", logo: "/logos/python.svg" },
+type Lang = "ts" | "py" | "rs";
+/** The language switch: each language's name, shortened on narrow screens, and its colour on GitHub. */
+const LANGS: Array<{ id: Lang; name: string; short: string }> = [
+  { id: "ts", name: "TypeScript", short: "TS" },
+  { id: "py", name: "Python", short: "Py" },
+  { id: "rs", name: "Rust", short: "Rs" },
 ];
 
 interface Example {
@@ -26,7 +31,7 @@ interface Example {
   label: string;
   /** The address shown above the mock-up. */
   host: string;
-  /** The same test in each language. Both carry the same playback steps. */
+  /** The same test in each language. Each carries the same playback steps. */
   code: Record<Lang, { file: string; sample: Sample }>;
   Mock: ComponentType<MockProps>;
   /** What the test asserts, each shown once playback reaches its step. */
@@ -39,7 +44,11 @@ const EXAMPLES: Example[] = [
     id: "slack",
     label: "Slack",
     host: "slack.localhost",
-    code: { ts: { file: "deploy.test.ts", sample: slack }, py: { file: "test_deploy.py", sample: slackPy } },
+    code: {
+      ts: { file: "deploy.test.ts", sample: slack },
+      py: { file: "test_deploy.py", sample: slackPy },
+      rs: { file: "deploy.rs", sample: slackRs },
+    },
     Mock: SlackMock,
     checks: [
       { step: 2, text: "status reads “checking CI”" },
@@ -60,7 +69,11 @@ const EXAMPLES: Example[] = [
     id: "github",
     label: "GitHub",
     host: "github.localhost",
-    code: { ts: { file: "issues.test.ts", sample: github }, py: { file: "test_issues.py", sample: githubPy } },
+    code: {
+      ts: { file: "issues.test.ts", sample: github },
+      py: { file: "test_issues.py", sample: githubPy },
+      rs: { file: "issues.rs", sample: githubRs },
+    },
     Mock: GitHubMock,
     checks: [
       { step: 3, text: "my-agent commented, mentioning Safari" },
@@ -80,7 +93,11 @@ const EXAMPLES: Example[] = [
     id: "linear",
     label: "Linear",
     host: "linear.localhost",
-    code: { ts: { file: "sessions.test.ts", sample: linear }, py: { file: "test_sessions.py", sample: linearPy } },
+    code: {
+      ts: { file: "sessions.test.ts", sample: linear },
+      py: { file: "test_sessions.py", sample: linearPy },
+      rs: { file: "sessions.rs", sample: linearRs },
+    },
     Mock: LinearMock,
     checks: [
       { step: 3, text: "the session shows a thought" },
@@ -100,7 +117,11 @@ const EXAMPLES: Example[] = [
     id: "notion",
     label: "Notion",
     host: "notion.localhost",
-    code: { ts: { file: "comments.test.ts", sample: notion }, py: { file: "test_comments.py", sample: notionPy } },
+    code: {
+      ts: { file: "comments.test.ts", sample: notion },
+      py: { file: "test_comments.py", sample: notionPy },
+      rs: { file: "comments.rs", sample: notionRs },
+    },
     Mock: NotionMock,
     checks: [
       { step: 3, text: "my-agent answered in the same discussion" },
@@ -177,12 +198,16 @@ function Panel({
               <button
                 key={item.id}
                 type="button"
+                className={item.id}
                 aria-pressed={item.id === lang}
                 aria-label={item.name}
-                title={item.name}
                 onClick={() => onLang(item.id)}
               >
-                <img src={item.logo} alt="" width="18" height="18" decoding="async" />
+                <i aria-hidden="true" />
+                <span className="full">{item.name}</span>
+                <span className="short" aria-hidden="true">
+                  {item.short}
+                </span>
               </button>
             ))}
           </span>
@@ -192,7 +217,7 @@ function Panel({
           className="code"
           tabIndex={0}
           role="region"
-          aria-label={`${example.label} example test in ${lang === "ts" ? "TypeScript" : "Python"}`}
+          aria-label={`${example.label} example test in ${LANGS.find((item) => item.id === lang)?.name}`}
         >
           <code>
             <span className="hot" ref={bar} aria-hidden="true" />

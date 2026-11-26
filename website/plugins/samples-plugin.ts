@@ -9,6 +9,8 @@
  *   // [!step 2]                    on a line of its own: tags the lines below it for playback,
  *                                   up to the next marker, blank line or shallower line. The
  *                                   marker line itself is not shown. (`#` instead of `//` in Python.)
+ *   … // @hide                      at the end of a line: the line is left out, for what the check
+ *                                   needs but a reader doesn't (Rust's `#[ignore]`).
  */
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
@@ -19,6 +21,7 @@ import { highlightLines } from "./highlight";
 
 const QUERY = "?sample";
 const STEP = /^(\s*)(?:\/\/|#)\s*\[!step (\d+)\]\s*$/;
+const HIDE = /(?:\/\/|#)\s*@hide\s*$/;
 const LANG: Record<string, string> = {
   ".ts": "ts",
   ".tsx": "tsx",
@@ -43,6 +46,7 @@ export function parseSample(source: string): { code: string; steps: number[] } {
   const start = lines.findIndex((l) => /@show:start/.test(l));
   const end = lines.findIndex((l) => /@show:end/.test(l));
   if (start !== -1 && end > start) lines = lines.slice(start + 1, end);
+  lines = lines.filter((l) => !HIDE.test(l));
   const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^ */)![0].length));
   const shown: string[] = [];
   const steps: number[] = [];
