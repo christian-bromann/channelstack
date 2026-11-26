@@ -102,6 +102,15 @@ describe("agent sessions", () => {
       },
       activities: { nodes: [{ sourceComment: { id: thread.id } }] },
     });
+    // Nor is it the app's to change: Linear refuses, as for anyone else's comment.
+    const edited = await gql(
+      `mutation ($id: String!) { commentUpdate(id: $id, input: { body: "mine now" }) { success } }`,
+      { id: thread.id },
+    );
+    const deleted = await gql(`mutation ($id: String!) { commentDelete(id: $id) { success } }`, { id: thread.id });
+    for (const refused of [edited, deleted]) expect(refused.body.errors[0].extensions.code).toBe("FORBIDDEN");
+    const kept = await gql(`query ($id: String!) { comment(id: $id) { body } }`, { id: thread.id });
+    expect(kept.body.data.comment.body).toBe(thread.body);
 
     const publish = (content: object, extra: object = {}) =>
       gql(ACTIVITY, { input: { agentSessionId: session.id, content, ...extra } });
