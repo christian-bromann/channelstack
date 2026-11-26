@@ -98,6 +98,8 @@ export function emitRust(ir: Ir): Map<string, string> {
         return `&|v: &Value| enc::ref_ids(v, &[${index.refIdFields(type.resources).map(str).join(", ")}])`;
       case "duration":
         return "&|v: &Value| enc::duration(v)";
+      case "files":
+        return `&|v: &Value| files::${{ tree: "read_tree", changes: "read_changes", document: "read_document" }[type.mode]}(v)`;
       case "array": {
         const item = encoder(type.items);
         return item === undefined && !type.oneOrMany
@@ -590,6 +592,7 @@ export function emitRust(ir: Ir): Map<string, string> {
     "use serde_json::{Map, Value};",
     "",
     "use crate::runtime::client::{as_unit, as_value, enc, encode_segment, path_value, send, BoxFuture, Call, Ctx, Dyn, Handle, IntoArg};",
+    "use crate::runtime::files;",
     "use crate::runtime::error::{Error, Result};",
     "use crate::runtime::launcher::{launch, Mode};",
     "use crate::runtime::wait::{check_text, from_matches, latest_once_quiet, text_matches, wait_for, wait_for_next, DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT};",
