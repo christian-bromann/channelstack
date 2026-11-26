@@ -1,0 +1,58 @@
+name: PR title
+
+# A pull request is squash-merged with its title as the commit title, and the changelog is drafted
+# from those titles (cliff.toml), so the title must be `<type>(<scope>)<!>: <summary>`. The list of
+# types and scopes is the one in CONTRIBUTING.md and cliff.toml.
+#
+# `pull_request_target` so a pull request from a fork is checked too. The job reads only the title
+# from the event: it never checks out or runs the pull request's code, and its token can only read.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    # The required status check on `main` (docs/release.md, "Once, before the first release").
+    name: PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # v6.1.2, released on 2026-11-05.
+      - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            ci
+            build
+            chore
+          scopes: |
+            slack
+            github
+            linear
+            notion
+            resend
+            gmail
+            server
+            sdk-ts
+            sdk-python
+            pytest
+            sdk-rust
+            docs
+            ci
+            codegen
+            deps
+          requireScope: true

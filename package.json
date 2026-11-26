@@ -42,6 +42,7 @@
     "check:unused": "knip",
     "verify:phase": "node scripts/verify-phase.ts",
     "release:check": "node scripts/release.ts check",
+    "release:draft": "node scripts/release.ts draft",
     "release:version": "node scripts/release.ts version"
   },
   "devDependencies": {
@@ -68,6 +69,7 @@
     "channelstack": "workspace:*",
     "chat": "4.45.0",
     "dependency-cruiser": "18.8.0",
+    "git-cliff": "2.14.2",
     "google-auth-library": "11.3.3",
     "googleapis": "189.0.0",
     "jscpd": "5.4.3",

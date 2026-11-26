@@ -43,8 +43,10 @@ or "new: <path>" with one sentence on why nothing existing fits.
 Commit it, push, and open a **draft** PR:
 
 ```bash
-gh pr create --draft --base main --title "Phase <n>: <goal from docs/phases.md>" --body-file <body>
+gh pr create --draft --base main --title "<type>(<scope>): phase <n>, <goal from docs/phases.md>" --body-file <body>
 ```
+
+The title is a Conventional Commit from the types and scopes in CONTRIBUTING.md ("The title"), since the squash merge's commit title is what the changelog is drafted from, and the `PR title` check refuses any other: `feat(slack): phase 10, Slack canvases`. Several scopes are separated by commas: `feat(slack,github): …`.
 
 PR body:
 

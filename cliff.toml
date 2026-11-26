@@ -1,0 +1,118 @@
+# The changelog draft, from the titles of the pull requests merged since the last `v*` tag
+# (docs/release.md). Each pull request is squash-merged with its title as the commit title, and
+# `.github/workflows/pr-title.yml` checks that the title is `<type>(<scope>)<!>: <summary>`.
+#
+#   pnpm release:draft   # the draft of the next version's section (release.ts draft)
+#
+# Run git-cliff through scripts/release.ts, which refuses a shallow clone and drafts nothing before
+# the first tag.
+#
+# `pnpm release:version` puts the draft below the changelog's hand-written "Unreleased" lines, for
+# the maintainer to edit. The draft has the changelog's sections, a bullet per platform or package:
+#   - "The fakes" from slack, github, linear, notion, resend and gmail;
+#   - "Testing" from pytest, "Tools" from server, "Packages" from sdk-ts, sdk-python and sdk-rust;
+#   - "Other" from a title without one of those scopes, such as one from before the convention.
+# A title with several scopes (`fix(slack,github): …`) is listed under each. Only feat, fix and perf
+# are listed, and a breaking change of any type; the internal scopes (docs, ci, codegen, deps) are
+# left out.
+
+[changelog]
+header = ""
+footer = ""
+trim = false
+body = """
+{%- set sections = [
+    "The fakes|slack:Slack,github:GitHub,linear:Linear,notion:Notion,resend:Resend,gmail:Gmail",
+    "Testing|pytest:pytest-channelstack",
+    "Tools|server:The server",
+    "Packages|sdk-ts:The TypeScript SDK,sdk-python:The Python SDK,sdk-rust:The Rust SDK"
+] -%}
+{%- set listed = ["slack", "github", "linear", "notion", "resend", "gmail", "pytest", "server", "sdk-ts", "sdk-python", "sdk-rust"] -%}
+{%- for section in sections -%}
+    {%- set title = section | split(pat="|") | first -%}
+    {%- set entries = section | split(pat="|") | last | split(pat=",") -%}
+    {%- set_global any = false -%}
+    {%- for entry in entries -%}
+        {%- set scope = entry | split(pat=":") | first -%}
+        {%- for commit in commits -%}
+            {%- if commit.scope -%}
+                {%- set scopes = commit.scope | replace(from=" ", to="") | split(pat=",") -%}
+                {%- if scope in scopes -%}{%- set_global any = true -%}{%- endif -%}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endfor -%}
+    {%- if any %}
+### {{ title }}
+{% for entry in entries -%}
+    {%- set scope = entry | split(pat=":") | first -%}
+    {%- set name = entry | split(pat=":") | last -%}
+    {%- set_global lines = [] -%}
+    {%- for commit in commits -%}
+        {%- if commit.scope -%}
+            {%- set scopes = commit.scope | replace(from=" ", to="") | split(pat=",") -%}
+            {%- if scope in scopes -%}
+                {%- set line = commit.message | split(pat="\n") | first | trim | upper_first -%}
+                {%- if commit.breaking -%}{%- set line = "**Breaking:** " ~ line -%}{%- endif -%}
+                {%- set_global lines = lines | concat(with=line) -%}
+            {%- endif -%}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- if lines | length > 0 %}
+- **{{ name }}:**
+{%- for line in lines %}
+  - {{ line }}
+{%- endfor -%}
+    {%- endif -%}
+{%- endfor %}
+{% endif -%}
+{%- endfor -%}
+{%- set_global others = [] -%}
+{%- for commit in commits -%}
+    {%- set_global hit = false -%}
+    {%- if commit.scope -%}
+        {%- set scopes = commit.scope | replace(from=" ", to="") | split(pat=",") -%}
+        {%- for scope in listed -%}{%- if scope in scopes -%}{%- set_global hit = true -%}{%- endif -%}{%- endfor -%}
+    {%- endif -%}
+    {%- if not hit -%}
+        {%- set line = commit.raw_message | split(pat="\n") | first | trim -%}
+        {%- if commit.breaking -%}{%- set line = "**Breaking:** " ~ line -%}{%- endif -%}
+        {%- set_global others = others | concat(with=line) -%}
+    {%- endif -%}
+{%- endfor -%}
+{%- if others | length > 0 %}
+### Other
+{% for line in others %}
+- {{ line }}
+{%- endfor %}
+{% endif -%}
+"""
+
+[git]
+conventional_commits = true
+# A title from before the convention ("Slack fake: …", "Phase 9: …") is listed under "Other".
+filter_unconventional = false
+split_commits = false
+# The squash merge's `(#123)` becomes a link to the pull request.
+commit_preprocessors = [
+  # Only the title, which the check has seen: the squash body (the branch's commit messages, or the
+  # PR's description) can't make an entry breaking with a stray `BREAKING CHANGE:`. `!` does.
+  { pattern = '(?s)\n.*', replace = "" },
+  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/christian-bromann/channelstack/pull/${1}))" },
+]
+commit_parsers = [
+  { message = "^Merge ", skip = true },
+  { message = "^(refactor|docs|test|ci|build|chore)(\\(|!|:)", skip = true },
+  # Only internal scopes: `fix(docs,ci): …` is left out, `fix(slack,docs): …` is listed under Slack.
+  { field = "scope", pattern = "^ *(docs|ci|codegen|deps)( *, *(docs|ci|codegen|deps))* *$", skip = true },
+]
+# A breaking change is listed whatever its type or scope.
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "^v[0-9]"
+topo_order = false
+sort_commits = "oldest"
+
+[bump]
+# Before 1.0, a breaking change or a feature bumps the minor version, a fix the patch version.
+features_always_bump_minor = true
+breaking_always_bump_major = false
