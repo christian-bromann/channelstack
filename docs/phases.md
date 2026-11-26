@@ -16,6 +16,7 @@
 | 5 | done | 2026-11-24, [#18](https://github.com/christian-bromann/channelstack/pull/18) (5.1, 5.2, 5.5 and 5.6 tracked in #19–#22) |
 | 6 | done | 2026-11-25, [#23](https://github.com/christian-bromann/channelstack/pull/23) (the nightly half of 6.4 and 6.5 tracked in #31) |
 | 7 | done | 2026-11-25, [#32](https://github.com/christian-bromann/channelstack/pull/32) (7.2 dropped, decision 0017; MCP tools for GitHub, Linear and Notion dropped, #33) |
+| 8 | done | 2026-11-25, [#57](https://github.com/christian-bromann/channelstack/pull/57) (Resend attachments and raw MIME tracked in #64; HTML to text on a library, #65) |
 
 ## When a phase is done
 
