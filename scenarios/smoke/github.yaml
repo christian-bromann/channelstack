@@ -1,0 +1,63 @@
+name: github
+description: The generated GitHub methods in every SDK. A person opens, labels, comments on and closes an issue in a repository the App isn't installed on. Runs against a server the SDK's launcher starts itself.
+steps:
+  - call: session.github
+    as: github
+  - call: github.createUser
+    options: { login: ana-smoke }
+    as: ana
+  - call: github.createRepo
+    options: { collaborators: [$ana], labels: [bug] }
+    as: repo
+  - expect:
+      - { value: $ana.login, equals: ana-smoke }
+      - { value: $ana.kind, equals: user }
+      - { value: $repo.defaultBranch, equals: main }
+      - { value: $repo.fullName, matches: "^[0-9A-Za-z-]+/test-[0-9a-z]+$" }
+
+  - call: ana.openIssue
+    args: [{ title: The login page is blank, body: Since the last deploy. }]
+    options: { repo: $repo }
+    as: issue
+  - expect:
+      - { value: $issue.number, equals: 1 }
+      - { value: $issue.author.login, equals: ana-smoke }
+      # The App isn't installed on the repository, so nothing is delivered to it.
+      - { value: $issue.delivery, equals: null }
+
+  - call: ana.label
+    args: [bug]
+    options: { issue: $issue }
+  - call: issue.labels
+    as: labels
+  - expect:
+      - { value: $labels, equals: [bug] }
+
+  - call: ana.comment
+    args: ["Steps: open /login."]
+    options: { issue: $issue }
+    as: comment
+  - call: issue.comments
+    as: comments
+  - expect:
+      - { value: $comments.length, equals: 1 }
+      - { value: $comments.0.body, equals: "Steps: open /login." }
+      - { value: $comments.0.author.login, equals: ana-smoke }
+      - { value: $comments.0.id, equals: $comment.id }
+
+  - call: ana.close
+    options: { issue: $issue }
+  - call: issue.state
+    as: state
+  - expect:
+      - { value: $state, equals: closed }
+
+  # The same issue read back by its number, and one that isn't there.
+  - call: repo.issue
+    args: [1]
+    as: again
+  - expect:
+      - { value: $again.url, equals: $issue.url }
+  - call: repo.issue
+    args: [2]
+    throws: not_found
