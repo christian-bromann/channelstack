@@ -6,7 +6,7 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { googlePayloads, type MessageFormat } from "../payloads.ts";
 import { GOOGLE_SECRETS } from "../secrets.ts";
-import type { GmailMessageRecord } from "../world.ts";
+import type { GmailLabelRecord, GmailMessageRecord } from "../world.ts";
 import type { PushCertificates } from "./certs.ts";
 import { type FakeGoogleWorld, GmailApiError, invalid, notFound } from "./world.ts";
 
@@ -46,13 +46,34 @@ function page<T>(c: Context, items: readonly T[]): { items: T[]; next: string | 
   return { items: window, next: from + max < items.length ? String(from + max).padStart(20, "0") : undefined };
 }
 
-/** `q` as Gmail's search reads it, for what agents search for: senders, subjects, states, labels. */
-function matches(world: FakeGoogleWorld, message: GmailMessageRecord, q: string): boolean {
+/** How far back `newer_than:` and `older_than:` count, per unit (`d`, `m`, `y`), in milliseconds. */
+const RELATIVE_MS: Readonly<Record<string, number>> = { d: 86_400_000, m: 30 * 86_400_000, y: 365 * 86_400_000 };
+/** Gmail's search categories and the labels they are. */
+const CATEGORIES: Readonly<Record<string, string>> = {
+  primary: "CATEGORY_PERSONAL",
+  social: "CATEGORY_SOCIAL",
+  promotions: "CATEGORY_PROMOTIONS",
+  updates: "CATEGORY_UPDATES",
+  forums: "CATEGORY_FORUMS",
+};
+
+/**
+ * `q` as Gmail's search reads it, for what agents search for: senders, subjects, states, labels,
+ * dates and categories, `-` for not, and `OR` between two terms. A term with no operator is text.
+ */
+function matches(world: FakeGoogleWorld, message: GmailMessageRecord, q: string, now: number): boolean {
   const email = world.emailOf(message);
-  const terms = q.match(/(?:[^\s"]+:"[^"]*"|"[^"]*"|\S)+/g) ?? [];
+  const words = q.match(/(?:[^\s"]+:"[^"]*"|"[^"]*"|\S)+/g) ?? [];
+  // `a OR b`: one of them. Every other term must hold.
+  const groups: string[][] = [];
+  for (let at = 0; at < words.length; at++) {
+    const word = words[at] as string;
+    if (word === "OR" && groups.length > 0 && at + 1 < words.length) groups.at(-1)?.push(words[++at] as string);
+    else groups.push([word]);
+  }
   const inAddresses = (mailboxes: readonly { address: string; name: string }[], value: string) =>
     mailboxes.some((mailbox) => `${mailbox.name} ${mailbox.address}`.toLowerCase().includes(value));
-  return terms.every((term) => {
+  const holds = (term: string) => {
     const negated = term.startsWith("-");
     const [, operator, rawValue] = /^-?(?:(\w+):)?(.*)$/.exec(term) ?? [];
     const value = (rawValue ?? "").replace(/^"|"$/g, "").toLowerCase();
@@ -86,6 +107,20 @@ function matches(world: FakeGoogleWorld, message: GmailMessageRecord, q: string)
           hit = message.labels.some((label) => world.store.labels.get(label)?.name.toLowerCase() === value);
         }
         break;
+      case "newer_than":
+      case "older_than": {
+        const [, count = "0", unit = "d"] = /^(\d+)([dmy])$/.exec(value) ?? [];
+        const since = now - Number(count) * (RELATIVE_MS[unit] ?? 0);
+        hit = operator === "newer_than" ? message.internalDate > since : message.internalDate <= since;
+        break;
+      }
+      case "category":
+        hit = message.labels.includes(CATEGORIES[value] ?? `CATEGORY_${value.toUpperCase()}`);
+        break;
+      case "has":
+        // The fake's mail carries no attachments, and the agent's mailbox has no stars or user colours.
+        hit = value === "userlabels" && message.labels.some((label) => label.startsWith("Label_"));
+        break;
       case "after":
       case "before": {
         const at = /^\d+$/.test(value) ? Number(value) * 1000 : Date.parse(value.replace(/\//g, "-"));
@@ -96,7 +131,8 @@ function matches(world: FakeGoogleWorld, message: GmailMessageRecord, q: string)
         hit = `${email.subject} ${email.text ?? ""}`.toLowerCase().includes(value);
     }
     return negated ? !hit : hit;
-  });
+  };
+  return groups.every((group) => group.some(holds));
 }
 
 /**
@@ -235,12 +271,16 @@ export function createGoogleApi(
   const listed = (c: Context) => {
     const q = c.req.query("q") ?? "";
     const labelIds = c.req.queries("labelIds") ?? [];
-    const spamTrash = c.req.query("includeSpamTrash") === "true" || /(^|\s)in:(trash|spam|anywhere)\b/i.test(q);
+    // A search or a label that names the trash or spam lists it, as `includeSpamTrash` does.
+    const spamTrash =
+      c.req.query("includeSpamTrash") === "true" ||
+      /(^|\s)in:(trash|spam|anywhere)\b/i.test(q) ||
+      labelIds.some((label) => label === "TRASH" || label === "SPAM");
     return store.messages
       .values()
       .filter((message) => spamTrash || !message.labels.some((label) => label === "TRASH" || label === "SPAM"))
       .filter((message) => labelIds.every((label) => message.labels.includes(label)))
-      .filter((message) => matches(world, message, q))
+      .filter((message) => matches(world, message, q, clock()))
       .sort((a, b) => b.internalDate - a.internalDate);
   };
   const labelsOf = (body: Record<string, unknown>, name: string) =>
@@ -416,24 +456,69 @@ export function createGoogleApi(
     );
   });
 
-  endpoint("post", `${base}/labels`, "users.labels.create", (_c, body) => {
-    const name = typeof body.name === "string" ? body.name.trim() : "";
+  /** A label's name as a request gives it: not empty, and no other label's (`except`: the one being changed). */
+  const labelName = (given: unknown, except?: string) => {
+    const name = typeof given === "string" ? given.trim() : "";
     if (name === "") throw invalid("Invalid label name");
-    const taken = [...store.labels.values()].some((label) => label.name.toLowerCase() === name.toLowerCase());
+    const taken = [...store.labels.values()].some(
+      (label) => label.id !== except && label.name.toLowerCase() === name.toLowerCase(),
+    );
     if (taken) throw new GmailApiError(409, "Label name exists or conflicts", "duplicate", "ALREADY_EXISTS");
-    const id = store.nextLabelId();
-    const label = {
-      id,
-      name,
-      type: "user" as const,
-      messageListVisibility: body.messageListVisibility === "hide" ? ("hide" as const) : ("show" as const),
-      labelListVisibility:
-        body.labelListVisibility === "labelHide" || body.labelListVisibility === "labelShowIfUnread"
-          ? (body.labelListVisibility as "labelHide" | "labelShowIfUnread")
-          : ("labelShow" as const),
+    return name;
+  };
+  /** A label's visibility as a request asks for it, or as it was. */
+  const visibilityOf = (body: Record<string, unknown>, was?: GmailLabelRecord) => ({
+    messageListVisibility:
+      body.messageListVisibility === "hide" || body.messageListVisibility === "show"
+        ? body.messageListVisibility
+        : (was?.messageListVisibility ?? ("show" as const)),
+    labelListVisibility:
+      body.labelListVisibility === "labelShow" ||
+      body.labelListVisibility === "labelHide" ||
+      body.labelListVisibility === "labelShowIfUnread"
+        ? body.labelListVisibility
+        : (was?.labelListVisibility ?? ("labelShow" as const)),
+  });
+  /** A label the agent made: Gmail's own can't be changed or deleted. */
+  const userLabelAt = (c: Context, refusal: string) => {
+    const label = store.labels.get(c.req.param("id") ?? "");
+    if (!label) throw notFound();
+    if (label.type === "system") throw invalid(refusal);
+    return label;
+  };
+
+  endpoint("post", `${base}/labels`, "users.labels.create", (_c, body) => {
+    const label: GmailLabelRecord = {
+      id: store.nextLabelId(),
+      name: labelName(body.name),
+      type: "user",
+      ...visibilityOf(body),
     };
-    store.labels.set(id, label);
+    store.labels.set(label.id, label);
     return answer(googlePayloads.label(label));
+  });
+
+  // `update` replaces the label, so it needs a name; `patch` changes what it is given.
+  for (const [method, operation] of [
+    ["put", "users.labels.update"],
+    ["patch", "users.labels.patch"],
+  ] as const) {
+    endpoint(method, `${base}/labels/:id`, operation, (c, body) => {
+      const was = userLabelAt(c, "Invalid update request");
+      const name = method === "patch" && body.name === undefined ? was.name : labelName(body.name, was.id);
+      const label: GmailLabelRecord = { ...was, name, ...visibilityOf(body, was) };
+      store.labels.set(label.id, label);
+      return answer(googlePayloads.label(label));
+    });
+  }
+
+  endpoint("delete", `${base}/labels/:id`, "users.labels.delete", (c) => {
+    const label = userLabelAt(c, "Invalid delete request");
+    // Gmail takes it off every message that has it, and answers nothing.
+    const had = store.messages.values().filter((message) => message.labels.includes(label.id));
+    for (const message of had) world.modify(message, [], [label.id]);
+    store.labels.delete(label.id);
+    return { body: undefined, sessions: had.map((message) => store.messages.owner(message.id)), status: 204 };
   });
 
   return finish();

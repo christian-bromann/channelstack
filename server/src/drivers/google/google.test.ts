@@ -177,7 +177,7 @@ describe("the mailbox, as Gmail's discovery document describes it", () => {
     expect((await gmail("POST", "/stop")).status).toBe(204);
   });
 
-  test("a negated in: brings in no spam; a thread's history id is the same listed and read", async () => {
+  test("search as Gmail reads it, spam listed only when asked for; a thread's history id the same listed and read", async () => {
     const { gmail, send } = await mailbox();
     const email = await send("Refund");
     await send("Other");
@@ -186,9 +186,19 @@ describe("the mailbox, as Gmail's discovery document describes it", () => {
         (message: { id: string }) => message.id,
       );
     const [other, refund] = await ids("in:inbox");
+    // Dates, categories and OR, as Gmail's search reads them.
+    expect(await ids("newer_than:1d")).toEqual([other, refund]);
+    expect(await ids("older_than:1d")).toEqual([]);
+    expect(await ids("category:primary")).toEqual([other, refund]);
+    expect(await ids("subject:Refund OR subject:Other")).toEqual([other, refund]);
+    expect(await ids("subject:Refund OR subject:Nothing")).toEqual([refund]);
+    expect(await ids("has:attachment")).toEqual([]);
     await gmail("POST", `/messages/${other}/modify`, { addLabelIds: ["SPAM"] });
     expect(await ids("-in:trash")).toEqual([refund]);
     expect(await ids("in:spam")).toContain(other);
+    // Listing by the spam label lists spam, as Gmail does.
+    const { body: spam } = await gmail("GET", "/messages?labelIds=SPAM");
+    expect(spam.messages.map((message: { id: string }) => message.id)).toEqual([other]);
 
     // The agent answers in the thread, then marks the older message read: the thread's history moves on.
     const { body: inbox } = await gmail("GET", `/messages/${refund}?format=minimal`);
@@ -199,6 +209,35 @@ describe("the mailbox, as Gmail's discovery document describes it", () => {
     const { body: listed } = await gmail("GET", "/threads");
     const fromList = listed.threads.find((thread: { id: string }) => thread.id === inbox.threadId);
     expect(fromList.historyId).toBe(read.historyId);
+  });
+
+  test("the agent's labels: renamed, replaced, deleted and taken off its mail; Gmail's own refused", async () => {
+    const { gmail, send } = await mailbox();
+    await send("Refund");
+    const { body: list } = await gmail("GET", "/messages");
+    const [message] = list.messages;
+    const { body: made } = await gmail("POST", "/labels", { name: "Todo" });
+    await gmail("POST", "/labels", { name: "Done" });
+    await gmail("POST", `/messages/${message.id}/modify`, { addLabelIds: [made.id] });
+    const { body: patched } = await gmail("PATCH", `/labels/${made.id}`, { labelListVisibility: "labelHide" });
+    expect(patched).toMatchObject({ id: made.id, name: "Todo", labelListVisibility: "labelHide" });
+    expect((await gmail("PUT", `/labels/${made.id}`, { name: "Done" })).status).toBe(409);
+    expect((await gmail("PUT", `/labels/${made.id}`, { name: "Doing" })).body.name).toBe("Doing");
+    expect((await gmail("DELETE", "/labels/INBOX")).status).toBe(400);
+    expect((await gmail("PATCH", "/labels/INBOX", { name: "Mine" })).status).toBe(400);
+    expect((await gmail("DELETE", `/labels/${made.id}`)).status).toBe(204);
+    expect((await gmail("GET", `/labels/${made.id}`)).status).toBe(404);
+    const { body: after } = await gmail("GET", `/messages/${message.id}?format=minimal`);
+    expect(after.labelIds).not.toContain(made.id);
+  });
+
+  test("an answer sent without a threadId starts a thread of its own, though it names the email", async () => {
+    const { gmail, send } = await mailbox();
+    const email = await send("Refund");
+    const { body: list } = await gmail("GET", "/messages");
+    const answer = `From: my-agent <my-agent@acme.example>\r\nTo: ana@example.com\r\nSubject: Re: Refund\r\nIn-Reply-To: ${email.messageId}\r\nReferences: ${email.messageId}\r\n\r\nSent.`;
+    const { body: sent } = await gmail("POST", "/messages/send", { raw: Buffer.from(answer).toString("base64url") });
+    expect(sent.threadId).not.toBe(list.messages[0].threadId);
   });
 
   test("an answer whose subject doesn't match starts a thread of its own in the mailbox, as Gmail threads", async () => {

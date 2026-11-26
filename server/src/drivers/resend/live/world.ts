@@ -8,7 +8,6 @@ import {
   messageIdsIn,
   parseAddresses,
   replyOf,
-  threadOf,
 } from "../../../core/email/index.ts";
 import type { EmailMessageInput } from "../../../core/email/routes.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -94,16 +93,6 @@ export function createLiveResendWorld(deps: {
     }
   };
 
-  /** Keep what was read or sent in the mirror, in the thread its references name. */
-  const keep = (session: string, email: Omit<ResendEmailRecord, "thread">) => {
-    const existing = store.emails.find(email.id);
-    if (existing) return existing;
-    const thread = threadOf(email, (id) => store.byMessageId(id)?.thread) ?? email.id;
-    if (thread === email.id)
-      store.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
-    return store.emails.add(email.id, { ...email, thread }, session);
-  };
-
   let readying: Promise<void> | undefined;
   const prepare = async () => {
     app = live.vault.fromEnv("CHANNELSTACK_RESEND_API_KEY");
@@ -153,27 +142,30 @@ export function createLiveResendWorld(deps: {
     // Its `Message-ID`, which the agent's answer will name in `In-Reply-To`.
     const messageId = await messageIdOf(credential, id);
     if (messageId === undefined) unnamed.set(id, credential);
-    return keep(session, {
-      id,
-      direction: "outside",
-      author: person.id,
-      from: { address: person.address, name: person.name },
-      to: input.to,
-      cc: input.cc,
-      bcc: [],
-      replyTo: [],
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-      headers: {},
-      tags: {},
-      messageId: messageId ?? `<${id}@resend.dev>`,
-      inReplyTo: headers.inReplyTo,
-      references: headers.references ?? [],
-      createdAt: clock(),
-      lastEvent: undefined,
-      delivery: undefined,
-    });
+    return store.mirror(
+      {
+        id,
+        direction: "outside",
+        author: person.id,
+        from: { address: person.address, name: person.name },
+        to: input.to,
+        cc: input.cc,
+        bcc: [],
+        replyTo: [],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+        headers: {},
+        tags: {},
+        messageId: messageId ?? `<${id}@resend.dev>`,
+        inReplyTo: headers.inReplyTo,
+        references: headers.references ?? [],
+        createdAt: clock(),
+        lastEvent: undefined,
+        delivery: undefined,
+      },
+      session,
+    );
   };
 
   const world: ResendWorld & { ready(): Promise<void>; release(session: string): void } = {
@@ -244,27 +236,30 @@ export function createLiveResendWorld(deps: {
           const [from] = parseAddresses(email.from);
           if (!from) continue;
           const header = (name: string) => email.headers?.[name] ?? email.headers?.[name.toLowerCase()];
-          keep(session, {
-            id,
-            direction: "outside",
-            author: from.address === store.app.address ? store.app.id : store.personAt(from.address)?.id,
-            from,
-            to: parseAddresses(email.to),
-            cc: parseAddresses(email.cc ?? []),
-            bcc: [],
-            replyTo: parseAddresses(email.reply_to ?? []),
-            subject: email.subject,
-            text: email.text ?? undefined,
-            html: email.html ?? undefined,
-            headers: {},
-            tags: {},
-            messageId: email.message_id,
-            inReplyTo: messageIdsIn(header("In-Reply-To"))[0],
-            references: messageIdsIn(header("References")),
-            createdAt: Date.parse(email.created_at) || clock(),
-            lastEvent: undefined,
-            delivery: undefined,
-          });
+          store.mirror(
+            {
+              id,
+              direction: "outside",
+              author: from.address === store.app.address ? store.app.id : store.personAt(from.address)?.id,
+              from,
+              to: parseAddresses(email.to),
+              cc: parseAddresses(email.cc ?? []),
+              bcc: [],
+              replyTo: parseAddresses(email.reply_to ?? []),
+              subject: email.subject,
+              text: email.text ?? undefined,
+              html: email.html ?? undefined,
+              headers: {},
+              tags: {},
+              messageId: email.message_id,
+              inReplyTo: messageIdsIn(header("In-Reply-To"))[0],
+              references: messageIdsIn(header("References")),
+              createdAt: Date.parse(email.created_at) || clock(),
+              lastEvent: undefined,
+              delivery: undefined,
+            },
+            session,
+          );
         }
       }
     },

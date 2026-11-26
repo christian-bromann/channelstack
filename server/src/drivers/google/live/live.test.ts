@@ -124,7 +124,8 @@ describe("exit check 9.7: Gmail live", () => {
   test("a thread whose labelling fails is on the ledger all the same, and its session trashes it", async () => {
     const stub = googleStub();
     const ana = stub.mailbox("ana", ANA);
-    const { google, close } = await liveGoogle(stub, `${AGENT},${ANA}`).open();
+    const server = liveGoogle(stub, `${AGENT},${ANA}`);
+    const { google, close } = await server.open();
     const { app } = (await google("GET", "")).body;
     const person = (await google("POST", "/users", { name: "Ana", token: ana.refreshToken })).body;
     stub.failNext(/\/threads\/[^/]+\/modify$/, 403);
@@ -139,8 +140,59 @@ describe("exit check 9.7: Gmail live", () => {
     expect(ana.messages).toHaveLength(1);
     // Gmail refused the label: the thread has none of the run's.
     expect(ana.messages[0]?.labels).toEqual(["SENT"]);
+    // A label refused while the answer is read back doesn't fail the read, and is tried again on the next.
+    stub.agentReplies(stub.sent[0] as Sent, "On its way.");
+    stub.failNext(/\/threads\/[^/]+\/modify$/, 403);
+    const replies = await google("GET", `/threads/${sent.body.thread.id}/replies`);
+    expect(replies.status).toBe(200);
+    expect(replies.body).toHaveLength(1);
+    server.clock.advance(2_000);
+    await google("GET", `/threads/${sent.body.thread.id}/replies`);
+    // Both threads labelled now, in Ana's mailbox and in the agent's.
+    for (const mailbox of [ana, stub.agent]) {
+      expect(mailbox.messages.every((message) => message.labels.some((label) => label.startsWith("Label_")))).toBe(
+        true,
+      );
+    }
     await close();
     expect(ana.trashed).toEqual([ana.messages[0]?.threadId]);
+  });
+
+  test("the sweep leaves a label it can't date to its own run's sweep, and knows a ledger entry by its mailbox", async () => {
+    const stub = googleStub();
+    const ana = stub.mailbox("ana", ANA);
+    const env = { ...liveEnv(stub, `${AGENT},${ANA}`), CHANNELSTACK_GOOGLE_USER_ANA_TOKEN: ana.refreshToken };
+    ana.labels.push({ id: "Label_9", name: "channelstack-run-old1-abcd-1" });
+    const sweep = (run: string | undefined, entries: Parameters<typeof googleMaintenance.sweep>[0]["entries"] = []) =>
+      googleMaintenance.sweep({
+        env,
+        fetch: stub.fetch,
+        apiBase: stub.url,
+        timers: systemTimers,
+        entries,
+        check: false,
+        run,
+        olderThanMs: 60_000,
+        now: Date.now(),
+      });
+    // No thread dates it: it may be a running session's, so an age sweep leaves it.
+    expect((await sweep(undefined)).removed).toEqual([]);
+    expect(ana.labels).toHaveLength(1);
+    // The same id in the agent's mailbox is another label: its ledger entry doesn't cover Ana's.
+    const elsewhere = {
+      id: "e1",
+      run: "old1",
+      createdAt: 0,
+      channel: "google",
+      kind: "label",
+      ref: { label: "Label_9", name: "channelstack-run-old1-wxyz-1" },
+      workspace: AGENT,
+      by: "app",
+      session: "s",
+    };
+    const swept = await sweep("old1", [elsewhere]);
+    expect(swept.removed).toContain("label channelstack-run-old1-abcd-1");
+    expect(ana.labels).toEqual([]);
   });
 
   test("a reply to an address outside the allowlist is refused, and nothing is sent", async () => {

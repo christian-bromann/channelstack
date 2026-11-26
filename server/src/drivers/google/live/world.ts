@@ -10,7 +10,6 @@ import {
   messageIdsIn,
   parseAddresses,
   replyOf,
-  threadOf,
 } from "../../../core/email/index.ts";
 import { composeMime } from "../../../core/email/mime.ts";
 import type { EmailMessageInput } from "../../../core/email/routes.ts";
@@ -95,7 +94,7 @@ export function createLiveGoogleWorld(deps: {
   /** The messages each session read from each mailbox, by `<address> <id>`: each is read once. */
   const seen = new Map<string, Set<string>>();
   /** Each email's copy in the agent's mailbox, by the email's id, once Gmail has it there. */
-  const agentCopy = new Map<string, string>();
+  const agentCopy = new Map<string, { id: string; thread: string }>();
   /** Each copy's labels when they were last read, without the run's own. */
   const agentLabels = new Map<string, readonly string[]>();
   let app: LiveCredential | undefined;
@@ -166,17 +165,6 @@ export function createLiveGoogleWorld(deps: {
       tagged.delete(key);
       throw error;
     }
-  };
-
-  /** Keep what was read or sent in the mirror, in the conversation its references name. */
-  const keep = (session: string, email: Omit<GoogleEmailRecord, "thread">) => {
-    const existing = store.emails.find(email.id);
-    if (existing) return existing;
-    const thread = threadOf(email, (id) => store.byMessageId(id)?.thread) ?? email.id;
-    if (thread === email.id) {
-      store.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
-    }
-    return store.emails.add(email.id, { ...email, thread }, session);
   };
 
   /** A message read back from Gmail, as the mirror keeps it. */
@@ -265,16 +253,19 @@ export function createLiveGoogleWorld(deps: {
     // Gmail has sent it: a label that fails doesn't undo that. The thread is on the ledger already,
     // so the session's cleanup trashes it, and the label is tried again when the thread is read.
     await tag(session, credential, person.address, sent.threadId, input.subject).catch(() => undefined);
-    const email = keep(session, {
-      ...fromWire(copy),
-      ...message,
-      id: sent.id,
-      author: person.id,
-      messageId: kept ?? message.messageId,
-      raw,
-      headers: [],
-      createdAt: clock(),
-    });
+    const email = store.mirror(
+      {
+        ...fromWire(copy),
+        ...message,
+        id: sent.id,
+        author: person.id,
+        messageId: kept ?? message.messageId,
+        raw,
+        headers: [],
+        createdAt: clock(),
+      },
+      session,
+    );
     gmailThread.set(`${person.address} ${email.messageId}`, sent.threadId);
     return email;
   };
@@ -365,9 +356,13 @@ export function createLiveGoogleWorld(deps: {
           const message = fromWire(wire);
           gmailThread.set(`${address} ${message.messageId}`, threadId);
           // An answer to several people is one email, with an id in each of their mailboxes: kept once.
-          const email = (message.messageId && store.byMessageId(message.messageId)) || keep(session, message);
-          await tag(session, credential, address, threadId, email.subject);
-          known.add(`${address} ${id}`);
+          const email = (message.messageId && store.byMessageId(message.messageId)) || store.mirror(message, session);
+          // A label that fails doesn't fail the read: the message is read again next time, and labelled then.
+          const labelled = await tag(session, credential, address, threadId, email.subject).then(
+            () => true,
+            () => false,
+          );
+          if (labelled) known.add(`${address} ${id}`);
         }
       }
       // The emails the agent has, as its mailbox holds them: labelled too, for the sweep, and their labels read.
@@ -385,14 +380,15 @@ export function createLiveGoogleWorld(deps: {
           );
           const [first] = found.messages ?? [];
           if (!first) continue;
-          copy = first.id;
+          copy = { id: first.id, thread: first.threadId };
           agentCopy.set(email.id, copy);
-          await tag(session, app, store.app.address, first.threadId, email.subject);
         }
+        // Once a thread is labelled this is nothing; a label that failed is tried again on each read.
+        await tag(session, app, store.app.address, copy.thread, email.subject).catch(() => undefined);
         const { labelIds = [] } = await client.call<{ labelIds?: string[] }>(
           app,
           "GET",
-          `gmail/v1/users/me/messages/${copy}?format=minimal`,
+          `gmail/v1/users/me/messages/${copy.id}?format=minimal`,
         );
         agentLabels.set(
           email.id,

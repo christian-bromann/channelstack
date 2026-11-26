@@ -59,9 +59,20 @@ export const googleMaintenance: LiveMaintenance = {
     });
 
     // Run-labelled threads no ledger knows: each mailbox's `channelstack-run-…` labels, and their threads.
-    const threads: Array<{ thread: string; label: string; by: LiveCredential; at: number }> = [];
-    const runLabels: Array<{ id: string; name: string; by: LiveCredential; at: number }> = [];
-    for (const { credential } of usable) {
+    // Gmail's ids are a mailbox's own: each is known by its mailbox too.
+    const threads: Array<{ thread: string; label: string; mailbox: string; by: LiveCredential; at: number }> = [];
+    const runLabels: Array<{ id: string; name: string; mailbox: string; by: LiveCredential; at: number }> = [];
+    /** When a thread was written: its first message's date. */
+    const dateOf = async (credential: LiveCredential, thread: string) => {
+      const { messages = [] } = await client.call<{ messages?: Array<{ internalDate?: string }> }>(
+        credential,
+        "GET",
+        `gmail/v1/users/me/threads/${thread}?format=minimal`,
+      );
+      return Number(messages[0]?.internalDate) || 0;
+    };
+    for (const { credential, who } of usable) {
+      const mailbox = who?.address ?? "";
       const { labels = [] } = await client.call<{ labels?: Array<{ id: string; name: string }> }>(
         credential,
         "GET",
@@ -75,16 +86,22 @@ export const googleMaintenance: LiveMaintenance = {
         );
         let newest = 0;
         for (const { id } of listed.threads ?? []) {
-          const { messages = [] } = await client.call<{ messages?: Array<{ internalDate?: string }> }>(
+          const at = await dateOf(credential, id);
+          newest = Math.max(newest, at);
+          threads.push({ thread: id, label: label.name, mailbox, by: credential, at });
+        }
+        if (newest === 0) {
+          // No thread outside the trash has it: a trashed one dates it, or it counts as new, so
+          // only a sweep of its own run removes it (a session may have just made it).
+          const trashed = await client.call<{ threads?: Array<{ id: string }> }>(
             credential,
             "GET",
-            `gmail/v1/users/me/threads/${id}?format=minimal`,
+            `gmail/v1/users/me/threads?labelIds=${label.id}&includeSpamTrash=true&maxResults=1`,
           );
-          const at = Number(messages[0]?.internalDate) || 0;
-          newest = Math.max(newest, at);
-          threads.push({ thread: id, label: label.name, by: credential, at });
+          const [first] = trashed.threads ?? [];
+          newest = (first && (await dateOf(credential, first.id))) || now;
         }
-        runLabels.push({ id: label.id, name: label.name, by: credential, at: newest });
+        runLabels.push({ id: label.id, name: label.name, mailbox, by: credential, at: newest });
       }
     }
     const swept = await sweepTagged(report, threads, {
@@ -94,7 +111,8 @@ export const googleMaintenance: LiveMaintenance = {
       now,
       check,
       name: (item) => `thread ${item.label} ${item.thread}`,
-      known: (item, entry) => entry.channel === "google" && entry.ref.thread === item.thread,
+      known: (item, entry) =>
+        entry.channel === "google" && entry.workspace === item.mailbox && entry.ref.thread === item.thread,
       createdAt: (item) => item.at,
       remove: async (item) => {
         await client.trashThread(item.by, item.thread);
@@ -109,7 +127,8 @@ export const googleMaintenance: LiveMaintenance = {
       now,
       check,
       name: (item) => `label ${item.name}`,
-      known: (item, entry) => entry.channel === "google" && entry.ref.label === item.id,
+      known: (item, entry) =>
+        entry.channel === "google" && entry.workspace === item.mailbox && entry.ref.label === item.id,
       createdAt: (item) => item.at,
       remove: async (item) => {
         const left = await client.call<{ threads?: unknown[] }>(

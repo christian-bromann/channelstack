@@ -22,9 +22,10 @@ pushes that carry an OIDC token it checks with `google-auth-library`. People are
 - **Hosts:** `gmail.googleapis.com` (`/gmail/v1/…`), `oauth2.googleapis.com` (`/token`) and
   `www.googleapis.com` (`/oauth2/v1/certs`, `/oauth2/v3/certs`), all at `google.localhost`.
 - **The Gmail API `googleapis` calls:** `users.getProfile`; `users.messages` `list` (with `q`'s
-  `from:`, `to:`, `subject:`, `is:unread`, `in:inbox`, `label:`, and `labelIds`), `get` (`full`,
+  `from:`, `to:`, `subject:`, `is:unread`, `in:inbox`, `label:`, `category:`, `newer_than:`,
+  `older_than:`, `after:`, `before:`, `-` and `OR`, and `labelIds`), `get` (`full`,
   `metadata`, `minimal`, `raw`), `send` (`raw`, with `threadId`), `modify`, `trash`, `untrash`;
-  `users.threads` `list`, `get`, `modify`, `trash`; `users.labels` `list`, `get`, `create`;
+  `users.threads` `list`, `get`, `modify`, `trash`; `users.labels` `list`, `get`, `create`, `update`, `patch`, `delete` (the agent's own labels; Gmail's are refused);
   `users.history.list` (`messageAdded`, `labelAdded`, `labelRemoved`; 404 for a `startHistoryId`
   before the mailbox's history); `users.watch` and `users.stop`. Google's error envelope
   `{ error: { code, message, errors[], status } }`, with `WWW-Authenticate` on a 401.

@@ -203,7 +203,10 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
 
   /** Put a copy of `email` into the agent's mailbox, with `labels`, in the thread Gmail would put it in. */
   const intoMailbox = (email: GoogleEmailRecord, labels: string[], session: string | undefined, threadId?: string) => {
-    const joined = gmailThreadFor(email, threadId);
+    // Mail that arrives joins a thread by its references and subject. What the account sends joins
+    // one only when it names the thread (`threadId`), as Gmail's threading guide says.
+    const sent = email.author === store.app.id;
+    const joined = sent && threadId === undefined ? undefined : gmailThreadFor(email, threadId);
     const thread = joined ?? ids.next(GOOGLE_IDS.thread);
     if (joined === undefined) {
       store.gmailThreads.add(thread, { id: thread, subject: threadSubject(email.subject) }, session);

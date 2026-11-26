@@ -1,6 +1,6 @@
 import { ProtocolError } from "../errors/index.ts";
 import type { Collection, Registry } from "../registry/index.ts";
-import { localPartOf, type Mailbox, parseAddresses } from "./index.ts";
+import { localPartOf, type Mailbox, parseAddresses, threadOf } from "./index.ts";
 
 /**
  * What every email channel keeps (Resend, Gmail): the agent's mailbox, people's mailboxes, every
@@ -109,6 +109,17 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
       this.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
     }
     return this.emails.add(email.id, email, session);
+  }
+
+  /**
+   * Keep an email a live world read back or sent, once (by its id), in the conversation its
+   * `In-Reply-To` and `References` name, or one of its own.
+   */
+  mirror(email: Omit<Email, "thread">, session: string): Email {
+    const existing = this.emails.find(email.id);
+    if (existing) return existing;
+    const thread = threadOf(email, (id) => this.byMessageId(id)?.thread) ?? email.id;
+    return this.keep({ ...email, thread } as Email, session);
   }
 
   /** A person in the fake: a mailbox at `<name>@example.com` unless the test gives an address. */
