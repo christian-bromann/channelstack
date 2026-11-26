@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { threadTranscript } from "./index.ts";
+import { htmlToText, threadTranscript } from "./index.ts";
 
 const ana = { id: "U1", name: "Ana Lima", kind: "user" } as const;
 
@@ -38,6 +38,19 @@ describe("an HTML-only email as a person reads it", () => {
         html: `<h1>Release notes</h1><p>${sentence}</p><img src="https://example.com/pixel.gif" alt=""><script>track()</script><style>p { color: red }</style>`,
       }),
     ).toBe(`Release notes\n\n${sentence}`);
+  });
+
+  test("a layout table's rows and cells are lines, and a linked image reads as its alt text", () => {
+    const html =
+      '<table><tr><td><a href="https://click.example/t/1"><img src="https://cdn.example/logo.png" alt="Acme"></a></td></tr>' +
+      "<tr><td><h1>Welcome, Ana</h1></td></tr><tr><td>Your code is</td><td><b>123456</b></td></tr></table>";
+    expect(read({ html })).toBe("Acme [https://click.example/t/1]\n\nWelcome, Ana\n\nYour code is\n123456");
+  });
+
+  test("without link addresses, a link is its text", () => {
+    expect(htmlToText('<p>See <a href="https://example.com/docs">the docs</a>.</p>', { links: false })).toBe(
+      "See the docs.",
+    );
   });
 
   test("a Gmail reply is its own words, without the quoted history", () => {

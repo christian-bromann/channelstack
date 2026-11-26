@@ -153,26 +153,44 @@ function ownText(text: string): string {
   return kept.join("\n").trim();
 }
 
-/**
- * HTML as a person reads it, on `html-to-text`: entities decoded, blocks and line breaks as lines,
- * lists as `- ` and `1. ` items, a quote as `> ` lines (so `ownText` drops it as it does in text
- * mail), a link as its text and its address (once, when the text is the address), no images, no
- * scripts or styles, and lines as long as they were written.
- */
-const htmlConvert = compile({
-  wordwrap: false,
-  selectors: [
-    { selector: "a", options: { hideLinkHrefIfSameAsText: true } },
-    { selector: "img", format: "skip" },
-    { selector: "ul", options: { itemPrefix: "- " } },
-    ...["h1", "h2", "h3", "h4", "h5", "h6"].map((selector) => ({ selector, options: { uppercase: false } })),
-  ],
-});
+/** A line break before and after: a table's rows and cells, which mail lays out with, read as lines. */
+const LINE = { leadingLineBreaks: 1, trailingLineBreaks: 1 };
 
-/** The plain text of an HTML body, for an email sent with HTML only. A no-break space reads as a space. */
-function htmlText(html: string): string {
-  return htmlConvert(html)
-    .replace(/ /g, " ")
+/**
+ * HTML as a person reads it, on `html-to-text`: entities decoded (a no-break space is a space),
+ * blocks, line breaks and a layout table's rows and cells as lines, `ul` items as `- ` and `ol`
+ * items as ` 1. ` (the library's prefix, its space included), a quote as `> ` lines (so `ownText`
+ * drops it as it does in text mail), an image as its alt text, no scripts or styles, and lines as
+ * long as they were written. With `links`, a link reads as its text and its address (the address
+ * once, when it is the text); without, as its text.
+ */
+const converter = (links: boolean) =>
+  compile({
+    wordwrap: false,
+    whitespaceCharacters: " \t\r\n\f\u200b\u00a0",
+    formatters: {
+      altText: (elem, _walk, builder) => {
+        const alt: unknown = elem.attribs?.alt;
+        if (typeof alt === "string" && alt.trim() !== "") builder.addInline(alt);
+      },
+    },
+    selectors: [
+      { selector: "a", options: links ? { hideLinkHrefIfSameAsText: true } : { ignoreHref: true } },
+      { selector: "img", format: "altText" },
+      { selector: "ul", options: { itemPrefix: "- " } },
+      ...["h1", "h2", "h3", "h4", "h5", "h6"].map((selector) => ({ selector, options: { uppercase: false } })),
+      ...["tr", "td", "th"].map((selector) => ({ selector, format: "block", options: LINE })),
+    ],
+  });
+const withLinks = converter(true);
+const withoutLinks = converter(false);
+
+/**
+ * The plain text of an HTML body, as a person reads it: for an email sent with HTML only, in a
+ * transcript (with link addresses) or in Gmail's snippet (without).
+ */
+export function htmlToText(html: string, options: { readonly links: boolean }): string {
+  return (options.links ? withLinks : withoutLinks)(html)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -193,7 +211,7 @@ export interface ThreadMessage {
  */
 export function threadTranscript(messages: readonly ThreadMessage[]): { entries: TranscriptEntry[]; text: string } {
   const entries: TranscriptEntry[] = messages.map((message) => {
-    const body = ownText(message.text ?? htmlText(message.html ?? ""));
+    const body = ownText(message.text ?? htmlToText(message.html ?? "", { links: true }));
     const attached = message.attachments.length === 0 ? "" : `\n(attached: ${message.attachments.join(", ")})`;
     return {
       id: message.id,
