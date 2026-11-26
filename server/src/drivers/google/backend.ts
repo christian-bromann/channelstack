@@ -8,7 +8,7 @@ import type { GoogleEmailRecord } from "./world.ts";
  * over the Gmail API with each person's own account. Routes use `live ?? fake`.
  */
 export interface GoogleWorld extends EmailWorld<GoogleEmailRecord> {
-  /** The labels of an email's copy in the agent's mailbox: the fake's; live, none a test reads. */
+  /** The labels of an email's copy in the agent's mailbox, fake and live (without the run's own). */
   labelsOf(email: GoogleEmailRecord): readonly string[];
 }
 

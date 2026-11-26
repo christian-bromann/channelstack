@@ -73,6 +73,9 @@ describe("exit check 9.7: Gmail live", () => {
     stub.agentReplies(out as Sent, "Your refund was sent today.");
     const replies = (await google("GET", `/threads/${email.thread.id}/replies`)).body;
     expect(replies).toMatchObject([{ author: { name: "my-agent", kind: "app" }, text: "Your refund was sent today." }]);
+    // Each email's labels are its copy's in the agent's mailbox, as in the fake: without the run's own.
+    const messages = (await google("GET", `/threads/${email.thread.id}/messages`)).body;
+    expect(messages.map((message: { labels: string[] }) => message.labels)).toEqual([["INBOX", "UNREAD"], ["SENT"]]);
     // The run's label on Ana's thread and on the agent's copy of it.
     for (const mailbox of [ana, stub.agent]) {
       expect(mailbox.labels.map((label) => label.name)).toEqual([expect.stringMatching(/^channelstack-run-unit9/)]);

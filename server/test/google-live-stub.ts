@@ -76,13 +76,14 @@ export function googleStub(): GoogleStub {
   const notFound = () =>
     json({ error: { code: 404, message: "Requested entity was not found.", errors: [{ reason: "notFound" }] } }, 404);
 
-  /** An email from `by` reaches each mailbox it names, in the thread its `In-Reply-To` names there. */
+  /** An email from `by` reaches each mailbox it names: in each, in the thread its `In-Reply-To` names there. */
   const deliver = (by: Mailbox, email: Sent, threadId?: string) => {
+    const answered = (mailbox: Mailbox) =>
+      mailbox.messages.find((message) => message.sent.messageId === email.inReplyTo)?.threadId;
     sent.push(email);
-    by.messages.push({ id: email.id, threadId: threadId ?? id(), sent: email, labels: ["SENT"] });
+    by.messages.push({ id: email.id, threadId: threadId ?? answered(by) ?? id(), sent: email, labels: ["SENT"] });
     for (const to of mailboxes.filter((each) => email.to.includes(each.address) && each !== by)) {
-      const answered = to.messages.find((message) => message.sent.messageId === email.inReplyTo);
-      to.messages.push({ id: id(), threadId: answered?.threadId ?? id(), sent: email, labels: ["INBOX", "UNREAD"] });
+      to.messages.push({ id: id(), threadId: answered(to) ?? id(), sent: email, labels: ["INBOX", "UNREAD"] });
     }
   };
   const wire = (message: Mailbox["messages"][number], format: string) => ({

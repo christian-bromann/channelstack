@@ -84,8 +84,10 @@ export function createLiveGoogleWorld(deps: {
   const tagged = new Set<string>();
   /** An email's thread in each person's mailbox: a reply there names it. */
   const gmailThread = new Map<string, string>();
-  /** What people sent whose copy in the agent's mailbox isn't labelled yet, by `Message-ID`. */
-  const untagged = new Map<string, string>();
+  /** Each email's copy in the agent's mailbox, by the email's id, once Gmail has it there. */
+  const agentCopy = new Map<string, string>();
+  /** Each copy's labels when they were last read, without the run's own. */
+  const agentLabels = new Map<string, readonly string[]>();
   let app: LiveCredential | undefined;
 
   /** Everyone an email goes to must be at an allowlisted address: sent mail can't be taken back. */
@@ -242,7 +244,6 @@ export function createLiveGoogleWorld(deps: {
       headers: [],
       createdAt: clock(),
     });
-    if (input.to.some((to) => to.address === store.app.address)) untagged.set(email.messageId, session);
     return email;
   };
 
@@ -332,24 +333,40 @@ export function createLiveGoogleWorld(deps: {
           await tag(session, credential, address, threadId, email.subject);
         }
       }
-      // The people's emails, as they reached the agent's mailbox: labelled too, for the sweep.
-      for (const [sent, owner] of untagged) {
-        if (owner !== session || !app) continue;
-        const query = encodeURIComponent(`rfc822msgid:${sent.slice(1, -1)}`);
-        const found = await client.call<{ messages?: Array<{ threadId: string }> }>(
+      // The emails the agent has, as its mailbox holds them: labelled too, for the sweep, and their labels read.
+      if (!app) return;
+      for (const email of store.emails.list(session)) {
+        const toAgent = [...email.to, ...email.cc].some(({ address }) => address === store.app.address);
+        if (!toAgent && email.author !== store.app.id) continue;
+        let copy = agentCopy.get(email.id);
+        if (copy === undefined) {
+          const query = encodeURIComponent(`rfc822msgid:${email.messageId.slice(1, -1)}`);
+          const found = await client.call<{ messages?: Array<{ id: string; threadId: string }> }>(
+            app,
+            "GET",
+            `gmail/v1/users/me/messages?q=${query}&includeSpamTrash=true`,
+          );
+          const [first] = found.messages ?? [];
+          if (!first) continue;
+          copy = first.id;
+          agentCopy.set(email.id, copy);
+          await tag(session, app, store.app.address, first.threadId, email.subject);
+        }
+        const own = await runLabel(app);
+        const { labelIds = [] } = await client.call<{ labelIds?: string[] }>(
           app,
           "GET",
-          `gmail/v1/users/me/messages?q=${query}&includeSpamTrash=true`,
+          `gmail/v1/users/me/messages/${copy}?format=minimal`,
         );
-        const [copy] = found.messages ?? [];
-        if (!copy) continue;
-        untagged.delete(sent);
-        await tag(session, app, store.app.address, copy.threadId, store.byMessageId(sent)?.subject ?? "");
+        agentLabels.set(
+          email.id,
+          labelIds.filter((label) => label !== own),
+        );
       }
     },
 
-    /** Live, the agent's labels aren't the test's to read. */
-    labelsOf: () => [],
+    /** The labels of the email's copy in the agent's mailbox, as the last read found them. */
+    labelsOf: (email: GoogleEmailRecord) => agentLabels.get(email.id) ?? [],
 
     principalOf: (email: GoogleEmailRecord) => emailAuthor(email, store.app, (id) => store.users.find(id)),
 
@@ -360,9 +377,11 @@ export function createLiveGoogleWorld(deps: {
       people.leave(session);
       read.delete(session);
       since.delete(session);
-      for (const [sent, owner] of untagged) if (owner === session) untagged.delete(sent);
       store.users.release(session);
-      store.emails.release(session);
+      for (const email of store.emails.release(session)) {
+        agentCopy.delete(email.id);
+        agentLabels.delete(email.id);
+      }
       store.threads.release(session);
     },
   };
