@@ -25,6 +25,7 @@ One page per platform: every handle, field, method and wait of its fake, each ca
 - [Linear API](/docs/reference/api/linear)
 - [Notion API](/docs/reference/api/notion)
 - [Resend API](/docs/reference/api/resend)
+- [Google API](/docs/reference/api/google)
 
 ## Test API
 

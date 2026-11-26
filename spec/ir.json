@@ -464,6 +464,41 @@
             "cross_workspace_credential"
           ],
           "dispose": false
+        },
+        {
+          "name": "google",
+          "kind": "factory",
+          "summary": "The Google fixture: the agent's mailbox, and where the agent reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -15200,6 +15235,1141 @@
       ]
     },
     {
+      "name": "GoogleFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "GoogleApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person: a mailbox, at `<name>@example.com` unless a test gives the address",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "address",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_GOOGLE_USER_{name}_TOKEN"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deliveries",
+          "kind": "method",
+          "summary": "Every push channelstack sent the agent for this session, with every attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "type",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "resource",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GoogleThread"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The Gmail calls the agent made about this session's mail, by the SDK's method name (`users.messages.send`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "requires": "proxy",
+            "reason": "Gmail doesn't report the mailbox's calls; proxy mode sees them"
+          }
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "named",
+            "name": "GoogleApiCall"
+          },
+          "filter": true,
+          "what": "an API call from the agent"
+        }
+      ]
+    },
+    {
+      "name": "GoogleApp",
+      "idFields": [
+        "id"
+      ],
+      "role": "app",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "botUserId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "address",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "GoogleUser",
+      "idFields": [
+        "id"
+      ],
+      "role": "user",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "address",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "send",
+          "kind": "method",
+          "summary": "The person emails someone: the agent (`google.app`), or another person",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/users/{user}/send",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "to",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GoogleUser",
+                    "GoogleApp"
+                  ]
+                }
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "cc",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GoogleUser",
+                    "GoogleApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "subject",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "html",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/users/{user}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "email",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GoogleEmail"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "html",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "all",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "inbox",
+          "kind": "method",
+          "summary": "What reached the person's mailbox, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/users/{user}/inbox",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleInbox"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForEmail",
+          "mode": "next",
+          "read": "inbox",
+          "item": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "from": "author",
+          "what": "an email"
+        }
+      ]
+    },
+    {
+      "name": "GoogleEmail",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "thread",
+          "type": {
+            "kind": "resource",
+            "name": "GoogleThread"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "named",
+            "name": "GooglePrincipal"
+          },
+          "optional": false
+        },
+        {
+          "name": "from",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "to",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "cc",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "subject",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "text",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "at",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "messageId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "labels",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "GoogleDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read an email",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/emails/{email}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "email",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "GoogleThread",
+      "idFields": [
+        "id"
+      ],
+      "role": "resource",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "subject",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "Every email in the thread, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/threads/{thread}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "thread",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "The thread's answers: every email after the first, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/threads/{thread}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "thread",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The thread as a person reads it: each email's own words, without the quoted history",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/threads/{thread}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "thread",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForReply",
+          "mode": "next",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "from": "author",
+          "what": "a reply"
+        },
+        {
+          "name": "latestReply",
+          "mode": "latest",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "from": "author",
+          "what": "a reply"
+        }
+      ]
+    },
+    {
+      "name": "GoogleDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "emailAddress",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "historyId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Push the same message again, as Pub/Sub does when a push isn't acknowledged: the same message id",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Pub/Sub has no API to push an acknowledged message again"
+          }
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Push it again, forged: with a token signed by another key, one that has expired, or one for another audience than the push endpoint",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "stale",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "wrongAudience",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "GoogleDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
+        }
+      ]
+    },
+    {
       "name": "GitHubPullRequest",
       "idFields": [
         "repoId",
@@ -18238,6 +19408,263 @@
       }
     },
     {
+      "name": "GooglePrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoogleInbox",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleEmail"
+        }
+      }
+    },
+    {
+      "name": "GoogleMessages",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleEmail"
+        }
+      }
+    },
+    {
+      "name": "GoogleReplies",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleEmail"
+        }
+      }
+    },
+    {
+      "name": "GoogleTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "GoogleTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "GoogleTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "GooglePrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "GoogleDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleDelivery"
+        }
+      }
+    },
+    {
+      "name": "GoogleApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GoogleApiCall"
+        }
+      }
+    },
+    {
+      "name": "GoogleApiCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "literal",
+              "value": "google"
+            },
+            "optional": false
+          },
+          {
+            "name": "operation",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
       "name": "UiLoginLink",
       "type": {
         "kind": "object",
@@ -18360,6 +19787,10 @@
     {
       "name": "resend",
       "title": "Resend"
+    },
+    {
+      "name": "google",
+      "title": "Google"
     }
   ]
 }

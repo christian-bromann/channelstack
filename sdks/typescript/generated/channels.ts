@@ -4,7 +4,7 @@ import type * as G from "./index.ts";
 type Option<Method extends (...args: never[]) => unknown> = NonNullable<Parameters<Method>[0]>;
 
 /** Every channel, by name, in the server's order. */
-export const CHANNEL_NAMES = ["slack", "github", "linear", "notion", "resend"] as const;
+export const CHANNEL_NAMES = ["slack", "github", "linear", "notion", "resend", "google"] as const;
 export type ChannelKind = (typeof CHANNEL_NAMES)[number];
 /** Each channel's fixture, by its name: what a test framework hands a test. */
 export interface ChannelFixtures {
@@ -13,13 +13,14 @@ export interface ChannelFixtures {
   linear: G.LinearFixture;
   notion: G.NotionFixture;
   resend: G.ResendFixture;
+  google: G.GoogleFixture;
 }
-export type User = G.SlackUser | G.GitHubUser | G.LinearUser | G.NotionUser | G.ResendUser;
-export type App = G.SlackApp | G.GitHubApp | G.LinearApp | G.NotionIntegration | G.ResendApp;
-export type Resource = G.SlackConversation | G.GitHubRepo | G.LinearTeam | G.NotionPage | G.NotionDatabase | G.ResendThread;
-export type AnyDelivery = G.SlackDelivery | G.GitHubDelivery | G.LinearDelivery | G.NotionDelivery | G.ResendDelivery;
-export type DeliveryFilter = Option<G.GitHubFixture["deliveries"]> | Option<G.LinearFixture["deliveries"]> | Option<G.NotionFixture["deliveries"]> | Option<G.ResendFixture["deliveries"]>;
-export type ApiCall = G.SlackApiCall | G.GitHubApiCall | G.LinearApiCall | G.NotionApiCall | G.ResendApiCall;
-export type Transcript = G.SlackTranscript | G.GitHubTranscript | G.LinearTranscript | G.NotionTranscript | G.ResendTranscript;
+export type User = G.SlackUser | G.GitHubUser | G.LinearUser | G.NotionUser | G.ResendUser | G.GoogleUser;
+export type App = G.SlackApp | G.GitHubApp | G.LinearApp | G.NotionIntegration | G.ResendApp | G.GoogleApp;
+export type Resource = G.SlackConversation | G.GitHubRepo | G.LinearTeam | G.NotionPage | G.NotionDatabase | G.ResendThread | G.GoogleThread;
+export type AnyDelivery = G.SlackDelivery | G.GitHubDelivery | G.LinearDelivery | G.NotionDelivery | G.ResendDelivery | G.GoogleDelivery;
+export type DeliveryFilter = Option<G.GitHubFixture["deliveries"]> | Option<G.LinearFixture["deliveries"]> | Option<G.NotionFixture["deliveries"]> | Option<G.ResendFixture["deliveries"]> | Option<G.GoogleFixture["deliveries"]>;
+export type ApiCall = G.SlackApiCall | G.GitHubApiCall | G.LinearApiCall | G.NotionApiCall | G.ResendApiCall | G.GoogleApiCall;
+export type Transcript = G.SlackTranscript | G.GitHubTranscript | G.LinearTranscript | G.NotionTranscript | G.ResendTranscript | G.GoogleTranscript;
 /** What every channel fixture has to inspect what the agent did: the fixture whose deliveries are `TDelivery`. */
-export type Inspectable<TDelivery extends AnyDelivery = AnyDelivery> = TDelivery extends G.SlackDelivery ? G.SlackFixture : TDelivery extends G.GitHubDelivery ? G.GitHubFixture : TDelivery extends G.LinearDelivery ? G.LinearFixture : TDelivery extends G.NotionDelivery ? G.NotionFixture : TDelivery extends G.ResendDelivery ? G.ResendFixture : never;
+export type Inspectable<TDelivery extends AnyDelivery = AnyDelivery> = TDelivery extends G.SlackDelivery ? G.SlackFixture : TDelivery extends G.GitHubDelivery ? G.GitHubFixture : TDelivery extends G.LinearDelivery ? G.LinearFixture : TDelivery extends G.NotionDelivery ? G.NotionFixture : TDelivery extends G.ResendDelivery ? G.ResendFixture : TDelivery extends G.GoogleDelivery ? G.GoogleFixture : never;

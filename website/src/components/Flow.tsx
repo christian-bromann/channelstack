@@ -35,7 +35,8 @@ export function Flow() {
             <li>schema checks</li>
           </ul>
           <p className="node-foot">
-            slack.localhost · github.localhost · linear.localhost · notion.localhost · resend.localhost
+            slack.localhost · github.localhost · linear.localhost · notion.localhost · resend.localhost ·
+            google.localhost
           </p>
         </div>
 

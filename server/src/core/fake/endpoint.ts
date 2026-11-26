@@ -39,16 +39,30 @@ type Method = "get" | "post" | "put" | "patch" | "delete";
 /** Where `bodyOf` keeps the body it parsed, for the record. */
 const PARSED_BODY = "channelstackRestBody";
 
+/** What an endpoint takes beyond JSON. */
+export interface EndpointOptions {
+  /** A form's fields too (an OAuth token request). Elsewhere a form is invalid JSON, as the platforms answer it. */
+  readonly form?: boolean;
+}
+
 /**
- * A request's JSON body, as every REST platform reads it: an object or a list (a batch), `{}` when
- * there is none, or which way it is wrong, for the platform to refuse in its own words. A body that
- * was given is kept on the request, so the call goes on record with it.
+ * A request's body, as every REST platform reads it: a JSON object or list (a batch), a form's
+ * fields where the endpoint takes one, `{}` when there is none, or which way it is wrong, for the
+ * platform to refuse in its own words. A body that was given is kept on the request, so the call
+ * goes on record with it.
  */
 export async function bodyOf(
   c: Context,
+  options: EndpointOptions = {},
 ): Promise<{ readonly body: Record<string, unknown> } | { readonly invalid: "json" | "not_object" }> {
   const text = await c.req.text();
   if (text === "") return { body: {} };
+  const type = c.req.header("content-type") ?? "";
+  if (options.form && type.startsWith("application/x-www-form-urlencoded")) {
+    const fields = Object.fromEntries(new URLSearchParams(text));
+    c.set(PARSED_BODY as never, fields as never);
+    return { body: fields };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -110,12 +124,18 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
   const api = new Hono();
   const { clock } = context;
 
-  const answer = async (c: Context, method: Method, operation: string, handle: Handler): Promise<RestAnswer> => {
+  const answer = async (
+    c: Context,
+    method: Method,
+    operation: string,
+    handle: Handler,
+    options: EndpointOptions,
+  ): Promise<RestAnswer> => {
     const refused = platform.authorize(c, operation);
     if (refused) return refused;
     let body: Record<string, unknown> = {};
     if (method !== "get" && method !== "delete") {
-      const parsed = await bodyOf(c);
+      const parsed = await bodyOf(c, options);
       if ("invalid" in parsed) return platform.invalidJson();
       // An array (a batch) reaches its handler as it is.
       body = parsed.body;
@@ -129,10 +149,10 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
     }
   };
 
-  const endpoint = (method: Method, path: string, operation: string, handle: Handler) =>
+  const endpoint = (method: Method, path: string, operation: string, handle: Handler, options: EndpointOptions = {}) =>
     api.on(method.toUpperCase(), path, async (c) => {
       const startedAt = clock();
-      let result = await answer(c, method, operation, handle);
+      let result = await answer(c, method, operation, handle, options);
       if (platform.decorate) result = platform.decorate(result);
       const status = result.status ?? 200;
       const request =
@@ -147,6 +167,8 @@ export function restApi(context: DriverContext, platform: RestPlatform) {
         result.sessions,
       );
       for (const [name, value] of Object.entries(result.headers ?? {})) c.header(name, value);
+      // A 204 has no body at all (Gmail's `users.stop`).
+      if (status === 204) return c.body(null, 204);
       return c.json(result.body, status as 200);
     });
 

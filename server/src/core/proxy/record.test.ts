@@ -41,6 +41,11 @@ describe("the recorder", () => {
       c: ["string"],
     });
     expect(shapeOf([{ a: 1 }, { b: "x" }])).toEqual([{ a: "number", b: "string" }]);
+    // Keys that are ids (Google's certificates by key id) are one key, whichever ids they are.
+    expect(shapeOf({ ["9e7b".repeat(10)]: "pem", ["943a".repeat(10)]: "pem", other: 1 })).toEqual({
+      "<id>": "string",
+      other: "number",
+    });
   });
 
   test("an operation is its path without ids, or a GraphQL operation's name", () => {

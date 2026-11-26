@@ -26,7 +26,7 @@ An empty variable counts as not set everywhere.
 | `CHANNELSTACK_SERVER_FILE` | `<home>/server.json` | Where `start` writes the control API's URL and token (0600). `--server-file` wins. The attach CLI reads it too |
 | `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the app. Read once, when the server starts |
 
-`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION` or `RESEND`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`.
+`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND` or `GOOGLE`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`. For Google it is the push endpoint: Pub/Sub's pushes go there, and their tokens are for it as their audience.
 
 An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. See [Connecting your app](/docs/guide/connecting-your-agent).
 
@@ -52,6 +52,7 @@ The SDKs read a person's token from the environment when a test leaves `token` o
 | `CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN` | `linear.createUser({ name })`: a personal API key |
 | `CHANNELSTACK_NOTION_USER_<NAME>_TOKEN` | `notion.createUser({ name })`: a personal access token |
 | `CHANNELSTACK_RESEND_USER_<NAME>_TOKEN` | `resend.createUser({ name })`: an API key of the person's own Resend team, with a verified domain their address is on |
+| `CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN` | `google.createUser({ name })`: a refresh token for the person's own Gmail account, from the agent's OAuth client |
 
 `<NAME>` is the name in upper case with every run of other characters as `_`: `Ana` is `ANA`, `ana-smith` is `ANA_SMITH`, the login `ana-channelstack` is `ANA_CHANNELSTACK`.
 
@@ -66,8 +67,9 @@ Read by the **server**. A channel runs live when every one of its credentials is
 | Linear | `CHANNELSTACK_LINEAR_APP_TOKEN` (the app's OAuth token) | `CHANNELSTACK_LIVE_LINEAR_WORKSPACES`: organization ids | |
 | Notion | `CHANNELSTACK_NOTION_TOKEN` (the integration's token) | `CHANNELSTACK_LIVE_NOTION_WORKSPACES`: workspace ids | `CHANNELSTACK_NOTION_PAGE`, `CHANNELSTACK_NOTION_UNSEEN_PAGE` |
 | Resend | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key, `re_…`) | `CHANNELSTACK_LIVE_RESEND_DOMAINS`: the domains mail may go to. Every recipient is checked before anything is sent | `CHANNELSTACK_RESEND_ADDRESS` |
+| Google | `CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET` (the agent's OAuth client, `GOCSPX-…`), `CHANNELSTACK_GOOGLE_REFRESH_TOKEN` (its mailbox's refresh token, `1//0…`) | `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`: the addresses mail may go to and come from, the agent's and the people's. Every recipient is checked before anything is sent | |
 
-Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace; anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
+Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace (for Resend the domain, for Google the address); anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -111,6 +113,15 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `RESEND_API_KEY` | Resend | The agent's team's key (`re_…`) |
 | `RESEND_WEBHOOK_SECRET` | Resend | What webhook deliveries are signed with (`whsec_…`) |
 | `RESEND_FROM` | Resend | The address the agent sends from, with its name: `my-agent <my-agent@acme.example>` |
+| `GOOGLE_API_URL` | Google | The root to give `googleapis` as `rootUrl`, per API: e.g. `https://google.localhost/` |
+| `GOOGLE_TOKEN_URL` | Google | Google's token endpoint, for `OAuth2Client`'s `endpoints.oauth2TokenUrl` |
+| `GOOGLE_CERTS_URL` | Google | The certificates push tokens are signed against, for `endpoints.oauth2FederatedSignonPemCertsUrl` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google | The agent's OAuth client (`…apps.googleusercontent.com`, `GOCSPX-…`) |
+| `GOOGLE_REFRESH_TOKEN` | Google | The agent's mailbox's refresh token (`1//0…`): the token endpoint takes the `refresh_token` grant only |
+| `GMAIL_ADDRESS` | Google | The agent's mailbox: `my-agent@acme.example` |
+| `GOOGLE_PUBSUB_TOPIC` | Google | The topic to give `users.watch`: the only one the fake publishes to |
+| `GOOGLE_PUSH_SERVICE_ACCOUNT` | Google | Who pushes: the `email` claim of every push token |
+| `GOOGLE_PUSH_AUDIENCE` | Google | The `aud` of every push token: the push endpoint, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`. Printed when that is set |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
 The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.

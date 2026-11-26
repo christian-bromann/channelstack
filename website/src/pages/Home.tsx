@@ -57,6 +57,12 @@ const CHANNELS = [
     text: "Email agents: people email your agent, it reads the mail back and answers in their thread, with Svix-signed webhooks and Resend's test addresses.",
     chips: ["email.received", "emails.send", "In-Reply-To", "svix-signature", "bounced@resend.dev"],
   },
+  {
+    id: "google",
+    name: "Google",
+    text: "Gmail agents: a watched mailbox, Pub/Sub pushes with tokens verifyIdToken checks, history to read, and answers sent in the thread.",
+    chips: ["users.watch", "history.list", "messages.send", "OIDC push token", "threadId"],
+  },
 ];
 
 const PRINCIPLES: Array<{ icon: ReactNode; title: string; body: ReactNode }> = [
@@ -132,16 +138,16 @@ export default function Home() {
             <HeroWaves />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
-              Test harness for Slack, GitHub, Linear, Notion and Resend apps
+              Test harness for Slack, GitHub, Linear, Notion, Resend and Gmail apps
             </p>
             <h1 id="hero-title">
               Your app’s whole world, <em>on localhost.</em>
             </h1>
             <p className="lede">
-              channelstack recreates <strong>Slack, GitHub, Linear, Notion and Resend</strong> on your machine, for the
-              bots, integrations and AI agents you build on them. Script the people, let your app answer through its
-              real code path, and assert on what a person would see. Signed webhooks, real payload shapes and real ids,
-              with no changes to how your app works.
+              channelstack recreates <strong>Slack, GitHub, Linear, Notion, Resend and Gmail</strong> on your machine,
+              for the bots, integrations and AI agents you build on them. Script the people, let your app answer through
+              its real code path, and assert on what a person would see. Signed webhooks, real payload shapes and real
+              ids, with no changes to how your app works.
             </p>
             <div className="cta">
               <a className="btn primary" href="#quick-start">
@@ -367,7 +373,7 @@ export default function Home() {
             </div>
             <p className="why-name">
               <strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear, Notion,
-              Resend. channelstack runs that whole stack on localhost, with the people in it, so you can test the
+              Resend, Gmail. channelstack runs that whole stack on localhost, with the people in it, so you can test the
               conversation end to end before your users have it.
             </p>
           </div>

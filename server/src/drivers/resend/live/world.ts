@@ -1,22 +1,23 @@
 import type { Clock } from "../../../core/clock/index.ts";
 import {
   domainOf,
+  emailAuthor,
   formatMailbox,
   localPartOf,
   type Mailbox,
   messageIdsIn,
   parseAddresses,
-  threadOf,
+  replyOf,
 } from "../../../core/email/index.ts";
+import type { EmailMessageInput } from "../../../core/email/routes.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
 import { fakeActorInLiveWorld, liveMisconfigured } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
-import type { ResendMessageInput, ResendWorld } from "../backend.ts";
+import type { ResendWorld } from "../backend.ts";
 import { ResendStore } from "../fake/store.ts";
-import { principalOf, replyOf } from "../mail.ts";
 import type { ResendEmailRecord, ResendUserRecord } from "../world.ts";
 import type { ResendRestClient } from "./client.ts";
 import { checkResendCredential, identifyResend } from "./identity.ts";
@@ -92,16 +93,6 @@ export function createLiveResendWorld(deps: {
     }
   };
 
-  /** Keep what was read or sent in the mirror, in the thread its references name. */
-  const keep = (session: string, email: Omit<ResendEmailRecord, "thread">) => {
-    const existing = store.emails.find(email.id);
-    if (existing) return existing;
-    const thread = threadOf(email, (id) => store.byMessageId(id)?.thread) ?? email.id;
-    if (thread === email.id)
-      store.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
-    return store.emails.add(email.id, { ...email, thread }, session);
-  };
-
   let readying: Promise<void> | undefined;
   const prepare = async () => {
     app = live.vault.fromEnv("CHANNELSTACK_RESEND_API_KEY");
@@ -129,7 +120,7 @@ export function createLiveResendWorld(deps: {
   const sendAs = async (
     session: string,
     person: ResendUserRecord,
-    input: ResendMessageInput,
+    input: EmailMessageInput,
     headers: { inReplyTo?: string; references?: readonly string[] },
   ): Promise<ResendEmailRecord> => {
     allowed([...input.to, ...input.cc]);
@@ -151,27 +142,30 @@ export function createLiveResendWorld(deps: {
     // Its `Message-ID`, which the agent's answer will name in `In-Reply-To`.
     const messageId = await messageIdOf(credential, id);
     if (messageId === undefined) unnamed.set(id, credential);
-    return keep(session, {
-      id,
-      direction: "outside",
-      author: person.id,
-      from: { address: person.address, name: person.name },
-      to: input.to,
-      cc: input.cc,
-      bcc: [],
-      replyTo: [],
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-      headers: {},
-      tags: {},
-      messageId: messageId ?? `<${id}@resend.dev>`,
-      inReplyTo: headers.inReplyTo,
-      references: headers.references ?? [],
-      createdAt: clock(),
-      lastEvent: undefined,
-      delivery: undefined,
-    });
+    return store.mirror(
+      {
+        id,
+        direction: "outside",
+        author: person.id,
+        from: { address: person.address, name: person.name },
+        to: input.to,
+        cc: input.cc,
+        bcc: [],
+        replyTo: [],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+        headers: {},
+        tags: {},
+        messageId: messageId ?? `<${id}@resend.dev>`,
+        inReplyTo: headers.inReplyTo,
+        references: headers.references ?? [],
+        createdAt: clock(),
+        lastEvent: undefined,
+        delivery: undefined,
+      },
+      session,
+    );
   };
 
   const world: ResendWorld & { ready(): Promise<void>; release(session: string): void } = {
@@ -242,32 +236,35 @@ export function createLiveResendWorld(deps: {
           const [from] = parseAddresses(email.from);
           if (!from) continue;
           const header = (name: string) => email.headers?.[name] ?? email.headers?.[name.toLowerCase()];
-          keep(session, {
-            id,
-            direction: "outside",
-            author: from.address === store.app.address ? store.app.id : store.personAt(from.address)?.id,
-            from,
-            to: parseAddresses(email.to),
-            cc: parseAddresses(email.cc ?? []),
-            bcc: [],
-            replyTo: parseAddresses(email.reply_to ?? []),
-            subject: email.subject,
-            text: email.text ?? undefined,
-            html: email.html ?? undefined,
-            headers: {},
-            tags: {},
-            messageId: email.message_id,
-            inReplyTo: messageIdsIn(header("In-Reply-To"))[0],
-            references: messageIdsIn(header("References")),
-            createdAt: Date.parse(email.created_at) || clock(),
-            lastEvent: undefined,
-            delivery: undefined,
-          });
+          store.mirror(
+            {
+              id,
+              direction: "outside",
+              author: from.address === store.app.address ? store.app.id : store.personAt(from.address)?.id,
+              from,
+              to: parseAddresses(email.to),
+              cc: parseAddresses(email.cc ?? []),
+              bcc: [],
+              replyTo: parseAddresses(email.reply_to ?? []),
+              subject: email.subject,
+              text: email.text ?? undefined,
+              html: email.html ?? undefined,
+              headers: {},
+              tags: {},
+              messageId: email.message_id,
+              inReplyTo: messageIdsIn(header("In-Reply-To"))[0],
+              references: messageIdsIn(header("References")),
+              createdAt: Date.parse(email.created_at) || clock(),
+              lastEvent: undefined,
+              delivery: undefined,
+            },
+            session,
+          );
         }
       }
     },
 
-    principalOf: (email) => principalOf(store, email),
+    principalOf: (email) => emailAuthor(email, store.app, (id) => store.users.find(id)),
 
     release(session) {
       people.leave(session);

@@ -29,6 +29,8 @@ const IN_TEXT: ReadonlyArray<[RegExp, string]> = [
   // An email's `Message-ID` as Amazon SES gives it (Resend sends through SES): `<16 hex>-<uuid>-000000@…`.
   [/\b[0-9a-f]{16}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-0{6}\b/gi, "<id>"],
   [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "<id>"],
+  // A `Message-ID` Gmail gives the mail it sends: `<CA…@mail.gmail.com>`, with `+`, `-`, `_` and `=` in it.
+  [/<CA[\w+=-]+@mail\.gmail\.com>/g, "<id>"],
   // Slack's ids (U…, C…, B…, T…, D…, G…, W…) and run-tagged names.
   [/<@[UW][A-Z0-9]{6,}>/g, "<@id>"],
   [/\b[UCBTDGW][A-Z0-9]{8,}\b/g, "<id>"],

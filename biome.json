@@ -19,7 +19,8 @@
       "!**/*.md",
       "!phase-log",
       "!server/src/drivers/linear/schema",
-      "!server/test/schemas/resend-openapi.json"
+      "!server/test/schemas/resend-openapi.json",
+      "!server/test/schemas/gmail-discovery.json"
     ]
   },
   "formatter": {

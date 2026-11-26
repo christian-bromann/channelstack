@@ -56,17 +56,62 @@ export function messageIdsIn(header: string | undefined): string[] {
 }
 
 /** The subject of a reply: `Re: ` before the original's, unless it has one already. */
-export const replySubject = (subject: string): string => (/^re:/i.test(subject.trim()) ? subject : `Re: ${subject}`);
+const replySubject = (subject: string): string => (/^re:/i.test(subject.trim()) ? subject : `Re: ${subject}`);
 
 /**
  * The headers a reply carries, as RFC 5322 says: `In-Reply-To` is the message answered, and
  * `References` that message's references with its id added.
  */
-export function replyHeaders(to: { messageId: string; references: readonly string[] }): {
+function replyHeaders(to: { messageId: string; references: readonly string[] }): {
   inReplyTo: string;
   references: string[];
 } {
   return { inReplyTo: to.messageId, references: [...to.references.filter((id) => id !== to.messageId), to.messageId] };
+}
+
+/** What a reply needs of the email it answers. */
+export interface Answerable {
+  readonly from: Mailbox;
+  readonly to: readonly Mailbox[];
+  readonly cc: readonly Mailbox[];
+  readonly replyTo: readonly Mailbox[];
+  readonly subject: string;
+  readonly messageId: string;
+  readonly references: readonly string[];
+}
+
+/**
+ * A person's reply to an email: to its sender (its `Reply-To` if it has one), and with `all` to
+ * everyone else on it too; `Re:` its subject, `In-Reply-To` and `References` set.
+ */
+export function replyOf(person: { readonly address: string }, to: Answerable, all: boolean) {
+  const sender: readonly Mailbox[] = to.replyTo.length > 0 ? to.replyTo : [to.from];
+  const others = all
+    ? [...to.to, ...to.cc].filter(
+        (mailbox) => mailbox.address !== person.address && !sender.some((s) => s.address === mailbox.address),
+      )
+    : [];
+  return {
+    to: sender,
+    cc: others,
+    subject: replySubject(to.subject),
+    ...replyHeaders({ messageId: to.messageId, references: to.references }),
+  };
+}
+
+/**
+ * Who wrote an email, as a transcript names them: the app, a person (by `person`, from the author's
+ * id), or for an address no one in the world has, the address itself.
+ */
+export function emailAuthor(
+  email: { readonly author: string | undefined; readonly from: Mailbox },
+  app: { readonly id: string; readonly name: string },
+  person: (id: string) => { readonly id: string; readonly name: string } | undefined,
+): TranscriptPrincipal {
+  if (email.author === app.id) return { id: app.id, name: app.name, kind: "app" };
+  const found = email.author === undefined ? undefined : person(email.author);
+  if (found) return { id: found.id, name: found.name, kind: "user" };
+  return { id: email.from.address, name: email.from.name || email.from.address, kind: "user" };
 }
 
 /**

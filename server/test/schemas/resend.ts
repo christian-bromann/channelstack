@@ -5,7 +5,7 @@ import description from "./resend-openapi.json" with { type: "json" };
 
 /**
  * Resend's own description of its REST API and webhooks (`resend/resend-openapi`, pinned by
- * `scripts/resend-schema.ts`), as validators. Exit check 8.3 holds every answer and every webhook
+ * `scripts/pinned-schema.ts`), as validators. Exit check 8.3 holds every answer and every webhook
  * of the fake to them. The description is OpenAPI 3.1, so its schemas are JSON Schema 2020-12.
  */
 type Json = Record<string, unknown>;

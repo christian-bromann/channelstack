@@ -23,7 +23,7 @@ export type Duration = number | `${number}ms` | `${number}s` | `${number}m`;
 /** ISO 8601 timestamp string. */
 export type Timestamp = string;
 
-export type ChannelKind = "slack" | "github" | "linear" | "notion" | "resend";
+export type ChannelKind = "slack" | "github" | "linear" | "notion" | "resend" | "google";
 
 /** Text that may contain `@name` mentions. */
 export type RichText = string;
@@ -104,7 +104,10 @@ export interface DeliveryAttempt {
   readonly forgedSignature: boolean;
 }
 
-/** How to resend a delivery. Every platform takes `badSignature`; Slack and Linear add `stale`, Slack adds `headers`. */
+/**
+ * How to resend a delivery. Every platform takes `badSignature`; Slack, Linear, Resend and Google
+ * add `stale`, Google `wrongAudience`, Slack `headers`.
+ */
 export interface DeliveryResendOptions {
   /** Sign with the wrong secret. The agent should reject it. */
   badSignature?: boolean;

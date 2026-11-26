@@ -6617,6 +6617,525 @@
           "responseStatus"
         ]
       },
+      "GoogleFixture": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/GoogleApp"
+          },
+          "apiUrl": {
+            "type": "string",
+            "description": "The root URL to give the agent's `googleapis` client (`GOOGLE_API_URL`, as `rootUrl`)."
+          }
+        },
+        "required": [
+          "app",
+          "apiUrl"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "GoogleApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "botUserId": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "description": "Where people email the agent: its mailbox's address."
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "name",
+          "botUserId",
+          "address"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "app"
+        }
+      },
+      "GoogleUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The person's address: an email person is their mailbox."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "name",
+          "address"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "user"
+        }
+      },
+      "GoogleUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "description": "The person's address. Default `<name>@example.com`."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Live: a refresh token for the person's own Gmail account, from the agent's OAuth client, which sends as them and reads their mail. Read from CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_GOOGLE_USER_{name}_TOKEN"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "GoogleEmail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "thread": {
+            "$ref": "#/components/schemas/GoogleThread"
+          },
+          "author": {
+            "$ref": "#/components/schemas/GooglePrincipal"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "What its writer wrote, without the quoted history a reply carries."
+          },
+          "at": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its labels in the agent's mailbox (`INBOX`, `UNREAD`, `SENT`, the agent's own), for an email the agent has."
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/GoogleDelivery"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "thread",
+          "author",
+          "from",
+          "to",
+          "cc",
+          "subject",
+          "text",
+          "at",
+          "messageId",
+          "labels"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "GoogleThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the thread's first email."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "subject"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "resource"
+        }
+      },
+      "GooglePrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "GoogleDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Pub/Sub message's id."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "`gmail.history`: the mailbox's history moved on."
+          },
+          "emailAddress": {
+            "type": "string",
+            "description": "The mailbox the push is about."
+          },
+          "historyId": {
+            "type": "string",
+            "description": "The mailbox's history id when the push was sent."
+          },
+          "payload": {},
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttempt"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "type",
+          "emailAddress",
+          "historyId",
+          "attempts",
+          "status"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        },
+        "description": "The push that told the agent of it, for an email to it."
+      },
+      "GoogleSendBody": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GoogleUser",
+                "GoogleApp"
+              ]
+            },
+            "description": "Who it goes to: the app, people."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GoogleUser",
+                "GoogleApp"
+              ]
+            },
+            "default": [],
+            "description": "Who gets a copy."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "subject"
+        ]
+      },
+      "GoogleReplyBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GoogleEmail"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "all": {
+            "type": "boolean",
+            "default": false,
+            "description": "Reply to everyone on the email, not only its sender."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "GoogleInbox": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleEmail"
+        }
+      },
+      "GoogleMessages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleEmail"
+        }
+      },
+      "GoogleReplies": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleEmail"
+        }
+      },
+      "GoogleTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoogleTranscriptEntry"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcript as plain text, one entry per line."
+          }
+        },
+        "required": [
+          "entries",
+          "text"
+        ],
+        "x-channelstack-string": "text"
+      },
+      "GoogleTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/GooglePrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "edited",
+          "depth"
+        ]
+      },
+      "GoogleDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleDelivery"
+        }
+      },
+      "GoogleResendBody": {
+        "type": "object",
+        "properties": {
+          "badSignature": {
+            "type": "boolean",
+            "default": false
+          },
+          "stale": {
+            "type": "boolean",
+            "default": false
+          },
+          "wrongAudience": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "GoogleApiCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleApiCall"
+        }
+      },
+      "GoogleApiCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "request": {},
+          "responseStatus": {
+            "type": "integer"
+          },
+          "response": {},
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "operation",
+          "method",
+          "path",
+          "at",
+          "durationMs",
+          "responseStatus"
+        ]
+      },
       "UiLoginLink": {
         "type": "object",
         "properties": {
@@ -24014,6 +24533,1117 @@
         }
       }
     },
+    "/sessions/{session}/google": {
+      "get": {
+        "summary": "The Google fixture: the agent's mailbox, and where the agent reaches the fake",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "google"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/users": {
+      "post": {
+        "summary": "Create a person: a mailbox, at `<name>@example.com` unless a test gives the address",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "GoogleFixture",
+          "name": "createUser",
+          "options": [
+            "name",
+            "address",
+            "token"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleUserOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/users/{user}/send": {
+      "post": {
+        "summary": "The person emails someone: the agent (`google.app`), or another person",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleUser",
+          "name": "send",
+          "options": [
+            "to",
+            "cc",
+            "subject",
+            "text",
+            "html"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/users/{user}/reply": {
+      "post": {
+        "summary": "The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleUser",
+          "name": "reply",
+          "args": [
+            "email"
+          ],
+          "options": [
+            "text",
+            "html",
+            "all"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/users/{user}/inbox": {
+      "get": {
+        "summary": "What reached the person's mailbox, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleUser",
+          "name": "inbox"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForEmail",
+            "mode": "next",
+            "from": "author",
+            "what": "an email"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleInbox"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/emails/{email}": {
+      "get": {
+        "summary": "Re-read an email",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleEmail",
+          "name": "refresh"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "email",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/threads/{thread}/messages": {
+      "get": {
+        "summary": "Every email in the thread, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleThread",
+          "name": "messages"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "thread",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/threads/{thread}/replies": {
+      "get": {
+        "summary": "The thread's answers: every email after the first, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleThread",
+          "name": "replies"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForReply",
+            "mode": "next",
+            "from": "author",
+            "what": "a reply"
+          },
+          {
+            "name": "latestReply",
+            "mode": "latest",
+            "from": "author",
+            "what": "a reply"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "thread",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleReplies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/threads/{thread}/transcript": {
+      "get": {
+        "summary": "The thread as a person reads it: each email's own words, without the quoted history",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleThread",
+          "name": "transcript"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "thread",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/deliveries": {
+      "get": {
+        "summary": "Every push channelstack sent the agent for this session, with every attempt",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleFixture",
+          "name": "deliveries",
+          "options": [
+            "type",
+            "resource"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only this kind: `gmail.history`."
+            },
+            "required": false,
+            "description": "Only this kind: `gmail.history`.",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only pushes that told of an email in this thread.",
+              "x-channelstack-ref": [
+                "GoogleThread"
+              ]
+            },
+            "required": false,
+            "description": "Only pushes that told of an email in this thread.",
+            "name": "resource",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/deliveries/{delivery}": {
+      "get": {
+        "summary": "Re-read a delivery: its attempts and status",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleDelivery",
+          "name": "refresh"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "settled",
+            "mode": "until",
+            "field": "status",
+            "not": [
+              "pending"
+            ],
+            "what": "the delivery to settle"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/deliveries/{delivery}/redeliver": {
+      "post": {
+        "summary": "Push the same message again, as Pub/Sub does when a push isn't acknowledged: the same message id",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleDelivery",
+          "name": "redeliver"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Pub/Sub has no API to push an acknowledged message again"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/deliveries/{delivery}/resend": {
+      "post": {
+        "summary": "Push it again, forged: with a token signed by another key, one that has expired, or one for another audience than the push endpoint",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleDelivery",
+          "name": "resend",
+          "options": [
+            "badSignature",
+            "stale",
+            "wrongAudience"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleResendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/calls": {
+      "get": {
+        "summary": "The Gmail calls the agent made about this session's mail, by the SDK's method name (`users.messages.send`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleFixture",
+          "name": "calls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "filter": true,
+            "what": "an API call from the agent"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "Gmail doesn't report the mailbox's calls; proxy mode sees them"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ui/login-links": {
       "post": {
         "summary": "A new one-time link that opens the UI in a browser (what `channelstack ui` prints)",
@@ -24133,6 +25763,10 @@
     {
       "name": "resend",
       "title": "Resend"
+    },
+    {
+      "name": "google",
+      "title": "Google"
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { PREFIXED_TOKENS } from "../../test/prefixed-tokens.ts";
 import { IdGenerator } from "../core/ids/index.ts";
 import { Redactor } from "../core/redact/index.ts";
 import { GITHUB_IDS, githubLegacyNodeId, githubNodeId } from "./github/ids.ts";
@@ -116,8 +117,6 @@ const secrets = DRIVERS.flatMap((driver) => [
   ...Object.entries(driver.secrets).map(([name, format]) => [`${driver.name}.${name}`, format] as const),
   ...(driver.liveTokens ?? []).map((format, at) => [`${driver.name} live token ${at + 1}`, format] as const),
 ]);
-/** A format with a recognisable prefix (`xoxb-`, `ntn_`): those are scrubbed by shape, the rest by value once loaded. */
-const prefixed = secrets.filter(([, format]) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern)));
 
 describe("secret formats", () => {
   test.each(secrets)("%s matches the platform's layout", (_name, format) => {
@@ -126,7 +125,7 @@ describe("secret formats", () => {
     for (let i = 0; i < draws; i++) expect(format.generate()).toMatch(format.pattern);
   });
 
-  test.each(prefixed)("a %s is scrubbed by its shape", (_name, format) => {
+  test.each(PREFIXED_TOKENS)("a %s is scrubbed by its shape", (_name, format) => {
     const token = format.generate();
     const out = new Redactor(TOKEN_PATTERNS).text(`calling with ${token} failed`);
     expect(out).not.toContain(token);

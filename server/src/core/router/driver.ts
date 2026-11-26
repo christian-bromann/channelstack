@@ -210,8 +210,9 @@ export interface DriverDefinition {
    */
   readonly tokenPatterns: readonly RegExp[];
   /**
-   * Tokens the real platform issues that the fake never generates (a person's Slack token, a
-   * Linear API key). The redaction tests make one of each and check `tokenPatterns` scrubs it.
+   * Tokens the platform issues that aren't among `secrets`: ones the fake never generates (a
+   * person's Slack token, a Linear API key), or makes per request (Google's access tokens). The
+   * redaction tests make one of each and check `tokenPatterns` scrubs it.
    */
   readonly liveTokens?: readonly SecretFormat[];
   readonly secrets: SecretSpec;
@@ -222,5 +223,11 @@ export interface DriverDefinition {
    * They are what channelstack's CA may vouch for, and nothing else.
    */
   readonly hosts?: readonly string[];
+  /**
+   * Paths the platform's SDK puts at the root of whatever host it is given, dropping a path the
+   * base URL has (`googleapis`: `/gmail/v1/`). Without portless, where each fake is under a path
+   * prefix, the server serves these at its root too, so the SDK finds them.
+   */
+  readonly rootPaths?: readonly string[];
   create(context: DriverContext): Driver;
 }

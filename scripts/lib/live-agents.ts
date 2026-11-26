@@ -310,6 +310,45 @@ const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
       stops,
     );
   },
+
+  // Google: the agent's Pub/Sub push subscription goes to CHANNELSTACK_GOOGLE_RELAY_URL, which is
+  // also the audience of its tokens.
+  async google(env, stops, { dir, path }) {
+    const token = env.CHANNELSTACK_GOOGLE_REFRESH_TOKEN;
+    const needed = [
+      env.CHANNELSTACK_GOOGLE_CLIENT_ID,
+      env.CHANNELSTACK_GOOGLE_CLIENT_SECRET,
+      env.CHANNELSTACK_GOOGLE_ADDRESS,
+      env.CHANNELSTACK_GOOGLE_PUBSUB_TOPIC,
+      env.CHANNELSTACK_GOOGLE_PUSH_SERVICE_ACCOUNT,
+    ];
+    if (!(token && needed.every(Boolean) && isRelay(env.CHANNELSTACK_GOOGLE_RELAY_URL))) {
+      if (token) {
+        say(
+          "Google: no OAuth client, CHANNELSTACK_GOOGLE_ADDRESS, Pub/Sub topic, push service account and smee.io CHANNELSTACK_GOOGLE_RELAY_URL, so no agent runs here",
+        );
+      }
+      return;
+    }
+    await webhookAgent(
+      "Google",
+      {
+        dir,
+        path,
+        source: env.CHANNELSTACK_GOOGLE_RELAY_URL as string,
+        env: {
+          GOOGLE_CLIENT_ID: env.CHANNELSTACK_GOOGLE_CLIENT_ID as string,
+          GOOGLE_CLIENT_SECRET: env.CHANNELSTACK_GOOGLE_CLIENT_SECRET as string,
+          GOOGLE_REFRESH_TOKEN: token,
+          GMAIL_ADDRESS: env.CHANNELSTACK_GOOGLE_ADDRESS as string,
+          GOOGLE_PUBSUB_TOPIC: env.CHANNELSTACK_GOOGLE_PUBSUB_TOPIC as string,
+          GOOGLE_PUSH_AUDIENCE: env.CHANNELSTACK_GOOGLE_RELAY_URL as string,
+          GOOGLE_PUSH_SERVICE_ACCOUNT: env.CHANNELSTACK_GOOGLE_PUSH_SERVICE_ACCOUNT as string,
+        },
+      },
+      stops,
+    );
+  },
 };
 
 /**

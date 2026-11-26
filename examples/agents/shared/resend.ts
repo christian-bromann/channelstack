@@ -6,21 +6,11 @@
  */
 import type { Resend } from "resend";
 
+import { scriptedAnswer } from "./email.ts";
+
 /** The address the agent sends from, as `channelstack env` prints it (`RESEND_FROM`). */
 const FROM = process.env.RESEND_FROM ?? "my-agent <my-agent@acme.example>";
 const own = (FROM.match(/<([^>]+)>/)?.[1] ?? FROM).toLowerCase();
-
-/** What to say to an email: scripted, from its subject and its first line. */
-function answer(subject: string, text: string): string {
-  const first =
-    text
-      .split("\n")
-      .find((line) => line.trim() !== "" && !line.startsWith(">"))
-      ?.trim() ?? "";
-  if (/invoice/i.test(text)) return "Your invoice is attached to your account page.";
-  if (/refund/i.test(`${subject} ${text}`)) return "Your refund was sent today; it arrives in 3 to 5 days.";
-  return `Thanks for your email about "${subject}". You wrote: ${first}`;
-}
 
 export function resendAgent(resend: Resend) {
   /** The received emails answered so far: Resend sends a webhook again with the same `email_id`. */
@@ -38,7 +28,7 @@ export function resendAgent(resend: Resend) {
       from: FROM,
       to: [sender],
       subject: /^re:/i.test(email.subject) ? email.subject : `Re: ${email.subject}`,
-      text: answer(email.subject, email.text ?? ""),
+      text: scriptedAnswer(email.subject, email.text ?? ""),
       headers: { "In-Reply-To": email.message_id, References: references },
     });
     if (failed) throw new Error(`Couldn't send the answer: ${failed.message}`);

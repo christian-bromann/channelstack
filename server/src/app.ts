@@ -489,6 +489,8 @@ export function createApp(options: AppOptions): App {
     return c.html(options.ui.replaceAll("__NONCE__", nonce).replaceAll("__SESSION__", sessions.open("dev").id));
   });
   for (const driver of drivers) root.route(`/${driver.name}`, driver.fake.api);
+  /** The fakes whose SDKs call paths at the server's root (`googleapis`), by those paths. */
+  const rooted = drivers.flatMap((driver, at) => (DRIVERS[at]?.rootPaths ?? []).map((path) => ({ path, driver })));
   root.notFound((c) => c.json(new ProtocolError("not_found", "Nothing is served here").toBody(), 404));
 
   // A driver's own name, and in proxy mode the provider's hosts, which arrive through the proxy's TLS listener.
@@ -503,7 +505,8 @@ export function createApp(options: AppOptions): App {
     fetch(request) {
       // Behind portless every driver has its own name; without it, drivers are path prefixes on one port.
       const host = (request.headers.get("x-forwarded-host") ?? new URL(request.url).host).split(":")[0] ?? "";
-      const driver = byHost.get(host);
+      const driver =
+        byHost.get(host) ?? rooted.find(({ path }) => new URL(request.url).pathname.startsWith(path))?.driver;
       if (driver) return quiet.during(() => driver.fake.api.fetch(request));
       // Anything outside the control API is the agent calling a fake: the agent isn't quiet while it runs.
       const fromAgent = !new URL(request.url).pathname.startsWith(CONTROL_PREFIX);

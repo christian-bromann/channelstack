@@ -10,19 +10,18 @@
  */
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 
 import { ROOT } from "./lib/generate.ts";
+import { liveEnvPath, parseLiveEnv } from "./lib/live-env.ts";
 
 const ENVIRONMENT = "live";
 
 const { values } = parseArgs({
   options: { "env-file": { type: "string" }, repo: { type: "string" }, "dry-run": { type: "boolean" } },
 });
-const envFile =
-  values["env-file"] ?? join(process.env.CHANNELSTACK_HOME || join(homedir(), ".channelstack"), "live.env");
+const envFile = values["env-file"] ?? liveEnvPath();
 const dryRun = values["dry-run"] === true;
 
 const fail = (message: string): never => {
@@ -56,16 +55,7 @@ try {
 }
 if (process.platform !== "win32" && (mode! & 0o077) !== 0) fail(`${envFile} can be read by others: chmod 600 it`);
 
-/** `NAME=value` lines, a value optionally in single or double quotes, as `set -a; . live.env` reads them. */
-const env = new Map<string, string>();
-for (const line of readFileSync(envFile, "utf8").split("\n")) {
-  const found = /^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$/.exec(line);
-  if (!found) continue;
-  let value = (found[2] as string).trim();
-  if (value.length >= 2 && (value[0] === "'" || value[0] === '"') && value.at(-1) === value[0])
-    value = value.slice(1, -1);
-  if (value !== "") env.set(found[1] as string, value);
-}
+const env = parseLiveEnv(readFileSync(envFile, "utf8"));
 
 // The people's saved browser sessions (`channelstack login`), as one secret the nightly job writes
 // back to files: `{ "<channel>-<person>.json": <storage state> }`.

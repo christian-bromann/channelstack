@@ -16,6 +16,9 @@ const KINDS = new Set(["ok", "error", "type", "subtype", "kind", "object", "stat
 
 export type Shape = string | Shape[] | { [key: string]: Shape };
 
+/** A key that is an id, a digest's hex (Google's certificates by key id): one `<id>` key, whichever ids there are. */
+const ID_KEY = /^[0-9a-f]{32,}$/;
+
 /** A value's shape: `"string"`, `"number"`, …, a code kept as `"=ok"`, an object's keys, a list's items merged. */
 export function shapeOf(value: unknown, key?: string): Shape {
   if (value === null) return "null";
@@ -24,7 +27,13 @@ export function shapeOf(value: unknown, key?: string): Shape {
     return items.length === 0 ? [] : [items.reduce(mergeShapes)];
   }
   if (typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, shapeOf(item, name)]));
+    const shape: { [key: string]: Shape } = {};
+    for (const [name, item] of Object.entries(value)) {
+      const key = ID_KEY.test(name) ? "<id>" : name;
+      const known = shape[key];
+      shape[key] = known === undefined ? shapeOf(item, name) : mergeShapes(known, shapeOf(item, name));
+    }
+    return shape;
   }
   if (typeof value === "string" && key !== undefined && KINDS.has(key) && value.length <= 64) return `=${value}`;
   if (typeof value === "boolean" && key === "ok") return `=${value}`;

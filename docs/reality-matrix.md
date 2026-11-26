@@ -225,6 +225,24 @@ Sent email can't be taken back. Live, every recipient must be at a domain in `CH
 | `delivery.resend()` / redelivery | Done | No | — | Fake-only. Resend replays a webhook only from its dashboard |
 | `resend.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Resend doesn't report the team's calls |
 
+## Google
+
+Built (phase 9), and checked against two Gmail accounts and a Pub/Sub topic on 2026-11-25: Ana's email from her own account reached the agent's inbox, Gmail pushed through Pub/Sub to the agent, its answer was read back in her thread, and each thread was labelled for the run in both mailboxes and trashed when the session closed. The differential run (`scenarios/google/reply.yaml`) found no difference from the fake. Gmail files mail from a new address as spam, which its watch on `INBOX` never hears of: each sandbox account needs a filter that never sends the other's mail to spam. An agent on Gmail has a mailbox it reads and sends from through the Gmail API (`googleapis`), with an OAuth client and its mailbox's refresh token, and a Pub/Sub topic its `users.watch` pushes to. With those set (`CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET`, `CHANNELSTACK_GOOGLE_REFRESH_TOKEN`), Google runs live: each person is a Gmail account of their own, with a refresh token from the same OAuth client (`CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN`). A person's email goes out through Gmail from their account; the agent's answers are read back from their mail.
+
+Sent email can't be taken back. Live, every recipient must be an address in `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`, checked before Gmail is asked to send. Each session labels every thread it touches with a label of its own, named with the run's tag, in the person's mailbox and in the agent's; when it closes it trashes them and deletes its labels, and the sweep does the same for a run that crashed.
+
+| Feature | Fake | Live | How (live) | Notes |
+|---|---|---|---|---|
+| `google.createUser({ name, address, token })` | Done | Built | The person's own account's refresh token; their address is the account's | A person is their mailbox: their `id` is their address. In the fake, `<name>@example.com` |
+| `ana.send({ to, cc, subject, text, html })` | Done | Built | `users.messages.send` with the person's token, labelled with the run's tag | To the agent's address a copy lands in the agent's inbox, unread, and its watch hears of it. Attachments aren't built, fake or live |
+| `ana.reply(email, { text, all })` | Done | Built | `users.messages.send` on the person's thread, with `In-Reply-To` and `References` | `Re:` its subject, to its sender (`Reply-To` first), and with `all` to everyone on it |
+| `ana.inbox()`, `waitForEmail` | Done | Built | `users.messages.list` and `get` in the person's mailbox | Read again before each read (cached for a second) |
+| `thread.messages()`, `replies()`, `transcript()`, `toHaveReplyFrom` | Done | Built | Each person's mail | A thread is the emails joined by `In-Reply-To` and `References`. In the agent's mailbox, Gmail threads them by `threadId`, references and a matching subject. An email's `labels` are its copy's there (`INBOX`, `UNREAD`, `SENT`, the agent's own), fake and live: live, read with the agent's token, without the run's own label |
+| The agent's API (`users.messages`, `threads`, `labels`, `history.list`, `watch`, `stop`, `getProfile`) and Google's token endpoint | Done | Agent's concern | — | The fake answers as Gmail's discovery document says (exit check 9.2), with Google's error envelope; the token endpoint takes the `refresh_token` grant only. `googleapis` needs `rootUrl` per API, and `{ raw }` for `messages.send`: its media upload ignores `rootUrl` |
+| Push deliveries (`gmail.history`) | Done | Agent's concern | — | Pub/Sub pushes to the agent's own URL. The fake pushes in Pub/Sub's wrapped format with an RS256 OIDC token for the push endpoint, from a per-install key whose certificates it serves, at most once a second per mailbox and session ([decision 0022](decisions/0022-gmail-push-rate.md)), retried on Pub/Sub's backoff |
+| `delivery.resend()` / redelivery | Done | No | — | Fake-only. Pub/Sub pushes again only what wasn't acknowledged |
+| `google.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Gmail doesn't report the mailbox's calls |
+
 ---
 
 ## What this means for test authors

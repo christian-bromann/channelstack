@@ -113,6 +113,14 @@ divergences:
       answers `raw: null`, which Resend's description allows. Building the raw message comes with
       attachments.
     expires: 2027-02-28
+  - scenario: shapes/google
+    path: api POST /token refresh_token_expires_in
+    reason: >-
+      Google answers a refresh token's remaining lifetime only when the token has one: access
+      granted for a time, or an OAuth client whose consent screen is still in Testing (its refresh
+      tokens last 7 days), as the sandbox's is. The fake's client is a published one, whose tokens
+      don't expire.
+    expires: 2027-02-28
   - scenario: shapes/notion
     path:
       - "api GET /v1/comments/{id} rich_text.[].mention.user.avatar_url"
