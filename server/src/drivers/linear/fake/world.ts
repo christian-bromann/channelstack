@@ -528,10 +528,10 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     // comment of the app in the session's thread; the activity's source comment is that comment.
     if (type === "response" || type === "elicitation" || type === "error") {
       const issue = store.issue(record.issue);
-      const parent = record.thread === null ? undefined : store.commentsOn(issue).find((c) => c.id === record.thread);
+      // Every session in the fake has its thread: its mention, or the one Linear opened for it.
+      const parent = store.comments.find(record.thread as string);
       const written = comment(issue, store.appUser.id, activity.content.body ?? "", parent);
       written.session = record.id;
-      record.thread ??= written.id;
       activity.sourceComment = written.id;
     }
     return activity;
@@ -714,7 +714,8 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
         priority: input.priority ?? 0,
         state: state.id,
         labels: labels.map((label) => label.id),
-        // Created delegated is delegating: the person is the assignee unless they named one.
+        // Created delegated is delegating: the person is the assignee unless they named one (inferred
+        // from delegating an existing issue, which the differential run saw).
         assignee: input.assignee ?? (input.delegate !== undefined && creator !== store.appUser.id ? creator : null),
         delegate: input.delegate ?? null,
         creator,
