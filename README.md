@@ -12,13 +12,11 @@
   <a href="https://channelstack.dev">Website</a> ·
   <a href="https://channelstack.dev/docs">Docs</a> ·
   <a href="#status">Status</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
   <a href="docs/phases.md">Build plan</a>
 </p>
 
 ---
-
-> [!NOTE]
-> channelstack is under construction and not on npm yet. See [Status](#status).
 
 channelstack runs fake versions of Slack, GitHub, Linear, Notion, Resend and Gmail on your machine. It's for anyone whose code talks to those platforms' APIs and reacts to their events: a Slack bot, a GitHub App or Probot app, a Linear or Notion integration, an agent people email, a notification bot, or an AI agent. Tests script the people, your app answers through its real code path, and you assert on what a person would see:
 
@@ -32,6 +30,51 @@ test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
   await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
   await expect(channel).not.toHaveChannelMessageFrom("my-agent");
 });
+```
+
+The same test in Python, with [pytest-channelstack](integrations/pytest-channelstack):
+
+```python
+from channelstack import SlackFixture
+from pytest_channelstack import expect
+
+
+async def test_a_mention_gets_exactly_one_reply_in_the_thread(slack: SlackFixture) -> None:
+    ana = await slack.create_user(name="Ana")
+    channel = await slack.create_channel(participants=[ana, slack.app])
+
+    msg = await ana.say("@my-agent summarize yesterday's incidents", channel=channel)
+
+    await expect(msg.thread).to_have_replies_from("my-agent", count=1)
+    await expect(channel).not_to_have_channel_message_from("my-agent")
+```
+
+And in Rust, with the [channelstack crate](sdks/rust):
+
+```rust
+use channelstack::{Handle, Mode, connect, expect};
+
+#[tokio::test]
+async fn a_mention_gets_exactly_one_reply_in_the_thread() -> channelstack::Result<()> {
+    let client = connect(Mode::Auto).await?;
+    let session = client.open_session().name("a mention").send().await?;
+    let slack = session.slack().await?;
+
+    let ana = slack.create_user().name("Ana").await?;
+    let channel = slack
+        .create_channel()
+        .participants(vec![&ana as &dyn Handle, &slack.app()])
+        .await?;
+
+    let msg = ana.say("@my-agent summarize yesterday's incidents").channel(&channel).await?;
+
+    expect(&msg.thread()).to_have_replies_from("my-agent", 1).await?;
+    expect(&channel).not_to_have_channel_message_from("my-agent").await?;
+
+    session.close().await?;
+    client.close().await;
+    Ok(())
+}
 ```
 
 There are no hand-built webhook payloads and no mocked SDK calls. Ana posts, the fake Slack delivers a signed event to your app, your app replies through the Slack SDK it already uses, and the matcher waits for what Ana would see in the thread.
@@ -76,8 +119,6 @@ One server process fakes the platforms in memory. Your test drives it through a 
 
 ## Quick start
 
-Once the first release is out:
-
 ```bash
 npm i -D channelstack
 CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events npx channelstack &   # the fakes, each with an app named my-agent
@@ -95,11 +136,27 @@ import channelstack from "channelstack/vitest";
 export default defineConfig({ plugins: [channelstack()] });
 ```
 
+For Python, install the pytest plugin, which registers itself and brings the `channelstack` SDK:
+
+```bash
+pip install pytest-channelstack
+```
+
+For Rust, add the crate, which runs on Tokio:
+
+```bash
+cargo add --dev channelstack
+cargo add --dev tokio --features macros,rt-multi-thread
+```
+
+The Python and Rust SDKs use the same server, from npm or the
+[GitHub releases](https://github.com/christian-bromann/channelstack/releases).
+
 There is no config file. Each fake has a built-in app named `my-agent`, and where it sends events comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE`) in the server's environment. [docs/devx.md](docs/devx.md) covers the CLI, Vitest and pytest, proxy mode and CI.
 
 ## Status
 
-Under construction, phase by phase. Phases 0 to 8 are merged: the server and the SDK generator, the Slack, GitHub, Linear and Notion fakes, live mode, proxy mode and conformance, the TypeScript, Python and Rust SDKs with the Vitest and pytest integrations and MCP, and the channel kit with Resend, the first email channel. Google (Gmail), phase 9, is in progress. [docs/phases.md](docs/phases.md) has each phase and the check that proves it is done.
+0.1.0 is the first release: the server on npm (`channelstack`, with a binary for Linux, macOS and Windows), the Python SDK and pytest plugin on PyPI (`channelstack`, `pytest-channelstack`), and the Rust SDK on crates.io (`channelstack`). Every package carries the same version. It's early: expect the API to change before 1.0, and see the [changelog](CHANGELOG.md) for what each release brings. [docs/phases.md](docs/phases.md) has how it was built, phase by phase.
 
 ## In this repository
 
@@ -114,4 +171,4 @@ Under construction, phase by phase. Phases 0 to 8 are merged: the server and the
 
 ## License
 
-[MIT](LICENSE). channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear or Notion.
+[MIT](LICENSE). channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub, Linear, Notion, Resend or Google.

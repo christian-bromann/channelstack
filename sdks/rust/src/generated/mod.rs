@@ -25,7 +25,7 @@ use crate::runtime::wait::{
 };
 
 /// The server version this SDK was generated for. It checks the server's major version on connect.
-pub const VERSION: &str = "0.0.0";
+pub const VERSION: &str = "0.1.0";
 const BASE_PATH: &str = "/_channelstack";
 
 /// A handle's wait state, shared by its clones.
