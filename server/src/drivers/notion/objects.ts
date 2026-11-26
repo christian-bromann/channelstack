@@ -8,6 +8,7 @@ import type {
   DatabaseObjectResponse,
   DataSourceObjectResponse,
   PageObjectResponse,
+  ParagraphBlockObjectResponse,
   UserObjectResponse,
 } from "@notionhq/client";
 
@@ -33,6 +34,9 @@ const partialUser = (id: string) => ({ object: "user" as const, id });
 
 type PropertyValue = PageObjectResponse["properties"][string];
 type DataSourceProperty = DataSourceObjectResponse["properties"][string];
+
+/** What a paragraph has that a request may leave out: its icon, none unless one is set. */
+const PARAGRAPH: Pick<ParagraphBlockObjectResponse["paragraph"], "icon"> = { icon: null };
 
 export interface NotionObjectsDeps {
   links: NotionLinks;
@@ -180,7 +184,7 @@ export function notionObjects(deps: NotionObjectsDeps) {
       in_trash: record.inTrash,
       archived: record.inTrash,
       type: record.type,
-      [record.type]: record.data,
+      [record.type]: record.type === "paragraph" ? { ...PARAGRAPH, ...record.data } : record.data,
     }) as BlockObjectResponse;
 
   const dataSourceProperty = (schema: NotionPropertyRecord): DataSourceProperty => {

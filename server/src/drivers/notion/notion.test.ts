@@ -96,6 +96,13 @@ describe("the REST API", () => {
       { type: "to_do", to_do: { checked: false, rich_text: [{ plain_text: "ship it" }] } },
     ]);
     expect(await get(`/pages/${page.id}/markdown`)).toBe("- one\n- [ ] ship it");
+    // A paragraph has an icon, null unless one is set, in what the append answers and what lists.
+    const paragraph = await api("PATCH", `blocks/${page.id}/children`, {
+      children: [{ type: "paragraph", paragraph: { rich_text: [{ type: "text", text: { content: "why" } }] } }],
+    });
+    expect(paragraph.body.results[0].paragraph).toEqual(expect.objectContaining({ icon: null, color: "default" }));
+    const prose = await post("/pages", { title: "Prose", content: "Just words.", connections: [app.id] });
+    expect((await api("GET", `blocks/${prose.id}/children`)).body.results[0].paragraph).toHaveProperty("icon", null);
     const comment = await post(`/users/${ana.id}/comment`, { text: "@my-agent hi", page: page.id });
     expect(comment.text).toBe("@my-agent hi");
     // Anchored by a pattern, as the SDKs send a RegExp.
