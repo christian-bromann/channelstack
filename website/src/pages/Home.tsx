@@ -23,6 +23,7 @@ const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {
   github: { onLight: "/logos/github.svg", onDark: "/logos/github-white.svg" },
   linear: { onLight: "/logos/linear.svg", onDark: "/logos/linear-light.svg" },
   notion: { onLight: "/logos/notion.svg", onDark: "/logos/notion.svg" },
+  resend: { onLight: "/logos/resend.svg", onDark: "/logos/resend-white.svg" },
 };
 
 const CHANNELS = [
