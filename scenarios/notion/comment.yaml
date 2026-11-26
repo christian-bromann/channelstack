@@ -14,6 +14,10 @@ steps:
   - call: ana.createPage
     args: [{ title: Conformance smoke test, connections: [$notion.app] }]
     as: page
+  # A page in the page, so the agent's read of the page's blocks lists a child_page in both worlds.
+  - call: ana.createPage
+    args: [{ title: Conformance subpage, parent: $page }]
+    as: subpage
   - call: ana.comment
     args: ["@my-agent summarize this page"]
     options: { page: $page }
