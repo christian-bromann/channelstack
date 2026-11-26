@@ -143,11 +143,12 @@ export interface LinearSessionRecord {
   appUser: string;
   /** The person responsible for the session: whoever delegated or mentioned the app. */
   creator: string;
-  /** The comment that opened the session (a mention), as `AgentSession.comment`. */
+  /** The comment that opened the session (a mention, or Linear's own for a delegation), as `AgentSession.comment`. */
   comment: string | null;
   /**
    * The root comment of the thread the session's comments are in: the mention, or for a
-   * delegation the first comment Linear wrote for the session. A reply there prompts the session.
+   * delegation the comment Linear writes to open it. A reply there prompts the session. Null
+   * only live, for a session whose thread the mirror hasn't read.
    */
   thread: string | null;
   status: LinearSessionStatus;

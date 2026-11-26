@@ -337,7 +337,10 @@ export function createLiveLinearWorld(deps: {
     // Only the fake delivers: live, Linear delivers to the agent itself.
     delivery: undefined,
     prompted: undefined,
-    ...(comment.user === null && comment.botActor?.type === "workflow" ? { byLinear: true } : {}),
+    // Linear's own comment: no user, its workflow the author, and a session's thread.
+    ...(comment.user === null && comment.botActor?.type === "workflow" && comment.agentSession
+      ? { byLinear: true }
+      : {}),
   });
 
   /** Someone the session's view names: a person of the session, the app, or someone else in the workspace. */

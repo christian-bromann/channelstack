@@ -3074,7 +3074,7 @@ export class LinearIssue {
     return data;
   }
 
-  /** The comments on the issue, oldest first. Experimental. */
+  /** The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread. Experimental. */
   async comments(): Promise<LinearComments> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues/${segment(this.id)}/comments`)) as LinearCommentsWire;

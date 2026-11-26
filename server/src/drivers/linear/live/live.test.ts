@@ -153,6 +153,18 @@ describe("live Linear: acting and reading back", () => {
       "Found it",
       "Fixed in the login form",
     ]);
+    // The comment Linear opened the session's thread with is no one's: not among the comments, and
+    // the transcript reads the session as the fake's does.
+    expect((await session.linear("GET", `/issues/${issue.body.id}/comments`)).body).toEqual([]);
+    const transcript = await session.linear("GET", `/issues/${issue.body.id}/transcript`);
+    expect(transcript.body.text).not.toContain("This thread is for an agent session");
+    expect(
+      transcript.body.entries.slice(1).map((entry: { depth: number; text: string }) => [entry.depth, entry.text]),
+    ).toEqual([
+      [0, "(thought) Looking into it"],
+      [0, "(thought) Found it"],
+      [0, "Fixed in the login form"],
+    ]);
   });
 
   test("a fake person can't act in a live workspace", async () => {

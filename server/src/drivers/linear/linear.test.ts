@@ -77,8 +77,14 @@ describe("agent sessions", () => {
     expect(event?.payload.agentActivity.sourceCommentId).toBe(thread.id);
     expect(linearWebhookProblems("AgentSessionEvent", event?.payload)).toEqual([]);
     expect(session.delivery).toMatchObject({ type: "AgentSessionEvent", action: "created" });
+    // Linear's comment is no one's: a test reading the issue's comments, or waiting for the app's, doesn't see it.
+    expect(await get(`/issues/${created.id}/comments`)).toEqual([]);
     // Ana delegated an issue nobody had: it is hers now, in the Issue event too.
     expect(await get(`/issues/${created.id}/assignee`)).toMatchObject({ id: ana.id });
+    // Created delegated is delegating (inferred: the differential run delegated an existing issue).
+    const born = await issue("Delegated from the start", { delegate: app.id });
+    expect(await get(`/issues/${born.id}/assignee`)).toMatchObject({ id: ana.id });
+    expect(await get(`/issues/${born.id}/comments`)).toEqual([]);
     const update = webhooks().find((hook) => hook.event === "Issue" && hook.payload.action === "update");
     expect(update?.payload).toMatchObject({ data: { assigneeId: ana.id }, updatedFrom: { assigneeId: null } });
     const read = await gql(
