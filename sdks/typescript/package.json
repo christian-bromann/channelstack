@@ -1,12 +1,30 @@
 {
   "name": "channelstack",
   "version": "0.0.0",
-  "description": "A test harness for AI agents that live in Slack, GitHub, Linear and Notion.",
+  "description": "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail: fake platforms on localhost, the TypeScript SDK, Vitest fixtures and matchers.",
+  "keywords": [
+    "testing",
+    "test-harness",
+    "fake",
+    "slack",
+    "github",
+    "linear",
+    "notion",
+    "resend",
+    "gmail",
+    "agents",
+    "vitest"
+  ],
+  "homepage": "https://channelstack.dev",
+  "bugs": {
+    "url": "https://github.com/christian-bromann/channelstack/issues"
+  },
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/christian-bromann/channelstack.git"
+    "url": "git+https://github.com/christian-bromann/channelstack.git",
+    "directory": "sdks/typescript"
   },
   "engines": {
     "node": ">=22"

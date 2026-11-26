@@ -83,7 +83,7 @@ Agents tend to write the same function twice when they can't see the first one. 
 Use a dependency wherever a good one exists; don't hand-write what a maintained library already does well (HTTP and routing, validation, WebSockets, JSON Schema and GraphQL validation, git objects, the browser actor, test frameworks, the platforms' official SDKs in reference agents and tests).
 
 - **What stays ours:** the fake platforms themselves, the transcripts and the matchers. They're the product, so they aren't layered on another emulator (the closed MDA stack showed why).
-- **A dependency must be:** permissively licensed (MIT, Apache-2.0, BSD, ISC), maintained (a release in the last 12 months or clearly stable), widely used, compatible with Bun and the compiled binary (avoid native modules), and pinned to an exact version.
+- **A dependency must be:** permissively licensed (MIT, Apache-2.0, BSD, ISC), maintained (a release in the last 12 months or clearly stable), widely used, compatible with Bun and the compiled binary (avoid native modules), and pinned to an exact version. The published Python and Rust libraries are the exception: their manifests take a range up to the next major version, and their lock files pin what CI tests ([decision 0023](docs/decisions/0023-releases.md)).
 - **Record each new runtime dependency** in the phase plan with the reason; the review checks it.
 
 ## Decisions that are settled

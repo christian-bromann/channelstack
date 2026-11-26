@@ -259,7 +259,7 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 - **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`, defined in [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md)) run through every SDK in CI, like WebDriver's WPT.
 - **No stale output.** CI fails if `openapi.json`, `ir.json` or any generated SDK is out of date with the routes.
 - **The TS contract holds.** CI type-checks `api/examples/*.test.ts` against the generated TypeScript SDK, and checks that every member of every handle in `api/*.d.ts` exists on the generated handle (gaps listed with their issues), so the hand-designed API and the generated one can't drift.
-- **Versioning.** One tag releases the server, the spec and every SDK at the same version. SDKs check the server's major version on connect.
+- **Versioning.** One tag releases the server, the spec and every SDK at the same version ([releasing](release.md)). SDKs check the server's major version on connect.
 
 ## 6. Distribution
 
@@ -269,7 +269,7 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 | npm | `channelstack` (CLI, UI, `channelstack/vitest`, `channelstack/checks`) with `@channelstack/server-<platform>` as optional dependencies |
 | PyPI | `channelstack`, without the binary: the launcher finds it at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH` (for example from the npm package); `pytest-channelstack` for fixtures and matchers |
 | Rust | The crate `channelstack`, without the binary and without downloading one: it finds it at `CHANNELSTACK_SERVER_BIN` or `channelstack` on the `PATH` |
-| Docker | `ghcr.io/<org>/channelstack` for CI and for proxy mode with Go or Linux agents |
+| Docker | `ghcr.io/<org>/channelstack` for CI and for proxy mode with Go or Linux agents. Not in the first release ([decision 0023](decisions/0023-releases.md)) |
 
 ## 7. Repository layout
 

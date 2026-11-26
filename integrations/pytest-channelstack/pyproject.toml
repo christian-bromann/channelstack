@@ -1,10 +1,34 @@
 [project]
 name = "pytest-channelstack"
 version = "0.0.0"
-description = "pytest fixtures and expect(...) checks for channelstack: test AI agents in Slack, GitHub, Linear and Notion."
+description = "pytest fixtures and expect(...) checks for channelstack: test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail."
+readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
-dependencies = ["channelstack", "pytest==8.4.2", "pytest-asyncio==1.4.1"]
+keywords = ["pytest", "testing", "slack", "github", "linear", "notion", "email", "agents"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: Pytest",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+  "Typing :: Typed",
+]
+# The SDK of the same release; the rest take a range, and the lock file pins what CI tests
+# (docs/decisions/0023-releases.md).
+dependencies = ["channelstack==0.0.0", "pytest>=8.4.2,<9", "pytest-asyncio>=1.4.1,<2"]
+
+[project.urls]
+Homepage = "https://channelstack.dev"
+Documentation = "https://channelstack.dev/docs"
+Repository = "https://github.com/christian-bromann/channelstack"
+Issues = "https://github.com/christian-bromann/channelstack/issues"
+Changelog = "https://github.com/christian-bromann/channelstack/blob/main/CHANGELOG.md"
 
 [project.entry-points.pytest11]
 channelstack = "pytest_channelstack.plugin"

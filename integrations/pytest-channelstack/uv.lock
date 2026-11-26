@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "httpx", specifier = "==0.28.1" }]
+requires-dist = [{ name = "httpx", specifier = ">=0.28.1,<1" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -205,8 +205,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "channelstack", editable = "../../sdks/python" },
-    { name = "pytest", specifier = "==8.4.2" },
-    { name = "pytest-asyncio", specifier = "==1.4.1" },
+    { name = "pytest", specifier = ">=8.4.2,<9" },
+    { name = "pytest-asyncio", specifier = ">=1.4.1,<2" },
 ]
 
 [package.metadata.requires-dev]

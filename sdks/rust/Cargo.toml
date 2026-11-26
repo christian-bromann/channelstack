@@ -3,14 +3,21 @@ name = "channelstack"
 version = "0.0.0"
 edition = "2024"
 license = "MIT"
-description = "Test AI agents that live in Slack, GitHub, Linear and Notion: the channelstack Rust SDK"
+description = "Test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail: the channelstack Rust SDK"
 repository = "https://github.com/christian-bromann/channelstack"
+homepage = "https://channelstack.dev"
+documentation = "https://docs.rs/channelstack"
+readme = "README.md"
+keywords = ["testing", "slack", "github", "agents", "fake"]
+categories = ["development-tools::testing", "api-bindings"]
 
+# A published library takes a range (Cargo's default, `^`), so it builds next to the versions a
+# project already has; Cargo.lock pins what CI tests (docs/decisions/0023-releases.md).
 [dependencies]
-percent-encoding = "=2.3.2"
-regex = "=1.13.1"
-reqwest = { version = "=0.13.5", default-features = false, features = ["json", "query", "rustls"] }
-serde_json = "=1.0.154"
-tempfile = "=3.27.0"
-thiserror = "=2.0.21"
-tokio = { version = "=1.54.1", features = ["fs", "macros", "process", "rt-multi-thread", "time"] }
+percent-encoding = "2.3.2"
+regex = "1.13.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "query", "rustls"] }
+serde_json = "1.0.154"
+tempfile = "3.27.0"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["fs", "macros", "process", "rt-multi-thread", "time"] }
