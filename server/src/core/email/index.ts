@@ -1,3 +1,4 @@
+import { compile } from "html-to-text";
 import { addressParser } from "postal-mime";
 
 import { type TranscriptEntry, type TranscriptPrincipal, transcriptText } from "../router/inspect.ts";
@@ -140,26 +141,38 @@ function ownText(text: string): string {
   for (let at = 0; at < lines.length; at++) {
     const line = lines[at] ?? "";
     if (line.startsWith(">")) continue;
-    // Gmail, Apple Mail and Outlook introduce a quote with one line; the quote follows it.
-    if (/^On .+ wrote:\s*$/.test(line) && (lines[at + 1] ?? "").startsWith(">")) continue;
+    // Gmail, Apple Mail and Outlook introduce a quote with one line; the quote follows it, after a
+    // blank line in HTML mail, where the line and the quote are blocks of their own.
+    if (
+      /^On .+ wrote:\s*$/.test(line) &&
+      (lines.slice(at + 1).find((next) => next.trim() !== "") ?? "").startsWith(">")
+    )
+      continue;
     kept.push(line);
   }
   return kept.join("\n").trim();
 }
 
-/** The plain text of an HTML body, for an email sent with HTML only: tags out, entities decoded, blocks as lines. */
+/**
+ * HTML as a person reads it, on `html-to-text`: entities decoded, blocks and line breaks as lines,
+ * lists as `- ` and `1. ` items, a quote as `> ` lines (so `ownText` drops it as it does in text
+ * mail), a link as its text and its address (once, when the text is the address), no images, no
+ * scripts or styles, and lines as long as they were written.
+ */
+const htmlConvert = compile({
+  wordwrap: false,
+  selectors: [
+    { selector: "a", options: { hideLinkHrefIfSameAsText: true } },
+    { selector: "img", format: "skip" },
+    { selector: "ul", options: { itemPrefix: "- " } },
+    ...["h1", "h2", "h3", "h4", "h5", "h6"].map((selector) => ({ selector, options: { uppercase: false } })),
+  ],
+});
+
+/** The plain text of an HTML body, for an email sent with HTML only. A no-break space reads as a space. */
 function htmlText(html: string): string {
-  return html
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&")
+  return htmlConvert(html)
+    .replace(/ /g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
