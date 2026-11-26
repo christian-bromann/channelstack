@@ -23,10 +23,10 @@ export interface NotionFixture extends Inspectable<NotionDelivery> {
    *
    * In the fake, a seed page sends no event. Live, a real person makes it (`createdBy`,
    * or else the session's first person), so Notion sends `page.created` to a connected
-   * integration, and an agent that acts
-   * on new pages (writes a summary into them, say) may change the page before the test
-   * reads it. Use `user.createPage` when the creation itself should reach the agent as
-   * an event: it sends `page.created` in both worlds.
+   * integration, and an agent that acts on new pages (writes a summary into them, say)
+   * may change the page before the test reads it. Use `user.createPage` when the
+   * creation itself should reach the agent as an event: it sends `page.created` in
+   * both worlds.
    */
   createPage(options: NotionPageOptions): Promise<NotionPage>;
   createDatabase(options: NotionDatabaseOptions): Promise<NotionDatabase>;
