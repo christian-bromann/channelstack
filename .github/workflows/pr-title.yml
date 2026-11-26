@@ -7,6 +7,9 @@ name: PR title
 # `pull_request_target` so a pull request from a fork is checked too. The job reads only the title
 # from the event: it never checks out or runs the pull request's code, and its token can only read.
 on:
+  # Scratch only: pull_request_target runs main's copy of this file, which doesn't exist yet.
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
   pull_request_target:
     types: [opened, edited, synchronize, reopened]
 
