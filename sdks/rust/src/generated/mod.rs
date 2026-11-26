@@ -753,6 +753,7 @@ fn run_slack_user_say<'a>(
         let p_message = args.next().unwrap_or(Value::Null);
         let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
         let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let p_files = options.get("files").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/say",
             encode_segment(ctx.session()?),
@@ -777,6 +778,10 @@ fn run_slack_user_say<'a>(
                     (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
                         &p_to,
                     )?,
+                );
+                wire.insert(
+                    "files".into(),
+                    (&|v: &Value| files::read_tree(v))(&p_files)?,
                 );
                 wire
             }),
@@ -803,6 +808,7 @@ fn run_slack_user_reply<'a>(
             .get("alsoSendToChannel")
             .cloned()
             .unwrap_or(Value::Null);
+        let p_files = options.get("files").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/slack/users/{}/reply",
             encode_segment(ctx.session()?),
@@ -823,6 +829,10 @@ fn run_slack_user_reply<'a>(
                     (&|v: &Value| enc::ref_ids(v, &["channel", "ts"]))(&p_thread)?,
                 );
                 wire.insert("alsoSendToChannel".into(), p_also_send_to_channel.clone());
+                wire.insert(
+                    "files".into(),
+                    (&|v: &Value| files::read_tree(v))(&p_files)?,
+                );
                 wire
             }),
             None,
@@ -8387,6 +8397,10 @@ impl SlackUserSay {
     pub fn to(self, value: impl IntoArg) -> Self {
         Self(self.0.option("to", value))
     }
+    /// `files`.
+    pub fn files(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("files", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<SlackMessage> {
         self.0.send().await
@@ -8412,6 +8426,10 @@ impl SlackUserReply {
     /// `alsoSendToChannel`.
     pub fn also_send_to_channel(self, value: impl IntoArg) -> Self {
         Self(self.0.option("alsoSendToChannel", value))
+    }
+    /// `files`.
+    pub fn files(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("files", value))
     }
     /// Send the request.
     pub async fn send(self) -> Result<SlackMessage> {

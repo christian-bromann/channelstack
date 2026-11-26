@@ -638,3 +638,79 @@ describe("files (upload v2, the basics)", () => {
     expect((await api("files.completeUploadExternal", { files: [] })).error).toBe("invalid_arguments");
   });
 });
+
+describe("files a person shares", () => {
+  const b64 = (text: string) => Buffer.from(text).toString("base64");
+
+  test("a person's message shares files the agent reads from url_private with its bot token", async () => {
+    const { h, agent, app, ana, channel, post, api, get } = await workspace();
+    const log = "Error: disk full\n";
+    const said = await post(`/users/${ana.id}/say`, {
+      message: { text: "@my-agent why does it crash?" },
+      channel: channel.id,
+      files: [{ path: "crash.log", content: b64(log) }],
+    });
+    await h.app.settled();
+
+    // Slack sends the mention, and the message as a file share, both with the file on them.
+    const events = agent.received.map((delivery) => JSON.parse(delivery.body).event);
+    const file = { name: "crash.log", user: ana.id, size: log.length, mimetype: "application/octet-stream" };
+    expect(events.find((event) => event.type === "app_mention")).toMatchObject({ files: [file] });
+    const shared = events.find((event) => event.type === "message");
+    expect(shared).toMatchObject({ subtype: "file_share", user: ana.id, files: [file] });
+    const [{ id, url_private, url_private_download }] = shared.files;
+    expect(id).toMatch(/^F0[0-9A-Z]{9}$/);
+    expect((await api("files.info", { file: id })).file).toMatchObject({ ...file, url_private });
+
+    const download = async (url: string, token: string | undefined) =>
+      h.app.fetch(new Request(url, token === undefined ? {} : { headers: { authorization: `Bearer ${token}` } }));
+    const read = await download(url_private, app.botToken);
+    expect([read.status, await read.text()]).toEqual([200, log]);
+    const attachment = await download(url_private_download, app.botToken);
+    expect(attachment.headers.get("content-disposition")).toBe("attachment; filename*=UTF-8''crash.log");
+    expect(await attachment.text()).toBe(log);
+    // Only the bot token reads it.
+    expect((await download(url_private, undefined)).status).toBe(403);
+    expect((await download(url_private, app.appToken)).status).toBe(403);
+
+    // A reply shares files too, with no text, and a person reads the names in the transcript.
+    await post(`/users/${ana.id}/reply`, {
+      message: {},
+      thread: { channel: channel.id, ts: said.ts },
+      files: [{ path: "a.png", content: b64("png") }],
+    });
+    expect((await get(`/conversations/${channel.id}/transcript`)).text).toBe(
+      "Ana: @my-agent why does it crash? [file: crash.log]\n  Ana: [file: a.png]",
+    );
+  });
+
+  test("the bot reads no file shared where it is no longer a member", async () => {
+    const { h, agent, app, ana, channel, post } = await workspace();
+    await post(`/users/${ana.id}/say`, {
+      message: {},
+      channel: channel.id,
+      files: [{ path: "secret.txt", content: b64("between us") }],
+    });
+    await h.app.settled();
+    const url = JSON.parse(agent.received.at(-1)?.body ?? "{}").event.files[0].url_private;
+    const read = () => h.app.fetch(new Request(url, { headers: { authorization: `Bearer ${app.botToken}` } }));
+    expect((await read()).status).toBe(200);
+    await post(`/users/${ana.id}/kick`, { participant: app.id, channel: channel.id });
+    expect((await read()).status).toBe(404);
+  });
+
+  test("what the control API refuses: a message with neither text nor files, a file over the fake's limit", async () => {
+    const { ana, channel, post } = await workspace();
+    expect(await post(`/users/${ana.id}/say`, { message: {}, channel: channel.id })).toMatchObject({
+      error: "no_text",
+    });
+    const big = Buffer.alloc(10 * 1024 * 1024 + 1).toString("base64");
+    expect(
+      await post(`/users/${ana.id}/say`, {
+        message: {},
+        channel: channel.id,
+        files: [{ path: "big.bin", content: big }],
+      }),
+    ).toMatchObject({ error: "invalid_argument" });
+  });
+});

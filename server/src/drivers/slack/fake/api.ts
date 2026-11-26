@@ -18,7 +18,7 @@ import {
 } from "../world.ts";
 import type { SocketMode } from "./socket.ts";
 import type { SlackStore } from "./store.ts";
-import type { FakeSlackWorld } from "./world.ts";
+import { type FakeSlackWorld, fileUrl, MAX_FILE_BYTES } from "./world.ts";
 
 /** A Web API refusal: Slack answers 200 with `{ ok: false, error }`. */
 class SlackApiError extends Error {
@@ -35,8 +35,6 @@ type Method = (args: Args) => Record<string, unknown>;
 
 /** Slack's limits (https://docs.slack.dev/reference/methods/chat.postMessage, chat.startStream). */
 const MAX_STREAM_LENGTH = 12_000;
-/** The fake keeps uploads in memory, so it takes small files only. */
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
 /** How long after Retry-After a retry may still come: clients add their own backoff (Slack's WebClient: 1 to 2 seconds). */
 const RETRY_GRACE_MS = 3000;
 const SESSION_STATUSES = ["active", "processing", "suspended", "closed"] as const;
@@ -467,6 +465,7 @@ export function createSlackApi(
       const id = ids.next(SLACK_IDS.file);
       store.files.set(id, {
         id,
+        url: fileUrl(context.apiUrl(), store.team.id, id, name),
         name,
         title: name,
         size: length,
@@ -788,6 +787,27 @@ export function createSlackApi(
     file.bytes = bytes;
     file.size = bytes.length;
     return c.text(`OK - ${bytes.length}`);
+  });
+
+  // A file's bytes (`url_private`, `url_private_download`), for the bot token, as `files.slack.com` serves them.
+  api.get("/files-pri/:key/*", (c) => {
+    const id = /^[A-Z0-9]+-(F[A-Z0-9]+)$/.exec(c.req.param("key"))?.[1];
+    const file = id === undefined ? undefined : store.files.get(id);
+    const token = bearerFrom(c.req.header("authorization"));
+    if (token === undefined || !constantTimeEqual(token, context.secret("botToken"))) {
+      return c.text("Forbidden", 403);
+    }
+    // The bot sees its own files, and those shared where it is a member.
+    const conversation = file?.conversation === undefined ? undefined : store.conversations.find(file.conversation);
+    if (!file || file.bytes === undefined || (file.user !== bot() && !conversation?.members.has(bot()))) {
+      return c.text("Not Found", 404);
+    }
+    const download = c.req.path.endsWith(`/download/${encodeURIComponent(file.name)}`);
+    return c.body(Buffer.from(file.bytes), 200, {
+      "content-type": String(fileObject(file).mimetype),
+      "content-length": String(file.bytes.length),
+      ...(download ? { "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}` } : {}),
+    });
   });
 
   api.all("*", (c) => c.json({ ok: false, error: "unknown_method" }, 404));

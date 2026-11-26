@@ -9,7 +9,7 @@ import {
   type Reality,
   unsupportedInLive,
 } from "../../core/reality/index.ts";
-import { type DriverRouter, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
+import { type DriverRouter, fileTree, pathParam, refTo, registerInspectionRoutes } from "../../core/router/index.ts";
 import {
   apiCallSchema,
   DeliveryAttempt,
@@ -26,6 +26,7 @@ import { shownValue, viewInputs } from "./views.ts";
 import type {
   SlackAppRecord,
   SlackConversationRecord,
+  SlackMessageInput,
   SlackMessageRecord,
   SlackUserRecord,
   SlackViewRecord,
@@ -177,6 +178,15 @@ const MessageInput = z
       .optional(),
   })
   .openapi("SlackMessageInput", { "x-channelstack-shorthand": "text" });
+
+/** A message with the files a person shares in it, each by its name and with its bytes. */
+const withFiles = (
+  message: z.infer<typeof MessageInput>,
+  files: ReadonlyArray<{ path: string; content: string }> | undefined,
+): SlackMessageInput =>
+  files === undefined || files.length === 0
+    ? message
+    : { ...message, files: files.map((file) => ({ name: file.path, bytes: Buffer.from(file.content, "base64") })) };
 
 const participantRef = z.string().openapi(refTo("SlackUser", "SlackApp"));
 /** One participant or several: `ana.invite(slack.app, …)` and `ana.invite([ben, slack.app], …)` both work. */
@@ -454,11 +464,16 @@ export function registerSlackRoutes(
     summary: "Post a top-level message in a conversation, or in a DM with the people in `to`",
     params: UserParams,
     body: z
-      .object({ message: MessageInput, channel: conversationRef.optional(), to: participants().optional() })
+      .object({
+        message: MessageInput,
+        channel: conversationRef.optional(),
+        to: participants().optional(),
+        files: fileTree().optional(),
+      })
       .openapi("SlackSayBody"),
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
-    sdkMethod: { on: "SlackUser", name: "say", args: ["message"], options: ["channel", "to"] },
+    sdkMethod: { on: "SlackUser", name: "say", args: ["message"], options: ["channel", "to", "files"] },
     stability,
     handler: async ({ session, params, body }) => {
       const where =
@@ -466,7 +481,10 @@ export function registerSlackRoutes(
       if (!where || (body.channel !== undefined && body.to !== undefined)) {
         throw new ProtocolError("invalid_argument", "say needs exactly one of `channel` and `to`");
       }
-      return messageWire(session.id, await world.postAsUser(session.id, params.user, body.message, where));
+      return messageWire(
+        session.id,
+        await world.postAsUser(session.id, params.user, withFiles(body.message, body.files), where),
+      );
     },
   });
 
@@ -476,16 +494,32 @@ export function registerSlackRoutes(
     summary: "Reply in a thread: pass the message that starts it, or any reply in it",
     params: UserParams,
     body: z
-      .object({ message: MessageInput, thread: threadRef, alsoSendToChannel: z.boolean().optional() })
+      .object({
+        message: MessageInput,
+        thread: threadRef,
+        alsoSendToChannel: z.boolean().optional(),
+        files: fileTree().optional(),
+      })
       .openapi("SlackReplyBody"),
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "no_text", "msg_too_long"],
-    sdkMethod: { on: "SlackUser", name: "reply", args: ["message"], options: ["thread", "alsoSendToChannel"] },
+    sdkMethod: {
+      on: "SlackUser",
+      name: "reply",
+      args: ["message"],
+      options: ["thread", "alsoSendToChannel", "files"],
+    },
     stability,
     handler: async ({ session, params, body }) =>
       messageWire(
         session.id,
-        await world.replyAsUser(session.id, params.user, body.message, body.thread, body.alsoSendToChannel === true),
+        await world.replyAsUser(
+          session.id,
+          params.user,
+          withFiles(body.message, body.files),
+          body.thread,
+          body.alsoSendToChannel === true,
+        ),
       ),
   });
 

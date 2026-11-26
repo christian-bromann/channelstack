@@ -1,5 +1,5 @@
 import type {
-  App, ApiCall, Delivery, DeliveryAttempt, Duration, Inspectable, Principal,
+  App, ApiCall, Delivery, DeliveryAttempt, Duration, FileInput, Inspectable, Principal,
   QuietOptions, DeliveryResendOptions, Resource, RichText, Timestamp, Transcript, User, WaitOptions,
 } from "./common";
 
@@ -105,10 +105,11 @@ export interface SlackUser extends User {
   /**
    * Post a top-level message. `@name` mentions resolve to `<@U…>`.
    * `{ to }` opens (or reuses) a DM with the app or another person and posts there.
+   * `files` shares files with it (a directory path or a list), which the agent reads from `url_private` with its bot token.
    */
-  say(message: SlackMessageInput, where: { channel: SlackConversation } | { to: SlackParticipant | SlackParticipant[] }): Promise<SlackMessage>;
+  say(message: SlackMessageInput, where: ({ channel: SlackConversation } | { to: SlackParticipant | SlackParticipant[] }) & { files?: string | FileInput[] }): Promise<SlackMessage>;
   /** Reply in a thread. Pass the thread or the message that starts it. */
-  reply(message: SlackMessageInput, where: { thread: SlackThread | SlackMessage; alsoSendToChannel?: boolean }): Promise<SlackMessage>;
+  reply(message: SlackMessageInput, where: { thread: SlackThread | SlackMessage; alsoSendToChannel?: boolean; files?: string | FileInput[] }): Promise<SlackMessage>;
   edit(message: SlackMessageInput, target: { message: SlackMessage }): Promise<SlackMessage>;
   delete(target: { message: SlackMessage }): Promise<void>;
   react(emoji: string, target: { message: SlackMessage }): Promise<SlackDelivery | undefined>;

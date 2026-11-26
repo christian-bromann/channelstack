@@ -1369,16 +1369,16 @@ export class SlackUser {
   }
 
   /** Post a top-level message in a conversation, or in a DM with the people in `to`. Experimental. */
-  async say(message: string | SlackMessageInput, options: { channel?: SlackConversation; to?: SlackUser | SlackApp | Array<SlackUser | SlackApp> } = {}): Promise<SlackMessage> {
+  async say(message: string | SlackMessageInput, options: { channel?: SlackConversation; to?: SlackUser | SlackApp | Array<SlackUser | SlackApp>; files?: string | FileInput[] } = {}): Promise<SlackMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : message, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as SlackMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/say`, { body: { message: typeof message === "string" ? { text: message } : message, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id), files: options.files === undefined ? undefined : readTree(options.files) } })) as SlackMessageData;
     return new SlackMessage(ctx, data);
   }
 
   /** Reply in a thread: pass the message that starts it, or any reply in it. Experimental. */
-  async reply(message: string | SlackMessageInput, options: { thread: SlackThread | SlackMessage; alsoSendToChannel?: boolean }): Promise<SlackMessage> {
+  async reply(message: string | SlackMessageInput, options: { thread: SlackThread | SlackMessage; alsoSendToChannel?: boolean; files?: string | FileInput[] }): Promise<SlackMessage> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : message, thread: { channel: options.thread.channel, ts: options.thread.ts }, alsoSendToChannel: options.alsoSendToChannel } })) as SlackMessageData;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/slack/users/${segment(this.id)}/reply`, { body: { message: typeof message === "string" ? { text: message } : message, thread: { channel: options.thread.channel, ts: options.thread.ts }, alsoSendToChannel: options.alsoSendToChannel, files: options.files === undefined ? undefined : readTree(options.files) } })) as SlackMessageData;
     return new SlackMessage(ctx, data);
   }
 

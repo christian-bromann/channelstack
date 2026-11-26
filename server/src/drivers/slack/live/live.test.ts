@@ -414,6 +414,32 @@ describe("the browser actor: what only Slack's client does", () => {
     expect(stub.channel(channel.body.id)?.messages).toHaveLength(1);
   });
 
+  test("a person's files aren't live yet, and say so", async () => {
+    const stub = slackStub();
+    const ana = stub.person("ana");
+    const server = liveSlack(stub);
+    server.signIn("Ana", ana.userId);
+    const session = await server.open();
+    await session.slack("POST", "/users", { name: "Ana", token: ana.token });
+    const channel = await session.slack("POST", "/channels", { participants: [ana.userId, stub.bot.userId] });
+    const files = [{ path: "crash.log", content: Buffer.from("disk full").toString("base64") }];
+    const said = await session.slack("POST", `/users/${ana.userId}/say`, {
+      message: { text: "the log" },
+      channel: channel.body.id,
+      files,
+    });
+    expect(said.body).toMatchObject({ error: "unsupported_in_live" });
+    expect(said.body.message).toContain("doesn't attach files");
+    const root = stub.typed(ana.userId, channel.body.id, "first");
+    const reply = await session.slack("POST", `/users/${ana.userId}/reply`, {
+      message: {},
+      thread: { channel: channel.body.id, ts: root },
+      files,
+    });
+    expect(reply.body).toMatchObject({ error: "unsupported_in_live" });
+    expect(stub.channel(channel.body.id)?.messages).toHaveLength(1);
+  });
+
   test("in a DM two sessions write in, each reads back what it typed, not the other's", async () => {
     const stub = slackStub();
     const ana = stub.person("ana");

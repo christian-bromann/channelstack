@@ -103,6 +103,10 @@ export function fileObject(file: SlackFileRecord): Record<string, unknown> {
     mode: "hosted",
     is_external: false,
     is_public: false,
+    // Where a bot token reads its bytes, as Slack's `files.slack.com` serves them.
+    ...(file.url === undefined
+      ? {}
+      : { url_private: file.url, url_private_download: file.url.replace(/\/([^/]*)$/, "/download/$1") }),
   };
 }
 
@@ -139,6 +143,8 @@ export function appMentionEvent(
     ...(message.threadTs === undefined ? {} : { thread_ts: message.threadTs }),
     // A mention written by another bot says so, which is how an agent can ignore bots.
     ...(author?.botId === undefined ? {} : { bot_id: author.botId }),
+    // A mention that shares files carries them, without the message's `file_share` subtype.
+    ...(message.files.length === 0 ? {} : { upload: false, files: message.files.map((file) => fileObject(file)) }),
   };
 }
 
