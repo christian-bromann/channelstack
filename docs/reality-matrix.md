@@ -216,7 +216,7 @@ Sent email can't be taken back. Live, every recipient must be at a domain in `CH
 | Feature | Fake | Live | How (live) | Notes |
 |---|---|---|---|---|
 | `resend.createUser({ name, address, token })` | Done | Built | The person's own team's key; their address on its verified domain | A person is their mailbox: their `id` is their address. In the fake, `<name>@example.com` |
-| `ana.send({ to, cc, subject, text, html })` | Done | Built | `POST /emails` with the person's key | To the agent's address it reaches the agent's team as a received email (`email.received`), with its raw message (`raw.download_url`). A person's email can't carry attachments yet, fake or live: the contract has no option for them (#64) |
+| `ana.send({ to, cc, subject, text, html })` | Done | Built | `POST /emails` with the person's key | To the agent's address it reaches the agent's team as a received email (`email.received`), with its raw message (`raw.download_url`). A person's email can't carry attachments yet, fake or live: the contract has no option for them (#84) |
 | `ana.reply(email, { text, all })` | Done | Built | `POST /emails`, with `In-Reply-To` and `References` | `Re:` its subject, to its sender (`Reply-To` first), and with `all` to everyone on it |
 | `ana.inbox()`, `waitForEmail` | Done | Built | The person's team's receiving API | Read again before each read (cached for a second) |
 | `thread.messages()`, `replies()`, `transcript()`, `toHaveReplyFrom` | Done | Built | Each person's received mail | A thread is the emails joined by `In-Reply-To` and `References`. A transcript has each email's own words, without the quoted history |
