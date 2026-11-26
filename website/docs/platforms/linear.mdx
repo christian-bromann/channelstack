@@ -27,7 +27,7 @@ The fake Linear is one workspace with one OAuth app installed in it, `my-agent`,
 
 Sessions follow Linear's rules: created as `pending`, `active` after a thought or action, `awaitingInput` after an elicitation, `complete` after a response (or `active` again with the `continue` signal), `error` after an error. A person's prompt starts a new turn, and Stop makes the session `stopping` until the agent's next response or error.
 
-What a person has to read is also a comment. The agent's `response`, `elicitation` and `error` activities appear as the app's comments in the session's thread: the comment that mentioned it, or for a delegation a thread of its own. A reply there prompts the session.
+What a person has to read is also a comment. The agent's `response`, `elicitation` and `error` activities appear as the app's comments in the session's thread: the comment that mentioned it, or for a delegation the thread Linear opens with a comment of its own ("This thread is for an agent session with my-agent."), which `issue.comments()` lists as the app's. A reply there prompts the session. Delegating an issue nobody is assigned to makes the person who delegated it its assignee, as in Linear.
 
 Not covered: creating issues as the app (`issueCreate`), projects, cycles, initiatives, documents, attachments, notifications and the OAuth install flow. A field the fake doesn't model either gets Linear's empty value for its type or, for a required object, an error that names it (`The fake has no Issue.sharedAccess`), so a gap shows up as a failing call, never as an invented value.
 
@@ -130,7 +130,7 @@ A test creates the people, teams and issues it needs. Nothing is declared in a c
 | `key`     | The issue prefix, e.g. `OPS`. Generated if omitted, so parallel tests never share one                                                                                                          |
 | `name`    | The team's name                                                                                                                                                                                |
 | `members` | People in the team                                                                                                                                                                             |
-| `states`  | Workflow states, each `{ name, type }` with `type` one of `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Default: Backlog, Todo, In Progress, In Review, Done, Canceled |
+| `states`  | Workflow states, each `{ name, type }` with `type` one of `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Default: Backlog, Todo, In Progress, In Review, Done, Canceled. Every team also has Linear's own Duplicate state (`type: duplicate`), which can't be created |
 | `labels`  | Label names                                                                                                                                                                                    |
 
 Issues are created by a person, so the creation reaches the app as an `Issue` event:

@@ -171,7 +171,7 @@ The live backend is built: people act with their personal API keys, reads go thr
 | `session.state()`, `activities()`, `plan()`, `externalUrls()`, `toHaveSessionState`, `toHaveActivity` | Done | Built | App credentials (`agentSessions`, `agentSession`: the app's own sessions) | |
 | `issue.comments()`, `toHaveCommentFrom`, `toBeDelegatedTo`, `toHaveState` | Done | Built | The app's OAuth token (read APIs) | An issue is read again before each read (cached for a second) |
 | `delivery.redeliver()` | Done | No | — | Fake-only. Linear has no redelivery mutation. The fake stamps a new `webhookTimestamp` into the body and signs it again, as Linear's own retries do |
-| An agent's `response`, `elicitation` and `error` as comments | Done | Yes | — | **unverified**: the fake writes them as the app's comments in the session's thread (the mention, or for a delegation a thread of their own), with the activity's `sourceComment` on that comment. The Chat SDK's Linear adapter relies on a response having one. First live spike |
+| An agent's `response`, `elicitation` and `error` as comments | Done | Yes | — | The fake writes them as the app's comments in the session's thread, with the activity's `sourceComment` on that comment: the mention, or for a delegation the thread Linear opens with a comment of its own ("This thread is for an agent session with …", no user, Linear's workflow as its `botActor`), which is also the session's `comment` and the opening prompt's source. The differential run saw that thread live (#26). The Chat SDK's Linear adapter relies on a response having a source comment |
 | Webhook deliveries to the agent | Done | Agent's concern | — | Linear delivers to the agent's own webhook URL |
 
 ---
