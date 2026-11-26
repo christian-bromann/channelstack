@@ -19,7 +19,7 @@ Besides the errors listed with each method, most methods can fail with [`action_
 
 Returned by [`Session.resend()`](/docs/reference/api/client#resend).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `app` | `app` | `ResendApp` |
 | `apiUrl` | `api_url` | `string` |
@@ -44,11 +44,11 @@ let user = resend.create_user().name("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `name` | `name` | `string` | yes | option |
-| `address` | `address` | `string` | no | option |
-| `token` | `token` | `string` | no | option; read from `CHANNELSTACK_RESEND_USER_{name}_TOKEN` when left out |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | option |
+| `address` | `string` | no | option |
+| `token` | `string` | no | option; read from `CHANNELSTACK_RESEND_USER_{name}_TOKEN` when left out |
 
 **Returns** [`ResendUser`](/docs/reference/api/resend#resenduser).
 
@@ -72,7 +72,7 @@ let deliveries = resend.deliveries().r#type("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `ResendThread` | no | option |
@@ -101,10 +101,10 @@ let api_calls = resend.calls().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | option |
-| `error` | `error` | `true \| string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | option |
+| `error` | `true \| string` | no | option |
 
 **Returns** [`ResendApiCalls`](/docs/reference/api/resend#resendapicalls).
 
@@ -130,17 +130,17 @@ let api_call = resend.wait_for_call().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | filter |
-| `error` | `error` | `true \| string` | no | filter |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | filter |
+| `error` | `true \| string` | no | filter |
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`ResendApiCall`](/docs/reference/api/resend#resendapicall). When the time is up, it fails with what it was waiting for.
 
 ## ResendApp
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"resend"` |
@@ -153,13 +153,13 @@ let api_call = resend.wait_for_call().operation("…").await?;
 
 Returned by [`ResendFixture.createUser()`](/docs/reference/api/resend#createuser).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"resend"` |
-| `kind` | `kind` | `"user"` |
-| `name` | `name` | `string` |
-| `address` | `address` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"resend"` |
+| `kind` | `"user"` |
+| `name` | `string` |
+| `address` | `string` |
 
 ### send()
 
@@ -181,13 +181,13 @@ let email = user.send().to(to).subject("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `to` | `to` | `Array<ResendUser \| ResendApp>` | yes | option |
-| `cc` | `cc` | `Array<ResendUser \| ResendApp>` | no | option |
-| `subject` | `subject` | `string` | yes | option |
-| `text` | `text` | `string` | no | option |
-| `html` | `html` | `string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `to` | `Array<ResendUser \| ResendApp>` | yes | option |
+| `cc` | `Array<ResendUser \| ResendApp>` | no | option |
+| `subject` | `string` | yes | option |
+| `text` | `string` | no | option |
+| `html` | `string` | no | option |
 
 **Returns** [`ResendEmail`](/docs/reference/api/resend#resendemail).
 
@@ -211,12 +211,12 @@ let result = user.reply(&email).text("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `email` | `email` | `ResendEmail` | yes | positional |
-| `text` | `text` | `string` | no | option |
-| `html` | `html` | `string` | no | option |
-| `all` | `all` | `boolean` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `email` | `ResendEmail` | yes | positional |
+| `text` | `string` | no | option |
+| `html` | `string` | no | option |
+| `all` | `boolean` | no | option |
 
 **Returns** [`ResendEmail`](/docs/reference/api/resend#resendemail).
 
@@ -262,7 +262,7 @@ let email = user.wait_for_email().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `ResendPrincipal \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -273,7 +273,7 @@ let email = user.wait_for_email().from("my-agent").await?;
 
 Returned by [`ResendUser.send()`](/docs/reference/api/resend#send), [`ResendUser.reply()`](/docs/reference/api/resend#reply), [`ResendEmail.refresh()`](/docs/reference/api/resend#refresh).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"resend"` |
@@ -312,11 +312,11 @@ let updated = email.refresh().await?;
 
 ## ResendThread
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"resend"` |
-| `subject` | `subject` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"resend"` |
+| `subject` | `string` |
 
 ### messages()
 
@@ -404,7 +404,7 @@ let email = thread.wait_for_reply().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `ResendPrincipal \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -431,7 +431,7 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `ResendPrincipal \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -443,7 +443,7 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 Returned by [`ResendDelivery.refresh()`](/docs/reference/api/resend#refresh-1).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"resend"` |
@@ -521,7 +521,7 @@ let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `badSignature` | `bad_signature` | `boolean` | no | option |
 | `stale` | `stale` | `boolean` | no | option |
@@ -550,9 +550,9 @@ let updated = delivery.settled().await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`ResendDelivery`](/docs/reference/api/resend#resenddelivery). When the time is up, it fails with what it was waiting for.
 
@@ -562,11 +562,11 @@ Plain values the handles return and take.
 
 ### ResendPrincipal
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `name` | `name` | `string` |
-| `kind` | `kind` | `"user" \| "app"` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user" \| "app"` |
 
 ### ResendInbox
 
@@ -588,22 +588,22 @@ type ResendReplies = ResendEmail[];
 
 ### ResendTranscript
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `entries` | `entries` | `ResendTranscriptEntry[]` |
-| `text` | `text` | `string` |
+| Field | Type |
+|---|---|
+| `entries` | `ResendTranscriptEntry[]` |
+| `text` | `string` |
 
 ### ResendTranscriptEntry
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `author` | `author` | `ResendPrincipal` |
-| `at` | `at` | `string` |
-| `text` | `text` | `string` |
-| `controls` | `controls` | `string[]` |
-| `edited` | `edited` | `boolean` |
-| `depth` | `depth` | `number` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `author` | `ResendPrincipal` |
+| `at` | `string` |
+| `text` | `string` |
+| `controls` | `string[]` |
+| `edited` | `boolean` |
+| `depth` | `number` |
 
 ### ResendDeliveries
 
@@ -619,7 +619,7 @@ type ResendApiCalls = ResendApiCall[];
 
 ### ResendApiCall
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"resend"` |

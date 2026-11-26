@@ -290,9 +290,11 @@
   font-size: 0.86em;
 }
 
+/* A block, so a wide table scrolls on its own; as wide as its cells, so a narrow one doesn't trail empty space. */
 .prose table {
   display: block;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
   font-size: 14.5px;

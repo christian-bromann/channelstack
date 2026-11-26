@@ -19,7 +19,7 @@ Besides the errors listed with each method, most methods can fail with [`action_
 
 Returned by [`Session.linear()`](/docs/reference/api/client#linear).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `app` | `app` | `LinearApp` |
 | `apiUrl` | `api_url` | `string` |
@@ -44,7 +44,7 @@ let user = linear.create_user().name("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `name` | `name` | `string` | yes | option |
 | `id` | `id` | `string` | no | option |
@@ -76,13 +76,13 @@ let team = linear.create_team().key("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `key` | `key` | `string` | no | option |
-| `name` | `name` | `string` | no | option |
-| `members` | `members` | `LinearUser[]` | no | option |
-| `states` | `states` | `Array<{ name: string; type: "backlog" \| "unstarted" \| "started" \| "completed" \| "canceled" \| "triage" }>` | no | option |
-| `labels` | `labels` | `string[]` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `key` | `string` | no | option |
+| `name` | `string` | no | option |
+| `members` | `LinearUser[]` | no | option |
+| `states` | `Array<{ name: string; type: "backlog" \| "unstarted" \| "started" \| "completed" \| "canceled" \| "triage" }>` | no | option |
+| `labels` | `string[]` | no | option |
 
 **Returns** [`LinearTeam`](/docs/reference/api/linear#linearteam).
 
@@ -106,7 +106,7 @@ let deliveries = linear.deliveries().r#type("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `LinearIssue` | no | option |
@@ -135,10 +135,10 @@ let api_calls = linear.calls().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | option |
-| `error` | `error` | `true \| string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | option |
+| `error` | `true \| string` | no | option |
 
 **Returns** [`LinearApiCalls`](/docs/reference/api/linear#linearapicalls).
 
@@ -164,11 +164,11 @@ let api_call = linear.wait_for_call().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | filter |
-| `error` | `error` | `true \| string` | no | filter |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | filter |
+| `error` | `true \| string` | no | filter |
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`LinearApiCall`](/docs/reference/api/linear#linearapicall). When the time is up, it fails with what it was waiting for.
 
@@ -176,7 +176,7 @@ let api_call = linear.wait_for_call().operation("…").await?;
 
 Returned by [`LinearIssue.delegatedTo()`](/docs/reference/api/linear#delegatedto).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -191,7 +191,7 @@ Returned by [`LinearIssue.delegatedTo()`](/docs/reference/api/linear#delegatedto
 
 Returned by [`LinearFixture.createUser()`](/docs/reference/api/linear#createuser), [`LinearIssue.assignee()`](/docs/reference/api/linear#assignee).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `name` | `name` | `string` |
@@ -221,10 +221,10 @@ let result = user.create_issue(issue).team(&team).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `issue` | `issue` | `{ title: string; description?: string; priority?: number; state?: string; labels?: string[]; assignee?: LinearUser; delegate?: LinearApp; parent?: LinearIssue }` | yes | positional |
-| `team` | `team` | `LinearTeam` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `issue` | `{ title: string; description?: string; priority?: number; state?: string; labels?: string[]; assignee?: LinearUser; delegate?: LinearApp; parent?: LinearIssue }` | yes | positional |
+| `team` | `LinearTeam` | yes | option |
 
 **Returns** [`LinearIssue`](/docs/reference/api/linear#linearissue).
 
@@ -250,10 +250,10 @@ let delivery = user.edit_issue(changes).issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `changes` | `changes` | `{ title?: string; description?: string; priority?: number }` | yes | positional |
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `changes` | `{ title?: string; description?: string; priority?: number }` | yes | positional |
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -279,9 +279,9 @@ let delivery = user.undelegate().issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -307,10 +307,10 @@ let delivery = user.assign().issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `assignee` | `assignee` | `LinearUser` | no | positional |
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `assignee` | `LinearUser` | no | positional |
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -336,10 +336,10 @@ let delivery = user.set_state("…").issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `state` | `state` | `string` | yes | positional |
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `state` | `string` | yes | positional |
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -365,10 +365,10 @@ let delivery = user.label(labels).issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `labels` | `labels` | `string \| string[]` | yes | positional |
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `labels` | `string \| string[]` | yes | positional |
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -394,10 +394,10 @@ let agent_session = user.delegate(&app).issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `app` | `app` | `LinearApp` | yes | positional |
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `app` | `LinearApp` | yes | positional |
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearAgentSession`](/docs/reference/api/linear#linearagentsession).
 
@@ -423,10 +423,10 @@ let comment = user.comment("…").issue(&issue).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `body` | `body` | `string` | yes | positional |
-| `issue` | `issue` | `LinearIssue` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `issue` | `LinearIssue` | yes | option |
 
 **Returns** [`LinearComment`](/docs/reference/api/linear#linearcomment).
 
@@ -452,10 +452,10 @@ let result = user.reply("…").comment(&comment).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `body` | `body` | `string` | yes | positional |
-| `comment` | `comment` | `LinearComment` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `comment` | `LinearComment` | yes | option |
 
 **Returns** [`LinearComment`](/docs/reference/api/linear#linearcomment).
 
@@ -481,10 +481,10 @@ let delivery = user.edit("…").comment(&comment).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `body` | `body` | `string` | yes | positional |
-| `comment` | `comment` | `LinearComment` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `comment` | `LinearComment` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -510,9 +510,9 @@ let delivery = user.delete().comment(&comment).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `comment` | `comment` | `LinearComment` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `comment` | `LinearComment` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -538,10 +538,10 @@ user.react("…").comment(&comment).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `emoji` | `emoji` | `string` | yes | positional |
-| `comment` | `comment` | `LinearComment` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `emoji` | `string` | yes | positional |
+| `comment` | `LinearComment` | yes | option |
 
 **Returns** nothing.
 
@@ -567,10 +567,10 @@ let delivery = user.prompt("…").session(&session).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `body` | `body` | `string` | yes | positional |
-| `session` | `session` | `LinearAgentSession` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `session` | `LinearAgentSession` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -596,10 +596,10 @@ let delivery = user.answer("…").elicitation(&elicitation).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `body` | `body` | `string` | yes | positional |
-| `elicitation` | `elicitation` | `LinearAgentActivity` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `elicitation` | `LinearAgentActivity` | yes | option |
 
 **Returns** [`LinearDelivery | undefined`](/docs/reference/api/linear#lineardelivery).
 
@@ -625,9 +625,9 @@ let delivery = user.stop().session(&session).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `session` | `session` | `LinearAgentSession` | yes | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `session` | `LinearAgentSession` | yes | option |
 
 **Returns** [`LinearDelivery`](/docs/reference/api/linear#lineardelivery).
 
@@ -639,11 +639,11 @@ let delivery = user.stop().session(&session).await?;
 
 Returned by [`LinearFixture.createTeam()`](/docs/reference/api/linear#createteam).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `key` | `key` | `string` |
-| `name` | `name` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `key` | `string` |
+| `name` | `string` |
 
 ### issue()
 
@@ -665,9 +665,9 @@ let issue = team.issue("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `identifier` | `identifier` | `string` | yes | positional |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `identifier` | `string` | yes | positional |
 
 **Returns** [`LinearIssue`](/docs/reference/api/linear#linearissue).
 
@@ -675,13 +675,13 @@ let issue = team.issue("…").await?;
 
 Returned by [`LinearUser.createIssue()`](/docs/reference/api/linear#createissue), [`LinearTeam.issue()`](/docs/reference/api/linear#issue), [`LinearIssue.refresh()`](/docs/reference/api/linear#refresh).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `identifier` | `identifier` | `string` |
-| `url` | `url` | `string` |
-| `team` | `team` | `LinearTeam` |
-| `creator` | `creator` | `LinearUser \| LinearApp` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `identifier` | `string` |
+| `url` | `string` |
+| `team` | `LinearTeam` |
+| `creator` | `LinearUser \| LinearApp` |
 
 ### refresh()
 
@@ -923,7 +923,7 @@ let comment = issue.wait_for_comment().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `LinearUser \| LinearApp \| string` | no | a handle, or a name |
 | `body` | `body` | `string \| RegExp` | no | contains, or matches |
@@ -951,7 +951,7 @@ let comment = issue.latest_comment().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `LinearUser \| LinearApp \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -963,7 +963,7 @@ let comment = issue.latest_comment().from("my-agent").await?;
 
 Returned by [`LinearUser.editIssue()`](/docs/reference/api/linear#editissue), [`LinearUser.undelegate()`](/docs/reference/api/linear#undelegate), [`LinearUser.assign()`](/docs/reference/api/linear#assign), [`LinearUser.setState()`](/docs/reference/api/linear#setstate).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"linear"` |
@@ -1042,7 +1042,7 @@ let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `badSignature` | `bad_signature` | `boolean` | no | option |
 | `stale` | `stale` | `boolean` | no | option |
@@ -1071,9 +1071,9 @@ let updated = delivery.settled().await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`LinearDelivery`](/docs/reference/api/linear#lineardelivery). When the time is up, it fails with what it was waiting for.
 
@@ -1081,7 +1081,7 @@ let updated = delivery.settled().await?;
 
 Returned by [`LinearUser.delegate()`](/docs/reference/api/linear#delegate), [`LinearIssue.session()`](/docs/reference/api/linear#session).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `issue` | `issue` | `LinearIssue` |
@@ -1219,10 +1219,10 @@ let result = agent_session.wait_for_state(wanted).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `wanted` | `wanted` | `"pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error" \| "stale" \| Array<"pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error" \| "stale">` | yes | positional |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `wanted` | `"pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error" \| "stale" \| Array<"pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error" \| "stale">` | yes | positional |
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** `"pending" | "active" | "stopping" | "awaitingInput" | "complete" | "error" | "stale"`. When the time is up, it fails with what it was waiting for.
 
@@ -1246,7 +1246,7 @@ let agent_activity = agent_session.wait_for_activity().await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string \| RegExp` | no | contains, or matches |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -1257,7 +1257,7 @@ let agent_activity = agent_session.wait_for_activity().await?;
 
 Returned by [`LinearUser.comment()`](/docs/reference/api/linear#comment), [`LinearUser.reply()`](/docs/reference/api/linear#reply).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `issue` | `issue` | `LinearIssue` |
@@ -1314,7 +1314,7 @@ let transcript = comment.transcript().await?;
 
 ## LinearAgentActivity
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `session` | `session` | `LinearAgentSession` |
@@ -1331,7 +1331,7 @@ Plain values the handles return and take.
 
 ### LinearIssueState
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `name` | `name` | `string` |
 | `type` | `type` · `r#type` | `"backlog" \| "unstarted" \| "started" \| "completed" \| "canceled" \| "triage"` |
@@ -1350,30 +1350,30 @@ type LinearAgentSessions = LinearAgentSession[];
 
 ### LinearTranscript
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `entries` | `entries` | `LinearTranscriptEntry[]` |
-| `text` | `text` | `string` |
+| Field | Type |
+|---|---|
+| `entries` | `LinearTranscriptEntry[]` |
+| `text` | `string` |
 
 ### LinearTranscriptEntry
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `author` | `author` | `LinearPrincipal` |
-| `at` | `at` | `string` |
-| `text` | `text` | `string` |
-| `controls` | `controls` | `string[]` |
-| `edited` | `edited` | `boolean` |
-| `depth` | `depth` | `number` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `author` | `LinearPrincipal` |
+| `at` | `string` |
+| `text` | `string` |
+| `controls` | `string[]` |
+| `edited` | `boolean` |
+| `depth` | `number` |
 
 ### LinearPrincipal
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `name` | `name` | `string` |
-| `kind` | `kind` | `"user" \| "app"` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user" \| "app"` |
 
 ### LinearCommentReplies
 
@@ -1413,7 +1413,7 @@ type LinearApiCalls = LinearApiCall[];
 
 ### LinearApiCall
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"linear"` |
