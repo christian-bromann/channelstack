@@ -31,18 +31,6 @@ divergences:
     expires: 2027-02-28
   - scenario: shapes/linear
     path:
-      - "api POST /graphql issue data.issue.addedToTeamAt"
-      - "api POST /graphql issue data.issue.assignee"
-      - "api POST /graphql issue data.issue.slaType"
-      - "api POST /graphql issue data.issue.syncedWith"
-      - "api POST /graphql team data.team.allMembersCanJoin"
-      - "api POST /graphql team data.team.autoClosePeriod"
-      - "api POST /graphql team data.team.autoCloseStateId"
-      - "api POST /graphql team data.team.color"
-      - "api POST /graphql team data.team.defaultIssueState"
-      - "api POST /graphql team data.team.markedAsDuplicateWorkflowState"
-      - "webhook AgentSessionEvent created agentSession.comment"
-      - "webhook AgentSessionEvent created agentSession.commentId"
       - "webhook AgentSessionEvent created agentSession.context"
       - "webhook AgentSessionEvent created agentSession.dismissedAt"
       - "webhook AgentSessionEvent created agentSession.dismissedById"
@@ -53,25 +41,20 @@ divergences:
       - "webhook AgentSessionEvent created agentSession.plan"
       - "webhook AgentSessionEvent created agentSession.pullRequestId"
       - "webhook AgentSessionEvent created agentSession.slugId"
-      - "webhook AgentSessionEvent created agentSession.sourceMetadata"
       - "webhook AgentSessionEvent created agentSession.workspaceDiff"
       - "webhook AgentSessionEvent created agentSession.availableSkills"
-      - "webhook AgentSessionEvent created agentActivity.sourceCommentId"
       - "webhook AgentSessionEvent created agentActivity.sourceMetadata"
       - "webhook AgentSessionEvent created agentActivity.executionSkippedReason"
       - "webhook AgentSessionEvent created agentActivity.ephemeral"
       - "webhook AgentSessionEvent created agentActivity.pushSummary"
       - "webhook AgentSessionEvent created agentActivity.queued"
       - "webhook AgentSessionEvent created agentActivity.sentAt"
-      - "api POST /graphql team_states data.team.states.nodes.[].type"
     reason: >-
-      Real Linear's AgentSessionEvent on delegation carries the comment thread it opens for the
-      session (comment, commentId, and the opening prompt's sourceCommentId) and sourceMetadata,
-      which AgentSessionWebhookPayload declares, and fields that neither it nor
-      AgentActivityWebhookPayload declares (slugId, plan, context, availableSkills, and the
-      activity's ephemeral, queued, sentAt and others; some are on the GraphQL types), which an
-      agent typed against @linear/sdk's webhook types can't read; real teams and issues fill fields
-      the fake leaves null. To add to the fake, once a recording shows their values: #26.
+      Real Linear's AgentSessionEvent carries fields that neither AgentSessionWebhookPayload nor
+      AgentActivityWebhookPayload declares, in the committed schema or in @linear/sdk's webhook
+      types (slugId, plan, context, availableSkills, and the activity's ephemeral, queued, sentAt
+      and others; some are on the GraphQL types), so an agent typed against them can't read them.
+      The fake sends what the payload types declare (#26).
     expires: 2027-02-28
   - scenario: shapes/resend
     path:

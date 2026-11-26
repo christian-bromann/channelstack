@@ -666,8 +666,8 @@ export function registerLinearRoutes(
     const issue = store.issue(record.issue);
     const user = actor(session, userId, issue);
     const body = world.markdown(session, text);
-    // In a session with a thread (its mention, or the comments Linear wrote for it), the prompt is a
-    // reply there; a session without one yet takes it directly.
+    // In a session's thread (its mention, or the one Linear opens for a delegation), the prompt is a
+    // reply; a live session whose thread the mirror hasn't read yet takes it directly.
     const root = record.thread === null ? undefined : store.comments.find(record.thread);
     if (root) return caused(session, (await world.comment(issue, user.id, body, root)).prompted);
     return caused(session, await world.promptSession(record, user.id, body));
@@ -778,7 +778,7 @@ export function registerLinearRoutes(
     z
       .object({
         name: z.string(),
-        type: z.enum(["backlog", "unstarted", "started", "completed", "canceled", "triage"]),
+        type: z.enum(["backlog", "unstarted", "started", "completed", "canceled", "triage", "duplicate"]),
       })
       .openapi("LinearIssueState"),
     (issue) => {
@@ -799,9 +799,13 @@ export function registerLinearRoutes(
   issueRead(
     "/comments",
     "comments",
-    "The comments on the issue, oldest first",
+    "The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread",
     z.array(LinearComment).openapi("LinearComments"),
-    (issue, session) => store.commentsOn(issue).map((comment) => commentWire(session, comment)),
+    (issue, session) =>
+      store
+        .commentsOn(issue)
+        .filter((comment) => !comment.byLinear)
+        .map((comment) => commentWire(session, comment)),
     {
       waits: [
         { name: "waitForComment", mode: "next", from: "author", text: "body", what: "a comment" },
