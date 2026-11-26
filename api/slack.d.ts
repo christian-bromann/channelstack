@@ -147,7 +147,7 @@ export interface SlackUser extends User {
   pickPrompt(title: string, where: { thread: SlackThread }): Promise<SlackMessage>;
   /** Move to another channel while the split view stays open (`assistant_thread_context_changed`). */
   switchContext(channel: SlackConversation, where: { thread: SlackThread }): Promise<SlackDelivery>;
-  /** Invite people or the app. Sends `member_joined_channel`. */
+  /** Invite people or the app. Sends `member_joined_channel`, then the `channel_join` message Slack posts. */
   invite(participants: SlackParticipant | SlackParticipant[], where: { channel: SlackConversation }): Promise<void>;
   /** Remove someone. Sends `member_left_channel` (or `channel_left` for the app). */
   kick(participant: SlackParticipant, where: { channel: SlackConversation }): Promise<void>;
