@@ -27,6 +27,7 @@ function pythonLiteral(value: string | number | boolean): string {
 /** The Python SDK's generated half: async handle classes, frozen dataclasses for data, typed errors. */
 export function emitPython(ir: Ir): Map<string, string> {
   const index = new IrIndex(ir);
+  const glue = channelGlue(ir);
   const namedTypes = new Map(ir.types.map((type) => [type.name, type.type]));
   const isDataclass = (name: string) => namedTypes.get(name)?.kind === "object";
 
@@ -270,9 +271,18 @@ export function emitPython(ir: Ir): Map<string, string> {
     const filters = w.filter && read ? read.options : [];
     const passed = filters.map((option) => `${snakeCase(option.name)}=${snakeCase(option.name)}`).join(", ");
     const reader = filters.length > 0 ? `lambda: self.${snakeCase(w.read)}(${passed})` : `self.${snakeCase(w.read)}`;
-    const fromField =
-      w.item.kind === "resource" ? index.resource(w.item.name).fields.find((f) => f.name === w.from) : undefined;
-    const from = fromField ? [`from_: ${typeOf(fromField.type)} | str | None = None`] : [];
+    const item = w.item.kind === "resource" ? w.item.name : undefined;
+    const fromField = item === undefined ? undefined : index.resource(item).fields.find((f) => f.name === w.from);
+    // Python checks types by name, not by shape: where the author is plain data (an email's
+    // `ResendPrincipal`), the channel's own handles (`resend.app`, a person) are named as well.
+    const authors =
+      fromField && item !== undefined
+        ? new Set([
+            ...(fromField.type.kind === "union" ? fromField.type.types : [fromField.type]).map(typeOf),
+            ...glue.actorsOf(item),
+          ])
+        : undefined;
+    const from = authors ? [`from_: ${[...authors].join(" | ")} | str | None = None`] : [];
     const parameters = [
       "self",
       "*",
@@ -425,7 +435,7 @@ export function emitPython(ir: Ir): Map<string, string> {
     ];
   };
 
-  const channelNames = channelGlue(ir).channels.map((channel) => JSON.stringify(channel.name));
+  const channelNames = glue.channels.map((channel) => JSON.stringify(channel.name));
   const exported = [
     "VERSION",
     "CHANNEL_NAMES",

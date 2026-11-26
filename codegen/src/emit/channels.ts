@@ -26,6 +26,8 @@ export interface ChannelGlue {
   readonly withTranscript: ReadonlyArray<{ readonly name: string; readonly viewer: boolean }>;
   /** Every fixture with a `calls()` read. */
   readonly withCalls: readonly string[];
+  /** The people and the app of the channel a type belongs to (`ResendEmail` → `ResendUser`, `ResendApp`). */
+  actorsOf(name: string): readonly string[];
 }
 
 export function channelGlue(ir: Ir): ChannelGlue {
@@ -36,6 +38,14 @@ export function channelGlue(ir: Ir): ChannelGlue {
   const ofChannels = (resource: IrResource) =>
     !internal.some((prefix) => resource.name.startsWith(prefix)) &&
     channels.some((channel) => resource.name.startsWith(channel.title));
+  /** The channel a type belongs to: the longest title its name starts with, so no title claims another's types. */
+  const channelOf = (name: string): string | undefined =>
+    channels
+      .filter((channel) => name.startsWith(channel.title))
+      .reduce<string | undefined>(
+        (longest, { title }) => (title.length > (longest?.length ?? 0) ? title : longest),
+        undefined,
+      );
   /** A resource's methods, its own and those it has from what it extends. */
   const methodsOf = (resource: IrResource): IrResource["methods"] => {
     const parent = resource.extends === undefined ? undefined : resources.get(resource.extends);
@@ -68,5 +78,13 @@ export function channelGlue(ir: Ir): ChannelGlue {
     withCalls: fixtures.filter((name) =>
       methodsOf(resources.get(name) as IrResource).some((method) => method.name === "calls"),
     ),
+    actorsOf: (name) => {
+      const channel = channelOf(name);
+      const ofRole = (wanted: "user" | "app") =>
+        ir.resources
+          .filter((resource) => resource.role === wanted && channelOf(resource.name) === channel)
+          .map((resource) => resource.name);
+      return channel === undefined ? [] : [...ofRole("user"), ...ofRole("app")];
+    },
   };
 }

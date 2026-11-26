@@ -3063,7 +3063,7 @@ class ResendUser:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/inbox")
         return [ResendEmail(ctx, item) for item in data]
 
-    async def wait_for_email(self, *, from_: ResendPrincipal | str | None = None, timeout: Duration | None = None) -> ResendEmail:
+    async def wait_for_email(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None) -> ResendEmail:
         """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
 
@@ -3117,11 +3117,11 @@ class ResendThread:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/threads/{quote(str(self.id), safe='')}/transcript")
         return ResendTranscript._from_wire(ctx, data)
 
-    async def wait_for_reply(self, *, from_: ResendPrincipal | str | None = None, timeout: Duration | None = None) -> ResendEmail:
+    async def wait_for_reply(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None) -> ResendEmail:
         """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
 
-    async def latest_reply(self, *, from_: ResendPrincipal | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> ResendEmail:
+    async def latest_reply(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> ResendEmail:
         """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
@@ -3234,7 +3234,7 @@ class GoogleUser:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/inbox")
         return [GoogleEmail(ctx, item) for item in data]
 
-    async def wait_for_email(self, *, from_: GooglePrincipal | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
+    async def wait_for_email(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
         """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
 
@@ -3289,11 +3289,11 @@ class GoogleThread:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/threads/{quote(str(self.id), safe='')}/transcript")
         return GoogleTranscript._from_wire(ctx, data)
 
-    async def wait_for_reply(self, *, from_: GooglePrincipal | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
+    async def wait_for_reply(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
         """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
         return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
 
-    async def latest_reply(self, *, from_: GooglePrincipal | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> GoogleEmail:
+    async def latest_reply(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> GoogleEmail:
         """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
