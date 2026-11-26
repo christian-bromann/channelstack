@@ -141,7 +141,13 @@ function release(port: number): void {
   rmSync(join(CLAIMS, name), { force: true });
 }
 
-/** Can a server listen on this port, on every address, the way an agent that names no host does? */
+/**
+ * Can a server listen on this port on every interface? The probe names no host, so Node binds `::`
+ * (IPv4 included), or `0.0.0.0` where IPv6 is off. Some agents listen that way (Bolt's
+ * `app.start(port)`, Go's `ListenAndServe(":port")`), and a port free on loopback alone can still
+ * be taken there (EADDRINUSE). A port free on every interface suits them and the agents that bind
+ * `127.0.0.1`.
+ */
 const bindable = (port: number) =>
   new Promise<boolean>((resolve) => {
     const server = createServer();

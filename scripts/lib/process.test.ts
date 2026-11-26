@@ -1,13 +1,41 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { once } from "node:events";
 import { readdirSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
 import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { pathToFileURL } from "node:url";
 
-import { expect, test } from "vitest";
+import { describe, expect, it, test, vi } from "vitest";
+
+// The address each probe server bound, read from the server once it listens.
+const probed = vi.hoisted((): string[] => []);
+vi.mock("node:net", async (importOriginal) => {
+  const net = await importOriginal<typeof import("node:net")>();
+  return {
+    ...net,
+    createServer: (...args: Parameters<typeof net.createServer>) => {
+      const server = net.createServer(...args);
+      server.once("listening", () => {
+        const address = server.address();
+        if (address && typeof address === "object") probed.push(address.address);
+      });
+      return server;
+    },
+  };
+});
+
+const { freePort } = await import("./process.ts");
+
+/** Listen on `port` the way Bolt and the Go agent do: no host, so every interface. */
+const listenLikeAnAgent = (port: number) =>
+  new Promise<() => Promise<void>>((resolve, reject) => {
+    const server = createHttpServer();
+    server.once("error", reject);
+    server.listen(port, () => resolve(() => new Promise((done) => server.close(() => done()))));
+  });
 
 const COUNT = 400;
 const CLAIMS = join(tmpdir(), `channelstack-ports-${process.getuid?.() ?? "user"}`);
@@ -113,4 +141,22 @@ test("a port that is in use leaves no claim behind", { timeout: 30_000 }, async 
     if (child.exitCode === null) await once(child, "exit");
     for (const server of listeners) server.close();
   }
+});
+
+describe("freePort", () => {
+  it("probes every interface, not loopback alone", async () => {
+    probed.length = 0;
+    await freePort();
+    // More than one probe when a port it drew was in use; each of them on every interface.
+    expect(probed.length).toBeGreaterThan(0);
+    // `::` where IPv6 is on, `0.0.0.0` where it is off: never a single interface like 127.0.0.1.
+    for (const address of probed) expect(["::", "0.0.0.0"]).toContain(address);
+  });
+
+  it("hands out each port once, and each one can be bound", async () => {
+    const ports = await Promise.all(Array.from({ length: 20 }, () => freePort()));
+    expect(new Set(ports).size).toBe(ports.length);
+    const closes = await Promise.all(ports.map(listenLikeAnAgent));
+    await Promise.all(closes.map((close) => close()));
+  });
 });

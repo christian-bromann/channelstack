@@ -110,16 +110,16 @@ A test creates the people, pages and databases it needs. Nothing is declared in 
 
 <Example id="notion-pages" />
 
-`notion.createPage` makes seed data: it sends no event. Use `ana.createPage(...)` when the creation itself should reach the app as `page.created`.
+`notion.createPage` makes seed data: in the fake, it sends no event. Live, a real person makes the page (`createdBy`, or else the session's first person), so Notion sends `page.created` to a connected integration, and an app that acts on new pages (one that writes a summary into them, say) may change the page before your test reads it. Use `ana.createPage(...)` when the creation itself should reach the app as `page.created`: it sends the event in both worlds.
 
-| Option        | What it does                                                                                   |
-| ------------- | ---------------------------------------------------------------------------------------------- |
-| `title`       | Required                                                                                       |
-| `parent`      | Another page. Without one, the page is at the top of the workspace                             |
-| `content`     | Markdown, `{ path }` to a `.md` fixture relative to the test file, or raw Notion block objects |
-| `icon`        | An emoji                                                                                       |
-| `connections` | Integrations connected to the page                                                             |
-| `createdBy`   | Who's shown as the creator. Default: a generated workspace owner                               |
+| Option        | What it does                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `title`       | Required                                                                                                      |
+| `parent`      | Another page. Without one, the page is at the top of the workspace                                            |
+| `content`     | Markdown, `{ path }` to a `.md` fixture relative to the test file, or raw Notion block objects                |
+| `icon`        | An emoji                                                                                                      |
+| `connections` | Integrations connected to the page                                                                            |
+| `createdBy`   | Who's shown as the creator. Default: a generated workspace owner in the fake, the session's first person live |
 
 ### Databases
 
@@ -223,4 +223,4 @@ The [errors reference](/docs/reference/api/errors) lists every code.
 
 The same tests can run in a real Notion workspace. Set the integration's token (`CHANNELSTACK_NOTION_TOKEN`), allowlist the workspace with `CHANNELSTACK_LIVE_NOTION_WORKSPACES`, and give each person a personal access token (`CHANNELSTACK_NOTION_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`), which acts as them. Connect the integration by hand, once, to one page (`CHANNELSTACK_NOTION_PAGE`); each session's pages go in a page of their own under it, which goes to the trash when the session closes. Pages the integration must not see go under `CHANNELSTACK_NOTION_UNSEEN_PAGE`.
 
-Live, Notion delivers to your integration itself. Pages, comments, replies, edits, mentions and every read on pages work with the personal tokens. Not live yet: databases and rows (`createDatabase`, `addRow`, `setProperty`, `toHavePropertyValue`), resolving and reopening discussions, and `connect` / `disconnect`, which have no API and need the browser actor, not built for Notion yet. Redelivery, `resend`, `sendVerification` and `setContentUpdateDelay` are fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/notion).
+Live, Notion delivers to your integration itself, so a page made with `notion.createPage` reaches a connected integration as `page.created`, which the fake's seed pages don't send (see [Pages](#pages)). Pages, comments, replies, edits, mentions and every read on pages work with the personal tokens. Not live yet: databases and rows (`createDatabase`, `addRow`, `setProperty`, `toHavePropertyValue`), resolving and reopening discussions, and `connect` / `disconnect`, which have no API and need the browser actor, not built for Notion yet. Redelivery, `resend`, `sendVerification` and `setContentUpdateDelay` are fake only. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/notion).
