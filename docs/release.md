@@ -46,21 +46,28 @@ A prerelease (`0.2.0-rc.1`) goes to npm's `next` tag, and its GitHub release is 
 
 These need the maintainer's accounts, so the workflow can't do them:
 
-- [ ] **npm:**
-  - Create the organization `channelstack`, for the `@channelstack/server-*` scope.
-  - Create a granular access token that may publish `channelstack` and `@channelstack/*`.
-  - Store the token as the secret `NPM_TOKEN` in the repository's `release` environment.
-  - The name `channelstack` is reserved already (`0.0.0-placeholder.0`).
-- [ ] **PyPI:** a trusted publisher for each project:
+- [ ] **npm:** trusted publishing, which npm tries first (npm 11.5.1 or later; Node 24.12 ships
+  11.6.2). It trusts the repository `christian-bromann/channelstack`, the workflow `release.yml`
+  and the environment `release`.
+  - [x] `channelstack`, reserved as `0.0.0-placeholder.0`, trusts the workflow.
+  - [ ] The five `@channelstack/server-*` packages: npm sets up trusted publishing only for a
+    package that exists. Create the organization `channelstack`, then either publish a placeholder
+    of each and let it trust the workflow, or store a granular token that may publish
+    `@channelstack/*` as `NPM_TOKEN` in the `release` environment for the first release. The
+    workflow uses the token only for a package that doesn't trust it.
+- [x] **PyPI:** a trusted publisher for each project:
   - for `channelstack`, which is reserved already (`0.0.0.dev0`), under its settings;
-  - for `pytest-channelstack`, a pending publisher, under the account's publishing settings.
+  - for `pytest-channelstack`, a pending publisher, under the account's publishing settings. A
+    pending publisher doesn't reserve the name, so it is reserved as `0.0.0.dev0` too. After that
+    upload, check that the project's publishing settings still list the trusted publisher.
 
   Both trust the repository `christian-bromann/channelstack`, the workflow `release.yml` and the
   environment `pypi`.
 - [ ] **crates.io:**
-  - Create an API token with the `publish-new` and `publish-update` scopes, for `channelstack`.
+  - Reserve the name: publish the placeholder `channelstack` `0.0.0-placeholder.0`, which has no
+    code, from your machine (`cargo login`, then `cargo publish`).
+  - Create an API token with the `publish-update` scope, for `channelstack`.
   - Store it as `CARGO_REGISTRY_TOKEN` in the `release` environment.
-  - The name is free: the first publish claims it.
 - [ ] **GitHub:**
   - Create the environments `release` and `pypi` (Settings → Environments).
   - Limit both to tags `v*`, and add yourself as a required reviewer, so a release waits for your
@@ -70,5 +77,5 @@ These need the maintainer's accounts, so the workflow can't do them:
     [SECURITY.md](../SECURITY.md) points reporters to. It's off today.
 - [ ] **The first release's pull request:** take the README's "not on npm yet" note out.
 
-After the first release, npm and crates.io can trust the workflow too (trusted publishing). Then
-the two tokens can be deleted.
+Once every npm package trusts the workflow, `NPM_TOKEN` can be deleted. crates.io's trusted
+publishing can replace `CARGO_REGISTRY_TOKEN` the same way.

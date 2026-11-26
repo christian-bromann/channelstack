@@ -182,7 +182,7 @@ jobs:
     environment: release
     permissions:
       contents: read
-      id-token: write # npm's provenance, and trusted publishing once it is set up
+      id-token: write # npm's trusted publishing, which npm tries first, and its provenance
     env:
       VERSION: ${{ needs.check.outputs.version }}
       NPM_TAG: ${{ needs.check.outputs.npm-tag }}
@@ -200,6 +200,7 @@ jobs:
           name: packages
       - name: The platform packages first, then channelstack, which names them
         env:
+          # Only for a package that doesn't trust this workflow yet (docs/release.md).
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           publish() {

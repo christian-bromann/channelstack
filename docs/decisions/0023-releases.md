@@ -37,9 +37,11 @@ new major version, the range moves with it.
 
 ## Credentials
 
-- **npm:** a token in the `release` environment (`NPM_TOKEN`), able to publish `channelstack` and
-  the `@channelstack` scope. Every package gets npm's provenance. Once the packages exist, npm's
-  trusted publishing for this workflow can replace the token.
+- **npm:** trusted publishing, so no token is stored once every package trusts `release.yml` in
+  the `release` environment. npm sets it up only for a package that exists, so the five platform
+  packages need a placeholder first, or a token in the `release` environment (`NPM_TOKEN`) for the
+  first release; npm uses the token only for a package that doesn't trust the workflow. Every
+  package gets npm's provenance.
 - **PyPI:** trusted publishing, so no token is stored: both projects trust `release.yml` in the
   `pypi` environment.
 - **crates.io:** a token in the `release` environment (`CARGO_REGISTRY_TOKEN`). Trusted publishing can
