@@ -19,8 +19,13 @@ export interface NotionFixture extends Inspectable<NotionDelivery> {
   /**
    * Create a page as seed data. The integration can only read it, and only gets
    * webhooks for it, when it's listed in `connections` or inherits a connection from
-   * its parent (Notion's real rule). Use `user.createPage` when the creation itself
-   * should reach the agent as an event.
+   * its parent (Notion's real rule).
+   *
+   * In the fake, a seed page sends no event. Live, the session's first person makes it,
+   * so Notion sends `page.created` to a connected integration, and an agent that acts
+   * on new pages (writes a summary into them, say) may change the page before the test
+   * reads it. Use `user.createPage` when the creation itself should reach the agent as
+   * an event: it sends `page.created` in both worlds.
    */
   createPage(options: NotionPageOptions): Promise<NotionPage>;
   createDatabase(options: NotionDatabaseOptions): Promise<NotionDatabase>;
