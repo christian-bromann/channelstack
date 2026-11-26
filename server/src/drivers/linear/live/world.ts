@@ -88,6 +88,9 @@ const COMMENT_FIELDS = /* GraphQL */ `
     user {
       id
     }
+    botActor {
+      type
+    }
     parent {
       id
     }
@@ -196,6 +199,8 @@ interface WireComment {
   updatedAt: string;
   editedAt: string | null;
   user: { id: string } | null;
+  /** Who wrote a comment without a user: Linear's workflow, for the thread it opens for a delegated session. */
+  botActor?: { type: string } | null;
   parent: { id: string } | null;
   agentSession: { id: string } | null;
 }
@@ -332,6 +337,7 @@ export function createLiveLinearWorld(deps: {
     // Only the fake delivers: live, Linear delivers to the agent itself.
     delivery: undefined,
     prompted: undefined,
+    ...(comment.user === null && comment.botActor?.type === "workflow" ? { byLinear: true } : {}),
   });
 
   /** Someone the session's view names: a person of the session, the app, or someone else in the workspace. */

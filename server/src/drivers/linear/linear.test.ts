@@ -63,10 +63,39 @@ describe("agent sessions", () => {
       },
       previousComments: null,
       guidance: null,
-      agentSession: { sourceCommentId: null, archivedAt: null },
+      agentSession: { sourceCommentId: null, archivedAt: null, sourceMetadata: null },
     });
+    // Linear opens the session's thread with a comment of its own (no user, so no userId); it is
+    // the session's comment and the opening prompt's source.
+    const thread = event?.payload.agentSession.comment;
+    expect(thread).toEqual({
+      id: expect.any(String),
+      body: "This thread is for an agent session with my-agent.",
+      issueId: created.id,
+    });
+    expect(event?.payload.agentSession.commentId).toBe(thread.id);
+    expect(event?.payload.agentActivity.sourceCommentId).toBe(thread.id);
     expect(linearWebhookProblems("AgentSessionEvent", event?.payload)).toEqual([]);
     expect(session.delivery).toMatchObject({ type: "AgentSessionEvent", action: "created" });
+    // Ana delegated an issue nobody had: it is hers now, in the Issue event too.
+    expect(await get(`/issues/${created.id}/assignee`)).toMatchObject({ id: ana.id });
+    const update = webhooks().find((hook) => hook.event === "Issue" && hook.payload.action === "update");
+    expect(update?.payload).toMatchObject({ data: { assigneeId: ana.id }, updatedFrom: { assigneeId: null } });
+    const read = await gql(
+      `query ($id: String!) { agentSession(id: $id) { sourceMetadata comment { id body user { id } botActor { type name } agentSession { id } } activities { nodes { sourceComment { id } } } } }`,
+      { id: session.id },
+    );
+    expect(read.body.data.agentSession).toEqual({
+      sourceMetadata: null,
+      comment: {
+        id: thread.id,
+        body: thread.body,
+        user: null,
+        botActor: { type: "workflow", name: "Linear" },
+        agentSession: { id: session.id },
+      },
+      activities: { nodes: [{ sourceComment: { id: thread.id } }] },
+    });
 
     const publish = (content: object, extra: object = {}) =>
       gql(ACTIVITY, { input: { agentSessionId: session.id, content, ...extra } });
@@ -221,18 +250,19 @@ describe("agent sessions", () => {
         // Delegating is Ana's first turn, as Linear records it.
         "Ana: Work on [ENG-1](http://127.0.0.1:4500/linear/acme/issue/ENG-1/checkout-fails-on-safari)",
         "my-agent: (thought) Reading the code",
+        // The session's thread is the one Linear opened, so its turns read as the page's own.
         "my-agent: Which browser?",
-        "  Ana: Safari 18",
-        "  my-agent: Fixed for Safari 18",
+        "Ana: Safari 18",
+        "my-agent: Fixed for Safari 18",
       ].join("\n"),
     );
   });
 
-  test("in a delegated session, a person's answer is a reply in the thread the agent's question opened", async () => {
+  test("in a delegated session, a person's answer is a reply in the session's thread", async () => {
     const { ana, app, post, get, gql, issue } = await workspace();
     const created = await issue();
     const session = await post(`/users/${ana.id}/delegate`, { app: app.id, issue: created.id });
-    // Before the agent has written anything there is no thread: the prompt goes to the session itself.
+    // Before the agent has written anything, the thread Linear opened for the session takes the prompt.
     const early = await post(`/users/${ana.id}/prompt`, { body: "it's urgent", session: session.id });
     expect(early).toMatchObject({ action: "prompted" });
     await gql(ACTIVITY, {
@@ -250,7 +280,7 @@ describe("agent sessions", () => {
         "Ana: Work on [ENG-1](http://127.0.0.1:4500/linear/acme/issue/ENG-1/checkout-fails-on-safari)",
         "Ana: it's urgent",
         "my-agent: Which browser?",
-        "  Ana: Safari 18",
+        "Ana: Safari 18",
       ].join("\n"),
     );
   });
@@ -337,6 +367,8 @@ describe("the GraphQL API", () => {
       "In Review",
       "Done",
       "Canceled",
+      // Every team has Linear's own.
+      "Duplicate",
     ]);
     const states = await gql(
       `query ($team: ID) { workflowStates(filter: { team: { id: { eq: $team } }, name: { eq: "In Review" } }) { nodes { id name } } }`,
@@ -362,6 +394,37 @@ describe("the GraphQL API", () => {
     expect(mine.body.data.issues.nodes).toEqual([{ identifier: "ENG-1" }]);
     const calls = await get("/calls");
     expect(calls.map((call: { operation: string }) => call.operation)).toContain("issueUpdate");
+  });
+
+  test("a team and an issue have what real Linear fills in for them (#26)", async () => {
+    const { gql, issue } = await workspace();
+    const created = await issue();
+    const read = await gql(
+      `query ($id: String!) { issue(id: $id) { createdAt addedToTeamAt slaType syncedWith { id } team {
+        color allMembersCanJoin autoClosePeriod autoArchivePeriod autoCloseStateId
+        defaultIssueState { name type } markedAsDuplicateWorkflowState { id name type }
+        states { nodes { id name type } } } } }`,
+      { id: created.id },
+    );
+    const { team, ...rest } = read.body.data.issue;
+    expect(rest).toEqual({ createdAt: rest.createdAt, addedToTeamAt: rest.createdAt, slaType: "all", syncedWith: [] });
+    const canceled = team.states.nodes.find((state: { type: string }) => state.type === "canceled");
+    const duplicate = team.states.nodes.find((state: { type: string }) => state.type === "duplicate");
+    expect(team).toMatchObject({
+      color: expect.stringMatching(/^#[0-9a-f]{6}$/),
+      allMembersCanJoin: true,
+      autoClosePeriod: 6,
+      autoArchivePeriod: 6,
+      autoCloseStateId: canceled.id,
+      defaultIssueState: { name: "Backlog", type: "backlog" },
+      markedAsDuplicateWorkflowState: { id: duplicate.id, name: "Duplicate", type: "duplicate" },
+    });
+    // An issue marked as a duplicate is closed, as a canceled one is.
+    const moved = await gql(
+      `mutation ($id: String!, $state: String!) { issueUpdate(id: $id, input: { stateId: $state }) { issue { canceledAt state { type } } } }`,
+      { id: created.id, state: duplicate.id },
+    );
+    expect(moved.body.data.issueUpdate.issue).toEqual({ canceledAt: expect.any(String), state: { type: "duplicate" } });
   });
 
   test("a call is on record for the sessions of what it answered with, not of what a filter left out", async () => {

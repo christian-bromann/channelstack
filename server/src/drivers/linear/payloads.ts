@@ -55,7 +55,8 @@ export function linearPayloads(lookups: LinearLookups) {
     id: record.id,
     body: record.body,
     issueId: record.issue,
-    userId: record.user,
+    // A comment Linear wrote has no user, and Linear sends none.
+    ...(record.byLinear ? {} : { userId: record.user }),
   });
 
   const priorityLabel = (priority: number) =>
@@ -143,6 +144,8 @@ export function linearPayloads(lookups: LinearLookups) {
       // Only for a session spawned from another thread, which the fake has no way to start.
       sourceCommentId: null,
       archivedAt: null,
+      // The integration or automation that created the session; null for one a person started.
+      sourceMetadata: null,
       summary: record.summary,
       url: links.session(issueRecord, record.slugId),
     };
