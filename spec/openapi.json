@@ -4711,7 +4711,8 @@
               "started",
               "completed",
               "canceled",
-              "triage"
+              "triage",
+              "duplicate"
             ]
           }
         },
@@ -19261,7 +19262,7 @@
     },
     "/sessions/{session}/linear/issues/{issue}/comments": {
       "get": {
-        "summary": "The comments on the issue, oldest first",
+        "summary": "The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread",
         "security": [
           {
             "bearer": []

@@ -782,7 +782,7 @@ type GitHubAppCalls = list[GitHubApiCall]
 @dataclass(frozen=True)
 class LinearIssueState:
     name: str
-    type: Literal["backlog", "unstarted", "started", "completed", "canceled", "triage"]
+    type: Literal["backlog", "unstarted", "started", "completed", "canceled", "triage", "duplicate"]
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearIssueState:
@@ -2519,7 +2519,7 @@ class LinearIssue:
         return data
 
     async def comments(self) -> LinearComments:
-        """The comments on the issue, oldest first. Experimental."""
+        """The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/issues/{quote(str(self.id), safe='')}/comments")
         return [LinearComment(ctx, item) for item in data]

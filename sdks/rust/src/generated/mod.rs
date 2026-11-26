@@ -13982,7 +13982,7 @@ impl LinearIssue {
         )
     }
 
-    /// The comments on the issue, oldest first. Experimental.
+    /// The comments on the issue, oldest first, without the one Linear writes to open a delegated session's thread. Experimental.
     pub fn comments(&self) -> Call<Value> {
         Call::new(
             &self.ctx,

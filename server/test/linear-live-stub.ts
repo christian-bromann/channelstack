@@ -49,7 +49,15 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
   >();
   const sessions = new Map<
     string,
-    { id: string; issue: string; creator: string; createdAt: string; activities: Array<Record<string, unknown>> }
+    {
+      id: string;
+      issue: string;
+      creator: string;
+      createdAt: string;
+      /** The comment Linear opens the session's thread with. */
+      comment: string;
+      activities: Array<Record<string, unknown>>;
+    }
   >();
   const calls: LinearStub["calls"] = [];
   let said = 0;
@@ -91,7 +99,7 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
     issue: { id: session.issue },
     appUser: { id: app.userId },
     creator: { id: session.creator },
-    comment: null,
+    comment: { id: session.comment },
     externalLinks: [],
     // Newest first, as Linear answers them.
     activities: { nodes: [...session.activities].reverse() },
@@ -177,9 +185,30 @@ export function linearStub(options: { org?: string } = {}): LinearStub {
         const issue = issues.get(v.id);
         if (!issue) throw Object.assign(new Error("Issue not found"), { code: "INPUT_ERROR" });
         if (v.input.delegateId === app.userId && issue.delegate !== app.userId && !quiet) {
-          // Linear opens an agent session when an issue is delegated to an agent.
+          // Linear opens an agent session when an issue is delegated to an agent, and its thread
+          // with a comment of its own: no user, its workflow the author.
           const id = uuid();
-          sessions.set(id, { id, issue: issue.id, creator: who.id, createdAt: now(), activities: [] });
+          const at = now();
+          const comment = {
+            id: uuid(),
+            body: "This thread is for an agent session with robin.",
+            createdAt: at,
+            updatedAt: at,
+            editedAt: null,
+            user: null,
+            botActor: { type: "workflow" },
+            parent: null,
+            agentSession: { id },
+          };
+          issue.comments.push(comment);
+          sessions.set(id, {
+            id,
+            issue: issue.id,
+            creator: who.id,
+            createdAt: at,
+            comment: comment.id,
+            activities: [],
+          });
         }
         if (v.input.delegateId !== undefined) issue.delegate = v.input.delegateId;
         if (v.input.title !== undefined) issue.title = v.input.title;
