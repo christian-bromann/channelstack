@@ -271,10 +271,43 @@ main > .hero {
   white-space: nowrap;
 }
 
-.soon {
-  margin-top: 14px;
+.registries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.registries a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.registries a:hover,
+.registries a:focus-visible {
+  border-color: var(--line-strong);
+}
+
+.registries .registry {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--line);
   color: var(--muted);
-  font-size: 13.5px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 500;
 }
 
 /* ---------- channels ---------- */

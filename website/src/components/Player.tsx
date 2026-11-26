@@ -1,24 +1,35 @@
 import { type ComponentType, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
+import githubRs from "../../examples/rust/src/home_github.rs?sample";
+import gmailRs from "../../examples/rust/src/home_gmail.rs?sample";
+import linearRs from "../../examples/rust/src/home_linear.rs?sample";
+import notionRs from "../../examples/rust/src/home_notion.rs?sample";
+import resendRs from "../../examples/rust/src/home_resend.rs?sample";
+import slackRs from "../../examples/rust/src/home_slack.rs?sample";
 import type { Sample } from "../../plugins/samples-plugin";
 import github from "../../samples/github.test.ts?sample";
+import gmail from "../../samples/gmail.test.ts?sample";
 import slack from "../../samples/hero.test.ts?sample";
 import linear from "../../samples/linear.test.ts?sample";
 import notion from "../../samples/notion.test.ts?sample";
 import notionPy from "../../samples/python/test_comments.py?sample";
 import slackPy from "../../samples/python/test_deploy.py?sample";
+import gmailPy from "../../samples/python/test_invoice.py?sample";
 import githubPy from "../../samples/python/test_issues.py?sample";
+import resendPy from "../../samples/python/test_refund.py?sample";
 import linearPy from "../../samples/python/test_sessions.py?sample";
+import resend from "../../samples/resend.test.ts?sample";
 import { prefersReducedMotion, useInView } from "../lib/hooks";
 import { CopyButton } from "./Code";
 import { Check, Pause, Play, Replay } from "./Icons";
-import { GitHubMock, LinearMock, type MockProps, NotionMock, SlackMock } from "./Mocks";
+import { GitHubMock, GmailMock, LinearMock, type MockProps, NotionMock, ResendMock, SlackMock } from "./Mocks";
 
-type Lang = "ts" | "py";
-/** The switch shows each language's official logo, unmodified (public/logos/SOURCES.md). */
-const LANGS: Array<{ id: Lang; name: string; logo: string }> = [
-  { id: "ts", name: "TypeScript", logo: "/logos/typescript.svg" },
-  { id: "py", name: "Python", logo: "/logos/python.svg" },
+type Lang = "ts" | "py" | "rs";
+/** The language switch: each language's name, shortened on narrow screens, and its colour on GitHub. */
+const LANGS: Array<{ id: Lang; name: string; short: string }> = [
+  { id: "ts", name: "TypeScript", short: "TS" },
+  { id: "py", name: "Python", short: "Py" },
+  { id: "rs", name: "Rust", short: "Rs" },
 ];
 
 interface Example {
@@ -26,7 +37,7 @@ interface Example {
   label: string;
   /** The address shown above the mock-up. */
   host: string;
-  /** The same test in each language. Both carry the same playback steps. */
+  /** The same test in each language. Each carries the same playback steps. */
   code: Record<Lang, { file: string; sample: Sample }>;
   Mock: ComponentType<MockProps>;
   /** What the test asserts, each shown once playback reaches its step. */
@@ -39,7 +50,11 @@ const EXAMPLES: Example[] = [
     id: "slack",
     label: "Slack",
     host: "slack.localhost",
-    code: { ts: { file: "deploy.test.ts", sample: slack }, py: { file: "test_deploy.py", sample: slackPy } },
+    code: {
+      ts: { file: "deploy.test.ts", sample: slack },
+      py: { file: "test_deploy.py", sample: slackPy },
+      rs: { file: "deploy.rs", sample: slackRs },
+    },
     Mock: SlackMock,
     checks: [
       { step: 2, text: "status reads “checking CI”" },
@@ -60,7 +75,11 @@ const EXAMPLES: Example[] = [
     id: "github",
     label: "GitHub",
     host: "github.localhost",
-    code: { ts: { file: "issues.test.ts", sample: github }, py: { file: "test_issues.py", sample: githubPy } },
+    code: {
+      ts: { file: "issues.test.ts", sample: github },
+      py: { file: "test_issues.py", sample: githubPy },
+      rs: { file: "issues.rs", sample: githubRs },
+    },
     Mock: GitHubMock,
     checks: [
       { step: 3, text: "my-agent commented, mentioning Safari" },
@@ -80,7 +99,11 @@ const EXAMPLES: Example[] = [
     id: "linear",
     label: "Linear",
     host: "linear.localhost",
-    code: { ts: { file: "sessions.test.ts", sample: linear }, py: { file: "test_sessions.py", sample: linearPy } },
+    code: {
+      ts: { file: "sessions.test.ts", sample: linear },
+      py: { file: "test_sessions.py", sample: linearPy },
+      rs: { file: "sessions.rs", sample: linearRs },
+    },
     Mock: LinearMock,
     checks: [
       { step: 3, text: "the session shows a thought" },
@@ -100,7 +123,11 @@ const EXAMPLES: Example[] = [
     id: "notion",
     label: "Notion",
     host: "notion.localhost",
-    code: { ts: { file: "comments.test.ts", sample: notion }, py: { file: "test_comments.py", sample: notionPy } },
+    code: {
+      ts: { file: "comments.test.ts", sample: notion },
+      py: { file: "test_comments.py", sample: notionPy },
+      rs: { file: "comments.rs", sample: notionRs },
+    },
     Mock: NotionMock,
     checks: [
       { step: 3, text: "my-agent answered in the same discussion" },
@@ -113,6 +140,54 @@ const EXAMPLES: Example[] = [
       </>,
       <>
         <code>page.content_updated</code> batched the way Notion does
+      </>,
+    ],
+  },
+  {
+    id: "resend",
+    label: "Resend",
+    host: "resend.localhost",
+    code: {
+      ts: { file: "refund.test.ts", sample: resend },
+      py: { file: "test_refund.py", sample: resendPy },
+      rs: { file: "refund.rs", sample: resendRs },
+    },
+    Mock: ResendMock,
+    checks: [
+      { step: 2, text: "my-agent answered about the refund, in Ana’s thread" },
+      { step: 4, text: "still one answer after Resend’s retry" },
+    ],
+    notes: [
+      <>
+        Delivers <code>email.received</code>, signed the Svix way
+      </>,
+      <>Serves the email back through the receiving API</>,
+      <>
+        Retries on Resend’s schedule, with the same <code>svix-id</code>
+      </>,
+    ],
+  },
+  {
+    id: "gmail",
+    label: "Gmail",
+    host: "google.localhost",
+    code: {
+      ts: { file: "invoice.test.ts", sample: gmail },
+      py: { file: "test_invoice.py", sample: gmailPy },
+      rs: { file: "invoice.rs", sample: gmailRs },
+    },
+    Mock: GmailMock,
+    checks: [
+      { step: 3, text: "the answer is “Re: Invoice”, in Ana’s thread" },
+      { step: 4, text: "exactly one answer from my-agent" },
+    ],
+    notes: [
+      <>Pushes a Pub/Sub message with an OIDC token your app verifies</>,
+      <>
+        Serves <code>history.list</code> and <code>messages.get</code> from the mailbox
+      </>,
+      <>
+        Threads <code>messages.send</code> by <code>threadId</code> and <code>In-Reply-To</code>
       </>,
     ],
   },
@@ -146,14 +221,25 @@ function Panel({
   useEffect(() => {
     const el = bar.current;
     if (!el) return;
+    const pre = el.closest("pre");
     const first = sample.steps.indexOf(step);
     if (!active || step < 1 || first === -1) {
       el.style.opacity = "0";
+      if (pre && step < 1) pre.scrollTop = 0;
       return;
     }
     const rows = sample.steps.filter((s) => s === step).length;
     el.style.opacity = "1";
     el.style.transform = `translateY(calc(${first} * var(--code-lh))) scaleY(${rows})`;
+    // Code taller than its panel scrolls: keep the lines being played in the middle of it.
+    if (pre && pre.scrollHeight > pre.clientHeight) {
+      const lines = pre.querySelectorAll<HTMLElement>(".line");
+      const top = lines[first]?.offsetTop ?? 0;
+      const last = lines[first + rows - 1];
+      const bottom = last ? last.offsetTop + last.offsetHeight : top;
+      const target = top - (pre.clientHeight - (bottom - top)) / 2;
+      pre.scrollTo({ top: Math.max(0, target), behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    }
   }, [active, step, sample]);
 
   return (
@@ -177,12 +263,16 @@ function Panel({
               <button
                 key={item.id}
                 type="button"
+                className={item.id}
                 aria-pressed={item.id === lang}
                 aria-label={item.name}
-                title={item.name}
                 onClick={() => onLang(item.id)}
               >
-                <img src={item.logo} alt="" width="18" height="18" decoding="async" />
+                <i aria-hidden="true" />
+                <span className="full">{item.name}</span>
+                <span className="short" aria-hidden="true">
+                  {item.short}
+                </span>
               </button>
             ))}
           </span>
@@ -192,7 +282,7 @@ function Panel({
           className="code"
           tabIndex={0}
           role="region"
-          aria-label={`${example.label} example test in ${lang === "ts" ? "TypeScript" : "Python"}`}
+          aria-label={`${example.label} example test in ${LANGS.find((item) => item.id === lang)?.name}`}
         >
           <code>
             <span className="hot" ref={bar} aria-hidden="true" />

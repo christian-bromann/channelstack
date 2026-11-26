@@ -5,7 +5,7 @@ test("Stop ends a working session", async ({ linear }) => {
   const kai = await linear.createUser({ name: "Kai" });
   const team = await linear.createTeam({ key: "ENG", members: [kai] });
   // [!step 1]
-  const issue = await kai.createIssue({ title: "Migrate billing cron" }, { team });
+  const issue = await kai.createIssue({ title: "Migrate cron" }, { team });
 
   // [!step 2]
   const session = await kai.delegate(linear.app, { issue });

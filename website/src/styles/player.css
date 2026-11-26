@@ -75,7 +75,7 @@
 
 .panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   grid-template-rows: 1fr auto;
   min-width: 0;
 }
@@ -161,49 +161,105 @@ html:not(.js) .panel + .panel {
 
 .panel-code .code {
   flex: 1;
+  min-height: 0;
+  font-size: 12.5px;
 }
 
-/* the TS | Py switch */
+/* side by side, the mock-up sets the height: longer code scrolls in its panel, following playback */
+@media (min-width: 941px) {
+  .panel-code {
+    contain: size;
+  }
+}
+
+/* the language switch: TypeScript | Python | Rust */
 .lang {
   display: inline-flex;
-  padding: 2px;
-  border-radius: 8px;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--code-line);
+  border-radius: 9px;
   background: var(--code-raise);
 }
 
 .lang button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 28px;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px;
   border: 0;
   border-radius: 6px;
   background: none;
+  color: var(--code-dim);
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
   transition:
     background-color 150ms,
+    color 150ms,
     box-shadow 150ms;
 }
 
-/* the logos keep their own colours; the selected language gets a raised tile */
-.lang img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
+/* each language's colour on GitHub, as a dot: no logos */
+.lang i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lang);
+  opacity: 0.55;
+  transition: opacity 150ms;
+}
+
+.lang .ts {
+  --lang: #3178c6;
+}
+
+.lang .py {
+  --lang: #ffd43b;
+}
+
+.lang .rs {
+  --lang: #dea584;
+}
+
+.lang .short {
+  display: none;
 }
 
 .lang button:hover {
-  background: color-mix(in srgb, var(--code-line) 60%, transparent);
+  color: var(--code-fg);
 }
 
 .lang button[aria-pressed="true"] {
   background: var(--code-bg);
-  box-shadow: 0 0 0 1px var(--code-dim);
+  box-shadow:
+    0 0 0 1px var(--code-line),
+    0 1px 2px rgb(0 0 0 / 0.25);
+  color: var(--code-fg);
+}
+
+.lang button[aria-pressed="true"] i,
+.lang button:hover i {
+  opacity: 1;
 }
 
 .lang button:focus-visible {
   outline-color: var(--code-key);
+}
+
+@media (max-width: 520px) {
+  .lang button {
+    padding: 0 8px;
+  }
+
+  .lang .full {
+    display: none;
+  }
+
+  .lang .short {
+    display: inline;
+  }
 }
 
 html:not(.js) .lang {
@@ -445,7 +501,15 @@ html:not(.js) .lang {
       .nt-doc,
       .nt-crumb,
       .nt-comment,
-      .nt-reply
+      .nt-reply,
+      .em-subject,
+      .em-msg,
+      .em-event,
+      .em-count,
+      .gm-subject,
+      .gm-count,
+      .gm-msg,
+      .gm-actions
     ) {
     transition:
       opacity 380ms var(--ease),
@@ -1161,5 +1225,390 @@ html:not(.js) .lang {
   .nt-body {
     grid-template-columns: minmax(0, 1fr);
     padding: 16px;
+  }
+}
+
+/* ---------- Email (Resend, Gmail) ---------- */
+
+.app-email {
+  --bg: light-dark(#ffffff, #17191d);
+  --fg: light-dark(#2b2f36, #d6d9de);
+  --strong: light-dark(#111418, #ffffff);
+  --dim: light-dark(#6b717c, #9097a3);
+  --rule: light-dark(#e6e8eb, #2a2e35);
+  --chip: light-dark(#f3f4f6, #23272e);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.em-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.em-box {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.em-body {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  flex: 1;
+  padding: 18px 20px 22px;
+}
+
+.em-subject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--strong);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.em-count {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.em-msg {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.em-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2c7a9e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.em-avatar.bot {
+  border-radius: 7px;
+  background: #b4552d;
+}
+
+.em-from {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.em-from b {
+  color: var(--strong);
+}
+
+.em-from span,
+.em-to {
+  color: var(--dim);
+  font-size: 12.5px;
+}
+
+.em-from small {
+  margin-left: auto;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.em-text {
+  margin-top: 8px;
+  font-size: 14.5px;
+}
+
+.em-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.em-file span {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #c9413b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.em-event {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--chip);
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.em-event code {
+  color: var(--fg);
+}
+
+/* ---------- Gmail: its layout and colours, no Google artwork ---------- */
+
+.app-gmail {
+  --shell: light-dark(#e9eef6, #1b1c1f);
+  --pill: light-dark(#dde3ea, #2c2d31);
+  --card: light-dark(#ffffff, #202124);
+  --fg: light-dark(#1f1f1f, #e3e3e3);
+  --dim: light-dark(#444746, #a8abb0);
+  --rule: light-dark(#e3e3e3, #3c4043);
+  --chip: light-dark(#e8e8e8, #3c4043);
+  --line: light-dark(#747775, #8e918f);
+  padding: 0 10px 10px;
+  background: var(--shell);
+  color: var(--fg);
+  font-family:
+    Roboto,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
+}
+
+.gm-top {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+}
+
+.gm-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--pill);
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.gm-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  flex: 1;
+  padding: 6px 18px 18px;
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.gm-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+  color: var(--dim);
+}
+
+.gm-tools i {
+  width: 1px;
+  height: 18px;
+  background: var(--rule);
+}
+
+.gm-tools small {
+  font-size: 12px;
+}
+
+.gm-subject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+}
+
+.gm-chip,
+.gm-count {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--chip);
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.gm-count {
+  border-radius: 999px;
+}
+
+.gm-msg {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.gm-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #5e97f6;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.gm-avatar.bot {
+  background: #e8710a;
+}
+
+.gm-avatar.small {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+
+.gm-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gm-head p {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-head span {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.gm-head small {
+  color: var(--dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.gm-icons {
+  display: inline-flex;
+  gap: 10px;
+}
+
+.gm-to {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.gm-text {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.gm-file {
+  display: inline-grid;
+  grid-template-rows: 54px auto;
+  width: 150px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.gm-file-thumb {
+  display: grid;
+  place-items: center;
+  background: var(--chip);
+  color: #d93025;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.gm-file > span:last-child {
+  padding: 6px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-collapsed {
+  display: grid;
+  grid-template-columns: 28px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.gm-collapsed > span:not(.gm-avatar) {
+  overflow: hidden;
+  color: var(--dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-collapsed small {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.gm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  padding-left: 48px;
+}
+
+.gm-actions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--dim);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+@media (max-width: 520px) {
+  .gm-tools {
+    gap: 12px;
+  }
+  .gm-icons {
+    display: none;
+  }
+  .gm-actions {
+    padding-left: 0;
   }
 }
