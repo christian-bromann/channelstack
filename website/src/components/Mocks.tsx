@@ -310,3 +310,103 @@ export function NotionMock({ step }: MockProps) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Email (Resend, Gmail): one thread, as the person who wrote in reads it. Not a copy of any
+// product's client: the same view serves both channels.
+
+function EmailMessage({
+  step,
+  at,
+  who,
+  from,
+  to,
+  bot = false,
+  attachment,
+  children,
+}: {
+  step: number;
+  at: number;
+  who: string;
+  from: string;
+  to: string;
+  bot?: boolean;
+  attachment?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={when(step, at, "em-msg")}>
+      <span className={bot ? "em-avatar bot" : "em-avatar"} aria-hidden="true">
+        {who[0]!.toUpperCase()}
+      </span>
+      <div>
+        <p className="em-from">
+          <b>{who}</b> <span>&lt;{from}&gt;</span>
+          <small>9:14 AM</small>
+        </p>
+        <p className="em-to">to {to}</p>
+        <div className="em-text">{children}</div>
+        {attachment ? (
+          <p className="em-file">
+            <span aria-hidden="true">PDF</span>
+            {attachment}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EmailShell({ mailbox, children }: { mailbox: string; children: ReactNode }) {
+  return (
+    <div className="app app-email">
+      <div className="em-top">
+        <span>Inbox</span>
+        <span className="spacer" />
+        <span className="em-box">{mailbox}</span>
+      </div>
+      <div className="em-body">{children}</div>
+    </div>
+  );
+}
+
+export function ResendMock({ step }: MockProps) {
+  return (
+    <EmailShell mailbox="ana@example.com">
+      <p className={when(step, 1, "em-subject")}>Refund</p>
+      <EmailMessage step={step} at={1} who="Ana" from="ana@example.com" to="my-agent@acme.resend.app">
+        <p>Where is my refund for #4411?</p>
+      </EmailMessage>
+      <EmailMessage step={step} at={2} who="my-agent" bot from="my-agent@acme.resend.app" to="ana@example.com">
+        <p>Your refund for #4411 went out on Monday. It reaches your card within 5 days.</p>
+      </EmailMessage>
+      <p className={when(step, 3, "em-event")}>
+        Resend delivered <code>email.received</code> again, with the same <code>svix-id</code>
+      </p>
+    </EmailShell>
+  );
+}
+
+export function GmailMock({ step }: MockProps) {
+  return (
+    <EmailShell mailbox="ana@example.com">
+      <p className={when(step, 1, "em-subject")}>
+        Invoice <span className={when(step, 3, "em-count")}>2 in this thread</span>
+      </p>
+      <EmailMessage step={step} at={1} who="Ana" from="ana@example.com" to="my-agent@example.com">
+        <p>Can you resend the March invoice?</p>
+      </EmailMessage>
+      <EmailMessage
+        step={step}
+        at={2}
+        who="my-agent"
+        bot
+        from="my-agent@example.com"
+        to="ana@example.com"
+        attachment="invoice-2026-03.pdf"
+      >
+        <p>Here is the March invoice again, attached.</p>
+      </EmailMessage>
+    </EmailShell>
+  );
+}

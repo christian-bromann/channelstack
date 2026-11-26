@@ -49,6 +49,8 @@ describe("parseSample", () => {
       ["../samples/github.test.ts", "../samples/python/test_issues.py", "../examples/rust/src/home_github.rs"],
       ["../samples/linear.test.ts", "../samples/python/test_sessions.py", "../examples/rust/src/home_linear.rs"],
       ["../samples/notion.test.ts", "../samples/python/test_comments.py", "../examples/rust/src/home_notion.rs"],
+      ["../samples/resend.test.ts", "../samples/python/test_refund.py", "../examples/rust/src/home_resend.rs"],
+      ["../samples/gmail.test.ts", "../samples/python/test_invoice.py", "../examples/rust/src/home_gmail.rs"],
     ];
     for (const files of scenes) {
       const stepSets = await Promise.all(

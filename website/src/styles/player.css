@@ -161,6 +161,14 @@ html:not(.js) .panel + .panel {
 
 .panel-code .code {
   flex: 1;
+  min-height: 0;
+}
+
+/* side by side, the mock-up sets the height: longer code scrolls in its panel, following playback */
+@media (min-width: 941px) {
+  .panel-code {
+    contain: size;
+  }
 }
 
 /* the language switch: TypeScript | Python | Rust */
@@ -492,7 +500,11 @@ html:not(.js) .lang {
       .nt-doc,
       .nt-crumb,
       .nt-comment,
-      .nt-reply
+      .nt-reply,
+      .em-subject,
+      .em-msg,
+      .em-event,
+      .em-count
     ) {
     transition:
       opacity 380ms var(--ease),
@@ -1209,4 +1221,147 @@ html:not(.js) .lang {
     grid-template-columns: minmax(0, 1fr);
     padding: 16px;
   }
+}
+
+/* ---------- Email (Resend, Gmail) ---------- */
+
+.app-email {
+  --bg: light-dark(#ffffff, #17191d);
+  --fg: light-dark(#2b2f36, #d6d9de);
+  --strong: light-dark(#111418, #ffffff);
+  --dim: light-dark(#6b717c, #9097a3);
+  --rule: light-dark(#e6e8eb, #2a2e35);
+  --chip: light-dark(#f3f4f6, #23272e);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.em-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.em-box {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.em-body {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  flex: 1;
+  padding: 18px 20px 22px;
+}
+
+.em-subject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--strong);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.em-count {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.em-msg {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.em-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2c7a9e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.em-avatar.bot {
+  border-radius: 7px;
+  background: #b4552d;
+}
+
+.em-from {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.em-from b {
+  color: var(--strong);
+}
+
+.em-from span,
+.em-to {
+  color: var(--dim);
+  font-size: 12.5px;
+}
+
+.em-from small {
+  margin-left: auto;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.em-text {
+  margin-top: 8px;
+  font-size: 14.5px;
+}
+
+.em-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.em-file span {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #c9413b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.em-event {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--chip);
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.em-event code {
+  color: var(--fg);
 }
