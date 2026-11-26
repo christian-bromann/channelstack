@@ -782,7 +782,7 @@ type GitHubAppCalls = list[GitHubApiCall]
 @dataclass(frozen=True)
 class LinearIssueState:
     name: str
-    type: Literal["backlog", "unstarted", "started", "completed", "canceled", "triage"]
+    type: Literal["backlog", "unstarted", "started", "completed", "canceled", "triage", "duplicate"]
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> LinearIssueState:

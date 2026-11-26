@@ -778,7 +778,7 @@ export function registerLinearRoutes(
     z
       .object({
         name: z.string(),
-        type: z.enum(["backlog", "unstarted", "started", "completed", "canceled", "triage"]),
+        type: z.enum(["backlog", "unstarted", "started", "completed", "canceled", "triage", "duplicate"]),
       })
       .openapi("LinearIssueState"),
     (issue) => {

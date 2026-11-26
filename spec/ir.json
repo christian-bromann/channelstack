@@ -18407,7 +18407,8 @@
                 "started",
                 "completed",
                 "canceled",
-                "triage"
+                "triage",
+                "duplicate"
               ]
             },
             "optional": false

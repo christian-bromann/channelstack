@@ -543,7 +543,7 @@ export type GitHubAppCalls = GitHubApiCall[];
 
 export interface LinearIssueState {
   name: string;
-  type: "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage";
+  type: "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage" | "duplicate";
 }
 
 export type LinearComments = LinearComment[];
