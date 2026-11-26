@@ -953,6 +953,8 @@ describe("check runs", () => {
     for (const context of ["a", "b", "a"]) await api("POST", `${path}/statuses/${sha}`, { state: "success", context });
     const combined = (await api("GET", `${path}/commits/${sha}/status`)).body;
     expect(combined.statuses.map((status: { context: string }) => status.context)).toEqual(["a", "b"]);
+    // A combined status names the repository as a minimal repository, which has custom properties.
+    expect(combined.repository).toMatchObject({ custom_properties: {} });
     for (const name of ["lint", "test", "lint"])
       await api("POST", `${path}/check-runs`, { name, head_sha: sha, conclusion: "success" });
     const runs = (await api("GET", `${path}/commits/${sha}/check-runs`)).body.check_runs;
