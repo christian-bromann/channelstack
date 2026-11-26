@@ -94,6 +94,9 @@ filter_unconventional = false
 split_commits = false
 # The squash merge's `(#123)` becomes a link to the pull request.
 commit_preprocessors = [
+  # Only the title, which the check has seen: the squash body (the branch's commit messages, or the
+  # PR's description) can't make an entry breaking with a stray `BREAKING CHANGE:`. `!` does.
+  { pattern = '(?s)\n.*', replace = "" },
   { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/christian-bromann/channelstack/pull/${1}))" },
 ]
 commit_parsers = [

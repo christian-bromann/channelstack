@@ -249,9 +249,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`release: every package is at ${versions()[NPM[1]]}${tag ? `, as ${tag} says` : ""}`);
   } else if (command === "draft") {
     const last = lastTag();
-    console.log(
-      last === undefined ? "No v* tag yet, so nothing to draft: the first release is hand-written." : draft(),
-    );
+    const drafted = last === undefined ? "" : draft();
+    if (last === undefined) console.log("No v* tag yet, so nothing to draft: the first release is hand-written.");
+    else console.log(drafted === "" ? `Nothing merged since ${last} goes in the changelog.` : drafted);
   } else if (command === "notes" && value !== undefined) {
     const section = changelogSection(read("CHANGELOG.md"), value);
     if (section === undefined) throw new Error(`CHANGELOG.md has no "## [${value}]" section`);

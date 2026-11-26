@@ -150,6 +150,10 @@ describe("the changelog draft, from the pull requests' titles", () => {
     expect(nextVersion(repository(["Phase 9 (#88)", "fix(slack): a (#1)", "feat(github): b (#2)"], 1))).toBe("0.2.0");
     expect(nextVersion(repository(["Phase 9 (#88)", "fix(server)!: a (#1)"], 1))).toBe("0.2.0");
     expect(() => nextVersion(repository(["Phase 9 (#88)"], 1))).toThrow("Nothing to release");
+    // Only the title counts: a stray footer in the squash body breaks nothing.
+    const stray = repository(["Phase 9 (#88)", "fix(slack): a (#1)\n\nBREAKING CHANGE: from a branch commit"], 1);
+    expect(nextVersion(stray)).toBe("0.1.1");
+    expect(draft(stray)).not.toContain("Breaking");
     // An internal scope bumps nothing, as it lists nothing.
     expect(() => nextVersion(repository(["Phase 9 (#88)", "fix(deps): a (#1)", "feat(docs,ci): b (#2)"], 1))).toThrow(
       "Nothing to release",

@@ -4,8 +4,8 @@ name: Prepare a release
 # one (then the pull requests merged since the last `v*` tag decide it, cliff.toml). It sets that
 # version in every package, regenerates what follows from it, moves the changelog's "Unreleased"
 # section under the version with a draft from those pull requests' titles, and opens the version
-# pull request. Merging that pull
-# request tags it (release-tag.yml), and the tag releases it (release.yml).
+# pull request. Merging that pull request tags it (release-tag.yml), and the tag releases it
+# (release.yml).
 #
 # The pull request is opened with the release App's token, not GITHUB_TOKEN: a pull request that
 # GITHUB_TOKEN opens starts no workflows, so it would get no CI.

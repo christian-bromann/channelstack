@@ -15,7 +15,8 @@ their own machine, and no machine but GitHub's holds what publishing needs.
 1. **Prepare it.** Actions → **Prepare a release** → **Run workflow** on `main`. Leave the version
    empty to take the next one from the pull requests merged since the last `v*` tag (git-cliff's
    `--bumped-version`): before 1.0, a breaking change (`!`) or a `feat` bumps the minor version,
-   and a `fix` or `perf` the patch version. Name the version to choose it yourself, as for the first
+   and anything else that is listed (a `fix`, a `perf`, or a title from before the convention) the
+   patch version. Only `!` in the title marks a breaking change; the commit's body is ignored. Name the version to choose it yourself, as for the first
    release (`0.1.0`) or a prerelease (`0.2.0-rc.1`). The workflow runs `pnpm release:version`,
    which:
    - sets the version in every published manifest: `server/package.json` and
@@ -73,6 +74,22 @@ clone):
 pnpm release:draft
 ```
 
+## Once, for the changelog
+
+These keep the commit titles the changelog is drafted from the ones the `PR title` check passed.
+They are repository settings, so they need the maintainer:
+
+- [ ] **A branch ruleset on `main`** (Settings → Rules → Rulesets → New branch ruleset, target the
+  default branch) with **Require status checks to pass** and the check `PR title`, so a pull
+  request whose title the changelog can't use isn't merged. The check runs on
+  `pull_request_target`, from `main`'s copy of `.github/workflows/pr-title.yml`. In the same
+  ruleset, **Require a pull request before merging** with **Allowed merge methods: Squash** only.
+- [ ] **The checked title is the commit's title** (Settings → General → Pull Requests): allow squash
+  merging only, with the default commit message **Pull request title**, or **Pull request title
+  and description**. Today a pull request with one commit is squashed under that commit's own
+  title (`COMMIT_OR_PR_TITLE`), which the check never saw, and merge commits and rebase merges
+  are allowed too.
+
 ## Once, before the first release
 
 These need the maintainer's accounts, so the workflow can't do them:
@@ -99,16 +116,6 @@ These need the maintainer's accounts, so the workflow can't do them:
   - An API token that may publish it is stored as `CARGO_REGISTRY_TOKEN` in the `release`
     environment.
 - [ ] **GitHub:**
-  - Add a branch ruleset on `main` (Settings → Rules → Rulesets → New branch ruleset, target the
-    default branch) with **Require status checks to pass** and the check `PR title`, so a pull
-    request whose title the changelog can't use isn't merged. The check runs on
-    `pull_request_target`, from `main`'s copy of `.github/workflows/pr-title.yml`. In the same
-    ruleset, **Require a pull request before merging** with **Allowed merge methods: Squash** only.
-  - Make the checked title the commit's title (Settings → General → Pull Requests): allow squash
-    merging only, with the default commit message **Pull request title**, or **Pull request title
-    and description**. Today a pull request with one commit is squashed under that commit's own
-    title (`COMMIT_OR_PR_TITLE`), which the check never saw, and merge commits and rebase merges
-    are allowed too.
   - Create the environments `release` and `pypi` (Settings → Environments).
   - Limit both to tags `v*`, and add yourself as a required reviewer, so a release waits for your
     approval.
