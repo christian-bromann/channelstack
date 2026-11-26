@@ -1,3 +1,4 @@
+import formats from "ajv-formats";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 
 import discovery from "./gmail-discovery.json" with { type: "json" };
@@ -53,7 +54,10 @@ function converted(schema: DiscoverySchema): Json {
 }
 
 const schemas = discovery.schemas as unknown as Record<string, DiscoverySchema>;
-const ajv = new Ajv2020({ strict: false, allErrors: true });
+// The package's default export is the function itself under Node's ESM; its types say otherwise.
+const addFormats = formats as unknown as (ajv: Ajv2020) => void;
+const ajv = new Ajv2020({ strict: false, allErrors: true, validateFormats: true });
+addFormats(ajv);
 ajv.addSchema(
   {
     $id: "gmail",
