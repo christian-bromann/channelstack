@@ -148,6 +148,8 @@ def test_a_relative_path_starts_from_the_root_an_integration_set_or_from_the_wor
     assert [file["path"] for file in read_tree([{"path": "web/README.md"}])] == ["README.md"]
     set_files_root(None)
     # Without a root the same path starts from the working directory, where it isn't: an error, not no files.
+    (fixture / "elsewhere").mkdir()
+    monkeypatch.chdir(fixture / "elsewhere")
     with pytest.raises(FileNotFoundError):
         read_tree("./web")
     monkeypatch.chdir(fixture)
