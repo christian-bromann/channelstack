@@ -27,5 +27,7 @@ export interface ResendEmailRecord extends EmailRecord {
   /** Headers the sender set itself, beyond the ones every email has. */
   readonly headers: Readonly<Record<string, string>>;
   readonly tags: Readonly<Record<string, string>>;
+  /** The message as the team received it (RFC 5322), for an email to the team: what `raw.download_url` opens. */
+  readonly raw: string | undefined;
   lastEvent: ResendLastEvent | undefined;
 }

@@ -15,7 +15,11 @@ export const resend: DriverDefinition = {
   ids: RESEND_IDS,
   tokenPatterns: [/re_[A-Za-z0-9]{8}_[A-Za-z0-9]{24}/g, /whsec_[A-Za-z0-9+/=]{20,}/g],
   hosts: ["api.resend.com"],
-  secrets: { apiKey: RESEND_SECRETS.apiKey, webhookSecret: RESEND_SECRETS.webhookSecret },
+  secrets: {
+    apiKey: RESEND_SECRETS.apiKey,
+    webhookSecret: RESEND_SECRETS.webhookSecret,
+    downloadKey: RESEND_SECRETS.downloadKey,
+  },
   // The agent's team's key (live-mode.md, section 4). People bring their own teams' keys.
   live: {
     credentials: ["CHANNELSTACK_RESEND_API_KEY"],

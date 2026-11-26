@@ -89,13 +89,6 @@ divergences:
       Live mode tags the email a person sends with the run (`X-Channelstack-Run`); the fake's
       people send none. Where live mode marks its mail, not drift.
     expires: 2027-02-28
-  - scenario: shapes/resend
-    path: api GET /emails/receiving/{id} raw
-    reason: >-
-      Real Resend links the received email's raw MIME message (`raw.download_url`); the fake
-      answers `raw: null`, which Resend's description allows. Building the raw message comes with
-      attachments.
-    expires: 2027-02-28
   - scenario: shapes/google
     path: api POST /token refresh_token_expires_in
     reason: >-

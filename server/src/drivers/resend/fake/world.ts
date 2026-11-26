@@ -1,6 +1,7 @@
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import {
   domainOf,
+  type EmailAttachment,
   emailAuthor,
   type Mailbox,
   messageId,
@@ -9,6 +10,7 @@ import {
   replyOf,
   threadOf,
 } from "../../../core/email/index.ts";
+import { composeMime, withHeaders } from "../../../core/email/mime.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { RESEND_IDS } from "../ids.ts";
 import { resendPayloads } from "../payloads.ts";
@@ -46,6 +48,9 @@ function testOutcome(address: string): ResendLastEvent | undefined {
   return match[1] as ResendLastEvent;
 }
 
+/** A file an email carries, before Resend gives it an id. */
+export type AttachmentFile = Omit<EmailAttachment, "id" | "size" | "content"> & { readonly content: Uint8Array };
+
 /** What an email the agent sends through the API carries, as `POST /emails` takes it. */
 export interface SendInput {
   readonly from: string;
@@ -58,6 +63,7 @@ export interface SendInput {
   readonly html: string | undefined;
   readonly headers: Readonly<Record<string, string>>;
   readonly tags: Readonly<Record<string, string>>;
+  readonly attachments: readonly AttachmentFile[];
 }
 
 export function createFakeWorld(context: DriverContext, store: ResendStore) {
@@ -102,6 +108,10 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
 
   const isApp = (mailbox: Mailbox) => mailbox.address === store.app.address;
 
+  /** The attachments an email keeps, each with Resend's id for it. */
+  const keptFiles = (files: readonly AttachmentFile[] = []): EmailAttachment[] =>
+    files.map((file) => ({ ...file, id: ids.next(RESEND_IDS.attachment), size: file.content.byteLength }));
+
   return {
     store,
     principalOf: (email: ResendEmailRecord) => emailAuthor(email, store.app, (id) => store.users.find(id)),
@@ -115,7 +125,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
      * A person sends an email, from their mailbox. To the agent's address it reaches the agent's
      * team as a received email (`email.received`); to anyone else it stays in the outside world.
      */
-    personSends(
+    async personSends(
       session: string,
       person: ResendUserRecord,
       input: {
@@ -124,17 +134,17 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         subject: string;
         text: string | undefined;
         html: string | undefined;
+        attachments?: readonly AttachmentFile[];
         inReplyTo?: string | undefined;
         references?: readonly string[];
       },
-    ): ResendEmailRecord {
+    ): Promise<ResendEmailRecord> {
       const id = ids.next(RESEND_IDS.email);
+      const at = clock();
       const toApp = [...input.to, ...input.cc].some(isApp);
-      const email: ResendEmailRecord = {
-        id,
-        direction: toApp ? "received" : "outside",
-        author: person.id,
-        from: { address: person.address, name: person.name },
+      const from = { address: person.address, name: person.name };
+      const message = {
+        from,
         to: input.to,
         cc: input.cc,
         bcc: [],
@@ -142,14 +152,29 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         subject: input.subject,
         text: input.text,
         html: input.html,
-        headers: {},
-        tags: {},
+        attachments: keptFiles(input.attachments),
         // A person's mail goes out through Resend too, in the sandbox, so it has an SES id as well.
         messageId: messageId(ids.next(RESEND_IDS.messageLocal), SES_DOMAIN),
         inReplyTo: input.inReplyTo,
         references: input.references ?? [],
+      };
+      // As the team's receiving server got it: what the sender wrote, and what the servers on the way stamped first.
+      const raw = toApp
+        ? withHeaders(await composeMime(message, at), {
+            Received: `from ${domainOf(from.address)} by inbound-smtp.us-east-1.amazonaws.com with SMTP id ${id}; ${new Date(at).toUTCString()}`,
+            "DKIM-Signature": `v=1; a=rsa-sha256; c=relaxed/simple; d=${domainOf(from.address)}; s=resend; h=From:To:Subject:Message-ID:Date`,
+          })
+        : undefined;
+      const email: ResendEmailRecord = {
+        ...message,
+        id,
+        direction: toApp ? "received" : "outside",
+        author: person.id,
+        headers: {},
+        tags: {},
+        raw,
         thread: threadFor({ id, inReplyTo: input.inReplyTo, references: input.references ?? [] }),
-        createdAt: clock(),
+        createdAt: at,
         lastEvent: undefined,
         delivery: undefined,
       };
@@ -164,7 +189,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
       person: ResendUserRecord,
       to: ResendEmailRecord,
       input: { text: string | undefined; html: string | undefined; all: boolean },
-    ): ResendEmailRecord {
+    ): Promise<ResendEmailRecord> {
       return this.personSends(session, person, {
         ...replyOf(person, to, input.all),
         text: input.text,
@@ -237,9 +262,11 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         subject: input.subject,
         text: input.text,
         html: input.html,
+        attachments: keptFiles(input.attachments),
         // Every header the agent set, `In-Reply-To` and `References` too: the webhooks list them.
         headers: input.headers,
         tags: input.tags,
+        raw: undefined,
         messageId: messageId(ids.next(RESEND_IDS.messageLocal), SES_DOMAIN),
         inReplyTo,
         references,

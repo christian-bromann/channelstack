@@ -1,4 +1,4 @@
-import { hmacSha256Base64 } from "../../core/signing/hmac.ts";
+import { hmacSha256Base64, hmacSha256Hex } from "../../core/signing/hmac.ts";
 
 /**
  * Resend's webhook headers, signed the way Svix signs (Standard Webhooks): HMAC-SHA256 with the
@@ -14,3 +14,10 @@ export function signResendWebhook(secret: string, id: string, body: string, atMs
     "svix-signature": `v1,${hmacSha256Base64(key, `${id}.${timestamp}.${body}`)}`,
   };
 }
+
+/**
+ * A download link's signature, as Resend's CDN signs its links: over what the link opens and
+ * when it stops working (`Expires`, in seconds). The fake checks it the same way when the link is used.
+ */
+export const resendDownloadSignature = (key: string, path: string, expires: number): string =>
+  hmacSha256Hex(key, `${path}?Expires=${expires}`);

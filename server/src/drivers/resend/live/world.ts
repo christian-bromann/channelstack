@@ -39,6 +39,13 @@ interface WireReceived {
   text?: string | null;
   html?: string | null;
   headers?: Record<string, string> | null;
+  attachments?: Array<{
+    id: string;
+    filename?: string | null;
+    content_type?: string;
+    content_id?: string;
+    size?: number;
+  }>;
 }
 
 /**
@@ -155,8 +162,10 @@ export function createLiveResendWorld(deps: {
         subject: input.subject,
         text: input.text,
         html: input.html,
+        attachments: [],
         headers: {},
         tags: {},
+        raw: undefined,
         messageId: messageId ?? `<${id}@resend.dev>`,
         inReplyTo: headers.inReplyTo,
         references: headers.references ?? [],
@@ -249,8 +258,18 @@ export function createLiveResendWorld(deps: {
               subject: email.subject,
               text: email.text ?? undefined,
               html: email.html ?? undefined,
+              // What a transcript names of them: their content stays at Resend.
+              attachments: (email.attachments ?? []).map((attachment, at) => ({
+                id: attachment.id,
+                filename: attachment.filename ?? `attachment-${at}`,
+                contentType: attachment.content_type ?? "application/octet-stream",
+                size: attachment.size ?? 0,
+                content: undefined,
+                contentId: attachment.content_id,
+              })),
               headers: {},
               tags: {},
+              raw: undefined,
               messageId: email.message_id,
               inReplyTo: messageIdsIn(header("In-Reply-To"))[0],
               references: messageIdsIn(header("References")),
