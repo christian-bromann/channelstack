@@ -180,16 +180,73 @@ describe("messages and the events they send", () => {
     const second = await post(`/users/${ana.id}/say`, { message: { text: "@my-agent now?" }, channel: channel.id });
     await h.app.settled();
     expect(second.delivery.eventType).toBe("app_mention");
-    expect(events(agent as RecordingAgent).map((event) => event.event.type)).toEqual([
+    // Joining sends `member_joined_channel`, then the message Slack posts in the channel (#58).
+    expect(events(agent as RecordingAgent).map((event) => event.event.subtype ?? event.event.type)).toEqual([
       "member_joined_channel",
+      "channel_join",
       "app_mention",
       "message",
     ]);
-    expect(events(agent as RecordingAgent)[0].event).toMatchObject({
+    const [joined, joinMessage] = events(agent as RecordingAgent);
+    expect(joined.event).toMatchObject({ user: app.botUserId, channel: channel.id, inviter: ana.id });
+    // Field for field what a real workspace sent.
+    expect(joinMessage.event).toEqual({
+      type: "message",
+      subtype: "channel_join",
       user: app.botUserId,
-      channel: channel.id,
+      text: `<@${app.botUserId}> has joined the channel`,
       inviter: ana.id,
+      ts: expect.stringMatching(/^\d{10}\.\d{6}$/),
+      channel: channel.id,
+      event_ts: joinMessage.event.ts,
+      channel_type: "channel",
     });
+  });
+
+  test("someone joining a channel the app is in sends channel_join too, `group` in a private one", async () => {
+    const { h, agent, app, user, post } = await workspace();
+    const ana = await user({ name: "Ana" });
+    const ben = await user({ name: "Ben" });
+    const channel = await post("/channels", { private: true, participants: [ana.id, app.id] });
+
+    await post(`/users/${ana.id}/invite`, { participants: [ben.id], channel: channel.id });
+    await h.app.settled();
+    expect(events(agent as RecordingAgent).map((event) => event.event)).toMatchObject([
+      // A private channel's id starts with C as well, and a real workspace said "C" here.
+      { type: "member_joined_channel", user: ben.id, inviter: ana.id, channel_type: "C" },
+      {
+        type: "message",
+        subtype: "channel_join",
+        user: ben.id,
+        text: `<@${ben.id}> has joined the channel`,
+        inviter: ana.id,
+        channel_type: "group",
+      },
+    ]);
+  });
+
+  test("the envelope names the workspace in context_team_id, except on app_mention, as Slack's do", async () => {
+    const { h, agent, app, user, post, fixture } = await workspace();
+    const ana = await user({ name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id] });
+    await post(`/users/${ana.id}/say`, { message: { text: "@my-agent hi" }, channel: channel.id });
+    await h.app.settled();
+    const [mention, message] = events(agent as RecordingAgent);
+    expect(mention.event.type).toBe("app_mention");
+    expect(mention).not.toHaveProperty("context_team_id");
+    expect(mention).not.toHaveProperty("context_enterprise_id");
+    expect(message.event.type).toBe("message");
+    expect(message).toMatchObject({ team_id: fixture.team.id, context_team_id: fixture.team.id });
+    expect(message.context_enterprise_id).toBeNull();
+
+    // Only on the types they were recorded with: not yet on `member_left_channel` (#88).
+    const ben = await user({ name: "Ben" });
+    await post(`/users/${ana.id}/invite`, { participants: [ben.id], channel: channel.id });
+    await post(`/users/${ana.id}/kick`, { participant: ben.id, channel: channel.id });
+    await h.app.settled();
+    const byType = (type: string) => events(agent as RecordingAgent).find((event) => event.event.type === type);
+    expect(byType("member_joined_channel")).toHaveProperty("context_team_id", fixture.team.id);
+    expect(byType("member_left_channel")).not.toHaveProperty("context_team_id");
   });
 
   test("a DM to the app opens (or reuses) an im and sends message.im", async () => {

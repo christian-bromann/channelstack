@@ -2,18 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
 
-import { BrowserActors } from "../../core/browser/index.ts";
-import { systemClock, systemTimers } from "../../core/clock/index.ts";
-import { DeliveryQueue } from "../../core/delivery/index.ts";
-import { EventLog } from "../../core/events/index.ts";
-import { IdGenerator } from "../../core/ids/index.ts";
-import { Ledger } from "../../core/ledger/index.ts";
-import { createLogger } from "../../core/log/index.ts";
-import { Redactor } from "../../core/redact/index.ts";
-import { Registry } from "../../core/registry/index.ts";
-import type { DriverContext, FakeBackend } from "../../core/router/index.ts";
-import { Allowlist } from "../../core/safety/index.ts";
-import { LiveVault } from "../../core/secrets/index.ts";
+import { driverContext } from "../../../test/driver-context.ts";
+import type { FakeBackend } from "../../core/router/index.ts";
 import { createEchoFake } from "./fake/index.ts";
 
 const read = (path: string) => readFileSync(new URL(`../../../../${path}`, import.meta.url), "utf8");
@@ -25,37 +15,7 @@ function fakeBackendMembers(source: string): string[] {
   return [...body.matchAll(/^\s*(?:readonly )?(\w+)[(:]/gm)].map((match) => match[1] as string);
 }
 
-function context(): DriverContext {
-  const redactor = new Redactor();
-  const log = createLogger({ level: "silent", redactor, write: () => {} });
-  const events = new EventLog(systemClock, redactor);
-  return {
-    ids: new IdGenerator({ seed: 1, clock: systemClock }),
-    clock: systemClock,
-    timers: systemTimers,
-    registry: new Registry(),
-    events,
-    delivery: new DeliveryQueue({ events, clock: systemClock, timers: systemTimers, log }),
-    log,
-    expectMore: () => {},
-    arrived: () => {},
-    secret: (name) => `secret-for-${name}`,
-    apiUrl: () => "http://127.0.0.1:4500/echo",
-    webhookUrl: undefined,
-    live: {
-      active: false,
-      strict: false,
-      vault: new LiveVault({}, () => {}),
-      allowlist: new Allowlist("", {}),
-      ledger: new Ledger({ file: undefined, run: "test", server: "s1", clock: systemClock, log }),
-      tag: "channelstack-run-test",
-      fetch,
-      browsers: new BrowserActors(),
-      home: undefined,
-      apiBase: undefined,
-    },
-  };
-}
+const context = () => driverContext({ apiUrl: () => "http://127.0.0.1:4500/echo" });
 
 describe("exit check 0.7: the fake store design is locked", () => {
   test("docs/decisions/0001-fake-backend.md describes the interface the code has", () => {

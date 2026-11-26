@@ -8,6 +8,7 @@ import { SLACK_IDS, slackTs } from "../ids.ts";
 import { emojiName, mentionedUsers, resolveMentions } from "../mentions.ts";
 import {
   appMentionEvent,
+  channelMessageEvent,
   eventCallback,
   membershipEvent,
   messageChangedEvent,
@@ -88,6 +89,14 @@ export interface FakeSlackWorld extends Immediate<SlackWorld> {
   respond(key: string, body: Record<string, unknown>): boolean;
   /** Send an event about a conversation to the agent, if the app is subscribed, installed and a member. */
   emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
+  /**
+   * Someone joins a channel, invited by `inviter` or by themselves (`conversations.join`). The app
+   * hears `member_joined_channel`, then the `channel_join` message Slack posts in the channel. The
+   * caller has checked they may.
+   */
+  join(conversation: SlackConversationRecord, userId: string, inviter?: string): void;
+  /** Someone archives a channel. The app hears the `channel_archive` message. The caller has checked they may. */
+  archive(conversation: SlackConversationRecord, userId: string): void;
   /** The user a name in a test's text refers to, in this session. */
   resolveName(session: string, name: string): string | undefined;
   /**
@@ -516,24 +525,42 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
       return delivery;
     },
 
+    join(conversation, userId, inviter) {
+      conversation.members.add(userId);
+      emit(
+        conversation,
+        "member_joined_channel",
+        membershipEvent("member_joined_channel", {
+          user: userId,
+          conversation,
+          team: store.team,
+          inviter,
+          eventTs: slackTs(ids),
+        }),
+      );
+      emit(
+        conversation,
+        messageSubscription(conversation),
+        channelMessageEvent("channel_join", { user: userId, conversation, inviter, ts: slackTs(ids) }),
+      );
+    },
+
+    archive(conversation, userId) {
+      conversation.isArchived = true;
+      emit(
+        conversation,
+        messageSubscription(conversation),
+        channelMessageEvent("channel_archive", { user: userId, conversation, ts: slackTs(ids) }),
+      );
+    },
+
     invite(session, userId, participants, channel) {
       const conversation = store.conversations.get(session, channel);
       const inviter = member(session, userId, conversation);
       for (const id of participants.map((candidate) => participant(session, candidate))) {
         if (conversation.members.has(id))
           throw refuse("already_in_channel", `${id} is already a member of ${conversation.id}`);
-        conversation.members.add(id);
-        emit(
-          conversation,
-          "member_joined_channel",
-          membershipEvent("member_joined_channel", {
-            user: id,
-            conversation,
-            team: store.team,
-            inviter: inviter.id,
-            eventTs: slackTs(ids),
-          }),
-        );
+        this.join(conversation, id, inviter.id);
       }
       action(session, "invite", { user: inviter.id, channel: conversation.id });
     },
