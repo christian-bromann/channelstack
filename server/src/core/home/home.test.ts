@@ -1,10 +1,11 @@
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { homeDir, readPrivateJsonFile, removeFile, writePrivateFile } from "./index.ts";
+import { homeDir, processRunning, readPrivateJsonFile, removeFile, writePrivateFile } from "./index.ts";
 
 const posix = process.platform !== "win32";
 
@@ -46,5 +47,12 @@ describe("state directory", () => {
     expect(readPrivateJsonFile(file)).toBeUndefined();
     removeFile(file);
     removeFile(file);
+  });
+
+  test("a state file's writer is running while its process is, and not once it has exited", () => {
+    expect(processRunning(process.pid)).toBe(true);
+    const ended = spawnSync(process.execPath, ["-e", ""]).pid;
+    expect(processRunning(ended)).toBe(false);
+    expect(processRunning(Number.NaN)).toBe(false);
   });
 });
