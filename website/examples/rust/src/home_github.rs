@@ -17,15 +17,12 @@ async fn answers_on_the_issue_and_ignores_itself() -> Result<()> {
         .await?;
     // [!step 1]
     let issue = mo
-        .open_issue(json!({ "title": "Login 500s on Safari" }))
+        .open_issue(json!({ "title": "500s on Safari" }))
         .repo(&repo)
         .await?;
 
     // [!step 2]
-    let comment = mo
-        .comment("@my-agent can you take a look?")
-        .issue(&issue)
-        .await?;
+    let comment = mo.comment("@my-agent take a look?").issue(&issue).await?;
     // [!step 3]
     expect(&issue)
         .to_have_comment_from("my-agent")

@@ -13,7 +13,7 @@ async fn stop_ends_a_working_session() -> Result<()> {
     let team = linear.create_team().key("ENG").members(vec![&kai]).await?;
     // [!step 1]
     let issue = kai
-        .create_issue(json!({ "title": "Migrate billing cron" }))
+        .create_issue(json!({ "title": "Migrate cron" }))
         .team(&team)
         .await?;
 

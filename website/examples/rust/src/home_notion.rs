@@ -4,7 +4,7 @@ use channelstack::{Mode, Result, connect, expect};
 
 #[ignore = "needs a running agent"] // @hide
 #[tokio::test]
-async fn answers_a_comment_mention_in_the_same_discussion() -> Result<()> {
+async fn answers_a_mention_in_the_same_discussion() -> Result<()> {
     let client = connect(Mode::Auto).await?;
     let test_session = client.open_session().send().await?;
     let notion = test_session.notion().await?;
@@ -18,19 +18,15 @@ async fn answers_a_comment_mention_in_the_same_discussion() -> Result<()> {
         .await?;
 
     // [!step 2]
-    let comment = ana
-        .comment("@my-agent summarize this page")
-        .page(&page)
-        .await?;
+    let comment = ana.comment("@my-agent summarize").page(&page).await?;
     // [!step 3]
-    expect(&comment.discussion())
+    let thread = comment.discussion();
+    expect(&thread)
         .to_have_comment_from("my-agent")
         .text("search")
         .await?;
     // [!step 4]
-    expect(&comment.discussion())
-        .to_have_comments_from("my-agent", 1)
-        .await?;
+    expect(&thread).to_have_comments_from("my-agent", 1).await?;
 
     test_session.close().await
 }

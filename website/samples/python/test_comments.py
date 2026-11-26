@@ -2,7 +2,8 @@ from channelstack import NotionFixture
 from pytest_channelstack import expect
 
 
-async def test_answers_a_comment_mention_in_the_same_discussion(notion: NotionFixture):
+async def test_answers_a_mention_in_the_same_discussion(
+        notion: NotionFixture):
     ana = await notion.create_user(name="Ana")
     # [!step 1]
     page = await notion.create_page(
@@ -12,8 +13,9 @@ async def test_answers_a_comment_mention_in_the_same_discussion(notion: NotionFi
     )
 
     # [!step 2]
-    comment = await ana.comment("@my-agent summarize this page", page=page)
+    comment = await ana.comment("@my-agent summarize", page=page)
     # [!step 3]
-    await expect(comment.discussion).to_have_comment_from("my-agent", text="search")
+    thread = comment.discussion
+    await expect(thread).to_have_comment_from("my-agent", text="search")
     # [!step 4]
-    await expect(comment.discussion).to_have_comments_from("my-agent", count=1)
+    await expect(thread).to_have_comments_from("my-agent", count=1)

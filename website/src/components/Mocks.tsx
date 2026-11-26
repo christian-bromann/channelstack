@@ -139,7 +139,7 @@ export function GitHubMock({ step }: MockProps) {
       <div className="gh-body">
         <div className={when(step, 1, "gh-issue")}>
           <p className="app-title">
-            Login 500s on Safari <span>#1</span>
+            500s on Safari <span>#1</span>
           </p>
           <p className="gh-meta">
             <span className="gh-state">
@@ -157,7 +157,7 @@ export function GitHubMock({ step }: MockProps) {
         <div className="gh-timeline">
           <GitHubComment who="mo" className={when(step, 2, "gh-comment")}>
             <p>
-              <Mention>@my-agent</Mention> can you take a look?
+              <Mention>@my-agent</Mention> take a look?
             </p>
           </GitHubComment>
           <GitHubComment who="my-agent" bot className={when(step, 3, "gh-comment")}>
@@ -187,7 +187,7 @@ export function LinearMock({ step }: MockProps) {
       </div>
       <div className="ln-body">
         <div className={when(step, 1, "ln-issue")}>
-          <p className="app-title">Migrate billing cron</p>
+          <p className="app-title">Migrate cron</p>
           <p className="ln-props">
             <span>
               <i className="ln-status" aria-hidden="true" />
@@ -296,7 +296,7 @@ export function NotionMock({ step }: MockProps) {
         <div className="nt-comments">
           <NotionComment who="Ana" className={when(step, 2, "nt-comment")}>
             <p>
-              <Mention>@my-agent</Mention> summarize this page
+              <Mention>@my-agent</Mention> summarize
             </p>
           </NotionComment>
           <NotionComment who="my-agent" bot className={when(step, 3, "nt-comment")}>

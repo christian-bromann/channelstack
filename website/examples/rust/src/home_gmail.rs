@@ -4,7 +4,7 @@ use channelstack::{Mode, Result, connect, expect};
 
 #[ignore = "needs a running agent"] // @hide
 #[tokio::test]
-async fn answers_in_anas_thread_in_her_mailbox() -> Result<()> {
+async fn answers_in_anas_thread() -> Result<()> {
     let client = connect(Mode::Auto).await?;
     let test_session = client.open_session().send().await?;
     let google = test_session.google().await?;
@@ -24,7 +24,7 @@ async fn answers_in_anas_thread_in_her_mailbox() -> Result<()> {
     assert_eq!(answer.thread().id(), email.thread().id());
     // [!step 4]
     expect(&email.thread())
-        .to_have_replies_from(&google.app(), 1)
+        .to_have_replies_from("my-agent", 1)
         .await?;
 
     test_session.close().await
