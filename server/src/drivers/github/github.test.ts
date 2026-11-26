@@ -1065,3 +1065,71 @@ describe("sessions in one org", () => {
     expect((await h.call("GET", `/sessions/${other}/github/calls`)).body).toEqual([]);
   });
 });
+
+// Issue #25: fields GitHub's payloads have gained, with the values GitHub gives a plain issue,
+// comment and repository (the shape differ saw them live).
+describe("what GitHub sends that it added lately", () => {
+  test("an issue has no type, sub-issues, dependencies, field values or pinned comment", async () => {
+    const { h, api, path, issue, webhooks } = await workspace();
+    const { number } = await issue();
+    await h.app.settled();
+    const plain = {
+      type: null,
+      sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 },
+      issue_dependencies_summary: { blocked_by: 0, total_blocked_by: 0, blocking: 0, total_blocking: 0 },
+      issue_field_values: [],
+      pinned_comment: null,
+      performed_via_github_app: null,
+    };
+    expect((await api("GET", `${path}/issues/${number}`)).body).toMatchObject(plain);
+    expect(webhooks().find((hook) => hook.event === "issues")?.payload.issue).toMatchObject(plain);
+    // What the App opens names the App.
+    const opened = (await api("POST", `${path}/issues`, { title: "From the App" })).body;
+    expect(opened.performed_via_github_app).toMatchObject({ slug: "my-agent", permissions: { issues: "write" } });
+  });
+
+  test("a comment has no pin, is minimized with its reason, and the App's names the App", async () => {
+    const { h, ana, api, path, issue, post, webhooks } = await workspace();
+    const { ref, number } = await issue();
+    const comment = await post(`/users/${ana.id}/comment`, { body: "@my-agent hi", issue: ref });
+    await h.app.settled();
+    const hook = webhooks().find(({ event }) => event === "issue_comment")?.payload.comment;
+    expect(hook).toMatchObject({ pin: null, minimized: null, performed_via_github_app: null });
+    await post(`/users/${ana.id}/minimize`, { comment: comment.id, reason: "OFF_TOPIC" });
+    expect((await api("GET", `${path}/issues/comments/${comment.id}`)).body).toMatchObject({
+      pin: null,
+      minimized: { reason: "off-topic" },
+      performed_via_github_app: null,
+    });
+    const reply = (await api("POST", `${path}/issues/${number}/comments`, { body: "On it" })).body;
+    expect(reply).toMatchObject({ pin: null, minimized: null, user: { login: "my-agent[bot]" } });
+    expect(reply.performed_via_github_app).toMatchObject({
+      slug: "my-agent",
+      owner: { login: "acme", type: "Organization" },
+      permissions: { administration: "write", issues: "write", metadata: "read" },
+    });
+  });
+
+  test("a repository has pull requests on, open to all, and no custom properties", async () => {
+    const { h, api, path, issue, webhooks } = await workspace();
+    await issue();
+    await h.app.settled();
+    const settings = { has_pull_requests: true, pull_request_creation_policy: "all", custom_properties: {} };
+    expect((await api("GET", path)).body).toMatchObject(settings);
+    expect(webhooks().find((hook) => hook.event === "issues")?.payload.repository).toMatchObject(settings);
+  });
+
+  test("the installation and its tokens have Administration, and the App's bot added the repository it made", async () => {
+    const { h, asApp, webhooks } = await workspace();
+    await h.app.settled();
+    const [installation] = (await asApp("GET", "/app/installations")).body;
+    expect(installation.permissions).toMatchObject({ administration: "write", metadata: "read" });
+    const minted = (await asApp("POST", `/app/installations/${installation.id}/access_tokens`)).body;
+    expect(minted.permissions).toMatchObject({ administration: "write", metadata: "read" });
+    expect(webhooks().find((hook) => hook.event === "installation_repositories")?.payload).toMatchObject({
+      action: "added",
+      installation: { permissions: { administration: "write" } },
+      sender: { login: "my-agent[bot]", type: "Bot" },
+    });
+  });
+});
