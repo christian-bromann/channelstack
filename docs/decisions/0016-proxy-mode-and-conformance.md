@@ -51,7 +51,7 @@ The differential run (implementation plan 9) is channelstack's own CI, not a use
 - **Linear:** real Linear records the delegating person's prompt, "Work on [KEY-1](url)", as a session's first activity. The fake now does too.
 - **Notion:** every answer of Notion's carries a `request_id`. The fake's now do too.
 - **Recorded, with issues:** fields GitHub's, Linear's and Notion's payloads have that the fakes don't send yet ([#25](https://github.com/christian-bromann/channelstack/issues/25), [#26](https://github.com/christian-bromann/channelstack/issues/26), [#27](https://github.com/christian-bromann/channelstack/issues/27)).
-- **Notion's seeded pages:** live, a seeded page is made by a real person, so Notion sends `page.created`, and the fake's seeds send nothing. The scenario makes its page as Ana, which sends the event in both worlds; the fixture's gap is [#29](https://github.com/christian-bromann/channelstack/issues/29).
+- **Notion's seeded pages:** live, a seeded page is made by a real person, so Notion sends `page.created`, and the fake's seeds send nothing. The scenario makes its page as Ana, which sends the event in both worlds; the fixture's gap is documented ([#29](https://github.com/christian-bromann/channelstack/issues/29)), and closing it is [#79](https://github.com/christian-bromann/channelstack/issues/79).
 - **Slack:** real Slack gives an agent's text a generated `rich_text` block, and its `conversations.info` and `chat.postMessage` answers carry fields the fake doesn't send yet ([#30](https://github.com/christian-bromann/channelstack/issues/30)). Slack's webhooks aren't received live for the shape differ ([#28](https://github.com/christian-bromann/channelstack/issues/28)).
 
 ## Alternatives considered

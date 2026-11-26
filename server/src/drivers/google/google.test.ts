@@ -177,6 +177,16 @@ describe("the mailbox, as Gmail's discovery document describes it", () => {
     expect((await gmail("POST", "/stop")).status).toBe(204);
   });
 
+  test("an HTML-only email's snippet is its text as a person reads it, escaped once", async () => {
+    const { h, base, ana, app, gmail } = await mailbox();
+    const html =
+      '<style>p { color: red }</style><p>Fish &amp; chips &lt;3</p><p><a href="https://example.com/order">Your order</a></p>';
+    await h.call("POST", `${base}/users/${encodeURIComponent(ana.id)}/send`, { to: [app.id], subject: "Order", html });
+    const { body: list } = await gmail("GET", "/messages?labelIds=INBOX");
+    const { body: message } = await gmail("GET", `/messages/${list.messages[0].id}?format=minimal`);
+    expect(message.snippet).toBe("Fish &amp; chips &lt;3 Your order");
+  });
+
   test("search as Gmail reads it, spam listed only when asked for; a thread's history id the same listed and read", async () => {
     const { gmail, send } = await mailbox();
     const email = await send("Refund");
