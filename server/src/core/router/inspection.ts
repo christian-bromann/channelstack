@@ -16,7 +16,8 @@ export const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resour
 export const pathParam = (name: string) => z.string().openapi({ param: { name, in: "path" } });
 
 /** What a test may forge on a delivery it sends again (`delivery.resend()`). */
-type ForgeOption = "badSignature" | "stale" | "headers";
+/** How a channel lets a test forge a delivery: a bad signature, a stale one, a token for another audience (Pub/Sub), extra headers. */
+type ForgeOption = "badSignature" | "stale" | "wrongAudience" | "headers";
 
 /** What the routes read of a delivery: the fake's whole record, or what a live platform's log says (GitHub's). */
 export type DeliveryView = Pick<DeliveryRecord, "attempts"> & {
@@ -32,7 +33,12 @@ interface InspectedDeliveries {
   resend(
     session: string,
     id: string,
-    options: { badSignature: boolean; stale?: boolean; headers?: Record<string, string> | undefined },
+    options: {
+      badSignature: boolean;
+      stale?: boolean;
+      wrongAudience?: boolean;
+      headers?: Record<string, string> | undefined;
+    },
   ): Awaitable<Attempt>;
 }
 
@@ -176,6 +182,7 @@ export function registerInspectionRoutes<Wire>(router: DriverRouter, spec: Inspe
       .object({
         badSignature: z.boolean().default(false),
         ...(forge.includes("stale") ? { stale: z.boolean().default(false) } : {}),
+        ...(forge.includes("wrongAudience") ? { wrongAudience: z.boolean().default(false) } : {}),
         ...(forge.includes("headers") ? { headers: z.record(z.string(), z.string()).optional() } : {}),
       })
       .openapi(`${title}ResendBody`),
@@ -188,7 +195,7 @@ export function registerInspectionRoutes<Wire>(router: DriverRouter, spec: Inspe
       deliveries.resend(
         session.id,
         params.delivery,
-        body as { badSignature: boolean; stale?: boolean; headers?: Record<string, string> },
+        body as { badSignature: boolean; stale?: boolean; wrongAudience?: boolean; headers?: Record<string, string> },
       ),
   });
 

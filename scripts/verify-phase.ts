@@ -105,6 +105,11 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
     { name: "8.1 Every channel is complete and on the channel kit", script: ["check:channels"], group: "static" },
     { name: "8.3 Resend's description is the pinned one", script: ["resend:schema", "--check"], group: "static" },
   ],
+  // 9.1 to 9.6 run in the acceptance and unit checks above, once Google's examples, agents and
+  // checks are enabled; 9.7 and 9.8 in the nightly live run.
+  9: [
+    { name: "9.2 Gmail's discovery document is the pinned one", script: ["google:schema", "--check"], group: "static" },
+  ],
 };
 
 const phase = Number(process.argv[2]);

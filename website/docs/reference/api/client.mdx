@@ -346,6 +346,28 @@ let resend = session.resend().await?;
 
 **Returns** [`ResendFixture`](/docs/reference/api/resend#resendfixture).
 
+### google()
+
+The Google fixture: the agent's mailbox, and where the agent reaches the fake.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const google = await session.google();
+```
+
+```python title="Python"
+google = await session.google()
+```
+
+```rust title="Rust"
+let google = session.google().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleFixture`](/docs/reference/api/google#googlefixture).
+
 ## Types
 
 Plain values the handles return and take.

@@ -20,6 +20,7 @@
     "jose": "6.2.17",
     "marked": "18.2.0",
     "memfs": "4.80.1",
+    "nodemailer": "10.5.0",
     "postal-mime": "4.2.1",
     "pure-rand": "8.4.2",
     "reflect-metadata": "0.2.2",
@@ -27,6 +28,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@linear/sdk": "103.0.0"
+    "@linear/sdk": "103.0.0",
+    "@types/nodemailer": "8.0.2"
   }
 }

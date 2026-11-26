@@ -66,6 +66,11 @@ type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "retry" 
 interface ForgeOptions {
   readonly badSignature?: boolean;
   readonly stale?: boolean;
+  /**
+   * A forgery only the platform knows how to make, signed in its place: a Pub/Sub token for
+   * another audience. The attempt counts as forged, like a bad signature.
+   */
+  readonly forge?: (body: string, atMs: number) => Record<string, string>;
   readonly headers?: Readonly<Record<string, string>> | undefined;
 }
 
@@ -114,8 +119,8 @@ export function deliveryKit(
       const secret = options.badSignature ? (platform.forgedSecret?.() ?? randomToken()) : platform.secret();
       const stale = options.stale === true;
       return delivery.again(session, id, {
-        sign: signer(secret, request),
-        forged: options.badSignature === true || stale,
+        sign: options.forge ?? signer(secret, request),
+        forged: options.badSignature === true || stale || options.forge !== undefined,
         ...(stale ? { atMs: clock() - (platform.staleMs ?? 0) } : {}),
         ...(options.headers ? { headers: options.headers } : {}),
       });

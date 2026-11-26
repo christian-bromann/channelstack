@@ -70,6 +70,9 @@ export type NotionDatabaseOptions = Option<G.NotionFixture["createDatabase"]>;
 export type ResendUserOptions = Option<G.ResendFixture["createUser"]>;
 export type ResendEventType = G.ResendDelivery["type"];
 export type ResendDeliveryResendOptions = Option<G.ResendDelivery["resend"]>;
+export type GoogleUserOptions = Option<G.GoogleFixture["createUser"]>;
+export type GoogleEventType = G.GoogleDelivery["type"];
+export type GoogleDeliveryResendOptions = Option<G.GoogleDelivery["resend"]>;
 /** An email a person sends, with the channel's own people and app as its recipients. */
 export type EmailSendOptions<TRecipient = unknown> = Omit<Option<G.ResendUser["send"]>, "to" | "cc"> & {
   to: readonly TRecipient[];

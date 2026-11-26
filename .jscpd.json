@@ -11,7 +11,8 @@
     "**/generated/**",
     "**/.venv/**",
     "**/linear/schema/**",
-    "**/resend-openapi.json"
+    "**/resend-openapi.json",
+    "**/gmail-discovery.json"
   ],
   "reporters": ["console"],
   "exitCode": 1

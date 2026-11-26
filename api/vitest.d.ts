@@ -15,6 +15,7 @@ import type { GitHubFixture } from "./github";
 import type { LinearFixture } from "./linear";
 import type { NotionFixture } from "./notion";
 import type { ResendFixture } from "./resend";
+import type { GoogleFixture } from "./google";
 import type { ChannelstackFixture, ChannelstackIntegrationOptions } from "./server";
 import type { ChannelstackMatchers } from "./matchers";
 
@@ -27,6 +28,7 @@ declare module "vitest" {
     linear: LinearFixture;
     notion: NotionFixture;
     resend: ResendFixture;
+    google: GoogleFixture;
   }
 
   // Vitest 5 declares `Matchers<R, T>`; the parameters have to be identical to merge with it.

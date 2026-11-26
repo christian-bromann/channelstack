@@ -1,17 +1,18 @@
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import {
   domainOf,
+  emailAuthor,
   localPartOf,
   type Mailbox,
   messageId,
   messageIdsIn,
   parseAddresses,
+  replyOf,
   threadOf,
 } from "../../../core/email/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { RESEND_IDS } from "../ids.ts";
-import { principalOf, replyOf } from "../mail.ts";
 import { resendPayloads } from "../payloads.ts";
 import { RESEND_SECRETS } from "../secrets.ts";
 import { signResendWebhook } from "../signing.ts";
@@ -113,7 +114,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
 
   return {
     store,
-    principalOf: (email: ResendEmailRecord) => principalOf(store, email),
+    principalOf: (email: ResendEmailRecord) => emailAuthor(email, store.app, (id) => store.users.find(id)),
     isApp,
 
     /** A person: a mailbox at `<name>@example.com` unless the test gives an address. Their id is their address. */

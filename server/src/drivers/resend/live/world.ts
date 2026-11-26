@@ -1,11 +1,13 @@
 import type { Clock } from "../../../core/clock/index.ts";
 import {
   domainOf,
+  emailAuthor,
   formatMailbox,
   localPartOf,
   type Mailbox,
   messageIdsIn,
   parseAddresses,
+  replyOf,
   threadOf,
 } from "../../../core/email/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -16,7 +18,6 @@ import type { LiveContext } from "../../../core/router/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import type { ResendMessageInput, ResendWorld } from "../backend.ts";
 import { ResendStore } from "../fake/store.ts";
-import { principalOf, replyOf } from "../mail.ts";
 import type { ResendEmailRecord, ResendUserRecord } from "../world.ts";
 import type { ResendRestClient } from "./client.ts";
 import { checkResendCredential, identifyResend } from "./identity.ts";
@@ -267,7 +268,7 @@ export function createLiveResendWorld(deps: {
       }
     },
 
-    principalOf: (email) => principalOf(store, email),
+    principalOf: (email) => emailAuthor(email, store.app, (id) => store.users.find(id)),
 
     release(session) {
       people.leave(session);

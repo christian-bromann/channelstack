@@ -18,5 +18,6 @@ pnpm-lock.yaml
 
 # Generated from Linear's schema by scripts/linear-schema.ts.
 /server/src/drivers/linear/schema/schema.ts
-# Resend's own description, byte for byte (`pnpm resend:schema --check`).
+# Resend's and Gmail's own descriptions, byte for byte (`pnpm resend:schema --check`, `pnpm google:schema --check`).
 /server/test/schemas/resend-openapi.json
+/server/test/schemas/gmail-discovery.json

@@ -62,3 +62,10 @@ export declare function notionChecks(options: ChecksOptions): void;
  * rejects a bad webhook signature · rejects a stale webhook.
  */
 export declare function resendChecks(options: ChecksOptions): void;
+
+/**
+ * Registers: answers an email in its thread · two emails in one push are both answered, once ·
+ * a push sent again doesn't answer twice · rejects a push signed by another key · rejects a push
+ * for another audience · rejects an expired push token.
+ */
+export declare function googleChecks(options: ChecksOptions): void;

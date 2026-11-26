@@ -87,6 +87,16 @@ export const RESEND_CHECKS = [
   "resend.stale",
 ] as const;
 
+/** The ids of the Google checks, in the order they are registered. */
+export const GOOGLE_CHECKS = [
+  "google.reply-in-thread",
+  "google.history",
+  "google.redelivery",
+  "google.bad-signature",
+  "google.wrong-audience",
+  "google.stale",
+] as const;
+
 /**
  * Registers one check as a test, with its id in the name. A check that was skipped, or whose
  * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
@@ -109,6 +119,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
       linear,
       notion,
       resend,
+      google,
       task,
       expect,
       skip,
@@ -124,6 +135,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
         linear,
         notion,
         resend,
+        google,
         task,
         expect,
         skip,
@@ -554,6 +566,77 @@ export function resendChecks(options: ChecksOptions): void {
       if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
       await delivery.resend({ stale: true });
       await expect(delivery).toBeRejected(wait);
+    });
+  });
+}
+
+/**
+ * The Google checks: a person emails the agent's Gmail address. `prompt` is the email's text
+ * (default `hello`); the agent should answer once, in the email's thread, whatever Gmail pushes.
+ */
+export function googleChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const prompt = options.prompt ?? "hello";
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar(options, GOOGLE_CHECKS);
+  /** Ana, and her email to the agent. */
+  const emailed = async ({ google }: TestContext) => {
+    const ana = await google.createUser({ name: "Ana" });
+    const email = await ana.send({ to: [google.app], subject: "A question", text: prompt });
+    return { ana, email };
+  };
+  /** The push that told the agent of an email. */
+  const pushOf = (email: Awaited<ReturnType<typeof emailed>>["email"]) => {
+    if (!email.delivery) throw new Error("The email caused no push: is the agent watching, and its push URL set?");
+    return email.delivery;
+  };
+
+  describe(`google checks: ${app}`, () => {
+    check("google.reply-in-thread", "answers an email in its thread", async (context) => {
+      const { ana, email } = await emailed(context);
+      // The answer reaches Ana, and in the thread she started: In-Reply-To and References are set.
+      const answer = await ana.waitForEmail({ from: app, ...wait });
+      expect(answer.thread.id, "the answer started a thread of its own: set In-Reply-To and References").toBe(
+        email.thread.id,
+      );
+    });
+
+    check("google.history", "answers each of two emails Gmail told of in one push, once", async ({ google }) => {
+      // Gmail pushes at most once a second: one push tells of both, and the agent reads its history.
+      const ana = await google.createUser({ name: "Ana" });
+      const first = await ana.send({ to: [google.app], subject: "First", text: prompt });
+      const second = await ana.send({ to: [google.app], subject: "Second", text: prompt });
+      await expect(first.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
+      await expect(second.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
+    });
+
+    check("google.redelivery", "a push sent again doesn't produce a second answer", async (context) => {
+      const { email } = await emailed(context);
+      await expect(email.thread).toHaveReplyFrom(app, wait);
+      // Pub/Sub delivers at least once: the same message id again.
+      await pushOf(email).redeliver();
+      await expect(email.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
+    });
+
+    check("google.bad-signature", "rejects a push whose token another key signed", async (context) => {
+      const { email } = await emailed(context);
+      const push = pushOf(email);
+      await push.resend({ badSignature: true });
+      await expect(push).toBeRejected(wait);
+    });
+
+    check("google.wrong-audience", "rejects a push whose token is for another audience", async (context) => {
+      const { email } = await emailed(context);
+      const push = pushOf(email);
+      await push.resend({ wrongAudience: true });
+      await expect(push).toBeRejected(wait);
+    });
+
+    check("google.stale", "rejects a push whose token has expired", async (context) => {
+      const { email } = await emailed(context);
+      const push = pushOf(email);
+      await push.resend({ stale: true });
+      await expect(push).toBeRejected(wait);
     });
   });
 }

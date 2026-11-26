@@ -222,5 +222,11 @@ export interface DriverDefinition {
    * They are what channelstack's CA may vouch for, and nothing else.
    */
   readonly hosts?: readonly string[];
+  /**
+   * Paths the platform's SDK puts at the root of whatever host it is given, dropping a path the
+   * base URL has (`googleapis`: `/gmail/v1/`). Without portless, where each fake is under a path
+   * prefix, the server serves these at its root too, so the SDK finds them.
+   */
+  readonly rootPaths?: readonly string[];
   create(context: DriverContext): Driver;
 }

@@ -84,6 +84,13 @@ export const HARNESS = {
     agents: { "resend-node": "/webhooks/resend" },
     broken: { agent: "broken-resend", path: "/webhooks/resend" },
   },
+  google: {
+    enabled: ["email conversations > ", "delivery and failures \\(fake only\\) > ", "inspecting what the agent did > "],
+    // The standard checks as a developer adds them (exit check 9.4).
+    suites: ["test/acceptance/checks/google-checks.test.ts"],
+    agents: { "gmail-node": "/webhooks/google" },
+    broken: { agent: "broken-google", path: "/webhooks/google" },
+  },
 } as const satisfies Readonly<Record<string, ChannelHarness>>;
 
 export type HarnessChannel = keyof typeof HARNESS;

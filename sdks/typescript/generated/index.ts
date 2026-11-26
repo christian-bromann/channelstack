@@ -823,6 +823,85 @@ export interface ResendApiCall {
   error?: string;
 }
 
+export interface GooglePrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+export type GoogleInbox = GoogleEmail[];
+
+export type GoogleInboxWire = GoogleEmailData[];
+
+function decodeGoogleInbox(ctx: HandleContext, data: GoogleInboxWire): GoogleInbox {
+  return data.map((item) => new GoogleEmail(ctx, item));
+}
+
+export type GoogleMessages = GoogleEmail[];
+
+export type GoogleMessagesWire = GoogleEmailData[];
+
+function decodeGoogleMessages(ctx: HandleContext, data: GoogleMessagesWire): GoogleMessages {
+  return data.map((item) => new GoogleEmail(ctx, item));
+}
+
+export type GoogleReplies = GoogleEmail[];
+
+export type GoogleRepliesWire = GoogleEmailData[];
+
+function decodeGoogleReplies(ctx: HandleContext, data: GoogleRepliesWire): GoogleReplies {
+  return data.map((item) => new GoogleEmail(ctx, item));
+}
+
+export interface GoogleTranscript {
+  entries: GoogleTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface GoogleTranscriptWire {
+  entries: GoogleTranscriptEntry[];
+  text: string;
+}
+
+function decodeGoogleTranscript(_ctx: HandleContext, data: GoogleTranscriptWire): GoogleTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface GoogleTranscriptEntry {
+  id: string;
+  author: GooglePrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+}
+
+export type GoogleDeliveries = GoogleDelivery[];
+
+export type GoogleDeliveriesWire = GoogleDeliveryData[];
+
+function decodeGoogleDeliveries(ctx: HandleContext, data: GoogleDeliveriesWire): GoogleDeliveries {
+  return data.map((item) => new GoogleDelivery(ctx, item));
+}
+
+export type GoogleApiCalls = GoogleApiCall[];
+
+export interface GoogleApiCall {
+  id: string;
+  channel: "google";
+  operation: string;
+  method: string;
+  path: string;
+  at: string;
+  durationMs: number;
+  request?: unknown;
+  responseStatus: number;
+  response?: unknown;
+  error?: string;
+}
+
 export interface UiLoginLink {
   url: string;
 }
@@ -953,6 +1032,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend`)) as ResendFixtureData;
     return new ResendFixture(ctx, data);
+  }
+
+  /** The Google fixture: the agent's mailbox, and where the agent reaches the fake. Experimental. */
+  async google(): Promise<GoogleFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google`)) as GoogleFixtureData;
+    return new GoogleFixture(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4134,6 +4220,347 @@ export class ResendDelivery {
 
   /** Wait for the delivery to settle, and resolve with the value as it is then. */
   async settled(options: WaitOptions = {}): Promise<ResendDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleFixture}. */
+export interface GoogleFixtureData {
+  app: GoogleAppData;
+  apiUrl: string;
+}
+
+export class GoogleFixture {
+  readonly app: GoogleApp;
+  readonly apiUrl: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleFixtureData) {
+    this.#ctx = ctx;
+    this.app = new GoogleApp(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+  }
+
+  /** Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental. */
+  async createUser(options: { name: string; address?: string; token?: string }): Promise<GoogleUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users`, { body: { name: options.name, address: options.address, token: options.token ?? credential("CHANNELSTACK_GOOGLE_USER_{name}_TOKEN", { name: options.name }) } })) as GoogleUserData;
+    return new GoogleUser(ctx, data);
+  }
+
+  /** Every push channelstack sent the agent for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: GoogleThread } = {}): Promise<GoogleDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as GoogleDeliveriesWire;
+    return decodeGoogleDeliveries(ctx, data);
+  }
+
+  /** The Gmail calls the agent made about this session's mail, by the SDK's method name (`users.messages.send`). Experimental. */
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<GoogleApiCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/calls`, { query: { operation: options.operation, error: options.error } })) as GoogleApiCalls;
+    return data;
+  }
+
+  /** Wait for the next new API call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<GoogleApiCall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleApp}. */
+export interface GoogleAppData {
+  id: string;
+  channel: "google";
+  kind: "app";
+  name: string;
+  botUserId: string;
+  address: string;
+}
+
+export class GoogleApp {
+  readonly id: string;
+  readonly channel: "google";
+  readonly kind: "app";
+  readonly name: string;
+  readonly botUserId: string;
+  readonly address: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleAppData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.botUserId = data.botUserId;
+    this.address = data.address;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleUser}. */
+export interface GoogleUserData {
+  id: string;
+  channel: "google";
+  kind: "user";
+  name: string;
+  address: string;
+}
+
+export class GoogleUser {
+  readonly id: string;
+  readonly channel: "google";
+  readonly kind: "user";
+  readonly name: string;
+  readonly address: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.address = data.address;
+  }
+
+  /** The person emails someone: the agent (`google.app`), or another person. Experimental. */
+  async send(options: { to: Array<GoogleUser | GoogleApp>; cc?: Array<GoogleUser | GoogleApp>; subject: string; text?: string; html?: string }): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/send`, { body: { to: options.to.map((item) => item.id), cc: options.cc === undefined ? undefined : options.cc.map((item) => item.id), subject: options.subject, text: options.text, html: options.html } })) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
+  }
+
+  /** The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental. */
+  async reply(email: GoogleEmail, options: { text?: string; html?: string; all?: boolean } = {}): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/reply`, { body: { email: email.id, text: options.text, html: options.html, all: options.all } })) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
+  }
+
+  /** What reached the person's mailbox, oldest first. Experimental. */
+  async inbox(): Promise<GoogleInbox> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/users/${segment(this.id)}/inbox`)) as GoogleInboxWire;
+    return decodeGoogleInbox(ctx, data);
+  }
+
+  /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForEmail(options: { from?: GooglePrincipal | string } & WaitOptions = {}): Promise<GoogleEmail> {
+    return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleEmail}. */
+export interface GoogleEmailData {
+  id: string;
+  channel: "google";
+  thread: GoogleThreadData;
+  author: GooglePrincipal;
+  from: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  text: string;
+  at: string;
+  messageId: string;
+  labels: string[];
+  delivery?: GoogleDeliveryData;
+}
+
+export class GoogleEmail {
+  readonly id: string;
+  readonly channel: "google";
+  readonly thread: GoogleThread;
+  readonly author: GooglePrincipal;
+  readonly from: string;
+  readonly to: string[];
+  readonly cc: string[];
+  readonly subject: string;
+  readonly text: string;
+  readonly at: string;
+  readonly messageId: string;
+  readonly labels: string[];
+  readonly delivery: GoogleDelivery | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleEmailData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.thread = new GoogleThread(ctx, data.thread);
+    this.author = data.author;
+    this.from = data.from;
+    this.to = data.to;
+    this.cc = data.cc;
+    this.subject = data.subject;
+    this.text = data.text;
+    this.at = data.at;
+    this.messageId = data.messageId;
+    this.labels = data.labels;
+    this.delivery = data.delivery === undefined ? undefined : new GoogleDelivery(ctx, data.delivery);
+  }
+
+  /** Re-read an email. Experimental. */
+  async refresh(): Promise<GoogleEmail> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/emails/${segment(this.id)}`)) as GoogleEmailData;
+    return new GoogleEmail(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleThread}. */
+export interface GoogleThreadData {
+  id: string;
+  channel: "google";
+  subject: string;
+}
+
+export class GoogleThread {
+  readonly id: string;
+  readonly channel: "google";
+  readonly subject: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleThreadData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.subject = data.subject;
+  }
+
+  /** Every email in the thread, oldest first. Experimental. */
+  async messages(): Promise<GoogleMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/threads/${segment(this.id)}/messages`)) as GoogleMessagesWire;
+    return decodeGoogleMessages(ctx, data);
+  }
+
+  /** The thread's answers: every email after the first, oldest first. Experimental. */
+  async replies(): Promise<GoogleReplies> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/threads/${segment(this.id)}/replies`)) as GoogleRepliesWire;
+    return decodeGoogleReplies(ctx, data);
+  }
+
+  /** The thread as a person reads it: each email's own words, without the quoted history. Experimental. */
+  async transcript(): Promise<GoogleTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/threads/${segment(this.id)}/transcript`)) as GoogleTranscriptWire;
+    return decodeGoogleTranscript(ctx, data);
+  }
+
+  /** Wait for the next new reply matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForReply(options: { from?: GooglePrincipal | string } & WaitOptions = {}): Promise<GoogleEmail> {
+    return waitForNext(this.#seen, "waitForReply", () => this.replies(), (item) => fromMatches(item.author, options.from), describeWait("a reply", options.from), options);
+  }
+
+  /** The latest reply matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestReply(options: { from?: GooglePrincipal | string } & QuietOptions = {}): Promise<GoogleEmail> {
+    return latestOnceQuiet(() => this.replies(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a reply", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GoogleDelivery}. */
+export interface GoogleDeliveryData {
+  id: string;
+  channel: "google";
+  type: string;
+  emailAddress: string;
+  historyId: string;
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class GoogleDelivery {
+  readonly id: string;
+  readonly channel: "google";
+  readonly type: string;
+  readonly emailAddress: string;
+  readonly historyId: string;
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GoogleDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.type = data.type;
+    this.emailAddress = data.emailAddress;
+    this.historyId = data.historyId;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<GoogleDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/deliveries/${segment(this.id)}`)) as GoogleDeliveryData;
+    return new GoogleDelivery(ctx, data);
+  }
+
+  /** Push the same message again, as Pub/Sub does when a push isn't acknowledged: the same message id. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Push it again, forged: with a token signed by another key, one that has expired, or one for another audience than the push endpoint. Experimental. */
+  async resend(options: { badSignature?: boolean; stale?: boolean; wrongAudience?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/google/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature, stale: options.stale, wrongAudience: options.wrongAudience } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<GoogleDelivery> {
     return waitFor("the delivery to settle", async () => {
       const value = await this.refresh();
       return value.status === "pending" ? undefined : value;

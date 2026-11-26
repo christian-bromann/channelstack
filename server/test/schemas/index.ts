@@ -5,6 +5,7 @@
  * a pinned schema adds its entry here.
  */
 import { restProblems, webhookProblems } from "./github.ts";
+import { googlePushProblems, googleResponseProblems } from "./google.ts";
 import { linearResponseProblems, linearWebhookProblems } from "./linear.ts";
 import { resendResponseProblems, resendWebhookProblems } from "./resend.ts";
 
@@ -43,5 +44,9 @@ export const SCHEMAS: Readonly<Record<string, ChannelSchemas>> = {
   resend: {
     call: (call) => resendResponseProblems(call.method, call.path, call.responseStatus, call.response),
     webhook: resendWebhookProblems,
+  },
+  google: {
+    call: (call) => googleResponseProblems(call.method, call.path, call.responseStatus, call.response),
+    webhook: (_type, payload) => googlePushProblems(payload),
   },
 };
