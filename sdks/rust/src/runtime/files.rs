@@ -16,7 +16,8 @@ static ROOT: RwLock<Option<PathBuf>> = RwLock::new(None);
 
 /// Where relative fixture paths start from, so `.files("./fixtures/web")` means the directory next
 /// to the test. Without it (`None`), paths start from the working directory, which `cargo test`
-/// sets to the crate's directory.
+/// sets to the crate's directory. The root is the whole process's, and `cargo test` runs tests on
+/// parallel threads: set it once, before the tests that need it, not per test.
 pub fn set_files_root(directory: Option<&Path>) {
     *ROOT
         .write()
@@ -322,7 +323,7 @@ mod tests {
             .into_owned();
         rooted(None, || {
             assert_eq!(
-                kind(read_tree(&json!("./web")).unwrap_err()),
+                kind(read_tree(&json!("./web-that-is-not-in-the-working-directory")).unwrap_err()),
                 ErrorKind::NotFound
             );
             let web = json!(format!("{relative}/web"));

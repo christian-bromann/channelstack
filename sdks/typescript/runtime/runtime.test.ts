@@ -376,7 +376,7 @@ describe("files a test hands over", () => {
     expect(readTree([{ path: "web/README.md" }]).map((file) => file.path)).toEqual(["README.md"]);
     setFilesRoot(undefined);
     // Without a root the same path starts from the working directory, where it isn't: an error, not no files.
-    expect(() => readTree("./web")).toThrow(/ENOENT/);
+    expect(() => readTree("./web-that-is-not-in-the-working-directory")).toThrow(/ENOENT/);
     const here = fixture(process.cwd());
     try {
       const relative = basename(here);
