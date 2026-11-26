@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from channelstack import SlackDelivery, SlackThread
+from channelstack import GoogleApp, GoogleUser, ResendThread, ResendUser, SlackDelivery, SlackThread
 from channelstack.runtime import transport
 from channelstack.runtime.client import HandleContext
 from channelstack.runtime.credentials import credential
@@ -106,6 +106,50 @@ def test_the_wait_defaults_a_test_framework_sets_apply_to_every_wait(monkeypatch
         asyncio.run(until_quiet(lambda: quiet_for_ms(10), quiet_for=5))
     finally:
         set_wait_defaults(timeout=before.timeout, quiet_for=before.quiet_for)
+
+
+def email(channel: str, id: str, author: dict[str, str]) -> dict[str, object]:
+    """An email as the server sends it: its author is plain data, not a handle."""
+    return {
+        "id": id,
+        "channel": channel,
+        "thread": {"id": "t1", "channel": channel, "subject": "Invoice"},
+        "author": author,
+        "from": f"{author['name']}@example.test",
+        "to": [],
+        "cc": [],
+        "subject": "Invoice",
+        "text": f"from {author['name']}",
+        "at": "2026-01-01T00:00:00Z",
+        "messageId": f"<{id}@example.test>",
+        "labels": [],
+    }
+
+
+def test_an_email_wait_takes_the_channels_own_handles_as_who_it_is_from(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Python checks types by name, so the waits name the handles as well as the email's author data:
+    # `from_=google.app` type-checks, as `from: google.app` does in TypeScript.
+    agent = {"id": "app_1", "name": "my-agent", "kind": "app"}
+    ben = {"id": "user_2", "name": "Ben", "kind": "user"}
+
+    async def send(*_: object) -> httpx.Response:
+        return httpx.Response(200, json=[email("google", "e1", ben), email("google", "e2", agent)])
+
+    client = Transport(url="http://127.0.0.1:1", token=secrets.token_hex(8), base_path="/_channelstack", errors={})
+    monkeypatch.setattr(client, "_send", send)
+    ctx = HandleContext(transport=client, session="ses_1")
+    person = {"channel": "google", "kind": "user", "address": "x@example.test"}
+    app = GoogleApp(ctx, {**agent, "channel": "google", "botUserId": "b1", "address": "agent@example.test"})
+    ana = GoogleUser(ctx, {**person, "id": "user_1", "name": "Ana"})
+    assert asyncio.run(ana.wait_for_email(from_=app, timeout="40ms")).id == "e2"
+
+    async def send_resend(*_: object) -> httpx.Response:
+        return httpx.Response(200, json=[email("resend", "e3", agent), email("resend", "e4", ben)])
+
+    monkeypatch.setattr(client, "_send", send_resend)
+    thread = ResendThread(ctx, {"id": "t1", "channel": "resend", "subject": "Invoice"})
+    resend_ben = ResendUser(ctx, {**person, **ben, "channel": "resend"})
+    assert asyncio.run(thread.wait_for_reply(from_=resend_ben, timeout="40ms")).id == "e4"
 
 
 # Files a test hands over (`files.py`), as the TypeScript runtime's "files a test hands over".
