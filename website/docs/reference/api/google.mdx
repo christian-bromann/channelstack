@@ -19,7 +19,7 @@ Besides the errors listed with each method, most methods can fail with [`action_
 
 Returned by [`Session.google()`](/docs/reference/api/client#google).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `app` | `app` | `GoogleApp` |
 | `apiUrl` | `api_url` | `string` |
@@ -44,11 +44,11 @@ let user = google.create_user().name("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `name` | `name` | `string` | yes | option |
-| `address` | `address` | `string` | no | option |
-| `token` | `token` | `string` | no | option; read from `CHANNELSTACK_GOOGLE_USER_{name}_TOKEN` when left out |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | option |
+| `address` | `string` | no | option |
+| `token` | `string` | no | option; read from `CHANNELSTACK_GOOGLE_USER_{name}_TOKEN` when left out |
 
 **Returns** [`GoogleUser`](/docs/reference/api/google#googleuser).
 
@@ -72,7 +72,7 @@ let deliveries = google.deliveries().r#type("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `type` | `type` · `r#type` | `string` | no | option |
 | `resource` | `resource` | `GoogleThread` | no | option |
@@ -101,10 +101,10 @@ let api_calls = google.calls().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | option |
-| `error` | `error` | `true \| string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | option |
+| `error` | `true \| string` | no | option |
 
 **Returns** [`GoogleApiCalls`](/docs/reference/api/google#googleapicalls).
 
@@ -130,17 +130,17 @@ let api_call = google.wait_for_call().operation("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `operation` | `operation` | `string` | no | filter |
-| `error` | `error` | `true \| string` | no | filter |
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `operation` | `string` | no | filter |
+| `error` | `true \| string` | no | filter |
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`GoogleApiCall`](/docs/reference/api/google#googleapicall). When the time is up, it fails with what it was waiting for.
 
 ## GoogleApp
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"google"` |
@@ -153,13 +153,13 @@ let api_call = google.wait_for_call().operation("…").await?;
 
 Returned by [`GoogleFixture.createUser()`](/docs/reference/api/google#createuser).
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"google"` |
-| `kind` | `kind` | `"user"` |
-| `name` | `name` | `string` |
-| `address` | `address` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"google"` |
+| `kind` | `"user"` |
+| `name` | `string` |
+| `address` | `string` |
 
 ### send()
 
@@ -181,13 +181,13 @@ let email = user.send().to(to).subject("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `to` | `to` | `Array<GoogleUser \| GoogleApp>` | yes | option |
-| `cc` | `cc` | `Array<GoogleUser \| GoogleApp>` | no | option |
-| `subject` | `subject` | `string` | yes | option |
-| `text` | `text` | `string` | no | option |
-| `html` | `html` | `string` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `to` | `Array<GoogleUser \| GoogleApp>` | yes | option |
+| `cc` | `Array<GoogleUser \| GoogleApp>` | no | option |
+| `subject` | `string` | yes | option |
+| `text` | `string` | no | option |
+| `html` | `string` | no | option |
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
 
@@ -211,12 +211,12 @@ let result = user.reply(&email).text("…").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `email` | `email` | `GoogleEmail` | yes | positional |
-| `text` | `text` | `string` | no | option |
-| `html` | `html` | `string` | no | option |
-| `all` | `all` | `boolean` | no | option |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `email` | `GoogleEmail` | yes | positional |
+| `text` | `string` | no | option |
+| `html` | `string` | no | option |
+| `all` | `boolean` | no | option |
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
 
@@ -262,7 +262,7 @@ let email = user.wait_for_email().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `GooglePrincipal \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -273,7 +273,7 @@ let email = user.wait_for_email().from("my-agent").await?;
 
 Returned by [`GoogleUser.send()`](/docs/reference/api/google#send), [`GoogleUser.reply()`](/docs/reference/api/google#reply), [`GoogleEmail.refresh()`](/docs/reference/api/google#refresh).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"google"` |
@@ -313,11 +313,11 @@ let updated = email.refresh().await?;
 
 ## GoogleThread
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"google"` |
-| `subject` | `subject` | `string` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `channel` | `"google"` |
+| `subject` | `string` |
 
 ### messages()
 
@@ -405,7 +405,7 @@ let email = thread.wait_for_reply().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `GooglePrincipal \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -432,7 +432,7 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `from` | `from_` · `from` | `GooglePrincipal \| string` | no | a handle, or a name |
 | `timeout` | `timeout` | `Duration` | no | default 10s |
@@ -444,7 +444,7 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 Returned by [`GoogleDelivery.refresh()`](/docs/reference/api/google#refresh-1).
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"google"` |
@@ -523,7 +523,7 @@ let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
+| Parameter | Python / Rust | Type | Required |  |
 |---|---|---|---|---|
 | `badSignature` | `bad_signature` | `boolean` | no | option |
 | `stale` | `stale` | `boolean` | no | option |
@@ -553,9 +553,9 @@ let updated = delivery.settled().await?;
 
 </CodeGroup>
 
-| Parameter | Python · Rust | Type | Required | |
-|---|---|---|---|---|
-| `timeout` | `timeout` | `Duration` | no | default 10s |
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `timeout` | `Duration` | no | default 10s |
 
 **Returns** [`GoogleDelivery`](/docs/reference/api/google#googledelivery). When the time is up, it fails with what it was waiting for.
 
@@ -565,11 +565,11 @@ Plain values the handles return and take.
 
 ### GooglePrincipal
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `name` | `name` | `string` |
-| `kind` | `kind` | `"user" \| "app"` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user" \| "app"` |
 
 ### GoogleInbox
 
@@ -591,22 +591,22 @@ type GoogleReplies = GoogleEmail[];
 
 ### GoogleTranscript
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `entries` | `entries` | `GoogleTranscriptEntry[]` |
-| `text` | `text` | `string` |
+| Field | Type |
+|---|---|
+| `entries` | `GoogleTranscriptEntry[]` |
+| `text` | `string` |
 
 ### GoogleTranscriptEntry
 
-| Field | Python · Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `author` | `author` | `GooglePrincipal` |
-| `at` | `at` | `string` |
-| `text` | `text` | `string` |
-| `controls` | `controls` | `string[]` |
-| `edited` | `edited` | `boolean` |
-| `depth` | `depth` | `number` |
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `author` | `GooglePrincipal` |
+| `at` | `string` |
+| `text` | `string` |
+| `controls` | `string[]` |
+| `edited` | `boolean` |
+| `depth` | `number` |
 
 ### GoogleDeliveries
 
@@ -622,7 +622,7 @@ type GoogleApiCalls = GoogleApiCall[];
 
 ### GoogleApiCall
 
-| Field | Python · Rust | Type |
+| Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"google"` |
