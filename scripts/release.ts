@@ -3,12 +3,17 @@
  * the server, the spec and every SDK at the same version), and the check the release workflow and
  * the gate run.
  *
- *   node scripts/release.ts version <version>   # every manifest, the spec, the SDKs, the lock files, the changelog
+ *   node scripts/release.ts version [<version>] # every manifest, the spec, the SDKs, the lock files, the changelog
  *   node scripts/release.ts check [--tag <tag>] # all agree (and match the tag, with its changelog section)
  *   node scripts/release.ts notes <version>     # the changelog section of a version, for the GitHub release
  *
  * A version is `X.Y.Z` or a prerelease `X.Y.Z-alpha.N`, `-beta.N` or `-rc.N`. PyPI spells a
  * prerelease its own way (PEP 440: `X.Y.ZrcN`); everything else takes it as it is.
+ *
+ * `version` drafts the new version's changelog section from the titles of the pull requests merged
+ * since the last `v*` tag (git-cliff, with `cliff.toml`), below the hand-written "Unreleased" lines.
+ * Without a version it takes git-cliff's next one: before 1.0, a breaking change or a feature bumps
+ * the minor version, a fix the patch version.
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -34,6 +39,62 @@ export function pep440(version: string): string {
   const [, major, minor, patch, pre, number] = found;
   const tag = pre === undefined ? "" : `${{ alpha: "a", beta: "b", rc: "rc" }[pre]}${number}`;
   return `${major}.${minor}.${patch}${tag}`;
+}
+
+/** git-cliff with `cliff.toml`, on a repository (this one by default). Returns what it prints. */
+function cliff(args: readonly string[], repository = ROOT): string {
+  const command = ["exec", "git-cliff", "--config", at("cliff.toml"), "--repository", repository, ...args];
+  const result = spawnSync("pnpm", command, { cwd: ROOT, encoding: "utf8" });
+  if (result.error) throw result.error;
+  if (result.status !== 0)
+    throw new Error(`git-cliff ${args.join(" ")} exited with ${result.status}:\n${result.stderr}`);
+  return result.stdout;
+}
+
+/** The last `v*` tag before the repository's HEAD, if there is one. */
+export function lastTag(repository = ROOT): string | undefined {
+  const result = spawnSync("git", ["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"], {
+    cwd: repository,
+    encoding: "utf8",
+  });
+  return result.status === 0 ? result.stdout.trim() : undefined;
+}
+
+/**
+ * The changelog entries of the pull requests merged since the last `v*` tag, in the changelog's
+ * sections. Nothing without a tag: the first release's changelog is all hand-written.
+ */
+export function draft(repository = ROOT): string {
+  return lastTag(repository) === undefined ? "" : cliff(["--unreleased", "--strip", "all"], repository).trim();
+}
+
+/** The version after the last `v*` tag, as the commits since it bump it. */
+export function nextVersion(repository = ROOT): string {
+  const last = lastTag(repository);
+  if (last === undefined) throw new Error("There's no v* tag to bump yet: name the version, as in `version 0.1.0`");
+  const next = cliff(["--bumped-version"], repository).trim().replace(/^v/, "");
+  pep440(next);
+  if (next === last.replace(/^v/, "")) throw new Error(`Nothing to release: no change since ${last} bumps the version`);
+  return next;
+}
+
+/**
+ * The changelog with what is unreleased as `version`'s section, under a new empty "Unreleased": the
+ * hand-written lines first, then the drafted ones, for the maintainer to edit.
+ */
+export function released(changelog: string, version: string, today: string, drafted = ""): string {
+  const heading = /^## Unreleased[^\S\n]*(?:\n|$)/m.exec(changelog);
+  if (!heading) throw new Error('CHANGELOG.md has no "## Unreleased" section to release');
+  const start = heading.index + heading[0].length;
+  const next = changelog.slice(start).search(/^## /m);
+  const end = next === -1 ? changelog.length : start + next;
+  const body = [changelog.slice(start, end).trim(), drafted.trim()].filter((part) => part !== "").join("\n\n");
+  const rest = changelog.slice(end);
+  return (
+    `${changelog.slice(0, heading.index)}## Unreleased\n\n## [${version}] - ${today}\n` +
+    (body === "" ? "" : `\n${body}\n`) +
+    (rest === "" ? "" : `\n${rest}`)
+  );
 }
 
 /** A path in the repository. */
@@ -139,13 +200,12 @@ function setVersion(version: string): void {
   }
   writeFileSync(at(CRATE), read(CRATE).replace(TOML_VERSION, `version = "${version}"`));
 
-  // The changelog: what is unreleased becomes this version's section, under a new empty one.
+  // The changelog: what is unreleased, and the draft from the pull requests since the last tag,
+  // becomes this version's section, under a new empty one.
   const changelog = read("CHANGELOG.md");
   if (changelogSection(changelog, version) === undefined) {
     const today = new Date().toISOString().slice(0, 10);
-    const moved = changelog.replace(/^## Unreleased$/m, `## Unreleased\n\n## [${version}] - ${today}`);
-    if (moved === changelog) throw new Error('CHANGELOG.md has no "## Unreleased" section to release');
-    writeFileSync(at("CHANGELOG.md"), moved);
+    writeFileSync(at("CHANGELOG.md"), released(changelog, version, today, draft()));
   }
 
   // The spec carries the server's version, and every SDK the spec's.
@@ -157,12 +217,16 @@ function setVersion(version: string): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [command, value] = process.argv.slice(2);
-  if (command === "version" && value !== undefined) {
-    pep440(value);
-    setVersion(value);
+  if (command === "version") {
+    const version = value ?? nextVersion();
+    pep440(version);
+    setVersion(version);
     const left = problems();
     if (left.length > 0) throw new Error(`After setting the version:\n${left.join("\n")}`);
-    console.log(`Every package is at ${value} now. Review the diff, then open a pull request.`);
+    console.log(`\n## [${version}]\n\n${changelogSection(read("CHANGELOG.md"), version) ?? ""}\n`);
+    console.log(
+      `Every package is at ${version} now. Edit CHANGELOG.md's section above, review the diff, then open a pull request.`,
+    );
   } else if (command === "check") {
     const tagAt = process.argv.indexOf("--tag");
     const tag = tagAt === -1 ? undefined : process.argv[tagAt + 1];
@@ -177,7 +241,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (section === undefined) throw new Error(`CHANGELOG.md has no "## [${value}]" section`);
     console.log(section);
   } else {
-    console.error("Usage: node scripts/release.ts version <version> | check [--tag <tag>] | notes <version>");
+    console.error("Usage: node scripts/release.ts version [<version>] | check [--tag <tag>] | notes <version>");
     process.exit(2);
   }
 }
