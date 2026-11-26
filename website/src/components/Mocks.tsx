@@ -387,26 +387,137 @@ export function ResendMock({ step }: MockProps) {
   );
 }
 
+/** Gmail's line icons, drawn simply: no Google artwork. */
+const GmIcon = ({ d }: { d: string }) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <path d={d} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const GM = {
+  search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 20 20",
+  tune: "M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4",
+  back: "M19 12H5M11 6l-6 6 6 6",
+  archive: "M4 6h16v4H4zM5 10v9h14v-9M10 14h4",
+  spam: "M12 3l9 9-9 9-9-9zM12 8v5M12 16h0",
+  trash: "M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13",
+  mail: "M4 6h16v12H4zM4 7l8 6 8-6",
+  more: "M12 5h0M12 12h0M12 19h0",
+  star: "M12 4l2.5 5 5.5.8-4 3.9.9 5.5L12 16.6 7.1 19.2l.9-5.5-4-3.9 5.5-.8z",
+  reply: "M10 8L5 12l5 4M5 12h9a5 5 0 0 1 5 5v1",
+  forward: "M14 8l5 4-5 4M19 12h-9a5 5 0 0 0-5 5v1",
+};
+
+function GmailMessage({
+  step,
+  at,
+  who,
+  from,
+  bot = false,
+  attachment,
+  children,
+}: {
+  step: number;
+  at: number;
+  who: string;
+  from: string;
+  bot?: boolean;
+  attachment?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={when(step, at, "gm-msg")}>
+      <span className={bot ? "gm-avatar bot" : "gm-avatar"} aria-hidden="true">
+        {who[0]!.toUpperCase()}
+      </span>
+      <div>
+        <div className="gm-head">
+          <p>
+            <b>{who}</b> <span>&lt;{from}&gt;</span>
+          </p>
+          <small>9:14 AM</small>
+          <span className="gm-icons">
+            <GmIcon d={GM.star} />
+            <GmIcon d={GM.reply} />
+            <GmIcon d={GM.more} />
+          </span>
+        </div>
+        <p className="gm-to">
+          to me <span aria-hidden="true">▾</span>
+        </p>
+        <div className="gm-text">{children}</div>
+        {attachment ? (
+          <div className="gm-file">
+            <span className="gm-file-thumb" aria-hidden="true">
+              PDF
+            </span>
+            <span>{attachment}</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function GmailMock({ step }: MockProps) {
   return (
-    <EmailShell mailbox="ana@example.com">
-      <p className={when(step, 1, "em-subject")}>
-        Invoice <span className={when(step, 3, "em-count")}>2 in this thread</span>
-      </p>
-      <EmailMessage step={step} at={1} who="Ana" from="ana@example.com" to="my-agent@example.com">
-        <p>Can you resend the March invoice?</p>
-      </EmailMessage>
-      <EmailMessage
-        step={step}
-        at={2}
-        who="my-agent"
-        bot
-        from="my-agent@example.com"
-        to="ana@example.com"
-        attachment="invoice-2026-03.pdf"
-      >
-        <p>Here is the March invoice again, attached.</p>
-      </EmailMessage>
-    </EmailShell>
+    <div className="app app-gmail">
+      <div className="gm-top">
+        <span className="gm-search">
+          <GmIcon d={GM.search} />
+          <span>Search mail</span>
+          <span className="spacer" />
+          <GmIcon d={GM.tune} />
+        </span>
+      </div>
+      <div className="gm-card">
+        <div className="gm-tools" aria-hidden="true">
+          <GmIcon d={GM.back} />
+          <GmIcon d={GM.archive} />
+          <GmIcon d={GM.spam} />
+          <GmIcon d={GM.trash} />
+          <i />
+          <GmIcon d={GM.mail} />
+          <GmIcon d={GM.more} />
+          <span className="spacer" />
+          <small>1 of 2</small>
+        </div>
+        <p className={when(step, 1, "gm-subject")}>
+          Invoice <span className="gm-chip">Inbox ×</span>
+          <span className={when(step, 3, "gm-count")}>2 in this thread</span>
+        </p>
+        {step >= 2 ? (
+          <div className="gm-collapsed">
+            <span className="gm-avatar small" aria-hidden="true">
+              A
+            </span>
+            <b>Ana</b>
+            <span>Can you resend the March invoice?</span>
+            <small>9:14 AM</small>
+          </div>
+        ) : (
+          <GmailMessage step={step} at={1} who="Ana" from="ana@example.com">
+            <p>Can you resend the March invoice?</p>
+          </GmailMessage>
+        )}
+        <GmailMessage
+          step={step}
+          at={2}
+          who="my-agent"
+          bot
+          from="my-agent@example.com"
+          attachment="invoice-2026-03.pdf"
+        >
+          <p>Here is the March invoice again, attached.</p>
+        </GmailMessage>
+        <div className={when(step, 2, "gm-actions")} aria-hidden="true">
+          <span>
+            <GmIcon d={GM.reply} /> Reply
+          </span>
+          <span>
+            <GmIcon d={GM.forward} /> Forward
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
