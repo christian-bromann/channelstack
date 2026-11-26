@@ -51,6 +51,8 @@ export class GoogleStore extends EmailStore<GoogleEmailRecord, GoogleAppRecord> 
   historyStart = "0";
   /** The mailbox's newest history id. */
   historyId = "0";
+  /** How many labels the agent has made: a label's id is never given out twice, a reset or not. */
+  #userLabels = 0;
 
   constructor(registry: Registry) {
     super(registry, "google");
@@ -60,16 +62,21 @@ export class GoogleStore extends EmailStore<GoogleEmailRecord, GoogleAppRecord> 
   }
 
   /**
-   * The mailbox as a reset leaves it: no mail, only the system labels. The agent runs on, so its
-   * watch stays, and the history id never goes back (Gmail's only grow): a cursor the agent kept
-   * lists what comes after the reset.
+   * The mailbox as a reset leaves it: no mail. The agent runs on, so what it set up stays: its
+   * watch, and the labels it made. The history id never goes back (Gmail's only grow): a cursor the
+   * agent kept lists what comes after the reset.
    */
   seed(app: GoogleAppRecord, historyStart: string): void {
     this.setApp(app);
-    this.labels.clear();
     for (const label of SYSTEM_LABELS) this.labels.set(label.id, label);
     this.historyStart = historyStart;
     if (BigInt(this.historyId) < BigInt(historyStart)) this.historyId = historyStart;
+  }
+
+  /** The id of a label the agent makes: `Label_<n>`, counting every one it has made. */
+  nextLabelId(): string {
+    this.#userLabels += 1;
+    return `Label_${this.#userLabels}`;
   }
 
   /** A thread's messages in the agent's mailbox, oldest first. */

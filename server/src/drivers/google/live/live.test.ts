@@ -84,10 +84,11 @@ describe("exit check 9.7: Gmail live", () => {
     // Pushes are Gmail's to deliver: channelstack's deliveries are the fake's.
     expect((await google("GET", "/deliveries")).body.error).toBe("unsupported_in_live");
 
-    // Closing the session trashes the run's threads, as the mailbox each is in.
+    // Closing the session trashes its threads and deletes its labels, as the mailbox each is in.
     await close();
     expect(ana.trashed).toHaveLength(1);
     expect(stub.agent.trashed).toHaveLength(1);
+    expect([ana.labels, stub.agent.labels]).toEqual([[], []]);
   });
 
   test("two people: the agent's answer to both is one email, and each replies in their own mailbox's thread", async () => {
@@ -132,7 +133,9 @@ describe("exit check 9.7: Gmail live", () => {
       subject: "Refund",
       text: "Where?",
     });
-    expect(sent.status).toBeGreaterThanOrEqual(400);
+    // Gmail sent it: the send says so, though the label failed.
+    expect(sent.status).toBe(200);
+    expect(sent.body.subject).toBe("Refund");
     expect(ana.messages).toHaveLength(1);
     // Gmail refused the label: the thread has none of the run's.
     expect(ana.messages[0]?.labels).toEqual(["SENT"]);
@@ -204,7 +207,12 @@ describe("exit check 9.7: Gmail live", () => {
       olderThanMs: 0,
       now: Date.now(),
     });
-    expect(report.removed).toHaveLength(1);
+    // Its thread to the trash, then its label: no thread outside the trash has it any more.
+    expect(report.removed).toEqual([
+      expect.stringMatching(/^thread channelstack-run-unit9-[a-z]{4}-1 /),
+      expect.stringMatching(/^label channelstack-run-unit9-[a-z]{4}-1$/),
+    ]);
     expect(ana.trashed).toHaveLength(1);
+    expect(ana.labels).toEqual([]);
   });
 });

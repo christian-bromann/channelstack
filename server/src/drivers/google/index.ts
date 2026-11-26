@@ -54,11 +54,12 @@ export const google: DriverDefinition = {
       ? createLiveGoogleWorld({ client, live: context.live, clock: context.clock, appName: fake.store.app.name })
       : undefined;
     if (live) {
-      // A run's threads go to the trash, as the mailbox they are in.
+      // A session's threads go to the trash, and its labels are deleted, as the mailbox they are in.
       context.live.ledger.onCleanup("google", async (entry) => {
         const credential = live.credential(entry.by, entry.session);
         if (!credential) throw new Error(`no credential for ${entry.by}`);
-        await client.trashThread(credential, entry.ref.thread ?? "");
+        if (entry.kind === "label") await client.deleteLabel(credential, entry.ref.label ?? "");
+        else await client.trashThread(credential, entry.ref.thread ?? "");
       });
     }
     const world = live ?? fakeGoogleWorld(fake.world);

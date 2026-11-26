@@ -177,6 +177,30 @@ describe("the mailbox, as Gmail's discovery document describes it", () => {
     expect((await gmail("POST", "/stop")).status).toBe(204);
   });
 
+  test("a negated in: brings in no spam; a thread's history id is the same listed and read", async () => {
+    const { gmail, send } = await mailbox();
+    const email = await send("Refund");
+    await send("Other");
+    const ids = async (q: string) =>
+      ((await gmail("GET", `/messages?q=${encodeURIComponent(q)}`)).body.messages ?? []).map(
+        (message: { id: string }) => message.id,
+      );
+    const [other, refund] = await ids("in:inbox");
+    await gmail("POST", `/messages/${other}/modify`, { addLabelIds: ["SPAM"] });
+    expect(await ids("-in:trash")).toEqual([refund]);
+    expect(await ids("in:spam")).toContain(other);
+
+    // The agent answers in the thread, then marks the older message read: the thread's history moves on.
+    const { body: inbox } = await gmail("GET", `/messages/${refund}?format=minimal`);
+    const answer = `From: my-agent <my-agent@acme.example>\r\nTo: ana@example.com\r\nSubject: Re: Refund\r\nIn-Reply-To: ${email.messageId}\r\n\r\nSent.`;
+    await gmail("POST", "/messages/send", { raw: Buffer.from(answer).toString("base64url"), threadId: inbox.threadId });
+    await gmail("POST", `/messages/${refund}/modify`, { removeLabelIds: ["UNREAD"] });
+    const { body: read } = await gmail("GET", `/threads/${inbox.threadId}`);
+    const { body: listed } = await gmail("GET", "/threads");
+    const fromList = listed.threads.find((thread: { id: string }) => thread.id === inbox.threadId);
+    expect(fromList.historyId).toBe(read.historyId);
+  });
+
   test("an answer whose subject doesn't match starts a thread of its own in the mailbox, as Gmail threads", async () => {
     const { gmail, send } = await mailbox();
     const email = await send("Refund");
@@ -242,9 +266,10 @@ describe("pushes, as Pub/Sub sends Gmail's", () => {
     expect(BigInt(historyIds[1])).toBeGreaterThan(BigInt(historyIds[0]));
   });
 
-  test("a reset keeps the agent's watch, and the mailbox's history ids growing", async () => {
+  test("a reset keeps the agent's watch and labels, and the mailbox's history ids growing", async () => {
     const { h, gmail, send, pushes, watch } = await mailbox();
     await watch();
+    expect((await gmail("POST", "/labels", { name: "Processed" })).body.id).toBe("Label_1");
     await send("Before the reset");
     const historyOf = (push: { body: string } | undefined) =>
       BigInt(JSON.parse(Buffer.from(JSON.parse(push?.body ?? "{}").message.data, "base64").toString()).historyId);
@@ -265,6 +290,9 @@ describe("pushes, as Pub/Sub sends Gmail's", () => {
     // The agent's cursor from before the reset lists the new mail.
     const { body: listed } = await gmail("GET", `/history?startHistoryId=${before}&historyTypes=messageAdded`);
     expect(listed.history).toHaveLength(1);
+    // A label the agent made before it is still there, and a new one gets an id of its own.
+    expect((await gmail("GET", "/labels/Label_1")).body.name).toBe("Processed");
+    expect((await gmail("POST", "/labels", { name: "Answered" })).body.id).toBe("Label_2");
   });
 
   test("its token verifies against the certificate and the JWK the fake serves", async () => {

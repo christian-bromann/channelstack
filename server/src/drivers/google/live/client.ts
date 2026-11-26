@@ -43,6 +43,11 @@ export class GoogleRestClient {
     return this.call(credential, "POST", `gmail/v1/users/me/threads/${thread}/trash`);
   }
 
+  /** Delete a label of the mailbox: Gmail takes it off every message that has it. */
+  deleteLabel(credential: LiveCredential, label: string): Promise<unknown> {
+    return this.call(credential, "DELETE", `gmail/v1/users/me/labels/${label}`);
+  }
+
   /** An access token for the mailbox whose refresh token this is. */
   async #token(credential: LiveCredential): Promise<string> {
     const held = this.#access.get(credential);
@@ -71,7 +76,12 @@ export class GoogleRestClient {
   }
 
   /** One Gmail call as the mailbox, `path` under the API's root (`gmail/v1/users/me/profile`). */
-  async call<T>(credential: LiveCredential, method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  async call<T>(
+    credential: LiveCredential,
+    method: "GET" | "POST" | "DELETE",
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       const response = await this.#fetch(`${this.#base ? `${this.#base}/` : GMAIL_API}${path}`, {
         method,

@@ -162,6 +162,14 @@ export function googleStub(): GoogleStub {
       if (route === "/profile")
         return json({ emailAddress: by.address, messagesTotal: by.messages.length, historyId: "1" });
       if (route === "/labels" && request.method === "GET") return json({ labels: by.labels });
+      const deleted = /^\/labels\/([^/]+)$/.exec(route);
+      if (deleted && request.method === "DELETE") {
+        // Gmail takes a deleted label off every message that has it.
+        if (!by.labels.some((label) => label.id === deleted[1])) return notFound();
+        by.labels = by.labels.filter((label) => label.id !== deleted[1]);
+        for (const message of by.messages) message.labels = message.labels.filter((label) => label !== deleted[1]);
+        return new Response(null, { status: 204 });
+      }
       if (route === "/labels") {
         const label = { id: `Label_${by.labels.length + 1}`, name: body.name };
         by.labels.push(label);
@@ -199,7 +207,9 @@ export function googleStub(): GoogleStub {
             (from === undefined || address(message.sent.from) === from) &&
             message.sent.at >= after &&
             (messageId === undefined || message.sent.messageId === `<${messageId}>`) &&
-            (label === null || message.labels.includes(label)),
+            (label === null || message.labels.includes(label)) &&
+            // Gmail leaves the trash out of a list unless asked.
+            (searchParams.get("includeSpamTrash") === "true" || !by.trashed.includes(message.threadId)),
         );
         if (route === "/threads")
           return json({ threads: [...new Set(found.map((m) => m.threadId))].map((thread) => ({ id: thread })) });

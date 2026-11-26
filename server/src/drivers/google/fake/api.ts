@@ -235,7 +235,7 @@ export function createGoogleApi(
   const listed = (c: Context) => {
     const q = c.req.query("q") ?? "";
     const labelIds = c.req.queries("labelIds") ?? [];
-    const spamTrash = c.req.query("includeSpamTrash") === "true" || /\bin:(trash|spam|anywhere)\b/i.test(q);
+    const spamTrash = c.req.query("includeSpamTrash") === "true" || /(^|\s)in:(trash|spam|anywhere)\b/i.test(q);
     return store.messages
       .values()
       .filter((message) => spamTrash || !message.labels.some((label) => label === "TRASH" || label === "SPAM"))
@@ -344,10 +344,17 @@ export function createGoogleApi(
 
   // --- Threads ------------------------------------------------------------------------------------
 
-  /** A thread as Gmail shows it: its newest message's history id, its messages oldest first. */
+  /** A thread's history id: the last change to any of its messages, as Gmail's `Thread.historyId` is. */
+  const threadHistoryId = (threadId: string) =>
+    store
+      .messagesIn(threadId)
+      .map((message) => message.historyId)
+      .sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0];
+
+  /** A thread as Gmail shows it: its history id, its messages oldest first. */
   const threadBody = (c: Context, thread: { id: string; messages: GmailMessageRecord[] }) => ({
     id: thread.id,
-    historyId: thread.messages.map((message) => message.historyId).sort((a, b) => (BigInt(a) < BigInt(b) ? 1 : -1))[0],
+    historyId: threadHistoryId(thread.id),
     messages: thread.messages.map((message) => shown(c, message)),
   });
 
@@ -363,7 +370,7 @@ export function createGoogleApi(
               threads: items.map((message) => ({
                 id: message.threadId,
                 snippet: googlePayloads.message(message, world.emailOf(message), "minimal").snippet,
-                historyId: message.historyId,
+                historyId: threadHistoryId(message.threadId),
               })),
             }
           : {}),
@@ -414,7 +421,7 @@ export function createGoogleApi(
     if (name === "") throw invalid("Invalid label name");
     const taken = [...store.labels.values()].some((label) => label.name.toLowerCase() === name.toLowerCase());
     if (taken) throw new GmailApiError(409, "Label name exists or conflicts", "duplicate", "ALREADY_EXISTS");
-    const id = `Label_${[...store.labels.values()].filter((label) => label.type === "user").length + 1}`;
+    const id = store.nextLabelId();
     const label = {
       id,
       name,

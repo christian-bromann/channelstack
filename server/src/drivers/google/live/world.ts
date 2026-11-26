@@ -19,6 +19,7 @@ import { LivePeople } from "../../../core/people/index.ts";
 import { fakeActorInLiveWorld, liveMisconfigured } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
+import { taggedNames } from "../../../core/safety/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import type { GoogleWorld } from "../backend.ts";
 import { GoogleStore } from "../fake/store.ts";
@@ -78,8 +79,11 @@ export function createLiveGoogleWorld(deps: {
   const read = new Map<string, number>();
   /** When each session's first person joined: older mail in their mailboxes is an earlier run's. */
   const since = new Map<string, number>();
-  /** Each mailbox's label for this run, made once. */
-  const labels = new Map<LiveCredential, Promise<string>>();
+  /** Each session's label in each mailbox, by `<session> <mailbox>`, made the first time it's needed. */
+  const labels = new Map<string, Promise<string>>();
+  const labelName = taggedNames(live.tag);
+  /** The ids of the labels this world made: none is a label an email shows. */
+  const madeLabels = new Set<string>();
   /** The threads on the ledger, and those labelled, by `<mailbox> <thread>`. */
   const ledgered = new Set<string>();
   const tagged = new Set<string>();
@@ -101,27 +105,35 @@ export function createLiveGoogleWorld(deps: {
     for (const { address } of mailboxes) live.allowlist.assert(address, `the address ${address}`);
   };
 
-  /** The run's label in a mailbox: `channelstack-run-…`, hidden, made the first time it's needed. */
-  const runLabel = (credential: LiveCredential) => {
-    let made = labels.get(credential);
+  /**
+   * The session's label in a mailbox (`channelstack-run-<run>-<world>-<n>`, hidden), made the
+   * first time it's needed and put on the ledger, so the session's cleanup deletes it, and the
+   * sweep a crashed run's. One per session: another session of the run may still be labelling.
+   */
+  const runLabel = (session: string, credential: LiveCredential, mailbox: string) => {
+    const key = `${session} ${mailbox}`;
+    let made = labels.get(key);
     if (!made) {
       made = (async () => {
-        const { labels: existing = [] } = await client.call<{ labels?: Array<{ id: string; name: string }> }>(
-          credential,
-          "GET",
-          "gmail/v1/users/me/labels",
-        );
-        const found = existing.find((label) => label.name === live.tag);
-        if (found) return found.id;
+        const name = labelName();
         const created = await client.call<{ id: string }>(credential, "POST", "gmail/v1/users/me/labels", {
-          name: live.tag,
+          name,
           labelListVisibility: "labelHide",
           messageListVisibility: "hide",
         });
+        madeLabels.add(created.id);
+        live.ledger.record({
+          channel: "google",
+          kind: "label",
+          ref: { label: created.id, name },
+          workspace: mailbox,
+          by: credential.owner,
+          session,
+        });
         return created.id;
       })();
-      made.catch(() => labels.delete(credential));
-      labels.set(credential, made);
+      made.catch(() => labels.delete(key));
+      labels.set(key, made);
     }
     return made;
   };
@@ -148,7 +160,7 @@ export function createLiveGoogleWorld(deps: {
     tagged.add(key);
     try {
       await client.call(credential, "POST", `gmail/v1/users/me/threads/${thread}/modify`, {
-        addLabelIds: [await runLabel(credential)],
+        addLabelIds: [await runLabel(session, credential, mailbox)],
       });
     } catch (error) {
       tagged.delete(key);
@@ -250,7 +262,9 @@ export function createLiveGoogleWorld(deps: {
     const kept = messageIdsIn(
       copy.payload?.headers?.find((each) => each.name.toLowerCase() === "message-id")?.value,
     )[0];
-    await tag(session, credential, person.address, sent.threadId, input.subject);
+    // Gmail has sent it: a label that fails doesn't undo that. The thread is on the ledger already,
+    // so the session's cleanup trashes it, and the label is tried again when the thread is read.
+    await tag(session, credential, person.address, sent.threadId, input.subject).catch(() => undefined);
     const email = keep(session, {
       ...fromWire(copy),
       ...message,
@@ -375,7 +389,6 @@ export function createLiveGoogleWorld(deps: {
           agentCopy.set(email.id, copy);
           await tag(session, app, store.app.address, first.threadId, email.subject);
         }
-        const own = await runLabel(app);
         const { labelIds = [] } = await client.call<{ labelIds?: string[] }>(
           app,
           "GET",
@@ -383,7 +396,7 @@ export function createLiveGoogleWorld(deps: {
         );
         agentLabels.set(
           email.id,
-          labelIds.filter((label) => label !== own),
+          labelIds.filter((label) => !madeLabels.has(label)),
         );
       }
     },
@@ -400,6 +413,7 @@ export function createLiveGoogleWorld(deps: {
       people.leave(session);
       read.delete(session);
       seen.delete(session);
+      for (const key of labels.keys()) if (key.startsWith(`${session} `)) labels.delete(key);
       since.delete(session);
       store.users.release(session);
       for (const email of store.emails.release(session)) {

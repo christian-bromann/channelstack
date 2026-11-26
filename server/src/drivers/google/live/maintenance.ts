@@ -49,16 +49,18 @@ export const googleMaintenance: LiveMaintenance = {
     const report = await sweepLedger(entries, {
       allowlist,
       check,
-      describe: (entry) => `thread ${entry.ref.name ?? entry.ref.thread ?? ""}`,
+      describe: (entry) => `${entry.kind} ${entry.ref.name ?? entry.ref.thread ?? entry.ref.label ?? ""}`,
       remove: async (entry) => {
         const credential = byOwner(entry.by);
         if (!credential) throw new Error(`no credential for ${entry.by} in the environment`);
-        await client.trashThread(credential, entry.ref.thread ?? "");
+        if (entry.kind === "label") await client.deleteLabel(credential, entry.ref.label ?? "");
+        else await client.trashThread(credential, entry.ref.thread ?? "");
       },
     });
 
     // Run-labelled threads no ledger knows: each mailbox's `channelstack-run-…` labels, and their threads.
     const threads: Array<{ thread: string; label: string; by: LiveCredential; at: number }> = [];
+    const runLabels: Array<{ id: string; name: string; by: LiveCredential; at: number }> = [];
     for (const { credential } of usable) {
       const { labels = [] } = await client.call<{ labels?: Array<{ id: string; name: string }> }>(
         credential,
@@ -71,17 +73,21 @@ export const googleMaintenance: LiveMaintenance = {
           "GET",
           `gmail/v1/users/me/threads?labelIds=${label.id}&maxResults=500`,
         );
+        let newest = 0;
         for (const { id } of listed.threads ?? []) {
           const { messages = [] } = await client.call<{ messages?: Array<{ internalDate?: string }> }>(
             credential,
             "GET",
             `gmail/v1/users/me/threads/${id}?format=minimal`,
           );
-          threads.push({ thread: id, label: label.name, by: credential, at: Number(messages[0]?.internalDate) || 0 });
+          const at = Number(messages[0]?.internalDate) || 0;
+          newest = Math.max(newest, at);
+          threads.push({ thread: id, label: label.name, by: credential, at });
         }
+        runLabels.push({ id: label.id, name: label.name, by: credential, at: newest });
       }
     }
-    return sweepTagged(report, threads, {
+    const swept = await sweepTagged(report, threads, {
       entries,
       run,
       olderThanMs,
@@ -92,6 +98,27 @@ export const googleMaintenance: LiveMaintenance = {
       createdAt: (item) => item.at,
       remove: async (item) => {
         await client.trashThread(item.by, item.thread);
+        return undefined;
+      },
+    });
+    // Then the labels themselves, once no thread outside the trash has one: Gmail keeps a mailbox's labels for good.
+    return sweepTagged(swept, runLabels, {
+      entries,
+      run,
+      olderThanMs,
+      now,
+      check,
+      name: (item) => `label ${item.name}`,
+      known: (item, entry) => entry.channel === "google" && entry.ref.label === item.id,
+      createdAt: (item) => item.at,
+      remove: async (item) => {
+        const left = await client.call<{ threads?: unknown[] }>(
+          item.by,
+          "GET",
+          `gmail/v1/users/me/threads?labelIds=${item.id}&maxResults=1`,
+        );
+        if ((left.threads ?? []).length > 0) return "a thread outside the trash still has it";
+        await client.deleteLabel(item.by, item.id);
         return undefined;
       },
     });
