@@ -293,7 +293,7 @@ describe("what people may do", () => {
   test("the App needs the permission an endpoint asks for", async () => {
     const { api, path, issue } = await workspace();
     const { number } = await issue();
-    // The default App has no `administration` or `actions`; what it has, it may use.
+    // The default App has no `actions`; what it has, it may use.
     expect((await api("POST", `${path}/issues/${number}/comments`, { body: "ok" })).status).toBe(201);
     expect((await api("POST", `${path}/issues/${number}/comments`, { body: "  " })).status).toBe(422);
     expect((await api("POST", `${path}/issues/${number}/comments`, {})).body).toMatchObject({
@@ -1083,9 +1083,15 @@ describe("what GitHub sends that it added lately", () => {
     };
     expect((await api("GET", `${path}/issues/${number}`)).body).toMatchObject(plain);
     expect(webhooks().find((hook) => hook.event === "issues")?.payload.issue).toMatchObject(plain);
-    // What the App opens names the App.
+    // What the App opens names the App, in the answer and in the webhook (whose schema lists the
+    // events an App may subscribe to, which `installation_repositories` isn't one of).
     const opened = (await api("POST", `${path}/issues`, { title: "From the App" })).body;
-    expect(opened.performed_via_github_app).toMatchObject({ slug: "my-agent", permissions: { issues: "write" } });
+    const app = { slug: "my-agent", permissions: { issues: "write" } };
+    expect(opened.performed_via_github_app).toMatchObject(app);
+    await h.app.settled();
+    const sent = webhooks().find((hook) => hook.event === "issues" && hook.payload.issue.number === opened.number);
+    expect(sent?.payload.issue.performed_via_github_app).toMatchObject(app);
+    expect(sent?.payload.issue.performed_via_github_app.events).not.toContain("installation_repositories");
   });
 
   test("a comment has no pin, is minimized with its reason, and the App's names the App", async () => {
@@ -1103,6 +1109,11 @@ describe("what GitHub sends that it added lately", () => {
     });
     const reply = (await api("POST", `${path}/issues/${number}/comments`, { body: "On it" })).body;
     expect(reply).toMatchObject({ pin: null, minimized: null, user: { login: "my-agent[bot]" } });
+    await h.app.settled();
+    const replied = webhooks().find(
+      ({ event, payload }) => event === "issue_comment" && payload.comment.id === reply.id,
+    );
+    expect(replied?.payload.comment.performed_via_github_app).toMatchObject({ slug: "my-agent" });
     expect(reply.performed_via_github_app).toMatchObject({
       slug: "my-agent",
       owner: { login: "acme", type: "Organization" },
