@@ -295,9 +295,9 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
   - one harness table for the acceptance, live and conformance scripts;
   - schema validators registered per channel.
 - `ResendOptions`, `SlackResendOptions` and `LinearResendOptions` become `DeliveryResendOptions`, `SlackDeliveryResendOptions` and `LinearDeliveryResendOptions`, so they don't read as the Resend channel's types.
-- **The email core** (`server/src/core/email/`, `api/email.d.ts`): addresses, threading by `Message-ID`, `In-Reply-To` and `References`, email threads as transcripts, and the contract's email bases. Building MIME comes with Gmail's `raw` format in phase 9; Resend's attachments and a received email's raw message wait for it (#64).
+- **The email core** (`server/src/core/email/`, `api/email.d.ts`): addresses, threading by `Message-ID`, `In-Reply-To` and `References`, email threads as transcripts, and the contract's email bases. Building MIME comes with Gmail's `raw` format in phase 9; Resend's attachments and a received email's raw message are built on it since (#64), but for a person's attachments, which the contract has no option for yet.
 - **The Resend fake:**
-  - The REST surface the `resend` SDK uses: sending, batches, receiving (attachments: #64).
+  - The REST surface the `resend` SDK uses: sending, batches, receiving, attachments and the raw message (#64).
   - `email.received` and the outbound events, signed the Svix way, with Resend's retry schedule.
   - The `@resend.dev` test addresses, idempotency keys, the rate limit and Resend's error shape.
 - `resendChecks()`, a reference agent on the `resend` SDK, and its broken variant.
