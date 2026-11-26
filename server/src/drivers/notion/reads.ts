@@ -64,7 +64,7 @@ export function notionReads(
     }).map((piece) =>
       "text" in piece
         ? textItem(piece.text)
-        : userMention(piece.mention, store.user(piece.mention)?.name ?? piece.name),
+        : userMention(piece.mention, store.user(piece.mention)?.name ?? piece.name, isBot(piece.mention)),
     );
 
   /** The block of a page whose text has this in it: where a comment is anchored, or a mention goes. */

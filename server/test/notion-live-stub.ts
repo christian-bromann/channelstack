@@ -93,9 +93,18 @@ export function notionStub(options: { workspace?: string } = {}): NotionStub {
       if (mention?.user) return `@${names.get(mention.user.id)?.name ?? "someone"}`;
       return (item.text as { content: string } | undefined)?.content ?? "";
     });
+  /** A mention as Notion answers it: a bot's user filled in, a person's by id. */
+  const mentionOut = (mention: unknown) => {
+    const id = (mention as { user?: { id: string } } | undefined)?.user?.id;
+    const user = id === undefined ? undefined : names.get(id);
+    return id === undefined || user?.type !== "bot"
+      ? mention
+      : { type: "user", user: { object: "user", id, name: user.name, avatar_url: null, type: "bot", bot: {} } };
+  };
   const richOut = (rich: Array<Record<string, unknown>>) =>
     rich.map((item, at) => ({
       ...item,
+      ...(item.mention === undefined ? {} : { mention: mentionOut(item.mention) }),
       annotations: item.annotations ?? {
         bold: false,
         italic: false,
