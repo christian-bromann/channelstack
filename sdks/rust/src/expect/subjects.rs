@@ -10,8 +10,9 @@ use crate::runtime::client::{BoxFuture, Handle, IntoArg};
 use crate::runtime::error::Result;
 use crate::runtime::wait::QuietState;
 use crate::{
-    GitHubCommit, GitHubIssue, GitHubPullRequest, LinearAgentSession, LinearIssue,
-    NotionDiscussion, NotionPage, SlackConversation, SlackMessage, SlackThread, SlackUser,
+    GitHubCommit, GitHubIssue, GitHubPullRequest, GoogleThread, LinearAgentSession, LinearIssue,
+    NotionDiscussion, NotionPage, ResendThread, SlackConversation, SlackMessage, SlackThread,
+    SlackUser,
 };
 
 /// Something checked in a session: every handle. A check that waits for quiet asks its session.
@@ -142,11 +143,8 @@ reads!(Comments::read_comments => comments for GitHubIssue, GitHubPullRequest, L
 reads!(CheckRuns::read_check_runs => check_runs for GitHubPullRequest, GitHubCommit);
 reads!(Labels::read_labels => labels for GitHubIssue, GitHubPullRequest, LinearIssue);
 
-impl Said for SlackThread {
-    fn read_said(&self) -> BoxFuture<'_, Result<Value>> {
-        Box::pin(self.replies().into_future())
-    }
-}
+// A thread's replies: Slack's, and an email thread's (Resend, Gmail), as in matchers-core.
+reads!(Said::read_said => replies for SlackThread, ResendThread, GoogleThread);
 
 impl Said for SlackConversation {
     fn read_said(&self) -> BoxFuture<'_, Result<Value>> {
