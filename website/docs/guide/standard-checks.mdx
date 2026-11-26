@@ -156,7 +156,7 @@ The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECK
 
 ## In live mode
 
-Most checks are about delivery: retries, redeliveries, forged signatures, acknowledgement times. Live, the real platform delivers to your app, so a message or comment has no delivery to retry or forge. Every check that needs one skips, before it waits for anything, with the reason in the report (`live: Slack delivers to the agent itself, so delivery checks are fake-only`). Nothing needs to go in `skip` for a live run.
+Most checks are about delivery: retries, redeliveries, forged signatures, acknowledgement times. Live, the real platform delivers to your app, so a message or comment has no delivery to retry or forge. Every check that needs one skips, before it waits for anything, with the reason in the report (`live: Slack delivers to the agent itself, so delivery checks are fake-only`). Nothing needs to go in `skip` for a live run. A fake run whose agent has no webhook URL (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`) has no deliveries either, so these checks skip there too, with the same note. That run is still red: every check that waits for a reply fails.
 
 | Checks | Live |
 | --- | --- |
