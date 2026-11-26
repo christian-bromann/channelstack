@@ -16,7 +16,8 @@ export interface GitHubStub {
   readonly org: string;
   readonly app: { id: number; slug: string; botId: number; installationId: number };
   readonly privateKey: string;
-  person(login: string, options?: { type?: "User" | "Bot" }): { token: string; id: number };
+  /** A person in the org, with `token` when it's given (a stand-in server's, from its environment), or a new one. */
+  person(login: string, options?: { type?: "User" | "Bot"; token?: string }): { token: string; id: number };
   readonly calls: Array<{ method: string; path: string; as: string }>;
   /** The installation covers selected repositories instead of all. */
   selectOnly(): void;
@@ -388,7 +389,7 @@ export function githubStub(options: { org?: string } = {}): GitHubStub {
     privateKey,
     calls,
     person(login, personOptions = {}) {
-      const token = `ghp_${randomString(36, hex)}`;
+      const token = personOptions.token ?? `ghp_${randomString(36, hex)}`;
       const user = { id: id(), login, type: personOptions.type ?? "User" };
       people.set(login, user);
       tokens.set(token, login);
