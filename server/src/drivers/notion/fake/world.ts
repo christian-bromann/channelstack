@@ -232,7 +232,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         return textItem(item.text.content, item.annotations ?? {}, link);
       }
       const mentioned = typeof item?.mention?.user?.id === "string" ? store.user(item.mention.user.id) : undefined;
-      if (mentioned) return userMention(mentioned.id, mentioned.name, mentioned.id === store.bot.id);
+      if (mentioned) return userMention(mentioned.id, mentioned.name, isBot(mentioned.id));
       throw invalid(`body failed validation: rich_text[${index}] should be \`text\` or a user \`mention\``);
     });
   };

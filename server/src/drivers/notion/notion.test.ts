@@ -132,11 +132,8 @@ describe("the REST API", () => {
     // A mention of the bot carries its user as Notion fills it in; a person's is their id.
     const me = (await api("GET", "users/me")).body;
     const botUser = { object: "user", id: me.id, name: "my-agent", avatar_url: null, type: "bot", bot: {} };
-    expect(listed.body.results[0].rich_text[0]).toMatchObject({
-      type: "mention",
-      mention: { type: "user", user: botUser },
-      plain_text: "@my-agent",
-    });
+    expect(listed.body.results[0].rich_text[0]).toMatchObject({ type: "mention", plain_text: "@my-agent" });
+    expect(listed.body.results[0].rich_text[0].mention).toEqual({ type: "user", user: botUser });
     const mentions = await api("POST", "comments", {
       discussion_id: comment.discussion.id,
       rich_text: [
@@ -297,7 +294,7 @@ describe("webhooks", () => {
   });
 
   test("content updates are batched: one event for every block changed during the delay", async () => {
-    const { h, agent, ana, app, post, get } = await workspace();
+    const { h, agent, ana, app, post, get, api } = await workspace();
     const page = await post("/pages", { title: "Draft", content: "## Intro\nTODO", connections: [app.id] });
     await post("/content-delay", { delay: 2000 });
     await post(`/users/${ana.id}/edit`, { change: { append: "first" }, page: page.id });
@@ -311,6 +308,13 @@ describe("webhooks", () => {
     expect(event).toMatchObject({ type: "page.content_updated", entity: { id: page.id, type: "page" } });
     expect(event.data.updated_blocks).toHaveLength(2);
     expect(await get(`/pages/${page.id}/markdown`)).toBe("## Intro\nTODO @my-agent\nfirst");
+    // The mention in the body carries the bot's user, as Notion fills it in.
+    const me = (await api("GET", "users/me")).body;
+    const todo = (await api("GET", `blocks/${page.id}/children`)).body.results[1];
+    expect(todo.paragraph.rich_text.at(-1).mention).toEqual({
+      type: "user",
+      user: { object: "user", id: me.id, name: "my-agent", avatar_url: null, type: "bot", bot: {} },
+    });
   });
 
   test("the verification request carries the token, and isn't signed", async () => {
