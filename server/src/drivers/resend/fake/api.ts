@@ -8,7 +8,8 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { resendPayloads } from "../payloads.ts";
 import type { ResendEmailRecord } from "../world.ts";
-import { type FakeResendWorld, ResendApiError, type SendInput } from "./world.ts";
+import { createDownloads } from "./downloads.ts";
+import { type AttachmentFile, type FakeResendWorld, ResendApiError, type SendInput } from "./world.ts";
 
 /** Resend's default rate limit: 10 requests a second. */
 const RATE_LIMIT = 10;
@@ -16,6 +17,10 @@ const RATE_LIMIT = 10;
 const DOMAIN_CREATED_AT = "2026-01-01T00:00:00.000Z";
 /** How long Resend keeps an idempotency key: 24 hours. */
 const IDEMPOTENCY_MS = 24 * 3_600_000;
+/** How long the fake waits for a `path` attachment's file. */
+const FETCH_MS = 10_000;
+/** The most an email's attachments may be: 40 MB, Resend's limit for an email. */
+const ATTACHMENTS_MAX_BYTES = 40 * 1024 * 1024;
 
 /** An error as Resend answers it. */
 const errorAnswer = (status: number, name: string, message: string): RestAnswer => ({
@@ -59,7 +64,86 @@ function sendInput(body: Record<string, unknown>): SendInput {
     html: typeof body.html === "string" ? body.html : undefined,
     headers: headers as Record<string, string>,
     tags,
+    attachments: [],
   };
+}
+
+/** Refused as Resend refuses an attachment it can't take. */
+const invalidAttachment = (message: string) => new ResendApiError(422, "invalid_attachment", message);
+const overLimit = () => invalidAttachment("The email's attachments are over the 40 MB limit.");
+
+/**
+ * The files `path` attachments name, fetched as Resend fetches them: over HTTP(S), within ten
+ * seconds and the size limit. Resend fetches after it answers, and fails the email when it can't;
+ * the fake refuses the send instead.
+ */
+async function fetchFile(path: string, budget: number): Promise<Uint8Array> {
+  let url: URL;
+  try {
+    url = new URL(path);
+  } catch {
+    throw invalidAttachment(`The attachment \`path\` "${path}" is not a URL.`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw invalidAttachment("The attachment `path` must be an http or https URL.");
+  }
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(FETCH_MS) });
+  } catch {
+    throw invalidAttachment(`The fake couldn't fetch the attachment at ${url.origin}${url.pathname}.`);
+  }
+  if (!response.ok) {
+    throw invalidAttachment(
+      `The fake couldn't fetch the attachment at ${url.origin}${url.pathname}: ${response.status}.`,
+    );
+  }
+  if (Number(response.headers.get("content-length") ?? 0) > budget) {
+    await response.body?.cancel();
+    throw overLimit();
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > budget) throw overLimit();
+  return bytes;
+}
+
+/**
+ * `POST /emails`'s attachments as Resend keeps them: `content` as base64 or a list of bytes (the
+ * Python SDK's), or a `path` it fetches; named `attachment-<n>` without a `filename`, and of type
+ * `application/octet-stream` without a `content_type` (found against Resend).
+ */
+async function attachmentsOf(value: unknown): Promise<AttachmentFile[]> {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value))
+    throw new ResendApiError(422, "validation_error", "The `attachments` field must be an array.");
+  const files: AttachmentFile[] = [];
+  let budget = ATTACHMENTS_MAX_BYTES;
+  for (const [at, item] of value.entries()) {
+    const attachment = (typeof item === "object" && item !== null ? item : {}) as Record<string, unknown>;
+    const { content, path } = attachment;
+    let bytes: Uint8Array;
+    if (typeof content === "string") bytes = Buffer.from(content, "base64");
+    else if (Array.isArray(content) && content.every((byte) => Number.isInteger(byte) && byte >= 0 && byte < 256)) {
+      bytes = Uint8Array.from(content as number[]);
+    } else if (typeof path === "string" && path !== "") bytes = await fetchFile(path, budget);
+    else throw invalidAttachment("Attachment must have either a `content` or `path`.");
+    budget -= bytes.byteLength;
+    if (budget < 0) throw overLimit();
+    files.push({
+      filename:
+        typeof attachment.filename === "string" && attachment.filename !== ""
+          ? attachment.filename
+          : `attachment-${at}`,
+      contentType:
+        typeof attachment.content_type === "string" && attachment.content_type !== ""
+          ? attachment.content_type
+          : "application/octet-stream",
+      contentId:
+        typeof attachment.content_id === "string" && attachment.content_id !== "" ? attachment.content_id : undefined,
+      content: bytes,
+    });
+  }
+  return files;
 }
 
 /** A page of a list, as Resend pages them: `limit` (1–100, default 20), `after` or `before` an id. */
@@ -86,11 +170,12 @@ function page(c: Context, items: readonly ResendEmailRecord[], show: (email: Res
 export function createResendApi(context: DriverContext, world: FakeResendWorld): Hono {
   const { store } = world;
   const { clock } = context;
+  const downloads = createDownloads(context, store);
   /** Each session's calls in the last second: Resend's limit is per team; here each test is its own. */
   const recent = new Map<string, number[]>();
   const used = new Map<string, { request: string; answer: RestAnswer; at: number }>();
 
-  const { endpoint, finish } = restApi(context, {
+  const { api, endpoint, finish } = restApi(context, {
     driver: "resend",
     authorize(c) {
       const key = bearerFrom(c.req.header("authorization"));
@@ -169,8 +254,8 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     return email;
   };
 
-  endpoint("post", "/emails", "emails.send", (c, body) => {
-    const input = sendInput(body);
+  endpoint("post", "/emails", "emails.send", async (c, body) => {
+    const input = { ...sendInput(body), attachments: await attachmentsOf(body.attachments) };
     // Over the limit, nothing is sent and the key isn't used up: the agent may send again.
     const refused = limited(world.checkSend(input).session);
     if (refused) return refused;
@@ -185,6 +270,7 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     if (!Array.isArray(items))
       throw new ResendApiError(422, "validation_error", "The body must be an array of emails.");
     if (items.length > 100) throw new ResendApiError(422, "validation_error", "A batch has at most 100 emails.");
+    // A batch takes no attachments: Resend sends its emails without them (found against Resend).
     const inputs = items.map((item) => sendInput(item as Record<string, unknown>));
     // Every email is checked before any is sent: a batch is sent whole, or not at all.
     const checked = inputs.map((input) => world.checkSend(input));
@@ -211,18 +297,56 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
 
   endpoint("get", "/emails/receiving/:id", "emails.receiving.get", (c) => {
     const email = receivedEmail(c.req.param("id") ?? "");
-    return { body: resendPayloads.receivedEmail(email), sessions: [world.sessionOf(email)] };
+    return {
+      body: resendPayloads.receivedEmail(email, downloads.link(email, "raw")),
+      sessions: [world.sessionOf(email)],
+    };
   });
 
-  endpoint("get", "/emails/receiving/:id/attachments", "emails.receiving.attachments.list", (c) => {
-    const email = receivedEmail(c.req.param("id") ?? "");
-    return { body: { object: "list", has_more: false, data: [] }, sessions: [world.sessionOf(email)] };
+  /** An email's attachments, each with the link to its content. */
+  const attachmentList = (email: ResendEmailRecord): RestAnswer => ({
+    body: {
+      object: "list",
+      has_more: false,
+      data: email.attachments.map((attachment) =>
+        resendPayloads.attachment(attachment, downloads.link(email, { attachment: attachment.id })),
+      ),
+    },
+    sessions: [world.sessionOf(email)],
   });
+  /** One of an email's attachments, with the link to its content. */
+  const attachmentOne = (email: ResendEmailRecord, id: string): RestAnswer => {
+    const attachment = email.attachments.find((each) => each.id === id);
+    if (!attachment) throw new ResendApiError(404, "not_found", "Attachment not found");
+    return {
+      body: {
+        object: "attachment",
+        ...resendPayloads.attachment(attachment, downloads.link(email, { attachment: attachment.id })),
+      },
+      sessions: [world.sessionOf(email)],
+    };
+  };
+
+  endpoint("get", "/emails/receiving/:id/attachments", "emails.receiving.attachments.list", (c) =>
+    attachmentList(receivedEmail(c.req.param("id") ?? "")),
+  );
+
+  endpoint("get", "/emails/receiving/:id/attachments/:attachment", "emails.receiving.attachments.get", (c) =>
+    attachmentOne(receivedEmail(c.req.param("id") ?? ""), c.req.param("attachment") ?? ""),
+  );
 
   endpoint("get", "/emails/:id", "emails.get", (c) => {
     const email = sentEmail(c.req.param("id") ?? "");
     return { body: resendPayloads.sentEmail(email), sessions: [world.sessionOf(email)] };
   });
+
+  endpoint("get", "/emails/:id/attachments", "emails.attachments.list", (c) =>
+    attachmentList(sentEmail(c.req.param("id") ?? "")),
+  );
+
+  endpoint("get", "/emails/:id/attachments/:attachment", "emails.attachments.get", (c) =>
+    attachmentOne(sentEmail(c.req.param("id") ?? ""), c.req.param("attachment") ?? ""),
+  );
 
   endpoint("get", "/domains", "domains.list", () => ({
     body: {
@@ -242,5 +366,6 @@ export function createResendApi(context: DriverContext, world: FakeResendWorld):
     sessions: [],
   }));
 
+  downloads.serve(api);
   return finish();
 }
