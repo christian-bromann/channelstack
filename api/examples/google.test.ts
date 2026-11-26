@@ -54,7 +54,8 @@ describe("email conversations", () => {
     const email = await ana.send({ to: [google.app], subject: "Refund", text: "Where is my refund?" });
     await expect(email.thread).toHaveReplyFrom(google.app);
 
-    // The agent may mark it read after it answers: read the labels until UNREAD is gone.
+    // The agent may mark it read after it answers: read the labels until UNREAD is gone, for a
+    // fixed 10 s (expect.poll's own default is 1 s, and live reads are cached for a second).
     const labels = async () => (await email.refresh()).labels;
     await expect.poll(labels, { timeout: 10_000 }).not.toContain("UNREAD");
     expect(await labels()).toContain("INBOX");

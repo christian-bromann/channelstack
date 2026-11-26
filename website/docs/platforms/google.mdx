@@ -97,7 +97,7 @@ A person's `id` is their address: `ana@example.com` unless the test gives one. T
 
 - `email.thread.replies()` and `toHaveReplyFrom` / `toHaveRepliesFrom`: the answers, read as a person reads them, without the quoted history a reply carries.
 - `ana.waitForEmail({ from: google.app })`: the answer in Ana's mailbox, with its subject and thread.
-- `email.labels`: the labels of the agent's copy (`INBOX`, `UNREAD`, `SENT`, its own), so a test sees whether the agent marked what it answered as read. `email.refresh()` reads them once, and an agent may mark an email read after its answer is out, so wait for the label: `await expect.poll(async () => (await email.refresh()).labels).not.toContain("UNREAD")`.
+- `email.labels`: the labels of the agent's copy (`INBOX`, `UNREAD`, `SENT`, its own), so a test sees whether the agent marked what it answered as read. `email.refresh()` reads them once, and an agent may mark an email read after its answer is out, so wait for the label: `await expect.poll(async () => (await email.refresh()).labels, { timeout: 10_000 }).not.toContain("UNREAD")`. Give `expect.poll` a timeout: its default is 1 s, and live, the mail is read again at most once a second.
 - `email.delivery`: the push that told the agent of the email, with every attempt. `resend({ badSignature: true })` sends it again with a token another key signed, `resend({ stale: true })` with one that has expired, and `resend({ wrongAudience: true })` with one for another endpoint: the agent must refuse each. `redeliver()` pushes it again with the same message id, as Pub/Sub does.
 - `google.calls()` and `toHaveReceivedCall("users.messages.send")`: what the agent asked of Gmail.
 
