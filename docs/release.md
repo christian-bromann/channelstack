@@ -12,20 +12,25 @@ their own machine, and no machine but GitHub's holds what publishing needs.
 
 ## A release
 
-1. **Prepare it.** Actions → **Prepare a release** → **Run workflow** on `main`, with the version
-   (`0.1.0`, or a prerelease such as `0.2.0-rc.1`). The workflow runs `pnpm release:version`,
+1. **Prepare it.** Actions → **Prepare a release** → **Run workflow** on `main`. Leave the version
+   empty to take the next one from the pull requests merged since the last `v*` tag (git-cliff's
+   `--bumped-version`): before 1.0, a breaking change (`!`) or a `feat` bumps the minor version,
+   and a `fix` or `perf` the patch version. Name the version to choose it yourself, as for the first
+   release (`0.1.0`) or a prerelease (`0.2.0-rc.1`). The workflow runs `pnpm release:version`,
    which:
    - sets the version in every published manifest: `server/package.json` and
      `sdks/typescript/package.json` with its platform packages, both `pyproject.toml` files and the
      plugin's pin of the SDK, and `sdks/rust/Cargo.toml`;
    - regenerates the spec and the SDKs (they carry the version they check on connect), and updates
      `Cargo.lock` and both `uv.lock` files;
-   - moves the changelog's "Unreleased" section under `## [0.1.0] - <today>`.
+   - moves the changelog's "Unreleased" section under `## [0.1.0] - <today>`, with a draft from the
+     pull requests' titles below the hand-written lines (see "The changelog" below).
 
    It then opens the pull request `chore: release v0.1.0` from the branch `release/v0.1.0`. Its CI
    includes the release workflow's dry run, which builds every package and binary.
-2. **Review it.** Edit the changelog's section on the branch if it needs it, and merge the pull
-   request once CI is green.
+2. **Review it.** Edit the changelog's section on the branch into sentences a user reads (merge the
+   draft into the hand-written lines, drop what isn't worth saying), and merge the pull request
+   once CI is green.
 3. **Approve it.** The merge makes `release-tag.yml` tag the merge commit `v0.1.0`; only the release
    App may create `v*` tags. The tag starts `release.yml`, which checks it first: it must name the
    version every package has, it must be on `main`, and the changelog must have its section. Then it
@@ -37,6 +42,28 @@ A run that fails partway can be run again from the Actions tab. What a registry 
 skipped, since none of them takes the same version twice.
 
 A prerelease (`0.2.0-rc.1`) goes to npm's `next` tag, and its GitHub release is marked as one.
+
+## The changelog
+
+CHANGELOG.md is written for people, in Keep a Changelog's form
+([decision 0024](decisions/0024-changelog-from-pr-titles.md)). Write what users should know under
+"Unreleased" as you go; `release:version` adds a draft below it from the titles of the pull
+requests merged since the last `v*` tag (CONTRIBUTING.md, "The title"):
+
+- `cliff.toml` sorts the draft into the changelog's sections: "The fakes" with a bullet per
+  platform, "Testing", "Tools" and "Packages".
+- It links each entry to its pull request, and marks a breaking change.
+- It leaves out the internal scopes and the types that aren't `feat`, `fix` or `perf`.
+- A title without one of the listed scopes, such as one from before the convention, is under
+  "Other".
+- Before the first tag there is nothing to draft from, so 0.1.0's section is all hand-written.
+
+To see the draft without changing anything (it needs the history and the tags, so not a shallow
+clone):
+
+```bash
+pnpm release:draft
+```
 
 ## Once, before the first release
 
@@ -64,6 +91,10 @@ These need the maintainer's accounts, so the workflow can't do them:
   - An API token that may publish it is stored as `CARGO_REGISTRY_TOKEN` in the `release`
     environment.
 - [ ] **GitHub:**
+  - Add a branch ruleset on `main` (Settings → Rules → Rulesets → New branch ruleset, target the
+    default branch) with **Require status checks to pass** and the check `PR title`, so a pull
+    request whose title the changelog can't use isn't merged. The check runs on
+    `pull_request_target`, from `main`'s copy of `.github/workflows/pr-title.yml`.
   - Create the environments `release` and `pypi` (Settings → Environments).
   - Limit both to tags `v*`, and add yourself as a required reviewer, so a release waits for your
     approval.

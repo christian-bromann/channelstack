@@ -123,5 +123,6 @@ These are for the maintainer. Don't decide them alone; ask, or flag them in the 
 - **Package manager:** pnpm workspaces; the server builds with Bun.
 - **No secrets in output.** Redact tokens, signing secrets, emails and user names in logs, errors, recordings and the UI. `pnpm test:redaction` enforces it.
 - **Platform realism.** Fakes refuse what the real platform refuses, with the same error codes, and only send what the real platform sends.
-- **Commits:** small and focused, each naming the exit check it moves. Phase PRs are squash-merged, with the PR title as the commit title (`Phase <n>: <goal>`).
+- **Commits:** small and focused, each naming the exit check it moves. PRs are squash-merged, with the PR title as the commit title.
+- **PR titles** are Conventional Commits, `<type>(<scope>)<!>: <summary>`, from the types and scopes in [CONTRIBUTING.md](CONTRIBUTING.md#the-title). The changelog is drafted from them ([decision 0024](docs/decisions/0024-changelog-from-pr-titles.md)), and the `PR title` check refuses any other. A phase PR's summary names the phase: `feat(slack): phase <n>, <goal>`.
 - **Branches:** `phase-<n>-<slug>` for phases; `fix/<slug>` for fixes between phases, which go through the same review loop.

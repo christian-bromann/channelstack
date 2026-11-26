@@ -7,7 +7,7 @@ description: Independently review a channelstack phase pull request against its 
 
 You are the reviewer, not the implementer. Work only from the repository and the PR: the specs, the code, the PR's history. Don't trust claims in commit messages, the plan or replies to earlier reviews — check them.
 
-Input: the PR number `<pr>` on `christian-bromann/channelstack`. The phase number `<n>` is in its title.
+Input: the PR number `<pr>` on `christian-bromann/channelstack`. The phase number `<n>` is in its title (`feat(<scope>): phase <n>, <goal>`).
 
 ## 1. Read
 
