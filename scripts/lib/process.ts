@@ -1,5 +1,9 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { randomInt, randomUUID } from "node:crypto";
+import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /** Run a command to completion, with its output on this terminal. Throws when it fails. */
 export function run(
@@ -63,27 +67,81 @@ export function background(
   };
 }
 
-/** Ports this process has handed out. The system may name the same free port twice before anything binds it. */
-const handedOut = new Set<number>();
+/**
+ * Where the processes of a run note the ports they hand out. Vitest runs each test file in its own
+ * worker: two stacks started side by side in two workers must not get the same port, or the second
+ * agent can't listen, and its test talks to the first one's agent.
+ */
+const CLAIMS = join(tmpdir(), `channelstack-ports-${process.getuid?.() ?? "user"}`);
+/**
+ * How long a claim holds: long enough for a stack to start its server and then its agent on the
+ * port. By then the agent listens on it, and the probe turns the port down anyway.
+ */
+const CLAIM_MS = 5 * 60_000;
+/**
+ * Ports come from below every system's ephemeral range (Linux's starts at 32768, macOS's and
+ * Windows' at 49152): nothing that binds port 0, such as a server started with `--port 0`, is given
+ * one of them between `freePort` and the agent's own `listen`.
+ */
+const RANGE = { from: 20_000, to: 32_767 } as const;
+
+/** This process's claims, given up when it exits. */
+const mine = new Set<string>();
+let swept = false;
+
+/** Is a claim older than `CLAIM_MS`? Gone counts as old. */
+const expired = (name: string, now: number) => {
+  try {
+    return now - statSync(join(CLAIMS, name)).mtimeMs >= CLAIM_MS;
+  } catch {
+    return true;
+  }
+};
 
 /**
- * A loopback port nothing is listening on right now, and that this process hasn't handed out
- * before: stacks that start side by side each get their own, though none has bound its port yet.
+ * Claim a port for this process, unless another one claimed it within `CLAIM_MS`. The claim is
+ * written first and the others read second: of two processes claiming the same port at once, at
+ * least one sees the other and gives way, so both never win.
+ */
+function claim(port: number): boolean {
+  mkdirSync(CLAIMS, { recursive: true, mode: 0o700 });
+  const now = Date.now();
+  // Once per process: give up this process's claims when it exits, and remove those of processes
+  // that ended without giving theirs up (they count for nothing).
+  if (!swept) {
+    swept = true;
+    process.once("exit", () => {
+      for (const name of mine) rmSync(join(CLAIMS, name), { force: true });
+    });
+    for (const name of readdirSync(CLAIMS)) if (expired(name, now)) rmSync(join(CLAIMS, name), { force: true });
+  }
+  const own = `${port}-${process.pid}-${randomUUID()}`;
+  writeFileSync(join(CLAIMS, own), "", { flag: "wx" });
+  const taken = readdirSync(CLAIMS).some((name) => name.startsWith(`${port}-`) && name !== own && !expired(name, now));
+  if (taken) {
+    rmSync(join(CLAIMS, own), { force: true });
+    return false;
+  }
+  mine.add(own);
+  return true;
+}
+
+/** Can a server listen on this port, on every address, the way an agent that names no host does? */
+const bindable = (port: number) =>
+  new Promise<boolean>((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, () => server.close(() => resolve(true)));
+  });
+
+/**
+ * A port nothing is listening on right now, and that no process of this run has handed out in the
+ * last `CLAIM_MS`: stacks that start side by side, in one process or several, each get their own,
+ * though none has bound its port yet.
  */
 export async function freePort(): Promise<number> {
   for (;;) {
-    const port = await new Promise<number>((resolve, reject) => {
-      const server = createServer();
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => {
-        const address = server.address();
-        server.close(() =>
-          typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port")),
-        );
-      });
-    });
-    if (handedOut.has(port)) continue;
-    handedOut.add(port);
-    return port;
+    const port = randomInt(RANGE.from, RANGE.to + 1);
+    if (claim(port) && (await bindable(port))) return port;
   }
 }
