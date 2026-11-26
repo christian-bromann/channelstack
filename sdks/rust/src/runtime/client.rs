@@ -238,7 +238,7 @@ pub mod enc {
         }
     }
 
-    /// As it is: plain values, named data in the API's own field names, patterns and files.
+    /// As it is: plain values, named data in the API's own field names, and patterns.
     pub fn plain(value: &Value) -> Result<Value> {
         Ok(value.clone())
     }
