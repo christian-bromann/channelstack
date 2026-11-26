@@ -527,4 +527,11 @@ describe("what the GitHub surface needed", () => {
     expect(code).toContain('({"who": item.id} if isinstance(item, (Widget,)) else');
     expect(code).toContain('query={"since": since}');
   });
+
+  test("Rust: files read on the test's side, by the runtime's files module", () => {
+    const code = [...emitRust(ir).values()].join("\n");
+    expect(code).toContain("use crate::runtime::files;");
+    expect(code).toContain('wire.insert("files".into(), (&|v: &Value| files::read_tree(v))(&p_files)?);');
+    expect(code).toContain('wire.insert("changes".into(), (&|v: &Value| files::read_changes(v))(&p_changes)?);');
+  });
 });

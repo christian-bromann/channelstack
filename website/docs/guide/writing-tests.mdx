@@ -130,7 +130,7 @@ A fixed id is unique in the whole world, not only in the test, because the app c
 
 ## Files and fixture directories
 
-A GitHub repository can start from a directory of files, and a Notion page from a Markdown file. Relative paths start from the test file, like an import:
+A GitHub repository can start from a directory of files, and a Notion page from a Markdown file. Relative paths start from the test file, like an import. In Rust, which can't know where the test file is, they start from the working directory, which `cargo test` sets to the crate's directory (`channelstack::runtime::files::set_files_root` changes that):
 
 <Example id="writing-tests-fixture-files" />
 

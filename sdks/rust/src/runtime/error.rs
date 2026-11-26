@@ -25,6 +25,12 @@ pub enum Error {
     /// An argument the SDK can't send: a duration that isn't one, a handle where text is expected.
     #[error("{0}")]
     Invalid(String),
+    /// A fixture file or directory a test handed over couldn't be read: not there, or not a directory.
+    #[error("{path}: {source}")]
+    Files {
+        path: String,
+        source: std::io::Error,
+    },
     /// A check of `expect(…)` failed: what was expected, and what was there instead.
     #[error("{0}")]
     Expectation(String),
@@ -62,6 +68,11 @@ impl std::fmt::Debug for Error {
                 .field("timeout_ms", timeout_ms)
                 .finish(),
             Error::Invalid(message) => f.debug_tuple("Invalid").field(message).finish(),
+            Error::Files { path, source } => f
+                .debug_struct("Files")
+                .field("path", path)
+                .field("source", source)
+                .finish(),
             Error::Expectation(message) => f.write_str(message),
         }
     }
