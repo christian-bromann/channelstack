@@ -1,3 +1,4 @@
+import { GITHUB_IDS } from "../ids.ts";
 import type {
   GitHubCommentRecord,
   GitHubIssueRecord,
@@ -43,7 +44,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
   ): GitHubIssueRecord => {
     const now = clock();
     return store.add(store.issues, store.sessionOf(repo), {
-      id: Number(ids.next("github.issue")),
+      id: Number(ids.next(GITHUB_IDS.issue)),
       repo: repo.id,
       number: ids.sequence(`github.issue:${repo.id}`),
       title,
@@ -207,7 +208,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
       const repo = store.repo(issue.repo);
       const now = clock();
       const comment = store.add(store.comments, store.sessionOf(repo), {
-        id: Number(ids.next("github.comment")),
+        id: Number(ids.next(GITHUB_IDS.comment)),
         repo: repo.id,
         issue: issue.number,
         author: actor,
@@ -261,7 +262,7 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
     ): { reaction: GitHubReactionRecord; created: boolean } {
       const existing = target.reactions.find((reaction) => reaction.user === actor && reaction.content === content);
       if (existing) return { reaction: existing, created: false };
-      const reaction = { id: Number(ids.next("github.reaction")), user: actor, content, createdAt: clock() };
+      const reaction = { id: Number(ids.next(GITHUB_IDS.reaction)), user: actor, content, createdAt: clock() };
       target.reactions.push(reaction);
       return { reaction, created: true };
     },

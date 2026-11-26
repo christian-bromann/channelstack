@@ -58,7 +58,7 @@ export interface GitHubApiCall { readonly operation: string }
 const run = (known: Record<string, string> = {}) =>
   checkContract({
     ...files(),
-    notImplemented: new Set(["Base", "Options"]),
+    notImplemented: (name) => ["Base", "Options"].includes(name),
     perChannel: { ApiCall: ["Slack", "GitHub"] },
     known,
     options,

@@ -4,12 +4,12 @@ import type { BrowserActors } from "../browser/index.ts";
 import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
 import type { EventLog } from "../events/index.ts";
-import type { IdGenerator } from "../ids/index.ts";
+import type { IdFormat, IdGenerator } from "../ids/index.ts";
 import type { Ledger, LedgerEntry } from "../ledger/index.ts";
 import type { Logger } from "../log/index.ts";
 import type { Registry } from "../registry/index.ts";
 import type { Allowlist } from "../safety/index.ts";
-import type { LiveVault, SecretSpec } from "../secrets/index.ts";
+import type { LiveVault, SecretFormat, SecretSpec } from "../secrets/index.ts";
 import type { DriverRouter } from "./route.ts";
 
 /**
@@ -192,6 +192,28 @@ export interface Driver {
 /** How a driver registers itself with core: its name, the secrets it needs, and how to build it. */
 export interface DriverDefinition {
   readonly name: string;
+  /** The platform's name as people write it (`GitHub`), and the prefix of its types in the SDKs (`GitHubUser`). */
+  readonly title: string;
+  /** channelstack's own test platform (`echo`): in the binary, but not a channel anyone tests against. */
+  readonly internal?: boolean;
+  /**
+   * The last path segment that sends a delivery again (`/deliveries/{delivery}/<this>`), in the
+   * platform's own word: Slack retries. Defaults to `redeliver`.
+   */
+  readonly redeliver?: string;
+  /** Every kind of id the driver generates (`idFormats`): exit check 0.5 holds each one to its format. */
+  readonly ids: Readonly<Record<string, IdFormat>>;
+  /**
+   * The shapes of the platform's tokens, fake or real (`/xox[abeoprs]-…/g`, global): the redactor
+   * scrubs them from logs, errors and the event log. A signing secret with no shape is scrubbed
+   * by its value instead, once the secrets are loaded.
+   */
+  readonly tokenPatterns: readonly RegExp[];
+  /**
+   * Tokens the real platform issues that the fake never generates (a person's Slack token, a
+   * Linear API key). The redaction tests make one of each and check `tokenPatterns` scrubs it.
+   */
+  readonly liveTokens?: readonly SecretFormat[];
   readonly secrets: SecretSpec;
   /** What makes it live. A driver without it is always fake. */
   readonly live?: LiveDeclaration;

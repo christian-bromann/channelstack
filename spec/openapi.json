@@ -549,7 +549,8 @@
           "scopes"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "SlackTeam": {
@@ -608,7 +609,8 @@
           "isBot"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "SlackUserOptions": {
@@ -705,7 +707,8 @@
           "kind"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "SlackMessage": {
@@ -1877,27 +1880,6 @@
           "$ref": "#/components/schemas/SlackDelivery"
         }
       },
-      "SlackRetryBody": {
-        "type": "object",
-        "properties": {
-          "after": {
-            "type": "integer",
-            "minimum": 0,
-            "default": 3000,
-            "description": "How long to wait before the retry. Slack's first retry comes after about 3 seconds.",
-            "x-channelstack-duration": true
-          },
-          "reason": {
-            "type": "string",
-            "enum": [
-              "http_timeout",
-              "http_error",
-              "too_many_redirects"
-            ],
-            "default": "http_timeout"
-          }
-        }
-      },
       "SlackResendBody": {
         "type": "object",
         "properties": {
@@ -1969,6 +1951,27 @@
           "durationMs",
           "responseStatus"
         ]
+      },
+      "SlackRetryBody": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 3000,
+            "description": "How long to wait before the retry. Slack's first retry comes after about 3 seconds.",
+            "x-channelstack-duration": true
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "http_timeout",
+              "http_error",
+              "too_many_redirects"
+            ],
+            "default": "http_timeout"
+          }
+        }
       },
       "SlackUninstallDeliveries": {
         "type": "array",
@@ -2105,7 +2108,8 @@
           "webhookSecret"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "GitHubUser": {
@@ -2154,7 +2158,8 @@
           "role"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "GitHubUserOptions": {
@@ -2224,7 +2229,8 @@
           "private"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "GitHubRepoOptions": {
@@ -3899,7 +3905,7 @@
           }
         }
       },
-      "GitHubAppCalls": {
+      "GitHubApiCalls": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/GitHubApiCall"
@@ -3952,7 +3958,7 @@
           "responseStatus"
         ]
       },
-      "GitHubApiCalls": {
+      "GitHubAppCalls": {
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/GitHubApiCall"
@@ -4016,7 +4022,8 @@
           "clientSecret"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "LinearUser": {
@@ -4056,7 +4063,8 @@
           "guest"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "LinearUserOptions": {
@@ -4111,7 +4119,8 @@
           "name"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "LinearTeamOptions": {
@@ -5065,7 +5074,8 @@
           "webhookSecret"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "app"
         }
       },
       "NotionUser": {
@@ -5100,7 +5110,8 @@
           "channel"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "user"
         }
       },
       "NotionUserOptions": {
@@ -5156,7 +5167,8 @@
           "url"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "NotionPageOptions": {
@@ -5234,7 +5246,8 @@
           "url"
         ],
         "x-channelstack-resource": {
-          "id": "id"
+          "id": "id",
+          "role": "resource"
         }
       },
       "NotionDatabaseOptions": {
@@ -6065,6 +6078,508 @@
             "type": "string",
             "enum": [
               "notion"
+            ]
+          },
+          "operation": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "request": {},
+          "responseStatus": {
+            "type": "integer"
+          },
+          "response": {},
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "operation",
+          "method",
+          "path",
+          "at",
+          "durationMs",
+          "responseStatus"
+        ]
+      },
+      "ResendFixture": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/ResendApp"
+          },
+          "apiUrl": {
+            "type": "string",
+            "description": "The base URL to give the agent: `RESEND_BASE_URL`."
+          }
+        },
+        "required": [
+          "app",
+          "apiUrl"
+        ],
+        "x-channelstack-resource": {}
+      },
+      "ResendApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "botUserId": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "description": "Where people email the agent: its team's receiving address."
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "name",
+          "botUserId",
+          "address"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "app"
+        }
+      },
+      "ResendUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The person's address: an email person is their mailbox."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "name",
+          "address"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "user"
+        }
+      },
+      "ResendUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "description": "The person's address. Default `<name>@example.com`."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Live: an API key of the person's own Resend team, which sends as them and reads their mail. Read from CHANNELSTACK_RESEND_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_RESEND_USER_{name}_TOKEN"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ResendEmail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "thread": {
+            "$ref": "#/components/schemas/ResendThread"
+          },
+          "author": {
+            "$ref": "#/components/schemas/ResendPrincipal"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "What its writer wrote, without the quoted history a reply carries."
+          },
+          "at": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/ResendDelivery"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "thread",
+          "author",
+          "from",
+          "to",
+          "cc",
+          "subject",
+          "text",
+          "at",
+          "messageId"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
+      },
+      "ResendThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id of the thread's first email."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "subject"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "resource"
+        }
+      },
+      "ResendPrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
+      "ResendDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The webhook message's id (`svix-id`)."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "`email.received`, `email.sent`, `email.delivered`, `email.bounced`, …"
+          },
+          "email": {
+            "type": "string",
+            "description": "The email the event is about."
+          },
+          "payload": {},
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryAttempt"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "type",
+          "email",
+          "attempts",
+          "status"
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        },
+        "description": "The `email.received` webhook that told the agent, for an email to it."
+      },
+      "ResendSendBody": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "ResendUser",
+                "ResendApp"
+              ]
+            },
+            "description": "Who it goes to: the app, people."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "ResendUser",
+                "ResendApp"
+              ]
+            },
+            "default": [],
+            "description": "Who gets a copy."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "subject"
+        ]
+      },
+      "ResendReplyBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "ResendEmail"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "all": {
+            "type": "boolean",
+            "default": false,
+            "description": "Reply to everyone on the email, not only its sender."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResendInbox": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendEmail"
+        }
+      },
+      "ResendMessages": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendEmail"
+        }
+      },
+      "ResendReplies": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendEmail"
+        }
+      },
+      "ResendTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResendTranscriptEntry"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcript as plain text, one entry per line."
+          }
+        },
+        "required": [
+          "entries",
+          "text"
+        ],
+        "x-channelstack-string": "text"
+      },
+      "ResendTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/ResendPrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "edited",
+          "depth"
+        ]
+      },
+      "ResendDeliveries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendDelivery"
+        }
+      },
+      "ResendResendBody": {
+        "type": "object",
+        "properties": {
+          "badSignature": {
+            "type": "boolean",
+            "default": false
+          },
+          "stale": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ResendApiCalls": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendApiCall"
+        }
+      },
+      "ResendApiCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
             ]
           },
           "operation": {
@@ -10523,92 +11038,6 @@
         }
       }
     },
-    "/sessions/{session}/slack/deliveries/{delivery}/retry": {
-      "post": {
-        "summary": "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "x-channelstack-method": {
-          "on": "SlackDelivery",
-          "name": "retry",
-          "options": [
-            "after",
-            "reason"
-          ]
-        },
-        "x-channelstack-error-codes": [
-          "unauthorized",
-          "invalid_argument",
-          "internal",
-          "session_not_found",
-          "unsupported_in_live",
-          "action_requires",
-          "live_misconfigured",
-          "live_not_allowlisted",
-          "fake_actor_in_live_world",
-          "cross_workspace_credential",
-          "not_found"
-        ],
-        "x-channelstack-stability": "experimental",
-        "x-channelstack-live": {
-          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
-            },
-            "required": true,
-            "name": "session",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "delivery",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SlackRetryBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeliveryAttempt"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "A protocol error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/sessions/{session}/slack/deliveries/{delivery}/resend": {
       "post": {
         "summary": "Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window",
@@ -10783,6 +11212,92 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SlackApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/slack/deliveries/{delivery}/retry": {
+      "post": {
+        "summary": "Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "SlackDelivery",
+          "name": "retry",
+          "options": [
+            "after",
+            "reason"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlackRetryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
                 }
               }
             }
@@ -15956,102 +16471,6 @@
         }
       }
     },
-    "/sessions/{session}/github/app-calls": {
-      "get": {
-        "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "x-channelstack-method": {
-          "on": "GitHubFixture",
-          "name": "appCalls",
-          "options": [
-            "operation",
-            "error"
-          ]
-        },
-        "x-channelstack-error-codes": [
-          "unauthorized",
-          "invalid_argument",
-          "internal",
-          "session_not_found",
-          "unsupported_in_live",
-          "action_requires",
-          "live_misconfigured",
-          "live_not_allowlisted",
-          "fake_actor_in_live_world",
-          "cross_workspace_credential"
-        ],
-        "x-channelstack-stability": "experimental",
-        "x-channelstack-live": {
-          "requires": "proxy",
-          "reason": "GitHub doesn't report the App's calls; proxy mode sees them"
-        },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
-            },
-            "required": true,
-            "name": "session",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": false,
-            "name": "operation",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean",
-                  "enum": [
-                    true
-                  ]
-                },
-                {
-                  "type": "string"
-                }
-              ],
-              "description": "`true` for any error, or one error code"
-            },
-            "required": false,
-            "description": "`true` for any error, or one error code",
-            "name": "error",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GitHubAppCalls"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "A protocol error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/sessions/{session}/github/calls": {
       "get": {
         "summary": "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
@@ -16139,6 +16558,102 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GitHubApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/github/app-calls": {
+      "get": {
+        "summary": "The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GitHubFixture",
+          "name": "appCalls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "GitHub doesn't report the App's calls; proxy mode sees them"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubAppCalls"
                 }
               }
             }
@@ -22389,6 +22904,1116 @@
         }
       }
     },
+    "/sessions/{session}/resend": {
+      "get": {
+        "summary": "The Resend fixture: the agent's team, and where the agent reaches the fake",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "Session",
+          "name": "resend"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendFixture"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/users": {
+      "post": {
+        "summary": "Create a person: a mailbox, at `<name>@example.com` unless a test gives the address",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "ResendFixture",
+          "name": "createUser",
+          "options": [
+            "name",
+            "address",
+            "token"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendUserOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/users/{user}/send": {
+      "post": {
+        "summary": "The person emails someone: the agent (`resend.app`), or another person",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendUser",
+          "name": "send",
+          "options": [
+            "to",
+            "cc",
+            "subject",
+            "text",
+            "html"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendSendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/users/{user}/reply": {
+      "post": {
+        "summary": "The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendUser",
+          "name": "reply",
+          "args": [
+            "email"
+          ],
+          "options": [
+            "text",
+            "html",
+            "all"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/users/{user}/inbox": {
+      "get": {
+        "summary": "What reached the person's mailbox, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendUser",
+          "name": "inbox"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForEmail",
+            "mode": "next",
+            "from": "author",
+            "what": "an email"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "user",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendInbox"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/emails/{email}": {
+      "get": {
+        "summary": "Re-read an email",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendEmail",
+          "name": "refresh"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "email",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/threads/{thread}/messages": {
+      "get": {
+        "summary": "Every email in the thread, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendThread",
+          "name": "messages"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "thread",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendMessages"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/threads/{thread}/replies": {
+      "get": {
+        "summary": "The thread's answers: every email after the first, oldest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendThread",
+          "name": "replies"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForReply",
+            "mode": "next",
+            "from": "author",
+            "what": "a reply"
+          },
+          {
+            "name": "latestReply",
+            "mode": "latest",
+            "from": "author",
+            "what": "a reply"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "thread",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendReplies"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/threads/{thread}/transcript": {
+      "get": {
+        "summary": "The thread as a person reads it: each email's own words, without the quoted history",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendThread",
+          "name": "transcript"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "thread",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendTranscript"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/deliveries": {
+      "get": {
+        "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendFixture",
+          "name": "deliveries",
+          "options": [
+            "type",
+            "resource"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only this event type, e.g. `email.received`."
+            },
+            "required": false,
+            "description": "Only this event type, e.g. `email.received`.",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Only deliveries about this thread.",
+              "x-channelstack-ref": [
+                "ResendThread"
+              ]
+            },
+            "required": false,
+            "description": "Only deliveries about this thread.",
+            "name": "resource",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendDeliveries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/deliveries/{delivery}": {
+      "get": {
+        "summary": "Re-read a delivery: its attempts and status",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendDelivery",
+          "name": "refresh"
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "settled",
+            "mode": "until",
+            "field": "status",
+            "not": [
+              "pending"
+            ],
+            "what": "the delivery to settle"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendDelivery"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/deliveries/{delivery}/redeliver": {
+      "post": {
+        "summary": "Send the same webhook again, as Resend retries: the same `svix-id`, signed again",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendDelivery",
+          "name": "redeliver"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Resend has no API to redeliver a webhook"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/deliveries/{delivery}/resend": {
+      "post": {
+        "summary": "Send the webhook again, forged: signed with a secret that isn't the webhook's, or with a timestamp past the five minutes receivers accept",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendDelivery",
+          "name": "resend",
+          "options": [
+            "badSignature",
+            "stale"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "delivery",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendResendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryAttempt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/calls": {
+      "get": {
+        "summary": "The REST calls the agent made about this session's emails, by the SDK's method name (`emails.send`)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendFixture",
+          "name": "calls",
+          "options": [
+            "operation",
+            "error"
+          ]
+        },
+        "x-channelstack-waits": [
+          {
+            "name": "waitForCall",
+            "mode": "next",
+            "filter": true,
+            "what": "an API call from the agent"
+          }
+        ],
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "requires": "proxy",
+          "reason": "Resend doesn't report the team's calls; proxy mode sees them"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "operation",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "enum": [
+                    true
+                  ]
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "`true` for any error, or one error code"
+            },
+            "required": false,
+            "description": "`true` for any error, or one error code",
+            "name": "error",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ui/login-links": {
       "post": {
         "summary": "A new one-time link that opens the UI in a browser (what `channelstack ui` prints)",
@@ -22482,5 +24107,32 @@
       "status": 400,
       "description": "A person's token belongs to a different workspace than the app's."
     }
-  }
+  },
+  "x-channelstack-channels": [
+    {
+      "name": "echo",
+      "title": "Echo",
+      "internal": true
+    },
+    {
+      "name": "slack",
+      "title": "Slack"
+    },
+    {
+      "name": "github",
+      "title": "GitHub"
+    },
+    {
+      "name": "linear",
+      "title": "Linear"
+    },
+    {
+      "name": "notion",
+      "title": "Notion"
+    },
+    {
+      "name": "resend",
+      "title": "Resend"
+    }
+  ]
 }

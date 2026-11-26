@@ -2,8 +2,14 @@ import { z } from "@hono/zod-openapi";
 
 import { ProtocolError } from "../../core/errors/index.ts";
 import { type EventLog, WORLD_SCOPE } from "../../core/events/index.ts";
-import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts";
-import type { DriverRouter } from "../../core/router/index.ts";
+import { type LiveSupport, unsupportedInLive } from "../../core/reality/index.ts";
+import {
+  type DeliveryView,
+  type DriverRouter,
+  pathParam,
+  refTo,
+  registerInspectionRoutes,
+} from "../../core/router/index.ts";
 import {
   apiCallSchema,
   CallsQuery,
@@ -13,7 +19,7 @@ import {
   readCalls,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
-import type { GitHubDeliveryView, GitHubWorld } from "./backend.ts";
+import type { GitHubWorld } from "./backend.ts";
 import { fakeGitHubWorld, mayChange } from "./fake/actions.ts";
 import type { FakeGitHubWorld } from "./fake/world.ts";
 import { GITHUB_API } from "./live/client.ts";
@@ -31,8 +37,6 @@ import {
   REACTIONS,
 } from "./world.ts";
 
-const refTo = (...resources: string[]) => ({ "x-channelstack-ref": resources });
-const pathParam = (name: string) => z.string().openapi({ param: { name, in: "path" } });
 const numberParam = (name: string) =>
   z.coerce
     .number()
@@ -50,7 +54,7 @@ const GitHubUser = z
     email: z.string().optional(),
     role: z.enum(["member", "admin", "outside_collaborator"]),
   })
-  .openapi("GitHubUser", { "x-channelstack-resource": { id: "id" } });
+  .openapi("GitHubUser", { "x-channelstack-resource": { id: "id", role: "user" } });
 
 const GitHubApp = z
   .object({
@@ -64,7 +68,7 @@ const GitHubApp = z
     privateKey: z.string(),
     webhookSecret: z.string(),
   })
-  .openapi("GitHubApp", { "x-channelstack-resource": { id: "id" } });
+  .openapi("GitHubApp", { "x-channelstack-resource": { id: "id", role: "app" } });
 
 const GitHubAuthor = z.discriminatedUnion("kind", [GitHubUser, GitHubApp]);
 
@@ -77,7 +81,7 @@ const GitHubRepo = z
     defaultBranch: z.string(),
     private: z.boolean(),
   })
-  .openapi("GitHubRepo", { "x-channelstack-resource": { id: "id" } });
+  .openapi("GitHubRepo", { "x-channelstack-resource": { id: "id", role: "resource" } });
 
 const GitHubDelivery = z
   .object({
@@ -315,7 +319,7 @@ export function registerGitHubRoutes(
     head: issue.pull?.head ?? "",
     base: issue.pull?.base ?? "",
   });
-  const deliveryWire = ({ request, attempts }: GitHubDeliveryView) => ({
+  const deliveryWire = ({ request, attempts }: DeliveryView) => ({
     id: request.id,
     channel: "github" as const,
     type: request.type,
@@ -1529,73 +1533,36 @@ export function registerGitHubRoutes(
 
   // --- Deliveries and calls -------------------------------------------------------------------------
 
-  const DeliveryParams = z.object({ delivery: pathParam("delivery") });
-
-  router.route({
-    method: "get",
-    path: "/deliveries",
-    summary: "Every webhook channelstack sent the agent for this session, with every attempt",
-    query: z.object({
-      type: z
-        .string()
-        .optional()
-        .openapi({ param: { name: "type", in: "query" }, description: "Only this event, e.g. `issue_comment`." }),
-      resource: z
-        .string()
-        .optional()
-        .openapi({
-          param: { name: "resource", in: "query" },
-          description: "Only deliveries about this repository.",
-          ...refTo("GitHubRepo"),
-        }),
-    }),
-    response: z.array(GitHubDelivery).openapi("GitHubDeliveries"),
-    sdkMethod: { on: "GitHubFixture", name: "deliveries", options: ["type", "resource"] },
+  registerInspectionRoutes(router, {
+    title: "GitHub",
+    events: deps.events,
     stability,
-    handler: async ({ session, query }) =>
-      (await world.deliveries(session.id))
-        .filter(({ request }) => query.type === undefined || request.type === query.type)
-        .filter(({ request }) => query.resource === undefined || String(request.meta?.repo) === query.resource)
-        .map(deliveryWire),
-  });
-
-  router.route({
-    method: "get",
-    path: "/deliveries/{delivery}",
-    summary: "Re-read a delivery: its attempts and status",
-    params: DeliveryParams,
-    response: GitHubDelivery,
-    errors: ["not_found"],
-    sdkMethod: { on: "GitHubDelivery", name: "refresh" },
-    waits: [{ name: "settled", mode: "until", field: "status", not: ["pending"], what: "the delivery to settle" }],
-    stability,
-    handler: async ({ session, params }) => deliveryWire(await world.delivery(session.id, params.delivery)),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/redeliver",
-    summary: "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
-    params: DeliveryParams,
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "GitHubDelivery", name: "redeliver" },
-    stability,
-    handler: ({ session, params }) => world.redeliver(session.id, params.delivery),
-  });
-
-  router.route({
-    method: "post",
-    path: "/deliveries/{delivery}/resend",
-    summary: "Send the delivery again, unchanged or signed with a secret that isn't the App's",
-    params: DeliveryParams,
-    body: z.object({ badSignature: z.boolean().default(false) }).openapi("GitHubResendBody"),
-    response: DeliveryAttempt,
-    errors: ["not_found"],
-    sdkMethod: { on: "GitHubDelivery", name: "resend", options: ["badSignature"] },
-    live: DELIVERY_IS_THE_PLATFORMS,
-    stability,
-    handler: ({ session, params, body }) => fake.resend(session.id, params.delivery, body),
+    // Live, these read the App's delivery log on GitHub, and redeliver from it.
+    deliveries: { ...world, resend: fake.resend },
+    delivery: { schema: GitHubDelivery, wire: deliveryWire },
+    listSummary: "Every webhook channelstack sent the agent for this session, with every attempt",
+    filters: {
+      type: "Only this event, e.g. `issue_comment`.",
+      resource: {
+        description: "Only deliveries about this repository.",
+        ref: "GitHubRepo",
+        matches: ({ request }, repo) => String(request.meta?.repo) === repo,
+      },
+    },
+    live: { reads: undefined },
+    redeliver: {
+      summary: "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
+    },
+    resend: {
+      summary: "Send the delivery again, unchanged or signed with a secret that isn't the App's",
+      options: ["badSignature"],
+    },
+    calls: {
+      schema: GitHubApiCall,
+      summary:
+        "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
+      live: AGENT_SIDE,
+    },
   });
 
   router.route({
@@ -1609,19 +1576,5 @@ export function registerGitHubRoutes(
     live: AGENT_SIDE,
     stability,
     handler: ({ query }) => readCalls(deps.events, WORLD_SCOPE, "github", query),
-  });
-
-  router.route({
-    method: "get",
-    path: "/calls",
-    summary:
-      "The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session",
-    query: CallsQuery,
-    response: z.array(GitHubApiCall).openapi("GitHubApiCalls"),
-    sdkMethod: { on: "GitHubFixture", name: "calls", options: ["operation", "error"] },
-    waits: [{ name: "waitForCall", mode: "next", filter: true, what: "an API call from the agent" }],
-    live: AGENT_SIDE,
-    stability,
-    handler: ({ session, query }) => readCalls(deps.events, session.id, "github", query),
   });
 }

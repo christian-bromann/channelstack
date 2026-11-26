@@ -1,3 +1,4 @@
+import { iso } from "../../core/clock/index.ts";
 import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
 import type { LinearActivityRecord, LinearCommentRecord, LinearIssueRecord, LinearSessionRecord } from "./world.ts";
 
@@ -29,10 +30,9 @@ export function renderTranscript(
     readable(markdown: string): string;
   },
 ): { entries: TranscriptEntry[]; text: string } {
-  const at = (ms: number) => new Date(ms).toISOString();
   const entries: TranscriptEntry[] = [];
   const push = (id: string, user: string, ms: number, text: string, edited: boolean, depth: number) =>
-    entries.push({ id, author: options.principal(user), at: at(ms), text, controls: [], edited, depth });
+    entries.push({ id, author: options.principal(user), at: iso(ms), text, controls: [], edited, depth });
   const { issue } = input;
   if (issue)
     push(

@@ -289,6 +289,14 @@ describe("emitters", () => {
         },
       },
       "x-channelstack-errors": { not_found: { status: 404, description: "It isn't there." } },
+      // The pages come from the drivers in the binary: one per channel, none for the internal echo.
+      "x-channelstack-channels": [
+        { name: "echo", title: "Echo", internal: true },
+        { name: "slack", title: "Slack" },
+        { name: "github", title: "GitHub" },
+        { name: "linear", title: "Linear" },
+        { name: "notion", title: "Notion" },
+      ],
     });
     const pages = emitDocs(documented);
     expect([...pages.keys()]).toEqual([

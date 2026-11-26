@@ -1,0 +1,72 @@
+---
+title: "Resend"
+order: 5
+description: "Test an agent people email, built on Resend: point the resend SDK at the fake, send it email as people, and check its answers arrive in the thread."
+---
+
+# Resend
+
+This page shows how to test an agent that answers email through Resend: how to point it at the fake, who the people in a test are, what they send, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+
+> [!TIP]
+> Every method, option and wait of the Resend fake, with each call in TypeScript, Python and Rust, is in the [Resend API reference](/docs/reference/api/resend).
+
+## How an email agent works on Resend
+
+The agent has a Resend team: an API key, and a verified domain that sends and receives mail. When someone emails the agent's address, Resend sends the agent's webhook an `email.received` event. The event carries the email's metadata only, so the agent reads the email itself with `resend.emails.receiving.get(id)`. It answers with `resend.emails.send`, setting `In-Reply-To` and `References`, so the answer lands in the person's thread.
+
+## Connecting the agent
+
+`channelstack env` prints what the agent needs. The `resend` SDK reads `RESEND_BASE_URL` itself, so the agent needs no code changes:
+
+```bash
+RESEND_BASE_URL=https://resend.localhost
+RESEND_API_KEY=re_…
+RESEND_WEBHOOK_SECRET=whsec_…
+RESEND_FROM=my-agent <my-agent@acme.example>
+```
+
+Start the server with `CHANNELSTACK_RESEND_WEBHOOK_URL` set to the agent's webhook endpoint, for example `http://localhost:3000/webhooks/resend`. The agent verifies each webhook with `resend.webhooks.verify`, as Resend's guide shows: the fake signs the way Svix does.
+
+## What the fake covers
+
+The fake is one team, `my-agent`, on one verified domain, `acme.example`, that sends and receives. People are mailboxes in the world outside it.
+
+| Area | What's there |
+|---|---|
+| Sending | `emails.send` (`POST /emails`, with `headers`, `tags`, `cc`, `bcc`, `reply_to`), `batch.send`, `Idempotency-Key` for 24 hours |
+| Reading | `emails.get`, `emails.list`, `emails.receiving.get` and `list` (with `to`, `limit`, `after`, `before`), `emails.receiving.attachments.list`, `domains.list` |
+| Webhooks | `email.received`, `email.sent`, `email.delivered`, `email.bounced`, `email.complained`, `email.suppressed`, signed with `svix-id`, `svix-timestamp` and `svix-signature`, retried on Resend's schedule |
+| Test addresses | `delivered@resend.dev`, `bounced@resend.dev`, `complained@resend.dev`, `suppressed@resend.dev`, with `+label` where Resend allows it |
+
+Answers and errors have Resend's shapes (`{ statusCode, name, message }`). Sending from a domain the team hasn't verified is refused as Resend refuses it, and so is a request without an API key. The rate limit is Resend's, 10 requests a second, counted per test session so tests running side by side don't slow each other down.
+
+Attachments aren't built yet.
+
+## People and what they do
+
+```ts
+test("an email to the agent gets one reply, in its thread", async ({ resend }) => {
+  const ana = await resend.createUser({ name: "Ana" });
+
+  const email = await ana.send({ to: [resend.app], subject: "Refund", text: "Where is my refund?" });
+
+  await expect(email.thread).toHaveReplyFrom("my-agent", { text: /refund/i });
+  await expect(email.thread).toHaveRepliesFrom(resend.app, { count: 1 });
+});
+```
+
+A person's `id` is their address: `ana@example.com` unless the test gives one. They `send` email to the app or to other people, `reply` to an email in its thread (to everyone on it with `all: true`), and read their `inbox`. An email between people never reaches the agent: Resend only sees its own team's mail.
+
+## What a test checks
+
+- `email.thread.replies()` and `toHaveReplyFrom` / `toHaveRepliesFrom`: the answers, read as a person reads them, without the quoted history a reply carries.
+- `ana.waitForEmail({ from: resend.app })`: the answer in Ana's mailbox, with its subject and thread.
+- `email.delivery`: the `email.received` webhook, with every attempt. `resend({ badSignature: true })` and `resend({ stale: true })` forge one the agent must refuse; `redeliver()` sends it again as Resend retries.
+- `resend.calls()` and `toHaveReceivedCall("emails.send")`: what the agent asked of Resend.
+
+The standard checks register the same in one line: `resendChecks({ app: "my-agent" })`.
+
+## Live mode
+
+With the agent's team's key set (`CHANNELSTACK_RESEND_API_KEY`), the same tests run against real Resend. Each person is a Resend team of their own, with a key in `CHANNELSTACK_RESEND_USER_<NAME>_TOKEN` and an address on that team's verified domain. Sent email can't be taken back, so live mode refuses any recipient outside `CHANNELSTACK_LIVE_RESEND_DOMAINS` before anything is sent. See [Live mode](/docs/guide/live-mode).

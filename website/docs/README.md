@@ -25,7 +25,7 @@ The folder is the section and the frontmatter's `order` is the position in it. T
 
 | Page | Kind | What it covers |
 |---|---|---|
-| Overview (`index.mdx`) | Explanation | What channelstack is in one screen, and who it's for (bots, apps, integrations and AI agents on the four platforms): a test scripts people, the fake platform delivers to the unchanged app, the matchers read what a person would see. Animated: the request flow |
+| Overview (`index.mdx`) | Explanation | What channelstack is in one screen, and who it's for (bots, apps, integrations and AI agents on the five platforms): a test scripts people, the fake platform delivers to the unchanged app, the matchers read what a person would see. Animated: the request flow |
 | Why channelstack (`why.md`) | Explanation | Why apps and agents on these platforms are hard to test (async replies, retries, signatures, Stop, no sandbox), what mocking the SDK misses, why fakes plus live runs |
 | Getting started (`getting-started.mdx`) | Tutorial | Install, start the server, `channelstack env`, run a small Bolt bot, write and pass a first Vitest test, then break the bot and watch it fail. Animated: the terminal |
 
@@ -43,7 +43,7 @@ One per agent framework, in the order people use them with channelstack. Each is
 
 | Page | Kind | What it covers |
 |---|---|---|
-| How it works | Explanation | One server, four fakes, the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
+| How it works | Explanation | One server, five fakes, the control API; sessions in one shared world; the transcript the matchers and UI read. Animated: the architecture, and parallel sessions |
 | Connecting your app | How-to | `channelstack env`, each SDK's base-URL option, where the server delivers (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`), Socket Mode, TLS trust per runtime, `--no-portless` |
 | Writing tests | How-to | The Vitest plugin, fixtures, actor-first calls, giving the app access explicitly, shared people with `test.extend`, files and fixtures paths, cleanup |
 | Waiting and quiet | Explanation | Why matchers wait, positive vs negative and exact-count checks, the quiet window, "Still open:" messages, timeouts. Animated: the quiet window |
@@ -67,6 +67,7 @@ One page per platform, the same shape on each: what the fake covers, connecting 
 | GitHub | How-to |
 | Linear | How-to |
 | Notion | How-to |
+| Resend | How-to |
 
 **Reference** (`docs/reference/`)
 
@@ -75,7 +76,7 @@ The reference is generated wherever there's one source for it, so it can't drift
 | Page | What it lists | Source |
 |---|---|---|
 | Vitest plugin | `channelstack()` options, the `channelstack` fixture, modes | Written by hand |
-| Client and sessions, Slack API, GitHub API, Linear API, Notion API (`api/`) | Every handle, field, method and wait: the call in each SDK's language, every parameter with its name in each language, what it returns, its errors, and what it needs live | **Generated** from `spec/ir.json` by `codegen/src/emit/docs.ts`, with the SDKs' own naming |
+| Client and sessions, Slack API, GitHub API, Linear API, Notion API, Resend API (`api/`) | Every handle, field, method and wait: the call in each SDK's language, every parameter with its name in each language, what it returns, its errors, and what it needs live | **Generated** from `spec/ir.json` by `codegen/src/emit/docs.ts`, with the SDKs' own naming |
 | Errors (`api/errors.mdx`) | Every error code: what channelstack's own mean, which platform's a fake's codes are, the SDK class, and the methods that raise it | **Generated**, from the IR and `x-channelstack-errors` |
 | Matchers | Every matcher: subject, arguments, waits how, fails with what. The pytest names next to each | Written by hand; to be generated from `integrations/matchers-core` |
 | CLI | Every command and flag | Written by hand; to be generated once the CLI's commands are one table |

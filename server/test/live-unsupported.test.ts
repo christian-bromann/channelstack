@@ -99,6 +99,8 @@ const CASES: Record<string, Case | Case[]> = {
   "`delivery.resend()` / redelivery": [
     { channel: "notion", method: "POST", path: "/deliveries/x/resend", body: {} },
     { channel: "notion", method: "POST", path: "/deliveries/x/redeliver", reason: /no API to redeliver/ },
+    { channel: "resend", method: "POST", path: "/deliveries/x/resend", body: {} },
+    { channel: "resend", method: "POST", path: "/deliveries/x/redeliver", reason: /no API to redeliver/ },
   ],
   "`notion.setContentUpdateDelay(delay)`": {
     channel: "notion",
@@ -218,6 +220,7 @@ function liveEverywhere() {
           CHANNELSTACK_LIVE_GITHUB_ORGS: github.org,
           CHANNELSTACK_LINEAR_APP_TOKEN: "not-a-token",
           CHANNELSTACK_NOTION_TOKEN: "not-a-token",
+          CHANNELSTACK_RESEND_API_KEY: "not-a-token",
         },
         fetch,
         apiBase: { slack: stub.apiBase, github: github.url },

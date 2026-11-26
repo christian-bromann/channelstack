@@ -1,9 +1,10 @@
 import type { DeliveryTransport } from "../../../core/delivery/index.ts";
+import type { DeliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
-import { signSlackRequest } from "../../../core/signing/slack.ts";
 import { type Block, blockControls, findButton, findSelect, identified, plain, selectOptions } from "../blocks.ts";
+import { SLACK_IDS, slackTs } from "../ids.ts";
 import {
   blockActionsPayload,
   type InteractionContext,
@@ -33,6 +34,8 @@ const RESPONSE_URL_LIFETIME_MS = 30 * 60_000;
 export interface InteractionKit {
   context: DriverContext;
   store: SlackStore;
+  /** The world's Slack deliveries. */
+  deliveries: DeliveryKit;
   refuse(code: string, message: string, data?: Record<string, unknown>): ProtocolError;
   /** The person, who must be in the conversation. */
   member(session: string, userId: string, conversation: SlackConversationRecord): SlackUserRecord;
@@ -100,11 +103,11 @@ type Interactions = Pick<
 /** What a person does in the client beyond writing: buttons, menus, shortcuts and slash commands. */
 export function createInteractions(kit: InteractionKit): Interactions {
   const { context, store, refuse, member, requireMessage } = kit;
-  const { ids, clock, delivery } = context;
+  const { ids, clock } = context;
 
   /** A `trigger_id` the app may open one modal with, for three seconds. */
   const issueTrigger = (session: string, user: SlackUserRecord): string => {
-    const triggerId = ids.next("slack.trigger");
+    const triggerId = ids.next(SLACK_IDS.trigger);
     store.triggers.set(triggerId, { session, user: user.id, expiresAt: clock() + ACK_WINDOW_MS, used: false });
     return triggerId;
   };
@@ -155,18 +158,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
     answered?: (answer: { contentType: string; body: string }) => void,
   ): string => {
     reachable();
-    const id = ids.next("slack.event");
-    delivery.enqueue({
+    const id = ids.next(SLACK_IDS.event);
+    kit.deliveries.send({
       id,
       session,
-      driver: "slack",
       type,
       url: context.webhookUrl ?? "",
       transport: kit.transport,
       body,
       contentType: "application/x-www-form-urlencoded",
-      sign: (bytes, atMs) => signSlackRequest(context.secret("signingSecret"), bytes, atMs),
-      timeoutMs: ACK_WINDOW_MS,
+      retry: false,
       meta: { payload },
       ...(answered ? { answered } : {}),
     });
@@ -203,7 +204,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
   const acted = (found: { block: Block; element: Block }, extra: object) => ({
     ...found.element,
     block_id: found.block.block_id,
-    action_ts: ids.slackTs(),
+    action_ts: slackTs(ids),
     ...extra,
   });
 
@@ -292,7 +293,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const payload = messageActionPayload(answerable(session, "actions", user, conversation), {
         callbackId,
         message: kit.messageObject(message),
-        actionTs: ids.slackTs(),
+        actionTs: slackTs(ids),
       });
       return send(session, "message_action", payloadForm(payload), payload);
     },
@@ -355,7 +356,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
           thread_ts: rootTs,
           user: user.id,
           streaming_message_ts: streaming.map((message) => message.ts),
-          event_ts: ids.slackTs(),
+          event_ts: slackTs(ids),
         }) ?? ""
       );
     },
@@ -434,7 +435,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
       if (source && body.replace_original !== false) {
         const text = typeof body.text === "string" ? body.text : "";
         const blocks = Array.isArray(body.blocks) ? body.blocks : [];
-        if (quietly) Object.assign(source, { text, blocks: identified(blocks, () => ids.next("slack.block")) });
+        if (quietly) Object.assign(source, { text, blocks: identified(blocks, () => ids.next(SLACK_IDS.block)) });
         else kit.edit(conversation, source, { text, blocks });
         return true;
       }
@@ -459,7 +460,7 @@ export function createInteractions(kit: InteractionKit): Interactions {
         channel_id: dm.id,
         thread_ts: threadTs,
       },
-      event_ts: ids.slackTs(),
+      event_ts: slackTs(ids),
     };
   }
 

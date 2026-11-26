@@ -34,7 +34,9 @@ export function Flow() {
             <li>fake platform APIs</li>
             <li>schema checks</li>
           </ul>
-          <p className="node-foot">slack.localhost · github.localhost · linear.localhost · notion.localhost</p>
+          <p className="node-foot">
+            slack.localhost · github.localhost · linear.localhost · notion.localhost · resend.localhost
+          </p>
         </div>
 
         <div className="wires" aria-hidden="true">

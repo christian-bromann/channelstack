@@ -99,6 +99,12 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // run covers 7.3 (`test/acceptance/pytest` against Bolt, in its `slack` part) and 7.4
   // (`test/acceptance/mcp.test.ts`); pytest-channelstack's own tests are in `pnpm test`.
   7: [{ name: "7.1 The Rust SDK: clippy and its own tests", script: ["test:rust"], group: "unit" }],
+  // 8.2 to 8.6 run in the acceptance and unit checks above, once Resend's examples, agents and
+  // checks are enabled; 8.7 and 8.8 in the nightly live run.
+  8: [
+    { name: "8.1 Every channel is complete and on the channel kit", script: ["check:channels"], group: "static" },
+    { name: "8.3 Resend's description is the pinned one", script: ["resend:schema", "--check"], group: "static" },
+  ],
 };
 
 const phase = Number(process.argv[2]);

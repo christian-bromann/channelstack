@@ -1,4 +1,4 @@
-import { githubNodeId } from "../../../core/ids/index.ts";
+import { GITHUB_IDS, githubNodeId } from "../ids.ts";
 import type {
   GitHubFileChange,
   GitHubIssueRecord,
@@ -71,7 +71,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
 
   const newReview = (pull: Pull, author: number, state: GitHubReviewState, body: string): GitHubReviewRecord =>
     store.add(store.reviews, store.sessionOf(store.repo(pull.repo)), {
-      id: Number(ids.next("github.review")),
+      id: Number(ids.next(GITHUB_IDS.review)),
       repo: pull.repo,
       pull: pull.number,
       author,
@@ -151,7 +151,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
     }
     if (input.body.trim() === "") throw refused("PullRequestReviewComment", "body", "body can't be blank");
     const now = clock();
-    const id = Number(ids.next("github.comment"));
+    const id = Number(ids.next(GITHUB_IDS.comment));
     return store.add(store.reviewComments, store.sessionOf(repo), {
       id,
       repo: repo.id,
@@ -234,7 +234,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       const title = input.title ?? commits.at(-1)?.message.split("\n", 1)[0] ?? input.head;
       const issue = issues.newIssue(repo, actor, title, input.body);
       issue.pull = {
-        id: Number(ids.next("github.pull")),
+        id: Number(ids.next(GITHUB_IDS.pull)),
         head: input.head,
         base,
         headSha,
@@ -345,7 +345,7 @@ export function createPulls(kit: GitHubKit, repos: GitHubRepos, issues: GitHubIs
       const now = clock();
       const comment = store.add(store.reviewComments, store.sessionOf(store.repo(pull.repo)), {
         ...head,
-        id: Number(ids.next("github.comment")),
+        id: Number(ids.next(GITHUB_IDS.comment)),
         review: review.id,
         author: actor,
         body,

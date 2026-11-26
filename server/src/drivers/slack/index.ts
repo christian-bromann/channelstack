@@ -1,10 +1,12 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createSlackFake } from "./fake/index.ts";
+import { SLACK_IDS } from "./ids.ts";
 import { removeSlackEntry } from "./live/cleanup.ts";
 import { SlackWebClient } from "./live/client.ts";
 import { slackMaintenance } from "./live/maintenance.ts";
 import { createLiveWorld } from "./live/world.ts";
 import { registerSlackRoutes } from "./routes.ts";
+import { SLACK_SECRETS } from "./secrets.ts";
 
 /** The start of a text, short enough for one line of a failure message. */
 const excerpt = (text: string): string => {
@@ -15,12 +17,17 @@ const excerpt = (text: string): string => {
 /** The Slack driver: the fake Web API and Events API, and the control actions a test's people take. */
 export const slack: DriverDefinition = {
   name: "slack",
+  title: "Slack",
+  ids: SLACK_IDS,
+  tokenPatterns: [/xox[abeoprs]-[A-Za-z0-9-]{10,}/g, /xapp-\d-[A-Za-z0-9-]{10,}/g],
+  liveTokens: [SLACK_SECRETS.userToken],
+  redeliver: "retry",
   hosts: ["slack.com"],
   secrets: {
-    botToken: "slack.botToken",
-    appToken: "slack.appToken",
-    signingSecret: "slack.signingSecret",
-    verificationToken: "slack.verificationToken",
+    botToken: SLACK_SECRETS.botToken,
+    appToken: SLACK_SECRETS.appToken,
+    signingSecret: SLACK_SECRETS.signingSecret,
+    verificationToken: SLACK_SECRETS.verificationToken,
   },
   // A real app in a sandbox workspace (live-mode.md, section 4). People bring their own tokens.
   live: {

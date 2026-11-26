@@ -1,7 +1,9 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { capabilities } from "./capabilities.ts";
 import { createEchoFake } from "./fake/index.ts";
+import { ECHO_IDS } from "./ids.ts";
 import { registerEchoRoutes } from "./routes.ts";
+import { ECHO_SECRETS } from "./secrets.ts";
 
 /**
  * The echo driver: a minimal platform of channelstack's own (people, rooms, messages) that takes
@@ -9,7 +11,11 @@ import { registerEchoRoutes } from "./routes.ts";
  */
 export const echo: DriverDefinition = {
   name: "echo",
-  secrets: { appToken: "echo.appToken", signingSecret: "echo.signingSecret" },
+  title: "Echo",
+  ids: ECHO_IDS,
+  tokenPatterns: [/echo_app_[A-Za-z0-9]{20,}/g],
+  internal: true,
+  secrets: { appToken: ECHO_SECRETS.appToken, signingSecret: ECHO_SECRETS.signingSecret },
   create(context): Driver {
     const fake = createEchoFake(context);
     return {

@@ -9,13 +9,13 @@ import { createBearerToken } from "../../server/src/core/auth/index.ts";
 import { createLogger } from "../../server/src/core/log/index.ts";
 import { Redactor } from "../../server/src/core/redact/index.ts";
 import { Secrets } from "../../server/src/core/secrets/index.ts";
-import { secretSpecs } from "../../server/src/drivers/index.ts";
+import { secretSpecs, TOKEN_PATTERNS } from "../../server/src/drivers/index.ts";
 
 export const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 /** The OpenAPI document and the IR, built from the routes as they are in the working tree. */
 export function specFromRoutes(): { openapi: object; ir: Ir } {
-  const redactor = new Redactor();
+  const redactor = new Redactor(TOKEN_PATTERNS);
   const app = createApp({
     version: serverPackage.version,
     token: createBearerToken(),

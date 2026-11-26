@@ -15,6 +15,7 @@ import { taggedNames } from "../../../core/safety/index.ts";
 import { type LiveCredential, randomString } from "../../../core/secrets/index.ts";
 import type { LinearWorld } from "../backend.ts";
 import { LinearStore } from "../fake/store.ts";
+import { LINEAR_IDS } from "../ids.ts";
 import { linearLinks } from "../links.ts";
 import { linearText } from "../text.ts";
 import type {
@@ -548,7 +549,7 @@ export function createLiveLinearWorld(deps: {
           );
         }
         // A fake person can exist next to a live workspace, but can't act in it.
-        const id = ids.next("linear.uuid");
+        const id = ids.next(LINEAR_IDS.uuid);
         aliases.set(id, input.name);
         return store.add(store.users, session, {
           id,
@@ -886,7 +887,7 @@ export function createLiveLinearWorld(deps: {
         `,
         { input: { commentId: record.id, emoji } },
       );
-      record.reactions.push({ id: ids.next("linear.uuid"), emoji, user, createdAt: clock() });
+      record.reactions.push({ id: ids.next(LINEAR_IDS.uuid), emoji, user, createdAt: clock() });
     },
 
     async promptSession(record, user) {

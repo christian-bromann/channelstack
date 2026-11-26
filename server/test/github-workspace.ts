@@ -3,7 +3,7 @@ import { createPrivateKey } from "node:crypto";
 import { SignJWT } from "jose";
 
 import { harness, recordingAgent } from "./app-harness.ts";
-import { restProblems, webhookProblems } from "./github-schemas.ts";
+import { restProblems, webhookProblems } from "./schemas/github.ts";
 
 /**
  * A GitHub org for a unit test: the app in memory, a stand-in agent, one session with Ana and a

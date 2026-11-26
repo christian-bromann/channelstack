@@ -15,6 +15,16 @@ export interface Ir {
   errors: string[];
   /** What channelstack's own codes mean, and their HTTP status (`x-channelstack-errors`). A fake's codes are the platform's own. */
   errorDocs: Record<string, { status: number; description: string }>;
+  /** The drivers in the binary, in their order (`x-channelstack-channels`). */
+  channels: IrChannel[];
+}
+
+/** A driver: its name (`github`), and its title, which is also the prefix of its types (`GitHubUser`). */
+interface IrChannel {
+  name: string;
+  title: string;
+  /** channelstack's own test platform (`echo`), not a channel people test against. */
+  internal?: true;
 }
 
 /** A handle: an object with an identity on the server, and methods. */
@@ -27,6 +37,11 @@ export interface IrResource {
   idFields?: string[];
   /** This resource is the session: its id is the `{session}` of everything created through it. */
   scope?: "session";
+  /**
+   * What the handle is on its channel, for the unions every SDK and test framework has: a person
+   * (`User`), the agent's app (`App`), or a place things happen in (`Resource`).
+   */
+  role?: "user" | "app" | "resource";
   /**
    * The resource this one is a kind of: a pull request is an issue. It has every field and method
    * of its parent (its own `fields` list them too), and goes wherever the parent is accepted.
@@ -314,6 +329,7 @@ export function buildIr(openapi: Json): Ir {
       name,
       ...(idFields === undefined ? {} : { idFields }),
       ...(marker.scope === undefined ? {} : { scope: marker.scope }),
+      ...(marker.role === undefined ? {} : { role: marker.role }),
       ...(typeof marker.extends === "string" ? { extends: marker.extends } : {}),
       fields,
       methods: [],
@@ -544,6 +560,7 @@ export function buildIr(openapi: Json): Ir {
     types: types.filter((type) => reachable.has(type.name)),
     errors: [...errors].sort(),
     errorDocs: openapi["x-channelstack-errors"] ?? {},
+    channels: openapi["x-channelstack-channels"] ?? [],
   };
 }
 

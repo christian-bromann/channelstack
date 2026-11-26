@@ -6,7 +6,7 @@ import type { Timers } from "../src/core/clock/index.ts";
 import { createLogger } from "../src/core/log/index.ts";
 import { Redactor } from "../src/core/redact/index.ts";
 import { Secrets } from "../src/core/secrets/index.ts";
-import { secretSpecs } from "../src/drivers/index.ts";
+import { secretSpecs, TOKEN_PATTERNS } from "../src/drivers/index.ts";
 
 /** The UI page of the app a harness builds: enough to see what the server fills in. */
 const UI_PAGE = '<script nonce="__NONCE__">const session = "__SESSION__";</script>';
@@ -80,7 +80,7 @@ export function harness(
   options: { live?: LiveOptions; urls?: () => ServerUrls } = {},
 ): Harness {
   const secrets = Secrets.ephemeral(secretSpecs());
-  const redactor = new Redactor();
+  const redactor = new Redactor(TOKEN_PATTERNS);
   redactor.register(TOKEN, ...secrets.all());
   const logs: string[] = [];
   const timers = manualTimers();

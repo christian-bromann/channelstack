@@ -1,5 +1,5 @@
 import { harness, recordingAgent } from "./app-harness.ts";
-import { linearResponseProblems, linearWebhookProblems } from "./linear-schema.ts";
+import { linearResponseProblems, linearWebhookProblems } from "./schemas/linear.ts";
 
 /**
  * A Linear workspace for a unit test: the app in memory, a stand-in agent, one session with Ana in

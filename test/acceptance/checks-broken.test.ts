@@ -3,27 +3,31 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { GITHUB_CHECKS, LINEAR_CHECKS, NOTION_CHECKS, SLACK_CHECKS } from "../../integrations/checks/index.ts";
+import * as checkIds from "../../integrations/checks/index.ts";
+import { HARNESS, HARNESS_CHANNELS } from "../../scripts/lib/channels.ts";
 import { ROOT } from "../../scripts/lib/generate.ts";
 import { binaryPath } from "../../scripts/lib/packages.ts";
 import { withStack } from "../../scripts/lib/stack.ts";
 
-/** Per channel: the agent with one fault per check, where it takes webhooks, and the checks' ids. */
-const CHANNELS = {
-  slack: { agent: "broken-slack", path: "/slack/events", ids: SLACK_CHECKS },
-  github: { agent: "broken-github", path: "/api/webhooks/github", ids: GITHUB_CHECKS },
-  linear: { agent: "broken-linear", path: "/webhooks/linear", ids: LINEAR_CHECKS },
-  notion: { agent: "broken-notion", path: "/webhooks/notion", ids: NOTION_CHECKS },
-} as const;
+/** Per channel: the agent with one fault per check, where it takes webhooks, and the checks' ids (`SLACK_CHECKS`). */
+const CHANNELS = Object.fromEntries(
+  HARNESS_CHANNELS.map((channel) => {
+    const ids = (checkIds as unknown as Record<string, readonly string[] | undefined>)[
+      `${channel.toUpperCase()}_CHECKS`
+    ];
+    if (!ids) throw new Error(`integrations/checks has no ${channel.toUpperCase()}_CHECKS`);
+    return [channel, { ...HARNESS[channel].broken, ids }] as const;
+  }),
+);
 
 /** Run a channel's standard checks (all, or one) against its agent with one fault switched on (or none). */
 async function checks(
-  channel: keyof typeof CHANNELS,
+  channel: string,
   fault: string | undefined,
   only: string | undefined,
   agentEnv: Record<string, string> = {},
 ) {
-  const { agent, path } = CHANNELS[channel];
+  const { agent, path } = CHANNELS[channel] as { agent: string; path: string };
   let run = { status: null as number | null, output: "" };
   await withStack(
     {
@@ -55,7 +59,7 @@ const channels = Object.entries(CHANNELS).filter(([name]) => only === undefined 
 
 // Exit checks 2.3, 3.4 and 4.5: against a deliberately broken agent each check fails, one broken variant per check.
 describe.for(channels)("the standard %s checks catch what they are for", ([name, { ids }]) => {
-  const channel = name as keyof typeof CHANNELS;
+  const channel = name;
 
   test("with no fault switched on, the agent passes every check", async () => {
     const run = await checks(channel, undefined, undefined);

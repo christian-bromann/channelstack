@@ -1,20 +1,26 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createLinearFake } from "./fake/index.ts";
+import { LINEAR_IDS } from "./ids.ts";
 import { removeLinearEntry } from "./live/cleanup.ts";
 import { LinearGraphqlClient } from "./live/client.ts";
 import { linearMaintenance } from "./live/maintenance.ts";
 import { createLiveLinearWorld } from "./live/world.ts";
 import { registerLinearRoutes } from "./routes.ts";
+import { LINEAR_SECRETS } from "./secrets.ts";
 
 /** The Linear driver: the fake GraphQL API and agent webhooks, and the control actions a test's people take. */
 export const linear: DriverDefinition = {
   name: "linear",
+  title: "Linear",
+  ids: LINEAR_IDS,
+  tokenPatterns: [/lin_(?:api|oauth|wh)_[A-Za-z0-9]{16,}/g],
+  liveTokens: [LINEAR_SECRETS.apiKey],
   hosts: ["api.linear.app"],
   secrets: {
-    oauthToken: "linear.oauthToken",
-    webhookSecret: "linear.webhookSecret",
-    clientId: "linear.clientId",
-    clientSecret: "linear.clientSecret",
+    oauthToken: LINEAR_SECRETS.oauthToken,
+    webhookSecret: LINEAR_SECRETS.webhookSecret,
+    clientId: LINEAR_SECRETS.clientId,
+    clientSecret: LINEAR_SECRETS.clientSecret,
   },
   // The agent app's OAuth token in a test workspace (live-mode.md, section 4). People bring their own keys.
   live: {

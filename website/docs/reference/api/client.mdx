@@ -324,6 +324,28 @@ let notion = session.notion().await?;
 
 **Returns** [`NotionFixture`](/docs/reference/api/notion#notionfixture).
 
+### resend()
+
+The Resend fixture: the agent's team, and where the agent reaches the fake.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const resend = await session.resend();
+```
+
+```python title="Python"
+resend = await session.resend()
+```
+
+```rust title="Rust"
+let resend = session.resend().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`ResendFixture`](/docs/reference/api/resend#resendfixture).
+
 ## Types
 
 Plain values the handles return and take.

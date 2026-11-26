@@ -19,6 +19,7 @@ import type { LiveContext } from "../../../core/router/index.ts";
 import { taggedNames } from "../../../core/safety/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 import { findButton, plain } from "../blocks.ts";
+import { SLACK_IDS } from "../ids.ts";
 import { mentionedUsers, resolveMentions, typedText } from "../mentions.ts";
 import {
   type SlackAppRecord,
@@ -552,7 +553,7 @@ export function createLiveWorld(deps: {
           );
         }
         // A fake person can exist next to a live workspace, but can't act in it.
-        const id = ids.next("slack.user");
+        const id = ids.next(SLACK_IDS.user);
         const record: SlackUserRecord = {
           id,
           name: options.name,

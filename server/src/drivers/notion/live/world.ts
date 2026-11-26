@@ -15,6 +15,7 @@ import type { LiveCredential } from "../../../core/secrets/index.ts";
 import type { NotionWorld } from "../backend.ts";
 import { NotionStore } from "../fake/store.ts";
 import type { PageInput } from "../fake/world.ts";
+import { NOTION_IDS } from "../ids.ts";
 import { notionLinks } from "../links.ts";
 import { type BlockDraft, markdownToBlocks } from "../markdown.ts";
 import { notionObjects } from "../objects.ts";
@@ -483,7 +484,7 @@ export function createLiveNotionWorld(deps: {
           );
         }
         // A fake person can exist next to a live workspace, but can't act in it.
-        const id = ids.next("notion.uuid");
+        const id = ids.next(NOTION_IDS.uuid);
         return store.users.add(
           id,
           { id, name: input.name, email: "", avatarUrl: null, fixedId: false } satisfies NotionUserRecord,

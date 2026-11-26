@@ -1,6 +1,6 @@
-import { slackTsTime } from "../../core/ids/index.ts";
 import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
 import { type Block, blockControls, blockText } from "./blocks.ts";
+import { slackTsTime } from "./ids.ts";
 import { nameMentions } from "./mentions.ts";
 import type { SlackMessageRecord } from "./world.ts";
 

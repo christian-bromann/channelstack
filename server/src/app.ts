@@ -36,7 +36,7 @@ import {
 import { Allowlist, runId, runTag } from "./core/safety/index.ts";
 import { LiveVault, randomString, randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
-import { DRIVERS } from "./drivers/index.ts";
+import { channelsExtension, DRIVERS } from "./drivers/index.ts";
 
 export const CONTROL_PREFIX = "/_channelstack";
 
@@ -286,7 +286,7 @@ export function createApp(options: AppOptions): App {
     // A message or its data can quote what the caller sent, so both are scrubbed on the way out.
     if (error instanceof ProtocolError) {
       const { error: code, message, data } = error.toBody();
-      return c.json({ error: code, message: redactor.text(message), data: redactor.tokens(data) }, error.status as 400);
+      return c.json({ error: code, message: redactor.text(message), data: redactor.data(data) }, error.status as 400);
     }
     // Hono refuses a body it can't parse before validation runs.
     if (error instanceof HTTPException && error.status === 400) {
@@ -517,6 +517,8 @@ export function createApp(options: AppOptions): App {
       }),
       // What channelstack's own error codes mean; a fake's codes are the platform's.
       "x-channelstack-errors": CORE_ERRORS,
+      // The drivers in the binary, so generators and scripts don't keep their own list.
+      "x-channelstack-channels": channelsExtension(),
     }),
     hosts: () => ["channelstack", ...driverNames],
     settled: () => delivery.settled(),

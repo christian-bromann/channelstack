@@ -1,19 +1,12 @@
-import { delay, type Timers } from "../../../core/clock/index.ts";
-import { ProtocolError } from "../../../core/errors/index.ts";
+import { RATE_LIMIT_RETRIES, type Timers, waitRetryAfter } from "../../../core/clock/index.ts";
+import { LivePlatformRefusal } from "../../../core/errors/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
 
 /** Real Linear's GraphQL API. Only `createApp` can point the client elsewhere (a stub in unit tests), never the environment. */
 const LINEAR_API = "https://api.linear.app/graphql";
 
-const RATE_LIMIT_RETRIES = 3;
-const MAX_RETRY_AFTER_MS = 30_000;
-
 /** Linear refusing a call, with its own error code (`extensions.code`: `INPUT_ERROR`, `FORBIDDEN`, …). */
-export class LinearRefusal extends ProtocolError {
-  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
-    super({ platform: code, status: 409 }, message, data);
-  }
-}
+export class LinearRefusal extends LivePlatformRefusal {}
 
 /**
  * Calls Linear's GraphQL API with one credential per call: the app's OAuth token, or a person's
@@ -60,8 +53,7 @@ export class LinearGraphqlClient {
                 ? "AUTHENTICATION_ERROR"
                 : "unexpected";
       if (code === "RATELIMITED" && attempt < RATE_LIMIT_RETRIES) {
-        const seconds = Number(response.headers.get("retry-after") ?? "1");
-        await delay(this.#timers, Math.min(MAX_RETRY_AFTER_MS, (Number.isFinite(seconds) ? seconds : 1) * 1000));
+        await waitRetryAfter(this.#timers, response.headers);
         continue;
       }
       if (code !== undefined || !answer?.data) {

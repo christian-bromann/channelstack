@@ -1,7 +1,44 @@
 import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
+import { channelGlue } from "./channels.ts";
 import { BANNER, errorClassName, IrIndex, pathParts } from "./shared.ts";
 
 const OUT = "sdks/typescript/generated/index.ts";
+const CHANNELS_OUT = "sdks/typescript/generated/channels.ts";
+
+/** What the SDK and the Vitest integration need per channel, from the IR: the channel list, the fixtures, the unions. */
+function channelsFile(ir: Ir): string {
+  const glue = channelGlue(ir);
+  const union = (names: readonly string[]) =>
+    names.length === 0 ? "never" : names.map((name) => `G.${name}`).join(" | ");
+  const inspectable = glue.deliveries.reduceRight(
+    (rest, delivery) => `TDelivery extends G.${delivery} ? G.${delivery.replace(/Delivery$/, "Fixture")} : ${rest}`,
+    "never",
+  );
+  return [
+    `// ${BANNER}`,
+    'import type * as G from "./index.ts";',
+    "",
+    "type Option<Method extends (...args: never[]) => unknown> = NonNullable<Parameters<Method>[0]>;",
+    "",
+    "/** Every channel, by name, in the server's order. */",
+    `export const CHANNEL_NAMES = [${glue.channels.map((channel) => JSON.stringify(channel.name)).join(", ")}] as const;`,
+    "export type ChannelKind = (typeof CHANNEL_NAMES)[number];",
+    "/** Each channel's fixture, by its name: what a test framework hands a test. */",
+    "export interface ChannelFixtures {",
+    ...glue.channels.map((channel) => `  ${channel.name}: G.${channel.title}Fixture;`),
+    "}",
+    `export type User = ${union(glue.users)};`,
+    `export type App = ${union(glue.apps)};`,
+    `export type Resource = ${union(glue.resources)};`,
+    `export type AnyDelivery = ${union(glue.deliveries)};`,
+    `export type DeliveryFilter = ${glue.filteredDeliveries.map((name) => `Option<G.${name}["deliveries"]>`).join(" | ") || "never"};`,
+    `export type ApiCall = ${union(glue.apiCalls)};`,
+    `export type Transcript = ${union(glue.transcripts)};`,
+    "/** What every channel fixture has to inspect what the agent did: the fixture whose deliveries are `TDelivery`. */",
+    `export type Inspectable<TDelivery extends AnyDelivery = AnyDelivery> = ${inspectable};`,
+    "",
+  ].join("\n");
+}
 
 /**
  * How the TypeScript SDK spells types: as its users see them (`public`: handles, `Duration`) or as
@@ -477,5 +514,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     "}",
     "",
   ];
-  return new Map([[OUT, lines.join("\n")]]);
+  return new Map([
+    [OUT, lines.join("\n")],
+    [CHANNELS_OUT, channelsFile(ir)],
+  ]);
 }

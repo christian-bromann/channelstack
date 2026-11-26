@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "vitest";
 
-import { SECRET_FORMATS } from "../../src/core/secrets/index.ts";
+import { DRIVERS } from "../../src/drivers/index.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 
 /**
@@ -13,15 +13,11 @@ import { type RunningBinary, startBinary } from "./harness.ts";
  * of them in the server's logs, its error responses or the event log.
  */
 
-// Live-shaped tokens are built at runtime, so no token-shaped literal is ever committed.
-const liveShaped = [
-  SECRET_FORMATS["slack.botToken"].generate(),
-  SECRET_FORMATS["slack.userToken"].generate(),
-  SECRET_FORMATS["github.installationToken"].generate(),
-  SECRET_FORMATS["linear.apiKey"].generate(),
-  SECRET_FORMATS["notion.token"].generate(),
-  ["github", "pat", "11ABCDEFG0aBcDeFgHiJkL", "mNoPqRsTuVwXyZ0123456789"].join("_"),
-];
+// Live-shaped tokens are built at runtime, so no token-shaped literal is ever committed: one of
+// each prefixed token every driver knows, fake or live.
+const liveShaped = DRIVERS.flatMap((driver) => [...Object.values(driver.secrets), ...(driver.liveTokens ?? [])])
+  .filter((format) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern)) && !String(format.pattern).startsWith("/^echo"))
+  .map((format) => format.generate());
 const email = ["ana.live", "example.com"].join("@");
 
 const agent = createServer((_request, response) => {
@@ -82,6 +78,12 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
     });
   }
 
+  // A Resend person's id is their address: errors that name one must not show it, encoded or not.
+  const resend = `/sessions/${sessionId}/resend`;
+  note(await control("POST", `${resend}/users`, { name: "Ana", address: email }));
+  note(await control("POST", `${resend}/users`, { name: "Ana again", address: email }));
+  note(await control("GET", `${resend}/users/${encodeURIComponent(`nobody.${email}`)}/inbox`));
+
   // Let every delivery attempt finish, so its outcome is in the log too.
   await expect
     .poll(
@@ -108,7 +110,7 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
   await server.stop();
   const logs = server.output();
 
-  expect(errors.length).toBeGreaterThanOrEqual(secrets.length * 5);
+  expect(errors.length).toBeGreaterThanOrEqual(secrets.length * 5 + 2);
   expect(logs).toContain('"message":"request"');
   expect(logs).toContain('"message":"delivery attempt"');
   expect(events).toContain("[redacted]");
@@ -122,5 +124,7 @@ test("no fake secret and no live-shaped token reaches logs, errors, the event lo
   for (const secret of uiSecrets) expect(logs, "logs").not.toContain(secret);
   // Emails are scrubbed from logs and errors. The event log keeps message content, which is what tests read.
   expect(logs).not.toContain(email);
+  expect(logs).not.toContain(encodeURIComponent(email));
   expect(JSON.stringify(errors)).not.toContain(email);
+  expect(JSON.stringify(errors)).not.toContain(encodeURIComponent(email));
 });

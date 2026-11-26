@@ -1,35 +1,47 @@
 import { describe, expect, test } from "vitest";
 
-import { SECRET_FORMATS } from "../secrets/index.ts";
+import { alnum, hex } from "../secrets/index.ts";
 import { Redactor } from "./index.ts";
 
+/** A made-up platform's token shape: each driver's own are tested in drivers/formats.test.ts. */
+const PATTERNS = [/tok_[A-Za-z0-9]{20,}/g];
+const token = () => `tok_${alnum(32)}`;
+
 describe("redaction", () => {
-  test.each(
-    // Secrets with no prefix have no shape to recognise; they are scrubbed once registered (next test).
-    Object.entries(SECRET_FORMATS).filter(([, format]) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern))),
-  )("a %s is scrubbed by its shape", (_name, format) => {
-    const token = format.generate();
-    const out = new Redactor().text(`calling with ${token} failed`);
-    expect(out).not.toContain(token);
+  test("a token is scrubbed by its shape", () => {
+    const value = token();
+    const out = new Redactor(PATTERNS).text(`calling with ${value} failed`);
+    expect(out).not.toContain(value);
     expect(out).toContain("[redacted]");
   });
 
   test("shapeless secrets are scrubbed once registered", () => {
-    const secret = SECRET_FORMATS["slack.signingSecret"].generate();
-    const redactor = new Redactor();
+    const secret = hex(32);
+    const redactor = new Redactor(PATTERNS);
     expect(redactor.text(`secret=${secret}`)).toContain(secret);
     redactor.register(secret);
     expect(redactor.text(`secret=${secret}`)).toBe("secret=[redacted]");
   });
 
-  test("bearer headers, live-shaped tokens and emails are scrubbed from text", () => {
-    const pat = ["github", "pat", "11ABCDEFG0abcdefghijkl", "mnopqrstuvwxyz"].join("_");
-    const out = new Redactor().text(`Authorization: Bearer abc.def-123456 from ana@example.com using ${pat}`);
+  test("bearer headers and emails are scrubbed from text", () => {
+    const out = new Redactor(PATTERNS).text(
+      `Authorization: Bearer abc.def-123456 from ana@example.com using ${token()}`,
+    );
     expect(out).toBe("Authorization: Bearer [redacted] from [redacted] using [redacted]");
   });
 
+  test("an address in a URL is scrubbed too, and error data is scrubbed like text", () => {
+    const redactor = new Redactor(PATTERNS);
+    expect(redactor.text("GET /resend/users/ana.mar%40example.com/inbox")).toBe("GET /resend/users/[redacted]/inbox");
+    expect(redactor.data({ id: "ana@example.com", path: ["/users/ana%40example.com"], n: 1 })).toEqual({
+      id: "[redacted]",
+      path: ["/users/[redacted]"],
+      n: 1,
+    });
+  });
+
   test("recorded payloads keep ordinary text that mentions bearer tokens", () => {
-    const redactor = new Redactor();
+    const redactor = new Redactor(PATTERNS);
     const said = { text: "please use bearer authentication", header: "Authorization: Bearer abcdefgh12345678" };
     expect(redactor.tokens(said)).toEqual(said);
     // A log line is not content: there, whatever follows `Bearer` is scrubbed.
@@ -37,8 +49,13 @@ describe("redaction", () => {
   });
 
   test("recorded payloads keep their content and lose only tokens", () => {
-    const token = SECRET_FORMATS["slack.botToken"].generate();
-    const recorded = new Redactor().tokens({ text: `mail ana@example.com`, nested: [{ token }], n: 1, none: null });
+    const value = token();
+    const recorded = new Redactor(PATTERNS).tokens({
+      text: `mail ana@example.com`,
+      nested: [{ token: value }],
+      n: 1,
+      none: null,
+    });
     expect(recorded).toEqual({ text: "mail ana@example.com", nested: [{ token: "[redacted]" }], n: 1, none: null });
   });
 });

@@ -1,4 +1,4 @@
-import { githubNodeId } from "../../../../core/ids/index.ts";
+import { githubNodeId } from "../../ids.ts";
 import { type GitHubCommitInfo, PERMISSIONS } from "../../world.ts";
 import { FILE_MODE, type GitTreeEntry, TREE_MODE } from "../git.ts";
 import { GitHubRefusal } from "../kit.ts";

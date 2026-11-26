@@ -8,11 +8,22 @@
  * `ChannelstackMatchers`, `TextOptions`, in `channelstack/vitest`), and `SlackInjectedFault`, which
  * the SDK calls `SlackFault` (#37).
  */
+import type { AnyDelivery, App, Transcript, User } from "./generated/channels.ts";
 import type * as G from "./generated/index.ts";
+
+export type {
+  ApiCall,
+  App,
+  ChannelKind,
+  DeliveryFilter,
+  Inspectable,
+  Resource,
+  Transcript,
+  User,
+} from "./generated/channels.ts";
 
 type Option<Method extends (...args: never[]) => unknown> = NonNullable<Parameters<Method>[0]>;
 
-export type ChannelKind = "slack" | "github" | "linear" | "notion";
 /** Text that may contain `@name` mentions. */
 export type RichText = string;
 /** ISO 8601 timestamp string. */
@@ -23,14 +34,9 @@ export type GitHubAuthor = G.GitHubUser | G.GitHubApp;
 export type LinearAuthor = G.LinearUser | G.LinearApp;
 export type NotionAuthor = G.NotionUser | G.NotionIntegration;
 
-export type User = G.SlackUser | G.GitHubUser | G.LinearUser | G.NotionUser;
-export type App = G.SlackApp | G.GitHubApp | G.LinearApp | G.NotionIntegration;
 export type Principal = User | App;
 /** Anything that can be named as an author in a matcher: a handle or its `name`. */
 export type AuthorRef = Principal | string;
-export type Resource = G.SlackConversation | G.GitHubRepo | G.LinearTeam | G.NotionPage | G.NotionDatabase;
-
-type AnyDelivery = G.SlackDelivery | G.GitHubDelivery | G.LinearDelivery | G.NotionDelivery;
 /** A delivery of any channel, narrowed by its `type` and `payload` as the contract's `Delivery<TType, TPayload>` is. */
 export type Delivery<TType extends string = string, TPayload = unknown> = AnyDelivery & {
   readonly type: TType;
@@ -39,26 +45,10 @@ export type Delivery<TType extends string = string, TPayload = unknown> = AnyDel
 export type DeliveryStatus = Delivery["status"];
 export type DeliveryTransport = G.DeliveryAttempt["transport"];
 export type SlackDeliveryType = G.SlackDelivery["type"];
-export type ResendOptions = Option<G.GitHubDelivery["resend"]>;
-export type SlackResendOptions = Option<G.SlackDelivery["resend"]>;
-export type LinearResendOptions = Option<G.LinearDelivery["resend"]>;
-export type DeliveryFilter =
-  Option<G.GitHubFixture["deliveries"]> | Option<G.LinearFixture["deliveries"]> | Option<G.NotionFixture["deliveries"]>;
-
-export type ApiCall = G.SlackApiCall | G.GitHubApiCall | G.LinearApiCall | G.NotionApiCall;
+export type DeliveryResendOptions = Option<G.GitHubDelivery["resend"]>;
+export type SlackDeliveryResendOptions = Option<G.SlackDelivery["resend"]>;
+export type LinearDeliveryResendOptions = Option<G.LinearDelivery["resend"]>;
 export type ApiCallFilter = Option<G.SlackFixture["calls"]>;
-/** What every channel fixture has to inspect what the agent did: the fixture whose deliveries are `TDelivery`. */
-export type Inspectable<TDelivery extends Delivery = Delivery> = TDelivery extends G.SlackDelivery
-  ? G.SlackFixture
-  : TDelivery extends G.GitHubDelivery
-    ? G.GitHubFixture
-    : TDelivery extends G.LinearDelivery
-      ? G.LinearFixture
-      : TDelivery extends G.NotionDelivery
-        ? G.NotionFixture
-        : never;
-
-export type Transcript = G.SlackTranscript | G.GitHubTranscript | G.LinearTranscript | G.NotionTranscript;
 export type TranscriptEntry = Transcript["entries"][number];
 export type HasTranscript = { transcript(): Promise<Transcript> };
 export type SlackHasTranscript = { transcript(options?: { as?: SlackParticipant }): Promise<G.SlackTranscript> };
@@ -77,3 +67,12 @@ export type LinearActivityType = G.LinearAgentActivity["type"];
 export type NotionUserOptions = Option<G.NotionFixture["createUser"]>;
 export type NotionPageOptions = Option<G.NotionFixture["createPage"]>;
 export type NotionDatabaseOptions = Option<G.NotionFixture["createDatabase"]>;
+export type ResendUserOptions = Option<G.ResendFixture["createUser"]>;
+export type ResendEventType = G.ResendDelivery["type"];
+export type ResendDeliveryResendOptions = Option<G.ResendDelivery["resend"]>;
+/** An email a person sends, with the channel's own people and app as its recipients. */
+export type EmailSendOptions<TRecipient = unknown> = Omit<Option<G.ResendUser["send"]>, "to" | "cc"> & {
+  to: readonly TRecipient[];
+  cc?: readonly TRecipient[];
+};
+export type EmailReplyOptions = NonNullable<Parameters<G.ResendUser["reply"]>[1]>;

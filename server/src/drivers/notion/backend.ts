@@ -1,3 +1,4 @@
+import type { Awaitable } from "../../core/router/index.ts";
 import type { NotionStore } from "./fake/store.ts";
 import type { PageInput } from "./fake/world.ts";
 import type { NotionLinks } from "./links.ts";
@@ -5,9 +6,6 @@ import type { NotionObjects } from "./objects.ts";
 import type { NotionReads, TextPattern } from "./reads.ts";
 import type { RichTextItem } from "./rich-text.ts";
 import type { NotionCommentRecord, NotionDiscussionRecord, NotionPageRecord, NotionUserRecord } from "./world.ts";
-
-/** A value now (the fake), or once Notion answered (live). */
-type Awaitable<T> = T | Promise<T>;
 
 /**
  * What people do in Notion, written once. The fake implements it over its store; the live world

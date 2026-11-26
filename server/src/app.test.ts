@@ -5,7 +5,8 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { type Harness, harness, TOKEN } from "../test/app-harness.ts";
 import type { ServerUrls } from "./app.ts";
-import { signEchoDelivery } from "./core/signing/echo.ts";
+import { signEchoDelivery } from "./drivers/echo/signing.ts";
+import { DRIVERS } from "./drivers/index.ts";
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -36,7 +37,7 @@ describe("control API", () => {
     expect((await h.call("GET", "/status")).body).toEqual({
       ready: true,
       version: "0.0.0-test",
-      drivers: ["echo", "slack", "github", "linear", "notion"],
+      drivers: DRIVERS.map((driver) => driver.name),
     });
     for (const token of [null, "wrong-token-0123456789", `${TOKEN}x`]) {
       const refused = await h.call("GET", "/status", undefined, token);
@@ -290,7 +291,7 @@ describe("the echo pipeline", () => {
       new Request("http://127.0.0.1:4500/api/nope", { headers: { "x-forwarded-host": "echo.localhost" } }),
     );
     expect(await forwarded.json()).toEqual({ ok: false, error: "unknown_method" });
-    expect(h.app.hosts()).toEqual(["channelstack", "echo", "slack", "github", "linear", "notion"]);
+    expect(h.app.hosts()).toEqual(["channelstack", ...DRIVERS.map((driver) => driver.name)]);
     expect((await h.app.fetch(new Request("http://127.0.0.1:4500/elsewhere"))).status).toBe(404);
   });
 });

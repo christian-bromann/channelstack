@@ -9,6 +9,7 @@
 import { join } from "node:path";
 
 import { runExamples, runGoDockerExamples, runProxyExamples, runPytestExamples } from "./examples.ts";
+import { HARNESS, HARNESS_CHANNELS } from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";
 import { runSmoke, SDKS } from "./smoke.ts";
@@ -19,19 +20,26 @@ const BROKEN = "test/acceptance/checks-broken.test.ts";
 const broken = (channels: string) => () =>
   run("pnpm", [...vitest, BROKEN], { cwd: ROOT, env: { ...process.env, CHANNELSTACK_BROKEN_CHANNELS: channels } });
 
-/** The parts, each well under five minutes on CI, and together the whole suite. */
+/** A channel's examples against each of its reference agents, without `shared.test.ts`. */
+const agentsOf = (...channels: Array<keyof typeof HARNESS>) =>
+  runExamples({ agents: channels.flatMap((channel) => Object.keys(HARNESS[channel].agents)), shared: false });
+
+/**
+ * The parts, each well under five minutes on CI, and together the whole suite. The channels that
+ * share a part are grouped here by how long they take; any other channel gets a part of its own.
+ */
+const GROUPED: readonly string[] = ["slack", "github", "linear", "notion"];
 const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
   // The Slack examples against both Slack agents, then their pytest port against Bolt (exit check 7.3).
   slack: async () => {
-    await runExamples({ agents: ["bolt-ai-sdk", "chat-sdk-slack"], shared: false });
+    await agentsOf("slack");
     await runPytestExamples();
   },
-  "github-linear": () =>
-    runExamples({ agents: ["probot", "chat-sdk-github", "linear-sdk", "chat-sdk-linear"], shared: false }),
+  "github-linear": () => agentsOf("github", "linear"),
   // The smoke scenarios through every SDK, Notion, every channel in one run, and the tests that bring their own agent.
   "notion-shared-own": async () => {
     await runSmoke({ sdks: SDKS });
-    await runExamples({ agents: ["notion-sdk"], shared: true });
+    await runExamples({ agents: Object.keys(HARNESS.notion.agents), shared: true });
     run("pnpm", [...vitest, "--exclude", BROKEN], { cwd: ROOT });
   },
   // Proxy mode: the Slack examples against an agent that only knows slack.com (exit check 6.1), and
@@ -43,8 +51,20 @@ const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
   // Each conformance scenario against the fake (exit check 6.4); the nightly job runs them live too.
   conformance: () => run(process.execPath, [join(ROOT, "scripts", "conformance.ts"), "--fake-only"], { cwd: ROOT }),
   "broken-slack": broken("slack"),
-  "broken-others": broken("github,linear,notion"),
+  "broken-others": broken(HARNESS_CHANNELS.filter((channel) => channel !== "slack").join(",")),
+  ...Object.fromEntries(
+    HARNESS_CHANNELS.filter((channel) => !GROUPED.includes(channel)).map((channel) => [
+      channel,
+      () => agentsOf(channel),
+    ]),
+  ),
 };
+
+/** `--parts`: the parts' names, for `pnpm check:channels` to hold CI's matrix to. */
+if (process.argv.includes("--parts")) {
+  console.log(JSON.stringify(Object.keys(PARTS)));
+  process.exit(0);
+}
 
 const flag = (name: string) => {
   const at = process.argv.indexOf(name);

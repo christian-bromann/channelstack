@@ -1,6 +1,7 @@
 import type { Clock } from "../clock/index.ts";
 import { ProtocolError } from "../errors/index.ts";
 import type { IdGenerator } from "../ids/index.ts";
+import { CHANNELSTACK_IDS } from "../ids/index.ts";
 
 /** A scope inside the one shared world: it owns what it creates and sees only its own events. */
 export interface Session {
@@ -29,7 +30,7 @@ export class Sessions {
     const existing = name === undefined ? undefined : [...this.#open.values()].find((open) => open.name === name);
     if (existing) return existing;
     const session: Session = {
-      id: this.#ids.next("channelstack.session"),
+      id: this.#ids.next(CHANNELSTACK_IDS.session),
       openedAt: this.#clock(),
       ...(name === undefined ? {} : { name }),
     };

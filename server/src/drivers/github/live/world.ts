@@ -5,11 +5,12 @@ import type { IdGenerator } from "../../../core/ids/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
 import { fakeActorInLiveWorld, liveMisconfigured, unsupportedInLive } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
-import type { LiveContext } from "../../../core/router/index.ts";
+import type { DeliveryView, LiveContext } from "../../../core/router/index.ts";
 import { taggedNames } from "../../../core/safety/index.ts";
-import type { GitHubDeliveryView, GitHubWorld } from "../backend.ts";
+import type { GitHubWorld } from "../backend.ts";
 import { GitHubRefusal } from "../fake/kit.ts";
 import { GitHubStore } from "../fake/store.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import type {
   GitHubCommentRecord,
   GitHubIssueRecord,
@@ -231,7 +232,7 @@ export function createLiveGitHubWorld(deps: {
   };
 
   /** The deliveries about a session's repositories, each with its attempts (a redelivery is one more). */
-  const deliveriesOf = async (session: string): Promise<GitHubDeliveryView[]> => {
+  const deliveriesOf = async (session: string): Promise<DeliveryView[]> => {
     const repos = store.list(store.repos, session);
     if (repos.length === 0) return [];
     const ours = new Set(repos.map((repo) => repo.id));
@@ -243,7 +244,7 @@ export function createLiveGitHubWorld(deps: {
         continue;
       byGuid.set(wire.guid, [...(byGuid.get(wire.guid) ?? []), wire]);
     }
-    const views: GitHubDeliveryView[] = [];
+    const views: DeliveryView[] = [];
     for (const [guid, tries] of byGuid) {
       tries.sort((a, b) => Date.parse(a.delivered_at) - Date.parse(b.delivered_at));
       const first = tries[0] as WireHookDelivery;
@@ -350,7 +351,7 @@ export function createLiveGitHubWorld(deps: {
           );
         }
         // A fake person can exist next to a live org, but can't act in it.
-        const id = Number(ids.next("github.user"));
+        const id = Number(ids.next(GITHUB_IDS.user));
         return store.add(store.users, session, {
           id,
           login: input.login,

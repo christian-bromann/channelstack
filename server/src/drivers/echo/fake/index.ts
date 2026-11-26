@@ -1,4 +1,5 @@
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
+import { ECHO_IDS } from "../ids.ts";
 import { createEchoApi } from "./api.ts";
 import { EchoStore } from "./store.ts";
 import { createFakeWorld, type FakeEchoWorld } from "./world.ts";
@@ -20,7 +21,7 @@ export function createEchoFake(context: DriverContext): EchoFake {
     seed() {
       store.clear();
       store.app = {
-        id: context.ids.next("echo.app"),
+        id: context.ids.next(ECHO_IDS.app),
         name: APP_NAME,
         kind: "app",
       };

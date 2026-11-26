@@ -1,0 +1,24 @@
+name: resend/reply
+description: A person emails the agent and the agent answers in the thread. Runs against the fake and against the sandbox teams (the differential run).
+requires: [resend-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers: [ResendFixture.createUser, ResendUser.send, ResendThread.replies, ResendThread.messages]
+steps:
+  - call: session.resend
+    as: resend
+  - call: resend.createUser
+    options: { name: Ana }
+    as: ana
+  - call: ana.send
+    options: { to: [$resend.app], subject: Conformance smoke test, text: Where is my refund? }
+    as: email
+  - call: email.thread.waitForReply
+    options: { from: $resend.app, timeout: 60s }
+    as: answer
+  - call: email.thread.replies
+    as: replies
+  - call: email.thread.messages
+    as: messages
+  - record:
+      replies: $replies
+      messages: $messages

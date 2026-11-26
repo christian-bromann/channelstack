@@ -1,7 +1,7 @@
 # channelstack: interface and developer experience (draft)
 
 > Status: draft v2, 2026-11-19. Nothing is built.
-> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear and Notion (no Teams for now) · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
+> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear, Notion and email, Resend and Google ([decision 0021](decisions/0021-email-channels.md); no Teams for now) · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
 > Also decided: tests use an actor-first API (`ana.say("…", { channel })`). The UI is functional, not a faithful copy of each product ([section 7](#7-the-ui-is-functional-not-faithful)).
 > How it's built (server, protocol, SDK generation, live verification) is in [implementation-plan.md](implementation-plan.md); its section 1.1 lists the decisions both documents share. The architecture in short: [architecture.md](architecture.md).
 
@@ -27,7 +27,7 @@ The names don't collide with emulate: its portless mode uses `*.emulate.localhos
 
 ### Scope
 
-- **Channels:** Slack, GitHub, Linear and Notion. No Teams for now.
+- **Channels:** Slack, GitHub, Linear, Notion, and email: Resend and Google (Gmail), [decision 0021](decisions/0021-email-channels.md). No Teams for now.
 - **One workspace or org per channel:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. Multi-workspace installs are out of scope until a real test case needs them.
 - **State lives in memory.** Restarting the server gives a fresh world.
 - **No model mocking.** channelstack fakes the channel, not the LLM. Use your framework's own fake model, or a real one (see [section 6](#6-the-model-is-yours)).
@@ -44,6 +44,7 @@ channelstack is an independent project: the fake platforms are channelstack's ow
 | GitHub | Repos with an in-memory git store, issues, PRs, reviews, check runs, App installations, signed webhooks with GUIDs, the App delivery log and redelivery |
 | Linear | Teams, issues, comments, delegation, agent sessions and activities, the stop signal, signed webhooks |
 | Notion | Pages, blocks, databases, comments and discussions, connections, signed integration webhooks |
+| Resend | Email to and from the agent's team: sending, the receiving API, Svix-signed webhooks, Resend's test addresses ([decision 0021](decisions/0021-email-channels.md)) |
 
 ## 2. First run
 
@@ -78,6 +79,7 @@ Point the agent at it, using only options the SDKs already have. When the variab
 | GitHub (Octokit, Probot) | `baseUrl` | `GITHUB_API_URL=https://github.localhost`, with `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY` (a PEM in one line), `GITHUB_WEBHOOK_SECRET`, `GITHUB_INSTALLATION_ID` |
 | Linear (`@linear/sdk`) | `apiUrl` | `LINEAR_API_URL=https://linear.localhost/graphql` |
 | Notion (`@notionhq/client`) | `baseUrl` | `NOTION_BASE_URL=https://notion.localhost` |
+| Resend (`resend`) | the environment | `RESEND_BASE_URL=https://resend.localhost` |
 | Chat SDK, Mastra, Flue | the adapter's API URL option | the same variables |
 
 ```bash
@@ -97,6 +99,7 @@ There is no config file. Each fake comes with your agent's app already installed
 | GitHub | The App `my-agent` (its bot is `my-agent[bot]`), with write access to issues, pull requests, contents, checks and statuses, subscribed to issue, comment, pull request, review, push and check run events |
 | Linear | An agent app, subscribed to `AgentSessionEvent`, `Issue` and `Comment` webhooks |
 | Notion | An integration with every capability, subscribed to `page.*` and `comment.*` events |
+| Resend | A team with one verified domain (`acme.example`) that sends and receives, its address `my-agent@acme.example`, its webhook subscribed to every `email.*` event |
 
 Where each fake delivers events comes from the server's environment, one variable per channel: `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, with `SLACK`, `GITHUB`, `LINEAR` or `NOTION`.
 
@@ -255,6 +258,7 @@ await ana.reply("thanks!", { discussion });
 | GitHub | `push(changes, { repo, branch })` · `openIssue({ title }, { repo })` · `openPullRequest({ from }, { repo })` · `comment(text, { issue })` (an issue or a PR) · `review({ pr, event, comments })` · `reviewComment(text, { pr, path, line })` · `reply(text, { comment })` · `resolve({ comment })` · `label(names, { issue })` · `assign(people, { issue })` · `requestReview(people, { pr })` · `merge({ pr })` · `rerun({ checkRun })` |
 | Linear | `createIssue({ title }, { team })` · `comment(text, { issue })` · `reply(text, { comment })` · `delegate(linear.app, { issue })` · `prompt(text, { session })` · `answer(text, { elicitation })` · `stop({ session })` · `assign(user, { issue })` · `setState(name, { issue })` |
 | Notion | `comment(text, { page, anchor? })` · `reply(text, { discussion })` · `resolve({ discussion })` · `edit({ append }, { page })` · `mention(notion.app, { page })` · `setProperty(name, value, { page })` · `addRow(values, { database })` · `connect(notion.app, { page })` |
+| Resend | `send({ to, cc, subject, text, html })` · `reply(email, { text, all })` · `inbox()` · `waitForEmail({ from })` |
 
 Why this shape:
 - **It reads as a sentence:** "Ana says … in the channel", "Ben clicks Approve on the reply". Autocomplete on `ana.` shows everything a person can do on that platform.
@@ -313,7 +317,7 @@ Each test still gets fresh users and a fresh channel (fixtures are created per t
 |---|---|
 | People exist for the UI and CLI before any test runs | The CLI and UI create users on first use (`--as ana`, or the user picker) |
 | Stable user IDs, for agents that allowlist admins by ID (`ADMINS=U0ADMIN01`) | `createUser({ name: "Cara", id: "U0ADMIN01" })` accepts a fixed ID |
-| The same person across Slack, GitHub, Linear and Notion | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
+| The same person across Slack, GitHub, Linear, Notion and Resend | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
 | Less setup per test | Shared fixtures (above) are one line per test and visible where they're used |
 
 So predefined users would add nothing worth keeping, and they'd bring hidden shared state, which parallel tests can't afford.
@@ -386,6 +390,7 @@ Every matcher reads the **transcript**: each channel's state reduced to what a p
 | GitHub | `toHaveCommentFrom(app)`, `toHaveCommentsFrom(app, { count })`, `toHaveReviewComment({ path, line, from })`, `toHaveCheckRun(name, { status, conclusion })`, `toHaveLabel(name)`, `toBeMerged()` |
 | Linear | `toHaveSessionState("pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error")`, `toHaveActivity({ type, from, text })`, `toHaveCommentFrom(app)`, `toBeDelegatedTo(app)`, `toBeAssignedTo(user)`, `toHaveState(name)` |
 | Notion | `toHaveCommentFrom(app)` and `toHaveCommentsFrom(app, { count })` on a discussion, `toHaveBlock(text \| RegExp)`, `toHavePropertyValue(name, value)` (asymmetric matchers such as `expect.any(Number)` work) |
+| Resend | `toHaveReplyFrom(app)` and `toHaveRepliesFrom(app, { count })` on a thread: its answers, without the quoted history |
 | Any delivery | `toBeAccepted({ within: "3s" })`, `toBeRejected()` (bad signature), `toBeRetried({ times })` |
 
 The matchers assert on **behaviour** (once, in the thread, stopped, acknowledged in time, on the right line), not on exact wording. So they hold whether the agent uses a real model or a fake one.
@@ -428,7 +433,7 @@ A test can use one of those, or a real model. The matchers are designed for this
 
 ## 7. The UI is functional, not faithful
 
-Nobody needs the UI to look like Slack, GitHub, Linear or Notion. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for all four channels and shows the same transcript the matchers read:
+Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for all four channels and shows the same transcript the matchers read:
 
 - **Threads and conversations as text:** who said what, in which thread, edited or deleted, streaming or done, and the agent's status ("thinking…", "stopped").
 - **Interactive elements that work:** a button is a button, a select is a select, and a modal opens as a plain form. Clicking one sends the real `block_actions` or `view_submission` delivery. The same goes for GitHub review comments (shown with path and line), Linear Stop, and Notion comment replies.

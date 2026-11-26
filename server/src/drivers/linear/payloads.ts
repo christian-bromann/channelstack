@@ -1,3 +1,4 @@
+import { iso } from "../../core/clock/index.ts";
 import type { LinearLinks } from "./links.ts";
 import {
   type LinearActivityRecord,
@@ -11,7 +12,6 @@ import {
 } from "./world.ts";
 
 type Json = Record<string, unknown>;
-const iso = (ms: number) => new Date(ms).toISOString();
 const maybe = (ms: number | null) => (ms === null ? null : iso(ms));
 
 /** What the builders need beyond the record they are given. */

@@ -5,7 +5,14 @@
   "minTokens": 50,
   "threshold": 0,
   "gitignore": true,
-  "ignore": ["**/node_modules/**", "**/dist/**", "**/generated/**", "**/.venv/**", "**/linear/schema/**"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/generated/**",
+    "**/.venv/**",
+    "**/linear/schema/**",
+    "**/resend-openapi.json"
+  ],
   "reporters": ["console"],
   "exitCode": 1
 }

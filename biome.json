@@ -18,7 +18,8 @@
       "!.claude",
       "!**/*.md",
       "!phase-log",
-      "!server/src/drivers/linear/schema"
+      "!server/src/drivers/linear/schema",
+      "!server/test/schemas/resend-openapi.json"
     ]
   },
   "formatter": {

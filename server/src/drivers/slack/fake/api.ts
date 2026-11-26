@@ -6,6 +6,7 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { identified } from "../blocks.ts";
+import { SLACK_IDS, slackTs } from "../ids.ts";
 import { handleOf } from "../interaction-payloads.ts";
 import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
 import {
@@ -392,7 +393,7 @@ export function createSlackApi(
       if (!stream) throw new SlackApiError("message_not_in_streaming_state");
       const blocks = json(args, "blocks");
       if (Array.isArray(blocks)) {
-        message.blocks = [...message.blocks, ...identified(blocks, () => ids.next("slack.block"))];
+        message.blocks = [...message.blocks, ...identified(blocks, () => ids.next(SLACK_IDS.block))];
       }
       const metadata = json(args, "metadata");
       if (metadata !== undefined) message.metadata = metadata;
@@ -456,7 +457,7 @@ export function createSlackApi(
       const name = required(args, "filename");
       const length = Number(args.length);
       if (!Number.isInteger(length) || length <= 0) throw new SlackApiError("invalid_arguments");
-      const id = ids.next("slack.file");
+      const id = ids.next(SLACK_IDS.file);
       store.files.set(id, {
         id,
         name,
@@ -585,7 +586,7 @@ export function createSlackApi(
           user: bot(),
           conversation,
           team: store.team,
-          eventTs: ids.slackTs(),
+          eventTs: slackTs(ids),
         }),
       );
       return { channel: conversationObject(conversation) };

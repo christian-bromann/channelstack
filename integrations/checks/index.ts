@@ -79,6 +79,14 @@ export const NOTION_CHECKS = [
   "notion.bad-signature",
 ] as const;
 
+/** The ids of the Resend checks, in the order they are registered. */
+export const RESEND_CHECKS = [
+  "resend.reply-in-thread",
+  "resend.redelivery",
+  "resend.bad-signature",
+  "resend.stale",
+] as const;
+
 /**
  * Registers one check as a test, with its id in the name. A check that was skipped, or whose
  * prompt wasn't given, is left out. An id in `skip` that no check has is a mistake worth hearing about.
@@ -100,6 +108,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
       github,
       linear,
       notion,
+      resend,
       task,
       expect,
       skip,
@@ -114,6 +123,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
         github,
         linear,
         notion,
+        resend,
         task,
         expect,
         skip,
@@ -489,6 +499,60 @@ export function notionChecks(options: ChecksOptions): void {
       const delivery = comment.delivery;
       if (!delivery) throw new Error("The comment caused no delivery: is the agent's webhook URL set?");
       await delivery.resend({ badSignature: true });
+      await expect(delivery).toBeRejected(wait);
+    });
+  });
+}
+
+/**
+ * The Resend checks: a person emails the agent. `prompt` is the email's text (default `hello`); the
+ * agent should answer once, in the email's thread.
+ */
+export function resendChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const prompt = options.prompt ?? "hello";
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar(options, RESEND_CHECKS);
+  /** Ana, and her email to the agent. */
+  const emailed = async ({ resend }: TestContext) => {
+    const ana = await resend.createUser({ name: "Ana" });
+    const email = await ana.send({ to: [resend.app], subject: "A question", text: prompt });
+    return { ana, email };
+  };
+
+  describe(`resend checks: ${app}`, () => {
+    check("resend.reply-in-thread", "answers an email in its thread", async (context) => {
+      const { ana, email } = await emailed(context);
+      // The answer reaches Ana, and in the thread she started: In-Reply-To and References are set.
+      const answer = await ana.waitForEmail({ from: app, ...wait });
+      expect(answer.thread.id, "the answer started a thread of its own: set In-Reply-To and References").toBe(
+        email.thread.id,
+      );
+    });
+
+    check("resend.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
+      const { email } = await emailed(context);
+      await expect(email.thread).toHaveReplyFrom(app, wait);
+      // Resend retries with the same svix-id and the same email_id.
+      const delivery = email.delivery;
+      if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
+      await delivery.redeliver();
+      await expect(email.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
+    });
+
+    check("resend.bad-signature", "rejects a webhook with a bad signature", async (context) => {
+      const { email } = await emailed(context);
+      const delivery = email.delivery;
+      if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
+      await delivery.resend({ badSignature: true });
+      await expect(delivery).toBeRejected(wait);
+    });
+
+    check("resend.stale", "rejects a webhook signed more than five minutes ago", async (context) => {
+      const { email } = await emailed(context);
+      const delivery = email.delivery;
+      if (!delivery) throw new Error("The email caused no delivery: is the agent's webhook URL set?");
+      await delivery.resend({ stale: true });
       await expect(delivery).toBeRejected(wait);
     });
   });

@@ -5,25 +5,20 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 import { randomString } from "./csprng.ts";
-import { SECRET_FORMATS, type SecretFormatName, Secrets, type SecretSpec } from "./index.ts";
+import { alnum, hex, type SecretFormat, Secrets, type SecretSpec } from "./index.ts";
 
 const posix = process.platform !== "win32";
-const everyFormat = Object.fromEntries(Object.keys(SECRET_FORMATS).map((name) => [name, name])) as Record<
-  string,
-  SecretFormatName
->;
-const specs: Record<string, SecretSpec> = { all: everyFormat, echo: { appToken: "echo.appToken" } };
+/** Formats of a made-up platform: the store works with any driver's. Each driver's own are tested in drivers/formats.test.ts. */
+const TOKEN: SecretFormat = { pattern: /^tok_[A-Za-z0-9]{32}$/, generate: () => `tok_${alnum(32)}` };
+const SIGNING: SecretFormat = { pattern: /^[a-f0-9]{40}$/, generate: () => hex(40) };
+const BOT: SecretFormat = { pattern: /^bot-[a-f0-9]{24}$/, generate: () => `bot-${hex(24)}` };
+const everyFormat = { token: TOKEN, signing: SIGNING, bot: BOT };
+const specs: Record<string, SecretSpec> = { all: everyFormat, echo: { appToken: TOKEN } };
 const home = () => mkdtempSync(join(tmpdir(), "cs-secrets-"));
 
 describe("secret formats", () => {
-  test.each(Object.entries(SECRET_FORMATS))("%s matches the platform's layout", (name, format) => {
-    // An RSA key takes a moment to make, and its layout doesn't vary: a few are enough.
-    const draws = name === "github.privateKey" ? 3 : 200;
-    for (let i = 0; i < draws; i++) expect(format.generate()).toMatch(format.pattern);
-  });
-
   test("values come from the CSPRNG and don't repeat", () => {
-    const seen = new Set(Array.from({ length: 2000 }, () => SECRET_FORMATS["slack.signingSecret"].generate()));
+    const seen = new Set(Array.from({ length: 2000 }, () => SIGNING.generate()));
     expect(seen.size).toBe(2000);
     expect(randomString(64, "ab")).toMatch(/^[ab]{64}$/);
   });
@@ -41,15 +36,15 @@ describe("secrets.json", () => {
     const first = Secrets.load(dir, specs);
     const second = Secrets.load(dir, specs);
     expect(second.all()).toEqual(first.all());
-    expect(first.get("echo", "appToken")).toMatch(SECRET_FORMATS["echo.appToken"].pattern);
+    expect(first.get("echo", "appToken")).toMatch(TOKEN.pattern);
   });
 
   test("a driver added later gets its secrets without touching the others", () => {
     const dir = home();
-    const before = Secrets.load(dir, { echo: { appToken: "echo.appToken" } });
-    const after = Secrets.load(dir, { echo: { appToken: "echo.appToken" }, slack: { botToken: "slack.botToken" } });
+    const before = Secrets.load(dir, { echo: { appToken: TOKEN } });
+    const after = Secrets.load(dir, { echo: { appToken: TOKEN }, slack: { botToken: BOT } });
     expect(after.get("echo", "appToken")).toBe(before.get("echo", "appToken"));
-    expect(after.get("slack", "botToken")).toMatch(/^xoxb-/);
+    expect(after.get("slack", "botToken")).toMatch(/^bot-/);
   });
 
   test("exit check 0.6: rotate changes every value and keeps the file private", () => {
@@ -66,14 +61,14 @@ describe("secrets.json", () => {
 
   test("a value that doesn't match its format is replaced, not served", () => {
     const dir = home();
-    const spec = { echo: { appToken: "echo.appToken" } } as const;
+    const spec = { echo: { appToken: TOKEN } };
     Secrets.load(dir, spec);
     const path = Secrets.path(dir);
     writeFileSync(path, JSON.stringify({ version: 1, secrets: { echo: { appToken: "tampered" } } }));
 
     const repaired = Secrets.load(dir, spec);
 
-    expect(repaired.get("echo", "appToken")).toMatch(SECRET_FORMATS["echo.appToken"].pattern);
+    expect(repaired.get("echo", "appToken")).toMatch(TOKEN.pattern);
     expect(JSON.parse(readFileSync(path, "utf8")).secrets.echo.appToken).toBe(repaired.get("echo", "appToken"));
   });
 

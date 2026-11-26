@@ -1,15 +1,16 @@
-import type { RetryPolicy } from "../../../core/delivery/index.ts";
+import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
-import { signNotionWebhook } from "../../../core/signing/notion.ts";
 import { NotionApiError } from "../errors.ts";
+import { NOTION_IDS } from "../ids.ts";
 import { notionLinks } from "../links.ts";
 import { type BlockDraft, markdownToBlocks } from "../markdown.ts";
 import { notionObjects } from "../objects.ts";
 import { type Author, type EventParent, notionPayloads, stampAttempt } from "../payloads.ts";
 import { notionReads, type TextPattern } from "../reads.ts";
 import { plainText, type RichTextItem, textItem, userMention } from "../rich-text.ts";
+import { signNotionWebhook } from "../signing.ts";
 import type {
   NotionBlockRecord,
   NotionCommentRecord,
@@ -28,12 +29,6 @@ import type { NotionStore } from "./store.ts";
 const ACK_WINDOW_MS = 5_000;
 /** Notion retries up to eight times, backing off, over about a day. */
 const RETRY_DELAYS_MS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_200_000, 21_600_000, 43_200_000];
-const NOTION_RETRIES: RetryPolicy = {
-  next(_attempt, retries) {
-    const afterMs = RETRY_DELAYS_MS[retries];
-    return afterMs === undefined ? undefined : { afterMs, headers: {} };
-  },
-};
 /** How long `page.content_updated` waits to batch edits, unless a test sets another delay. */
 const DEFAULT_CONTENT_DELAY_MS = 1_000;
 const OPTION_COLORS = ["default", "gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red"];
@@ -71,7 +66,17 @@ export interface DatabaseInput {
  * and for the integration (through the REST API) alike. The caller brings the permission check.
  */
 export function createFakeWorld(context: DriverContext, store: NotionStore) {
-  const { ids, clock, delivery, timers } = context;
+  const { ids, clock, timers } = context;
+  /** Notion's deliveries: stamped with the attempt's number, signed with the verification token over the exact body. */
+  const deliveries = deliveryKit(context, {
+    driver: "notion",
+    timeoutMs: ACK_WINDOW_MS,
+    retry: fixedRetries(RETRY_DELAYS_MS),
+    stamp: stampAttempt,
+    sign: (secret, body) => ({ "user-agent": "notion-api", ...signNotionWebhook(secret, body) }),
+    secret: () => context.secret("verificationToken"),
+    forgedSecret: () => `secret_${randomToken()}`,
+  });
   const links = notionLinks(context.apiUrl, (page) => titleOf(page));
   const objects = notionObjects({
     links,
@@ -130,12 +135,6 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   /** Content updates waiting to go out, by page: one event names every block changed meanwhile. */
   const pendingContent = new Map<string, { session: string; blocks: Set<string>; authors: Map<string, Author> }>();
 
-  /** Notion's headers for an event, signed with this token over the exact body. */
-  const signedWith = (token: string) => (body: string) => ({
-    "user-agent": "notion-api",
-    ...signNotionWebhook(token, body),
-  });
-
   /**
    * Send an event to the agent if the integration is subscribed to it, may see the page and has a
    * URL. Every attempt is stamped with its number and signed with the verification token.
@@ -148,20 +147,15 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   ): string | undefined => {
     if (!store.bot.events.includes(type) || !accessible(page.id) || context.webhookUrl === undefined) return undefined;
     if (type.startsWith("comment.") && !store.bot.capabilities.includes("read_comments")) return undefined;
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const payload = build(id);
     const entity = payload.entity as { id: string; type: string };
-    delivery.enqueue({
+    deliveries.send({
       id,
       session,
-      driver: "notion",
       type,
       url: context.webhookUrl,
       body: JSON.stringify(payload),
-      stamp: stampAttempt,
-      sign: signedWith(context.secret("verificationToken")),
-      timeoutMs: ACK_WINDOW_MS,
-      retry: NOTION_RETRIES,
       meta: { payload, entity, page: page.id },
     });
     return id;
@@ -253,7 +247,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   ): string[] =>
     drafts.map((draft) => {
       const now = clock();
-      const id = ids.next("notion.uuid");
+      const id = ids.next(NOTION_IDS.uuid);
       const block = store.blocks.add(
         id,
         {
@@ -364,7 +358,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       for (const name of names)
         if (name !== null && !property.options.some((option) => option.name === name))
           property.options.push({
-            id: ids.next("notion.uuid"),
+            id: ids.next(NOTION_IDS.uuid),
             name,
             color: OPTION_COLORS[property.options.length % 10] ?? "default",
           });
@@ -517,7 +511,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     extra: { icon?: string | undefined; connections?: readonly string[] | undefined } = {},
   ): NotionPageRecord => {
     const now = clock();
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const page = store.pages.add(
       id,
       {
@@ -583,12 +577,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   /** A property schema as a test writes it: `"number"`, `{ status: ["Todo", "Done"] }`, `{ relation: db }`. */
   const propertySchema = (name: string, raw: unknown): NotionPropertyRecord => {
     // A database's title property is always `title`; the others get short ids of their own.
-    const id = raw === "title" ? "title" : ids.next("notion.propertyId");
+    const id = raw === "title" ? "title" : ids.next(NOTION_IDS.propertyId);
     if (typeof raw === "string") return { id, name, type: raw as NotionPropertyType, options: [] };
     const [type, value] = Object.entries(raw as Record<string, unknown>)[0] ?? [];
     if (type === "relation") return { id, name, type: "relation", options: [], relation: String(value) };
     const options = (value as string[]).map((option, at) => ({
-      id: ids.next("notion.uuid"),
+      id: ids.next(NOTION_IDS.uuid),
       name: option,
       color: OPTION_COLORS[at % 10] ?? "default",
     }));
@@ -600,12 +594,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     if (properties.filter((property) => property.type === "title").length !== 1)
       throw new ProtocolError("invalid_argument", "A database needs exactly one title property");
     const now = clock();
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const database = store.databases.add(
       id,
       {
         id,
-        dataSource: ids.next("notion.uuid"),
+        dataSource: ids.next(NOTION_IDS.uuid),
         parent: parentOf(input.parent),
         title: input.title,
         properties,
@@ -660,7 +654,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     if (rich.length === 0 || plainText(rich).trim() === "")
       throw invalid("body failed validation: rich_text should not be empty");
     const now = clock();
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const comment = store.comments.add(
       id,
       {
@@ -694,7 +688,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     rich: RichTextItem[],
     actor: string,
   ) => {
-    const id = ids.next("notion.uuid");
+    const id = ids.next(NOTION_IDS.uuid);
     const discussion = store.discussions.add(
       id,
       {
@@ -764,7 +758,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     ) {
       if (store.users.list(session).some((user) => user.name.toLowerCase() === input.name.toLowerCase()))
         throw new ProtocolError("invalid_argument", `There is already a person "${input.name}" in this session`);
-      const id = input.id === undefined ? ids.next("notion.uuid") : ids.reserve("notion.uuid", input.id);
+      const id = input.id === undefined ? ids.next(NOTION_IDS.uuid) : ids.reserve(NOTION_IDS.uuid, input.id);
       return store.users.add(
         id,
         {
@@ -912,29 +906,25 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     refresh: (_session: string, _about: { page: string } | { discussion: string }) => {},
 
     // Deliveries
-    resend(session: string, id: string, options: { badSignature: boolean }) {
-      const secret = options.badSignature ? `secret_${randomToken()}` : context.secret("verificationToken");
-      return delivery.again(session, id, {
-        sign: signedWith(secret),
-        forged: options.badSignature,
-      });
-    },
-    redeliver: (session: string, id: string) => delivery.again(session, id),
-    deliveries: (session: string) => delivery.list(session).filter(({ request }) => request.driver === "notion"),
-    delivery: (session: string, id: string) => delivery.get(session, id),
+    resend: (session: string, id: string, options: { badSignature: boolean }) =>
+      deliveries.resend(session, id, options),
+    redeliver: (session: string, id: string) => deliveries.redeliver(session, id),
+    deliveries: deliveries.deliveries,
+    delivery: deliveries.delivery,
     /** The subscription's verification request, as Notion sends it once when a subscription is created. */
     verify(session: string) {
       if (context.webhookUrl === undefined) return undefined;
-      const id = ids.next("notion.uuid");
-      delivery.enqueue({
+      const id = ids.next(NOTION_IDS.uuid);
+      // Sent once and unsigned: the token is in the body, for the agent to save.
+      deliveries.send({
         id,
         session,
-        driver: "notion",
         type: "verification",
         url: context.webhookUrl,
         body: JSON.stringify({ verification_token: context.secret("verificationToken") }),
         sign: () => ({ "user-agent": "notion-api" }),
-        timeoutMs: ACK_WINDOW_MS,
+        retry: false,
+        stamp: false,
         meta: {
           payload: { verification_token: "[redacted]" },
           entity: { type: "subscription", id: store.bot.subscriptionId },

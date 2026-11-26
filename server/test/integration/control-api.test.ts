@@ -5,6 +5,7 @@ import { delimiter, join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
 
+import { DRIVERS } from "../../src/drivers/index.ts";
 import { cli, type RunningBinary, startBinary, temporaryHome } from "./harness.ts";
 
 const running: RunningBinary[] = [];
@@ -45,7 +46,7 @@ describe("exit check 0.1: the control API needs the token", () => {
     expect(ok.body).toEqual({
       ready: true,
       version: cli(["--version"]).stdout.trim(),
-      drivers: ["echo", "slack", "github", "linear", "notion"],
+      drivers: DRIVERS.map((driver) => driver.name),
     });
 
     for (const token of [null, "not-the-token", `${server.token}x`, server.token.slice(0, -1)]) {
@@ -253,7 +254,7 @@ describe.runIf(posix)("portless", () => {
 
     expect(server.url).toBe("https://channelstack.localhost");
     // One name for the UI and control API, and one per driver, all on the server's one port.
-    const names = ["channelstack", "echo", "slack", "github", "linear", "notion"];
+    const names = ["channelstack", ...DRIVERS.map((driver) => driver.name)];
     const registered = portless.calls();
     const port = registered[0]?.split(" ")[2];
     expect(port).toMatch(/^\d+$/);

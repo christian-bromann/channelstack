@@ -2,11 +2,12 @@ import { type Context, Hono } from "hono";
 
 import { bearerFrom } from "../../../../core/auth/index.ts";
 import { ProtocolError } from "../../../../core/errors/index.ts";
+import { bodyOf, wrapRest } from "../../../../core/fake/endpoint.ts";
 import type { DriverContext } from "../../../../core/router/index.ts";
-import { recordCall } from "../../../../core/router/inspect.ts";
-import { verifyGitHubAppJwt } from "../../../../core/signing/github.ts";
 import { constantTimeEqual } from "../../../../core/signing/hmac.ts";
+import { GITHUB_IDS } from "../../ids.ts";
 import { githubTime } from "../../payloads.ts";
+import { verifyGitHubAppJwt } from "../../signing.ts";
 import type { GitHubRepoRecord } from "../../world.ts";
 import { GitHubRefusal } from "../kit.ts";
 import type { FakeGitHubWorld } from "../world.ts";
@@ -17,12 +18,12 @@ import { registerRepos } from "./repos.ts";
 import { type Json, notFound, page, type Register } from "./shared.ts";
 
 const DOCS = "https://docs.github.com/rest";
+const NOT_FOUND = { message: "Not Found", documentation_url: DOCS, status: "404" };
 /** An installation token is good for an hour. */
 const TOKEN_LIFETIME_MS = 60 * 60 * 1000;
 
 type Variables = {
   repo?: GitHubRepoRecord;
-  requestBody?: unknown;
   /** The request showed the App's JWT or its installation's token. Only such calls are on record. */
   authenticated?: boolean;
   /** A call about no repository that still belongs to one session: reading one of its deliveries. */
@@ -119,7 +120,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
   const hookDelivery = (entry: (typeof store.hookDeliveries)[number], detailed: boolean): Json => {
     const sameGuid = store.hookDeliveries.filter((other) => other.guid === entry.guid);
     const number = sameGuid.indexOf(entry);
-    const record = context.delivery.get(entry.session, entry.guid);
+    const record = world.kit.deliveries.delivery(entry.session, entry.guid);
     const attempt = record.attempts[number];
     const code = attempt?.responseStatus ?? 0;
     return {
@@ -203,25 +204,15 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
       if (granted === undefined || (level === "write" && granted !== "write")) {
         throw new GitHubRefusal(403, "Resource not accessible by integration");
       }
-      // Any method may carry a body (GitHub's DELETE for assignees and files does). It is parsed
-      // and put on record here, once, for every route.
-      let body: Json = {};
-      const raw = method === "get" ? "" : await c.req.text();
-      if (raw !== "") {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(raw);
-        } catch {
-          throw new GitHubRefusal(400, "Problems parsing JSON");
-        }
-        // An object, or a list where an endpoint takes one (labels); anything else is no request body.
-        if (typeof parsed !== "object" || parsed === null) {
-          throw new GitHubRefusal(400, "Invalid request.\n\nThe request body must be a JSON object or array.");
-        }
-        body = parsed as Json;
-        c.set("requestBody", body);
+      // Any method may carry a body (GitHub's DELETE for assignees and files does): an object, or a
+      // list where an endpoint takes one (labels).
+      const parsed = method === "get" ? { body: {} } : await bodyOf(c);
+      if ("invalid" in parsed) {
+        throw parsed.invalid === "json"
+          ? new GitHubRefusal(400, "Problems parsing JSON")
+          : new GitHubRefusal(400, "Invalid request.\n\nThe request body must be a JSON object or array.");
       }
-      return handler({ c, world, repo, body, bot: store.bot.id });
+      return handler({ c, world, repo, body: parsed.body as Json, bot: store.bot.id });
     });
   };
   registerRepos(register);
@@ -249,78 +240,53 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
 
   // --- What wraps every request ------------------------------------------------------------
 
-  const api = new Hono<{ Variables: Variables }>();
-
-  api.use(async (c, next) => {
-    const startedAt = clock();
-    await next();
-    c.header("x-github-media-type", "github.v3; format=json");
-    c.header("x-github-api-version-selected", "2022-11-28");
-    c.header(
-      "x-github-request-id",
-      world.kit.context.ids.next("github.delivery").toUpperCase().replaceAll("-", ":").slice(0, 34),
-    );
-    c.header("x-ratelimit-limit", "5000");
-    c.header("x-ratelimit-remaining", "4999");
-    c.header("x-ratelimit-used", "1");
-    c.header("x-ratelimit-reset", String(Math.floor(clock() / 1000) + 3600));
-    c.header("x-ratelimit-resource", "core");
-    const raw = c.res.status === 204 ? "" : await c.res.clone().text();
-    let response: unknown = raw;
-    try {
-      response = raw === "" ? undefined : JSON.parse(raw);
-    } catch {
-      response = raw;
-    }
-    const repo = c.get("repo");
-    // The path as GitHub has it: without the fake's own prefix, and without `/api/v3`.
-    const path = new URL(c.req.url).pathname.replace(/^\/github(?=\/)/, "").replace(/^\/api\/v3(?=\/)/, "");
-    const call = {
-      operation: `${c.req.method} ${path}`,
-      method: c.req.method,
-      path,
-      request: c.get("requestBody"),
-      responseStatus: c.res.status,
-      response,
-      error:
-        c.res.status >= 400
-          ? ((response as { message?: string } | undefined)?.message ?? String(c.res.status))
-          : undefined,
-      durationMs: clock() - startedAt,
-    };
-    // Only what authenticated as the App or its installation is on record. A call about a
-    // repository belongs to the session that owns it; one about a delivery, to the delivery's
-    // session; the rest (the App's own endpoints, the token exchange) to no session, and the
-    // core event log keeps those in the scope every session reads.
-    if (!c.get("authenticated")) return;
-    recordCall(context.events, "github", [repo ? store.sessionOf(repo) : c.get("session")], call, {
-      unattributed: "world",
-    });
-  });
-
-  api.onError((error, c) => {
-    if (error instanceof GitHubRefusal) {
-      const status = error.githubStatus;
-      return c.json(
-        {
+  const answer = (status: number, body: Json) => ({ status, body, sessions: [] });
+  // Only what authenticated as the App or its installation is on record. A call about a
+  // repository belongs to the session that owns it; one about a delivery, to the delivery's
+  // session; the rest (the App's own endpoints, the token exchange) to no session, and the
+  // core event log keeps those in the scope every session reads. GitHub Enterprise serves the
+  // same API under `/api/v3`; SDKs that are given a host assume that layout.
+  const github: Parameters<typeof wrapRest>[1] = {
+    driver: "github",
+    refusal: (error) => {
+      if (error instanceof GitHubRefusal) {
+        const status = error.githubStatus;
+        return answer(status, {
           message: error.message,
           ...(error.errors ? { errors: error.errors } : {}),
           documentation_url: DOCS,
           status: String(status),
-        },
-        status as 400,
-      );
-    }
-    // A handle the world doesn't know is GitHub's 404.
-    if (error instanceof ProtocolError && error.code === "not_found") {
-      return c.json({ message: "Not Found", documentation_url: DOCS, status: "404" }, 404);
-    }
-    context.log.error("github api", { error: error instanceof Error ? error.message : String(error) });
-    return c.json({ message: "Server Error", documentation_url: DOCS }, 500);
+        });
+      }
+      // A handle the world doesn't know is GitHub's 404.
+      if (error instanceof ProtocolError && error.code === "not_found") return answer(404, NOT_FOUND);
+      return undefined;
+    },
+    internal: () => answer(500, { message: "Server Error", documentation_url: DOCS }),
+    decorate: (answered) => ({
+      ...answered,
+      headers: {
+        "x-github-media-type": "github.v3; format=json",
+        "x-github-api-version-selected": "2022-11-28",
+        "x-github-request-id": world.kit.context.ids
+          .next(GITHUB_IDS.delivery)
+          .toUpperCase()
+          .replaceAll("-", ":")
+          .slice(0, 34),
+        "x-ratelimit-limit": "5000",
+        "x-ratelimit-remaining": "4999",
+        "x-ratelimit-used": "1",
+        "x-ratelimit-reset": String(Math.floor(clock() / 1000) + 3600),
+        "x-ratelimit-resource": "core",
+      },
+    }),
+  };
+  return wrapRest(context, github, routes, {
+    recorded: (c) => c.get("authenticated") === true,
+    sessions: (c) => {
+      const repo = c.get("repo") as GitHubRepoRecord | undefined;
+      return [repo ? store.sessionOf(repo) : (c.get("session") as string | undefined)];
+    },
+    mounts: ["/api/v3"],
   });
-
-  // GitHub Enterprise serves the same API under `/api/v3`; SDKs that are given a host assume that layout.
-  api.route("/api/v3", routes);
-  api.route("/", routes);
-  return api as unknown as Hono;
 }

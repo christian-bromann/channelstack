@@ -288,6 +288,20 @@ fn run_session_notion<'a>(
     })
 }
 
+fn run_session_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/resend", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_echo_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -1727,40 +1741,6 @@ fn run_slack_delivery_refresh<'a>(
     })
 }
 
-fn run_slack_delivery_retry<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_after = options.get("after").cloned().unwrap_or(Value::Null);
-        let p_reason = options.get("reason").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/slack/deliveries/{}/retry",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "POST",
-            path,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
-                wire.insert("reason".into(), p_reason.clone());
-                wire
-            }),
-            None,
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
 fn run_slack_delivery_resend<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -1787,6 +1767,40 @@ fn run_slack_delivery_resend<'a>(
                 wire.insert("badSignature".into(), p_bad_signature.clone());
                 wire.insert("stale".into(), p_stale.clone());
                 wire.insert("headers".into(), p_headers.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_slack_delivery_retry<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_after = options.get("after").cloned().unwrap_or(Value::Null);
+        let p_reason = options.get("reason").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/slack/deliveries/{}/retry",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("after".into(), (&|v: &Value| enc::duration(v))(&p_after)?);
+                wire.insert("reason".into(), p_reason.clone());
                 wire
             }),
             None,
@@ -2056,7 +2070,7 @@ fn run_git_hub_fixture_deliveries<'a>(
     })
 }
 
-fn run_git_hub_fixture_app_calls<'a>(
+fn run_git_hub_fixture_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2067,10 +2081,7 @@ fn run_git_hub_fixture_app_calls<'a>(
         let mut args = args.into_iter();
         let p_operation = options.get("operation").cloned().unwrap_or(Value::Null);
         let p_error = options.get("error").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/github/app-calls",
-            encode_segment(ctx.session()?)
-        );
+        let path = format!("/sessions/{}/github/calls", encode_segment(ctx.session()?));
         send(
             ctx,
             "GET",
@@ -2089,7 +2100,7 @@ fn run_git_hub_fixture_app_calls<'a>(
     })
 }
 
-fn run_git_hub_fixture_calls<'a>(
+fn run_git_hub_fixture_app_calls<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -2100,7 +2111,10 @@ fn run_git_hub_fixture_calls<'a>(
         let mut args = args.into_iter();
         let p_operation = options.get("operation").cloned().unwrap_or(Value::Null);
         let p_error = options.get("error").cloned().unwrap_or(Value::Null);
-        let path = format!("/sessions/{}/github/calls", encode_segment(ctx.session()?));
+        let path = format!(
+            "/sessions/{}/github/app-calls",
+            encode_segment(ctx.session()?)
+        );
         send(
             ctx,
             "GET",
@@ -5849,6 +5863,369 @@ fn run_notion_discussion_transcript<'a>(
     })
 }
 
+fn run_resend_fixture_create_user<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_address = options.get("address").cloned().unwrap_or(Value::Null);
+        let p_token = options.get("token").cloned().unwrap_or(Value::Null);
+        let raw: Map<String, Value> = [
+            ("name".to_owned(), p_name.clone()),
+            ("address".to_owned(), p_address.clone()),
+            ("token".to_owned(), p_token.clone()),
+        ]
+        .into_iter()
+        .collect();
+        let path = format!("/sessions/{}/resend/users", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("address".into(), p_address.clone());
+                wire.insert(
+                    "token".into(),
+                    enc::credential_or(
+                        p_token.clone(),
+                        "CHANNELSTACK_RESEND_USER_{name}_TOKEN",
+                        &raw,
+                    ),
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_fixture_deliveries<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_type = options.get("type").cloned().unwrap_or(Value::Null);
+        let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/deliveries",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("type".into(), p_type.clone());
+                wire.insert(
+                    "resource".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_fixture_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_operation = options.get("operation").cloned().unwrap_or(Value::Null);
+        let p_error = options.get("error").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/resend/calls", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("operation".into(), p_operation.clone());
+                wire.insert("error".into(), p_error.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_user_send<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let p_cc = options.get("cc").cloned().unwrap_or(Value::Null);
+        let p_subject = options.get("subject").cloned().unwrap_or(Value::Null);
+        let p_text = options.get("text").cloned().unwrap_or(Value::Null);
+        let p_html = options.get("html").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/users/{}/send",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire.insert(
+                    "cc".into(),
+                    (&|v: &Value| enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_cc,
+                    )?,
+                );
+                wire.insert("subject".into(), p_subject.clone());
+                wire.insert("text".into(), p_text.clone());
+                wire.insert("html".into(), p_html.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_user_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_email = args.next().unwrap_or(Value::Null);
+        let p_text = options.get("text").cloned().unwrap_or(Value::Null);
+        let p_html = options.get("html").cloned().unwrap_or(Value::Null);
+        let p_all = options.get("all").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/users/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "email".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_email)?,
+                );
+                wire.insert("text".into(), p_text.clone());
+                wire.insert("html".into(), p_html.clone());
+                wire.insert("all".into(), p_all.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_resend_user_inbox<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/users/{}/inbox",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_email_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/emails/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_thread_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/threads/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_thread_replies<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/threads/{}/replies",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_thread_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/threads/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_delivery_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/deliveries/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_delivery_redeliver<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/resend/deliveries/{}/redeliver",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_resend_delivery_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
+        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/resend/deliveries/{}/resend",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("badSignature".into(), p_bad_signature.clone());
+                wire.insert("stale".into(), p_stale.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
 fn run_git_hub_pull_request_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6257,6 +6634,17 @@ impl Session {
             vec![],
             run_session_notion,
             NotionFixture::wrap,
+        )
+    }
+
+    /// The Resend fixture: the agent's team, and where the agent reaches the fake. Experimental.
+    pub fn resend(&self) -> Call<ResendFixture> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_session_resend,
+            ResendFixture::wrap,
         )
     }
 }
@@ -8852,17 +9240,6 @@ impl SlackDelivery {
         )
     }
 
-    /// Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental.
-    pub fn retry(&self) -> SlackDeliveryRetry {
-        SlackDeliveryRetry(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_slack_delivery_retry,
-            as_value,
-        ))
-    }
-
     /// Send the delivery again, unchanged or forged: a wrong signature, or a timestamp outside the replay window. Experimental.
     pub fn resend(&self) -> SlackDeliveryResend {
         SlackDeliveryResend(Call::new(
@@ -8870,6 +9247,17 @@ impl SlackDelivery {
             &self.data,
             vec![],
             run_slack_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Retry the way Slack does: the same payload, with X-Slack-Retry-Num and X-Slack-Retry-Reason. Experimental.
+    pub fn retry(&self) -> SlackDeliveryRetry {
+        SlackDeliveryRetry(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_slack_delivery_retry,
             as_value,
         ))
     }
@@ -8882,32 +9270,6 @@ impl SlackDelivery {
             seen: self.seen.clone(),
             options: Map::new(),
         }
-    }
-}
-
-/// The options of [`SlackDelivery::retry`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct SlackDeliveryRetry(Call<Value>);
-
-impl SlackDeliveryRetry {
-    /// `after`.
-    pub fn after(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("after", value))
-    }
-    /// `reason`.
-    pub fn reason(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("reason", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for SlackDeliveryRetry {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
     }
 }
 
@@ -8934,6 +9296,32 @@ impl SlackDeliveryResend {
 }
 
 impl IntoFuture for SlackDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`SlackDelivery::retry`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct SlackDeliveryRetry(Call<Value>);
+
+impl SlackDeliveryRetry {
+    /// `after`.
+    pub fn after(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("after", value))
+    }
+    /// `reason`.
+    pub fn reason(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("reason", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for SlackDeliveryRetry {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {
@@ -9445,17 +9833,6 @@ impl GitHubFixture {
         ))
     }
 
-    /// The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental.
-    pub fn app_calls(&self) -> GitHubFixtureAppCalls {
-        GitHubFixtureAppCalls(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_git_hub_fixture_app_calls,
-            as_value,
-        ))
-    }
-
     /// The REST calls the agent made about this session's repositories. Calls about no repository (`GET /app`) are in no session. Experimental.
     pub fn calls(&self) -> GitHubFixtureCalls {
         GitHubFixtureCalls(Call::new(
@@ -9463,6 +9840,17 @@ impl GitHubFixture {
             &self.data,
             vec![],
             run_git_hub_fixture_calls,
+            as_value,
+        ))
+    }
+
+    /// The App's REST calls that are about no repository of any session: its own endpoints and the token exchange. They belong to no session, so every session reads the same list. Only calls that authenticated as the App or its installation are on it. Experimental.
+    pub fn app_calls(&self) -> GitHubFixtureAppCalls {
+        GitHubFixtureAppCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_fixture_app_calls,
             as_value,
         ))
     }
@@ -9592,32 +9980,6 @@ impl IntoFuture for GitHubFixtureDeliveries {
     }
 }
 
-/// The options of [`GitHubFixture::app_calls`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct GitHubFixtureAppCalls(Call<Value>);
-
-impl GitHubFixtureAppCalls {
-    /// `operation`.
-    pub fn operation(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("operation", value))
-    }
-    /// `error`.
-    pub fn error(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("error", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for GitHubFixtureAppCalls {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
 /// The options of [`GitHubFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
 pub struct GitHubFixtureCalls(Call<Value>);
 
@@ -9637,6 +9999,32 @@ impl GitHubFixtureCalls {
 }
 
 impl IntoFuture for GitHubFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubFixture::app_calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubFixtureAppCalls(Call<Value>);
+
+impl GitHubFixtureAppCalls {
+    /// `operation`.
+    pub fn operation(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("operation", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubFixtureAppCalls {
     type Output = Result<Value>;
     type IntoFuture = BoxFuture<'static, Result<Value>>;
     fn into_future(self) -> Self::IntoFuture {
@@ -15991,6 +16379,1239 @@ impl IntoFuture for NotionDiscussionLatestComment {
     }
 }
 
+/// A handle: `ResendFixture`.
+#[derive(Clone)]
+pub struct ResendFixture {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendFixture {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendFixture {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `app`.
+    pub fn app(&self) -> ResendApp {
+        ResendApp::from_wire_in(
+            &self.ctx,
+            self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
+        )
+    }
+    /// `apiUrl`.
+    pub fn api_url(&self) -> String {
+        self.data
+            .get("apiUrl")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental.
+    pub fn create_user(&self) -> ResendFixtureCreateUser {
+        ResendFixtureCreateUser(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_fixture_create_user,
+            ResendUser::wrap,
+        ))
+    }
+
+    /// Every webhook channelstack sent the agent for this session, with every attempt. Experimental.
+    pub fn deliveries(&self) -> ResendFixtureDeliveries {
+        ResendFixtureDeliveries(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_fixture_deliveries,
+            as_value,
+        ))
+    }
+
+    /// The REST calls the agent made about this session's emails, by the SDK's method name (`emails.send`). Experimental.
+    pub fn calls(&self) -> ResendFixtureCalls {
+        ResendFixtureCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_fixture_calls,
+            as_value,
+        ))
+    }
+
+    /// Wait for an API call from the agent. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_call(&self) -> ResendFixtureWaitForCall {
+        ResendFixtureWaitForCall {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`ResendFixture::create_user`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendFixtureCreateUser(Call<ResendUser>);
+
+impl ResendFixtureCreateUser {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `address`.
+    pub fn address(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("address", value))
+    }
+    /// `token`.
+    pub fn token(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("token", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendUser> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendFixtureCreateUser {
+    type Output = Result<ResendUser>;
+    type IntoFuture = BoxFuture<'static, Result<ResendUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendFixture::deliveries`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendFixtureDeliveries(Call<Value>);
+
+impl ResendFixtureDeliveries {
+    /// `type`.
+    pub fn r#type(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("type", value))
+    }
+    /// `resource`.
+    pub fn resource(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("resource", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendFixtureDeliveries {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendFixtureCalls(Call<Value>);
+
+impl ResendFixtureCalls {
+    /// `operation`.
+    pub fn operation(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("operation", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendFixture::wait_for_call`].
+pub struct ResendFixtureWaitForCall {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl ResendFixtureWaitForCall {
+    /// `operation`.
+    pub fn operation(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("operation".into(), value.into_arg());
+        self
+    }
+    /// `error`.
+    pub fn error(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("error".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<Value> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| ["operation", "error"].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let item = wait_for_next(
+            &seen.positions,
+            &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
+            || run_resend_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| {
+                let _ = item;
+                true
+            },
+            None,
+            "an API call from the agent",
+            &timeout,
+        )
+        .await?;
+        as_value(&ctx, item)
+    }
+}
+
+impl IntoFuture for ResendFixtureWaitForCall {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `ResendApp`.
+#[derive(Clone)]
+pub struct ResendApp {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendApp {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendApp {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `kind`.
+    pub fn kind(&self) -> String {
+        self.data
+            .get("kind")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `botUserId`.
+    pub fn bot_user_id(&self) -> String {
+        self.data
+            .get("botUserId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `address`.
+    pub fn address(&self) -> String {
+        self.data
+            .get("address")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+}
+
+/// A handle: `ResendUser`.
+#[derive(Clone)]
+pub struct ResendUser {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendUser {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendUser {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `kind`.
+    pub fn kind(&self) -> String {
+        self.data
+            .get("kind")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `address`.
+    pub fn address(&self) -> String {
+        self.data
+            .get("address")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The person emails someone: the agent (`resend.app`), or another person. Experimental.
+    pub fn send(&self) -> ResendUserSend {
+        ResendUserSend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_user_send,
+            ResendEmail::wrap,
+        ))
+    }
+
+    /// The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental.
+    pub fn reply(&self, email: impl IntoArg) -> ResendUserReply {
+        ResendUserReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![email.into_arg()],
+            run_resend_user_reply,
+            ResendEmail::wrap,
+        ))
+    }
+
+    /// What reached the person's mailbox, oldest first. Experimental.
+    pub fn inbox(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_user_inbox,
+            as_value,
+        )
+    }
+
+    /// Wait for an email. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_email(&self) -> ResendUserWaitForEmail {
+        ResendUserWaitForEmail {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`ResendUser::send`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendUserSend(Call<ResendEmail>);
+
+impl ResendUserSend {
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// `cc`.
+    pub fn cc(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("cc", value))
+    }
+    /// `subject`.
+    pub fn subject(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("subject", value))
+    }
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendUserSend {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendUser::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendUserReply(Call<ResendEmail>);
+
+impl ResendUserReply {
+    /// `text`.
+    pub fn text(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("text", value))
+    }
+    /// `html`.
+    pub fn html(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("html", value))
+    }
+    /// `all`.
+    pub fn all(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("all", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<ResendEmail> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendUserReply {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendUser::wait_for_email`].
+pub struct ResendUserWaitForEmail {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl ResendUserWaitForEmail {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<ResendEmail> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForEmail",
+            || run_resend_user_inbox(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "an email".to_owned(),
+                Value::String(name) => format!("{} from {}", "an email", name),
+                other => format!(
+                    "{} from {}",
+                    "an email",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        ResendEmail::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for ResendUserWaitForEmail {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `ResendEmail`.
+#[derive(Clone)]
+pub struct ResendEmail {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendEmail {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendEmail {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `thread`.
+    pub fn thread(&self) -> ResendThread {
+        ResendThread::from_wire_in(
+            &self.ctx,
+            self.data.get("thread").cloned().unwrap_or(Value::Null),
+            self.seen.field("thread"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `from`.
+    pub fn from(&self) -> String {
+        self.data
+            .get("from")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `to`.
+    pub fn to(&self) -> &Value {
+        self.data.get("to").unwrap_or(&Value::Null)
+    }
+    /// `cc`.
+    pub fn cc(&self) -> &Value {
+        self.data.get("cc").unwrap_or(&Value::Null)
+    }
+    /// `subject`.
+    pub fn subject(&self) -> String {
+        self.data
+            .get("subject")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `at`.
+    pub fn at(&self) -> String {
+        self.data
+            .get("at")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `messageId`.
+    pub fn message_id(&self) -> String {
+        self.data
+            .get("messageId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<ResendDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            ResendDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
+    }
+
+    /// Re-read an email. Experimental.
+    pub fn refresh(&self) -> Call<ResendEmail> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_email_refresh,
+            ResendEmail::wrap,
+        )
+    }
+}
+
+/// A handle: `ResendThread`.
+#[derive(Clone)]
+pub struct ResendThread {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendThread {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendThread {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `subject`.
+    pub fn subject(&self) -> String {
+        self.data
+            .get("subject")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Every email in the thread, oldest first. Experimental.
+    pub fn messages(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_thread_messages,
+            as_value,
+        )
+    }
+
+    /// The thread's answers: every email after the first, oldest first. Experimental.
+    pub fn replies(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_thread_replies,
+            as_value,
+        )
+    }
+
+    /// The thread as a person reads it: each email's own words, without the quoted history. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_thread_transcript,
+            as_value,
+        )
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_reply(&self) -> ResendThreadWaitForReply {
+        ResendThreadWaitForReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn latest_reply(&self) -> ResendThreadLatestReply {
+        ResendThreadLatestReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`ResendThread::wait_for_reply`].
+pub struct ResendThreadWaitForReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl ResendThreadWaitForReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<ResendEmail> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForReply",
+            || run_resend_thread_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        ResendEmail::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for ResendThreadWaitForReply {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// The options of [`ResendThread::latest_reply`].
+pub struct ResendThreadLatestReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl ResendThreadLatestReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// `quietFor`.
+    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("quietFor".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<ResendEmail> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let quiet_for = options
+            .get("quietFor")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = latest_once_quiet(
+            || run_resend_thread_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            || ctx.quiet(),
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+            &quiet_for,
+        )
+        .await?;
+        ResendEmail::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for ResendThreadLatestReply {
+    type Output = Result<ResendEmail>;
+    type IntoFuture = BoxFuture<'static, Result<ResendEmail>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `ResendDelivery`.
+#[derive(Clone)]
+pub struct ResendDelivery {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for ResendDelivery {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl ResendDelivery {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `type`.
+    pub fn r#type(&self) -> String {
+        self.data
+            .get("type")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `email`.
+    pub fn email(&self) -> String {
+        self.data
+            .get("email")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `payload`.
+    pub fn payload(&self) -> &Value {
+        self.data.get("payload").unwrap_or(&Value::Null)
+    }
+    /// `attempts`.
+    pub fn attempts(&self) -> &Value {
+        self.data.get("attempts").unwrap_or(&Value::Null)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Re-read a delivery: its attempts and status. Experimental.
+    pub fn refresh(&self) -> Call<ResendDelivery> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_delivery_refresh,
+            ResendDelivery::wrap,
+        )
+    }
+
+    /// Send the same webhook again, as Resend retries: the same `svix-id`, signed again. Experimental.
+    pub fn redeliver(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_delivery_redeliver,
+            as_value,
+        )
+    }
+
+    /// Send the webhook again, forged: signed with a secret that isn't the webhook's, or with a timestamp past the five minutes receivers accept. Experimental.
+    pub fn resend(&self) -> ResendDeliveryResend {
+        ResendDeliveryResend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_resend_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn settled(&self) -> ResendDeliverySettled {
+        ResendDeliverySettled {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`ResendDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct ResendDeliveryResend(Call<Value>);
+
+impl ResendDeliveryResend {
+    /// `badSignature`.
+    pub fn bad_signature(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("badSignature", value))
+    }
+    /// `stale`.
+    pub fn stale(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("stale", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for ResendDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`ResendDelivery::settled`].
+pub struct ResendDeliverySettled {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl ResendDeliverySettled {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<ResendDelivery> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let value = wait_for("the delivery to settle", &timeout, || {
+            let read = run_resend_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            async move {
+                let value = read.await?;
+                Ok((!["pending"]
+                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
+                .then_some(value))
+            }
+        })
+        .await?;
+        ResendDelivery::wrap(&ctx, value)
+    }
+}
+
+impl IntoFuture for ResendDeliverySettled {
+    type Output = Result<ResendDelivery>;
+    type IntoFuture = BoxFuture<'static, Result<ResendDelivery>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
 /// A handle: `GitHubPullRequest`.
 #[derive(Clone)]
 pub struct GitHubPullRequest {
@@ -16441,6 +18062,9 @@ pub async fn call_by_name(
         ("Session", "notion") => {
             run_session_notion(&target.ctx, &target.data, args, options).await?
         }
+        ("Session", "resend") => {
+            run_session_resend(&target.ctx, &target.data, args, options).await?
+        }
         ("EchoFixture", "createUser") => {
             run_echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
@@ -16580,11 +18204,11 @@ pub async fn call_by_name(
         ("SlackDelivery", "refresh") => {
             run_slack_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
-        ("SlackDelivery", "retry") => {
-            run_slack_delivery_retry(&target.ctx, &target.data, args, options).await?
-        }
         ("SlackDelivery", "resend") => {
             run_slack_delivery_resend(&target.ctx, &target.data, args, options).await?
+        }
+        ("SlackDelivery", "retry") => {
+            run_slack_delivery_retry(&target.ctx, &target.data, args, options).await?
         }
         ("SlackStream", "refresh") => {
             run_slack_stream_refresh(&target.ctx, &target.data, args, options).await?
@@ -16610,11 +18234,11 @@ pub async fn call_by_name(
         ("GitHubFixture", "deliveries") => {
             run_git_hub_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
-        ("GitHubFixture", "appCalls") => {
-            run_git_hub_fixture_app_calls(&target.ctx, &target.data, args, options).await?
-        }
         ("GitHubFixture", "calls") => {
             run_git_hub_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubFixture", "appCalls") => {
+            run_git_hub_fixture_app_calls(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubApp", "installationId") => {
             run_git_hub_app_installation_id(&target.ctx, &target.data, args, options).await?
@@ -16986,6 +18610,45 @@ pub async fn call_by_name(
         ("NotionDiscussion", "transcript") => {
             run_notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
         }
+        ("ResendFixture", "createUser") => {
+            run_resend_fixture_create_user(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendFixture", "deliveries") => {
+            run_resend_fixture_deliveries(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendFixture", "calls") => {
+            run_resend_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendUser", "send") => {
+            run_resend_user_send(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendUser", "reply") => {
+            run_resend_user_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendUser", "inbox") => {
+            run_resend_user_inbox(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendEmail", "refresh") => {
+            run_resend_email_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendThread", "messages") => {
+            run_resend_thread_messages(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendThread", "replies") => {
+            run_resend_thread_replies(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendThread", "transcript") => {
+            run_resend_thread_transcript(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendDelivery", "refresh") => {
+            run_resend_delivery_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendDelivery", "redeliver") => {
+            run_resend_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+        }
+        ("ResendDelivery", "resend") => {
+            run_resend_delivery_resend(&target.ctx, &target.data, args, options).await?
+        }
         ("GitHubPullRequest", "refresh") => {
             run_git_hub_pull_request_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -17061,6 +18724,11 @@ pub async fn call_by_name(
         },
         ("Session", "notion") => Dyn {
             resource: Some("NotionFixture"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("Session", "resend") => Dyn {
+            resource: Some("ResendFixture"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -17334,6 +19002,31 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("ResendFixture", "createUser") => Dyn {
+            resource: Some("ResendUser"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("ResendUser", "send") => Dyn {
+            resource: Some("ResendEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("ResendUser", "reply") => Dyn {
+            resource: Some("ResendEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("ResendEmail", "refresh") => Dyn {
+            resource: Some("ResendEmail"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("ResendDelivery", "refresh") => Dyn {
+            resource: Some("ResendDelivery"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("GitHubPullRequest", "refresh") => Dyn {
             resource: Some("GitHubPullRequest"),
             ctx: target.ctx.clone(),
@@ -17384,6 +19077,9 @@ pub fn field_resource(resource: &str, field: &str) -> Option<&'static str> {
         ("NotionComment", "discussion") => Some("NotionDiscussion"),
         ("NotionComment", "delivery") => Some("NotionDelivery"),
         ("NotionDiscussion", "page") => Some("NotionPage"),
+        ("ResendFixture", "app") => Some("ResendApp"),
+        ("ResendEmail", "thread") => Some("ResendThread"),
+        ("ResendEmail", "delivery") => Some("ResendDelivery"),
         ("GitHubPullRequest", "repo") => Some("GitHubRepo"),
         _ => None,
     }

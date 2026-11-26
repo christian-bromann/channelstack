@@ -23,7 +23,7 @@ export type Duration = number | `${number}ms` | `${number}s` | `${number}m`;
 /** ISO 8601 timestamp string. */
 export type Timestamp = string;
 
-export type ChannelKind = "slack" | "github" | "linear" | "notion";
+export type ChannelKind = "slack" | "github" | "linear" | "notion" | "resend";
 
 /** Text that may contain `@name` mentions. */
 export type RichText = string;
@@ -105,7 +105,7 @@ export interface DeliveryAttempt {
 }
 
 /** How to resend a delivery. Every platform takes `badSignature`; Slack and Linear add `stale`, Slack adds `headers`. */
-export interface ResendOptions {
+export interface DeliveryResendOptions {
   /** Sign with the wrong secret. The agent should reject it. */
   badSignature?: boolean;
 }
@@ -125,7 +125,7 @@ export interface Delivery<TType extends string = string, TPayload = unknown> {
   settled(options?: WaitOptions): Promise<this>;
 
   /** Send the same delivery again, unchanged or with a twist (a bad signature). */
-  resend(options?: ResendOptions): Promise<DeliveryAttempt>;
+  resend(options?: DeliveryResendOptions): Promise<DeliveryAttempt>;
 }
 
 export interface DeliveryFilter {

@@ -10,10 +10,8 @@ use crate::runtime::client::{BoxFuture, Handle, IntoArg};
 use crate::runtime::error::Result;
 use crate::runtime::wait::QuietState;
 use crate::{
-    GitHubCommit, GitHubDelivery, GitHubFixture, GitHubIssue, GitHubPullRequest,
-    LinearAgentSession, LinearDelivery, LinearFixture, LinearIssue, NotionDelivery,
-    NotionDiscussion, NotionFixture, NotionPage, SlackConversation, SlackDelivery, SlackFixture,
-    SlackMessage, SlackThread, SlackUser,
+    GitHubCommit, GitHubIssue, GitHubPullRequest, LinearAgentSession, LinearIssue,
+    NotionDiscussion, NotionPage, SlackConversation, SlackMessage, SlackThread, SlackUser,
 };
 
 /// Something checked in a session: every handle. A check that waits for quiet asks its session.
@@ -174,8 +172,8 @@ impl Said for SlackConversation {
     }
 }
 
-/// A Slack transcript takes `as`; only when it is given, as in matchers-core.
-macro_rules! slack_transcript {
+/// A transcript that takes the viewer (`as`, Slack's); only when it is given, as in matchers-core.
+macro_rules! transcript_as {
     ($($handle:ty),+) => {$(
         impl Readable for $handle {
             fn read_transcript(&self, viewer: Value) -> BoxFuture<'_, Result<Value>> {
@@ -185,7 +183,6 @@ macro_rules! slack_transcript {
         }
     )+};
 }
-slack_transcript!(SlackConversation, SlackThread, SlackMessage);
 
 macro_rules! transcript {
     ($($handle:ty),+) => {$(
@@ -196,16 +193,6 @@ macro_rules! transcript {
         }
     )+};
 }
-transcript!(
-    GitHubIssue,
-    GitHubPullRequest,
-    crate::GitHubReviewComment,
-    LinearIssue,
-    LinearAgentSession,
-    crate::LinearComment,
-    NotionPage,
-    NotionDiscussion
-);
 
 /// A transcript's entries.
 async fn entries(transcript: impl IntoFuture<Output = Result<Value>>) -> Result<Value> {
@@ -323,12 +310,6 @@ macro_rules! deliveries {
         }
     )+};
 }
-deliveries!(
-    SlackDelivery,
-    GitHubDelivery,
-    LinearDelivery,
-    NotionDelivery
-);
 
 macro_rules! calls {
     ($($handle:ty),+) => {$(
@@ -340,4 +321,7 @@ macro_rules! calls {
         }
     )+};
 }
-calls!(SlackFixture, GitHubFixture, LinearFixture, NotionFixture);
+
+// Which handles have the reads every channel has the same way (a transcript, deliveries, calls),
+// generated with the SDK from the IR, so a new channel's handles are subjects without listing them here.
+include!("../generated/subjects.rs");

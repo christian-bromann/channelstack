@@ -18,7 +18,7 @@ import {
   validate,
 } from "graphql";
 
-import { linearSchema } from "../src/drivers/linear/fake/graphql.ts";
+import { linearSchema } from "../../src/drivers/linear/fake/graphql.ts";
 
 /**
  * Linear's committed schema as a check, independent of the fake's own execution: a GraphQL answer

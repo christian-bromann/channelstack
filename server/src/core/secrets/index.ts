@@ -1,14 +1,14 @@
 import { join } from "node:path";
 
 import { readPrivateJsonFile, writePrivateFile } from "../home/index.ts";
-import { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
+import type { SecretFormat } from "./formats.ts";
 
 export { randomSeed, randomString, randomToken } from "./csprng.ts";
-export { SECRET_FORMATS, type SecretFormatName } from "./formats.ts";
+export { alnum, digits, hex, randomRsaPrivateKey, type SecretFormat, UPPER_ALNUM } from "./formats.ts";
 export { LiveCredential, LiveVault } from "./live.ts";
 
-/** The secrets one driver needs: a name of its choosing → the format to generate. */
-export type SecretSpec = Readonly<Record<string, SecretFormatName>>;
+/** The secrets one driver needs: a name of its choosing → the format to generate (in the driver's `secrets.ts`). */
+export type SecretSpec = Readonly<Record<string, SecretFormat>>;
 
 type SecretValues = Record<string, Record<string, string>>;
 
@@ -28,10 +28,10 @@ function generate(
     const next: Record<string, string> = {};
     for (const [name, format] of Object.entries(spec)) {
       const kept = current[name];
-      if (kept !== undefined && SECRET_FORMATS[format].pattern.test(kept)) {
+      if (kept !== undefined && format.pattern.test(kept)) {
         next[name] = kept;
       } else {
-        next[name] = SECRET_FORMATS[format].generate();
+        next[name] = format.generate();
         changed = true;
       }
     }

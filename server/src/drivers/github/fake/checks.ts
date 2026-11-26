@@ -1,3 +1,4 @@
+import { GITHUB_IDS } from "../ids.ts";
 import type {
   GitHubAnnotationRecord,
   GitHubCheckConclusion,
@@ -86,10 +87,10 @@ export function createChecks(kit: GitHubKit) {
     ): GitHubCheckRunRecord {
       validate(input);
       const key = `${repo.id}:${input.headSha}`;
-      const suite = store.suites.get(key) ?? Number(ids.next("github.checkRun"));
+      const suite = store.suites.get(key) ?? Number(ids.next(GITHUB_IDS.checkRun));
       store.suites.set(key, suite);
       const run = store.add(store.checkRuns, store.sessionOf(repo), {
-        id: Number(ids.next("github.checkRun")),
+        id: Number(ids.next(GITHUB_IDS.checkRun)),
         repo: repo.id,
         suite,
         headSha: input.headSha,
@@ -173,7 +174,7 @@ export function createChecks(kit: GitHubKit) {
       },
     ): GitHubStatusRecord {
       return store.add(store.statuses, store.sessionOf(repo), {
-        id: Number(ids.next("github.status")),
+        id: Number(ids.next(GITHUB_IDS.status)),
         repo: repo.id,
         sha,
         context: input.context ?? "default",

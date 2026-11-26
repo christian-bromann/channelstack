@@ -1,4 +1,4 @@
-import { hmacSha256Hex } from "./hmac.ts";
+import { hmacSha256Hex } from "../../core/signing/hmac.ts";
 
 /**
  * The echo platform's delivery signature: `v1=<HMAC-SHA256 of "v1:<timestamp>:<body>">`,

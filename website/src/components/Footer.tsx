@@ -9,6 +9,7 @@ const DOCS = [
   ["GitHub", "/docs/platforms/github"],
   ["Linear", "/docs/platforms/linear"],
   ["Notion", "/docs/platforms/notion"],
+  ["Resend", "/docs/platforms/resend"],
   ["Live mode", "/docs/guide/live-mode"],
   ["Reference", "/docs/reference"],
 ] as const;
@@ -24,8 +25,8 @@ export function Footer() {
           </Link>
           <p className="legal">
             MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub,
-            Linear or Notion. All names and logos shown, including TypeScript and Python, are trademarks of their
-            owners. The docs' assistant and editor icons are from{" "}
+            Linear, Notion or Resend. All names and logos shown, including TypeScript and Python, are trademarks of
+            their owners. The docs' assistant and editor icons are from{" "}
             <a href="https://github.com/lobehub/lobe-icons">Lobe Icons</a> (MIT) and Microsoft's{" "}
             <a href="https://github.com/microsoft/vscode-codicons">Codicons</a> (
             <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>).

@@ -91,6 +91,28 @@ divergences:
       agent typed against @linear/sdk's webhook types can't read; real teams and issues fill fields
       the fake leaves null. To add to the fake, once a recording shows their values: #26.
     expires: 2027-02-28
+  - scenario: shapes/resend
+    path:
+      - "api GET /emails/receiving/{id} headers.x-kumoref"
+      - "api GET /emails/receiving/{id} headers.feedback-id"
+      - "api GET /emails/receiving/{id} headers.x-ses-outgoing"
+    reason: >-
+      Headers Resend's and Amazon SES's own mail servers add on the way (KumoMTA's reference, SES's
+      feedback id and outgoing marker); an agent doesn't read them, and their values are theirs.
+    expires: 2027-02-28
+  - scenario: shapes/resend
+    path: api GET /emails/receiving/{id} headers.x-channelstack-run
+    reason: >-
+      Live mode tags the email a person sends with the run (`X-Channelstack-Run`); the fake's
+      people send none. Where live mode marks its mail, not drift.
+    expires: 2027-02-28
+  - scenario: shapes/resend
+    path: api GET /emails/receiving/{id} raw
+    reason: >-
+      Real Resend links the received email's raw MIME message (`raw.download_url`); the fake
+      answers `raw: null`, which Resend's description allows. Building the raw message comes with
+      attachments.
+    expires: 2027-02-28
   - scenario: shapes/notion
     path:
       - "api GET /v1/comments/{id} rich_text.[].mention.user.avatar_url"

@@ -3,8 +3,8 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { refusal } from "../../../test/app-harness.ts";
-import { linearWebhookProblems } from "../../../test/linear-schema.ts";
 import { linearWorkspace } from "../../../test/linear-workspace.ts";
+import { linearWebhookProblems } from "../../../test/schemas/linear.ts";
 
 const closers: Array<() => void> = [];
 afterEach(() => {

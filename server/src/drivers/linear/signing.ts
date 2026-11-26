@@ -1,4 +1,4 @@
-import { hmacSha256Hex } from "./hmac.ts";
+import { hmacSha256Hex } from "../../core/signing/hmac.ts";
 
 /**
  * Linear's webhook signature (https://linear.app/developers/webhooks#securing-webhooks):

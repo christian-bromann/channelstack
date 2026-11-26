@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 
+import { CHANNEL_NAMES } from "../drivers/index.ts";
 import { type Attached, CliError } from "./attach.ts";
-import { CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
+import { runDeliveries, runRedeliver } from "./deliveries.ts";
 
 /** An attachment that records what the commands ask the control API, and answers from `answers`. */
 function recording(answers: Record<string, unknown> = {}) {
@@ -11,7 +12,9 @@ function recording(answers: Record<string, unknown> = {}) {
     devSession: async () => "ses_dev",
     request: async <T>(method: string, path: string) => {
       asked.push(`${method} ${path}`);
-      return answers[`${method} ${path}`] as T;
+      // A channel the test doesn't list has delivered nothing.
+      const key = `${method} ${path}`;
+      return (key in answers ? answers[key] : key.endsWith("/deliveries") ? [] : undefined) as T;
     },
   };
   return { server, asked };
@@ -71,7 +74,7 @@ describe("channelstack deliveries", () => {
       "github 3f2a  issues opened  acknowledged  (attempts: 200)\nslack  Ev02  event_callback message  acknowledged  (attempts: 200)\n",
     );
     const { server: empty } = recording(
-      Object.fromEntries(CHANNELS.map((c) => [`GET /sessions/ses_dev/${c}/deliveries`, []])),
+      Object.fromEntries(CHANNEL_NAMES.map((c) => [`GET /sessions/ses_dev/${c}/deliveries`, []])),
     );
     expect(await runDeliveries(empty, undefined)).toBe("Nothing was delivered to the agent yet.\n");
   });
@@ -79,7 +82,7 @@ describe("channelstack deliveries", () => {
   test("an unknown channel is named", async () => {
     const { server, asked } = recording();
     await expect(runDeliveries(server, "teams")).rejects.toThrow(
-      new CliError(`say which channel: ${CHANNELS.join(", ")}, not "teams".`),
+      new CliError(`say which channel: ${CHANNEL_NAMES.join(", ")}, not "teams".`),
     );
     expect(asked).toEqual([]);
   });
@@ -135,7 +138,7 @@ describe("channelstack redeliver", () => {
     );
     await expect(runRedeliver(server, ["slack", "9c1d"])).rejects.toThrow("no delivery 9c1d on slack.");
     await expect(runRedeliver(server, ["teams", "x"])).rejects.toThrow(
-      'say which channel: slack, github, linear, notion, not "teams".',
+      `say which channel: ${CHANNEL_NAMES.join(", ")}, not "teams".`,
     );
     const { server: empty } = recording({ "GET /sessions/ses_dev/slack/deliveries": [] });
     await expect(runRedeliver(empty, ["slack"])).rejects.toThrow("nothing was delivered to the agent on slack yet.");

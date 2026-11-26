@@ -1,3 +1,4 @@
+import type { Awaitable } from "../../core/router/index.ts";
 import type { LinearStore } from "./fake/store.ts";
 import type { LinearLinks } from "./links.ts";
 import type {
@@ -11,9 +12,6 @@ import type {
   LinearTeamRecord,
   LinearUserRecord,
 } from "./world.ts";
-
-/** A value now (the fake), or once Linear answered (live). */
-type Awaitable<T> = T | Promise<T>;
 
 /**
  * Every control action on Linear, written once. The fake implements it over its store; the live

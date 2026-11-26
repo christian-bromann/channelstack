@@ -1,4 +1,5 @@
 import type { DriverContext, FakeBackend } from "../../../core/router/index.ts";
+import { LINEAR_IDS } from "../ids.ts";
 import { createLinearApi } from "./api.ts";
 import { LinearStore } from "./store.ts";
 import { createFakeWorld, type FakeLinearWorld } from "./world.ts";
@@ -18,9 +19,9 @@ export function createLinearFake(context: DriverContext): LinearFake {
   // Who the workspace and the app are is drawn once: the agent holds the app's ids from
   // `channelstack env`, and a reset builds a new world with the same app in it.
   const identity = {
-    org: context.ids.next("linear.uuid"),
-    appUser: context.ids.next("linear.uuid"),
-    webhook: context.ids.next("linear.uuid"),
+    org: context.ids.next(LINEAR_IDS.uuid),
+    appUser: context.ids.next(LINEAR_IDS.uuid),
+    webhook: context.ids.next(LINEAR_IDS.uuid),
   };
   const fake = {
     api: createLinearApi(context, world),
@@ -53,7 +54,7 @@ export function createLinearFake(context: DriverContext): LinearFake {
     release(session: string) {
       const released = store.release(session);
       // Ids a test fixed are free again once its session is gone (decision 0006).
-      for (const user of released.users) if (user.fixedId) context.ids.release("linear.uuid", user.id);
+      for (const user of released.users) if (user.fixedId) context.ids.release(LINEAR_IDS.uuid, user.id);
     },
   } satisfies LinearFake;
   fake.seed();

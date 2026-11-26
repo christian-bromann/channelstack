@@ -12,6 +12,7 @@ import { parse } from "yaml";
 
 import { type CoverageInput, coveragePage, coverageSummary } from "../conformance/coverage.ts";
 import { type ConformanceResults, loadDivergences } from "../conformance/lib.ts";
+import { CHANNEL_NAMES } from "../server/src/drivers/index.ts";
 import { ROOT } from "./lib/generate.ts";
 
 const { values } = parseArgs({
@@ -20,7 +21,7 @@ const { values } = parseArgs({
 const out = values.out ?? join(ROOT, "build", "coverage", "index.html");
 
 /** Each scenario of each channel: the actions it says it covers (`covers`), and the methods its steps call. */
-const scenarios: CoverageInput["scenarios"] = ["slack", "github", "linear", "notion"].flatMap((channel) => {
+const scenarios: CoverageInput["scenarios"] = CHANNEL_NAMES.flatMap((channel) => {
   const dir = join(ROOT, "scenarios", channel);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)

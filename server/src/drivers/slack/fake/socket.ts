@@ -1,6 +1,7 @@
 import type { DeliveryRequest, DeliveryTransport } from "../../../core/delivery/index.ts";
 import type { DriverContext, SocketPeer, SocketSession } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
+import { SLACK_IDS } from "../ids.ts";
 
 /** How long a ticket from `apps.connections.open` is good for. */
 const TICKET_LIFETIME_MS = 30_000;
@@ -78,7 +79,7 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
 
   const send: DeliveryTransport["send"] = async ({ request, headers, signal }) => {
     const peer = await connection(signal);
-    const envelopeId = ids.next("slack.envelope");
+    const envelopeId = ids.next(SLACK_IDS.envelope);
     const acknowledged = new Promise<unknown>((resolve, reject) => {
       signal.throwIfAborted();
       awaiting.set(envelopeId, resolve);

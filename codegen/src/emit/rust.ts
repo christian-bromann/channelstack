@@ -1,7 +1,33 @@
 import type { Ir, IrField, IrMethod, IrParam, IrResource, IrType, IrWait } from "../ir.ts";
+import { channelGlue } from "./channels.ts";
 import { BANNER, IrIndex, pathParts, snakeCase } from "./shared.ts";
 
 const OUT = "sdks/rust/src/generated/mod.rs";
+const SUBJECTS_OUT = "sdks/rust/src/generated/subjects.rs";
+
+/**
+ * The matcher subjects every channel has by the same reads, for `expect/subjects.rs` to include: each
+ * handle with a transcript (with the viewer, or without), each delivery, each fixture's calls.
+ */
+function subjectsFile(ir: Ir): string {
+  const glue = channelGlue(ir);
+  const list = (macro: string, names: readonly string[]) =>
+    names.length === 0 ? [] : [`${macro}!(${names.map((name) => `crate::${name}`).join(", ")});`];
+  return [
+    `// ${BANNER}`,
+    ...list(
+      "transcript_as",
+      glue.withTranscript.filter((read) => read.viewer).map((read) => read.name),
+    ),
+    ...list(
+      "transcript",
+      glue.withTranscript.filter((read) => !read.viewer).map((read) => read.name),
+    ),
+    ...list("deliveries", glue.deliveries),
+    ...list("calls", glue.withCalls),
+    "",
+  ].join("\n");
+}
 
 /** Words Rust reserves. A name that collides is a raw identifier (`r#type`); the few that can't be get a `_`. */
 const KEYWORDS = new Set(
@@ -611,5 +637,8 @@ export function emitRust(ir: Ir): Map<string, string> {
     "}",
     "",
   ];
-  return new Map([[OUT, lines.join("\n")]]);
+  return new Map([
+    [OUT, lines.join("\n")],
+    [SUBJECTS_OUT, subjectsFile(ir)],
+  ]);
 }

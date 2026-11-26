@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-import { DRIVERS } from "../server/src/drivers/index.ts";
+import { CHANNEL_NAMES, CHANNELS } from "../server/src/drivers/index.ts";
 import { ROOT } from "./lib/generate.ts";
 import { withLiveStack } from "./lib/live-stack.ts";
 import { binaryPath } from "./lib/packages.ts";
@@ -32,7 +32,7 @@ const ok = await withLiveStack({ bin, env }, async ({ env: live, home, serverLog
         "run",
         "--config",
         "test/acceptance/vitest.config.ts",
-        ...["slack", "github", "linear", "notion"].map((channel) => `api/examples/${channel}.test.ts`),
+        ...CHANNEL_NAMES.map((channel) => `api/examples/${channel}.test.ts`),
         "-t",
         "live mode",
         // A real platform and a real agent take their time: the examples' own waits (60 s) decide, not Vitest's.
@@ -62,7 +62,7 @@ const ok = await withLiveStack({ bin, env }, async ({ env: live, home, serverLog
     failed = true;
     process.stderr.write("Vitest wrote no report: the live tests didn't run\n");
   }
-  for (const driver of DRIVERS) {
+  for (const driver of CHANNELS) {
     const credentials = driver.live?.credentials ?? [];
     if (credentials.length === 0 || credentials.some((name) => !env[name])) continue;
     const file = results.testResults.find((result) => result.name.endsWith(`api/examples/${driver.name}.test.ts`));

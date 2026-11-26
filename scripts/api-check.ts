@@ -15,6 +15,7 @@ import { join, relative } from "node:path";
 import ts from "typescript";
 
 import { checkContract } from "../codegen/src/contract.ts";
+import { CHANNELS } from "../server/src/drivers/index.ts";
 import { ENABLED_TESTS } from "./examples.ts";
 import { ROOT } from "./lib/generate.ts";
 
@@ -68,20 +69,18 @@ for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
 
 /**
  * Contract types nothing implements by that name: the bases whose members every handle repeats
- * (checked there), the matchers' own option type, and option bags (the examples check them as the
- * methods' parameters).
+ * (checked there), the matchers' own option type, and option bags (every `…Options`, which the
+ * examples check as the methods' parameters).
  */
-const NOT_HANDLES = new Set([
+const BASES = new Set([
   ...["Principal", "User", "App", "Resource", "HasTranscript", "SlackHasTranscript", "Inspectable", "Delivery"],
-  ...["ResendOptions", "SlackResendOptions", "LinearResendOptions", "DeliveryFilter", "ApiCallFilter"],
-  ...["ChannelstackMatchers", "TextOptions"],
-  ...["SlackUserOptions", "SlackChannelOptions", "GitHubUserOptions", "GitHubRepoOptions", "LinearUserOptions"],
-  ...["LinearTeamOptions", "NotionUserOptions", "NotionPageOptions", "NotionDatabaseOptions"],
+  ...["DeliveryFilter", "ApiCallFilter", "ChannelstackMatchers", "TextOptions"],
 ]);
+const NOT_HANDLES = (name: string) => BASES.has(name) || name.endsWith("Options");
 
 /** Value types the SDK has once per channel: each channel's is compared with the contract's. */
 const PER_CHANNEL = Object.fromEntries(
-  ["ApiCall", "Transcript", "TranscriptEntry"].map((name) => [name, ["Slack", "GitHub", "Linear", "Notion"]]),
+  ["ApiCall", "Transcript", "TranscriptEntry"].map((name) => [name, CHANNELS.map((channel) => channel.title)]),
 );
 
 /** What the contract declares and nothing implements yet, each with the issue that tracks it. */
@@ -92,10 +91,11 @@ const KNOWN_GAPS: Readonly<Record<string, string>> = {
       ...["LinearApp", "LinearUser", "LinearTeam"],
     ].map((type) => [`${type}.channel`, "#36"]),
   ),
+  // Only Slack's transcript entries stream or are seen by one person so far.
   ...Object.fromEntries(
-    ["GitHub", "Linear", "Notion"].flatMap((channel) => [
-      [`${channel}TranscriptEntry.streaming`, "#40"],
-      [`${channel}TranscriptEntry.visibleTo`, "#40"],
+    CHANNELS.filter((channel) => channel.name !== "slack").flatMap(({ title }) => [
+      [`${title}TranscriptEntry.streaming`, "#40"],
+      [`${title}TranscriptEntry.visibleTo`, "#40"],
     ]),
   ),
   SlackInjectedFault: "#37",

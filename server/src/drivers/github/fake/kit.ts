@@ -1,7 +1,9 @@
+import { type DeliveryKit, deliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import { signGitHubWebhook } from "../../../core/signing/github.ts";
+import { GITHUB_IDS } from "../ids.ts";
 import { type GitHubObjects, githubObjects } from "../payloads.ts";
+import { signGitHubWebhook } from "../signing.ts";
 import {
   type GitHubIssueRecord,
   type GitHubPermission,
@@ -74,8 +76,8 @@ export interface GitHubKit {
    * event and reachable. Answers with the delivery's GUID, or nothing when nothing was sent.
    */
   emit(repo: GitHubRepoRecord, event: string, sender: number | "org", payload: Json): string | undefined;
-  /** The headers GitHub puts on a delivery, signed with `secret` over these exact bytes. */
-  headers(event: string, guid: string, body: string, secret: string): Record<string, string>;
+  /** GitHub's deliveries: one attempt each, with GitHub's headers, signed with the webhook secret over the exact bytes. */
+  readonly deliveries: DeliveryKit;
   /** May this person do something that needs `level` on the repository? The App's bot may, where it is installed. */
   can(repo: GitHubRepoRecord, user: number, level: GitHubPermission): boolean;
   /** Refuse unless they may. */
@@ -95,7 +97,7 @@ export interface GitHubKit {
 }
 
 export function createKit(context: DriverContext, store: GitHubStore, git: GitStore): GitHubKit {
-  const { ids, clock, delivery } = context;
+  const { ids, clock } = context;
 
   const permission = (repo: GitHubRepoRecord, user: number): GitHubPermission | undefined => {
     if (user === store.bot.id) return repo.installed ? "write" : undefined;
@@ -124,14 +126,20 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     },
   });
 
-  const headers: GitHubKit["headers"] = (event, guid, body, secret) => ({
-    "user-agent": "GitHub-Hookshot/0a1b2c3",
-    "x-github-delivery": guid,
-    "x-github-event": event,
-    "x-github-hook-id": String(store.app.id),
-    "x-github-hook-installation-target-id": String(store.app.id),
-    "x-github-hook-installation-target-type": "integration",
-    ...signGitHubWebhook(secret, body),
+  // GitHub doesn't retry a delivery the App didn't acknowledge: it only redelivers when asked.
+  const deliveries = deliveryKit(context, {
+    driver: "github",
+    timeoutMs: ACK_WINDOW_MS,
+    sign: (secret, body, _atMs, { id, type }) => ({
+      "user-agent": "GitHub-Hookshot/0a1b2c3",
+      "x-github-delivery": id,
+      "x-github-event": type,
+      "x-github-hook-id": String(store.app.id),
+      "x-github-hook-installation-target-id": String(store.app.id),
+      "x-github-hook-installation-target-type": "integration",
+      ...signGitHubWebhook(secret, body),
+    }),
+    secret: () => context.secret("webhookSecret"),
   });
 
   const emit: GitHubKit["emit"] = (repo, event, sender, payload) => {
@@ -139,7 +147,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     const about = event === "installation_repositories" || repo.installed;
     if (context.webhookUrl === undefined || !about || !store.app.events.includes(event)) return undefined;
     const session = store.sessionOf(repo);
-    const guid = ids.next("github.delivery");
+    const guid = ids.next(GITHUB_IDS.delivery);
     const full = {
       ...payload,
       ...(event === "installation_repositories" ? {} : { repository: objects.repository(repo) }),
@@ -150,7 +158,7 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     };
     const action = typeof payload.action === "string" ? payload.action : null;
     store.hookDeliveries.push({
-      id: Number(ids.next("github.hookDelivery")),
+      id: Number(ids.next(GITHUB_IDS.hookDelivery)),
       guid,
       session,
       event,
@@ -158,15 +166,12 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
       repo: repo.id,
       deliveredAt: clock(),
     });
-    delivery.enqueue({
+    deliveries.send({
       id: guid,
       session,
-      driver: "github",
       type: event,
       url: context.webhookUrl,
       body: JSON.stringify(full),
-      sign: (body) => headers(event, guid, body, context.secret("webhookSecret")),
-      timeoutMs: ACK_WINDOW_MS,
       meta: { eventType: action === null ? event : `${event}.${action}`, action, payload: full, repo: repo.id },
     });
     return guid;
@@ -182,12 +187,12 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     context,
     store,
     git,
+    deliveries,
     objects,
     dir: (repo) => `/${repo.id}`,
     action: (repo, name, data) =>
       context.events.append(store.sessionOf(repo), "github", "action", { action: name, ...data }),
     emit,
-    headers,
     can: (repo, user, level) => {
       const has = permission(repo, user);
       return has !== undefined && PERMISSIONS.indexOf(has) >= PERMISSIONS.indexOf(level);

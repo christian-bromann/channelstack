@@ -37,7 +37,7 @@ Recorded here and in the reality matrix, to be settled by the first live run:
 
 ## Held to GitHub's own schemas
 
-Every REST response and every webhook is validated in tests against `@octokit/openapi` (GitHub's REST description) and `@octokit/openapi-webhooks`: once for every route in a unit scenario, and after every acceptance test for whatever the reference agent called. Where GitHub's own answers don't satisfy GitHub's own description, the validator (`server/test/github-schemas.ts`) reads the description the way GitHub answers. Each case is named there, and here:
+Every REST response and every webhook is validated in tests against `@octokit/openapi` (GitHub's REST description) and `@octokit/openapi-webhooks`: once for every route in a unit scenario, and after every acceptance test for whatever the reference agent called. Where GitHub's own answers don't satisfy GitHub's own description, the validator (`server/test/schemas/github.ts`) reads the description the way GitHub answers. Each case is named there, and here:
 
 - `nullable` (OpenAPI 3.0) is translated to JSON Schema, and a nullable reference written as `allOf` plus `type: ["null"]` (in the webhook schemas) is read as "this or null".
 - `format: email` accepts GitHub's bot addresses (`…+my-agent[bot]@users.noreply.github.com`).

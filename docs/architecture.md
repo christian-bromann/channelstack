@@ -4,7 +4,7 @@
 
 ## 1. The big picture
 
-One server process fakes Slack, GitHub, Linear and Notion in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
+One server process fakes Slack, GitHub, Linear, Notion and Resend in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
  Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)
@@ -80,6 +80,9 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | Tokens | `lin_oauth_…`, `lin_api_…` |
 | Notion | Every object | UUIDs (v4), dashed in the API and as 32 hex characters in URLs |
 | | Tokens | `ntn_…` |
+| Resend | Email, domain, webhook | UUIDs (v4). A webhook message is Svix's `msg_` and 27 base-62 characters (`svix-id`); a `Message-ID` is Amazon SES's, as Resend sends through it: `<0100019a` and 8 hex characters, `-`, a UUID, `-000000@email.amazonses.com>` |
+| | People | A person is their mailbox: their id is their address |
+| | Tokens | `re_<8>_<24>` API keys, `whsec_…` webhook secrets (base64 of 24 bytes) |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
 - **Sequential where the platform is:** GitHub issue numbers, Linear identifiers, Slack `ts`.

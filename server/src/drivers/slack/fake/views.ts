@@ -1,5 +1,6 @@
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { identified } from "../blocks.ts";
+import { SLACK_IDS } from "../ids.ts";
 import {
   payloadForm,
   viewClosedPayload,
@@ -23,7 +24,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
   const { context, store, refuse } = kit;
   const { ids, clock } = context;
 
-  const nextHash = () => `${Math.floor(clock() / 1000)}.${ids.next("slack.block")}`;
+  const nextHash = () => `${Math.floor(clock() / 1000)}.${ids.next(SLACK_IDS.block)}`;
   const described = (view: SlackViewRecord) => viewObject(view, store.team, store.app);
 
   /** A view definition as Slack keeps it, or a refusal when it isn't one. */
@@ -32,7 +33,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
     if (typeof candidate !== "object" || candidate === null || !Array.isArray(candidate.blocks)) {
       throw refuse("invalid_arguments", "A view needs a type, a title and blocks");
     }
-    return { ...candidate, blocks: identified(candidate.blocks, () => ids.next("slack.block")) };
+    return { ...candidate, blocks: identified(candidate.blocks, () => ids.next(SLACK_IDS.block)) };
   };
 
   /** What is filled in for a definition: what was there before stays, new inputs start at their initial value. */
@@ -99,7 +100,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
         return;
       case "push": {
         const definition = definitionOf(response.view);
-        const id = ids.next("slack.view");
+        const id = ids.next(SLACK_IDS.view);
         store.views.set(id, {
           id,
           session: view.session,
@@ -133,7 +134,7 @@ export function createViews(kit: InteractionKit, dispatch: InteractionDispatch):
       const under = onTop
         ? [...store.views.values()].findLast((open) => open.user === trigger.user && !open.closed)
         : undefined;
-      const id = ids.next("slack.view");
+      const id = ids.next(SLACK_IDS.view);
       const record: SlackViewRecord = {
         id,
         session: trigger.session,
