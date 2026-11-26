@@ -45,7 +45,10 @@ const STATE_COLOR: Readonly<Record<LinearStateType, string>> = {
   started: "#f2c94c",
   completed: "#5e6ad2",
   canceled: "#95a2b3",
+  duplicate: "#95a2b3",
 };
+/** The state Linear gives every team for issues marked as duplicates, whatever else its workflow has. */
+const DUPLICATE_STATE = { name: "Duplicate", type: "duplicate", color: STATE_COLOR.duplicate } as const;
 
 /**
  * The fake Linear world: every change to the state happens here once, for people (through the
@@ -187,17 +190,41 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       createdAt: clock(),
     } satisfies LinearActivityRecord);
 
+  /**
+   * The comment Linear writes to open a delegated session's thread. It is Linear's, not a
+   * person's or the app's, so it sends no `Comment` event and prompts nothing.
+   */
+  const openThread = (session: string, issue: LinearIssueRecord, now: number): LinearCommentRecord =>
+    store.add(store.comments, session, {
+      id: ids.next(LINEAR_IDS.uuid),
+      issue: issue.id,
+      user: store.appUser.id,
+      body: `This thread is for an agent session with ${store.appUser.displayName}.`,
+      parent: null,
+      reactions: [],
+      createdAt: now,
+      updatedAt: now,
+      editedAt: null,
+      session: undefined,
+      delivery: undefined,
+      prompted: undefined,
+      byLinear: true,
+    } satisfies LinearCommentRecord);
+
   /** Open an agent session on an issue for the app, and tell it. */
   const startSession = (issue: LinearIssueRecord, creator: string, comment: LinearCommentRecord | undefined) => {
     const session = store.sessionOf(issue);
     const now = clock();
+    // A delegated session gets a thread of its own: Linear opens it with a comment of its own,
+    // which is the session's comment and the opening prompt's source (the differential run saw both).
+    const root = comment ? rootOf(comment) : openThread(session, issue, now);
     const record = store.add(store.sessions, session, {
       id: ids.next(LINEAR_IDS.uuid),
       issue: issue.id,
       appUser: store.appUser.id,
       creator,
-      comment: comment ? rootOf(comment).id : null,
-      thread: comment ? rootOf(comment).id : null,
+      comment: root.id,
+      thread: root.id,
       status: "pending",
       plan: null,
       externalUrls: [],
@@ -209,12 +236,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       endedAt: null,
       delivery: undefined,
     } satisfies LinearSessionRecord);
-    if (comment) comment.session = record.id;
+    (comment ?? root).session = record.id;
     // Delegating is the person's first turn: Linear records it as a prompt, "Work on [ENG-1](url)",
     // before the agent says anything (the differential run found it against the real workspace).
     const opening = comment
       ? undefined
-      : addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`);
+      : addPrompt(session, record, creator, `Work on [${issue.identifier}](${links.issue(issue)})`, { comment: root });
     // The thread's comments before the mention, in the order they were written (two can share a millisecond).
     const thread = comment ? store.commentsOn(issue).filter((other) => rootOf(other).id === rootOf(comment).id) : [];
     const previous = comment
@@ -302,13 +329,20 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       return label;
     });
 
+  /** Where a team's new issues start, as its `defaultIssueState`: the backlog, else the first unstarted state. */
+  const defaultStateOf = (team: LinearTeamRecord): LinearStateRecord =>
+    team.states.find((candidate) => candidate.type === "backlog") ??
+    team.states.find((candidate) => candidate.type === "unstarted") ??
+    (team.states[0] as LinearStateRecord);
+
   /** Move an issue to a state, keeping the times Linear keeps for it. */
   const enterState = (issue: LinearIssueRecord, state: LinearStateRecord) => {
     const now = clock();
     issue.state = state.id;
     if (state.type === "started" && issue.startedAt === null) issue.startedAt = now;
     issue.completedAt = state.type === "completed" ? now : null;
-    issue.canceledAt = state.type === "canceled" ? now : null;
+    // Linear: "Time the issue entered a canceled or duplicate status."
+    issue.canceledAt = state.type === "canceled" || state.type === "duplicate" ? now : null;
   };
 
   /**
@@ -342,9 +376,12 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     set("description", "description", changes.description === "" ? null : changes.description);
     set("priority", "priority", changes.priority);
     set("labels", "labelIds", changes.labelIds === undefined ? undefined : [...changes.labelIds]);
-    set("assignee", "assigneeId", changes.assigneeId);
     const delegated =
       changes.delegateId !== undefined && changes.delegateId !== issue.delegate && changes.delegateId !== null;
+    // A person delegating an issue nobody has keeps it: Linear makes them its assignee (the
+    // differential run saw it before the agent did anything).
+    const keeper = delegated && issue.assignee === null && actor !== store.appUser.id ? actor : undefined;
+    set("assignee", "assigneeId", changes.assigneeId === undefined ? keeper : changes.assigneeId);
     set("delegate", "delegateId", changes.delegateId);
     if (state && state.id !== issue.state) {
       updatedFrom.stateId = issue.state;
@@ -491,10 +528,10 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     // comment of the app in the session's thread; the activity's source comment is that comment.
     if (type === "response" || type === "elicitation" || type === "error") {
       const issue = store.issue(record.issue);
-      const parent = record.thread === null ? undefined : store.commentsOn(issue).find((c) => c.id === record.thread);
+      // Every session in the fake has its thread: its mention, or the one Linear opened for it.
+      const parent = store.comments.find(record.thread as string);
       const written = comment(issue, store.appUser.id, activity.content.body ?? "", parent);
       written.session = record.id;
-      record.thread ??= written.id;
       activity.sourceComment = written.id;
     }
     return activity;
@@ -570,6 +607,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
     // The fake holds the truth already: a read has nothing to ask first.
     refresh: () => {},
     stateOf,
+    defaultStateOf,
     markdown,
     readable,
     rootOf,
@@ -634,16 +672,16 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
           `A team with the key ${key} already exists, here or in another open session`,
         );
       }
-      const states = (input.states ?? DEFAULT_STATES.map(([name, type, color]) => ({ name, type, color }))).map(
-        (state, position): LinearStateRecord => ({
-          id: ids.next(LINEAR_IDS.uuid),
-          name: state.name,
-          type: state.type,
-          color: "color" in state && typeof state.color === "string" ? state.color : STATE_COLOR[state.type],
-          position,
-        }),
-      );
-      if (states.length === 0) throw new ProtocolError("invalid_argument", "A team needs at least one workflow state");
+      const workflow = input.states ?? DEFAULT_STATES.map(([name, type, color]) => ({ name, type, color }));
+      if (workflow.length === 0)
+        throw new ProtocolError("invalid_argument", "A team needs at least one workflow state");
+      const states = [...workflow, DUPLICATE_STATE].map((state, position): LinearStateRecord => ({
+        id: ids.next(LINEAR_IDS.uuid),
+        name: state.name,
+        type: state.type,
+        color: "color" in state && typeof state.color === "string" ? state.color : STATE_COLOR[state.type],
+        position,
+      }));
       return store.add(store.teams, session, {
         id: ids.next(LINEAR_IDS.uuid),
         key,
@@ -660,11 +698,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       const session = store.teams.owner(team.id);
       if (session === undefined) throw new Error("A team belongs to a test session");
       if (input.title.trim() === "") throw new LinearError("title must not be empty");
-      const state = input.state
-        ? stateNamed(team, input.state)
-        : (team.states.find((candidate) => candidate.type === "backlog") ??
-          team.states.find((candidate) => candidate.type === "unstarted") ??
-          (team.states[0] as LinearStateRecord));
+      const state = input.state ? stateNamed(team, input.state) : defaultStateOf(team);
       const labels = labelsNamed(team, input.labels ?? []);
       if (input.delegate !== undefined && input.delegate !== store.appUser.id)
         throw new LinearError("Only an agent can be delegated an issue");
@@ -680,7 +714,9 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
         priority: input.priority ?? 0,
         state: state.id,
         labels: labels.map((label) => label.id),
-        assignee: input.assignee ?? null,
+        // Created delegated is delegating: the person is the assignee unless they named one (inferred
+        // from delegating an existing issue, which the differential run saw).
+        assignee: input.assignee ?? (input.delegate !== undefined && creator !== store.appUser.id ? creator : null),
         delegate: input.delegate ?? null,
         creator,
         parent: input.parent ?? null,
