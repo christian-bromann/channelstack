@@ -1,5 +1,7 @@
 import { iso } from "../../core/clock/index.ts";
-import { domainOf, formatMailbox } from "../../core/email/index.ts";
+import { type EmailAttachment, formatMailbox } from "../../core/email/index.ts";
+import { mimeHeaders } from "../../core/email/mime.ts";
+import type { DownloadLink } from "./fake/downloads.ts";
 import type { ResendEmailRecord } from "./world.ts";
 
 type Json = Record<string, unknown>;
@@ -19,6 +21,31 @@ export const EMAIL_EVENTS = [
 ] as const;
 
 const addresses = (mailboxes: ResendEmailRecord["to"]) => mailboxes.map((mailbox) => mailbox.address);
+
+/** An attachment as a webhook names it: inline when an HTML body names it by its `Content-ID`. */
+const attachmentEvent = (attachment: EmailAttachment): Json => ({
+  id: attachment.id,
+  filename: attachment.filename,
+  content_type: attachment.contentType,
+  content_disposition: attachment.contentId === undefined ? "attachment" : "inline",
+  ...(attachment.contentId === undefined ? {} : { content_id: attachment.contentId }),
+});
+
+/** An attachment as an email lists it: with its size. */
+const attachmentSummary = (attachment: EmailAttachment): Json => ({
+  ...attachmentEvent(attachment),
+  size: attachment.size,
+});
+
+/**
+ * A message's headers as Resend answers them: keyed by their lowercase names, the first of a name
+ * (the newest `Received`) kept.
+ */
+function headersOf(raw: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const { name, value } of mimeHeaders(raw)) headers[name.toLowerCase()] ??= value;
+  return headers;
+}
 
 /**
  * Builders for what Resend sends and answers, each the shape of a schema in Resend's OpenAPI
@@ -41,7 +68,7 @@ export const resendPayloads = {
         subject: email.subject,
         // The team's own addresses the email was for.
         received_for: addresses(email.to),
-        attachments: [],
+        attachments: email.attachments.map(attachmentEvent),
       },
     };
   },
@@ -67,8 +94,8 @@ export const resendPayloads = {
     };
   },
 
-  /** `GET /emails/receiving/{id}`: a received email, body and headers. */
-  receivedEmail(email: ResendEmailRecord): Json {
+  /** An email in `GET /receiving`'s list: who it is from and to, and its attachments; no body, headers or raw message. */
+  receivedSummary(email: ResendEmailRecord): Json {
     return {
       object: "email",
       id: email.id,
@@ -80,37 +107,29 @@ export const resendPayloads = {
       bcc: addresses(email.bcc),
       cc: addresses(email.cc),
       reply_to: addresses(email.replyTo),
-      html: email.html ?? null,
       html_format: "data_uri",
-      text: email.text ?? null,
       received_for: addresses(email.to),
       // The checks a receiving mail server makes; mail in the fake passes them.
       authentication: { spf: "pass", dkim: "pass", dmarc: "pass" },
-      // The raw message isn't built in the fake (conformance/divergences.yaml).
-      raw: null,
-      headers: {
-        received: `from ${domainOf(email.from.address)} by inbound-smtp.us-east-1.amazonaws.com with SMTP id ${email.id}; ${new Date(email.createdAt).toUTCString()}`,
-        "dkim-signature": `v=1; a=rsa-sha256; c=relaxed/simple; d=${domainOf(email.from.address)}; s=resend; h=From:To:Subject:Message-ID:Date`,
-        date: new Date(email.createdAt).toUTCString().replace("GMT", "+0000"),
-        "mime-version": "1.0",
-        "content-type": email.html ? 'multipart/alternative; boundary="channelstack"' : "text/plain; charset=UTF-8",
-        "content-transfer-encoding": "7bit",
-        from: formatMailbox(email.from),
-        to: email.to.map(formatMailbox).join(", "),
-        subject: email.subject,
-        "message-id": email.messageId,
-        ...(email.inReplyTo ? { "in-reply-to": email.inReplyTo } : {}),
-        ...(email.references.length > 0 ? { references: email.references.join(" ") } : {}),
-        ...email.headers,
-      },
-      attachments: [],
+      attachments: email.attachments.map(attachmentSummary),
     };
   },
 
-  /** An email in `GET /receiving`'s list: the same, without the body and headers. */
-  receivedSummary(email: ResendEmailRecord): Json {
-    const { html: _html, text: _text, headers: _headers, ...summary } = resendPayloads.receivedEmail(email);
-    return summary;
+  /** `GET /emails/receiving/{id}`: a received email, body and headers, and the link to its raw message. */
+  receivedEmail(email: ResendEmailRecord, raw: DownloadLink): Json {
+    return {
+      ...resendPayloads.receivedSummary(email),
+      html: email.html ?? null,
+      text: email.text ?? null,
+      raw,
+      // The headers of the message as it was received.
+      headers: headersOf(email.raw ?? ""),
+    };
+  },
+
+  /** An attachment with the link to its content, as `GET /emails/{id}/attachments` and the received email's list it. */
+  attachment(attachment: EmailAttachment, link: DownloadLink): Json {
+    return { ...attachmentSummary(attachment), ...link };
   },
 
   /** `GET /emails/{id}`: an email the team sent, with what happened to it last. */

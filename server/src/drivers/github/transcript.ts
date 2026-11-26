@@ -1,5 +1,5 @@
 import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
-import { githubTime } from "./payloads.ts";
+import { githubTime, minimizedReason } from "./payloads.ts";
 import type { GitHubCommentRecord, GitHubIssueRecord, GitHubReviewCommentRecord, GitHubReviewRecord } from "./world.ts";
 
 const REVIEW_VERDICT: Readonly<Record<string, string>> = {
@@ -46,7 +46,7 @@ export function renderTranscript(
     timed.push({ at: issue.createdAt, entries: [entry(issue.id, issue.author, issue.createdAt, text, false, 0)] });
   }
   for (const comment of thread.comments) {
-    const text = comment.minimized ? `(hidden as ${comment.minimized.toLowerCase().replace("_", "-")})` : comment.body;
+    const text = comment.minimized ? `(hidden as ${minimizedReason(comment.minimized)})` : comment.body;
     timed.push({
       at: comment.createdAt,
       entries: [entry(comment.id, comment.author, comment.createdAt, text, comment.updatedAt > comment.createdAt, 0)],

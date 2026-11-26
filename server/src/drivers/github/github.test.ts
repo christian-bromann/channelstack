@@ -110,6 +110,8 @@ describe("installation", () => {
       action: "added",
       repositories_added: [{ name: quiet.name, full_name: `acme/${quiet.name}` }],
       repository_selection: "selected",
+      // Installing on a repository that is already there is the org's doing, not the App's.
+      sender: { login: "acme", type: "Organization" },
     });
     expect(await refusal(post(`/repos/${quiet.id}/install`, { app: app.id }))).toBe("validation_failed");
     expect((await post(`/repos/${quiet.id}/uninstall`, { app: app.id })).action).toBe("removed");
@@ -293,7 +295,7 @@ describe("what people may do", () => {
   test("the App needs the permission an endpoint asks for", async () => {
     const { api, path, issue } = await workspace();
     const { number } = await issue();
-    // The default App has no `administration` or `actions`; what it has, it may use.
+    // The default App has no `actions`; what it has, it may use.
     expect((await api("POST", `${path}/issues/${number}/comments`, { body: "ok" })).status).toBe(201);
     expect((await api("POST", `${path}/issues/${number}/comments`, { body: "  " })).status).toBe(422);
     expect((await api("POST", `${path}/issues/${number}/comments`, {})).body).toMatchObject({
@@ -951,6 +953,8 @@ describe("check runs", () => {
     for (const context of ["a", "b", "a"]) await api("POST", `${path}/statuses/${sha}`, { state: "success", context });
     const combined = (await api("GET", `${path}/commits/${sha}/status`)).body;
     expect(combined.statuses.map((status: { context: string }) => status.context)).toEqual(["a", "b"]);
+    // A combined status names the repository as a minimal repository, which has custom properties.
+    expect(combined.repository).toMatchObject({ custom_properties: {} });
     for (const name of ["lint", "test", "lint"])
       await api("POST", `${path}/check-runs`, { name, head_sha: sha, conclusion: "success" });
     const runs = (await api("GET", `${path}/commits/${sha}/check-runs`)).body.check_runs;
@@ -1063,5 +1067,92 @@ describe("sessions in one org", () => {
     // Nothing a session's log holds shows the installation token.
     const other = (await h.call("POST", "/sessions")).body.sessionId;
     expect((await h.call("GET", `/sessions/${other}/github/calls`)).body).toEqual([]);
+  });
+});
+
+// Issue #25: fields GitHub's payloads have gained, with the values GitHub gives a plain issue,
+// comment and repository (the shape differ saw them live).
+describe("what GitHub sends that it added lately", () => {
+  test("an issue has no type, sub-issues, dependencies, field values or pinned comment", async () => {
+    const { h, api, path, issue, webhooks } = await workspace();
+    const { number } = await issue();
+    await h.app.settled();
+    const plain = {
+      type: null,
+      sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 },
+      issue_dependencies_summary: { blocked_by: 0, total_blocked_by: 0, blocking: 0, total_blocking: 0 },
+      issue_field_values: [],
+      pinned_comment: null,
+      performed_via_github_app: null,
+    };
+    expect((await api("GET", `${path}/issues/${number}`)).body).toMatchObject(plain);
+    expect(webhooks().find((hook) => hook.event === "issues")?.payload.issue).toMatchObject(plain);
+    // What the App opens names the App, in the answer and in the webhook (whose schema lists the
+    // events an App may subscribe to, which `installation_repositories` isn't one of).
+    const opened = (await api("POST", `${path}/issues`, { title: "From the App" })).body;
+    const app = { slug: "my-agent", permissions: { issues: "write" } };
+    expect(opened.performed_via_github_app).toMatchObject(app);
+    await h.app.settled();
+    const sent = webhooks().find((hook) => hook.event === "issues" && hook.payload.issue.number === opened.number);
+    expect(sent?.payload.issue.performed_via_github_app).toMatchObject(app);
+    expect(sent?.payload.issue.performed_via_github_app.events).not.toContain("installation_repositories");
+  });
+
+  test("a comment has no pin, is minimized with its reason, and the App's names the App", async () => {
+    const { h, ana, api, path, issue, post, webhooks } = await workspace();
+    const { ref, number } = await issue();
+    const comment = await post(`/users/${ana.id}/comment`, { body: "@my-agent hi", issue: ref });
+    await h.app.settled();
+    const hook = webhooks().find(({ event }) => event === "issue_comment")?.payload.comment;
+    expect(hook).toMatchObject({ pin: null, minimized: null, performed_via_github_app: null });
+    await post(`/users/${ana.id}/minimize`, { comment: comment.id, reason: "OFF_TOPIC" });
+    expect((await api("GET", `${path}/issues/comments/${comment.id}`)).body).toMatchObject({
+      pin: null,
+      minimized: { reason: "off-topic" },
+      performed_via_github_app: null,
+    });
+    const reply = (await api("POST", `${path}/issues/${number}/comments`, { body: "On it" })).body;
+    expect(reply).toMatchObject({ pin: null, minimized: null, user: { login: "my-agent[bot]" } });
+    await h.app.settled();
+    const replied = webhooks().find(
+      ({ event, payload }) => event === "issue_comment" && payload.comment.id === reply.id,
+    );
+    expect(replied?.payload.comment.performed_via_github_app).toMatchObject({ slug: "my-agent" });
+    expect(reply.performed_via_github_app).toMatchObject({
+      slug: "my-agent",
+      owner: { login: "acme", type: "Organization" },
+      permissions: { administration: "write", issues: "write", metadata: "read" },
+    });
+  });
+
+  test("a repository has pull requests on, open to all, and no custom properties", async () => {
+    const { h, api, path, issue, pull, webhooks } = await workspace();
+    await issue();
+    await h.app.settled();
+    const settings = { has_pull_requests: true, pull_request_creation_policy: "all", custom_properties: {} };
+    expect((await api("GET", path)).body).toMatchObject(settings);
+    expect(webhooks().find((hook) => hook.event === "issues")?.payload.repository).toMatchObject(settings);
+    expect((await api("GET", "/installation/repositories")).body.repositories[0]).toMatchObject(settings);
+    // A pull request's sides name the repository without its custom properties, as GitHub's schemas have it.
+    const { number } = await pull();
+    const { head, base } = (await api("GET", `${path}/pulls/${number}`)).body;
+    for (const side of [head.repo, base.repo]) {
+      expect(side).toMatchObject({ has_pull_requests: true, pull_request_creation_policy: "all" });
+      expect(side).not.toHaveProperty("custom_properties");
+    }
+  });
+
+  test("the installation and its tokens have Administration, and the App's bot added the repository it made", async () => {
+    const { h, asApp, webhooks } = await workspace();
+    await h.app.settled();
+    const [installation] = (await asApp("GET", "/app/installations")).body;
+    expect(installation.permissions).toMatchObject({ administration: "write", metadata: "read" });
+    const minted = (await asApp("POST", `/app/installations/${installation.id}/access_tokens`)).body;
+    expect(minted.permissions).toMatchObject({ administration: "write", metadata: "read" });
+    expect(webhooks().find((hook) => hook.event === "installation_repositories")?.payload).toMatchObject({
+      action: "added",
+      installation: { permissions: { administration: "write" } },
+      sender: { login: "my-agent[bot]", type: "Bot" },
+    });
   });
 });

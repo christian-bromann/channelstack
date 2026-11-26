@@ -12,40 +12,22 @@
 #     expires: 2027-03-01            # YYYY-MM-DD
 divergences:
   - scenario: shapes/github
-    path:
-      - "api POST /app/installations/{n}/access_tokens permissions.administration"
-      - "api POST /repos/{owner}/{repo}/issues/{n}/comments minimized"
-      - "api POST /repos/{owner}/{repo}/issues/{n}/comments performed_via_github_app"
-      - "api POST /repos/{owner}/{repo}/issues/{n}/comments pin"
-      - "webhook installation_repositories added installation.permissions.administration"
-      - "webhook issue_comment created comment.minimized"
-      - "webhook issue_comment created comment.performed_via_github_app"
-      - "webhook issue_comment created comment.pin"
-      - "webhook issue_comment created issue.issue_dependencies_summary"
-      - "webhook issue_comment created issue.issue_field_values"
-      - "webhook issue_comment created issue.pinned_comment"
-      - "webhook issue_comment created issue.sub_issues_summary"
-      - "webhook issue_comment created issue.type"
-      - "webhook issue_comment created repository.custom_properties"
-      - "webhook issue_comment created repository.description"
-      - "webhook issue_comment created repository.has_pull_requests"
-      - "webhook issue_comment created repository.pull_request_creation_policy"
-      - "webhook issues opened issue.issue_dependencies_summary"
-      - "webhook issues opened issue.issue_field_values"
-      - "webhook issues opened issue.pinned_comment"
-      - "webhook issues opened issue.status"
-      - "webhook issues opened issue.sub_issues_summary"
-      - "webhook issues opened issue.type"
-      - "webhook issues opened repository.custom_properties"
-      - "webhook issues opened repository.description"
-      - "webhook issues opened repository.has_pull_requests"
-      - "webhook issues opened repository.pull_request_creation_policy"
-      - "webhook installation_repositories added sender.type"
+    path: webhook issues opened issue.status
     reason: >-
-      GitHub's payloads have gained fields the fake doesn't send yet (issue types, status,
-      sub-issue and dependency summaries, pins, repository policies, the administration
-      permission), and an App's own comment names the App in performed_via_github_app, and a repository the installation adds has the App's bot as its sender. To add to
-      the fake, against the pinned schemas: #25.
+      Real GitHub's issues have gained a status (`{ id, name, category }`) that neither pinned
+      schema (@octokit/openapi 24.0.0, @octokit/openapi-webhooks 12.2.0) declares, so neither its
+      shape nor a plain issue's value can be checked against one yet. To add to the fake once a
+      pinned schema describes it: #77.
+    expires: 2027-02-28
+  - scenario: shapes/github
+    path:
+      - "webhook issues opened repository.description"
+      - "webhook issue_comment created repository.description"
+    reason: >-
+      Live mode makes each session's repository with a description saying it is channelstack's and
+      goes away with the session; the fake's repositories have none (`null`), as one made without a
+      description has. The difference comes from how live mode makes repositories, not from drift
+      in the fake.
     expires: 2027-02-28
   - scenario: shapes/linear
     path:
@@ -88,13 +70,6 @@ divergences:
     reason: >-
       Live mode tags the email a person sends with the run (`X-Channelstack-Run`); the fake's
       people send none. Where live mode marks its mail, not drift.
-    expires: 2027-02-28
-  - scenario: shapes/resend
-    path: api GET /emails/receiving/{id} raw
-    reason: >-
-      Real Resend links the received email's raw MIME message (`raw.download_url`); the fake
-      answers `raw: null`, which Resend's description allows. Building the raw message comes with
-      attachments.
     expires: 2027-02-28
   - scenario: shapes/google
     path: api POST /token refresh_token_expires_in

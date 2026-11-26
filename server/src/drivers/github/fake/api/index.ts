@@ -177,7 +177,7 @@ export function createGitHubApi(context: DriverContext, world: FakeGitHubWorld):
 
   routes.get("/installation/repositories", (c) => {
     asInstallation(c);
-    const repositories = store.installedRepos().map((repo) => objects.repository(repo));
+    const repositories = store.installedRepos().map((repo) => objects.propertiedRepository(repo));
     return c.json({ total_count: repositories.length, repositories: page(c, repositories) });
   });
 
