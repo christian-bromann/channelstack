@@ -54,10 +54,10 @@ describe("email conversations", () => {
     const email = await ana.send({ to: [google.app], subject: "Refund", text: "Where is my refund?" });
     await expect(email.thread).toHaveReplyFrom(google.app);
 
-    const read = await email.refresh();
-
-    expect(read.labels).toContain("INBOX");
-    expect(read.labels).not.toContain("UNREAD");
+    // The agent may mark it read after it answers: read the labels until UNREAD is gone.
+    const labels = async () => (await email.refresh()).labels;
+    await expect.poll(labels, { timeout: 10_000 }).not.toContain("UNREAD");
+    expect(await labels()).toContain("INBOX");
   });
 
   test("an email between people doesn't reach the agent", async ({ google }) => {
