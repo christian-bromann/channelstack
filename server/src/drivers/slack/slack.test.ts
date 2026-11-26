@@ -238,6 +238,15 @@ describe("messages and the events they send", () => {
     expect(message.event.type).toBe("message");
     expect(message).toMatchObject({ team_id: fixture.team.id, context_team_id: fixture.team.id });
     expect(message.context_enterprise_id).toBeNull();
+
+    // Only on the types they were recorded with: not yet on `member_left_channel` (#88).
+    const ben = await user({ name: "Ben" });
+    await post(`/users/${ana.id}/invite`, { participants: [ben.id], channel: channel.id });
+    await post(`/users/${ana.id}/kick`, { participant: ben.id, channel: channel.id });
+    await h.app.settled();
+    const byType = (type: string) => events(agent as RecordingAgent).find((event) => event.event.type === type);
+    expect(byType("member_joined_channel")).toHaveProperty("context_team_id", fixture.team.id);
+    expect(byType("member_left_channel")).not.toHaveProperty("context_team_id");
   });
 
   test("a DM to the app opens (or reuses) an im and sends message.im", async () => {

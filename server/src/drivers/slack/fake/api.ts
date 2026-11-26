@@ -146,6 +146,9 @@ export function createSlackApi(
     is_app_user: false,
   });
 
+  /** The workspace's #general, which nobody can archive or leave. */
+  const isGeneral = (conversation: SlackConversationRecord) => conversation.name === "general";
+
   /** A conversation as Slack describes it; `info` adds what only `conversations.info` says (`last_read`). */
   const conversationObject = (conversation: SlackConversationRecord, info = false) => {
     if (conversation.kind === "im") {
@@ -179,7 +182,7 @@ export function createSlackApi(
       is_ext_shared: false,
       is_org_shared: false,
       is_pending_ext_shared: false,
-      is_general: conversation.name === "general",
+      is_general: isGeneral(conversation),
       context_team_id: store.team.id,
       shared_team_ids: [store.team.id],
       pending_shared: [],
@@ -200,7 +203,8 @@ export function createSlackApi(
 
   /**
    * A conversation the app may read and write: it exists, and the app is a member. An archived
-   * channel can still be read and reacted in, as on Slack, but not written to (`writing`).
+   * channel can still be read, and the app can add and remove reactions there, but not post
+   * (`writing`): what a real workspace answered (#58, recorded 2026-11-26).
    */
   const joined = (id: string, writing = true): SlackConversationRecord => {
     let conversation = store.conversations.find(id);
@@ -601,7 +605,7 @@ export function createSlackApi(
       }
       if (conversation.isArchived) throw new SlackApiError("already_archived");
       if (!conversation.members.has(bot())) throw new SlackApiError("not_in_channel");
-      if (conversation.name === "general") throw new SlackApiError("cant_archive_general");
+      if (isGeneral(conversation)) throw new SlackApiError("cant_archive_general");
       world.archive(conversation, bot());
       return {};
     },

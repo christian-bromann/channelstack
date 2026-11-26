@@ -55,10 +55,12 @@ describe("conversations.archive", () => {
   test("archiving posts the channel_archive message; the channel can still be read, not written to", async () => {
     const { slack, bot, ana, api, events } = await fake(["channels:manage"]);
     const channel = slack.world.createChannel("ses_a", { participants: [ana.id, bot] });
+    const before = slack.world.postAsApp(channel, { text: "before the archive" }, {});
+    await vi.waitFor(() => expect(events()).toHaveLength(1));
 
     expect(await api("conversations.archive", { channel: channel.id })).toEqual({ ok: true });
-    await vi.waitFor(() => expect(events()).toHaveLength(1));
-    const [archived] = events();
+    await vi.waitFor(() => expect(events()).toHaveLength(2));
+    const archived = events()[1];
     // Field for field what a real workspace sent, in the envelope a real workspace sent it in.
     expect(archived.event).toEqual({
       type: "message",
@@ -75,6 +77,13 @@ describe("conversations.archive", () => {
     expect((await api("conversations.info", { channel: channel.id })).channel).toMatchObject({ is_archived: true });
     expect(await api("conversations.history", { channel: channel.id })).toMatchObject({ ok: true });
     expect(await api("conversations.members", { channel: channel.id })).toMatchObject({ ok: true });
+    // A real workspace let the bot add and remove reactions in an archived channel (recorded 2026-11-26).
+    expect(await api("reactions.add", { channel: channel.id, timestamp: before.ts, name: "eyes" })).toEqual({
+      ok: true,
+    });
+    expect(await api("reactions.remove", { channel: channel.id, timestamp: before.ts, name: "eyes" })).toEqual({
+      ok: true,
+    });
     expect(await api("chat.postMessage", { channel: channel.id, text: "still here?" })).toEqual({
       ok: false,
       error: "is_archived",

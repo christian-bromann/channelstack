@@ -244,6 +244,12 @@ export function channelMessageEvent(
   };
 }
 
+/**
+ * The event types whose envelope carries `context_team_id` and `context_enterprise_id`, as
+ * recorded from a real workspace. The fake's other types aren't recorded yet: #88.
+ */
+const WITH_CONTEXT = new Set(["message", "reaction_added", "reaction_removed", "member_joined_channel"]);
+
 /** The Events API envelope around an event (`type: "event_callback"`). */
 export function eventCallback(input: {
   event: Record<string, unknown>;
@@ -257,9 +263,9 @@ export function eventCallback(input: {
   return {
     token: input.verificationToken,
     team_id: team.id,
-    // The workspace the event happened in, and its Enterprise Grid org (none here). Real Slack
-    // sends both on every event but `app_mention` (#58).
-    ...(input.event.type === "app_mention" ? {} : { context_team_id: team.id, context_enterprise_id: null }),
+    // The workspace the event happened in, and its Enterprise Grid org (none here), on the event
+    // types a real workspace was recorded sending them with (#58). `app_mention` came without them.
+    ...(WITH_CONTEXT.has(String(input.event.type)) ? { context_team_id: team.id, context_enterprise_id: null } : {}),
     api_app_id: app.id,
     event: input.event,
     type: "event_callback",
