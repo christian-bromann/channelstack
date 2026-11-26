@@ -17,7 +17,7 @@ export const pathParam = (name: string) => z.string().openapi({ param: { name, i
 
 /** Files a test hands over, as they travel: a path or name and the bytes in base64. SDKs read files and directories into this. */
 export const fileTree = () =>
-  z.array(z.object({ path: z.string().min(1), content: z.string() })).openapi({ "x-channelstack-files": "tree" });
+  z.array(z.object({ path: z.string().min(1), content: z.base64() })).openapi({ "x-channelstack-files": "tree" });
 
 /** What a test may forge on a delivery it sends again (`delivery.resend()`). */
 /** How a channel lets a test forge a delivery: a bad signature, a stale one, a token for another audience (Pub/Sub), extra headers. */

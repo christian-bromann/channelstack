@@ -163,6 +163,8 @@ Every action is a method on the person who takes it. The content comes first, an
 
 `say` and `reply` also take `{ text, blocks, metadata }` for a message with Block Kit or message metadata. `reply` takes `alsoSendToChannel: true` to broadcast the reply.
 
+`say` and `reply` take `files`, a directory path or a list of files (`{ path }` on disk, or `{ name, content }`), which the person shares with the message: `ana.say("the log", { channel, files: [{ path: "./fixtures/crash.log" }] })`. The message then sends `message` with `subtype: "file_share"` and the files, and `app_mention` carries them too; a message with files needs no text. The agent reads each file from its `url_private` (or `url_private_download`) with the bot token, as with Slack. The fake keeps files in memory and takes 10 MB a file at most.
+
 ### Buttons, menus, modals, commands and shortcuts
 
 <Example id="slack-interactivity" />
@@ -288,4 +290,4 @@ The same tests can run against a real Slack sandbox workspace. Set the app's cre
 
 Slack marks every message posted through its API as an app's, so a person's `say` and `reply` are typed in Slack's own client by the browser actor, and so is `click`. Save each person's browser session once with `channelstack login slack --user ana`, or pass `browser: { storageState }` to `createUser`. Edits, deletes, reactions, invites and every read go through the user token.
 
-Still fake only: `select`, `shortcut`, `runCommand`, `stop`, the agent split view, `uninstallApp`, fixed ids, faults and the delivery checks (`retry`, `resend`, `toBeAccepted`). Live runs skip those steps and say why. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/slack).
+Still fake only: `select`, `shortcut`, `runCommand`, `stop`, a person's `files`, the agent split view, `uninstallApp`, fixed ids, faults and the delivery checks (`retry`, `resend`, `toBeAccepted`). Live runs skip those steps and say why. See [Live mode](/docs/guide/live-mode) and the [API reference](/docs/reference/api/slack).

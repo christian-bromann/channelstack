@@ -12,6 +12,7 @@ import { fileObject, messageObject } from "../payloads.ts";
 import {
   NOBODY,
   type SlackConversationRecord,
+  type SlackFileRecord,
   type SlackMessageRecord,
   SlackRefusal,
   type SlackUserRecord,
@@ -102,6 +103,10 @@ export function createSlackApi(
 ): Hono {
   const { ids, clock } = context;
   const bot = () => store.app.botUserId;
+  /** The bot sees its own files, and those shared where it is a member. */
+  const botSees = (file: SlackFileRecord) =>
+    file.user === bot() ||
+    (file.conversation !== undefined && store.conversations.find(file.conversation)?.members.has(bot()) === true);
 
   const userObject = (user: SlackUserRecord) => ({
     id: user.id,
@@ -505,7 +510,7 @@ export function createSlackApi(
 
     "files.info": (args) => {
       const file = store.files.get(required(args, "file"));
-      if (!file) throw new SlackApiError("file_not_found");
+      if (!file || !botSees(file)) throw new SlackApiError("file_not_found");
       return { file: fileObject(file) };
     },
 
@@ -791,18 +796,28 @@ export function createSlackApi(
 
   // A file's bytes (`url_private`, `url_private_download`), for the bot token, as `files.slack.com` serves them.
   api.get("/files-pri/:key/*", (c) => {
-    const id = /^[A-Z0-9]+-(F[A-Z0-9]+)$/.exec(c.req.param("key"))?.[1];
-    const file = id === undefined ? undefined : store.files.get(id);
     const token = bearerFrom(c.req.header("authorization"));
-    if (token === undefined || !constantTimeEqual(token, context.secret("botToken"))) {
+    // The same token checks as the Web API's: the bot token, of an installed app that may read files.
+    if (
+      token === undefined ||
+      !constantTimeEqual(token, context.secret("botToken")) ||
+      !store.app.installed ||
+      !(SCOPES["files.info"] ?? []).some((scope) => store.app.scopes.includes(scope))
+    ) {
       return c.text("Forbidden", 403);
     }
-    // The bot sees its own files, and those shared where it is a member.
-    const conversation = file?.conversation === undefined ? undefined : store.conversations.find(file.conversation);
-    if (!file || file.bytes === undefined || (file.user !== bot() && !conversation?.members.has(bot()))) {
+    // `T…-F…/<name>`, or `T…-F…/download/<name>`, with the name escaped as in the URL the file has.
+    const key = c.req.param("key");
+    const [team, id] = key.split("-");
+    const file = id === undefined ? undefined : store.files.get(id);
+    const path = new URL(c.req.url).pathname;
+    const rest = path.slice(path.indexOf(`/files-pri/${key}/`) + `/files-pri/${key}/`.length);
+    const name = file === undefined ? "" : encodeURIComponent(file.name);
+    const download = rest === `download/${name}`;
+    if (!file || team !== store.team.id || (rest !== name && !download) || file.bytes === undefined) {
       return c.text("Not Found", 404);
     }
-    const download = c.req.path.endsWith(`/download/${encodeURIComponent(file.name)}`);
+    if (!botSees(file)) return c.text("Not Found", 404);
     return c.body(Buffer.from(file.bytes), 200, {
       "content-type": String(fileObject(file).mimetype),
       "content-length": String(file.bytes.length),
