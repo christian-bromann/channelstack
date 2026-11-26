@@ -7,17 +7,7 @@
  */
 import type { gmail_v1 } from "googleapis";
 
-/** What to say to an email: scripted, from its subject and its first line. */
-function answer(subject: string, text: string): string {
-  const first =
-    text
-      .split("\n")
-      .find((line) => line.trim() !== "" && !line.startsWith(">"))
-      ?.trim() ?? "";
-  if (/invoice/i.test(text)) return "Your invoice is attached to your account page.";
-  if (/refund/i.test(`${subject} ${text}`)) return "Your refund was sent today; it arrives in 3 to 5 days.";
-  return `Thanks for your email about "${subject}". You wrote: ${first}`;
-}
+import { scriptedAnswer } from "./email.ts";
 
 /** A header's value, the way Gmail lists them. */
 const header = (message: gmail_v1.Schema$Message, name: string) =>
@@ -67,7 +57,7 @@ export function gmailAgent(gmail: gmail_v1.Gmail, options: { address: string; na
       'Content-Type: text/plain; charset="UTF-8"',
       "Content-Transfer-Encoding: base64",
       "",
-      Buffer.from(answer(subject, textOf(message.payload)), "utf8").toString("base64"),
+      Buffer.from(scriptedAnswer(subject, textOf(message.payload)), "utf8").toString("base64"),
     ].join("\r\n");
     await gmail.users.messages.send({
       userId: "me",

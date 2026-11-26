@@ -2,7 +2,6 @@ import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import {
   domainOf,
   emailAuthor,
-  localPartOf,
   type Mailbox,
   messageId,
   messageIdsIn,
@@ -10,7 +9,6 @@ import {
   replyOf,
   threadOf,
 } from "../../../core/email/index.ts";
-import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { RESEND_IDS } from "../ids.ts";
 import { resendPayloads } from "../payloads.ts";
@@ -102,14 +100,6 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
   const threadFor = (email: { id: string; inReplyTo?: string | undefined; references: readonly string[] }) =>
     threadOf(email, (id) => store.byMessageId(id)?.thread) ?? email.id;
 
-  /** Keep an email, and the thread it starts. */
-  const keep = (email: ResendEmailRecord, session: string | undefined) => {
-    if (email.thread === email.id) {
-      store.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
-    }
-    return store.emails.add(email.id, email, session);
-  };
-
   const isApp = (mailbox: Mailbox) => mailbox.address === store.app.address;
 
   return {
@@ -118,22 +108,8 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
     isApp,
 
     /** A person: a mailbox at `<name>@example.com` unless the test gives an address. Their id is their address. */
-    createUser(session: string, input: { name: string; address?: string | undefined }): ResendUserRecord {
-      let address = input.address?.toLowerCase();
-      if (address !== undefined) {
-        if (parseAddresses(address)[0]?.address !== address) {
-          throw new ProtocolError("invalid_argument", `"${input.address}" is not an email address`);
-        }
-        if (store.personAt(address) || address === store.app.address) {
-          throw new ProtocolError("invalid_argument", `Someone has the address ${address} already`);
-        }
-      } else {
-        const local = localPartOf(input.name);
-        address = `${local}@example.com`;
-        for (let n = 2; store.personAt(address); n++) address = `${local}${n}@example.com`;
-      }
-      return store.users.add(address, { id: address, name: input.name, address, fixedId: false }, session);
-    },
+    createUser: (session: string, input: { name: string; address?: string | undefined }): ResendUserRecord =>
+      store.addPerson(session, input),
 
     /**
      * A person sends an email, from their mailbox. To the agent's address it reaches the agent's
@@ -177,7 +153,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         lastEvent: undefined,
         delivery: undefined,
       };
-      keep(email, session);
+      store.keep(email, session);
       if (toApp) email.delivery = emit(session, "email.received", email);
       return email;
     },
@@ -272,7 +248,7 @@ export function createFakeWorld(context: DriverContext, store: ResendStore) {
         lastEvent,
         delivery: undefined,
       };
-      keep(email, session);
+      store.keep(email, session);
       emit(session, "email.sent", email);
       if (lastEvent === "bounced") {
         emit(session, "email.bounced", email, {

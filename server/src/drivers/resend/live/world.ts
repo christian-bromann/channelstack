@@ -10,13 +10,14 @@ import {
   replyOf,
   threadOf,
 } from "../../../core/email/index.ts";
+import type { EmailMessageInput } from "../../../core/email/routes.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
 import { fakeActorInLiveWorld, liveMisconfigured } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
-import type { ResendMessageInput, ResendWorld } from "../backend.ts";
+import type { ResendWorld } from "../backend.ts";
 import { ResendStore } from "../fake/store.ts";
 import type { ResendEmailRecord, ResendUserRecord } from "../world.ts";
 import type { ResendRestClient } from "./client.ts";
@@ -130,7 +131,7 @@ export function createLiveResendWorld(deps: {
   const sendAs = async (
     session: string,
     person: ResendUserRecord,
-    input: ResendMessageInput,
+    input: EmailMessageInput,
     headers: { inReplyTo?: string; references?: readonly string[] },
   ): Promise<ResendEmailRecord> => {
     allowed([...input.to, ...input.cc]);

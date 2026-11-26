@@ -56,13 +56,13 @@ export function messageIdsIn(header: string | undefined): string[] {
 }
 
 /** The subject of a reply: `Re: ` before the original's, unless it has one already. */
-export const replySubject = (subject: string): string => (/^re:/i.test(subject.trim()) ? subject : `Re: ${subject}`);
+const replySubject = (subject: string): string => (/^re:/i.test(subject.trim()) ? subject : `Re: ${subject}`);
 
 /**
  * The headers a reply carries, as RFC 5322 says: `In-Reply-To` is the message answered, and
  * `References` that message's references with its id added.
  */
-export function replyHeaders(to: { messageId: string; references: readonly string[] }): {
+function replyHeaders(to: { messageId: string; references: readonly string[] }): {
   inReplyTo: string;
   references: string[];
 } {

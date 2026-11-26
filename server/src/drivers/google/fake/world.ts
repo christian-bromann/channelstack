@@ -1,15 +1,7 @@
 import { deliveryKit } from "../../../core/delivery/kit.ts";
-import {
-  emailAuthor,
-  localPartOf,
-  type Mailbox,
-  messageId,
-  parseAddresses,
-  replyOf,
-  threadOf,
-} from "../../../core/email/index.ts";
+import { emailAuthor, type Mailbox, messageId, replyOf, threadOf } from "../../../core/email/index.ts";
 import { composeMime, mimeHeaders, parseMime } from "../../../core/email/mime.ts";
-import { ProtocolError } from "../../../core/errors/index.ts";
+import type { EmailMessageInput } from "../../../core/email/routes.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { GOOGLE_IDS } from "../ids.ts";
 import { googlePayloads } from "../payloads.ts";
@@ -67,16 +59,11 @@ const threadSubject = (subject: string) =>
     .trim()
     .toLowerCase();
 
-/** What a person writes in an email. */
-export interface PersonMessage {
-  readonly to: readonly Mailbox[];
-  readonly cc: readonly Mailbox[];
-  readonly subject: string;
-  readonly text: string | undefined;
-  readonly html: string | undefined;
+/** What a person writes in an email: the email core's, and what it answers. */
+type PersonMessage = EmailMessageInput & {
   readonly inReplyTo?: string | undefined;
   readonly references?: readonly string[];
-}
+};
 
 export function createFakeWorld(context: DriverContext, store: GoogleStore) {
   const { ids, clock, timers } = context;
@@ -151,8 +138,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
   /** The agent's mailbox changed for `session`: push now, or when the session's second is over. */
   const changed = (session: string | undefined, email: string, labels: readonly string[]) => {
     if (session === undefined || !watched(labels)) return;
-    let pending = untold.get(session);
-    if (!pending) untold.set(session, (pending = new Set()));
+    const pending = untold.get(session) ?? new Set<string>();
+    untold.set(session, pending);
     pending.add(email);
     if (held.has(session)) return;
     const since = clock() - (lastPush.get(session) ?? Number.NEGATIVE_INFINITY);
@@ -238,14 +225,6 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
     return message;
   };
 
-  /** Keep an email, and the conversation it starts. */
-  const keep = (email: GoogleEmailRecord, session: string | undefined) => {
-    if (email.thread === email.id) {
-      store.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
-    }
-    return store.emails.add(email.id, email, session);
-  };
-
   const conversationOf = (message: { id: string; inReplyTo?: string | undefined; references: readonly string[] }) =>
     threadOf(message, (id) => store.byMessageId(id)?.thread) ?? message.id;
 
@@ -259,22 +238,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
     keyId,
 
     /** A person: a mailbox at `<name>@example.com` unless the test gives an address. Their id is their address. */
-    createUser(session: string, input: { name: string; address?: string | undefined }): GoogleUserRecord {
-      let address = input.address?.toLowerCase();
-      if (address !== undefined) {
-        if (parseAddresses(address)[0]?.address !== address) {
-          throw new ProtocolError("invalid_argument", `"${input.address}" is not an email address`);
-        }
-        if (store.personAt(address) || address === store.app.address) {
-          throw new ProtocolError("invalid_argument", `Someone has the address ${address} already`);
-        }
-      } else {
-        const local = localPartOf(input.name);
-        address = `${local}@example.com`;
-        for (let n = 2; store.personAt(address); n++) address = `${local}${n}@example.com`;
-      }
-      return store.users.add(address, { id: address, name: input.name, address, fixedId: false }, session);
-    },
+    createUser: (session: string, input: { name: string; address?: string | undefined }): GoogleUserRecord =>
+      store.addPerson(session, input),
 
     /**
      * A person sends an email from their Gmail mailbox. To the agent's address, a copy lands in the
@@ -309,7 +274,7 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
         agentCopy: undefined,
         delivery: undefined,
       };
-      keep(email, session);
+      store.keep(email, session);
       if ([...input.to, ...input.cc].some(isApp)) intoMailbox(email, [...RECEIVED_LABELS], session);
       return email;
     },
@@ -375,7 +340,7 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
         agentCopy: undefined,
         delivery: undefined,
       };
-      keep(email, session);
+      store.keep(email, session);
       return intoMailbox(email, ["SENT"], session, threadId);
     },
 

@@ -51,7 +51,7 @@ function payloadOf(email: GoogleEmailRecord, headers: readonly MimeHeader[]): Js
 }
 
 /** Gmail's snippet: the start of the text, whitespace folded, HTML-escaped as Gmail escapes it. */
-export function snippetOf(email: GoogleEmailRecord): string {
+function snippetOf(email: GoogleEmailRecord): string {
   const text = (email.text ?? (email.html ?? "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
   return text
     .slice(0, 200)

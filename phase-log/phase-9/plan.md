@@ -94,3 +94,25 @@ The same list as phase 8, for Google: AGENTS.md is already current; `docs/realit
 `docs/architecture.md` (id table), `docs/code-map.md` (rows for the driver), the website's
 platform page and the API reference (generated), the guides that list the channels,
 `website/docs/reference/environment-variables.md`, README, `index.html`, the skill.
+
+## Changed while building
+
+- **The email kit grew.** Resend's routes, people and records were the template for Google's, and
+  copying them was a duplicate. What both email channels have moved into `core/email`:
+  `store.ts` (`EmailStore`: the agent's mailbox, people, emails, conversations, `addPerson`),
+  `routes.ts` (`registerEmailRoutes` over an `EmailWorld`: the fixture, people who send, reply and
+  read their inbox, the conversations), `mime.ts` (`composeMime`, `parseMime`, `mimeHeaders`), and
+  `replyOf` and `emailAuthor` in `index.ts`. Resend moved onto them; its spec is unchanged.
+- **`rootPaths`.** `googleapis` rebuilds each URL as an absolute path against `rootUrl`, dropping
+  any path in it, so without portless (each fake under a path prefix) it can't reach the fake. A
+  driver now declares the paths its SDK keeps at the root (`/gmail/v1/`), and the server serves
+  them at its root too; `GOOGLE_API_URL` is the fake's origin.
+- **The delivery kit's `forge`.** A resend can carry a forgery only the platform makes: a Pub/Sub
+  token for another audience (`wrongAudience`), counted as forged like a bad signature.
+- **`restApi` reads form bodies and answers 204 empty:** Google's token endpoint takes a form, and
+  Gmail's `users.stop` answers nothing.
+- **History ids aren't drawn.** The id generator keeps every id unique, and a gap drawn from 1 to 40
+  ran out after 40 changes and looped. A history id grows by a gap from its count instead.
+- **The pinned descriptions share one script**, `scripts/pinned-schema.ts` (`resend:schema`,
+  `google:schema`).
+- **`google.history` doesn't run live**: it counts replies exactly, which needs proxy mode live.

@@ -30,8 +30,12 @@ export interface MimeMessage {
   readonly references: readonly string[];
 }
 
-/** Build a message: the bytes a mail server would send, CRLF line ends, `Date` at `at`. */
-export function composeMime(message: MimeMessage, at: number): Promise<string> {
+/** Build a message: the bytes a mail server would send, CRLF line ends, `Date` at `at`, and any `headers` of its own. */
+export function composeMime(
+  message: MimeMessage,
+  at: number,
+  headers: Readonly<Record<string, string>> = {},
+): Promise<string> {
   const composer = new MailComposer({
     from: formatMailbox(message.from),
     to: message.to.map(formatMailbox),
@@ -45,6 +49,7 @@ export function composeMime(message: MimeMessage, at: number): Promise<string> {
     ...(message.references.length > 0 ? { references: [...message.references] } : {}),
     // The composer writes no Bcc header: who got a blind copy is the sender's to know.
     date: new Date(at),
+    headers: { ...headers },
   });
   return new Promise((resolve, reject) => {
     composer.compile().build((error, bytes) => (error ? reject(error) : resolve(bytes.toString("utf8"))));

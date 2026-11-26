@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
 
 /** Who signs Gmail's pushes: Google's accounts, as `verifyIdToken` checks the issuer. */
-export const PUSH_ISSUER = "https://accounts.google.com";
+const PUSH_ISSUER = "https://accounts.google.com";
 /** A push token is good for an hour, as Pub/Sub's are. */
 export const PUSH_TOKEN_LIFETIME_S = 3600;
 

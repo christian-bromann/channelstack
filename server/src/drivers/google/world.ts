@@ -1,5 +1,5 @@
-import type { Mailbox } from "../../core/email/index.ts";
 import type { MimeHeader } from "../../core/email/mime.ts";
+import type { EmailAppRecord, EmailPersonRecord, EmailRecord } from "../../core/email/store.ts";
 
 /**
  * The Google fake's records. The Gmail API shows the agent its own mailbox only: the copies of
@@ -8,58 +8,19 @@ import type { MimeHeader } from "../../core/email/mime.ts";
  * can be read.
  */
 
-/** The agent's mailbox. */
-export interface GoogleAppRecord {
-  /** The mailbox's Google account id. */
-  readonly id: string;
-  readonly name: string;
-  /** Where people email the agent. */
-  readonly address: string;
-}
+/** The agent's mailbox; its id is its Google account's. */
+export type GoogleAppRecord = EmailAppRecord;
 
 /** A person: a mailbox in the outside world. */
-export interface GoogleUserRecord {
-  readonly id: string;
-  readonly name: string;
-  readonly address: string;
-  /** The test chose the id: freed again when its session closes (decision 0006). */
-  readonly fixedId: boolean;
-}
+export type GoogleUserRecord = EmailPersonRecord;
 
-/** One email as it was sent, whoever sent it. */
-export interface GoogleEmailRecord {
-  /** The email's id: the id of its sender's copy. */
-  readonly id: string;
-  /** Who wrote it: a person's or the app's id, or none for an address no one in the world has. */
-  readonly author: string | undefined;
-  readonly from: Mailbox;
-  readonly to: readonly Mailbox[];
-  readonly cc: readonly Mailbox[];
-  readonly bcc: readonly Mailbox[];
-  readonly replyTo: readonly Mailbox[];
-  readonly subject: string;
-  readonly text: string | undefined;
-  readonly html: string | undefined;
-  readonly messageId: string;
-  readonly inReplyTo: string | undefined;
-  readonly references: readonly string[];
-  /** The conversation it is in, as a test reads it: the id of its first email. */
-  readonly thread: string;
-  readonly createdAt: number;
+/** One email as it was sent, whoever sent it. Its id is its sender's copy's. */
+export interface GoogleEmailRecord extends EmailRecord {
   /** The message as it travelled (RFC 5322), and its top-level headers. Live, what was read back. */
   readonly raw: string | undefined;
   readonly headers: readonly MimeHeader[];
   /** The agent's copy of it, in its mailbox, if it has one. */
   agentCopy: string | undefined;
-  /** For an email to the agent: the push that told it of its copy. */
-  delivery: string | undefined;
-}
-
-/** A conversation: emails joined by `In-Reply-To` and `References`. Its id is its first email's. */
-export interface GoogleThreadRecord {
-  readonly id: string;
-  readonly subject: string;
-  readonly createdAt: number;
 }
 
 /** A message in the agent's mailbox: its copy of an email, in one of its threads, with its labels. */

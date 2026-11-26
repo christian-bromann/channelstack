@@ -1,43 +1,15 @@
-import type { Mailbox } from "../../core/email/index.ts";
-import type { Awaitable } from "../../core/router/index.ts";
-import type { TranscriptPrincipal } from "../../core/router/inspect.ts";
-import type { GoogleStore } from "./fake/store.ts";
+import type { EmailWorld } from "../../core/email/routes.ts";
 import type { FakeGoogleWorld } from "./fake/world.ts";
-import type { GoogleEmailRecord, GoogleUserRecord } from "./world.ts";
-
-/** What a person writes in an email. */
-export interface GoogleMessageInput {
-  readonly to: readonly Mailbox[];
-  readonly cc: readonly Mailbox[];
-  readonly subject: string;
-  readonly text: string | undefined;
-  readonly html: string | undefined;
-}
+import type { GoogleEmailRecord } from "./world.ts";
 
 /**
- * What people do on Gmail that works live, written once. The fake implements it over its world
- * (`fakeGoogleWorld`); live mode over the Gmail API with each person's own account. Routes use `live ?? fake`.
+ * What people do on Gmail that works live: the email core's world, and the labels of an email's
+ * copy in the agent's mailbox. The fake implements it over its world (`fakeGoogleWorld`); live mode
+ * over the Gmail API with each person's own account. Routes use `live ?? fake`.
  */
-export interface GoogleWorld {
-  /** The mail as the routes read it: the fake's own, or live, what was read back from Gmail. */
-  readonly store: GoogleStore;
-  createUser(
-    session: string,
-    input: { name: string; address?: string | undefined; token?: string | undefined },
-  ): Awaitable<GoogleUserRecord>;
-  send(session: string, person: GoogleUserRecord, input: GoogleMessageInput): Awaitable<GoogleEmailRecord>;
-  reply(
-    session: string,
-    person: GoogleUserRecord,
-    to: GoogleEmailRecord,
-    input: { text: string | undefined; html: string | undefined; all: boolean },
-  ): Awaitable<GoogleEmailRecord>;
-  inbox(session: string, person: GoogleUserRecord): Awaitable<GoogleEmailRecord[]>;
-  /** Read again what the agent may have changed: nothing to do in the fake, which holds the truth. */
-  refresh(session: string): Awaitable<void>;
-  /** The labels of an email's copy in the agent's mailbox: the fake's; live, none it can read. */
+export interface GoogleWorld extends EmailWorld<GoogleEmailRecord> {
+  /** The labels of an email's copy in the agent's mailbox: the fake's; live, none a test reads. */
   labelsOf(email: GoogleEmailRecord): readonly string[];
-  principalOf(email: GoogleEmailRecord): TranscriptPrincipal;
 }
 
 /** The fake as a `GoogleWorld`. */
