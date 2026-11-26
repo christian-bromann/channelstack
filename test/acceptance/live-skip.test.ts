@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 
 import { expect, test } from "vitest";
@@ -47,6 +48,54 @@ test("a GitHub example on a live server is skipped with the reason", async () =>
     expect(output).toMatch(
       /↓ .*no install, no events.* \d+ms \[live: GitHubFixture\.createRepo without apps isn't supported live: the App's installation covers all of acme-tests's repositories, so it hears about every one\]/,
     );
+  } finally {
+    await server.stop();
+  }
+}, 60_000);
+
+// Issue #46: live, the platform delivers to the agent itself, so a delivery check has no delivery to
+// redeliver or forge. It skips with that reason, before anything else: not failing with "caused no
+// delivery", and not stepping over the delivery to skip later for another reason. Ana has a token
+// the stand-in knows, so she acts in the live org and the checks get as far as their delivery.
+test("the delivery checks on a live server skip with the delivery reason", async () => {
+  const token = `ghp_${randomBytes(18).toString("hex")}`;
+  const server = await startBinary({
+    bin: join(ROOT, "test", "acceptance", "stand-ins", "github-live-server.sh"),
+    env: { CHANNELSTACK_LOG_LEVEL: "warn", CHANNELSTACK_GITHUB_USER_ANA_TOKEN: token },
+  });
+  try {
+    const run = spawnSync(
+      "pnpm",
+      [
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/acceptance/vitest.config.ts",
+        "test/acceptance/checks/github-checks.test.ts",
+        "-t",
+        String.raw`\[github\.(redelivery|bad-signature)\]`,
+        "--reporter",
+        "verbose",
+      ],
+      {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          CHANNELSTACK_HOME: server.home,
+          CHANNELSTACK_GITHUB_USER_ANA_TOKEN: token,
+          NO_COLOR: "1",
+        },
+        encoding: "utf8",
+      },
+    );
+    const output = `${run.stdout}\n${run.stderr}`;
+    expect(run.status, output).toBe(0);
+    expect(output).not.toMatch(/\bfailed\b/);
+    const reason = String.raw`\[live: GitHub delivers to the agent itself, so delivery checks are fake-only\]`;
+    for (const id of ["redelivery", "bad-signature"]) {
+      expect(output).toMatch(new RegExp(String.raw`↓ .*\[github\.${id}\].* \d+ms ${reason}`));
+    }
   } finally {
     await server.stop();
   }
