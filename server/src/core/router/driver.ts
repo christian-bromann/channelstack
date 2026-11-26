@@ -210,8 +210,9 @@ export interface DriverDefinition {
    */
   readonly tokenPatterns: readonly RegExp[];
   /**
-   * Tokens the real platform issues that the fake never generates (a person's Slack token, a
-   * Linear API key). The redaction tests make one of each and check `tokenPatterns` scrubs it.
+   * Tokens the platform issues that aren't among `secrets`: ones the fake never generates (a
+   * person's Slack token, a Linear API key), or makes per request (Google's access tokens). The
+   * redaction tests make one of each and check `tokenPatterns` scrubs it.
    */
   readonly liveTokens?: readonly SecretFormat[];
   readonly secrets: SecretSpec;

@@ -405,11 +405,11 @@ describe("code", () => {
   test("a body is parsed in one place: bad JSON is GitHub's 400, and a DELETE's body is on record", async () => {
     const { h, api, path, issue, get, token, raw } = await workspace();
     const { number } = await issue();
-    const send = async (method: string, body: string) =>
+    const send = async (method: string, body: string, type = "application/json") =>
       h.app.fetch(
         new Request(`http://127.0.0.1:4500/github${path}/issues/${number}/assignees`, {
           method,
-          headers: { authorization: `token ${await token()}`, "content-type": "application/json" },
+          headers: { authorization: `token ${await token()}`, "content-type": type },
           body,
         }),
       );
@@ -417,6 +417,9 @@ describe("code", () => {
       const bad = await send(method, "{not json");
       expect([bad.status, ((await bad.json()) as { message: string }).message]).toEqual([400, "Problems parsing JSON"]);
     }
+    // A form is no JSON to GitHub either: only an endpoint that takes one (an OAuth token request) reads it.
+    const form = await send("POST", "assignees=ana", "application/x-www-form-urlencoded");
+    expect([form.status, ((await form.json()) as { message: string }).message]).toEqual([400, "Problems parsing JSON"]);
     expect((await send("POST", "null")).status).toBe(400);
     expect((await raw("GET", `${path}/issues/${number}`, `token ${await token()}`)).status).toBe(200);
 

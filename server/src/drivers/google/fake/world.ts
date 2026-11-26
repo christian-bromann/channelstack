@@ -1,6 +1,6 @@
 import { deliveryKit } from "../../../core/delivery/kit.ts";
-import { emailAuthor, type Mailbox, messageId, replyOf, threadOf } from "../../../core/email/index.ts";
-import { composeMime, mimeHeaders, parseMime } from "../../../core/email/mime.ts";
+import { emailAuthor, formatMailbox, type Mailbox, messageId, replyOf, threadOf } from "../../../core/email/index.ts";
+import { composeMime, mimeHeaders, parseMime, withHeaders } from "../../../core/email/mime.ts";
 import type { EmailMessageInput } from "../../../core/email/routes.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
 import { GOOGLE_IDS } from "../ids.ts";
@@ -69,11 +69,10 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
   const { ids, clock, timers } = context;
   const keyId = () => keyIdOf(context.secret("pushKey"));
   const pushAccount = ids.next(GOOGLE_IDS.account);
-  const claims = (audience: string, atMs: number) => ({
-    audience,
-    email: PUBSUB.serviceAccount,
-    subject: pushAccount,
-    atMs,
+  /** A push's headers, as Pub/Sub sends them: its user agent, and a token for `audience` signed with `key`. */
+  const pushHeaders = (key: string, audience: string, atMs: number) => ({
+    "user-agent": "APIs-Google; (+https://developers.google.com/webmasters/APIs-Google.html)",
+    ...signPushToken(key, keyId(), { audience, email: PUBSUB.serviceAccount, subject: pushAccount, atMs }),
   });
 
   /** Gmail's pushes, through Pub/Sub: an OIDC token for the push endpoint, retried on Pub/Sub's backoff. */
@@ -86,10 +85,7 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
         return afterMs === undefined ? undefined : { afterMs, headers: {} };
       },
     },
-    sign: (secret, _body, atMs) => ({
-      "user-agent": "APIs-Google; (+https://developers.google.com/webmasters/APIs-Google.html)",
-      ...signPushToken(secret, keyId(), claims(context.webhookUrl ?? "", atMs)),
-    }),
+    sign: (secret, _body, atMs) => pushHeaders(secret, context.webhookUrl ?? "", atMs),
     secret: () => context.secret("pushKey"),
     // Another key, but the same `kid`: a token that fails its signature check.
     forgedSecret: () => GOOGLE_SECRETS.pushKey.generate(),
@@ -129,9 +125,11 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       body: JSON.stringify(payload),
       meta: { payload, ...notification, emails: [...emails] },
     });
+    // The push that told the agent of an email to it (the agent's own sent mail it hears of is no such email).
     for (const email of emails) {
       const record = store.emails.find(email);
-      if (record && record.delivery === undefined) record.delivery = id;
+      const toAgent = record !== undefined && [...record.to, ...record.cc, ...record.bcc].some(isApp);
+      if (record && toAgent && record.delivery === undefined) record.delivery = id;
     }
   };
 
@@ -310,6 +308,12 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
       const from =
         parsed.from.address === store.app.address ? parsed.from : { address: store.app.address, name: store.app.name };
       const ownId = parsed.messageId || messageId(ids.next(GOOGLE_IDS.messageLocal), GMAIL_DOMAIN);
+      // What Gmail keeps and sends is the message with the From and the Message-ID it gave it.
+      const stamped = {
+        ...(from === parsed.from ? {} : { From: formatMailbox(from) }),
+        ...(parsed.messageId ? {} : { "Message-ID": ownId }),
+      };
+      const sent = Object.keys(stamped).length === 0 ? raw : withHeaders(raw, stamped);
       // The email belongs to the session of the conversation it answers, or of a person it reaches.
       const answered = threadOf(parsed, (named) => store.byMessageId(named)?.thread);
       const reached = to.map((mailbox) => store.personAt(mailbox.address)).find(Boolean);
@@ -335,8 +339,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
         references: parsed.references,
         thread: answered ?? id,
         createdAt: clock(),
-        raw,
-        headers: parsed.headers,
+        raw: sent,
+        headers: sent === raw ? parsed.headers : mimeHeaders(sent),
         agentCopy: undefined,
         delivery: undefined,
       };
@@ -391,8 +395,8 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
     resend(session: string, id: string, options: { badSignature: boolean; stale?: boolean; wrongAudience?: boolean }) {
       if (options.wrongAudience) {
         return deliveries.resend(session, id, {
-          forge: (_body, atMs) =>
-            signPushToken(context.secret("pushKey"), keyId(), claims("https://example.com/not-the-agent", atMs)),
+          ...options,
+          forge: (secret, _body, atMs) => pushHeaders(secret, "https://example.com/not-the-agent", atMs),
         });
       }
       return deliveries.resend(session, id, options);

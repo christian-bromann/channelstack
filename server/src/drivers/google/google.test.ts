@@ -106,8 +106,11 @@ describe("what Gmail refuses, as Gmail does", () => {
     expect(other.status).toBe(403);
   });
 
-  test("an unknown or malformed id, a watch on a topic Gmail can't publish to, a send to no one", async () => {
-    const { gmail } = await mailbox();
+  test("an unknown or malformed id, a form body, a watch on a topic Gmail can't publish to, a send to no one", async () => {
+    const { h, issued, gmail } = await mailbox();
+    // A form is no JSON to Gmail: only the token endpoint takes one.
+    const form = await h.provider("POST", "google/gmail/v1/users/me/labels", "name=Refunds", issued.access_token, FORM);
+    expect(form).toMatchObject({ status: 400, body: { error: { message: "Invalid JSON payload received." } } });
     expect((await gmail("GET", "/messages/19aaaaaaaaaaaaaa")).body.error).toMatchObject({
       code: 404,
       status: "NOT_FOUND",
@@ -187,6 +190,38 @@ describe("the mailbox, as Gmail's discovery document describes it", () => {
   });
 });
 
+describe("what the agent sends, as Gmail keeps and sends it", () => {
+  test("Gmail's own Message-ID and From, in every format and in what the recipient gets", async () => {
+    const { h, gmail, base, ana, pushes } = await mailbox();
+    // A watch on every label: the agent hears of its own sent mail too.
+    await gmail("POST", "/watch", { topicName: PUBSUB.topic });
+    const written = [
+      "From: Someone Else <someone@elsewhere.example>",
+      `To: =?UTF-8?Q?Lima=2C_Ana?= <${ana.address}>`,
+      "Subject: Hello",
+      "",
+      "Hi Ana.",
+    ].join("\r\n");
+    const { body: sent } = await gmail("POST", "/messages/send", { raw: Buffer.from(written).toString("base64url") });
+    const { body: raw } = await gmail("GET", `/messages/${sent.id}?format=raw`);
+    const text = Buffer.from(raw.raw, "base64url").toString("utf8");
+    expect(text).toMatch(/^Message-ID: <CA[\w+=-]+@mail\.gmail\.com>\r\n/m);
+    expect(text).toContain("From: my-agent <my-agent@acme.example>\r\n");
+    expect(text).not.toContain("someone@elsewhere.example");
+    expect(text).toContain("Hi Ana.");
+    const { body: full } = await gmail("GET", `/messages/${sent.id}?format=metadata`);
+    const header = (name: string) =>
+      full.payload.headers.find((each: { name: string }) => each.name.toLowerCase() === name)?.value;
+    const [mailed] = (await h.call("GET", `${base}/users/${encodeURIComponent(ana.id)}/inbox`)).body;
+    expect(header("message-id")).toBe(mailed.messageId);
+    expect(header("from")).toBe("my-agent <my-agent@acme.example>");
+    expect(mailed.to).toEqual([ana.address]);
+    // It was pushed, but it is no email to the agent: no delivery told the agent of it.
+    expect(await pushes()).toHaveLength(1);
+    expect(mailed.delivery).toBeUndefined();
+  });
+});
+
 describe("pushes, as Pub/Sub sends Gmail's", () => {
   test("none without a watch; then at most one a second, the held one with the newest history id", async () => {
     const { h, send, pushes, watch } = await mailbox();
@@ -207,6 +242,31 @@ describe("pushes, as Pub/Sub sends Gmail's", () => {
     expect(BigInt(historyIds[1])).toBeGreaterThan(BigInt(historyIds[0]));
   });
 
+  test("a reset keeps the agent's watch, and the mailbox's history ids growing", async () => {
+    const { h, gmail, send, pushes, watch } = await mailbox();
+    await watch();
+    await send("Before the reset");
+    const historyOf = (push: { body: string } | undefined) =>
+      BigInt(JSON.parse(Buffer.from(JSON.parse(push?.body ?? "{}").message.data, "base64").toString()).historyId);
+    const before = historyOf((await pushes()).at(-1));
+
+    await h.call("POST", "/reset");
+    const { sessionId } = (await h.call("POST", "/sessions")).body;
+    const base = `/sessions/${sessionId}/google`;
+    const { app } = (await h.call("GET", base)).body;
+    const ben = (await h.call("POST", `${base}/users`, { name: "Ben" })).body;
+    await h.call("POST", `${base}/users/${encodeURIComponent(ben.id)}/send`, {
+      to: [app.id],
+      subject: "After",
+      text: "Hi",
+    });
+    const after = historyOf((await pushes()).at(-1));
+    expect(after).toBeGreaterThan(before);
+    // The agent's cursor from before the reset lists the new mail.
+    const { body: listed } = await gmail("GET", `/history?startHistoryId=${before}&historyTypes=messageAdded`);
+    expect(listed.history).toHaveLength(1);
+  });
+
   test("its token verifies against the certificate and the JWK the fake serves", async () => {
     const { h, send, pushes, watch } = await mailbox();
     await watch();
@@ -225,5 +285,27 @@ describe("pushes, as Pub/Sub sends Gmail's", () => {
     const [jwk] = jwks.keys;
     expect(jwk).toMatchObject({ kid, kty: "RSA", alg: "RS256", use: "sig" });
     expect(signed(createPublicKey({ key: jwk, format: "jwk" }))).toBe(true);
+  });
+
+  test("a forgery for another audience combines with the other forgeries, and comes with Pub/Sub's user agent", async () => {
+    const { h, base, send, pushes, watch } = await mailbox();
+    await watch();
+    const email = await send("Forged");
+    await pushes();
+    const resent = await h.call("POST", `${base}/deliveries/${email.delivery.id}/resend`, {
+      wrongAudience: true,
+      stale: true,
+    });
+    expect(resent.body.forgedSignature).toBe(true);
+    const [normal, forged] = await pushes();
+    expect(forged?.headers["user-agent"]).toBe(normal?.headers["user-agent"]);
+    const claims = (push: typeof normal) =>
+      JSON.parse(Buffer.from(String(push?.headers.authorization).split(".")[1] ?? "", "base64url").toString()) as {
+        aud: string;
+        exp: number;
+      };
+    expect(claims(forged).aud).not.toBe(claims(normal).aud);
+    // Stale too: it had expired before the push that was sent first was signed.
+    expect(claims(forged).exp).toBeLessThan(claims(normal).exp - 3600);
   });
 });

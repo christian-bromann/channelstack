@@ -602,10 +602,13 @@ export function googleChecks(options: ChecksOptions): void {
     });
 
     check("google.history", "answers each of two emails Gmail told of in one push, once", async ({ google }) => {
-      // Gmail pushes at most once a second: one push tells of both, and the agent reads its history.
+      // Gmail pushes at most once a second. A first email is pushed at once; the two after it, within
+      // that second, wait for its end and come in one push, so the agent must read its history.
       const ana = await google.createUser({ name: "Ana" });
+      const opener = await ana.send({ to: [google.app], subject: "Hello", text: prompt });
       const first = await ana.send({ to: [google.app], subject: "First", text: prompt });
       const second = await ana.send({ to: [google.app], subject: "Second", text: prompt });
+      await expect(opener.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
       await expect(first.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
       await expect(second.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });

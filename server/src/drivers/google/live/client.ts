@@ -38,6 +38,11 @@ export class GoogleRestClient {
     this.#client = options.client;
   }
 
+  /** Trash a thread of the mailbox, as a run's cleanup and the sweep do: Gmail empties the trash in 30 days. */
+  trashThread(credential: LiveCredential, thread: string): Promise<unknown> {
+    return this.call(credential, "POST", `gmail/v1/users/me/threads/${thread}/trash`);
+  }
+
   /** An access token for the mailbox whose refresh token this is. */
   async #token(credential: LiveCredential): Promise<string> {
     const held = this.#access.get(credential);

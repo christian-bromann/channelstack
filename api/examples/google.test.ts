@@ -112,7 +112,7 @@ describe("delivery and failures (fake only)", () => {
 });
 
 describe("inspecting what the agent did", () => {
-  test("it watched the mailbox, read its history and the email, and sent its answer", async ({ google }) => {
+  test("it read its history and the email, and sent its answer", async ({ google }) => {
     const ana = await google.createUser({ name: "Ana" });
     const email = await ana.send({ to: [google.app], subject: "Refund", text: "Where is my refund?" });
     await expect(email.thread).toHaveReplyFrom(google.app);

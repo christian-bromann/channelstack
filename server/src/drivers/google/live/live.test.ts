@@ -31,6 +31,7 @@ function liveGoogle(stub: GoogleStub, allowlist: string) {
 
 const AGENT = "my-agent@agent.example.org";
 const ANA = "ana@people.example.org";
+const BEN = "ben@people.example.org";
 
 describe("exit check 9.7: Gmail live", () => {
   test("the agent's mailbox outside CHANNELSTACK_LIVE_GOOGLE_ADDRESSES is refused before anything is sent", async () => {
@@ -87,6 +88,56 @@ describe("exit check 9.7: Gmail live", () => {
     await close();
     expect(ana.trashed).toHaveLength(1);
     expect(stub.agent.trashed).toHaveLength(1);
+  });
+
+  test("two people: the agent's answer to both is one email, and each replies in their own mailbox's thread", async () => {
+    const stub = googleStub();
+    const ana = stub.mailbox("ana", ANA);
+    const ben = stub.mailbox("ben", BEN);
+    const { google } = await liveGoogle(stub, `${AGENT},${ANA},${BEN}`).open();
+    const { app } = (await google("GET", "")).body;
+    const asAna = (await google("POST", "/users", { name: "Ana", token: ana.refreshToken })).body;
+    const asBen = (await google("POST", "/users", { name: "Ben", token: ben.refreshToken })).body;
+    const email = (
+      await google("POST", `/users/${encodeURIComponent(asAna.id)}/send`, {
+        to: [app.id, asBen.id],
+        subject: "Refund",
+        text: "Where is our refund?",
+      })
+    ).body;
+    stub.agentReplies(stub.sent[0] as Sent, "It was sent today.", { to: [ANA, BEN] });
+    const replies = (await google("GET", `/threads/${email.thread.id}/replies`)).body;
+    expect(replies).toHaveLength(1);
+
+    // Ben answers it: Gmail takes the thread id of Ben's own mailbox, and would refuse Ana's.
+    const answered = await google("POST", `/users/${encodeURIComponent(asBen.id)}/reply`, {
+      email: replies[0].id,
+      text: "Thanks!",
+    });
+    expect(answered.body.error, answered.body.message).toBeUndefined();
+    const own = ben.messages.find((message) => message.sent.text === "Thanks!");
+    const answer = ben.messages.find((message) => message.sent.text.includes("It was sent today."));
+    expect(own?.threadId).toBe(answer?.threadId);
+  });
+
+  test("a thread whose labelling fails is on the ledger all the same, and its session trashes it", async () => {
+    const stub = googleStub();
+    const ana = stub.mailbox("ana", ANA);
+    const { google, close } = await liveGoogle(stub, `${AGENT},${ANA}`).open();
+    const { app } = (await google("GET", "")).body;
+    const person = (await google("POST", "/users", { name: "Ana", token: ana.refreshToken })).body;
+    stub.failNext(/\/threads\/[^/]+\/modify$/, 403);
+    const sent = await google("POST", `/users/${encodeURIComponent(person.id)}/send`, {
+      to: [app.id],
+      subject: "Refund",
+      text: "Where?",
+    });
+    expect(sent.status).toBeGreaterThanOrEqual(400);
+    expect(ana.messages).toHaveLength(1);
+    // Gmail refused the label: the thread has none of the run's.
+    expect(ana.messages[0]?.labels).toEqual(["SENT"]);
+    await close();
+    expect(ana.trashed).toEqual([ana.messages[0]?.threadId]);
   });
 
   test("a reply to an address outside the allowlist is refused, and nothing is sent", async () => {

@@ -28,10 +28,6 @@ const credentials = (client: GoogleRestClient, env: Env) =>
     identify: (credential) => identifyGoogle(client, credential),
   });
 
-/** Trash a thread a run left, as the mailbox it is in. */
-const trash = (client: GoogleRestClient, credential: LiveCredential, thread: string) =>
-  client.call(credential, "POST", `gmail/v1/users/me/threads/${thread}/trash`);
-
 /** `channelstack doctor` and `channelstack sweep` for Google, from the credentials in the environment. */
 export const googleMaintenance: LiveMaintenance = {
   async doctor({ env, fetch, apiBase }) {
@@ -57,7 +53,7 @@ export const googleMaintenance: LiveMaintenance = {
       remove: async (entry) => {
         const credential = byOwner(entry.by);
         if (!credential) throw new Error(`no credential for ${entry.by} in the environment`);
-        await trash(client, credential, entry.ref.thread ?? "");
+        await client.trashThread(credential, entry.ref.thread ?? "");
       },
     });
 
@@ -95,7 +91,7 @@ export const googleMaintenance: LiveMaintenance = {
       known: (item, entry) => entry.channel === "google" && entry.ref.thread === item.thread,
       createdAt: (item) => item.at,
       remove: async (item) => {
-        await trash(client, item.by, item.thread);
+        await client.trashThread(item.by, item.thread);
         return undefined;
       },
     });

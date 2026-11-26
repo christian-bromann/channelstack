@@ -59,13 +59,17 @@ export class GoogleStore extends EmailStore<GoogleEmailRecord, GoogleAppRecord> 
     this.history = registry.collection("google", "history");
   }
 
+  /**
+   * The mailbox as a reset leaves it: no mail, only the system labels. The agent runs on, so its
+   * watch stays, and the history id never goes back (Gmail's only grow): a cursor the agent kept
+   * lists what comes after the reset.
+   */
   seed(app: GoogleAppRecord, historyStart: string): void {
     this.setApp(app);
     this.labels.clear();
     for (const label of SYSTEM_LABELS) this.labels.set(label.id, label);
-    this.watch = undefined;
     this.historyStart = historyStart;
-    this.historyId = historyStart;
+    if (BigInt(this.historyId) < BigInt(historyStart)) this.historyId = historyStart;
   }
 
   /** A thread's messages in the agent's mailbox, oldest first. */

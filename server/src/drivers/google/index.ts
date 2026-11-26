@@ -18,13 +18,15 @@ export const google: DriverDefinition = {
   // Gmail's API, Google's token endpoint, and where its certificates are.
   hosts: ["gmail.googleapis.com", "oauth2.googleapis.com", "www.googleapis.com"],
   // googleapis keeps its paths at the root of the `rootUrl` it is given.
-  rootPaths: ["/gmail/v1/", "/upload/gmail/v1/"],
+  rootPaths: ["/gmail/v1/"],
   secrets: {
     clientId: GOOGLE_SECRETS.clientId,
     clientSecret: GOOGLE_SECRETS.clientSecret,
     refreshToken: GOOGLE_SECRETS.refreshToken,
     pushKey: GOOGLE_SECRETS.pushKey,
   },
+  // The token endpoint makes an access token per refresh: none is kept among the secrets.
+  liveTokens: [GOOGLE_SECRETS.accessToken],
   // The agent's OAuth client and its mailbox's refresh token (live-mode.md, section 4). People bring their own accounts' tokens.
   live: {
     credentials: [
@@ -56,7 +58,7 @@ export const google: DriverDefinition = {
       context.live.ledger.onCleanup("google", async (entry) => {
         const credential = live.credential(entry.by, entry.session);
         if (!credential) throw new Error(`no credential for ${entry.by}`);
-        await client.call(credential, "POST", `gmail/v1/users/me/threads/${entry.ref.thread}/trash`);
+        await client.trashThread(credential, entry.ref.thread ?? "");
       });
     }
     const world = live ?? fakeGoogleWorld(fake.world);

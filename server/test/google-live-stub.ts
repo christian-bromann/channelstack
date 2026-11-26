@@ -16,8 +16,10 @@ export interface GoogleStub {
   readonly calls: Array<{ method: string; path: string; as: string }>;
   /** What every mailbox sent, oldest first. */
   readonly sent: Sent[];
-  /** The agent's answer to an email, with a `Reply-To` when given. */
-  agentReplies(to: Sent, text: string, also?: { replyTo?: string }): void;
+  /** The agent's answer to an email, to its sender (or to `to`), with a `Reply-To` when given. */
+  agentReplies(to: Sent, text: string, also?: { replyTo?: string; to?: string[] }): void;
+  /** The next call to a path matching `path` fails with `status`, as Gmail answers a refusal. */
+  failNext(path: RegExp, status: number): void;
 }
 
 interface Mailbox {
@@ -55,6 +57,7 @@ export function googleStub(): GoogleStub {
   const access = new Map<string, Mailbox>();
   const sent: Sent[] = [];
   const calls: GoogleStub["calls"] = [];
+  const failing: Array<{ path: RegExp; status: number }> = [];
   const mailbox = (name: string, at: string) => {
     const made: Mailbox = {
       name,
@@ -112,12 +115,15 @@ export function googleStub(): GoogleStub {
     mailbox,
     calls,
     sent,
+    failNext(path, status) {
+      failing.push({ path, status });
+    },
     agentReplies(to, text, also = {}) {
       deliver(agent, {
         ...(also.replyTo ? { replyTo: also.replyTo } : {}),
         id: id(),
         from: `my-agent <${agent.address}>`,
-        to: [address(to.from)],
+        to: also.to ?? [address(to.from)],
         subject: `Re: ${to.subject}`,
         messageId: `<${randomString(16, hex)}@mail.gmail.com>`,
         inReplyTo: to.messageId,
@@ -142,6 +148,11 @@ export function googleStub(): GoogleStub {
         access.set(token, owner);
         return json({ access_token: token, expires_in: 3599, token_type: "Bearer" });
       }
+      const failure = failing.findIndex((each) => each.path.test(pathname));
+      if (failure >= 0) {
+        const [{ status } = { status: 500 }] = failing.splice(failure, 1);
+        return json({ error: { code: status, message: "Refused.", errors: [{ reason: "forbidden" }] } }, status);
+      }
       const by = access.get(request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "");
       calls.push({ method: request.method, path: pathname, as: by?.name ?? "nobody" });
       if (!by)
@@ -157,6 +168,8 @@ export function googleStub(): GoogleStub {
         return json(label);
       }
       if (route === "/messages/send") {
+        // A thread id is the sender's mailbox's own: another's is not found.
+        if (body.threadId && !by.messages.some((message) => message.threadId === body.threadId)) return notFound();
         const raw = Buffer.from(body.raw, "base64url").toString("utf8");
         const header = (name: string) => mimeHeaders(raw).find((each) => each.name.toLowerCase() === name)?.value ?? "";
         const email: Sent = {

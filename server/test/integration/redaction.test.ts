@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "vitest";
 
-import { DRIVERS } from "../../src/drivers/index.ts";
+import { PREFIXED_TOKENS } from "../prefixed-tokens.ts";
 import { type RunningBinary, startBinary } from "./harness.ts";
 
 /**
@@ -14,10 +14,8 @@ import { type RunningBinary, startBinary } from "./harness.ts";
  */
 
 // Live-shaped tokens are built at runtime, so no token-shaped literal is ever committed: one of
-// each prefixed token every driver knows, fake or live.
-const liveShaped = DRIVERS.flatMap((driver) => [...Object.values(driver.secrets), ...(driver.liveTokens ?? [])])
-  .filter((format) => /^\/\^[a-z_]+[-_]/.test(String(format.pattern)) && !String(format.pattern).startsWith("/^echo"))
-  .map((format) => format.generate());
+// each prefixed token every driver knows, fake or live (echo's are this run's own, by value).
+const liveShaped = PREFIXED_TOKENS.filter(([name]) => !name.startsWith("echo")).map(([, format]) => format.generate());
 const email = ["ana.live", "example.com"].join("@");
 
 const agent = createServer((_request, response) => {

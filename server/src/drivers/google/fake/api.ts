@@ -161,29 +161,37 @@ export function createGoogleApi(
 
   // --- OAuth: the refresh-token grant, and the certificates push tokens are signed against --------
 
-  endpoint("post", "/token", "oauth2.token", (_c, body) => {
-    if (body.grant_type !== "refresh_token") {
-      return oauthRefusal(400, "unsupported_grant_type", `Invalid grant_type: ${String(body.grant_type ?? "")}`);
-    }
-    const same = (given: unknown, name: string) =>
-      typeof given === "string" && constantTimeEqual(given, context.secret(name));
-    if (!same(body.client_id, "clientId") || !same(body.client_secret, "clientSecret")) {
-      return oauthRefusal(401, "invalid_client", "The OAuth client was not found.");
-    }
-    if (typeof body.refresh_token !== "string" || body.refresh_token === "") {
-      return oauthRefusal(400, "invalid_request", "Missing required parameter: refresh_token");
-    }
-    if (!same(body.refresh_token, "refreshToken")) {
-      return oauthRefusal(400, "invalid_grant", "Token has been expired or revoked.");
-    }
-    const token = GOOGLE_SECRETS.accessToken.generate();
-    tokens.set(token, clock() + TOKEN_LIFETIME_S * 1000);
-    return {
-      body: { access_token: token, expires_in: TOKEN_LIFETIME_S, scope: SCOPE, token_type: "Bearer" },
-      sessions: [],
-      headers: { "cache-control": "no-cache, no-store, max-age=0, must-revalidate" },
-    };
-  });
+  // OAuth's token request is a form (RFC 6749, 4.1.3); Gmail's own endpoints take JSON only.
+  const OAUTH_FORM = { form: true };
+  endpoint(
+    "post",
+    "/token",
+    "oauth2.token",
+    (_c, body) => {
+      if (body.grant_type !== "refresh_token") {
+        return oauthRefusal(400, "unsupported_grant_type", `Invalid grant_type: ${String(body.grant_type ?? "")}`);
+      }
+      const same = (given: unknown, name: string) =>
+        typeof given === "string" && constantTimeEqual(given, context.secret(name));
+      if (!same(body.client_id, "clientId") || !same(body.client_secret, "clientSecret")) {
+        return oauthRefusal(401, "invalid_client", "The OAuth client was not found.");
+      }
+      if (typeof body.refresh_token !== "string" || body.refresh_token === "") {
+        return oauthRefusal(400, "invalid_request", "Missing required parameter: refresh_token");
+      }
+      if (!same(body.refresh_token, "refreshToken")) {
+        return oauthRefusal(400, "invalid_grant", "Token has been expired or revoked.");
+      }
+      const token = GOOGLE_SECRETS.accessToken.generate();
+      tokens.set(token, clock() + TOKEN_LIFETIME_S * 1000);
+      return {
+        body: { access_token: token, expires_in: TOKEN_LIFETIME_S, scope: SCOPE, token_type: "Bearer" },
+        sessions: [],
+        headers: { "cache-control": "no-cache, no-store, max-age=0, must-revalidate" },
+      };
+    },
+    OAUTH_FORM,
+  );
 
   const cached = { "cache-control": `public, max-age=${CERTS_MAX_AGE_S}, must-revalidate, no-transform` };
   endpoint("get", "/oauth2/v1/certs", "oauth2.certs", async () => ({

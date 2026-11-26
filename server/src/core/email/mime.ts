@@ -1,7 +1,7 @@
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
-import PostalMime, { decodeWords } from "postal-mime";
+import PostalMime, { type Address, decodeWords } from "postal-mime";
 
-import { formatMailbox, type Mailbox, messageIdsIn, parseAddresses } from "./index.ts";
+import { formatMailbox, type Mailbox, messageIdsIn } from "./index.ts";
 
 /**
  * Email as it travels: RFC 5322 messages, built with `nodemailer`'s composer and read with
@@ -66,19 +66,54 @@ export function mimeHeaders(raw: string): MimeHeader[] {
   });
 }
 
+/**
+ * The mailboxes of an address field as `postal-mime` read it: parsed before their names were
+ * decoded (a comma in `=?UTF-8?Q?Lima=2C_Ana?=` is a name's), groups flattened, an entry with no
+ * address left out.
+ */
+function mailboxesOf(field: Address | readonly Address[] | undefined): Mailbox[] {
+  const entries: readonly Address[] = field === undefined ? [] : Array.isArray(field) ? field : [field as Address];
+  return entries
+    .flatMap((entry) => entry.group ?? [entry])
+    .flatMap((mailbox) =>
+      typeof mailbox.address === "string" && mailbox.address.includes("@")
+        ? [{ address: mailbox.address.toLowerCase(), name: mailbox.name ?? "" }]
+        : [],
+    );
+}
+
+/**
+ * A message with these headers set, as a mail server stamps what it sends (Gmail's own
+ * `Message-ID`, its `From`): each replaces the field of its name, folded lines and all, and the
+ * new fields come first. The body is untouched.
+ */
+export function withHeaders(raw: string, headers: Readonly<Record<string, string>>): string {
+  const end = raw.search(/\r?\n\r?\n/);
+  const head = end < 0 ? raw : raw.slice(0, end);
+  const eol = head.includes("\r\n") ? "\r\n" : "\n";
+  const fields: string[] = [];
+  for (const line of head.split(/\r?\n/)) {
+    if (/^[ \t]/.test(line) && fields.length > 0) fields[fields.length - 1] += `${eol}${line}`;
+    else fields.push(line);
+  }
+  const named = new Set(Object.keys(headers).map((name) => name.toLowerCase()));
+  const kept = fields.filter((field) => !named.has(field.slice(0, field.indexOf(":")).trim().toLowerCase()));
+  const set = Object.entries(headers).map(([name, value]) => `${name}: ${value}`);
+  return [...set, ...kept].join(eol) + (end < 0 ? "" : raw.slice(end));
+}
+
 /** Read a message someone sent: who it is from and to, what it says, and what it answers. */
 export async function parseMime(raw: string): Promise<MimeMessage & { readonly headers: MimeHeader[] }> {
   const parsed = await PostalMime.parse(raw);
   const headers = mimeHeaders(raw);
   const header = (name: string) => headers.find((each) => each.name.toLowerCase() === name)?.value;
-  const mailboxes = (name: string) => parseAddresses(header(name) ? [header(name) as string] : undefined);
-  const [from] = mailboxes("from");
+  const [from] = mailboxesOf(parsed.from);
   return {
     from: from ?? { address: "", name: "" },
-    to: mailboxes("to"),
-    cc: mailboxes("cc"),
-    bcc: mailboxes("bcc"),
-    replyTo: mailboxes("reply-to"),
+    to: mailboxesOf(parsed.to),
+    cc: mailboxesOf(parsed.cc),
+    bcc: mailboxesOf(parsed.bcc),
+    replyTo: mailboxesOf(parsed.replyTo),
     subject: parsed.subject ?? "",
     text: parsed.text ?? undefined,
     html: parsed.html ?? undefined,

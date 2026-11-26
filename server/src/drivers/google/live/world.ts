@@ -80,10 +80,16 @@ export function createLiveGoogleWorld(deps: {
   const since = new Map<string, number>();
   /** Each mailbox's label for this run, made once. */
   const labels = new Map<LiveCredential, Promise<string>>();
-  /** The threads labelled and on the ledger, by mailbox. */
+  /** The threads on the ledger, and those labelled, by `<mailbox> <thread>`. */
+  const ledgered = new Set<string>();
   const tagged = new Set<string>();
-  /** An email's thread in each person's mailbox: a reply there names it. */
+  /**
+   * An email's thread in each mailbox, by `<address> <Message-ID>`: Gmail's ids are a mailbox's
+   * own, so a person's reply names the thread their own mailbox has it in.
+   */
   const gmailThread = new Map<string, string>();
+  /** The messages each session read from each mailbox, by `<address> <id>`: each is read once. */
+  const seen = new Map<string, Set<string>>();
   /** Each email's copy in the agent's mailbox, by the email's id, once Gmail has it there. */
   const agentCopy = new Map<string, string>();
   /** Each copy's labels when they were last read, without the run's own. */
@@ -120,22 +126,34 @@ export function createLiveGoogleWorld(deps: {
     return made;
   };
 
-  /** Label a thread with the run's tag, and put it on the ledger, once per mailbox. */
+  /**
+   * Put a thread on the ledger and label it with the run's tag, once per mailbox. The ledger comes
+   * first, so the session's cleanup trashes the thread even if labelling it fails; a label that
+   * failed is tried again the next time the thread is read.
+   */
   const tag = async (session: string, credential: LiveCredential, mailbox: string, thread: string, name: string) => {
     const key = `${mailbox} ${thread}`;
+    if (!ledgered.has(key)) {
+      ledgered.add(key);
+      live.ledger.record({
+        channel: "google",
+        kind: "thread",
+        ref: { thread, name: `${live.tag} ${name}` },
+        workspace: mailbox,
+        by: credential.owner,
+        session,
+      });
+    }
     if (tagged.has(key)) return;
     tagged.add(key);
-    await client.call(credential, "POST", `gmail/v1/users/me/threads/${thread}/modify`, {
-      addLabelIds: [await runLabel(credential)],
-    });
-    live.ledger.record({
-      channel: "google",
-      kind: "thread",
-      ref: { thread, name: `${live.tag} ${name}` },
-      workspace: mailbox,
-      by: credential.owner,
-      session,
-    });
+    try {
+      await client.call(credential, "POST", `gmail/v1/users/me/threads/${thread}/modify`, {
+        addLabelIds: [await runLabel(credential)],
+      });
+    } catch (error) {
+      tagged.delete(key);
+      throw error;
+    }
   };
 
   /** Keep what was read or sent in the mirror, in the conversation its references name. */
@@ -233,7 +251,6 @@ export function createLiveGoogleWorld(deps: {
       copy.payload?.headers?.find((each) => each.name.toLowerCase() === "message-id")?.value,
     )[0];
     await tag(session, credential, person.address, sent.threadId, input.subject);
-    gmailThread.set(sent.id, sent.threadId);
     const email = keep(session, {
       ...fromWire(copy),
       ...message,
@@ -244,6 +261,7 @@ export function createLiveGoogleWorld(deps: {
       headers: [],
       createdAt: clock(),
     });
+    gmailThread.set(`${person.address} ${email.messageId}`, sent.threadId);
     return email;
   };
 
@@ -291,7 +309,7 @@ export function createLiveGoogleWorld(deps: {
       input: { text: string | undefined; html: string | undefined; all: boolean },
     ) {
       const { inReplyTo, references, ...message } = replyOf(person, to, input.all);
-      const thread = gmailThread.get(to.id);
+      const thread = gmailThread.get(`${person.address} ${to.messageId}`);
       return sendAs(
         session,
         person,
@@ -321,16 +339,21 @@ export function createLiveGoogleWorld(deps: {
           "GET",
           `gmail/v1/users/me/messages?q=${query}&maxResults=100`,
         );
+        const known = seen.get(session) ?? new Set<string>();
+        seen.set(session, known);
         for (const { id, threadId } of list.messages ?? []) {
-          if (store.emails.find(id)) continue;
+          if (known.has(`${address} ${id}`)) continue;
           const wire = await client.call<WireMessage>(
             credential,
             "GET",
             `gmail/v1/users/me/messages/${id}?format=full`,
           );
-          gmailThread.set(id, threadId);
-          const email = keep(session, fromWire(wire));
+          const message = fromWire(wire);
+          gmailThread.set(`${address} ${message.messageId}`, threadId);
+          // An answer to several people is one email, with an id in each of their mailboxes: kept once.
+          const email = (message.messageId && store.byMessageId(message.messageId)) || keep(session, message);
           await tag(session, credential, address, threadId, email.subject);
+          known.add(`${address} ${id}`);
         }
       }
       // The emails the agent has, as its mailbox holds them: labelled too, for the sweep, and their labels read.
@@ -376,6 +399,7 @@ export function createLiveGoogleWorld(deps: {
     release(session: string) {
       people.leave(session);
       read.delete(session);
+      seen.delete(session);
       since.delete(session);
       store.users.release(session);
       for (const email of store.emails.release(session)) {
