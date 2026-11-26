@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import base64
+import errno
+import os
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +37,10 @@ def _base64(content: str | bytes) -> str:
 
 def _walk(directory: Path) -> list[dict[str, Any]]:
     """Every file under a directory, by its path inside it, with forward slashes."""
+    if not directory.is_dir():
+        # `rglob` finds nothing under a path that isn't a directory: a mistyped fixture path fails, as in TypeScript.
+        code = errno.ENOTDIR if directory.exists() else errno.ENOENT
+        raise OSError(code, os.strerror(code), str(directory))
     files = sorted(path for path in directory.rglob("*") if path.is_file())
     return [{"path": path.relative_to(directory).as_posix(), "content": _base64(path.read_bytes())} for path in files]
 
