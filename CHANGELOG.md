@@ -4,6 +4,14 @@ All notable changes to channelstack. The format follows [Keep a Changelog](https
 
 ## Unreleased
 
+## [0.1.1] - 2026-11-26
+
+The first release on npm and crates.io, and of `pytest-channelstack` on PyPI. What channelstack does is under [0.1.0](https://github.com/christian-bromann/channelstack/blob/main/CHANGELOG.md#010---2026-11-26).
+
+### Fixed
+
+- The npm packages and the Rust crate are published. 0.1.0's release stopped at a workflow bug ([#98](https://github.com/christian-bromann/channelstack/pull/98)), after publishing only the `channelstack` Python package.
+
 ## [0.1.0] - 2026-11-26
 
 The first version of channelstack, a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail. Everything below is new.
