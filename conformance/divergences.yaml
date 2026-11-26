@@ -80,16 +80,6 @@ divergences:
       don't expire.
     expires: 2027-02-28
   - scenario: shapes/notion
-    path:
-      - "api GET /v1/blocks/{id}/children results.[].child_page"
-      - "api GET /v1/blocks/{id}/children results.[].type"
-    reason: >-
-      Live, a session's pages go under a page of its own, which a person makes, so the agent hears
-      of it and lists its blocks: the session's pages, as child_page blocks. In the fake, the
-      scenario's page is at the workspace's top level and has no child pages to list (a page made
-      in a page is a child_page block in the fake too). Where live mode puts pages, not drift.
-    expires: 2027-02-28
-  - scenario: shapes/notion
     path: webhook page.created data.parent.type
     reason: >-
       Live, a session's pages go under a page of its own (so they are tagged and trashed with the
