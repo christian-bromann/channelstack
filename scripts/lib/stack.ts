@@ -110,12 +110,18 @@ export async function withStack(
       stops.push(started.stop);
       return { ...other, started };
     });
+    /** Which agent has exited, in a sentence, or undefined while they all run. */
+    const exited = () => {
+      for (const { path, child } of [
+        { path: options.agent, child: agent.child },
+        ...companions.map((other) => ({ path: other.agent, child: other.started.child })),
+      ])
+        if (child.exitCode !== null) return `The agent ${path} exited with ${child.exitCode}`;
+      return undefined;
+    };
     const running = () => {
-      if (agent.child.exitCode !== null)
-        throw new Error(`The agent ${options.agent} exited with ${agent.child.exitCode}`);
-      for (const other of companions)
-        if (other.started.child.exitCode !== null)
-          throw new Error(`The agent ${other.agent} exited with ${other.started.child.exitCode}`);
+      const why = exited();
+      if (why) throw new Error(why);
     };
     /** Something answers on this port. */
     const listening = (at: number) =>
@@ -161,9 +167,16 @@ export async function withStack(
         STARTUP,
       );
 
-    // Something answers on the port: make sure it is this agent, not one that took the port while this one failed to.
+    // Something answers on the port, and `freePort` gave it to no other stack: make sure this agent
+    // didn't fail to listen all the same.
     running();
-    await use({ home, env });
+    try {
+      await use({ home, env });
+    } catch (error) {
+      // An agent that died during the test is why it failed, not what the test was waiting for.
+      const why = exited();
+      throw why ? new Error(`${why} during the test`, { cause: error }) : error;
+    }
   } finally {
     for (const stop of stops.reverse()) await stop();
     rmSync(home, { recursive: true, force: true });
