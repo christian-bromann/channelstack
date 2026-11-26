@@ -1,8 +1,11 @@
 """The Python SDK runtime's own tests, mirroring the TypeScript runtime's (`runtime.test.ts`)."""
 
 import asyncio
+import base64
 import inspect
 import secrets
+from collections.abc import Iterator
+from pathlib import Path
 
 import httpx
 import pytest
@@ -11,6 +14,7 @@ from channelstack import SlackDelivery, SlackThread
 from channelstack.runtime import transport
 from channelstack.runtime.client import HandleContext
 from channelstack.runtime.credentials import credential
+from channelstack.runtime.files import read_changes, read_document, read_tree, set_files_root
 from channelstack.runtime.transport import ChannelstackError, Transport, on_refusal, unreported_refusals
 from channelstack.runtime.wait import QuietState, WaitTimeoutError, set_wait_defaults, until_quiet, wait_defaults
 
@@ -102,3 +106,84 @@ def test_the_wait_defaults_a_test_framework_sets_apply_to_every_wait(monkeypatch
         asyncio.run(until_quiet(lambda: quiet_for_ms(10), quiet_for=5))
     finally:
         set_wait_defaults(timeout=before.timeout, quiet_for=before.quiet_for)
+
+
+# Files a test hands over (`files.py`), as the TypeScript runtime's "files a test hands over".
+
+
+@pytest.fixture
+def fixture(tmp_path: Path) -> Iterator[Path]:
+    """A fixture directory `web` with a file at its top and one in a subdirectory. Leaves no root set."""
+    (tmp_path / "web" / "src").mkdir(parents=True)
+    (tmp_path / "web" / "README.md").write_text("# web\n")
+    (tmp_path / "web" / "src" / "app.ts").write_text("export {}\n")
+    yield tmp_path
+    set_files_root(None)
+
+
+def text(content: str | None) -> str | None:
+    return None if content is None else base64.b64decode(content).decode()
+
+
+def test_a_document_is_its_text_inline_or_a_fixture_files_contents_from_the_tests_directory(fixture: Path) -> None:
+    set_files_root(fixture)
+    assert read_document("# inline") == "# inline"
+    assert read_document({"path": "./web/README.md"}) == "# web\n"
+    blocks: list[dict[str, object]] = [{"type": "divider", "divider": {}}]
+    assert read_document(blocks) is blocks
+
+
+def test_a_directory_is_every_file_under_it_by_its_path_inside_it(fixture: Path) -> None:
+    assert [(file["path"], text(file["content"])) for file in read_tree(str(fixture / "web"))] == [
+        ("README.md", "# web\n"),
+        ("src/app.ts", "export {}\n"),
+    ]
+
+
+def test_a_relative_path_starts_from_the_root_an_integration_set_or_from_the_working_directory(
+    fixture: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_files_root(fixture)
+    assert [file["path"] for file in read_tree("./web")] == ["README.md", "src/app.ts"]
+    assert [file["path"] for file in read_tree([{"path": "web/README.md"}])] == ["README.md"]
+    set_files_root(None)
+    # Without a root the same path starts from the working directory, where it isn't: an error, not no files.
+    (fixture / "elsewhere").mkdir()
+    monkeypatch.chdir(fixture / "elsewhere")
+    with pytest.raises(FileNotFoundError):
+        read_tree("./web")
+    monkeypatch.chdir(fixture)
+    assert [file["path"] for file in read_tree("./web")] == ["README.md", "src/app.ts"]
+    with pytest.raises(NotADirectoryError):
+        read_tree("./web/README.md")
+
+
+def test_a_list_takes_inline_contents_a_file_on_disk_under_a_name_and_a_directory_under_a_prefix(
+    fixture: Path,
+) -> None:
+    files = read_tree(
+        [
+            {"name": "notes.txt", "content": "hi"},
+            {"name": "bin/data", "content": bytes([0, 255])},
+            {"path": str(fixture / "web" / "README.md")},
+            {"path": str(fixture / "web" / "README.md"), "name": "docs/README.md"},
+            {"path": str(fixture / "web" / "src"), "name": "lib"},
+        ]
+    )
+    assert [file["path"] for file in files] == ["notes.txt", "bin/data", "README.md", "docs/README.md", "lib/app.ts"]
+    assert text(files[0]["content"]) == "hi"
+    assert base64.b64decode(files[1]["content"]) == bytes([0, 255])
+    assert text(files[3]["content"]) == "# web\n"
+
+
+def test_changes_are_a_list_of_files_or_a_map_of_path_to_contents_where_none_deletes(fixture: Path) -> None:
+    changes = read_changes({"src/app.ts": "export const x = 1\n", "old.ts": None})
+    assert [(file["path"], text(file["content"])) for file in changes] == [
+        ("src/app.ts", "export const x = 1\n"),
+        ("old.ts", None),
+    ]
+    assert read_changes([{"name": "a.txt", "content": "a"}]) == [{"path": "a.txt", "content": "YQ=="}]
+    assert [file["path"] for file in read_changes([{"path": str(fixture / "web"), "name": "site"}])] == [
+        "site/README.md",
+        "site/src/app.ts",
+    ]
