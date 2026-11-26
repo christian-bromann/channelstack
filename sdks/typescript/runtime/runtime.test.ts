@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
 
@@ -341,8 +341,9 @@ describe("the server binary", () => {
 });
 
 describe("files a test hands over", () => {
-  const fixture = () => {
-    const root = mkdtempSync(join(tmpdir(), "cs-files-"));
+  /** `web/README.md` and `web/src/app.ts` in a new directory, in `parent` when given. */
+  const fixture = (parent = tmpdir()) => {
+    const root = mkdtempSync(join(parent, "cs-files-"));
     mkdirSync(join(root, "web", "src"), { recursive: true });
     writeFileSync(join(root, "web", "README.md"), "# web\n");
     writeFileSync(join(root, "web", "src", "app.ts"), "export {}\n");
@@ -372,8 +373,18 @@ describe("files a test hands over", () => {
     const root = fixture();
     setFilesRoot(root);
     expect(readTree("./web").map((file) => file.path)).toEqual(["README.md", "src/app.ts"]);
+    expect(readTree([{ path: "web/README.md" }]).map((file) => file.path)).toEqual(["README.md"]);
     setFilesRoot(undefined);
+    // Without a root the same path starts from the working directory, where it isn't: an error, not no files.
     expect(() => readTree("./web-that-is-not-in-the-working-directory")).toThrow(/ENOENT/);
+    const here = fixture(process.cwd());
+    try {
+      const relative = basename(here);
+      expect(readTree(`${relative}/web`).map((file) => file.path)).toEqual(["README.md", "src/app.ts"]);
+      expect(() => readTree(`${relative}/web/README.md`)).toThrow(/ENOTDIR/);
+    } finally {
+      rmSync(here, { recursive: true });
+    }
   });
 
   test("a list takes inline contents, a file on disk under a name, and a directory under a prefix", () => {
@@ -406,6 +417,11 @@ describe("files a test hands over", () => {
       ["old.ts", null],
     ]);
     expect(readChanges([{ name: "a.txt", content: "a" }])).toEqual([{ path: "a.txt", content: "YQ==" }]);
+    const root = fixture();
+    expect(readChanges([{ path: join(root, "web"), name: "site" }]).map((file) => file.path)).toEqual([
+      "site/README.md",
+      "site/src/app.ts",
+    ]);
   });
 });
 

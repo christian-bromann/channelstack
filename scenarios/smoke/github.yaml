@@ -1,5 +1,5 @@
 name: github
-description: The generated GitHub methods in every SDK. A person opens, labels, comments on and closes an issue in a repository the App isn't installed on. Runs against a server the SDK's launcher starts itself.
+description: The generated GitHub methods in every SDK. A repository is created with files, read back through the SDK, and a person opens, labels, comments on and closes an issue in it; the App isn't installed on it. Runs against a server the SDK's launcher starts itself.
 steps:
   - call: session.github
     as: github
@@ -7,13 +7,30 @@ steps:
     options: { login: ana-smoke }
     as: ana
   - call: github.createRepo
-    options: { collaborators: [$ana], labels: [bug] }
+    options:
+      collaborators: [$ana]
+      labels: [bug]
+      # Inline files go to the server as paths with base64 contents, in every SDK.
+      files: [{ name: README.md, content: "# hi\n" }, { name: docs/setup.md, content: Run it. }]
     as: repo
   - expect:
       - { value: $ana.login, equals: ana-smoke }
       - { value: $ana.kind, equals: user }
       - { value: $repo.defaultBranch, equals: main }
       - { value: $repo.fullName, matches: "^[0-9A-Za-z-]+/test-[0-9a-z]+$" }
+  - call: repo.readFile
+    args: [README.md]
+    as: readme
+  - call: repo.readFile
+    args: [docs/setup.md]
+    as: setup
+  - call: repo.readFile
+    args: [missing.md]
+    as: missing
+  - expect:
+      - { value: $readme, equals: "# hi\n" }
+      - { value: $setup, equals: Run it. }
+      - { value: $missing, equals: null }
 
   - call: ana.openIssue
     args: [{ title: The login page is blank, body: Since the last deploy. }]

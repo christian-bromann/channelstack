@@ -4,6 +4,7 @@ pub mod client;
 pub mod credentials;
 pub mod duration;
 pub mod error;
+pub mod files;
 pub mod launcher;
 pub mod transport;
 pub mod wait;

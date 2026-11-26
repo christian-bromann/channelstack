@@ -17,6 +17,7 @@ use crate::runtime::client::{
     send,
 };
 use crate::runtime::error::{Error, Result};
+use crate::runtime::files;
 use crate::runtime::launcher::{Mode, launch};
 use crate::runtime::wait::{
     DEFAULT_QUIET_FOR, DEFAULT_TIMEOUT, check_text, from_matches, latest_once_quiet, text_matches,
@@ -2011,7 +2012,10 @@ fn run_git_hub_fixture_create_repo<'a>(
                 wire.insert("name".into(), p_name.clone());
                 wire.insert("private".into(), p_private.clone());
                 wire.insert("defaultBranch".into(), p_default_branch.clone());
-                wire.insert("files".into(), p_files.clone());
+                wire.insert(
+                    "files".into(),
+                    (&|v: &Value| files::read_tree(v))(&p_files)?,
+                );
                 wire.insert(
                     "collaborators".into(),
                     (&|v: &Value| {
@@ -2205,7 +2209,10 @@ fn run_git_hub_user_push<'a>(
             path,
             Some({
                 let mut wire = Map::new();
-                wire.insert("changes".into(), p_changes.clone());
+                wire.insert(
+                    "changes".into(),
+                    (&|v: &Value| files::read_changes(v))(&p_changes)?,
+                );
                 wire.insert(
                     "repo".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
@@ -2298,9 +2305,12 @@ fn run_git_hub_user_open_pull_request<'a>(
                         enc::object(
                             v,
                             None,
-                            &[("reviewers", &|v: &Value| {
-                                enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
-                            })],
+                            &[
+                                ("changes", &|v: &Value| files::read_changes(v)),
+                                ("reviewers", &|v: &Value| {
+                                    enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
+                                }),
+                            ],
                         )
                     })(&p_pr)?,
                 );
@@ -4864,7 +4874,10 @@ fn run_notion_fixture_create_page<'a>(
                     "parent".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_parent)?,
                 );
-                wire.insert("content".into(), p_content.clone());
+                wire.insert(
+                    "content".into(),
+                    (&|v: &Value| files::read_document(v))(&p_content)?,
+                );
                 wire.insert("icon".into(), p_icon.clone());
                 wire.insert(
                     "connections".into(),
@@ -5294,6 +5307,7 @@ fn run_notion_user_create_page<'a>(
                             None,
                             &[
                                 ("parent", &|v: &Value| enc::ref_ids(v, &["id"])),
+                                ("content", &|v: &Value| files::read_document(v)),
                                 ("connections", &|v: &Value| {
                                     enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
                                 }),
@@ -5333,7 +5347,19 @@ fn run_notion_user_edit<'a>(
             path,
             Some({
                 let mut wire = Map::new();
-                wire.insert("change".into(), p_change.clone());
+                wire.insert(
+                    "change".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[
+                                ("append", &|v: &Value| files::read_document(v)),
+                                ("replace", &|v: &Value| files::read_document(v)),
+                            ],
+                        )
+                    })(&p_change)?,
+                );
                 wire.insert(
                     "page".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
