@@ -67,15 +67,20 @@ export function background(
 const handedOut = new Set<number>();
 
 /**
- * A loopback port nothing is listening on right now, and that this process hasn't handed out
- * before: stacks that start side by side each get their own, though none has bound its port yet.
+ * A port nothing is listening on right now, on any interface, and that this process hasn't handed
+ * out before: stacks that start side by side each get their own, though none has bound its port yet.
+ *
+ * The probe listens with no host, so Node binds `::` (every interface, IPv4 included), or `0.0.0.0`
+ * where IPv6 is off. Some agents listen that way (Bolt's `app.start(port)`, Go's
+ * `ListenAndServe(":port")`), and a port free on loopback alone can still be taken there
+ * (EADDRINUSE). A port free on every interface suits them and the agents that bind `127.0.0.1`.
  */
 export async function freePort(): Promise<number> {
   for (;;) {
     const port = await new Promise<number>((resolve, reject) => {
       const server = createServer();
       server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => {
+      server.listen(0, () => {
         const address = server.address();
         server.close(() =>
           typeof address === "object" && address ? resolve(address.port) : reject(new Error("no port")),
