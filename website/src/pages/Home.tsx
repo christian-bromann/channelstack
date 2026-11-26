@@ -165,7 +165,16 @@ export default function Home() {
                 <CopyButton text={SITE.install} label="Copy the install command" />
               </div>
             </div>
-            <p className="soon">Not on npm yet. The first release is on its way.</p>
+            <ul className="registries" aria-label="channelstack's packages">
+              {SITE.packages.map((pkg) => (
+                <li key={pkg.registry}>
+                  <a href={pkg.url}>
+                    <span className="registry">{pkg.registry}</span>
+                    {pkg.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
             <Player />
           </div>
         </section>
@@ -173,11 +182,11 @@ export default function Home() {
         <section id="channels" aria-labelledby="channels-title">
           <div className="wrap">
             <div className="sec-head">
-              <p className="kicker">Four platforms, one API</p>
+              <p className="kicker">Six platforms, one API</p>
               <h2 id="channels-title">Everywhere your app gets an event.</h2>
               <p className="sec-lede">
-                One package fakes all four, with the people, events and API calls apps actually use. Use one in a test,
-                or several when your app spans them. Discord, Stripe and email come next.
+                One package fakes all six, with the people, events and API calls apps actually use. Use one in a test,
+                or several when your app spans them. Discord and Stripe come next.
               </p>
             </div>
             <div className="channels" ref={channels}>

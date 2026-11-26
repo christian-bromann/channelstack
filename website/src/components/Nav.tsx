@@ -48,7 +48,9 @@ export function Nav() {
           </ul>
         </nav>
         <div className="nav-right">
-          <span className="pill">coming soon</span>
+          <a className="pill" href={SITE.release} aria-label={`channelstack ${SITE.version}: release notes`}>
+            v{SITE.version}
+          </a>
           <a className="nav-gh" href={SITE.repo}>
             GitHub
           </a>

@@ -402,6 +402,15 @@ button {
   margin-right: 8px;
 }
 
+a.pill {
+  text-decoration: none;
+}
+
+a.pill:hover,
+a.pill:focus-visible {
+  color: var(--ink);
+}
+
 .icon-btn {
   display: inline-grid;
   place-items: center;
