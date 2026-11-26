@@ -26,12 +26,13 @@ async function team() {
   const { sessionId } = (await h.call("POST", `/sessions`)).body;
   const ana = (await h.call("POST", `/sessions/${sessionId}/resend/users`, { name: "Ana" })).body;
   const key = h.secrets.get("resend", "apiKey");
-  const api = (method: string, path: string, body?: unknown) => h.provider(method, `resend${path}`, body, key);
+  const api = (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
+    h.provider(method, `resend${path}`, body, key, headers);
   /** Call, and hold a successful answer to Resend's description. */
   const read = async (method: string, path: string, body?: unknown) => {
     const reply = await api(method, path, body);
     expect(reply.status, JSON.stringify(reply.body)).toBeLessThan(400);
-    expect(resendResponseProblems(method, path, reply.status, reply.body)).toEqual([]);
+    expect(resendResponseProblems(method, path.split("?")[0] ?? path, reply.status, reply.body)).toEqual([]);
     return reply.body;
   };
   /** Open a download link, without the API key, as the agent's HTTP client would. */
@@ -94,9 +95,31 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
 
   test("a link works for an hour, and only as it was given", async () => {
     const { h, read, download, email } = await team();
-    const { id } = await read("POST", "/emails", email({ attachments: [{ filename: "a.txt", content: "aGk=" }] }));
-    const [attachment] = (await read("GET", `/emails/${id}/attachments`)).data;
+    const { id } = await read(
+      "POST",
+      "/emails",
+      email({
+        attachments: [
+          { filename: "a.txt", content: "aGk=" },
+          { filename: "b.txt", content: "aG8=" },
+        ],
+      }),
+    );
+    const [attachment, other] = (await read("GET", `/emails/${id}/attachments`)).data;
     expect(Date.parse(attachment.expires_at) - Date.now()).toBeGreaterThan(3_590_000);
+    // `expires_at` is the moment the link stops working: its `Expires`, in whole seconds.
+    expect(Date.parse(attachment.expires_at)).toBe(
+      Number(new URL(attachment.download_url).searchParams.get("Expires")) * 1000,
+    );
+    // A link's signature opens what it was made for, and nothing else: another file, another email, a raw message.
+    const signed = new URL(attachment.download_url).search;
+    const elsewhere = (path: string) => `${new URL(attachment.download_url).origin}/resend/_cdn/${path}${signed}`;
+    expect(
+      (await download(`${new URL(other.download_url).origin}${new URL(other.download_url).pathname}${signed}`)).status,
+    ).toBe(403);
+    expect((await download(elsewhere(`${id}/raw`))).status).toBe(403);
+    const second = await read("POST", "/emails", email({ attachments: [{ filename: "a.txt", content: "aGk=" }] }));
+    expect((await download(elsewhere(`${second.id}/${attachment.id}`))).status).toBe(403);
     const changed = new URL(attachment.download_url);
     changed.searchParams.set("Expires", String(Number(changed.searchParams.get("Expires")) + 3600));
     expect((await download(changed.toString())).status).toBe(403);
@@ -122,9 +145,21 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
 
   test("a `path` is fetched when the email is sent; one that can't be is refused", async () => {
     const files = createServer((request, response) => {
+      fetched.push(request.url ?? "");
       if (request.url === "/receipt.pdf") response.writeHead(200, { "content-type": "application/pdf" }).end(PDF);
-      else response.writeHead(404).end();
+      else if (request.url === "/large.bin")
+        response.writeHead(200, { "content-length": String(LARGE) }).end(Buffer.alloc(LARGE));
+      else if (request.url === "/streamed.bin") {
+        // No length: the fake stops reading once it is over the limit.
+        response.writeHead(200);
+        const chunk = Buffer.alloc(1024 * 1024);
+        const write = (left: number) => (left === 0 ? response.end() : response.write(chunk, () => write(left - 1)));
+        write(Math.ceil(LARGE / chunk.length));
+      } else response.writeHead(404).end();
     });
+    const fetched: string[] = [];
+    // 31 MB is over 40 MB in base64, which is how Resend counts its limit.
+    const LARGE = 31 * 1024 * 1024;
     await new Promise<void>((resolve) => files.listen(0, "127.0.0.1", resolve));
     const origin = `http://127.0.0.1:${(files.address() as AddressInfo).port}`;
     try {
@@ -138,6 +173,21 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
         expect(refused.status, path).toBe(422);
         expect(refused.body.name).toBe("invalid_attachment");
       }
+      for (const path of [`${origin}/large.bin`, `${origin}/streamed.bin`]) {
+        const refused = await api("POST", "/emails", email({ attachments: [{ path }] }));
+        expect(refused.status, path).toBe(422);
+        expect(refused.body.message).toBe("The email's attachments are over the 40 MB limit.");
+      }
+
+      // Files are fetched only for a send that happens: not again for a repeated idempotency key, nor for a refused send.
+      fetched.length = 0;
+      const once = email({ attachments: [{ path: `${origin}/receipt.pdf` }] });
+      const first = await api("POST", "/emails", once, { "idempotency-key": "receipt" });
+      const again = await api("POST", "/emails", once, { "idempotency-key": "receipt" });
+      expect(again.body).toEqual(first.body);
+      const unverified = await api("POST", "/emails", { ...once, from: "x@elsewhere.example" });
+      expect(unverified.status).toBe(403);
+      expect(fetched).toEqual(["/receipt.pdf"]);
     } finally {
       files.close();
     }
@@ -145,12 +195,36 @@ describe("the agent's attachments are kept, and linked as Resend links them", ()
 
   test("a person reads the attachments' names in the thread; the email's text is what was written", async () => {
     const { h, read, email, sessionId, ana } = await team();
-    const { id } = await read("POST", "/emails", email({ attachments: [{ filename: "refund.pdf", content: "aGk=" }] }));
+    const { id } = await read(
+      "POST",
+      "/emails",
+      email({
+        html: '<p>The form is attached.</p><img src="cid:logo">',
+        attachments: [
+          { filename: "refund.pdf", content: "aGk=" },
+          // Shown in the body by its `Content-ID`: not a file a person sees attached.
+          { filename: "logo.png", content: "aGk=", content_id: "logo" },
+        ],
+      }),
+    );
     const transcript = (await h.call("GET", `/sessions/${sessionId}/resend/threads/${id}/transcript`)).body;
     expect(transcript.text).toContain("The form is attached.\n(attached: refund.pdf)");
+    expect(transcript.text).not.toContain("logo.png");
     const [received] = (await h.call("GET", `/sessions/${sessionId}/resend/users/${encodeURIComponent(ana.id)}/inbox`))
       .body;
     expect(received.text).toBe("The form is attached.");
+  });
+
+  test("an email's attachments are listed in pages, as Resend's description says", async () => {
+    const { read, email } = await team();
+    const files = ["a", "b", "c"].map((name) => ({ filename: `${name}.txt`, content: "aGk=" }));
+    const { id } = await read("POST", "/emails", email({ attachments: files }));
+    const first = await read("GET", `/emails/${id}/attachments?limit=2`);
+    expect(first.data.map((file: { filename: string }) => file.filename)).toEqual(["a.txt", "b.txt"]);
+    expect(first.has_more).toBe(true);
+    const rest = await read("GET", `/emails/${id}/attachments?after=${first.data[1].id}`);
+    expect(rest.data.map((file: { filename: string }) => file.filename)).toEqual(["c.txt"]);
+    expect(rest.has_more).toBe(false);
   });
 });
 
