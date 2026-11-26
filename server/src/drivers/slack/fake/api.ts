@@ -6,9 +6,9 @@ import type { DriverContext } from "../../../core/router/index.ts";
 import { recordCall } from "../../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { identified } from "../blocks.ts";
-import { SLACK_IDS, slackTs } from "../ids.ts";
+import { SLACK_IDS } from "../ids.ts";
 import { handleOf } from "../interaction-payloads.ts";
-import { fileObject, membershipEvent, messageObject } from "../payloads.ts";
+import { fileObject, messageObject } from "../payloads.ts";
 import {
   NOBODY,
   type SlackConversationRecord,
@@ -146,6 +146,9 @@ export function createSlackApi(
     is_app_user: false,
   });
 
+  /** The workspace's #general, which nobody can archive or leave. */
+  const isGeneral = (conversation: SlackConversationRecord) => conversation.name === "general";
+
   /** A conversation as Slack describes it; `info` adds what only `conversations.info` says (`last_read`). */
   const conversationObject = (conversation: SlackConversationRecord, info = false) => {
     if (conversation.kind === "im") {
@@ -179,7 +182,7 @@ export function createSlackApi(
       is_ext_shared: false,
       is_org_shared: false,
       is_pending_ext_shared: false,
-      is_general: conversation.name === "general",
+      is_general: isGeneral(conversation),
       context_team_id: store.team.id,
       shared_team_ids: [store.team.id],
       pending_shared: [],
@@ -198,8 +201,12 @@ export function createSlackApi(
   const messageOf = (message: SlackMessageRecord) =>
     messageObject(message, store.users.find(message.user), store.team, store.app);
 
-  /** A conversation the app may read and write: it exists, and the app is a member. */
-  const joined = (id: string): SlackConversationRecord => {
+  /**
+   * A conversation the app may read and write: it exists, and the app is a member. An archived
+   * channel can still be read, and the app can add and remove reactions there, but not post
+   * (`writing`): what a real workspace answered (#58, recorded 2026-11-26).
+   */
+  const joined = (id: string, writing = true): SlackConversationRecord => {
     let conversation = store.conversations.find(id);
     // Posting to a user id opens the DM with that person, as Slack does.
     const person = conversation ? undefined : store.users.find(id);
@@ -210,7 +217,7 @@ export function createSlackApi(
       // Slack doesn't reveal a private conversation the app isn't in.
       throw new SlackApiError(conversation.kind === "channel" ? "not_in_channel" : "channel_not_found");
     }
-    if (conversation.isArchived) throw new SlackApiError("is_archived");
+    if (writing && conversation.isArchived) throw new SlackApiError("is_archived");
     return conversation;
   };
 
@@ -504,7 +511,7 @@ export function createSlackApi(
     },
 
     "reactions.add": (args) => {
-      const conversation = joined(required(args, "channel"));
+      const conversation = joined(required(args, "channel"), false);
       world.react(
         conversation,
         messageIn(conversation, required(args, "timestamp")),
@@ -516,7 +523,7 @@ export function createSlackApi(
     },
 
     "reactions.remove": (args) => {
-      const conversation = joined(required(args, "channel"));
+      const conversation = joined(required(args, "channel"), false);
       world.react(
         conversation,
         messageIn(conversation, required(args, "timestamp")),
@@ -528,15 +535,15 @@ export function createSlackApi(
     },
 
     "reactions.get": (args) => {
-      const conversation = joined(required(args, "channel"));
+      const conversation = joined(required(args, "channel"), false);
       const message = messageIn(conversation, required(args, "timestamp"));
       return { type: "message", channel: conversation.id, message: messageOf(message) };
     },
 
-    "conversations.info": (args) => ({ channel: conversationObject(joined(required(args, "channel")), true) }),
+    "conversations.info": (args) => ({ channel: conversationObject(joined(required(args, "channel"), false), true) }),
 
     "conversations.history": (args) => {
-      const conversation = joined(required(args, "channel"));
+      const conversation = joined(required(args, "channel"), false);
       const { messages, has_more } = page(
         args,
         store
@@ -550,7 +557,7 @@ export function createSlackApi(
     },
 
     "conversations.replies": (args) => {
-      const conversation = joined(required(args, "channel"));
+      const conversation = joined(required(args, "channel"), false);
       // A split-view thread hangs on an anchor nobody sees: the thread exists, its root isn't shown.
       const root = store.findMessage(conversation.id, required(args, "ts"));
       if (!root || (root.ephemeralFor !== undefined && root.ephemeralFor !== NOBODY)) {
@@ -567,7 +574,7 @@ export function createSlackApi(
     },
 
     "conversations.members": (args) => ({
-      members: [...joined(required(args, "channel")).members],
+      members: [...joined(required(args, "channel"), false).members],
       response_metadata: { next_cursor: "" },
     }),
 
@@ -578,18 +585,29 @@ export function createSlackApi(
       if (conversation.isArchived) throw new SlackApiError("is_archived");
       if (conversation.members.has(bot()))
         return { channel: conversationObject(conversation), warning: "already_in_channel" };
-      conversation.members.add(bot());
-      world.emit(
-        conversation,
-        "member_joined_channel",
-        membershipEvent("member_joined_channel", {
-          user: bot(),
-          conversation,
-          team: store.team,
-          eventTs: slackTs(ids),
-        }),
-      );
+      world.join(conversation, bot());
       return { channel: conversationObject(conversation) };
+    },
+
+    "conversations.archive": (args) => {
+      const conversation = store.conversations.find(required(args, "channel"));
+      // Slack doesn't reveal a private channel the app isn't in.
+      if (!conversation || (conversation.kind === "private_channel" && !conversation.members.has(bot()))) {
+        throw new SlackApiError("channel_not_found");
+      }
+      if (conversation.kind === "im" || conversation.kind === "mpim") {
+        throw new SlackApiError("method_not_supported_for_channel_type");
+      }
+      // The scope depends on the kind of channel: a public one needs `channels:manage`, a private one `groups:write`.
+      const needed = conversation.kind === "channel" ? "channels:manage" : "groups:write";
+      if (!store.app.scopes.includes(needed)) {
+        throw new SlackApiError("missing_scope", { needed, provided: store.app.scopes.join(",") });
+      }
+      if (conversation.isArchived) throw new SlackApiError("already_archived");
+      if (!conversation.members.has(bot())) throw new SlackApiError("not_in_channel");
+      if (isGeneral(conversation)) throw new SlackApiError("cant_archive_general");
+      world.archive(conversation, bot());
+      return {};
     },
 
     "conversations.open": (args) => {

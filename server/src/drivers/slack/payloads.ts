@@ -195,18 +195,60 @@ export function reactionEvent(
 
 export function membershipEvent(
   type: "member_joined_channel" | "member_left_channel",
-  input: { user: string; conversation: SlackConversationRecord; team: SlackTeam; inviter?: string; eventTs: string },
+  input: {
+    user: string;
+    conversation: SlackConversationRecord;
+    team: SlackTeam;
+    inviter?: string | undefined;
+    eventTs: string;
+  },
 ): Record<string, unknown> {
   return {
     type,
     user: input.user,
     channel: input.conversation.id,
-    channel_type: input.conversation.kind === "channel" ? "C" : "G",
+    // The first letter of the channel's id. A private channel's id starts with C too, and a real
+    // workspace said "C" for one (#58).
+    channel_type: input.conversation.id.startsWith("G") ? "G" : "C",
     team: input.team.id,
     ...(input.inviter === undefined ? {} : { inviter: input.inviter }),
     event_ts: input.eventTs,
   };
 }
+
+/** What Slack writes in a channel when someone joins it, or archives it. */
+const CHANNEL_MESSAGE_TEXT = {
+  channel_join: (user: string) => `<@${user}> has joined the channel`,
+  channel_archive: () => "archived the channel",
+} as const;
+
+/**
+ * The message Slack posts in a channel when someone joins it (`channel_join`, with `inviter` when
+ * someone added them) or archives it (`channel_archive`). A private channel gets the same
+ * subtypes, with `channel_type: "group"`. Shapes as a real workspace sent them (#58).
+ */
+export function channelMessageEvent(
+  subtype: keyof typeof CHANNEL_MESSAGE_TEXT,
+  input: { user: string; conversation: SlackConversationRecord; inviter?: string | undefined; ts: string },
+): Record<string, unknown> {
+  return {
+    type: "message",
+    subtype,
+    user: input.user,
+    text: CHANNEL_MESSAGE_TEXT[subtype](input.user),
+    ...(input.inviter === undefined ? {} : { inviter: input.inviter }),
+    ts: input.ts,
+    channel: input.conversation.id,
+    event_ts: input.ts,
+    channel_type: CHANNEL_TYPE[input.conversation.kind],
+  };
+}
+
+/**
+ * The event types whose envelope carries `context_team_id` and `context_enterprise_id`, as
+ * recorded from a real workspace. The fake's other types aren't recorded yet: #88.
+ */
+const WITH_CONTEXT = new Set(["message", "reaction_added", "reaction_removed", "member_joined_channel"]);
 
 /** The Events API envelope around an event (`type: "event_callback"`). */
 export function eventCallback(input: {
@@ -221,6 +263,9 @@ export function eventCallback(input: {
   return {
     token: input.verificationToken,
     team_id: team.id,
+    // The workspace the event happened in, and its Enterprise Grid org (none here), on the event
+    // types a real workspace was recorded sending them with (#58). `app_mention` came without them.
+    ...(WITH_CONTEXT.has(String(input.event.type)) ? { context_team_id: team.id, context_enterprise_id: null } : {}),
     api_app_id: app.id,
     event: input.event,
     type: "event_callback",
