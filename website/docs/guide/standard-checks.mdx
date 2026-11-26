@@ -156,16 +156,14 @@ The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECK
 
 ## In live mode
 
-Most checks are about delivery: retries, redeliveries, forged signatures, acknowledgement times. Live, the real platform delivers to your app, so a message or comment has no delivery to retry or forge, and the checks don't all skip:
+Most checks are about delivery: retries, redeliveries, forged signatures, acknowledgement times. Live, the real platform delivers to your app, so a message or comment has no delivery to retry or forge. Every check that needs one skips, before it waits for anything, with the reason in the report (`live: Slack delivers to the agent itself, so delivery checks are fake-only`). Nothing needs to go in `skip` for a live run. A fake run whose agent has no webhook URL (`CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`) has no deliveries either, so these checks skip there too, with the same note. That run is still red: every check that waits for a reply fails.
 
-| Checks                                                                                     | Live                                                                                                                                                                   |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `slack.bad-signature`, `slack.ack`, `github.bad-signature`, `notion.bad-signature`, `resend.redelivery`, `resend.bad-signature` and `resend.stale`, and `google.redelivery`, `google.bad-signature`, `google.wrong-audience` and `google.stale` | **Fail**, with "caused no delivery". List them in `skip` in a live run                                                                                                 |
-| `slack.retry`, `slack.redelivery`, `github.redelivery`, `notion.redelivery`                | Step over the delivery, then skip at their exact count, because waiting for quiet needs proxy mode live ([Live mode](/docs/guide/live-mode#what-skips-and-what-fails)) |
-| `google.history` | Skips at its exact count, because waiting for quiet needs proxy mode live |
-| `linear.redelivery`, `linear.stale`, `linear.bad-signature`                                | Skip, with the reason                                                                                                                                                  |
-| `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason                                                                                                                                                  |
-| `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop`                               | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet                                                    |
-| `github.review-thread`, `github.check-run`                                                 | Skip, with the reason: they open a pull request, and pull requests aren't built live yet                                                                               |
+| Checks | Live |
+| --- | --- |
+| `slack.retry`, `slack.redelivery`, `slack.bad-signature`, `slack.ack`; `github.redelivery`, `github.bad-signature`; `linear.redelivery`, `linear.stale`, `linear.bad-signature`; `notion.redelivery`, `notion.bad-signature`; `resend.redelivery`, `resend.bad-signature`, `resend.stale`; `google.redelivery`, `google.bad-signature`, `google.wrong-audience`, `google.stale` | Skip, with the delivery reason |
+| `google.history` | Skips at its exact count, because waiting for quiet needs proxy mode live ([Live mode](/docs/guide/live-mode#what-skips-and-what-fails)) |
+| `slack.msg-too-long`, `slack.stop` and the others that use a fault, Stop or an exact count | Skip, with the reason |
+| `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop` | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet |
+| `github.review-thread`, `github.check-run` | Skip, with the reason: they open a pull request, and pull requests aren't built live yet |
 
-Five run against the real platform: `linear.first-activity`, `linear.ends-turn`, `notion.reply-in-discussion`, `resend.reply-in-thread` and `google.reply-in-thread`. Making every delivery check skip live with its own reason is [#46](https://github.com/christian-bromann/channelstack/issues/46). The fake run on every pull request runs them all.
+Five run against the real platform: `linear.first-activity`, `linear.ends-turn`, `notion.reply-in-discussion`, `resend.reply-in-thread` and `google.reply-in-thread`. The fake run on every pull request runs them all.
