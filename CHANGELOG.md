@@ -4,7 +4,7 @@ All notable changes to channelstack. The format follows [Keep a Changelog](https
 
 ## Unreleased
 
-The first version of channelstack, a test harness for the apps and agents you build for Slack, GitHub, Linear and Notion. Everything below is new.
+The first version of channelstack, a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail. Everything below is new.
 
 ### The fakes
 
@@ -19,7 +19,9 @@ The first version of channelstack, a test harness for the apps and agents you bu
   - The REST API is served at `github.localhost` and at the GHE-style `/api/v3`.
 - **Linear:** teams, issues and comments, delegation, agent sessions and their activities, elicitations, the stop signal, and signed webhooks.
 - **Notion:** pages, blocks, databases and rows, comments and discussions, connections, and signed integration webhooks.
-- **Realistic by default:** every fake uses the platform's own id formats, error codes and payload shapes, and refuses what the platform refuses. GitHub's and Linear's answers are checked against their published schemas.
+- **Resend:** sending, batches, idempotency keys, the receiving API with attachments and the raw message, domains, the `@resend.dev` test addresses, and Svix-signed webhooks on Resend's retry schedule.
+- **Gmail:** a mailbox the agent reads and sends from through the Gmail API (messages, threads, labels, history, `watch`), Google's token endpoint, and Pub/Sub pushes with OIDC tokens, at most one a second.
+- **Realistic by default:** every fake uses the platform's own id formats, error codes and payload shapes, and refuses what the platform refuses. GitHub's, Linear's, Resend's and Gmail's answers are checked against their published descriptions.
 
 ### Testing
 
@@ -30,13 +32,13 @@ The first version of channelstack, a test harness for the apps and agents you bu
   - Negative and exact-count checks wait until the app has been quiet for a window they watch from start to end.
   - A failure says what the app left open.
 - **Delivery and failures:** Slack's retry, redelivery, bad signatures and stale timestamps, rate limits and dropped sockets.
-- **`channelstack/checks`:** `slackChecks()`, `githubChecks()`, `linearChecks()` and `notionChecks()` register standard behaviour checks, each named after a bug class.
+- **`channelstack/checks`:** `slackChecks()`, `githubChecks()`, `linearChecks()`, `notionChecks()`, `resendChecks()` and `googleChecks()` register standard behaviour checks, each named after a bug class.
 - **`pytest-channelstack`:** pytest fixtures, and `expect(...)` with every matcher, its semantics and its `not_to_…` form.
 - **Rust:** `channelstack::expect` in the SDK crate, with every matcher and its `not_to_…` form, each awaited to a `Result` (`Error::Expectation` when it fails).
 
 ### Live mode
 
-- With sandbox credentials in the environment, the same tests act on real Slack, GitHub, Linear and Notion workspaces and read the results back. channelstack never relays events to your app.
+- With sandbox credentials in the environment, the same tests act on real Slack, GitHub, Linear and Notion workspaces, Resend teams and Gmail accounts, and read the results back. channelstack never relays events to your app.
 - Workspace allowlists, run tags and cleanup.
 - A browser actor that types and clicks as a person in Slack (`say`, `reply`, `click`), using a session saved with `channelstack login slack`. Slack's Stop, select menus, shortcuts, slash commands, modal submit and close, and the agent-thread steps aren't done live yet, and skip.
 - `channelstack doctor` and `channelstack sweep`.
@@ -44,12 +46,19 @@ The first version of channelstack, a test harness for the apps and agents you bu
 
 ### Tools
 
-- **The server:** a single binary, serving the four fakes at `*.localhost` through portless, or on one port with `--no-portless`. `channelstack env` prints what the agent needs.
+- **The server:** a single binary, serving the six fakes at `*.localhost` through portless, or on one port with `--no-portless`. `channelstack env` prints what the agent needs.
 - **Proxy mode** (`--proxy`): for agents that hard-code `slack.com` or `api.github.com`, with a CA that only the agent trusts.
 - **The attach CLI:** `channelstack slack say|reply|react|click|stop`, `show`, `tail`, `deliveries` and `redeliver`, in a shared `dev` session.
 - **The UI:** the `dev` session's conversations as a person reads them, next to every delivery and API call.
 - **`channelstack mcp`:** the attach CLI's commands as MCP tools for coding agents, with a `channelstack` skill.
 - **SDKs for TypeScript, Python and Rust,** generated from one spec, with the same handles, waits and errors in each.
+
+### Packages
+
+- **npm:** `channelstack` (the CLI, the server, the TypeScript SDK, `channelstack/vitest` and `channelstack/checks`), with the server binary for each platform as `@channelstack/server-<platform>-<arch>`.
+- **PyPI:** `channelstack`, the Python SDK, and `pytest-channelstack`.
+- **crates.io:** `channelstack`, the Rust SDK.
+- **GitHub releases:** the server binary for macOS, Linux and Windows, with SHA-256 checksums.
 
 ### Docs
 

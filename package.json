@@ -40,7 +40,9 @@
     "check:deps": "depcruise server codegen sdks/typescript integrations examples scenarios scripts test conformance --config .dependency-cruiser.cjs",
     "check:channels": "node scripts/check-channels.ts",
     "check:unused": "knip",
-    "verify:phase": "node scripts/verify-phase.ts"
+    "verify:phase": "node scripts/verify-phase.ts",
+    "release:check": "node scripts/release.ts check",
+    "release:version": "node scripts/release.ts version"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

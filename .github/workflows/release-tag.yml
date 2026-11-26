@@ -1,0 +1,70 @@
+name: Tag a release
+
+# Step two of a release (docs/release.md): when main has a version that isn't tagged yet, which is
+# what merging the version pull request does, this tags the commit `vX.Y.Z`. The tag starts
+# release.yml.
+#
+# The tag is created with the release App's token: the tag ruleset lets only that App create `v*`
+# tags, and a tag GITHUB_TOKEN creates would start no workflow.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24.12.0
+
+jobs:
+  version:
+    name: main's version, if it isn't tagged yet
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/release.ts check
+          version="$(node -p 'require("./sdks/typescript/package.json").version')"
+          if [ "$version" = 0.0.0 ]; then echo "Nothing released yet: every package is at 0.0.0"; exit 0; fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" > /dev/null 2>&1; then
+            echo "v$version is tagged already"; exit 0
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  tag:
+    name: tag v${{ needs.version.outputs.version }}
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release-bot
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Tag the commit
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$GITHUB_SHA" > /dev/null
+          echo "Tagged $GITHUB_SHA v$VERSION: release.yml takes it from here."

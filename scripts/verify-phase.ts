@@ -41,6 +41,7 @@ const STANDING: readonly Check[] = [
   { name: "No duplicate code", script: ["check:dupes"], group: "static" },
   { name: "Architecture boundaries", script: ["check:deps"], group: "static" },
   { name: "No dead code", script: ["check:unused"], group: "static" },
+  { name: "Every package at one version, ready to release", script: ["release:check"], group: "static" },
   { name: "Flake-free acceptance (3 runs)", script: ["test:accept", "--repeat", "3"], group: "accept" },
 ];
 
