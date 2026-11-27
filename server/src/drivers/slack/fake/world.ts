@@ -180,13 +180,13 @@ const SLACK_RETRIES = fixedRetries(RETRY_DELAYS_MS, (attempt, retries, responseH
 });
 
 /** A delivery an event caused, and the app it went to. */
-export interface Sent {
+interface Sent {
   readonly app: string;
   readonly id: string;
 }
 
 /** The built-in app's delivery among those an event caused: what a message's `delivery` is. */
-export const builtInDelivery = (sent: readonly Sent[]): string | undefined =>
+const builtInDelivery = (sent: readonly Sent[]): string | undefined =>
   sent.find((one) => one.app === BUILT_IN_APP)?.id;
 
 export function createFakeWorld(

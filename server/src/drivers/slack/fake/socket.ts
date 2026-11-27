@@ -17,7 +17,7 @@ const ENVELOPE_TYPE: Readonly<Record<string, string>> = {
 /** The kinds the app may answer in its acknowledgement: a command's reply, a submission's `response_action`. */
 const ANSWERED_IN_ACK = new Set(["slash_command", "view_submission", "block_actions", "message_action"]);
 
-export interface SocketMode {
+interface SocketMode {
   /** `apps.connections.open`: the WebSocket URL for one connection, with a ticket that works once. */
   ticket(): string;
   /** A WebSocket request from the agent: the connection, if it comes with a ticket this fake issued. */
