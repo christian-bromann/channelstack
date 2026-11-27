@@ -1,8 +1,8 @@
 /**
- * `pnpm resend:schema --check`, `pnpm google:schema --check`: a platform's own description of its
- * API, as the tests hold its fake to it (exit checks 8.3 and 9.2). Each is the platform's file,
- * committed byte for byte from a repository at a commit; `--check` fails when it isn't that file,
- * and `--fetch` downloads it again.
+ * `pnpm resend:schema --check`, `pnpm google:schema --check`, `pnpm twilio:schema --check`: a
+ * platform's own description of its API, as the tests hold its fake to it (exit checks 8.3, 9.2 and
+ * 10.2). Each is the platform's file, committed byte for byte from a repository at a commit;
+ * `--check` fails when it isn't that file, and `--fetch` downloads it again.
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -40,6 +40,15 @@ const PINS: Readonly<Record<string, Pin>> = {
     commit: "e64e26ab87c7d621285fb6ab4e448436da3dffcb",
     blob: "b6af15b7d871f4d6a218ab810bf50e19d3e6289e",
     path: "gmail-discovery.json",
+  },
+  // Twilio's OpenAPI description of its REST API, version 2010-04-01 (Messages among it).
+  twilio: {
+    what: "Twilio's twilio_api_v2010.json",
+    repository: "twilio/twilio-oai",
+    file: "spec/json/twilio_api_v2010.json",
+    commit: "6891362428239e2b29339718ffb7bd9fb86ff9cb",
+    blob: "dc0d18bb8f39c7b0769ee288b1e871c29a8935ee",
+    path: "twilio-api-v2010.json",
   },
 };
 

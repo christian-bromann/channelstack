@@ -7,9 +7,10 @@ import { linear } from "./linear/index.ts";
 import { notion } from "./notion/index.ts";
 import { resend } from "./resend/index.ts";
 import { slack } from "./slack/index.ts";
+import { twilio } from "./twilio/index.ts";
 
 /** Every driver in the binary. Core never imports a driver; drivers are handed to it from here. */
-export const DRIVERS: readonly DriverDefinition[] = [echo, slack, github, linear, notion, resend, google];
+export const DRIVERS: readonly DriverDefinition[] = [echo, slack, github, linear, notion, resend, google, twilio];
 
 /** The channels people test against: every driver but channelstack's own (`echo`), in this order everywhere. */
 export const CHANNELS: readonly DriverDefinition[] = DRIVERS.filter((driver) => !driver.internal);

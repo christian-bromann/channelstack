@@ -1,6 +1,7 @@
 const REDACTED = "[redacted]";
 
-const BEARER_PATTERN = /\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
+/** What follows `Bearer`, or `Basic` (a key and its secret, in base64: Twilio's API). */
+const BEARER_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 /** An address, as written or as a URL carries it (`ana%40example.com`). */
 const EMAIL_PATTERN = /[A-Za-z0-9._%+-]+(?:@|%40)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/gi;
 
@@ -22,7 +23,7 @@ export class Redactor {
     for (const secret of secrets) if (secret.length >= 8) this.#literals.add(secret);
   }
 
-  /** For logs and error messages: tokens, registered secrets, anything after `Bearer`, and emails. */
+  /** For logs and error messages: tokens, registered secrets, anything after `Bearer` or `Basic`, and emails. */
   text(input: string): string {
     return this.#tokensIn(input).replace(BEARER_PATTERN, `$1 ${REDACTED}`).replace(EMAIL_PATTERN, REDACTED);
   }

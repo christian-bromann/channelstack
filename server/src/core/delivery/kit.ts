@@ -42,8 +42,16 @@ export interface PlatformDeliveries {
   readonly retry?: RetryPolicy;
   /** How the platform puts each attempt into the signed body (`DeliveryRequest.stamp`). */
   readonly stamp?: DeliveryRequest["stamp"];
-  /** The platform's headers for one attempt, signed with `secret` over the exact body, at `atMs`. */
-  sign(secret: string, body: string, atMs: number, request: { id: string; type: string }): Record<string, string>;
+  /**
+   * The platform's headers for one attempt, signed with `secret` over the exact body, at `atMs`.
+   * `request.url` is where it goes, for a platform that signs the URL too (Twilio).
+   */
+  sign(
+    secret: string,
+    body: string,
+    atMs: number,
+    request: { id: string; type: string; url: string },
+  ): Record<string, string>;
   /** The secret the agent checks signatures with. */
   secret(): string;
   /** A secret the agent can't know, for a forged delivery. Defaults to a random token. */
@@ -54,6 +62,8 @@ export interface PlatformDeliveries {
 
 /** One delivery to send. What the platform always sends the same way comes from `PlatformDeliveries`. */
 type Outgoing = Omit<DeliveryRequest, "driver" | "sign" | "timeoutMs" | "retry" | "stamp"> & {
+  /** Another ack window for this one: one the agent set itself (Twilio's connection overrides). */
+  readonly timeoutMs?: number;
   /** Sign this one differently: a request the platform doesn't sign (Notion's verification). */
   readonly sign?: DeliveryRequest["sign"];
   /** `false`: the platform doesn't retry this one (Slack's interactions). */
@@ -98,18 +108,18 @@ export function deliveryKit(
 ): DeliveryKit {
   const { delivery, clock } = deps;
   const signer =
-    (secret: string, request: { id: string; type: string }) =>
+    (secret: string, request: { id: string; type: string; url: string }) =>
     (body: string, atMs: number): Record<string, string> =>
       platform.sign(secret, body, atMs, request);
   return {
     send(outgoing) {
-      const { retry, stamp, sign, ...rest } = outgoing;
+      const { retry, stamp, sign, timeoutMs, ...rest } = outgoing;
       const retryPolicy = retry === false ? undefined : (retry ?? platform.retry);
       const stamper = stamp === false ? undefined : (stamp ?? platform.stamp);
       return delivery.enqueue({
         ...rest,
         driver: platform.driver,
-        timeoutMs: platform.timeoutMs,
+        timeoutMs: timeoutMs ?? platform.timeoutMs,
         sign: sign ?? signer(platform.secret(), outgoing),
         ...(retryPolicy ? { retry: retryPolicy } : {}),
         ...(stamper ? { stamp: stamper } : {}),

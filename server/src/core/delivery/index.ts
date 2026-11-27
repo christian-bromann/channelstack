@@ -109,6 +109,11 @@ export interface AttemptOptions {
    * stale delivery the agent should refuse.
    */
   atMs?: number;
+  /**
+   * Hand the agent's answer to the driver, as on the platform's own chain: for a platform that
+   * acts on the answer to a retry it sends (Twilio sends the TwiML of each).
+   */
+  answered?: boolean;
 }
 
 const RESPONSE_BODY_LIMIT = 2048;
@@ -167,23 +172,7 @@ export class DeliveryQueue {
     const cancelled = this.#sessions.get(record.request.session)?.records.get(record.request.id) !== record;
     if (cancelled) return;
     if (attempt.status === "acknowledged") {
-      try {
-        record.request.answered?.({
-          status: attempt.responseStatus ?? 200,
-          contentType: responseHeaders?.get("content-type") ?? "",
-          body: responseText ?? "",
-        });
-      } catch (error) {
-        // The agent acknowledged with something the platform can't act on (a view that isn't one, a
-        // reply it refuses). The delivery stands; what went wrong is in the log and the event log.
-        const problem = error instanceof Error ? error.message : String(error);
-        this.#log.warn("the agent's answer could not be acted on", { id: record.request.id, problem });
-        this.#events.append(record.request.session, record.request.driver, "action", {
-          action: "answer_refused",
-          delivery: record.request.id,
-          problem,
-        });
-      }
+      this.#answer(record, attempt, responseHeaders, responseText);
       return;
     }
     const next = record.request.retry?.next(attempt, retries, responseHeaders);
@@ -197,7 +186,41 @@ export class DeliveryQueue {
 
   /** Send a delivery again: a platform retry, a redelivery, or a forged copy. Resolves with the new attempt. */
   again(session: string, id: string, options: AttemptOptions = {}): Promise<DeliveryAttempt> {
-    return this.#track(this.#send(this.get(session, id), options).then(({ attempt }) => attempt));
+    const record = this.get(session, id);
+    return this.#track(
+      this.#send(record, options).then(({ attempt, responseHeaders, responseText }) => {
+        if (options.answered && attempt.status === "acknowledged") {
+          this.#answer(record, attempt, responseHeaders, responseText);
+        }
+        return attempt;
+      }),
+    );
+  }
+
+  /** The agent's answer to an acknowledged attempt, handed to the driver that acts on it. */
+  #answer(
+    record: DeliveryRecord,
+    attempt: DeliveryAttempt,
+    responseHeaders: Headers | undefined,
+    responseText: string | undefined,
+  ): void {
+    try {
+      record.request.answered?.({
+        status: attempt.responseStatus ?? 200,
+        contentType: responseHeaders?.get("content-type") ?? "",
+        body: responseText ?? "",
+      });
+    } catch (error) {
+      // The agent acknowledged with something the platform can't act on (a view that isn't one, a
+      // reply it refuses). The delivery stands; what went wrong is in the log and the event log.
+      const problem = error instanceof Error ? error.message : String(error);
+      this.#log.warn("the agent's answer could not be acted on", { id: record.request.id, problem });
+      this.#events.append(record.request.session, record.request.driver, "action", {
+        action: "answer_refused",
+        delivery: record.request.id,
+        problem,
+      });
+    }
   }
 
   get(session: string, id: string): DeliveryRecord {

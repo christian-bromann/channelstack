@@ -12,7 +12,8 @@
     "**/.venv/**",
     "**/linear/schema/**",
     "**/resend-openapi.json",
-    "**/gmail-discovery.json"
+    "**/gmail-discovery.json",
+    "**/twilio-api-v2010.json"
   ],
   "reporters": ["console"],
   "exitCode": 1

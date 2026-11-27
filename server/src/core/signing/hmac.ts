@@ -15,6 +15,11 @@ export function hmacSha256Base64(key: Uint8Array, payload: string): string {
   return createHmac("sha256", key).update(payload).digest("base64");
 }
 
+/** HMAC-SHA1 over the exact text that is signed, as base64 (Twilio's `X-Twilio-Signature`). */
+export function hmacSha1Base64(secret: string, payload: string): string {
+  return createHmac("sha1", secret).update(payload).digest("base64");
+}
+
 /** Compare two secrets or signatures without leaking where they differ, or how long they are. */
 export function constantTimeEqual(a: string, b: string): boolean {
   const left = createHash("sha256").update(a).digest();

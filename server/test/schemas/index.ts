@@ -8,6 +8,7 @@ import { restProblems, webhookProblems } from "./github.ts";
 import { googlePushProblems, googleResponseProblems } from "./google.ts";
 import { linearResponseProblems, linearWebhookProblems } from "./linear.ts";
 import { resendResponseProblems, resendWebhookProblems } from "./resend.ts";
+import { twilioResponseProblems, twilioWebhookProblems } from "./twilio.ts";
 
 /** An API call as a fixture's `calls()` reads it. */
 export interface CheckedCall {
@@ -48,5 +49,9 @@ export const SCHEMAS: Readonly<Record<string, ChannelSchemas>> = {
   google: {
     call: (call) => googleResponseProblems(call.method, call.path, call.responseStatus, call.response),
     webhook: (_type, payload) => googlePushProblems(payload),
+  },
+  twilio: {
+    call: (call) => twilioResponseProblems(call.method, call.path, call.responseStatus, call.response),
+    webhook: twilioWebhookProblems,
   },
 };

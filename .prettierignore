@@ -21,3 +21,4 @@ pnpm-lock.yaml
 # Resend's and Gmail's own descriptions, byte for byte (`pnpm resend:schema --check`, `pnpm google:schema --check`).
 /server/test/schemas/resend-openapi.json
 /server/test/schemas/gmail-discovery.json
+/server/test/schemas/twilio-api-v2010.json
