@@ -57,12 +57,15 @@ pub mod codes {
     pub const NOT_FOUND: &str = "not_found";
     pub const NOT_IN_CHANNEL: &str = "not_in_channel";
     pub const NOT_IN_ROOM: &str = "not_in_room";
+    pub const OBJECT_NOT_FOUND: &str = "object_not_found";
+    pub const RESTRICTED_RESOURCE: &str = "restricted_resource";
     pub const SESSION_NOT_FOUND: &str = "session_not_found";
     pub const SPLIT_VIEW_UNAVAILABLE: &str = "split_view_unavailable";
     pub const STOP_UNAVAILABLE: &str = "stop_unavailable";
     pub const UNAUTHORIZED: &str = "unauthorized";
     pub const UNSUPPORTED_IN_FAKE: &str = "unsupported_in_fake";
     pub const UNSUPPORTED_IN_LIVE: &str = "unsupported_in_live";
+    pub const VALIDATION_ERROR: &str = "validation_error";
     pub const VALIDATION_FAILED: &str = "validation_failed";
 }
 
@@ -4063,6 +4066,50 @@ fn run_linear_fixture_create_user<'a>(
     })
 }
 
+fn run_linear_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_events = options.get("events").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/linear/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("events".into(), p_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_linear_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/linear/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_linear_fixture_create_team<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -4163,6 +4210,80 @@ fn run_linear_fixture_calls<'a>(
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_linear_app_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/apps/{}/comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_linear_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
             false,
             &[],
         )
@@ -4741,7 +4862,7 @@ fn run_linear_user_stop<'a>(
     })
 }
 
-fn run_linear_team_issue<'a>(
+fn run_linear_comment_replies<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4750,9 +4871,27 @@ fn run_linear_team_issue<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
-        let p_identifier = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/linear/teams/{}/issue",
+            "/sessions/{}/linear/comments/{}/replies",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, true, &[]).await
+    })
+}
+
+fn run_linear_comment_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/comments/{}/delivery-for",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
@@ -4763,13 +4902,34 @@ fn run_linear_team_issue<'a>(
             None,
             Some({
                 let mut wire = Map::new();
-                wire.insert("identifier".into(), p_identifier.clone());
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
                 wire
             }),
             false,
             &[],
         )
         .await
+    })
+}
+
+fn run_linear_comment_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/linear/comments/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -4953,7 +5113,7 @@ fn run_linear_issue_transcript<'a>(
     })
 }
 
-fn run_linear_delivery_refresh<'a>(
+fn run_linear_team_issue<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -4962,60 +5122,22 @@ fn run_linear_delivery_refresh<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_identifier = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/linear/deliveries/{}",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_linear_delivery_redeliver<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/linear/deliveries/{}/redeliver",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "POST", path, None, None, false, &[]).await
-    })
-}
-
-fn run_linear_delivery_resend<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
-        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/linear/deliveries/{}/resend",
+            "/sessions/{}/linear/teams/{}/issue",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
         send(
             ctx,
-            "POST",
+            "GET",
             path,
+            None,
             Some({
                 let mut wire = Map::new();
-                wire.insert("badSignature".into(), p_bad_signature.clone());
-                wire.insert("stale".into(), p_stale.clone());
+                wire.insert("identifier".into(), p_identifier.clone());
                 wire
             }),
-            None,
             false,
             &[],
         )
@@ -5113,7 +5235,7 @@ fn run_linear_agent_session_transcript<'a>(
     })
 }
 
-fn run_linear_comment_replies<'a>(
+fn run_linear_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -5123,29 +5245,63 @@ fn run_linear_comment_replies<'a>(
         let _ = (&me, &options);
         let mut args = args.into_iter();
         let path = format!(
-            "/sessions/{}/linear/comments/{}/replies",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, true, &[]).await
-    })
-}
-
-fn run_linear_comment_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/linear/comments/{}/transcript",
+            "/sessions/{}/linear/deliveries/{}",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
         send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_linear_delivery_redeliver<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/linear/deliveries/{}/redeliver",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_linear_delivery_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
+        let p_stale = options.get("stale").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/linear/deliveries/{}/resend",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("badSignature".into(), p_bad_signature.clone());
+                wire.insert("stale".into(), p_stale.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -5198,6 +5354,52 @@ fn run_notion_fixture_create_user<'a>(
             &[],
         )
         .await
+    })
+}
+
+fn run_notion_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_capabilities = options.get("capabilities").cloned().unwrap_or(Value::Null);
+        let p_events = options.get("events").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/notion/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("capabilities".into(), p_capabilities.clone());
+                wire.insert("events".into(), p_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/notion/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -5340,11 +5542,28 @@ fn run_notion_fixture_send_verification<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/notion/verification",
             encode_segment(ctx.session()?)
         );
-        send(ctx, "POST", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -5407,6 +5626,168 @@ fn run_notion_fixture_calls<'a>(
                 wire.insert("error".into(), p_error.clone());
                 wire
             }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_page = options.get("page").cloned().unwrap_or(Value::Null);
+        let p_anchor = options.get("anchor").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("text".into(), p_text.clone());
+                wire.insert(
+                    "page".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
+                );
+                wire.insert("anchor".into(), p_anchor.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_discussion = options.get("discussion").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("text".into(), p_text.clone());
+                wire.insert(
+                    "discussion".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_discussion)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_edit<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_change = args.next().unwrap_or(Value::Null);
+        let p_page = options.get("page").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/edit",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "change".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[
+                                ("append", &|v: &Value| files::read_document(v)),
+                                ("replace", &|v: &Value| files::read_document(v)),
+                            ],
+                        )
+                    })(&p_change)?,
+                );
+                wire.insert(
+                    "page".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_notion_integration_rename<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_title = args.next().unwrap_or(Value::Null);
+        let p_page = options.get("page").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/notion/apps/{}/rename",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("title".into(), p_title.clone());
+                wire.insert(
+                    "page".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_page)?,
+                );
+                wire
+            }),
+            None,
             false,
             &[],
         )
@@ -5963,6 +6344,60 @@ fn run_notion_user_disconnect<'a>(
     })
 }
 
+fn run_notion_discussion_comments<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/notion/discussions/{}/comments",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_notion_discussion_resolved<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/notion/discussions/{}/resolved",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_notion_discussion_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/notion/discussions/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_notion_page_discussions<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6103,38 +6538,6 @@ fn run_notion_page_transcript<'a>(
     })
 }
 
-fn run_notion_database_rows<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_filter = args.next().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/notion/databases/{}/rows",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "POST",
-            path,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("filter".into(), p_filter.clone());
-                wire
-            }),
-            None,
-            false,
-            &[],
-        )
-        .await
-    })
-}
-
 fn run_notion_delivery_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6203,7 +6606,7 @@ fn run_notion_delivery_resend<'a>(
     })
 }
 
-fn run_notion_discussion_comments<'a>(
+fn run_notion_database_rows<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
     args: Vec<Value>,
@@ -6212,48 +6615,26 @@ fn run_notion_discussion_comments<'a>(
     Box::pin(async move {
         let _ = (&me, &options);
         let mut args = args.into_iter();
+        let p_filter = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/notion/discussions/{}/comments",
+            "/sessions/{}/notion/databases/{}/rows",
             encode_segment(ctx.session()?),
             path_value(&me["id"])?
         );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_notion_discussion_resolved<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/notion/discussions/{}/resolved",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_notion_discussion_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/notion/discussions/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("filter".into(), p_filter.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -13507,6 +13888,28 @@ impl LinearFixture {
         ))
     }
 
+    /// Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> LinearFixtureCreateApp {
+        LinearFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_fixture_create_app,
+            LinearApp::wrap,
+        ))
+    }
+
+    /// The workspace's apps: the built-in one first, then the others in the order they were made. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one. Experimental.
     pub fn create_team(&self) -> LinearFixtureCreateTeam {
         LinearFixtureCreateTeam(Call::new(
@@ -13592,6 +13995,32 @@ impl LinearFixtureCreateUser {
 impl IntoFuture for LinearFixtureCreateUser {
     type Output = Result<LinearUser>;
     type IntoFuture = BoxFuture<'static, Result<LinearUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`LinearFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearFixtureCreateApp(Call<LinearApp>);
+
+impl LinearFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `events`.
+    pub fn events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("events", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<LinearApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearFixtureCreateApp {
+    type Output = Result<LinearApp>;
+    type IntoFuture = BoxFuture<'static, Result<LinearApp>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -13858,6 +14287,72 @@ impl LinearApp {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
+
+    /// An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6). Experimental.
+    pub fn comment(&self, body: impl IntoArg) -> LinearAppComment {
+        LinearAppComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_linear_app_comment,
+            LinearComment::wrap,
+        ))
+    }
+
+    /// An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would. Experimental.
+    pub fn reply(&self, body: impl IntoArg) -> LinearAppReply {
+        LinearAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_linear_app_reply,
+            LinearComment::wrap,
+        ))
+    }
+}
+
+/// The options of [`LinearApp::comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearAppComment(Call<LinearComment>);
+
+impl LinearAppComment {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<LinearComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearAppComment {
+    type Output = Result<LinearComment>;
+    type IntoFuture = BoxFuture<'static, Result<LinearComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`LinearApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearAppReply(Call<LinearComment>);
+
+impl LinearAppReply {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<LinearComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearAppReply {
+    type Output = Result<LinearComment>;
+    type IntoFuture = BoxFuture<'static, Result<LinearComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
 }
 
 /// A handle: `LinearUser`.
@@ -14023,7 +14518,7 @@ impl LinearUser {
         ))
     }
 
-    /// Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental.
+    /// Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves. Experimental.
     pub fn delegate(&self, app: impl IntoArg) -> LinearUserDelegate {
         LinearUserDelegate(Call::new(
             &self.ctx,
@@ -14453,15 +14948,15 @@ impl IntoFuture for LinearUserStop {
     }
 }
 
-/// A handle: `LinearTeam`.
+/// A handle: `LinearComment`.
 #[derive(Clone)]
-pub struct LinearTeam {
+pub struct LinearComment {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for LinearTeam {
+impl Handle for LinearComment {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -14470,7 +14965,7 @@ impl Handle for LinearTeam {
     }
 }
 
-impl LinearTeam {
+impl LinearComment {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -14508,29 +15003,82 @@ impl LinearTeam {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `key`.
-    pub fn key(&self) -> String {
+    /// `issue`.
+    pub fn issue(&self) -> LinearIssue {
+        LinearIssue::from_wire_in(
+            &self.ctx,
+            self.data.get("issue").cloned().unwrap_or(Value::Null),
+            self.seen.field("issue"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `body`.
+    pub fn body(&self) -> String {
         self.data
-            .get("key")
+            .get("body")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `name`.
-    pub fn name(&self) -> String {
+    /// `createdAt`.
+    pub fn created_at(&self) -> String {
         self.data
-            .get("name")
+            .get("createdAt")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+    /// `url`.
+    pub fn url(&self) -> String {
+        self.data
+            .get("url")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `session`.
+    pub fn session(&self) -> Option<LinearAgentSession> {
+        self.data.get("session").filter(|v| !v.is_null()).map(|v| {
+            LinearAgentSession::from_wire_in(&self.ctx, v.clone(), self.seen.field("session"))
+        })
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<LinearDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            LinearDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
     }
 
-    /// An issue of this team by its identifier (`ENG-12`). Experimental.
-    pub fn issue(&self, identifier: impl IntoArg) -> Call<LinearIssue> {
+    /// The replies in a comment's thread, once the agent is quiet. Experimental.
+    pub fn replies(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
             &self.data,
-            vec![identifier.into_arg()],
-            run_linear_team_issue,
-            LinearIssue::wrap,
+            vec![],
+            run_linear_comment_replies,
+            as_value,
+        )
+    }
+
+    /// The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<LinearDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_linear_comment_delivery_for,
+            LinearDelivery::wrap_opt,
+        )
+    }
+
+    /// A comment's thread as a person reads it. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_comment_transcript,
+            as_value,
         )
     }
 }
@@ -14905,15 +15453,15 @@ impl IntoFuture for LinearIssueLatestComment {
     }
 }
 
-/// A handle: `LinearDelivery`.
+/// A handle: `LinearTeam`.
 #[derive(Clone)]
-pub struct LinearDelivery {
+pub struct LinearTeam {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for LinearDelivery {
+impl Handle for LinearTeam {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -14922,7 +15470,7 @@ impl Handle for LinearDelivery {
     }
 }
 
-impl LinearDelivery {
+impl LinearTeam {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -14960,171 +15508,30 @@ impl LinearDelivery {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `channel`.
-    pub fn channel(&self) -> String {
+    /// `key`.
+    pub fn key(&self) -> String {
         self.data
-            .get("channel")
+            .get("key")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `type`.
-    pub fn r#type(&self) -> String {
+    /// `name`.
+    pub fn name(&self) -> String {
         self.data
-            .get("type")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `action`.
-    pub fn action(&self) -> String {
-        self.data
-            .get("action")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `webhookId`.
-    pub fn webhook_id(&self) -> String {
-        self.data
-            .get("webhookId")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `payload`.
-    pub fn payload(&self) -> &Value {
-        self.data.get("payload").unwrap_or(&Value::Null)
-    }
-    /// `attempts`.
-    pub fn attempts(&self) -> &Value {
-        self.data.get("attempts").unwrap_or(&Value::Null)
-    }
-    /// `status`.
-    pub fn status(&self) -> String {
-        self.data
-            .get("status")
+            .get("name")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
 
-    /// Re-read a delivery: its attempts and status. Experimental.
-    pub fn refresh(&self) -> Call<LinearDelivery> {
+    /// An issue of this team by its identifier (`ENG-12`). Experimental.
+    pub fn issue(&self, identifier: impl IntoArg) -> Call<LinearIssue> {
         Call::new(
             &self.ctx,
             &self.data,
-            vec![],
-            run_linear_delivery_refresh,
-            LinearDelivery::wrap,
+            vec![identifier.into_arg()],
+            run_linear_team_issue,
+            LinearIssue::wrap,
         )
-    }
-
-    /// Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental.
-    pub fn redeliver(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_linear_delivery_redeliver,
-            as_value,
-        )
-    }
-
-    /// Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental.
-    pub fn resend(&self) -> LinearDeliveryResend {
-        LinearDeliveryResend(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_linear_delivery_resend,
-            as_value,
-        ))
-    }
-
-    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn settled(&self) -> LinearDeliverySettled {
-        LinearDeliverySettled {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`LinearDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct LinearDeliveryResend(Call<Value>);
-
-impl LinearDeliveryResend {
-    /// `badSignature`.
-    pub fn bad_signature(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("badSignature", value))
-    }
-    /// `stale`.
-    pub fn stale(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("stale", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for LinearDeliveryResend {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`LinearDelivery::settled`].
-pub struct LinearDeliverySettled {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl LinearDeliverySettled {
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<LinearDelivery> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run_linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
-            async move {
-                let value = read.await?;
-                Ok((!["pending"]
-                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
-                .then_some(value))
-            }
-        })
-        .await?;
-        LinearDelivery::wrap(&ctx, value)
-    }
-}
-
-impl IntoFuture for LinearDeliverySettled {
-    type Output = Result<LinearDelivery>;
-    type IntoFuture = BoxFuture<'static, Result<LinearDelivery>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
     }
 }
 
@@ -15416,15 +15823,15 @@ impl IntoFuture for LinearAgentSessionWaitForActivity {
     }
 }
 
-/// A handle: `LinearComment`.
+/// A handle: `LinearDelivery`.
 #[derive(Clone)]
-pub struct LinearComment {
+pub struct LinearDelivery {
     ctx: Ctx,
     data: Value,
     seen: Seen,
 }
 
-impl Handle for LinearComment {
+impl Handle for LinearDelivery {
     fn data(&self) -> &Value {
         &self.data
     }
@@ -15433,7 +15840,7 @@ impl Handle for LinearComment {
     }
 }
 
-impl LinearComment {
+impl LinearDelivery {
     #[doc(hidden)]
     pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
         Self::from_wire_in(ctx, data, Seen::default())
@@ -15471,72 +15878,178 @@ impl LinearComment {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `issue`.
-    pub fn issue(&self) -> LinearIssue {
-        LinearIssue::from_wire_in(
-            &self.ctx,
-            self.data.get("issue").cloned().unwrap_or(Value::Null),
-            self.seen.field("issue"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `body`.
-    pub fn body(&self) -> String {
+    /// `channel`.
+    pub fn channel(&self) -> String {
         self.data
-            .get("body")
+            .get("channel")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `createdAt`.
-    pub fn created_at(&self) -> String {
+    /// `app`.
+    pub fn app(&self) -> String {
         self.data
-            .get("createdAt")
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `url`.
-    pub fn url(&self) -> String {
+    /// `type`.
+    pub fn r#type(&self) -> String {
         self.data
-            .get("url")
+            .get("type")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
-    /// `session`.
-    pub fn session(&self) -> Option<LinearAgentSession> {
-        self.data.get("session").filter(|v| !v.is_null()).map(|v| {
-            LinearAgentSession::from_wire_in(&self.ctx, v.clone(), self.seen.field("session"))
-        })
+    /// `action`.
+    pub fn action(&self) -> String {
+        self.data
+            .get("action")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
     }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<LinearDelivery> {
-        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
-            LinearDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
-        })
+    /// `webhookId`.
+    pub fn webhook_id(&self) -> String {
+        self.data
+            .get("webhookId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `payload`.
+    pub fn payload(&self) -> &Value {
+        self.data.get("payload").unwrap_or(&Value::Null)
+    }
+    /// `attempts`.
+    pub fn attempts(&self) -> &Value {
+        self.data.get("attempts").unwrap_or(&Value::Null)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
     }
 
-    /// The replies in a comment's thread, once the agent is quiet. Experimental.
-    pub fn replies(&self) -> Call<Value> {
+    /// Re-read a delivery: its attempts and status. Experimental.
+    pub fn refresh(&self) -> Call<LinearDelivery> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![],
-            run_linear_comment_replies,
-            as_value,
+            run_linear_delivery_refresh,
+            LinearDelivery::wrap,
         )
     }
 
-    /// A comment's thread as a person reads it. Experimental.
-    pub fn transcript(&self) -> Call<Value> {
+    /// Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental.
+    pub fn redeliver(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
             &self.data,
             vec![],
-            run_linear_comment_transcript,
+            run_linear_delivery_redeliver,
             as_value,
         )
+    }
+
+    /// Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental.
+    pub fn resend(&self) -> LinearDeliveryResend {
+        LinearDeliveryResend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_linear_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn settled(&self) -> LinearDeliverySettled {
+        LinearDeliverySettled {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`LinearDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct LinearDeliveryResend(Call<Value>);
+
+impl LinearDeliveryResend {
+    /// `badSignature`.
+    pub fn bad_signature(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("badSignature", value))
+    }
+    /// `stale`.
+    pub fn stale(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("stale", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for LinearDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`LinearDelivery::settled`].
+pub struct LinearDeliverySettled {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl LinearDeliverySettled {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<LinearDelivery> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let value = wait_for("the delivery to settle", &timeout, || {
+            let read = run_linear_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            async move {
+                let value = read.await?;
+                Ok((!["pending"]
+                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
+                .then_some(value))
+            }
+        })
+        .await?;
+        LinearDelivery::wrap(&ctx, value)
+    }
+}
+
+impl IntoFuture for LinearDeliverySettled {
+    type Output = Result<LinearDelivery>;
+    type IntoFuture = BoxFuture<'static, Result<LinearDelivery>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
     }
 }
 
@@ -15715,6 +16228,28 @@ impl NotionFixture {
         ))
     }
 
+    /// Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it. Experimental.
+    pub fn create_app(&self) -> NotionFixtureCreateApp {
+        NotionFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_fixture_create_app,
+            NotionIntegration::wrap,
+        ))
+    }
+
+    /// The workspace's integrations: the built-in one first, then the others in the order they were made. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds. Experimental.
     pub fn create_page(&self) -> NotionFixtureCreatePage {
         NotionFixtureCreatePage(Call::new(
@@ -15748,15 +16283,15 @@ impl NotionFixture {
         )
     }
 
-    /// Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created. Experimental.
-    pub fn send_verification(&self) -> Call<Option<NotionDelivery>> {
-        Call::new(
+    /// Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's. Experimental.
+    pub fn send_verification(&self) -> NotionFixtureSendVerification {
+        NotionFixtureSendVerification(Call::new(
             &self.ctx,
             &self.data,
             vec![],
             run_notion_fixture_send_verification,
             NotionDelivery::wrap_opt,
-        )
+        ))
     }
 
     /// Every webhook channelstack sent the agent for this session, with every attempt. Experimental.
@@ -15825,6 +16360,36 @@ impl NotionFixtureCreateUser {
 impl IntoFuture for NotionFixtureCreateUser {
     type Output = Result<NotionUser>;
     type IntoFuture = BoxFuture<'static, Result<NotionUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionFixtureCreateApp(Call<NotionIntegration>);
+
+impl NotionFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `capabilities`.
+    pub fn capabilities(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("capabilities", value))
+    }
+    /// `events`.
+    pub fn events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("events", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<NotionIntegration> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionFixtureCreateApp {
+    type Output = Result<NotionIntegration>;
+    type IntoFuture = BoxFuture<'static, Result<NotionIntegration>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -15905,6 +16470,28 @@ impl NotionFixtureCreateDatabase {
 impl IntoFuture for NotionFixtureCreateDatabase {
     type Output = Result<NotionDatabase>;
     type IntoFuture = BoxFuture<'static, Result<NotionDatabase>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionFixture::send_verification`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionFixtureSendVerification(Call<Option<NotionDelivery>>);
+
+impl NotionFixtureSendVerification {
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<NotionDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionFixtureSendVerification {
+    type Output = Result<Option<NotionDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<NotionDelivery>>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -16125,6 +16712,142 @@ impl NotionIntegration {
             .get("webhookSecret")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page. Experimental.
+    pub fn comment(&self, text: impl IntoArg) -> NotionIntegrationComment {
+        NotionIntegrationComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_notion_integration_comment,
+            NotionComment::wrap,
+        ))
+    }
+
+    /// An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`. Experimental.
+    pub fn reply(&self, text: impl IntoArg) -> NotionIntegrationReply {
+        NotionIntegrationReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_notion_integration_reply,
+            NotionComment::wrap,
+        ))
+    }
+
+    /// An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental.
+    pub fn edit(&self, change: impl IntoArg) -> NotionIntegrationEdit {
+        NotionIntegrationEdit(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![change.into_arg()],
+            run_notion_integration_edit,
+            NotionDelivery::wrap_opt,
+        ))
+    }
+
+    /// An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`. Experimental.
+    pub fn rename(&self, title: impl IntoArg) -> NotionIntegrationRename {
+        NotionIntegrationRename(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![title.into_arg()],
+            run_notion_integration_rename,
+            NotionDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`NotionIntegration::comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationComment(Call<NotionComment>);
+
+impl NotionIntegrationComment {
+    /// `page`.
+    pub fn page(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("page", value))
+    }
+    /// `anchor`.
+    pub fn anchor(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("anchor", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<NotionComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationComment {
+    type Output = Result<NotionComment>;
+    type IntoFuture = BoxFuture<'static, Result<NotionComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionIntegration::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationReply(Call<NotionComment>);
+
+impl NotionIntegrationReply {
+    /// `discussion`.
+    pub fn discussion(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("discussion", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<NotionComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationReply {
+    type Output = Result<NotionComment>;
+    type IntoFuture = BoxFuture<'static, Result<NotionComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionIntegration::edit`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationEdit(Call<Option<NotionDelivery>>);
+
+impl NotionIntegrationEdit {
+    /// `page`.
+    pub fn page(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("page", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<NotionDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationEdit {
+    type Output = Result<Option<NotionDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<NotionDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionIntegration::rename`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionIntegrationRename(Call<Option<NotionDelivery>>);
+
+impl NotionIntegrationRename {
+    /// `page`.
+    pub fn page(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("page", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<NotionDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionIntegrationRename {
+    type Output = Result<Option<NotionDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<NotionDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -16660,459 +17383,6 @@ impl IntoFuture for NotionUserDisconnect {
     }
 }
 
-/// A handle: `NotionPage`.
-#[derive(Clone)]
-pub struct NotionPage {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for NotionPage {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl NotionPage {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `title`.
-    pub fn title(&self) -> String {
-        self.data
-            .get("title")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `url`.
-    pub fn url(&self) -> String {
-        self.data
-            .get("url")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// The page's discussions: on the page itself, and on its blocks. Experimental.
-    pub fn discussions(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_discussions,
-            as_value,
-        )
-    }
-
-    /// The page body as Markdown, once the agent is quiet. Experimental.
-    pub fn markdown(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_markdown,
-            as_value,
-        )
-    }
-
-    /// The page's blocks as the API has them, with nested blocks under `children`. Experimental.
-    pub fn blocks(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_blocks,
-            as_value,
-        )
-    }
-
-    /// A property's value as a person reads it: text, a number, option names, ids. Experimental.
-    pub fn property(&self, name: impl IntoArg) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![name.into_arg()],
-            run_notion_page_property,
-            as_value,
-        )
-    }
-
-    /// The pages directly under this page. Experimental.
-    pub fn children(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_children,
-            as_value,
-        )
-    }
-
-    /// The integrations that can see the page: connected to it or to a page above it. Experimental.
-    pub fn connections(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_connections,
-            as_value,
-        )
-    }
-
-    /// The page and its discussions as a person reads them. Experimental.
-    pub fn transcript(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_page_transcript,
-            as_value,
-        )
-    }
-}
-
-/// A handle: `NotionDatabase`.
-#[derive(Clone)]
-pub struct NotionDatabase {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for NotionDatabase {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl NotionDatabase {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `title`.
-    pub fn title(&self) -> String {
-        self.data
-            .get("title")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `url`.
-    pub fn url(&self) -> String {
-        self.data
-            .get("url")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// The rows of a database, optionally only those whose properties have these values. Experimental.
-    pub fn rows(&self, filter: impl IntoArg) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![filter.into_arg()],
-            run_notion_database_rows,
-            as_value,
-        )
-    }
-}
-
-/// A handle: `NotionDelivery`.
-#[derive(Clone)]
-pub struct NotionDelivery {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for NotionDelivery {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl NotionDelivery {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> String {
-        self.data
-            .get("channel")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `type`.
-    pub fn r#type(&self) -> String {
-        self.data
-            .get("type")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `entity`.
-    pub fn entity(&self) -> &Value {
-        self.data.get("entity").unwrap_or(&Value::Null)
-    }
-    /// `payload`.
-    pub fn payload(&self) -> &Value {
-        self.data.get("payload").unwrap_or(&Value::Null)
-    }
-    /// `attempts`.
-    pub fn attempts(&self) -> &Value {
-        self.data.get("attempts").unwrap_or(&Value::Null)
-    }
-    /// `status`.
-    pub fn status(&self) -> String {
-        self.data
-            .get("status")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-
-    /// Re-read a delivery: its attempts and status. Experimental.
-    pub fn refresh(&self) -> Call<NotionDelivery> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_delivery_refresh,
-            NotionDelivery::wrap,
-        )
-    }
-
-    /// Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. Experimental.
-    pub fn redeliver(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_delivery_redeliver,
-            as_value,
-        )
-    }
-
-    /// Send the delivery again, signed with a token that isn't the subscription's. Experimental.
-    pub fn resend(&self) -> NotionDeliveryResend {
-        NotionDeliveryResend(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_notion_delivery_resend,
-            as_value,
-        ))
-    }
-
-    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn settled(&self) -> NotionDeliverySettled {
-        NotionDeliverySettled {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`NotionDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct NotionDeliveryResend(Call<Value>);
-
-impl NotionDeliveryResend {
-    /// `badSignature`.
-    pub fn bad_signature(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("badSignature", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for NotionDeliveryResend {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`NotionDelivery::settled`].
-pub struct NotionDeliverySettled {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl NotionDeliverySettled {
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<NotionDelivery> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let value = wait_for("the delivery to settle", &timeout, || {
-            let read = run_notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
-            async move {
-                let value = read.await?;
-                Ok((!["pending"]
-                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
-                .then_some(value))
-            }
-        })
-        .await?;
-        NotionDelivery::wrap(&ctx, value)
-    }
-}
-
-impl IntoFuture for NotionDeliverySettled {
-    type Output = Result<NotionDelivery>;
-    type IntoFuture = BoxFuture<'static, Result<NotionDelivery>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
-    }
-}
-
 /// A handle: `NotionComment`.
 #[derive(Clone)]
 pub struct NotionComment {
@@ -17467,6 +17737,466 @@ impl IntoFuture for NotionDiscussionLatestComment {
     type IntoFuture = BoxFuture<'static, Result<NotionComment>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
+    }
+}
+
+/// A handle: `NotionPage`.
+#[derive(Clone)]
+pub struct NotionPage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for NotionPage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl NotionPage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `title`.
+    pub fn title(&self) -> String {
+        self.data
+            .get("title")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `url`.
+    pub fn url(&self) -> String {
+        self.data
+            .get("url")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The page's discussions: on the page itself, and on its blocks. Experimental.
+    pub fn discussions(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_discussions,
+            as_value,
+        )
+    }
+
+    /// The page body as Markdown, once the agent is quiet. Experimental.
+    pub fn markdown(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_markdown,
+            as_value,
+        )
+    }
+
+    /// The page's blocks as the API has them, with nested blocks under `children`. Experimental.
+    pub fn blocks(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_blocks,
+            as_value,
+        )
+    }
+
+    /// A property's value as a person reads it: text, a number, option names, ids. Experimental.
+    pub fn property(&self, name: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![name.into_arg()],
+            run_notion_page_property,
+            as_value,
+        )
+    }
+
+    /// The pages directly under this page. Experimental.
+    pub fn children(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_children,
+            as_value,
+        )
+    }
+
+    /// The integrations that can see the page: connected to it or to a page above it. Experimental.
+    pub fn connections(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_connections,
+            as_value,
+        )
+    }
+
+    /// The page and its discussions as a person reads them. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_page_transcript,
+            as_value,
+        )
+    }
+}
+
+/// A handle: `NotionDelivery`.
+#[derive(Clone)]
+pub struct NotionDelivery {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for NotionDelivery {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl NotionDelivery {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `type`.
+    pub fn r#type(&self) -> String {
+        self.data
+            .get("type")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `entity`.
+    pub fn entity(&self) -> &Value {
+        self.data.get("entity").unwrap_or(&Value::Null)
+    }
+    /// `payload`.
+    pub fn payload(&self) -> &Value {
+        self.data.get("payload").unwrap_or(&Value::Null)
+    }
+    /// `attempts`.
+    pub fn attempts(&self) -> &Value {
+        self.data.get("attempts").unwrap_or(&Value::Null)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Re-read a delivery: its attempts and status. Experimental.
+    pub fn refresh(&self) -> Call<NotionDelivery> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_delivery_refresh,
+            NotionDelivery::wrap,
+        )
+    }
+
+    /// Send the same event again, as a retry does: the same body, the next `attempt_number`, signed again. Experimental.
+    pub fn redeliver(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_delivery_redeliver,
+            as_value,
+        )
+    }
+
+    /// Send the delivery again, signed with a token that isn't the subscription's. Experimental.
+    pub fn resend(&self) -> NotionDeliveryResend {
+        NotionDeliveryResend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_notion_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn settled(&self) -> NotionDeliverySettled {
+        NotionDeliverySettled {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`NotionDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct NotionDeliveryResend(Call<Value>);
+
+impl NotionDeliveryResend {
+    /// `badSignature`.
+    pub fn bad_signature(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("badSignature", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for NotionDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`NotionDelivery::settled`].
+pub struct NotionDeliverySettled {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl NotionDeliverySettled {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<NotionDelivery> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let value = wait_for("the delivery to settle", &timeout, || {
+            let read = run_notion_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            async move {
+                let value = read.await?;
+                Ok((!["pending"]
+                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
+                .then_some(value))
+            }
+        })
+        .await?;
+        NotionDelivery::wrap(&ctx, value)
+    }
+}
+
+impl IntoFuture for NotionDeliverySettled {
+    type Output = Result<NotionDelivery>;
+    type IntoFuture = BoxFuture<'static, Result<NotionDelivery>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `NotionDatabase`.
+#[derive(Clone)]
+pub struct NotionDatabase {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for NotionDatabase {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl NotionDatabase {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `title`.
+    pub fn title(&self) -> String {
+        self.data
+            .get("title")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `url`.
+    pub fn url(&self) -> String {
+        self.data
+            .get("url")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The rows of a database, optionally only those whose properties have these values. Experimental.
+    pub fn rows(&self, filter: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![filter.into_arg()],
+            run_notion_database_rows,
+            as_value,
+        )
     }
 }
 
@@ -20755,6 +21485,12 @@ pub async fn call_by_name(
         ("LinearFixture", "createUser") => {
             run_linear_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
+        ("LinearFixture", "createApp") => {
+            run_linear_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearFixture", "apps") => {
+            run_linear_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("LinearFixture", "createTeam") => {
             run_linear_fixture_create_team(&target.ctx, &target.data, args, options).await?
         }
@@ -20763,6 +21499,12 @@ pub async fn call_by_name(
         }
         ("LinearFixture", "calls") => {
             run_linear_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearApp", "comment") => {
+            run_linear_app_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearApp", "reply") => {
+            run_linear_app_reply(&target.ctx, &target.data, args, options).await?
         }
         ("LinearUser", "createIssue") => {
             run_linear_user_create_issue(&target.ctx, &target.data, args, options).await?
@@ -20809,8 +21551,14 @@ pub async fn call_by_name(
         ("LinearUser", "stop") => {
             run_linear_user_stop(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearTeam", "issue") => {
-            run_linear_team_issue(&target.ctx, &target.data, args, options).await?
+        ("LinearComment", "replies") => {
+            run_linear_comment_replies(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearComment", "deliveryFor") => {
+            run_linear_comment_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearComment", "transcript") => {
+            run_linear_comment_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("LinearIssue", "refresh") => {
             run_linear_issue_refresh(&target.ctx, &target.data, args, options).await?
@@ -20842,14 +21590,8 @@ pub async fn call_by_name(
         ("LinearIssue", "transcript") => {
             run_linear_issue_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearDelivery", "refresh") => {
-            run_linear_delivery_refresh(&target.ctx, &target.data, args, options).await?
-        }
-        ("LinearDelivery", "redeliver") => {
-            run_linear_delivery_redeliver(&target.ctx, &target.data, args, options).await?
-        }
-        ("LinearDelivery", "resend") => {
-            run_linear_delivery_resend(&target.ctx, &target.data, args, options).await?
+        ("LinearTeam", "issue") => {
+            run_linear_team_issue(&target.ctx, &target.data, args, options).await?
         }
         ("LinearAgentSession", "state") => {
             run_linear_agent_session_state(&target.ctx, &target.data, args, options).await?
@@ -20866,14 +21608,23 @@ pub async fn call_by_name(
         ("LinearAgentSession", "transcript") => {
             run_linear_agent_session_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearComment", "replies") => {
-            run_linear_comment_replies(&target.ctx, &target.data, args, options).await?
+        ("LinearDelivery", "refresh") => {
+            run_linear_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
-        ("LinearComment", "transcript") => {
-            run_linear_comment_transcript(&target.ctx, &target.data, args, options).await?
+        ("LinearDelivery", "redeliver") => {
+            run_linear_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+        }
+        ("LinearDelivery", "resend") => {
+            run_linear_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "createUser") => {
             run_notion_fixture_create_user(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionFixture", "createApp") => {
+            run_notion_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionFixture", "apps") => {
+            run_notion_fixture_apps(&target.ctx, &target.data, args, options).await?
         }
         ("NotionFixture", "createPage") => {
             run_notion_fixture_create_page(&target.ctx, &target.data, args, options).await?
@@ -20893,6 +21644,18 @@ pub async fn call_by_name(
         }
         ("NotionFixture", "calls") => {
             run_notion_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "comment") => {
+            run_notion_integration_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "reply") => {
+            run_notion_integration_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "edit") => {
+            run_notion_integration_edit(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionIntegration", "rename") => {
+            run_notion_integration_rename(&target.ctx, &target.data, args, options).await?
         }
         ("NotionUser", "comment") => {
             run_notion_user_comment(&target.ctx, &target.data, args, options).await?
@@ -20936,6 +21699,15 @@ pub async fn call_by_name(
         ("NotionUser", "disconnect") => {
             run_notion_user_disconnect(&target.ctx, &target.data, args, options).await?
         }
+        ("NotionDiscussion", "comments") => {
+            run_notion_discussion_comments(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionDiscussion", "resolved") => {
+            run_notion_discussion_resolved(&target.ctx, &target.data, args, options).await?
+        }
+        ("NotionDiscussion", "transcript") => {
+            run_notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
+        }
         ("NotionPage", "discussions") => {
             run_notion_page_discussions(&target.ctx, &target.data, args, options).await?
         }
@@ -20957,9 +21729,6 @@ pub async fn call_by_name(
         ("NotionPage", "transcript") => {
             run_notion_page_transcript(&target.ctx, &target.data, args, options).await?
         }
-        ("NotionDatabase", "rows") => {
-            run_notion_database_rows(&target.ctx, &target.data, args, options).await?
-        }
         ("NotionDelivery", "refresh") => {
             run_notion_delivery_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -20969,14 +21738,8 @@ pub async fn call_by_name(
         ("NotionDelivery", "resend") => {
             run_notion_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
-        ("NotionDiscussion", "comments") => {
-            run_notion_discussion_comments(&target.ctx, &target.data, args, options).await?
-        }
-        ("NotionDiscussion", "resolved") => {
-            run_notion_discussion_resolved(&target.ctx, &target.data, args, options).await?
-        }
-        ("NotionDiscussion", "transcript") => {
-            run_notion_discussion_transcript(&target.ctx, &target.data, args, options).await?
+        ("NotionDatabase", "rows") => {
+            run_notion_database_rows(&target.ctx, &target.data, args, options).await?
         }
         ("ResendFixture", "createUser") => {
             run_resend_fixture_create_user(&target.ctx, &target.data, args, options).await?
@@ -21344,8 +22107,23 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("LinearFixture", "createApp") => Dyn {
+            resource: Some("LinearApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("LinearFixture", "createTeam") => Dyn {
             resource: Some("LinearTeam"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("LinearApp", "comment") => Dyn {
+            resource: Some("LinearComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("LinearApp", "reply") => Dyn {
+            resource: Some("LinearComment"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -21374,11 +22152,6 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
-        ("LinearTeam", "issue") => Dyn {
-            resource: Some("LinearIssue"),
-            ctx: target.ctx.clone(),
-            data,
-        },
         ("LinearIssue", "refresh") => Dyn {
             resource: Some("LinearIssue"),
             ctx: target.ctx.clone(),
@@ -21386,6 +22159,11 @@ pub async fn call_by_name(
         },
         ("LinearIssue", "session") => Dyn {
             resource: Some("LinearAgentSession"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("LinearTeam", "issue") => Dyn {
+            resource: Some("LinearIssue"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -21399,6 +22177,11 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("NotionFixture", "createApp") => Dyn {
+            resource: Some("NotionIntegration"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("NotionFixture", "createPage") => Dyn {
             resource: Some("NotionPage"),
             ctx: target.ctx.clone(),
@@ -21406,6 +22189,16 @@ pub async fn call_by_name(
         },
         ("NotionFixture", "createDatabase") => Dyn {
             resource: Some("NotionDatabase"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("NotionIntegration", "comment") => Dyn {
+            resource: Some("NotionComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("NotionIntegration", "reply") => Dyn {
+            resource: Some("NotionComment"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -21521,14 +22314,14 @@ pub fn field_resource(resource: &str, field: &str) -> Option<&'static str> {
         ("GitHubReviewComment", "pr") => Some("GitHubPullRequest"),
         ("GitHubReviewComment", "delivery") => Some("GitHubDelivery"),
         ("LinearFixture", "app") => Some("LinearApp"),
+        ("LinearComment", "issue") => Some("LinearIssue"),
+        ("LinearComment", "session") => Some("LinearAgentSession"),
+        ("LinearComment", "delivery") => Some("LinearDelivery"),
         ("LinearIssue", "team") => Some("LinearTeam"),
         ("LinearAgentSession", "issue") => Some("LinearIssue"),
         ("LinearAgentSession", "app") => Some("LinearApp"),
         ("LinearAgentSession", "startedBy") => Some("LinearUser"),
         ("LinearAgentSession", "delivery") => Some("LinearDelivery"),
-        ("LinearComment", "issue") => Some("LinearIssue"),
-        ("LinearComment", "session") => Some("LinearAgentSession"),
-        ("LinearComment", "delivery") => Some("LinearDelivery"),
         ("LinearAgentActivity", "session") => Some("LinearAgentSession"),
         ("NotionFixture", "app") => Some("NotionIntegration"),
         ("NotionComment", "discussion") => Some("NotionDiscussion"),

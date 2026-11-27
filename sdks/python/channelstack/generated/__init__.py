@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "ObjectNotFoundError", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -118,6 +118,14 @@ class NotInRoomError(ChannelstackError):
     pass
 
 
+class ObjectNotFoundError(ChannelstackError):
+    pass
+
+
+class RestrictedResourceError(ChannelstackError):
+    pass
+
+
 class SessionNotFoundError(ChannelstackError):
     pass
 
@@ -139,6 +147,10 @@ class UnsupportedInFakeError(ChannelstackError):
 
 
 class UnsupportedInLiveError(ChannelstackError):
+    pass
+
+
+class ValidationErrorError(ChannelstackError):
     pass
 
 
@@ -171,12 +183,15 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "not_found": NotFoundError,
     "not_in_channel": NotInChannelError,
     "not_in_room": NotInRoomError,
+    "object_not_found": ObjectNotFoundError,
+    "restricted_resource": RestrictedResourceError,
     "session_not_found": SessionNotFoundError,
     "split_view_unavailable": SplitViewUnavailableError,
     "stop_unavailable": StopUnavailableError,
     "unauthorized": UnauthorizedError,
     "unsupported_in_fake": UnsupportedInFakeError,
     "unsupported_in_live": UnsupportedInLiveError,
+    "validation_error": ValidationErrorError,
     "validation_failed": ValidationFailedError,
 }
 
@@ -792,6 +807,9 @@ class GitHubApiCall:
 type GitHubAppCalls = list[GitHubApiCall]
 
 
+type LinearApps = list[LinearApp]
+
+
 @dataclass(frozen=True)
 class LinearIssueState:
     name: str
@@ -912,6 +930,12 @@ class LinearApiCall:
             response=data.get("response"),
             error=data.get("error"),
         )
+
+
+type NotionCapability = Literal["read_content", "update_content", "insert_content", "read_comments", "insert_comments", "read_user_info"]
+
+
+type NotionIntegrations = list[NotionIntegration]
 
 
 type NotionPropertySchema = Literal["title", "rich_text", "number", "checkbox", "date", "people", "url", "email"] | dict[str, Any] | dict[str, Any] | dict[str, Any] | dict[str, Any]
@@ -2395,6 +2419,18 @@ class LinearFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users", body={"name": name, "id": id, "displayName": display_name, "email": email, "admin": admin, "guest": guest, "token": credential("CHANNELSTACK_LINEAR_USER_{name}_TOKEN", {"name": name}) if token is None else token})
         return LinearUser(ctx, data)
 
+    async def create_app(self, *, name: str, events: list[str] | None = None) -> LinearApp:
+        """Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps", body={"name": name, "events": events})
+        return LinearApp(ctx, data)
+
+    async def apps(self) -> LinearApps:
+        """The workspace's apps: the built-in one first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps")
+        return [LinearApp(ctx, item) for item in data]
+
     async def create_team(self, *, key: str | None = None, name: str | None = None, members: list[LinearUser] | None = None, states: list[dict[str, Any]] | None = None, labels: list[str] | None = None) -> LinearTeam:
         """Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one. Experimental."""
         ctx = self._ctx
@@ -2429,6 +2465,18 @@ class LinearApp:
         self.webhook_secret: str = data["webhookSecret"]
         self.client_id: str = data["clientId"]
         self.client_secret: str = data["clientSecret"]
+
+    async def comment(self, body: str, *, issue: LinearIssue) -> LinearComment:
+        """An app a test made comments on an issue, as its own `commentCreate` would. Its mention of another app is refused (to confirm, B6). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps/{quote(str(self.id), safe='')}/comment", body={"body": body, "issue": issue.id})
+        return LinearComment(ctx, data)
+
+    async def reply(self, body: str, *, comment: LinearComment) -> LinearComment:
+        """An app a test made replies in a comment's thread, as its own `commentCreate` with a `parentId` would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/apps/{quote(str(self.id), safe='')}/reply", body={"body": body, "comment": comment.id})
+        return LinearComment(ctx, data)
 
 
 class LinearUser:
@@ -2479,7 +2527,7 @@ class LinearUser:
         return (None if data is None else LinearDelivery(ctx, data))
 
     async def delegate(self, app: LinearApp, *, issue: LinearIssue) -> LinearAgentSession:
-        """Delegate an issue to the app. Opens an agent session and sends `AgentSessionEvent` (`created`). Experimental."""
+        """Delegate an issue to an app. Opens that app's agent session and sends it `AgentSessionEvent` (`created`); an issue delegated to another app moves. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/users/{quote(str(self.id), safe='')}/delegate", body={"app": app.id, "issue": issue.id})
         return LinearAgentSession(ctx, data)
@@ -2532,18 +2580,36 @@ class LinearUser:
         return LinearDelivery(ctx, data)
 
 
-class LinearTeam:
+class LinearComment:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.key: str = data["key"]
-        self.name: str = data["name"]
+        self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
+        self.author: LinearUser | LinearApp = LinearUser(ctx, data["author"]) if data["author"]["kind"] == "user" else LinearApp(ctx, data["author"])
+        self.body: str = data["body"]
+        self.created_at: str = data["createdAt"]
+        self.url: str = data["url"]
+        self.session: LinearAgentSession | None = None if data.get("session") is None else LinearAgentSession(ctx, data["session"])
+        self.delivery: LinearDelivery | None = None if data.get("delivery") is None else LinearDelivery(ctx, data["delivery"])
 
-    async def issue(self, identifier: str) -> LinearIssue:
-        """An issue of this team by its identifier (`ENG-12`). Experimental."""
+    async def replies(self) -> LinearCommentReplies:
+        """The replies in a comment's thread, once the agent is quiet. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/teams/{quote(str(self.id), safe='')}/issue", query={"identifier": identifier})
-        return LinearIssue(ctx, data)
+        await until_quiet(lambda: quiet_of(ctx))
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/replies")
+        return [LinearComment(ctx, item) for item in data]
+
+    async def delivery_for(self, app: LinearApp) -> LinearDelivery | None:
+        """The `Comment` (`create`) delivery this comment caused to this app (decision 0027), or nothing when it wasn't told. The comment's `delivery` is the built-in app's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else LinearDelivery(ctx, data))
+
+    async def transcript(self) -> LinearTranscript:
+        """A comment's thread as a person reads it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/transcript")
+        return LinearTranscript._from_wire(ctx, data)
 
 
 class LinearIssue:
@@ -2625,44 +2691,18 @@ class LinearIssue:
         return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
 
 
-class LinearDelivery:
+class LinearTeam:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.channel: Literal["linear"] = data["channel"]
-        self.type: str = data["type"]
-        self.action: str = data["action"]
-        self.webhook_id: str = data["webhookId"]
-        self.payload: Any | None = data.get("payload")
-        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
-        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
+        self.key: str = data["key"]
+        self.name: str = data["name"]
 
-    async def refresh(self) -> LinearDelivery:
-        """Re-read a delivery: its attempts and status. Experimental."""
+    async def issue(self, identifier: str) -> LinearIssue:
+        """An issue of this team by its identifier (`ENG-12`). Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}")
-        return LinearDelivery(ctx, data)
-
-    async def redeliver(self) -> DeliveryAttempt:
-        """Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/redeliver")
-        return DeliveryAttempt._from_wire(ctx, data)
-
-    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None) -> DeliveryAttempt:
-        """Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
-        return DeliveryAttempt._from_wire(ctx, data)
-
-    async def settled(self, *, timeout: Duration | None = None) -> LinearDelivery:
-        """Wait for the delivery to settle, and resolve with the value as it is then."""
-
-        async def settled() -> LinearDelivery | None:
-            value = await self.refresh()
-            return None if value.status in ("pending",) else value
-
-        return await wait_for("the delivery to settle", settled, timeout=timeout)
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/teams/{quote(str(self.id), safe='')}/issue", query={"identifier": identifier})
+        return LinearIssue(ctx, data)
 
 
 class LinearAgentSession:
@@ -2720,30 +2760,45 @@ class LinearAgentSession:
         return await wait_for_next(self._seen, "waitForActivity", self.activities, lambda item: text_matches(item.type, type), "an activity", timeout=timeout, starts_turn=lambda item: item.type == "prompt")
 
 
-class LinearComment:
+class LinearDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.issue: LinearIssue = LinearIssue(ctx, data["issue"])
-        self.author: LinearUser | LinearApp = LinearUser(ctx, data["author"]) if data["author"]["kind"] == "user" else LinearApp(ctx, data["author"])
-        self.body: str = data["body"]
-        self.created_at: str = data["createdAt"]
-        self.url: str = data["url"]
-        self.session: LinearAgentSession | None = None if data.get("session") is None else LinearAgentSession(ctx, data["session"])
-        self.delivery: LinearDelivery | None = None if data.get("delivery") is None else LinearDelivery(ctx, data["delivery"])
+        self.channel: Literal["linear"] = data["channel"]
+        self.app: str = data["app"]
+        self.type: str = data["type"]
+        self.action: str = data["action"]
+        self.webhook_id: str = data["webhookId"]
+        self.payload: Any | None = data.get("payload")
+        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
+        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
 
-    async def replies(self) -> LinearCommentReplies:
-        """The replies in a comment's thread, once the agent is quiet. Experimental."""
+    async def refresh(self) -> LinearDelivery:
+        """Re-read a delivery: its attempts and status. Experimental."""
         ctx = self._ctx
-        await until_quiet(lambda: quiet_of(ctx))
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/replies")
-        return [LinearComment(ctx, item) for item in data]
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}")
+        return LinearDelivery(ctx, data)
 
-    async def transcript(self) -> LinearTranscript:
-        """A comment's thread as a person reads it. Experimental."""
+    async def redeliver(self) -> DeliveryAttempt:
+        """Redeliver, as Linear retries: the same delivery, with a new `webhookTimestamp` and a new signature. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/linear/comments/{quote(str(self.id), safe='')}/transcript")
-        return LinearTranscript._from_wire(ctx, data)
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/redeliver")
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def resend(self, *, bad_signature: bool | None = None, stale: bool | None = None) -> DeliveryAttempt:
+        """Send the delivery again: stale (its `webhookTimestamp` two minutes old), or signed with a secret that isn't the app's. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/linear/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature, "stale": stale})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration | None = None) -> LinearDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> LinearDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
 class LinearAgentActivity:
@@ -2772,6 +2827,18 @@ class NotionFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users", body={"name": name, "id": id, "email": email, "avatarUrl": avatar_url, "token": credential("CHANNELSTACK_NOTION_USER_{name}_TOKEN", {"name": name}) if token is None else token})
         return NotionUser(ctx, data)
 
+    async def create_app(self, *, name: str, capabilities: list[NotionCapability] | None = None, events: list[str] | None = None) -> NotionIntegration:
+        """Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps", body={"name": name, "capabilities": capabilities, "events": events})
+        return NotionIntegration(ctx, data)
+
+    async def apps(self) -> NotionIntegrations:
+        """The workspace's integrations: the built-in one first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps")
+        return [NotionIntegration(ctx, item) for item in data]
+
     async def create_page(self, *, title: str, parent: NotionPage | None = None, content: DocumentInput | None = None, icon: str | None = None, connections: list[NotionIntegration] | None = None, created_by: NotionUser | None = None) -> NotionPage:
         """Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds. Experimental."""
         ctx = self._ctx
@@ -2789,10 +2856,10 @@ class NotionFixture:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/content-delay", body={"delay": parse_duration(delay)})
 
-    async def send_verification(self) -> NotionDelivery | None:
-        """Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created. Experimental."""
+    async def send_verification(self, *, app: NotionIntegration | None = None) -> NotionDelivery | None:
+        """Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/verification")
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/verification", body={"app": None if app is None else app.id})
         return (None if data is None else NotionDelivery(ctx, data))
 
     async def deliveries(self, *, type: str | None = None, resource: NotionPage | None = None) -> NotionDeliveries:
@@ -2822,6 +2889,30 @@ class NotionIntegration:
         self.bot_user_id: str = data["botUserId"]
         self.token: str = data["token"]
         self.webhook_secret: str = data["webhookSecret"]
+
+    async def comment(self, text: str, *, page: NotionPage, anchor: str | re.Pattern[str] | None = None) -> NotionComment:
+        """An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/comment", body={"text": text, "page": page.id, "anchor": None if anchor is None else pattern_on_wire(anchor)})
+        return NotionComment(ctx, data)
+
+    async def reply(self, text: str, *, discussion: NotionDiscussion) -> NotionComment:
+        """An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/reply", body={"text": text, "discussion": discussion.id})
+        return NotionComment(ctx, data)
+
+    async def edit(self, change: dict[str, Any], *, page: NotionPage) -> NotionDelivery | None:
+        """An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/edit", body={"change": {key: value for key, value in {**change, "append": None if change.get("append") is None else read_document(change["append"]), "replace": None if change.get("replace") is None else read_document(change["replace"])}.items() if value is not None}, "page": page.id})
+        return (None if data is None else NotionDelivery(ctx, data))
+
+    async def rename(self, title: str, *, page: NotionPage) -> NotionDelivery | None:
+        """An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/apps/{quote(str(self.id), safe='')}/rename", body={"title": title, "page": page.id})
+        return (None if data is None else NotionDelivery(ctx, data))
 
 
 class NotionUser:
@@ -2916,6 +3007,52 @@ class NotionUser:
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/users/{quote(str(self.id), safe='')}/disconnect", body={"integration": integration.id, "page": page.id})
 
 
+class NotionComment:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.discussion: NotionDiscussion = NotionDiscussion(ctx, data["discussion"])
+        self.author: NotionUser | NotionIntegration = NotionUser(ctx, data["author"]) if data["author"]["kind"] == "user" else NotionIntegration(ctx, data["author"])
+        self.text: str = data["text"]
+        self.created_at: str = data["createdAt"]
+        self.delivery: NotionDelivery | None = None if data.get("delivery") is None else NotionDelivery(ctx, data["delivery"])
+
+
+class NotionDiscussion:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.page: NotionPage = NotionPage(ctx, data["page"])
+        self.anchor: str | None = data.get("anchor")
+
+    async def comments(self) -> NotionComments:
+        """The discussion's comments, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/comments")
+        return [NotionComment(ctx, item) for item in data]
+
+    async def resolved(self) -> bool:
+        """Whether the discussion is resolved. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/resolved")
+        return data
+
+    async def transcript(self) -> NotionTranscript:
+        """The discussion as a person reads it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/transcript")
+        return NotionTranscript._from_wire(ctx, data)
+
+    async def wait_for_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None) -> NotionComment:
+        """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_), describe_wait("a comment", from_), timeout=timeout)
+
+    async def latest_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> NotionComment:
+        """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
+
+
 class NotionPage:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -2968,26 +3105,12 @@ class NotionPage:
         return NotionTranscript._from_wire(ctx, data)
 
 
-class NotionDatabase:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self.id: str = data["id"]
-        self.channel: Literal["notion"] = data["channel"]
-        self.title: str = data["title"]
-        self.url: str = data["url"]
-
-    async def rows(self, filter: dict[str, NotionPropertyValue] | None = None) -> NotionRows:
-        """The rows of a database, optionally only those whose properties have these values. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/databases/{quote(str(self.id), safe='')}/rows", body={"filter": filter})
-        return [NotionPage(ctx, item) for item in data]
-
-
 class NotionDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["notion"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.entity: dict[str, Any] = data["entity"]
         self.payload: Any | None = data.get("payload")
@@ -3022,50 +3145,19 @@ class NotionDelivery:
         return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
-class NotionComment:
+class NotionDatabase:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
-        self.discussion: NotionDiscussion = NotionDiscussion(ctx, data["discussion"])
-        self.author: NotionUser | NotionIntegration = NotionUser(ctx, data["author"]) if data["author"]["kind"] == "user" else NotionIntegration(ctx, data["author"])
-        self.text: str = data["text"]
-        self.created_at: str = data["createdAt"]
-        self.delivery: NotionDelivery | None = None if data.get("delivery") is None else NotionDelivery(ctx, data["delivery"])
+        self.channel: Literal["notion"] = data["channel"]
+        self.title: str = data["title"]
+        self.url: str = data["url"]
 
-
-class NotionDiscussion:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.page: NotionPage = NotionPage(ctx, data["page"])
-        self.anchor: str | None = data.get("anchor")
-
-    async def comments(self) -> NotionComments:
-        """The discussion's comments, oldest first. Experimental."""
+    async def rows(self, filter: dict[str, NotionPropertyValue] | None = None) -> NotionRows:
+        """The rows of a database, optionally only those whose properties have these values. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/comments")
-        return [NotionComment(ctx, item) for item in data]
-
-    async def resolved(self) -> bool:
-        """Whether the discussion is resolved. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/resolved")
-        return data
-
-    async def transcript(self) -> NotionTranscript:
-        """The discussion as a person reads it. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/notion/discussions/{quote(str(self.id), safe='')}/transcript")
-        return NotionTranscript._from_wire(ctx, data)
-
-    async def wait_for_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None) -> NotionComment:
-        """Wait for the next new comment matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForComment", self.comments, lambda item: from_matches(item.author, from_), describe_wait("a comment", from_), timeout=timeout)
-
-    async def latest_comment(self, *, from_: NotionUser | NotionIntegration | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> NotionComment:
-        """The latest comment matching `from_`, once the agent is quiet. Waits for at least one."""
-        return await latest_once_quiet(self.comments, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a comment", from_), timeout=timeout, quiet_for=quiet_for)
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/notion/databases/{quote(str(self.id), safe='')}/rows", body={"filter": filter})
+        return [NotionPage(ctx, item) for item in data]
 
 
 class ResendFixture:

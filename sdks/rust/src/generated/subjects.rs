@@ -7,11 +7,11 @@ transcript_as!(
 transcript!(
     crate::GitHubIssue,
     crate::GitHubReviewComment,
+    crate::LinearComment,
     crate::LinearIssue,
     crate::LinearAgentSession,
-    crate::LinearComment,
-    crate::NotionPage,
     crate::NotionDiscussion,
+    crate::NotionPage,
     crate::ResendThread,
     crate::GoogleThread,
     crate::GitHubPullRequest

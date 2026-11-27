@@ -233,6 +233,22 @@ SDK class: `NotInChannelError` in TypeScript and Python, a subclass of `Channels
 
 Raised by [`SlackApp.say()`](/docs/reference/api/slack#say), [`SlackApp.reply()`](/docs/reference/api/slack#reply), [`SlackApp.react()`](/docs/reference/api/slack#react), [`SlackApp.unreact()`](/docs/reference/api/slack#unreact), [`SlackUser.say()`](/docs/reference/api/slack#say-1), [`SlackUser.reply()`](/docs/reference/api/slack#reply-1), [`SlackUser.edit()`](/docs/reference/api/slack#edit), [`SlackUser.delete()`](/docs/reference/api/slack#delete), [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), and 7 more.
 
+### object_not_found
+
+The Notion fake refuses with it where the platform refuses the same request.
+
+SDK class: `ObjectNotFoundError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::OBJECT_NOT_FOUND`.
+
+Raised by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename).
+
+### restricted_resource
+
+The Notion fake refuses with it where the platform refuses the same request.
+
+SDK class: `RestrictedResourceError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::RESTRICTED_RESOURCE`.
+
+Raised by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename).
+
 ### split_view_unavailable
 
 The Slack fake refuses with it where the platform refuses the same request.
@@ -248,6 +264,14 @@ The Slack fake refuses with it where the platform refuses the same request.
 SDK class: `StopUnavailableError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::STOP_UNAVAILABLE`.
 
 Raised by [`SlackUser.stop()`](/docs/reference/api/slack#stop).
+
+### validation_error
+
+The Notion fake refuses with it where the platform refuses the same request.
+
+SDK class: `ValidationErrorError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::VALIDATION_ERROR`.
+
+Raised by [`NotionIntegration.comment()`](/docs/reference/api/notion#comment), [`NotionIntegration.reply()`](/docs/reference/api/notion#reply), [`NotionIntegration.edit()`](/docs/reference/api/notion#edit), [`NotionIntegration.rename()`](/docs/reference/api/notion#rename).
 
 ### validation_failed
 
