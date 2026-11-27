@@ -27,7 +27,8 @@ describe("scripting the model", () => {
     const ana = await slack.createUser({ name: "Ana" });
     const channel = await slack.createChannel({ participants: [ana, slack.app] });
     await openai.respond(
-      (request) => `I can see ${request.messages.filter((message) => message.role === "user").length} messages from you.`,
+      (request) =>
+        `I can see ${request.messages.filter((message) => message.role === "user").length} messages from you.`,
     );
 
     const msg = await ana.say("@my-agent the deploy failed", { channel });

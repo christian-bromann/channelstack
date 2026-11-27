@@ -2,14 +2,14 @@ import { z } from "@hono/zod-openapi";
 
 import { iso, type Timers } from "../../core/clock/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
+import type { IdGenerator } from "../../core/ids/index.ts";
 import { type DriverRouter, pathParam } from "../../core/router/index.ts";
 import { duration } from "../../core/router/inspect.ts";
+import { OPENAI_IDS } from "./ids.ts";
 import type { ModelRequest } from "./request.ts";
 import { turnsOf } from "./scripts.ts";
 import { MatchSchema, TurnObject, TurnSchema } from "./turns.ts";
 import type { CallRecord, OpenAIWorld } from "./world.ts";
-import { OPENAI_IDS } from "./ids.ts";
-import type { IdGenerator } from "../../core/ids/index.ts";
 
 /** The fake's calls aren't live: a model call is the agent's, and live mode never fakes what the agent calls. */
 const stability = "experimental";
@@ -35,7 +35,13 @@ const Message = z
     callId: z.string().optional().openapi({ description: "A tool result: the call it answers." }),
     name: z.string().optional().openapi({ description: "A tool result: the tool's name." }),
     parts: z
-      .array(z.object({ type: z.enum(["image", "file", "audio"]), from: z.enum(["data", "file_id", "url"]), url: z.string().optional() }))
+      .array(
+        z.object({
+          type: z.enum(["image", "file", "audio"]),
+          from: z.enum(["data", "file_id", "url"]),
+          url: z.string().optional(),
+        }),
+      )
       .optional(),
   })
   .openapi("OpenAIMessage");
@@ -105,7 +111,10 @@ const Call = z
       end: z.enum(["completed", "errored", "dropped", "stalled", "aborted"]).optional(),
     }),
     toolCalls: z.array(ToolCall),
-    script: z.string().optional().openapi({ description: "The script that answered. None: the call was refused for want of one." }),
+    script: z
+      .string()
+      .optional()
+      .openapi({ description: "The script that answered. None: the call was refused for want of one." }),
   })
   .openapi("OpenAICall", { "x-channelstack-resource": { id: "id" } });
 
@@ -143,9 +152,7 @@ const Unattributed = z
   })
   .openapi("OpenAIUnattributedCall");
 
-const Held = z
-  .object({ id: z.string(), request: Request })
-  .openapi("OpenAIHeldCall");
+const Held = z.object({ id: z.string(), request: Request }).openapi("OpenAIHeldCall");
 
 const ScriptParams = z.object({ script: pathParam("script") });
 
@@ -168,7 +175,9 @@ function rawRequestWire(call: CallRecord) {
       role: message.role,
       text: message.text,
       ...(message.role === "assistant" ? { toolCalls: message.toolCalls.map((call) => ({ ...call })) } : {}),
-      ...(message.role === "tool" ? { callId: message.callId, ...(message.name === undefined ? {} : { name: message.name }) } : {}),
+      ...(message.role === "tool"
+        ? { callId: message.callId, ...(message.name === undefined ? {} : { name: message.name }) }
+        : {}),
       ...(message.role === "user" ? { parts: message.parts.map((part) => ({ ...part })) } : {}),
     })),
     tools: request.tools.map((tool) => ({ ...tool })),
@@ -195,7 +204,8 @@ function toolCallsOf(calls: readonly CallRecord[], made: readonly CallRecord[] =
   const results = new Map<string, { text: string; sentIn: string }>();
   for (const call of calls) {
     for (const message of call.request.messages) {
-      if (message.role === "tool" && !results.has(message.callId)) results.set(message.callId, { text: message.text, sentIn: call.id });
+      if (message.role === "tool" && !results.has(message.callId))
+        results.set(message.callId, { text: message.text, sentIn: call.id });
     }
   }
   return made.flatMap((call) =>
@@ -297,13 +307,14 @@ export function registerOpenAIRoutes(
           .array(TurnSchema)
           .optional()
           .openapi({ "x-channelstack-one-or-many": true, description: "The turns, in order: one per matching call." }),
-        responder: z.boolean().default(false).openapi({ description: "The test answers each call itself (a function)." }),
+        responder: z
+          .boolean()
+          .default(false)
+          .openapi({ description: "The test answers each call itself (a function)." }),
         when: MatchSchema.optional(),
-        times: z
-          .number()
-          .int()
-          .optional()
-          .openapi({ description: "How many calls it answers. Default: the number of turns; unlimited for a responder (`-1`)." }),
+        times: z.number().int().optional().openapi({
+          description: "How many calls it answers. Default: the number of turns; unlimited for a responder (`-1`).",
+        }),
         timing: TurnObject.shape.timing,
       })
       .openapi("OpenAIRespondBody"),
@@ -422,7 +433,12 @@ export function registerOpenAIRoutes(
     path: "/scripts/{script}/tool-calls",
     summary: "The tool calls this script made, each with the result the agent sent back",
     params: ScriptParams,
-    query: z.object({ name: z.string().optional().openapi({ param: { name: "name", in: "query" } }) }),
+    query: z.object({
+      name: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "name", in: "query" } }),
+    }),
     response: z.array(ToolCall).openapi("OpenAIToolCalls"),
     errors: ["not_found"],
     sdkMethod: { on: "OpenAIScript", name: "toolCalls", options: ["name"] },
@@ -430,9 +446,10 @@ export function registerOpenAIRoutes(
     handler: ({ session, params, query }) => {
       const script = scriptOf(session.id, params.script);
       const all = world.calls(session.id);
-      return toolCallsOf(all, all.filter((call) => call.script === script.id)).filter(
-        (tool) => query.name === undefined || tool.name === query.name,
-      );
+      return toolCallsOf(
+        all,
+        all.filter((call) => call.script === script.id),
+      ).filter((tool) => query.name === undefined || tool.name === query.name);
     },
   });
 
@@ -442,8 +459,17 @@ export function registerOpenAIRoutes(
     summary: "For a responder's SDK: the calls held for it since `since`, waiting up to `waitMs` for one",
     params: ScriptParams,
     query: z.object({
-      since: z.string().optional().openapi({ param: { name: "since", in: "query" } }),
-      waitMs: z.coerce.number().int().min(0).max(LONG_POLL_MS).optional().openapi({ param: { name: "waitMs", in: "query" } }),
+      since: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "since", in: "query" } }),
+      waitMs: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(LONG_POLL_MS)
+        .optional()
+        .openapi({ param: { name: "waitMs", in: "query" } }),
     }),
     response: z.object({ held: z.array(Held), cursor: z.string() }).openapi("OpenAIHeldPage"),
     errors: ["not_found"],
@@ -481,14 +507,20 @@ export function registerOpenAIRoutes(
     path: "/scripts/{script}/answers",
     summary: "For a responder's SDK: answer a held call with a turn, or report that the test's function threw",
     params: ScriptParams,
-    body: z.object({ held: z.string(), turn: TurnSchema.optional(), error: z.string().optional() }).openapi("OpenAIAnswerBody"),
+    body: z
+      .object({ held: z.string(), turn: TurnSchema.optional(), error: z.string().optional() })
+      .openapi("OpenAIAnswerBody"),
     errors: ["not_found"],
     sdkMethod: { on: "OpenAIScript", name: "answerHeld", args: ["held"], options: ["turn", "error"] },
     stability,
     handler: ({ session, params, body }) => {
       const script = scriptOf(session.id, params.script);
       const held = script.held.get(body.held);
-      if (!held) throw new ProtocolError("not_found", `No held call "${body.held}" for ${script.id}: it was answered, or the agent hung up`);
+      if (!held)
+        throw new ProtocolError(
+          "not_found",
+          `No held call "${body.held}" for ${script.id}: it was answered, or the agent hung up`,
+        );
       if (body.error !== undefined) held.fail(body.error);
       else if (body.turn !== undefined) held.answer(turnsOf(body.turn)[0] as Parameters<typeof held.answer>[0]);
       else throw new ProtocolError("invalid_argument", "answer needs a turn or an error");
@@ -500,7 +532,10 @@ export function registerOpenAIRoutes(
     path: "/calls",
     summary: "Every model call attributed to this session, oldest first",
     query: z.object({
-      endpoint: z.enum(["chat.completions", "responses"]).optional().openapi({ param: { name: "endpoint", in: "query" } }),
+      endpoint: z
+        .enum(["chat.completions", "responses"])
+        .optional()
+        .openapi({ param: { name: "endpoint", in: "query" } }),
       error: z
         .union([z.literal(true), z.string()])
         .optional()
@@ -541,7 +576,8 @@ export function registerOpenAIRoutes(
     handler: ({ session, params }) => {
       const all = world.calls(session.id);
       const call = all.find((candidate) => candidate.id === params.call);
-      if (!call) throw new ProtocolError("not_found", `No model call "${params.call}" in this session`, { id: params.call });
+      if (!call)
+        throw new ProtocolError("not_found", `No model call "${params.call}" in this session`, { id: params.call });
       return callWire(call, all, scrub);
     },
   });
@@ -550,7 +586,12 @@ export function registerOpenAIRoutes(
     method: "get",
     path: "/tool-calls",
     summary: "Every tool call the model made in this session, each with the result the agent sent back",
-    query: z.object({ name: z.string().optional().openapi({ param: { name: "name", in: "query" } }) }),
+    query: z.object({
+      name: z
+        .string()
+        .optional()
+        .openapi({ param: { name: "name", in: "query" } }),
+    }),
     response: z.array(ToolCall).openapi("OpenAISessionToolCalls"),
     sdkMethod: { on: "OpenAIFixture", name: "toolCalls", options: ["name"] },
     stability,
@@ -610,8 +651,12 @@ export function registerOpenAIRoutes(
     summary: "Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers",
     body: z
       .object({
-        requests: z.object({ limit: z.number().int().min(0), per: duration("The window. Default 1 minute.").default(60_000) }).optional(),
-        tokens: z.object({ limit: z.number().int().min(0), per: duration("The window. Default 1 minute.").default(60_000) }).optional(),
+        requests: z
+          .object({ limit: z.number().int().min(0), per: duration("The window. Default 1 minute.").default(60_000) })
+          .optional(),
+        tokens: z
+          .object({ limit: z.number().int().min(0), per: duration("The window. Default 1 minute.").default(60_000) })
+          .optional(),
         error: z.enum(["rate_limit", "slow_down"]).default("rate_limit"),
       })
       .openapi("OpenAIRateLimitBody"),

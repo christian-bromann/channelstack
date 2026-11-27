@@ -9,7 +9,7 @@
 import type { App } from "@slack/bolt";
 
 /** One message of the conversation the agent sends the model. */
-export interface Turn {
+interface Turn {
   readonly role: "user" | "assistant";
   readonly text: string;
 }
@@ -40,7 +40,12 @@ export const TOOLS = {
   },
   page_oncall: {
     description: "Page a team's on-call engineer",
-    parameters: { type: "object", properties: { team: { type: "string" } }, required: ["team"], additionalProperties: false },
+    parameters: {
+      type: "object",
+      properties: { team: { type: "string" } },
+      required: ["team"],
+      additionalProperties: false,
+    },
     run: (args: { team?: string }) => `Paged ${args.team ?? "the"} on-call.`,
   },
 } as const;
@@ -51,7 +56,8 @@ export type ToolName = keyof typeof TOOLS;
 export const runTool = (name: string, args: unknown): string =>
   name in TOOLS ? TOOLS[name as ToolName].run((args ?? {}) as { team?: string }) : `No tool "${name}".`;
 
-const INSTRUCTIONS = "You are my-agent, the team's assistant in Slack. Answer briefly. Use the tools for incidents and paging.";
+const INSTRUCTIONS =
+  "You are my-agent, the team's assistant in Slack. Answer briefly. Use the tools for incidents and paging.";
 
 /** Wire a model into a Bolt app. */
 export function modelAgent(app: App, model: Model): void {
@@ -69,12 +75,22 @@ export function modelAgent(app: App, model: Model): void {
   });
 
   /** The thread so far, as the model reads it: people's messages and the agent's own answers. */
-  const historyOf = async (client: App["client"], channel: string, thread: string, self: string | undefined): Promise<Turn[]> => {
+  const historyOf = async (
+    client: App["client"],
+    channel: string,
+    thread: string,
+    self: string | undefined,
+  ): Promise<Turn[]> => {
     const { messages = [] } = await client.conversations.replies({ channel, ts: thread });
     return messages.flatMap((message) =>
       message.text === undefined || message.text === ""
         ? []
-        : [{ role: message.bot_id !== undefined || message.user === self ? ("assistant" as const) : ("user" as const), text: message.text }],
+        : [
+            {
+              role: message.bot_id !== undefined || message.user === self ? ("assistant" as const) : ("user" as const),
+              text: message.text,
+            },
+          ],
     );
   };
 
@@ -102,7 +118,8 @@ export function modelAgent(app: App, model: Model): void {
             // Outside a DM, Slack streams to someone: the person who asked, in their workspace.
             const recipient =
               channel.startsWith("D") || team === undefined ? {} : { recipient_user_id: user, recipient_team_id: team };
-            stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text, ...recipient })).ts;
+            stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text, ...recipient }))
+              .ts;
           } else await client.chat.appendStream({ channel, ts: stream, markdown_text: text });
         },
       });
@@ -121,7 +138,9 @@ export function modelAgent(app: App, model: Model): void {
     } finally {
       answering.delete(key);
       if (stream === undefined) {
-        await client.assistant.threads.setStatus({ channel_id: channel, thread_ts: thread, status: "" }).catch(() => undefined);
+        await client.assistant.threads
+          .setStatus({ channel_id: channel, thread_ts: thread, status: "" })
+          .catch(() => undefined);
       }
     }
   };
@@ -145,6 +164,12 @@ export function modelAgent(app: App, model: Model): void {
     const followUp = message.thread_ts !== undefined && joined.has(`${message.channel}:${thread}`);
     // A mention is answered by the app_mention handler.
     if ((!direct && !followUp) || ((message.text ?? "").includes("<@") && !direct)) return;
-    await respond(client, { channel: message.channel, thread, user: message.user, team: context.teamId, self: context.botUserId });
+    await respond(client, {
+      channel: message.channel,
+      thread,
+      user: message.user,
+      team: context.teamId,
+      self: context.botUserId,
+    });
   });
 }

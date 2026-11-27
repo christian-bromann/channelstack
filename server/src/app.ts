@@ -250,7 +250,8 @@ export function createApp(options: AppOptions): App {
         strings.push(...cached.strings);
       }
       for (const event of events.read(session).events) {
-        if (event.kind !== "api_call" || DRIVERS.find((definition) => definition.name === event.driver)?.provider) continue;
+        if (event.kind !== "api_call" || DRIVERS.find((definition) => definition.name === event.driver)?.provider)
+          continue;
         const at = Date.parse(event.at);
         for (const text of stringsOf(event.data.response)) strings.push({ text, driver: event.driver, at });
       }
@@ -292,12 +293,16 @@ export function createApp(options: AppOptions): App {
       }
     }
     for (const definition of DRIVERS) {
-      const shaped = definition.tokenPatterns.some((pattern) => new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, "")).test(text));
-      if (shaped && !kinds.some((kind) => kind.startsWith(`${definition.name}.`))) kinds.push(`a ${definition.title} token`);
+      const shaped = definition.tokenPatterns.some((pattern) =>
+        new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, "")).test(text),
+      );
+      if (shaped && !kinds.some((kind) => kind.startsWith(`${definition.name}.`)))
+        kinds.push(`a ${definition.title} token`);
     }
     if (text.includes(options.token)) kinds.push("the control API's token");
     // Anything else the redactor knows: a live credential, registered when it was handed over.
-    if (kinds.length === 0 && JSON.stringify(redactor.tokens(text)) !== JSON.stringify(text)) kinds.push("a live credential");
+    if (kinds.length === 0 && JSON.stringify(redactor.tokens(text)) !== JSON.stringify(text))
+      kinds.push("a live credential");
     return kinds;
   };
 
@@ -622,11 +627,15 @@ export function createApp(options: AppOptions): App {
       const driver =
         byHost.get(host) ?? rooted.find(({ path }) => new URL(request.url).pathname.startsWith(path))?.driver;
       // A provider's call is in flight for its session alone (its open work), not for every session.
-      if (driver) return providers.has(driver) ? driver.fake.api.fetch(request) : quiet.during(() => driver.fake.api.fetch(request));
+      if (driver)
+        return providers.has(driver)
+          ? driver.fake.api.fetch(request)
+          : quiet.during(() => driver.fake.api.fetch(request));
       // Anything outside the control API is the agent calling a fake: the agent isn't quiet while it runs.
       const { pathname } = new URL(request.url);
       const fromAgent =
-        !pathname.startsWith(CONTROL_PREFIX) && ![...providers].some((provider) => pathname.startsWith(`/${provider.name}/`));
+        !pathname.startsWith(CONTROL_PREFIX) &&
+        ![...providers].some((provider) => pathname.startsWith(`/${provider.name}/`));
       return fromAgent ? quiet.during(() => root.fetch(request)) : root.fetch(request);
     },
     openapi: () => ({

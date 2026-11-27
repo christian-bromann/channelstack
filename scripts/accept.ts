@@ -8,7 +8,13 @@
  */
 import { join } from "node:path";
 
-import { runExamples, runGoDockerExamples, runProviderExamples, runProxyExamples, runPytestExamples } from "./examples.ts";
+import {
+  runExamples,
+  runGoDockerExamples,
+  runProviderExamples,
+  runProxyExamples,
+  runPytestExamples,
+} from "./examples.ts";
 import { HARNESS, HARNESS_CHANNELS } from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";

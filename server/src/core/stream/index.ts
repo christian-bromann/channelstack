@@ -51,7 +51,7 @@ export interface SseStream {
 const DROP_AFTER_MS = 50;
 
 /** A frame as SSE text: `event: …` when it has a name, then `data: …`, then a blank line. */
-export const sseText = (frame: SseFrame): string =>
+const sseText = (frame: SseFrame): string =>
   `${frame.event === undefined ? "" : `event: ${frame.event}\n`}data: ${frame.data}\n\n`;
 
 /**

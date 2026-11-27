@@ -36,7 +36,9 @@ export function channelGlue(ir: Ir): ChannelGlue {
   const channels = ir.channels.filter((channel) => !channel.internal && !channel.provider);
   const providers = ir.channels.filter((channel) => channel.provider);
   // A provider's types are its own, like echo's: no channel union takes them.
-  const internal = ir.channels.filter((channel) => channel.internal || channel.provider).map((channel) => channel.title);
+  const internal = ir.channels
+    .filter((channel) => channel.internal || channel.provider)
+    .map((channel) => channel.title);
   const resources = new Map(ir.resources.map((resource) => [resource.name, resource]));
   const types = new Set(ir.types.map((type) => type.name));
   const ofChannels = (resource: IrResource) =>

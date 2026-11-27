@@ -2,26 +2,26 @@ import { invalidRequest, unsupportedInFake } from "./errors.ts";
 import type { Endpoint } from "./turns.ts";
 
 /** An image, file or audio part the agent sent (phase 14 reads their bytes; phase 13 records that they were there). */
-export interface ModelPart {
+interface ModelPart {
   readonly type: "image" | "file" | "audio";
   readonly from: "data" | "file_id" | "url";
   readonly url?: string;
 }
 
-export interface ModelToolCallRef {
+interface ModelToolCallRef {
   readonly id: string;
   readonly name: string;
   readonly arguments: unknown;
 }
 
 /** One message of the conversation, the same for both endpoints. */
-export type ModelMessage =
+type ModelMessage =
   | { readonly role: "system" | "developer"; readonly text: string }
   | { readonly role: "user"; readonly text: string; readonly parts: readonly ModelPart[] }
   | { readonly role: "assistant"; readonly text: string; readonly toolCalls: readonly ModelToolCallRef[] }
   | { readonly role: "tool"; readonly callId: string; readonly name?: string; readonly text: string };
 
-export interface ModelTool {
+interface ModelTool {
   readonly type: string;
   readonly name?: string;
   readonly description?: string;
@@ -29,7 +29,7 @@ export interface ModelTool {
   readonly strict?: boolean;
 }
 
-export type ResponseFormat =
+type ResponseFormat =
   | { readonly type: "text" }
   | { readonly type: "json_object" }
   | { readonly type: "json_schema"; readonly name: string; readonly schema: unknown; readonly strict?: boolean };
@@ -60,18 +60,21 @@ export interface ModelRequest {
 
 type Json = Record<string, unknown>;
 
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Json =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 /** A message's content as text, and its other parts: a string, or a list of parts. */
 function contentOf(content: unknown, where: string): { text: string; parts: ModelPart[] } {
   if (content === undefined || content === null) return { text: "", parts: [] };
   if (typeof content === "string") return { text: content, parts: [] };
-  if (!Array.isArray(content)) throw invalidRequest(`Invalid type for '${where}': expected a string or an array.`, where);
+  if (!Array.isArray(content))
+    throw invalidRequest(`Invalid type for '${where}': expected a string or an array.`, where);
   const texts: string[] = [];
   const parts: ModelPart[] = [];
   for (const [at, part] of content.entries()) {
-    if (!isObject(part)) throw invalidRequest(`Invalid type for '${where}[${at}]': expected an object.`, `${where}[${at}]`);
+    if (!isObject(part))
+      throw invalidRequest(`Invalid type for '${where}[${at}]': expected an object.`, `${where}[${at}]`);
     switch (part.type) {
       case "text":
       case "input_text":
@@ -148,7 +151,11 @@ function lastToolResults(messages: readonly ModelMessage[]): ModelRequest["lastT
   for (let at = messages.length - 1; at >= 0; at -= 1) {
     const message = messages[at];
     if (message?.role !== "tool") break;
-    results.unshift({ callId: message.callId, ...(message.name === undefined ? {} : { name: message.name }), text: message.text });
+    results.unshift({
+      callId: message.callId,
+      ...(message.name === undefined ? {} : { name: message.name }),
+      text: message.text,
+    });
   }
   return results;
 }
@@ -205,7 +212,11 @@ export function chatRequest(body: Json, headers: Headers): ModelRequest {
       case "tool": {
         const callId = str(raw.tool_call_id);
         if (callId === undefined) {
-          throw invalidRequest(`Missing required parameter: '${where}.tool_call_id'.`, `${where}.tool_call_id`, "missing_required_parameter");
+          throw invalidRequest(
+            `Missing required parameter: '${where}.tool_call_id'.`,
+            `${where}.tool_call_id`,
+            "missing_required_parameter",
+          );
         }
         if (!toolCallIds.has(callId)) {
           throw invalidRequest(
@@ -305,7 +316,11 @@ function toolsOf(tools: unknown, endpoint: "chat" | "responses"): ModelTool[] {
     const definition = endpoint === "chat" && isObject(tool[type]) ? (tool[type] as Json) : tool;
     const name = str(definition.name);
     if (name === undefined) {
-      throw invalidRequest(`Missing required parameter: 'tools[${at}].${endpoint === "chat" ? `${type}.` : ""}name'.`, `tools[${at}].name`, "missing_required_parameter");
+      throw invalidRequest(
+        `Missing required parameter: 'tools[${at}].${endpoint === "chat" ? `${type}.` : ""}name'.`,
+        `tools[${at}].name`,
+        "missing_required_parameter",
+      );
     }
     return {
       type,
@@ -334,7 +349,11 @@ function formatOf(format: Json | undefined, where: string): { responseFormat?: R
     const spec = isObject(format.json_schema) ? format.json_schema : format;
     const name = str(spec.name);
     if (name === undefined) {
-      throw invalidRequest(`Missing required parameter: '${where}.json_schema.name'.`, `${where}.json_schema.name`, "missing_required_parameter");
+      throw invalidRequest(
+        `Missing required parameter: '${where}.json_schema.name'.`,
+        `${where}.json_schema.name`,
+        "missing_required_parameter",
+      );
     }
     return {
       responseFormat: {
@@ -406,11 +425,19 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
       case "custom_tool_call_output": {
         const callId = str(item.call_id);
         if (callId === undefined) {
-          throw invalidRequest(`Missing required parameter: '${where}.call_id'.`, `${where}.call_id`, "missing_required_parameter");
+          throw invalidRequest(
+            `Missing required parameter: '${where}.call_id'.`,
+            `${where}.call_id`,
+            "missing_required_parameter",
+          );
         }
         refs.push(callId);
         const output = item.output;
-        messages.push({ role: "tool", callId, text: typeof output === "string" ? output : JSON.stringify(output ?? "") });
+        messages.push({
+          role: "tool",
+          callId,
+          text: typeof output === "string" ? output : JSON.stringify(output ?? ""),
+        });
         break;
       }
       case "reasoning":
@@ -447,7 +474,9 @@ export function responsesRequest(body: Json, headers: Headers, history: readonly
     includeUsage: true,
     includeObfuscation: streamOptions.include_obfuscation !== false,
     parallelToolCalls: body.parallel_tool_calls !== false,
-    includes: Array.isArray(body.include) ? body.include.filter((value): value is string => typeof value === "string") : [],
+    includes: Array.isArray(body.include)
+      ? body.include.filter((value): value is string => typeof value === "string")
+      : [],
   };
 }
 

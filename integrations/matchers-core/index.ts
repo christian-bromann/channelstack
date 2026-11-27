@@ -796,9 +796,15 @@ export const matchers = {
   },
 
   /** The agent ran the model's call to this tool and sent its result back (with this text). */
-  toHaveSentToolResult(state: MatcherState, subject: unknown, name: string, options?: Timing & { text?: string | RegExp }) {
+  toHaveSentToolResult(
+    state: MatcherState,
+    subject: unknown,
+    name: string,
+    options?: Timing & { text?: string | RegExp },
+  ) {
     const handle = subject as { toolCalls(options?: { name?: string }): Promise<readonly ModelToolCall[]> };
-    if (typeof handle.toolCalls !== "function") throw new TypeError("toHaveSentToolResult needs the openai fixture or a script");
+    if (typeof handle.toolCalls !== "function")
+      throw new TypeError("toHaveSentToolResult needs the openai fixture or a script");
     return settle(subject, state, options, {
       onceQuiet: false,
       read: () => handle.toolCalls({ name }),
@@ -854,14 +860,19 @@ interface ModelCallData {
 
 /** The model calls a matcher reads: the fixture's or a script's (a list), or one call. */
 async function modelCalls(subject: unknown): Promise<readonly ModelCallData[]> {
-  const handle = subject as { calls?: () => Promise<readonly ModelCallData[]>; request?: ModelCallData["request"]; refresh?: () => Promise<ModelCallData> };
+  const handle = subject as {
+    calls?: () => Promise<readonly ModelCallData[]>;
+    request?: ModelCallData["request"];
+    refresh?: () => Promise<ModelCallData>;
+  };
   if (typeof handle.calls === "function") return handle.calls();
   if (typeof handle.refresh === "function") return [await handle.refresh()];
   if (handle.request !== undefined) return [handle as ModelCallData];
   throw new TypeError("This matcher needs the openai fixture, a script or a model call");
 }
 
-const asText = (item: string | RegExp | Texted): string | RegExp => (typeof item === "object" && "text" in item ? item.text : item);
+const asText = (item: string | RegExp | Texted): string | RegExp =>
+  typeof item === "object" && "text" in item ? item.text : item;
 
 /** Text as the server compares it for attribution: mentions gone, whitespace collapsed, case ignored. */
 const normalised = (text: string) =>

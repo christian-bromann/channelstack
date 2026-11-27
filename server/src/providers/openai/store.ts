@@ -46,7 +46,8 @@ export class OpenAIStore {
   /** A closed session's responses and conversations are forgotten with it. */
   release(session: string): void {
     for (const [id, response] of this.responses) if (response.session === session) this.responses.delete(id);
-    for (const [id, conversation] of this.conversations) if (conversation.session === session) this.conversations.delete(id);
+    for (const [id, conversation] of this.conversations)
+      if (conversation.session === session) this.conversations.delete(id);
   }
 
   clear(): void {

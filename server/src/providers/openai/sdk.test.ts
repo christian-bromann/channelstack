@@ -57,7 +57,9 @@ describe("no script, no answer", () => {
     await respond({ turns: ["Only once."] });
 
     const first = await client.chat.completions.create({ model: "gpt-5", messages: ask(prompt) });
-    const second = await client.chat.completions.create({ model: "gpt-5", messages: ask(prompt) }).catch((caught: unknown) => caught);
+    const second = await client.chat.completions
+      .create({ model: "gpt-5", messages: ask(prompt) })
+      .catch((caught: unknown) => caught);
 
     expect(first.choices[0]?.message.content).toBe("Only once.");
     expect((second as APIError).code).toBe("channelstack_no_script");
@@ -107,7 +109,10 @@ describe("Chat Completions", () => {
     const tools = [
       {
         type: "function" as const,
-        function: { name: "search_incidents", parameters: { type: "object", properties: { since: { type: "string" } } } },
+        function: {
+          name: "search_incidents",
+          parameters: { type: "object", properties: { since: { type: "string" } } },
+        },
       },
     ];
 
@@ -136,16 +141,19 @@ describe("Chat Completions", () => {
       }),
     ]);
     const calls = await control("GET", "/calls");
-    expect(calls.map((recorded: { request: { context: { attributedBy?: string } } }) => recorded.request.context.attributedBy)).toEqual([
-      expect.stringMatching(/^(text|owned_id)$/),
-      "minted_id",
-    ]);
+    expect(
+      calls.map(
+        (recorded: { request: { context: { attributedBy?: string } } }) => recorded.request.context.attributedBy,
+      ),
+    ).toEqual([expect.stringMatching(/^(text|owned_id)$/), "minted_id"]);
   });
 
   test("a stream: content in pieces, tool calls with their arguments, the usage chunk and [DONE]", async () => {
     const { client, respond, prompt } = await setup();
     await respond({
-      turns: [{ text: ["Looking", " it up."], toolCalls: [{ name: "lookup", arguments: { query: "web deploy failed" } }] }],
+      turns: [
+        { text: ["Looking", " it up."], toolCalls: [{ name: "lookup", arguments: { query: "web deploy failed" } }] },
+      ],
     });
 
     const stream = await client.chat.completions.create({
@@ -199,7 +207,9 @@ describe("errors and the SDK's retries", () => {
 
     expect(answer.choices[0]?.message.content).toBe("All good now.");
     const calls = await control("GET", "/calls");
-    expect(calls.map((call: { response: { status: number }; attempt: number }) => [call.response.status, call.attempt])).toEqual([
+    expect(
+      calls.map((call: { response: { status: number }; attempt: number }) => [call.response.status, call.attempt]),
+    ).toEqual([
       [503, 0],
       [503, 1],
       [200, 2],
@@ -244,7 +254,12 @@ describe("Responses", () => {
     const { client, respond, prompt } = await setup();
     await respond({ turns: [{ reasoning: { summary: "Reading the incident log." }, text: "Two incidents." }] });
 
-    const stream = await client.responses.create({ model: "gpt-5", input: prompt, stream: true, reasoning: { summary: "auto" } });
+    const stream = await client.responses.create({
+      model: "gpt-5",
+      input: prompt,
+      stream: true,
+      reasoning: { summary: "auto" },
+    });
     const types: string[] = [];
     const sequence: number[] = [];
     let text = "";
@@ -263,7 +278,9 @@ describe("Responses", () => {
 
   test("a function call, then previous_response_id chains the answer to the same session", async () => {
     const { client, respond, prompt } = await setup();
-    await respond({ turns: [{ toolCalls: [{ name: "lookup", arguments: { query: "deploy" } }] }, "It was the migration."] });
+    await respond({
+      turns: [{ toolCalls: [{ name: "lookup", arguments: { query: "deploy" } }] }, "It was the migration."],
+    });
     const tools = [{ type: "function" as const, name: "lookup", parameters: { type: "object" }, strict: false }];
 
     const first = await client.responses.create({ model: "gpt-5", input: prompt, tools });
@@ -272,7 +289,13 @@ describe("Responses", () => {
       model: "gpt-5",
       tools,
       previous_response_id: first.id,
-      input: [{ type: "function_call_output", call_id: call?.type === "function_call" ? call.call_id : "", output: "failed at the migration" }],
+      input: [
+        {
+          type: "function_call_output",
+          call_id: call?.type === "function_call" ? call.call_id : "",
+          output: "failed at the migration",
+        },
+      ],
     });
 
     expect(first.id).toMatch(/^resp_[0-9a-f]{48}$/);

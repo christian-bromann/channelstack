@@ -6,8 +6,8 @@ import { removeSlackEntry } from "./live/cleanup.ts";
 import { SlackWebClient } from "./live/client.ts";
 import { slackMaintenance } from "./live/maintenance.ts";
 import { createLiveWorld } from "./live/world.ts";
-import { registerSlackRoutes } from "./routes.ts";
 import { slackPlace } from "./place.ts";
+import { registerSlackRoutes } from "./routes.ts";
 import { SLACK_SECRETS } from "./secrets.ts";
 
 /** The start of a text, short enough for one line of a failure message. */

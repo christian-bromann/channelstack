@@ -47,7 +47,12 @@ export const notFound = (method: string, path: string) =>
   });
 
 /** Every error kind a script can answer with: its status, `type`, `code` and message, as OpenAI's guide documents them. */
-const KINDS: Readonly<Record<Exclude<ErrorKind, "timeout">, { status: number; type: string; code: string | null; message: (model: string) => string; param?: string }>> = {
+const KINDS: Readonly<
+  Record<
+    Exclude<ErrorKind, "timeout">,
+    { status: number; type: string; code: string | null; message: (model: string) => string; param?: string }
+  >
+> = {
   rate_limit: {
     status: 429,
     type: "requests",
@@ -147,14 +152,16 @@ const KINDS: Readonly<Record<Exclude<ErrorKind, "timeout">, { status: number; ty
   },
 };
 
-/** The kinds the official SDKs retry by their status (408, 409, 429, 5xx), unless `x-should-retry` says otherwise. */
-export const retriedByStatus = (status: number): boolean =>
-  status === 408 || status === 409 || status === 429 || status >= 500;
-
 /** A scripted error, as OpenAI answers it. `timeout` isn't one: it is no answer at all. */
 export function scriptedError(
   kind: Exclude<ErrorKind, "timeout">,
-  options: { model: string; message?: string | undefined; retryAfterMs?: number | undefined; shouldRetry?: boolean | undefined; endpoint: "chat.completions" | "responses" },
+  options: {
+    model: string;
+    message?: string | undefined;
+    retryAfterMs?: number | undefined;
+    shouldRetry?: boolean | undefined;
+    endpoint: "chat.completions" | "responses";
+  },
 ): OpenAIError {
   const known = KINDS[kind];
   const headers: Record<string, string> = {};

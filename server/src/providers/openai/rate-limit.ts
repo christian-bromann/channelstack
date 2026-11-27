@@ -11,7 +11,7 @@ export interface RateLimits {
 const DEFAULT_TIER = { requests: 10_000, tokens: 30_000_000 } as const;
 
 /** A duration as OpenAI's reset headers write it: Go's style, `1s`, `6m0s`, `120ms`. */
-export function goDuration(ms: number): string {
+function goDuration(ms: number): string {
   if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
   const totalSeconds = ms / 1000;
   const minutes = Math.floor(totalSeconds / 60);
@@ -43,8 +43,10 @@ export class SessionRateLimit {
   #roll(): void {
     const now = this.#clock();
     const { requests, tokens } = this.limits;
-    if (requests && now - this.#requests.startedAt >= requests.perMs) this.#requests = { startedAt: now, requests: 0, tokens: 0 };
-    if (tokens && now - this.#tokens.startedAt >= tokens.perMs) this.#tokens = { startedAt: now, requests: 0, tokens: 0 };
+    if (requests && now - this.#requests.startedAt >= requests.perMs)
+      this.#requests = { startedAt: now, requests: 0, tokens: 0 };
+    if (tokens && now - this.#tokens.startedAt >= tokens.perMs)
+      this.#tokens = { startedAt: now, requests: 0, tokens: 0 };
   }
 
   /** How long until a slot frees up, when this call is over the limit; undefined when it may go on. */

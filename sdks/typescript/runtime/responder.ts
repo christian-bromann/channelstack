@@ -6,7 +6,10 @@
 
 /** What the loop needs of a responder's handle: its long-poll read, and the way to answer. */
 export interface ResponderIo<Request, Turn> {
-  held(options: { since?: string; waitMs?: number }): Promise<{ held: ReadonlyArray<{ id: string; request: Request }>; cursor: string }>;
+  held(options: {
+    since?: string;
+    waitMs?: number;
+  }): Promise<{ held: ReadonlyArray<{ id: string; request: Request }>; cursor: string }>;
   answer(id: string, options: { turn?: Turn; error?: string }): Promise<void>;
 }
 

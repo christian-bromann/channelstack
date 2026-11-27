@@ -11,7 +11,7 @@
  */
 
 /** How a request was attributed. */
-export type AttributedBy = "minted_id" | "tag" | "owned_id" | "text" | "order";
+type AttributedBy = "minted_id" | "tag" | "owned_id" | "text" | "order";
 
 /** One thing a session knows: a string the agent was sent, and where it came from. */
 export interface KnownString {
@@ -62,7 +62,7 @@ const MAX_EVIDENCE = 4000;
  * Text as both sides are compared: mentions and links removed (the agent strips `<@U…>` or
  * resolves it), whitespace collapsed, case ignored.
  */
-export function normalise(text: string): string {
+function normalise(text: string): string {
   return text
     .replace(/<[@#!][^>]*>/g, " ")
     .replace(/<(https?:[^>|]+)(\|[^>]*)?>/g, " $1 ")
@@ -192,7 +192,8 @@ export class Attributor {
         score += text.length;
         if (!longest || longest.text.length < text.length) longest = { text, source };
       }
-      if (longest && (!best || best.score < score)) best = { session, score, matched: longest.text, source: longest.source };
+      if (longest && (!best || best.score < score))
+        best = { session, score, matched: longest.text, source: longest.source };
     }
     if (best) {
       const by = isText(best.matched) ? "text" : "owned_id";

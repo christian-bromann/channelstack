@@ -1,7 +1,7 @@
 import type { ModelRequest } from "../request.ts";
 
 /** A tool call in an answer, its id minted and its arguments as the JSON text the model sends. */
-export interface AnswerToolCall {
+interface AnswerToolCall {
   readonly id: string;
   /** The item's own id on Responses (`fc_…`, `ctc_…`). */
   readonly itemId: string;
@@ -20,13 +20,18 @@ export interface Answer {
   readonly reasoning?: { readonly itemId: string; readonly summary: readonly string[]; readonly tokens: number };
   readonly refusal?: string;
   readonly finish: "stop" | "length" | "content_filter" | "tool_calls";
-  readonly usage: { readonly input: number; readonly output: number; readonly reasoning: number; readonly cached: number };
+  readonly usage: {
+    readonly input: number;
+    readonly output: number;
+    readonly reasoning: number;
+    readonly cached: number;
+  };
   /** The message item's id on Responses. */
   readonly messageId: string;
 }
 
 /** About four characters a token: numbers that grow with the text, without a tokenizer. */
-export const tokens = (text: string): number => Math.ceil(text.length / 4);
+const tokens = (text: string): number => Math.ceil(text.length / 4);
 
 /** Text in the pieces a stream sends: about four characters each. */
 export const textChunks = (text: string): string[] => text.match(/[\s\S]{1,4}/g) ?? [];
@@ -66,9 +71,15 @@ export function usageOf(
   requestText: string,
   answer: Pick<Answer, "text" | "toolCalls" | "refusal">,
   reasoning: number,
-  given: { input?: number | undefined; output?: number | undefined; reasoning?: number | undefined; cached?: number | undefined } = {},
+  given: {
+    input?: number | undefined;
+    output?: number | undefined;
+    reasoning?: number | undefined;
+    cached?: number | undefined;
+  } = {},
 ): Answer["usage"] {
-  const produced = answer.text + (answer.refusal ?? "") + answer.toolCalls.map((call) => call.name + call.arguments).join("");
+  const produced =
+    answer.text + (answer.refusal ?? "") + answer.toolCalls.map((call) => call.name + call.arguments).join("");
   const reasoningTokens = given.reasoning ?? reasoning;
   return {
     input: given.input ?? tokens(requestText),

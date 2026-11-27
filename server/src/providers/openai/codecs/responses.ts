@@ -25,7 +25,10 @@ export function outputItems(answer: Answer, meta: Pick<ResponseMeta, "encryptedR
     items.push({
       id: answer.reasoning.itemId,
       type: "reasoning",
-      summary: answer.reasoning.summary.length === 0 ? [] : [{ type: "summary_text", text: answer.reasoning.summary.join("") }],
+      summary:
+        answer.reasoning.summary.length === 0
+          ? []
+          : [{ type: "summary_text", text: answer.reasoning.summary.join("") }],
       ...(meta.encryptedReasoning === undefined ? {} : { encrypted_content: meta.encryptedReasoning }),
     });
   }
@@ -51,8 +54,22 @@ const messageItem = (answer: Answer, status: string, empty = false) => ({
 
 const callItem = (call: Answer["toolCalls"][number], status: string, empty = false) =>
   call.kind === "custom"
-    ? { id: call.itemId, type: "custom_tool_call", status, call_id: call.id, name: call.name, input: empty ? "" : call.arguments }
-    : { id: call.itemId, type: "function_call", status, call_id: call.id, name: call.name, arguments: empty ? "" : call.arguments };
+    ? {
+        id: call.itemId,
+        type: "custom_tool_call",
+        status,
+        call_id: call.id,
+        name: call.name,
+        input: empty ? "" : call.arguments,
+      }
+    : {
+        id: call.itemId,
+        type: "function_call",
+        status,
+        call_id: call.id,
+        name: call.name,
+        arguments: empty ? "" : call.arguments,
+      };
 
 /** A `response` object, in a given state. */
 export function responseObject(
@@ -70,7 +87,10 @@ export function responseObject(
     status,
     background: false,
     error: error ? { code: error.code ?? error.type, message: error.message } : null,
-    incomplete_details: status === "incomplete" ? { reason: answer?.finish === "content_filter" ? "content_filter" : "max_output_tokens" } : null,
+    incomplete_details:
+      status === "incomplete"
+        ? { reason: answer?.finish === "content_filter" ? "content_filter" : "max_output_tokens" }
+        : null,
     instructions: body.instructions ?? null,
     max_output_tokens: body.max_output_tokens ?? null,
     max_tool_calls: body.max_tool_calls ?? null,
@@ -80,7 +100,10 @@ export function responseObject(
     previous_response_id: meta.previousResponseId ?? null,
     ...(meta.conversation === undefined ? {} : { conversation: { id: meta.conversation } }),
     prompt_cache_key: body.prompt_cache_key ?? null,
-    reasoning: { effort: (body.reasoning as { effort?: unknown } | undefined)?.effort ?? null, summary: (body.reasoning as { summary?: unknown } | undefined)?.summary ?? null },
+    reasoning: {
+      effort: (body.reasoning as { effort?: unknown } | undefined)?.effort ?? null,
+      summary: (body.reasoning as { summary?: unknown } | undefined)?.summary ?? null,
+    },
     safety_identifier: body.safety_identifier ?? null,
     service_tier: "default",
     store: meta.store,
@@ -133,10 +156,24 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
     const item_id = answer.reasoning.itemId;
     emit("response.output_item.added", { output_index, item: { id: item_id, type: "reasoning", summary: [] } });
     answer.reasoning.summary.forEach((piece, summary_index) => {
-      emit("response.reasoning_summary_part.added", { item_id, output_index, summary_index, part: { type: "summary_text", text: "" } });
-      emit("response.reasoning_summary_text.delta", { item_id, output_index, summary_index, delta: piece, ...pad() }, true);
+      emit("response.reasoning_summary_part.added", {
+        item_id,
+        output_index,
+        summary_index,
+        part: { type: "summary_text", text: "" },
+      });
+      emit(
+        "response.reasoning_summary_text.delta",
+        { item_id, output_index, summary_index, delta: piece, ...pad() },
+        true,
+      );
       emit("response.reasoning_summary_text.done", { item_id, output_index, summary_index, text: piece });
-      emit("response.reasoning_summary_part.done", { item_id, output_index, summary_index, part: { type: "summary_text", text: piece } });
+      emit("response.reasoning_summary_part.done", {
+        item_id,
+        output_index,
+        summary_index,
+        part: { type: "summary_text", text: piece },
+      });
     });
     emit("response.output_item.done", { output_index, item: finished[index] });
     index += 1;
@@ -146,7 +183,10 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
     const item_id = answer.messageId;
     emit("response.output_item.added", { output_index, item: messageItem(answer, "in_progress", true) });
     const part = contentPart(answer);
-    const empty = answer.refusal !== undefined ? { type: "refusal", refusal: "" } : { type: "output_text", text: "", annotations: [], logprobs: [] };
+    const empty =
+      answer.refusal !== undefined
+        ? { type: "refusal", refusal: "" }
+        : { type: "output_text", text: "", annotations: [], logprobs: [] };
     emit("response.content_part.added", { item_id, output_index, content_index: 0, part: empty });
     if (answer.refusal !== undefined) {
       for (const delta of answer.refusal.match(/[\s\S]{1,4}/g) ?? []) {
@@ -155,7 +195,11 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
       emit("response.refusal.done", { item_id, output_index, content_index: 0, refusal: answer.refusal });
     } else {
       for (const delta of answer.chunks) {
-        emit("response.output_text.delta", { item_id, output_index, content_index: 0, delta, logprobs: [], ...pad() }, true);
+        emit(
+          "response.output_text.delta",
+          { item_id, output_index, content_index: 0, delta, logprobs: [], ...pad() },
+          true,
+        );
       }
       emit("response.output_text.done", { item_id, output_index, content_index: 0, text: answer.text, logprobs: [] });
     }
@@ -174,13 +218,20 @@ export function responseFrames(answer: Answer, meta: ResponseMeta): SseFrame[] {
       for (const delta of jsonChunks(call.arguments)) {
         emit("response.function_call_arguments.delta", { item_id, output_index, delta, ...pad() }, true);
       }
-      emit("response.function_call_arguments.done", { item_id, output_index, name: call.name, arguments: call.arguments });
+      emit("response.function_call_arguments.done", {
+        item_id,
+        output_index,
+        name: call.name,
+        arguments: call.arguments,
+      });
     }
     emit("response.output_item.done", { output_index, item: finished[index] });
     index += 1;
   }
   const status = finalStatus(answer);
-  emit(status === "completed" ? "response.completed" : "response.incomplete", { response: responseObject(answer, meta, status) });
+  emit(status === "completed" ? "response.completed" : "response.incomplete", {
+    response: responseObject(answer, meta, status),
+  });
   return frames;
 }
 

@@ -7,14 +7,14 @@ import type { Answer } from "./codecs/answer.ts";
 import { textChunks, usageOf } from "./codecs/answer.ts";
 import { OpenAIError, scriptedError } from "./errors.ts";
 import { OPENAI_IDS } from "./ids.ts";
-import { SessionRateLimit, type RateLimits } from "./rate-limit.ts";
+import { type RateLimits, SessionRateLimit } from "./rate-limit.ts";
 import { type ModelRequest, requestText } from "./request.ts";
 import { type CallContext, fillTemplate, type ScriptRecord, Scripts } from "./scripts.ts";
 import { OpenAIStore } from "./store.ts";
 import type { Turn } from "./turns.ts";
 
 /** Where a call belongs in the channels, from the evidence it was attributed by. */
-export interface CallPlace {
+interface CallPlace {
   readonly channel?: string;
   readonly from?: string;
   readonly conversation?: string;
@@ -54,7 +54,7 @@ export type Outcome =
   | { readonly kind: "timeout" };
 
 /** A call no script answered, or one a script couldn't: a 400 the SDKs don't retry, in channelstack's own code. */
-export function noScript(message: string): OpenAIError {
+function noScript(message: string): OpenAIError {
   return new OpenAIError(400, {
     message: `channelstack: ${message}`,
     type: "invalid_request_error",
@@ -101,7 +101,9 @@ export class OpenAIWorld {
       if (name !== "authorization" && name !== "api-key") kept[name] = value;
     });
     const record: CallRecord = {
-      id: this.#deps.ids.next(request.endpoint === "chat.completions" ? OPENAI_IDS.chatCompletion : OPENAI_IDS.response),
+      id: this.#deps.ids.next(
+        request.endpoint === "chat.completions" ? OPENAI_IDS.chatCompletion : OPENAI_IDS.response,
+      ),
       session: attribution?.session,
       endpoint: request.endpoint,
       request,
@@ -248,7 +250,12 @@ export class OpenAIWorld {
       for (const problem of problems) if (!script.problems.includes(problem)) script.problems.push(problem);
       return { kind: "error", error: noScript(problems.join("; ")), afterMs: 0 };
     }
-    return { kind: "answer", answer: this.#answer(turn, request, call, script.used), turn: { ...turn, timing }, script };
+    return {
+      kind: "answer",
+      answer: this.#answer(turn, request, call, script.used),
+      turn: { ...turn, timing },
+      script,
+    };
   }
 
   /** A responder's turn: the call is held, the test's SDK reads it and answers. */
@@ -263,7 +270,9 @@ export class OpenAIWorld {
       };
       const cancel = this.#deps.timers.after(ANSWER_TIMEOUT_MS, () => {
         done();
-        reject(new Error(`the test didn't answer the model call held for ${script.id} within ${ANSWER_TIMEOUT_MS / 1000}s`));
+        reject(
+          new Error(`the test didn't answer the model call held for ${script.id} within ${ANSWER_TIMEOUT_MS / 1000}s`),
+        );
       });
       abort.addEventListener("abort", () => {
         done();
@@ -295,8 +304,11 @@ export class OpenAIWorld {
     const { ids } = this.#deps;
     const toolCalls = (turn.toolCalls ?? []).map((spec) => {
       const custom = spec.input !== undefined;
-      const args =
-        custom ? (spec.input as string) : typeof spec.arguments === "string" ? spec.arguments : JSON.stringify(spec.arguments ?? {});
+      const args = custom
+        ? (spec.input as string)
+        : typeof spec.arguments === "string"
+          ? spec.arguments
+          : JSON.stringify(spec.arguments ?? {});
       return {
         id: ids.next(OPENAI_IDS.call),
         itemId: ids.next(custom ? OPENAI_IDS.customCall : OPENAI_IDS.functionCall),
@@ -315,7 +327,10 @@ export class OpenAIWorld {
           ? "tool_calls"
           : "stop");
     const base = {
-      text: finish === "length" && request.maxOutputTokens !== undefined ? text.slice(0, request.maxOutputTokens * 4) : text,
+      text:
+        finish === "length" && request.maxOutputTokens !== undefined
+          ? text.slice(0, request.maxOutputTokens * 4)
+          : text,
       toolCalls,
       ...(turn.refusal === undefined ? {} : { refusal: fill(turn.refusal) }),
     };
@@ -363,7 +378,8 @@ export class OpenAIWorld {
     const tools = request.tools.map((tool) => tool.name ?? tool.type);
     const user = request.lastUserText ?? "";
     const quoted = user.length > 80 ? `${user.slice(0, 77)}…` : user;
-    const example = quoted === "" ? `openai.respond("…")` : `openai.respond("…", { when: { text: ${JSON.stringify(quoted)} } })`;
+    const example =
+      quoted === "" ? `openai.respond("…")` : `openai.respond("…", { when: { text: ${JSON.stringify(quoted)} } })`;
     return `no openai.respond(…) in this test answers this call. Newest user message: ${JSON.stringify(quoted)}. Tools offered: ${tools.length === 0 ? "none" : tools.join(", ")}. For example: ${example}`;
   }
 

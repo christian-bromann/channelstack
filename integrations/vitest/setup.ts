@@ -5,12 +5,12 @@ import { expect, inject, test, type TestContext } from "vitest";
 import {
   CHANNEL_NAMES,
   type ChannelKind,
-  PROVIDER_NAMES,
-  type ProviderKind,
   type Channelstack,
   ChannelstackError,
   connect,
   onRefusal,
+  PROVIDER_NAMES,
+  type ProviderKind,
   type Session,
   setFilesRoot,
   setWaitDefaults,
@@ -111,7 +111,10 @@ const auto = { auto: true } as const;
         // Closing the session removes everything the test created. Disposing never fails a test.
         await session[Symbol.asyncDispose]();
       }
-      if (problems.length > 0) throw new Error(`The model calls of this test went wrong:\n${problems.map((problem) => `  ${problem}`).join("\n")}`);
+      if (problems.length > 0)
+        throw new Error(
+          `The model calls of this test went wrong:\n${problems.map((problem) => `  ${problem}`).join("\n")}`,
+        );
     },
     auto,
   ],

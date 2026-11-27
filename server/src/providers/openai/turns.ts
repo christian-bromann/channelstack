@@ -14,7 +14,7 @@ const duration = (description: string) =>
     .openapi({ description });
 
 /** Every error a script can answer with: OpenAI's documented ones, by the name a test uses. */
-export const ERROR_KINDS = [
+const ERROR_KINDS = [
   "rate_limit",
   "slow_down",
   "insufficient_quota",
@@ -34,7 +34,7 @@ export const ERROR_KINDS = [
 ] as const;
 export type ErrorKind = (typeof ERROR_KINDS)[number];
 
-export const ENDPOINTS = ["chat.completions", "responses"] as const;
+const ENDPOINTS = ["chat.completions", "responses"] as const;
 export type Endpoint = (typeof ENDPOINTS)[number];
 
 const Timing = z
@@ -70,7 +70,10 @@ export const TurnObject = z
         description:
           "The answer. Streamed, a string goes in chunks of about four characters; an array gives the chunks exactly. Templates: `{lastUserText}`, `{toolResult}`, `{toolResult.<name>}`, `{model}`, `{call}`",
       }),
-    toolCalls: z.array(ToolCallSpec).optional().openapi({ description: "Tool calls, in order: more than one is parallel." }),
+    toolCalls: z
+      .array(ToolCallSpec)
+      .optional()
+      .openapi({ description: "Tool calls, in order: more than one is parallel." }),
     reasoning: z
       .object({
         summary: z.union([z.string(), z.array(z.string())]).optional(),
@@ -111,7 +114,10 @@ export const TurnObject = z
       .optional()
       .openapi({ description: "An error the API answers with instead: OpenAI's documented errors." }),
     retryAfter: duration("For an error: what `retry-after` and `retry-after-ms` say. Default 0.").optional(),
-    shouldRetry: z.boolean().optional().openapi({ description: "For an error: `x-should-retry`, which the SDKs obey." }),
+    shouldRetry: z
+      .boolean()
+      .optional()
+      .openapi({ description: "For an error: `x-should-retry`, which the SDKs obey." }),
     message: z.string().optional().openapi({ description: "For an error: its message instead of OpenAI's." }),
   })
   .openapi("OpenAITurn");

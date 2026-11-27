@@ -1,7 +1,8 @@
 import type { MessagePlace } from "../../core/router/index.ts";
 
 type Json = Record<string, unknown>;
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Json =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 const str = (value: unknown) => (typeof value === "string" ? value : undefined);
 
 /**
@@ -12,7 +13,9 @@ const str = (value: unknown) => (typeof value === "string" ? value : undefined);
 export function slackPlace(body: string): Omit<MessagePlace, "channel"> | undefined {
   let parsed: unknown;
   try {
-    parsed = body.trim().startsWith("{") ? JSON.parse(body) : JSON.parse(new URLSearchParams(body).get("payload") ?? "");
+    parsed = body.trim().startsWith("{")
+      ? JSON.parse(body)
+      : JSON.parse(new URLSearchParams(body).get("payload") ?? "");
   } catch {
     return undefined;
   }

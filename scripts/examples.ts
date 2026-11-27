@@ -66,7 +66,10 @@ export async function runExamples(
 }
 
 /** A provider's examples against each of its agents (exit check 13.1): `test/acceptance/examples/<provider>.test.ts`. */
-export async function runProviderExamples(provider: keyof typeof PROVIDERS, options: { bin?: string } = {}): Promise<void> {
+export async function runProviderExamples(
+  provider: keyof typeof PROVIDERS,
+  options: { bin?: string } = {},
+): Promise<void> {
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
   const { enabled, agents } = PROVIDERS[provider];

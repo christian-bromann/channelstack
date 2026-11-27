@@ -261,7 +261,8 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       })
       .join("");
     const given = (param: IrParam) => {
-      if (responder && param === first) return `(answer === undefined ? (${param.name} as ${parameterType(param)} | undefined) : undefined)`;
+      if (responder && param === first)
+        return `(answer === undefined ? (${param.name} as ${parameterType(param)} | undefined) : undefined)`;
       if (responder && param.name === responder.flag) return "answer !== undefined";
       return m.args.includes(param) ? param.name : `options.${param.name}`;
     };
@@ -292,7 +293,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       `  /** ${m.summary}.${m.stability === "experimental" ? " Experimental." : ""} */`,
       `  ${index.inherits(resource, m.name) ? "override " : ""}async ${m.name}(${parameters.join(", ")}): Promise<${returns}> {`,
       "    const ctx = this.#ctx;",
-      ...(responder && first ? [`    const answer = typeof ${first.name} === "function" ? ${first.name} : undefined;`] : []),
+      ...(responder && first
+        ? [`    const answer = typeof ${first.name} === "function" ? ${first.name} : undefined;`]
+        : []),
       ...(m.onceQuiet ? ["    await untilQuiet(() => quietOf(ctx));"] : []),
       ...(m.returns && responder
         ? [

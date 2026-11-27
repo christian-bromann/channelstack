@@ -7,7 +7,7 @@ import type { Match, Turn, TurnInput } from "./turns.ts";
 import { turnOf } from "./turns.ts";
 
 /** A call the server holds for a responder until the test answers it. */
-export interface HeldCall {
+interface HeldCall {
   readonly id: string;
   readonly script: string;
   /** The request as the responder sees it. */
@@ -47,7 +47,8 @@ export interface CallContext {
 /** Text and tools of a request, as the matchers read them. */
 function matches(when: Match | undefined, request: ModelRequest, text: string, context: CallContext): boolean {
   if (when === undefined) return true;
-  if (when.text !== undefined && !matchesText(when.text, { ignoreCase: true })(request.lastUserText ?? "")) return false;
+  if (when.text !== undefined && !matchesText(when.text, { ignoreCase: true })(request.lastUserText ?? ""))
+    return false;
   if (when.prompt !== undefined && !matchesText(when.prompt, { ignoreCase: true })(text)) return false;
   if (when.tools !== undefined) {
     const offered = new Set(request.tools.map((tool) => tool.name ?? tool.type));
@@ -84,7 +85,9 @@ export class Scripts {
   readonly #byId = new Map<string, ScriptRecord>();
   readonly #ajv = new Ajv({ strict: false, allErrors: false });
 
-  add(record: Omit<ScriptRecord, "used" | "calls" | "problems" | "requests" | "held" | "paused" | "waiting">): ScriptRecord {
+  add(
+    record: Omit<ScriptRecord, "used" | "calls" | "problems" | "requests" | "held" | "paused" | "waiting">,
+  ): ScriptRecord {
     const script: ScriptRecord = {
       ...record,
       used: 0,
@@ -157,7 +160,9 @@ export class Scripts {
   /** What makes a turn impossible on the real API for this request, in a sentence each. */
   problemsOf(script: ScriptRecord, turn: Turn, request: ModelRequest): string[] {
     const problems: string[] = [];
-    const offered = new Map(request.tools.filter((tool) => tool.name !== undefined).map((tool) => [tool.name as string, tool]));
+    const offered = new Map(
+      request.tools.filter((tool) => tool.name !== undefined).map((tool) => [tool.name as string, tool]),
+    );
     for (const call of turn.toolCalls ?? []) {
       const tool = offered.get(call.name);
       if (!tool) {
@@ -167,7 +172,8 @@ export class Scripts {
         );
         continue;
       }
-      if (request.toolChoice === "none") problems.push(`${script.id} called \`${call.name}\`, but the request's tool_choice is "none"`);
+      if (request.toolChoice === "none")
+        problems.push(`${script.id} called \`${call.name}\`, but the request's tool_choice is "none"`);
       if (tool.strict === true && tool.parameters !== undefined && typeof call.arguments === "object") {
         const valid = this.#ajv.validate(tool.parameters as object, call.arguments);
         if (!valid) {

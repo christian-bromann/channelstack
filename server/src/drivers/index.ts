@@ -16,9 +16,6 @@ export const DRIVERS: readonly DriverDefinition[] = [echo, slack, github, linear
 /** The channels people test against: every driver but channelstack's own (`echo`) and the providers, in this order everywhere. */
 export const CHANNELS: readonly DriverDefinition[] = DRIVERS.filter((driver) => !driver.internal && !driver.provider);
 
-/** The fakes the agent calls that aren't channels: the fake OpenAI (decision 0029). */
-export const PROVIDERS: readonly DriverDefinition[] = DRIVERS.filter((driver) => driver.provider);
-
 /** Each channel's name, for a CLI argument or a script's loop. */
 export const CHANNEL_NAMES: readonly string[] = CHANNELS.map((channel) => channel.name);
 

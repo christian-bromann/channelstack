@@ -1,13 +1,20 @@
 import { type Context, Hono } from "hono";
 
 import { bodyOf } from "../../core/fake/endpoint.ts";
-import { recordCall } from "../../core/router/inspect.ts";
 import type { DriverContext } from "../../core/router/index.ts";
+import { recordCall } from "../../core/router/inspect.ts";
 import { constantTimeEqual } from "../../core/signing/hmac.ts";
 import { type SseFrame, sseStream, type StreamBreak } from "../../core/stream/index.ts";
 import { chatDialect } from "./codecs/answer.ts";
 import { chatCompletion, chatErrorFrames, chatFrames, type ChatMeta } from "./codecs/chat.ts";
-import { finalStatus, outputItems, responseErrorFrames, responseFrames, type ResponseMeta, responseObject } from "./codecs/responses.ts";
+import {
+  finalStatus,
+  outputItems,
+  responseErrorFrames,
+  responseFrames,
+  type ResponseMeta,
+  responseObject,
+} from "./codecs/responses.ts";
 import { invalidRequest, notFound, OpenAIError, scriptedError } from "./errors.ts";
 import { OPENAI_IDS } from "./ids.ts";
 import { defaultRateHeaders } from "./rate-limit.ts";
@@ -19,12 +26,25 @@ import type { CallRecord, OpenAIWorld } from "./world.ts";
 const OPENAI_VERSION = "2020-10-01";
 
 /** The models `GET /v1/models` lists: current OpenAI ids, plus every name the agent used. Any name is answered. */
-const MODELS = ["gpt-5.1", "gpt-5.1-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini", "o4-mini", "o3"];
+const MODELS = [
+  "gpt-5.1",
+  "gpt-5.1-mini",
+  "gpt-5",
+  "gpt-5-mini",
+  "gpt-5-nano",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "o4-mini",
+  "o3",
+];
 /** When the listed models were made: before any test. */
 const MODEL_CREATED = 1_735_689_600;
 
 type Json = Record<string, unknown>;
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Json =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The fake OpenAI's HTTP API: what the agent calls. */
 export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hono {
@@ -90,7 +110,13 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         path: new URL(c.req.url).pathname.replace(/^\/openai(?=\/)/, ""),
         request: call.body,
         responseStatus: call.status,
-        response: call.answer ? { text: call.answer.text, toolCalls: call.answer.toolCalls.map(({ name }) => name), finish: call.answer.finish } : undefined,
+        response: call.answer
+          ? {
+              text: call.answer.text,
+              toolCalls: call.answer.toolCalls.map(({ name }) => name),
+              finish: call.answer.finish,
+            }
+          : undefined,
         error: call.error,
         durationMs: call.durationMs ?? 0,
       },
@@ -175,9 +201,18 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     const { answer, turn, script } = outcome;
     call.answer = answer;
     const created = Math.floor(startedAt / 1000);
-    const chatMeta: ChatMeta = { id: call.id, created, model: request.model, fingerprint, dialect: chatDialect(request, body) };
+    const chatMeta: ChatMeta = {
+      id: call.id,
+      created,
+      model: request.model,
+      fingerprint,
+      dialect: chatDialect(request, body),
+    };
     const store = endpoint === "responses" && body.store !== false;
-    const encrypted = request.includes.includes("reasoning.encrypted_content") && answer.reasoning ? `gAAAAA${ids.next(OPENAI_IDS.held).slice(5)}${answer.reasoning.itemId.slice(3)}` : undefined;
+    const encrypted =
+      request.includes.includes("reasoning.encrypted_content") && answer.reasoning
+        ? `gAAAAA${ids.next(OPENAI_IDS.held).slice(5)}${answer.reasoning.itemId.slice(3)}`
+        : undefined;
     const responseMeta: ResponseMeta = {
       id: call.id,
       created,
@@ -193,7 +228,11 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     /** A finished Responses answer is stored, and its conversation grows by its input and output. */
     const keep = () => {
       if (endpoint !== "responses") return;
-      const own = inputItems(body.input).map((item) => (item.id === undefined && (item.type ?? "message") === "message" ? { ...item, id: ids.next(OPENAI_IDS.message) } : item));
+      const own = inputItems(body.input).map((item) =>
+        item.id === undefined && (item.type ?? "message") === "message"
+          ? { ...item, id: ids.next(OPENAI_IDS.message) }
+          : item,
+      );
       const output = outputItems(answer, responseMeta);
       const conversation = normalised.history?.conversation;
       if (conversation) {
@@ -201,7 +240,8 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
         conversation.session ??= call.session;
       }
       if (store) {
-        const history = normalised.history?.previous === undefined ? [] : (world.store.history(normalised.history.previous) ?? []);
+        const history =
+          normalised.history?.previous === undefined ? [] : (world.store.history(normalised.history.previous) ?? []);
         world.store.keep({
           id: call.id,
           session: call.session,
@@ -219,11 +259,17 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       done({ status: 200 });
       const headers = common(call.session, startedAt);
       for (const [name, value] of Object.entries(headers)) c.header(name, value);
-      return c.json(endpoint === "chat.completions" ? chatCompletion(answer, chatMeta) : responseObject(answer, responseMeta, finalStatus(answer)));
+      return c.json(
+        endpoint === "chat.completions"
+          ? chatCompletion(answer, chatMeta)
+          : responseObject(answer, responseMeta, finalStatus(answer)),
+      );
     }
 
     const frames: SseFrame[] =
-      endpoint === "chat.completions" ? chatFrames(answer, chatMeta, request.includeUsage) : responseFrames(answer, responseMeta);
+      endpoint === "chat.completions"
+        ? chatFrames(answer, chatMeta, request.includeUsage)
+        : responseFrames(answer, responseMeta);
     let breaking: StreamBreak | undefined;
     if (turn.failAfter !== undefined) {
       const { chunks, how } = turn.failAfter;
@@ -279,13 +325,22 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   };
 
   const chat = (c: Context, model?: string) =>
-    answerCall(c, "chat.completions", (body) => ({ request: chatRequest(body, c.req.raw.headers) }), model === undefined ? {} : { model });
+    answerCall(
+      c,
+      "chat.completions",
+      (body) => ({ request: chatRequest(body, c.req.raw.headers) }),
+      model === undefined ? {} : { model },
+    );
 
   const responses = (c: Context) =>
     answerCall(c, "responses", (body) => {
       const previous = typeof body.previous_response_id === "string" ? body.previous_response_id : undefined;
       const conversationId =
-        typeof body.conversation === "string" ? body.conversation : isObject(body.conversation) && typeof body.conversation.id === "string" ? body.conversation.id : undefined;
+        typeof body.conversation === "string"
+          ? body.conversation
+          : isObject(body.conversation) && typeof body.conversation.id === "string"
+            ? body.conversation.id
+            : undefined;
       if (previous !== undefined && conversationId !== undefined) {
         throw invalidRequest(
           "Mutually exclusive parameters: Ensure you are only providing one of: 'previous_response_id' or 'conversation'.",
@@ -298,18 +353,30 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
       if (previous !== undefined) {
         const found = world.store.history(previous);
         if (found === undefined) {
-          throw invalidRequest(`Previous response with id '${previous}' not found.`, "previous_response_id", "previous_response_not_found");
+          throw invalidRequest(
+            `Previous response with id '${previous}' not found.`,
+            "previous_response_id",
+            "previous_response_not_found",
+          );
         }
         history = found;
       }
       if (conversationId !== undefined) {
         conversation = world.store.conversations.get(conversationId);
-        if (!conversation) throw new OpenAIError(404, { message: `Conversation with id '${conversationId}' not found.`, type: "invalid_request_error", param: "conversation" });
+        if (!conversation)
+          throw new OpenAIError(404, {
+            message: `Conversation with id '${conversationId}' not found.`,
+            type: "invalid_request_error",
+            param: "conversation",
+          });
         history = conversation.items;
       }
       return {
         request: responsesRequest(body, c.req.raw.headers, history),
-        history: { ...(previous === undefined ? {} : { previous }), ...(conversation === undefined ? {} : { conversation }) },
+        history: {
+          ...(previous === undefined ? {} : { previous }),
+          ...(conversation === undefined ? {} : { conversation }),
+        },
       };
     });
 
@@ -324,7 +391,11 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     return c.json(body, status as 200);
   };
   const missing = (c: Context, message: string, param: string | null = null) =>
-    errorResponse(c, new OpenAIError(404, { message, type: "invalid_request_error", param }), common(undefined, clock()));
+    errorResponse(
+      c,
+      new OpenAIError(404, { message, type: "invalid_request_error", param }),
+      common(undefined, clock()),
+    );
 
   v1.get("/responses/:id", (c) => {
     const stored = world.store.responses.get(c.req.param("id"));
@@ -356,7 +427,9 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   });
   v1.get("/conversations/:id", (c) => {
     const conversation = world.store.conversations.get(c.req.param("id"));
-    return conversation ? plain(c, conversationWire(conversation)) : missing(c, `Conversation with id '${c.req.param("id")}' not found.`);
+    return conversation
+      ? plain(c, conversationWire(conversation))
+      : missing(c, `Conversation with id '${c.req.param("id")}' not found.`);
   });
   v1.post("/conversations/:id", async (c) => {
     const conversation = world.store.conversations.get(c.req.param("id"));
@@ -402,13 +475,22 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
   v1.get("/models", (c) =>
     plain(c, {
       object: "list",
-      data: [...new Set([...MODELS, ...seen])].map((id) => ({ id, object: "model", created: MODEL_CREATED, owned_by: "system" })),
+      data: [...new Set([...MODELS, ...seen])].map((id) => ({
+        id,
+        object: "model",
+        created: MODEL_CREATED,
+        owned_by: "system",
+      })),
     }),
   );
-  v1.get("/models/:model", (c) => plain(c, { id: c.req.param("model"), object: "model", created: MODEL_CREATED, owned_by: "system" }));
+  v1.get("/models/:model", (c) =>
+    plain(c, { id: c.req.param("model"), object: "model", created: MODEL_CREATED, owned_by: "system" }),
+  );
 
   const withId = (item: InputItem): InputItem =>
-    item.id === undefined ? { ...item, id: ids.next(OPENAI_IDS.message), ...(item.type === undefined ? { type: "message" } : {}) } : item;
+    item.id === undefined
+      ? { ...item, id: ids.next(OPENAI_IDS.message), ...(item.type === undefined ? { type: "message" } : {}) }
+      : item;
   const conversationWire = (conversation: Conversation) => ({
     id: conversation.id,
     object: "conversation",
@@ -430,7 +512,9 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     return chat(c, c.req.param("deployment"));
   });
 
-  api.all("*", (c) => errorResponse(c, notFound(c.req.method, new URL(c.req.url).pathname), common(undefined, clock())));
+  api.all("*", (c) =>
+    errorResponse(c, notFound(c.req.method, new URL(c.req.url).pathname), common(undefined, clock())),
+  );
   return api;
 }
 

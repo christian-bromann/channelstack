@@ -47,7 +47,8 @@ export function chatCompletion(answer: Answer, meta: ChatMeta): Record<string, u
         index: 0,
         message: {
           role: "assistant",
-          content: answer.refusal === undefined && (answer.text !== "" || answer.toolCalls.length === 0) ? answer.text : null,
+          content:
+            answer.refusal === undefined && (answer.text !== "" || answer.toolCalls.length === 0) ? answer.text : null,
           refusal: answer.refusal ?? null,
           ...(answer.toolCalls.length > 0 ? { tool_calls: answer.toolCalls.map(toolCallWire) } : {}),
           annotations: [],
@@ -64,7 +65,12 @@ export function chatCompletion(answer: Answer, meta: ChatMeta): Record<string, u
 }
 
 /** One `chat.completion.chunk` with this delta. */
-function chunk(meta: ChatMeta, delta: Record<string, unknown>, finish: string | null, usage: boolean): SseFrame["data"] {
+function chunk(
+  meta: ChatMeta,
+  delta: Record<string, unknown>,
+  finish: string | null,
+  usage: boolean,
+): SseFrame["data"] {
   return JSON.stringify({
     id: meta.id,
     object: "chat.completion.chunk",
@@ -84,13 +90,15 @@ function chunk(meta: ChatMeta, delta: Record<string, unknown>, finish: string | 
  */
 export function chatFrames(answer: Answer, meta: ChatMeta, includeUsage: boolean): SseFrame[] {
   const frames: SseFrame[] = [];
-  const data = (delta: Record<string, unknown>, finish: string | null = null) => chunk(meta, delta, finish, includeUsage);
+  const data = (delta: Record<string, unknown>, finish: string | null = null) =>
+    chunk(meta, delta, finish, includeUsage);
   frames.push({ data: data({ role: "assistant", content: "", refusal: null }) });
   for (const piece of answer.reasoning?.summary ?? []) {
     if (meta.dialect !== "openai") frames.push({ data: data(reasoningField(meta.dialect, piece)), content: true });
   }
   if (answer.refusal !== undefined) {
-    for (const piece of answer.refusal.match(/[\s\S]{1,4}/g) ?? []) frames.push({ data: data({ refusal: piece }), content: true });
+    for (const piece of answer.refusal.match(/[\s\S]{1,4}/g) ?? [])
+      frames.push({ data: data({ refusal: piece }), content: true });
   } else {
     for (const piece of answer.chunks) frames.push({ data: data({ content: piece }), content: true });
   }
@@ -101,7 +109,8 @@ export function chatFrames(answer: Answer, meta: ChatMeta, includeUsage: boolean
         : { index, id: call.id, type: "function", function: { name: call.name, arguments: "" } };
     frames.push({ data: data({ tool_calls: [opening] }), content: true });
     for (const piece of call.kind === "custom" ? [call.arguments] : jsonChunks(call.arguments)) {
-      const more = call.kind === "custom" ? { index, custom: { input: piece } } : { index, function: { arguments: piece } };
+      const more =
+        call.kind === "custom" ? { index, custom: { input: piece } } : { index, function: { arguments: piece } };
       frames.push({ data: data({ tool_calls: [more] }), content: true });
     }
   });

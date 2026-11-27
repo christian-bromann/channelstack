@@ -16,6 +16,20 @@ module.exports = {
       to: { path: "^server/src/drivers/" },
     },
     {
+      name: "core-doesnt-import-providers",
+      comment: "Providers register themselves with core, as drivers do (decision 0029).",
+      severity: "error",
+      from: { path: "^server/src/core/" },
+      to: { path: "^server/src/providers/" },
+    },
+    {
+      name: "providers-and-drivers-dont-import-each-other",
+      comment: "A provider isn't a channel: what both need lives in server/src/core/.",
+      severity: "error",
+      from: { path: "^server/src/(providers|drivers)/([^/]+)/" },
+      to: { path: "^server/src/(providers|drivers)/[^/]+/", pathNot: "^server/src/$1/$2/" },
+    },
+    {
       name: "generated-is-private-to-its-sdk",
       comment: "Nothing imports generated/ except the SDK it belongs to.",
       severity: "error",

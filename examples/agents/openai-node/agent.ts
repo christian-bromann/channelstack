@@ -39,7 +39,8 @@ const model: Model = {
           await onText(delta.content);
         }
         for (const part of delta?.tool_calls ?? []) {
-          const call = (calls[part.index] ??= { id: "", name: "", arguments: "" });
+          const call = calls[part.index] ?? { id: "", name: "", arguments: "" };
+          calls[part.index] = call;
           if (part.id) call.id = part.id;
           if (part.function?.name) call.name = part.function.name;
           call.arguments += part.function?.arguments ?? "";
@@ -49,7 +50,11 @@ const model: Model = {
       messages.push({
         role: "assistant",
         content: text === "" ? null : text,
-        tool_calls: calls.map((call) => ({ id: call.id, type: "function", function: { name: call.name, arguments: call.arguments } })),
+        tool_calls: calls.map((call) => ({
+          id: call.id,
+          type: "function",
+          function: { name: call.name, arguments: call.arguments },
+        })),
       });
       for (const call of calls) {
         let args: unknown;

@@ -195,7 +195,11 @@ class SpecError extends Error {
 }
 
 /** A responder binding, checked: its flag is a boolean option the SDK sets itself. */
-function responderOf(responder: Json | undefined, options: IrParam[], where: string): { responder: NonNullable<IrMethod["responder"]> } | undefined {
+function responderOf(
+  responder: Json | undefined,
+  options: IrParam[],
+  where: string,
+): { responder: NonNullable<IrMethod["responder"]> } | undefined {
   if (responder === undefined) return undefined;
   const { flag, held, answer, request } = responder;
   if ([flag, held, answer, request].some((value) => typeof value !== "string")) {
