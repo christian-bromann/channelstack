@@ -2,7 +2,7 @@ import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { createTwilioFake } from "./fake/index.ts";
 import { TWILIO_IDS } from "./ids.ts";
 import { TwilioRestClient } from "./live/client.ts";
-import { deleteMessage, twilioMaintenance } from "./live/maintenance.ts";
+import { deleteMessages, twilioMaintenance } from "./live/maintenance.ts";
 import { createLiveTwilioWorld } from "./live/world.ts";
 import { registerTwilioRoutes } from "./routes.ts";
 import { TWILIO_PERSON_TOKEN, TWILIO_SECRETS } from "./secrets.ts";
@@ -39,11 +39,11 @@ export const twilio: DriverDefinition = {
       ? createLiveTwilioWorld({ client, live: context.live, clock: context.clock, appName: fake.store.app.name })
       : undefined;
     if (live) {
-      // A session's messages are deleted, each with the credential of the account it is on.
+      // A session's messages are deleted, on each account they are on, with its credential.
       context.live.ledger.onCleanup("twilio", async (entry) => {
         const credential = live.credential(entry.by, entry.session);
         if (!credential) throw new Error(`no credential for ${entry.by}`);
-        await deleteMessage(client, credential, entry.ref.sid ?? "");
+        await deleteMessages(client, credential, entry);
       });
     }
     return {

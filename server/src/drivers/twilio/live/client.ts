@@ -1,6 +1,7 @@
 import { RATE_LIMIT_RETRIES, systemTimers, type Timers, waitRetryAfter } from "../../../core/clock/index.ts";
 import { LivePlatformRefusal } from "../../../core/errors/index.ts";
 import type { LiveCredential } from "../../../core/secrets/index.ts";
+import type { TwilioMessageStatus } from "../world.ts";
 
 /** Twilio's REST API. */
 export const TWILIO_API = "https://api.twilio.com";
@@ -10,6 +11,25 @@ export const TWILIO_API = "https://api.twilio.com";
  * the pair basic auth sends; the SID before the colon is no secret.
  */
 export const accountOf = (credential: LiveCredential): string => credential.reveal().split(":")[0] ?? "";
+
+/** A Message resource, as the REST API answers it: what live mode reads of it. */
+export interface WireMessage {
+  sid: string;
+  account_sid: string;
+  from: string;
+  to: string;
+  body: string | null;
+  status: TwilioMessageStatus;
+  direction: string;
+  error_code: number | null;
+  num_segments: string | null;
+  num_media: string | null;
+  date_created: string;
+  date_sent: string | null;
+}
+
+/** A day as Twilio's `DateSent>` filter takes it, in UTC. */
+const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Twilio refusing a call, with its error code as the refusal's (`21211`, `20003`). */
 export class TwilioRefusal extends LivePlatformRefusal {}
@@ -71,5 +91,16 @@ export class TwilioRestClient {
       }
       return answer as T;
     }
+  }
+
+  /** The messages from one number to another on the account a credential opens, made since `after`. */
+  async messagesBetween(credential: LiveCredential, from: string, to: string, after: number): Promise<WireMessage[]> {
+    const query = new URLSearchParams({ From: from, To: to, "DateSent>": day(after), PageSize: "1000" });
+    const { messages = [] } = await this.call<{ messages?: WireMessage[] }>(
+      credential,
+      "GET",
+      `/Messages.json?${query}`,
+    );
+    return messages.filter((message) => (Date.parse(message.date_created) || 0) >= after);
   }
 }

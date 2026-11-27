@@ -1,3 +1,4 @@
+import type { LedgerEntry } from "../../../core/ledger/index.ts";
 import { credentialChecks, liveCredentials, sweepLedger } from "../../../core/maintenance/index.ts";
 import type { LiveMaintenance } from "../../../core/router/index.ts";
 import { Allowlist } from "../../../core/safety/index.ts";
@@ -31,8 +32,8 @@ const numberOf = (env: Env, owner: string) =>
 
 /**
  * `channelstack doctor` and `channelstack sweep` for Twilio, from the credentials in the
- * environment. Texts carry no tag a sweep could find them by, so the sweep is the ledger's: each
- * message a crashed run saw is deleted with the credential of the account it is on.
+ * environment. Texts carry no tag a sweep could find them by, so the sweep is the ledger's: the
+ * messages between each pair of numbers a crashed run texted are deleted on each account they are on.
  */
 export const twilioMaintenance: LiveMaintenance = {
   async doctor({ env, fetch, apiBase }) {
@@ -57,22 +58,32 @@ export const twilioMaintenance: LiveMaintenance = {
     return sweepLedger(entries, {
       allowlist,
       check,
-      describe: (entry) => `message ${entry.ref.sid ?? ""}`,
+      describe: (entry) => `messages from ${entry.ref.from ?? ""} to ${entry.ref.to ?? ""}`,
       remove: async (entry) => {
         const credential = byOwner(entry.by);
         if (!credential) throw new Error(`no credential for ${entry.by} in the environment`);
-        await deleteMessage(client, asAccount(env, credential), entry.ref.sid ?? "");
+        await deleteMessages(client, asAccount(env, credential), entry);
       },
     });
   },
 };
 
-/** Delete a message: one already gone is fine, since a session's cleanup or a sweep may have been first. */
-export async function deleteMessage(client: TwilioRestClient, credential: LiveCredential, sid: string): Promise<void> {
-  try {
-    await client.call(credential, "DELETE", `/Messages/${sid}.json`);
-  } catch (error) {
-    if (error instanceof TwilioRefusal && error.code === "20404") return;
-    throw error;
+/**
+ * Delete what a ledger entry names: every message from one number to another on the account the
+ * credential opens, made since its session began. One already gone is fine: a session's cleanup
+ * or a sweep may have been first.
+ */
+export async function deleteMessages(
+  client: TwilioRestClient,
+  credential: LiveCredential,
+  entry: Pick<LedgerEntry, "ref">,
+): Promise<void> {
+  const { from = "", to = "", since = "0" } = entry.ref;
+  for (const { sid } of await client.messagesBetween(credential, from, to, Number(since))) {
+    try {
+      await client.call(credential, "DELETE", `/Messages/${sid}.json`);
+    } catch (error) {
+      if (!(error instanceof TwilioRefusal && error.code === "20404")) throw error;
+    }
   }
 }

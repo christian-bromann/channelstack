@@ -313,6 +313,9 @@ describe("a person texts the agent", () => {
     // It isn't the agent's answer.
     expect(transcript.entries.at(-1)?.author).toEqual({ id: "twilio", name: "Twilio", kind: "app" });
     expectRefusal(await api("POST", "/Messages.json", { To: ana.number, From: app.number, Body: "hi" }), 400, 21610);
+    // The refusal is on record for the test whose person it was for.
+    const refused = (await control("GET", "/calls?error=true")).body;
+    expect(refused).toMatchObject([{ operation: "messages.create", error: "21610", request: { To: ana.number } }]);
     await control("POST", `/users/${ana.id}/text`, { body: "START", to: app.id });
     await h.app.settled();
     expect((await call("POST", "/Messages.json", { To: ana.number, From: app.number, Body: "hi" })).status).toBe(201);

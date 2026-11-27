@@ -149,8 +149,14 @@ export function createTwilioApi(
       const input = sendInput(body, new URLSearchParams(await c.req.text()));
       const who = caller(c);
       if (who.test) return { body: world.testSend(input, who.accountSid), sessions: [], status: 201 };
-      const { message, queued } = world.appSends(input);
-      return { body: queued, sessions: [world.sessionOf(message)], status: 201 };
+      try {
+        const { message, queued } = world.appSends(input);
+        return { body: queued, sessions: [world.sessionOf(message)], status: 201 };
+      } catch (error) {
+        // A refused text is on record for the test whose person it was for, so the test sees it.
+        if (!(error instanceof TwilioApiError)) throw error;
+        return { ...errorAnswer(error.status, error.code, error.message), sessions: [world.sessionOfNumber(input.to)] };
+      }
     },
     { form: true },
   );

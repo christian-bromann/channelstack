@@ -8,33 +8,14 @@ import { LiveCredential } from "../../../core/secrets/index.ts";
 import type { TwilioWorld } from "../backend.ts";
 import { TwilioStore } from "../fake/store.ts";
 import { isTwilioAnswer, optOutTypeOf } from "../sms.ts";
-import type { TwilioMessageRecord, TwilioMessageStatus } from "../world.ts";
-import { accountOf, type TwilioRestClient } from "./client.ts";
+import type { TwilioMessageRecord } from "../world.ts";
+import { accountOf, type TwilioRestClient, type WireMessage } from "./client.ts";
 import { checkTwilioCredential, identifyTwilio } from "./identity.ts";
 
 /** Reading the people's messages again more often than this is a waste: the agent takes seconds to answer. */
 const READ_CACHE_MS = 1_000;
 /** How far Twilio's clock may be from ours. */
 const CLOCK_SKEW_MS = 5_000;
-
-/** A Message resource, as the REST API answers it: what the live world reads of it. */
-interface WireMessage {
-  sid: string;
-  account_sid: string;
-  from: string;
-  to: string;
-  body: string | null;
-  status: TwilioMessageStatus;
-  direction: string;
-  error_code: number | null;
-  num_segments: string | null;
-  num_media: string | null;
-  date_created: string;
-  date_sent: string | null;
-}
-
-/** A day as Twilio's `DateSent>` filter takes it, in UTC. */
-const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /**
  * The live Twilio world: the agent's number is a real one on its account, and each person is
@@ -60,19 +41,25 @@ export function createLiveTwilioWorld(deps: {
   const read = new Map<string, number>();
   /** When each session's first person joined: older messages are an earlier run's, so they are neither read nor shown. */
   const since = new Map<string, number>();
-  /** The messages on the ledger, by SID, with their session: each once, whichever account listed it. */
-  const ledgered = new Map<string, string>();
+  /** The copies on the ledger, by `<session> <account> <from> <to>`: each set once. */
+  const ledgered = new Set<string>();
   let app: LiveCredential | undefined;
 
-  /** Put a message on the ledger once, to be deleted with the credential of the account it is on. */
-  const ledger = (session: string, sid: string, number: string, credential: LiveCredential) => {
-    if (ledgered.has(sid)) return;
-    ledgered.set(sid, session);
+  /**
+   * Put on the ledger, once, every message from one number to another on the account a credential
+   * opens, since the session began: each copy of a text is a message of its own on each account,
+   * and those that arrive later (the agent's answers, the copy at the recipient's) are found when
+   * the ledger deletes them, not by what a read happened to see.
+   */
+  const ledger = (session: string, credential: LiveCredential, from: string, to: string) => {
+    const key = `${session} ${accountOf(credential)} ${from} ${to}`;
+    if (ledgered.has(key)) return;
+    ledgered.add(key);
     live.ledger.record({
       channel: "twilio",
-      kind: "message",
-      ref: { sid, account: accountOf(credential) },
-      workspace: number,
+      kind: "messages",
+      ref: { account: accountOf(credential), from, to, since: String(since.get(session) ?? clock()) },
+      workspace: to,
       by: credential.owner,
       session,
     });
@@ -116,17 +103,6 @@ export function createLiveTwilioWorld(deps: {
       delivery: undefined,
     };
     return store.keep(message, session);
-  };
-
-  /** The messages from one number to another on the account a credential opens, since the session began. */
-  const listed = async (credential: LiveCredential, from: string, to: string, after: number) => {
-    const query = new URLSearchParams({ From: from, To: to, "DateSent>": day(after), PageSize: "100" });
-    const { messages = [] } = await client.call<{ messages?: WireMessage[] }>(
-      credential,
-      "GET",
-      `/Messages.json?${query}`,
-    );
-    return messages.filter((message) => (Date.parse(message.date_created) || 0) >= after);
   };
 
   let readying: Promise<void> | undefined;
@@ -190,20 +166,25 @@ export function createLiveTwilioWorld(deps: {
       input: { to: string; body: string; media: readonly string[] },
     ) {
       live.allowlist.assert(input.to, `the number ${input.to}`);
-      if (input.to === store.app.number && optOutTypeOf(input.body) === "STOP") {
-        throw unsupportedInLive(
-          "texting STOP to the agent",
-          "the sandbox number would stay opted out of the agent's for every later run",
-        );
+      if (optOutTypeOf(input.body) === "STOP") {
+        throw unsupportedInLive("texting STOP", "the sandbox number would stay opted out for every later run");
       }
       const credential = people.actingAs(session, person.id, () => fakeActorInLiveWorld(person.name, "twilio"));
+      const recipient =
+        input.to === store.app.number ? app : people.of(session).find(({ id }) => id === input.to)?.credential;
       const sent = await client.call<WireMessage>(credential, "POST", "/Messages.json", {
         To: input.to,
         From: person.number,
         Body: input.body,
         MediaUrl: input.media,
       });
-      ledger(session, sent.sid, person.number, credential);
+      // The person's text on their account and at the recipient's; to the agent, its answers on both too.
+      ledger(session, credential, person.number, input.to);
+      if (recipient) ledger(session, recipient, person.number, input.to);
+      if (recipient && input.to === store.app.number) {
+        ledger(session, credential, store.app.number, person.number);
+        ledger(session, recipient, store.app.number, person.number);
+      }
       return mirror(session, sent);
     },
 
@@ -215,25 +196,15 @@ export function createLiveTwilioWorld(deps: {
     /**
      * Read back, for each person of the session, what reached them from the agent: the inbound copy
      * on their own account (with the agent's number on the same account, its outbound copy is
-     * listed there too, and is only put on the ledger). Then the agent's copies of both directions,
-     * on its account, onto the ledger as well: each copy is a message of its own, deleted on its own.
+     * listed there too). The ledger has every copy already, by its numbers.
      */
     async refresh(session: string) {
       if (clock() - (read.get(session) ?? 0) < READ_CACHE_MS) return;
       read.set(session, clock());
       const after = since.get(session) ?? clock();
-      const agent = app;
       for (const { id: number, credential } of people.of(session)) {
-        for (const wire of await listed(credential, store.app.number, number, after)) {
-          ledger(session, wire.sid, number, credential);
+        for (const wire of await client.messagesBetween(credential, store.app.number, number, after)) {
           if (wire.direction === "inbound") mirror(session, wire);
-        }
-        if (!agent) continue;
-        for (const [from, to] of [
-          [number, store.app.number],
-          [store.app.number, number],
-        ] as const) {
-          for (const wire of await listed(agent, from, to, after)) ledger(session, wire.sid, store.app.number, agent);
         }
       }
     },
@@ -245,7 +216,7 @@ export function createLiveTwilioWorld(deps: {
       people.leave(session);
       read.delete(session);
       since.delete(session);
-      for (const [sid, owner] of ledgered) if (owner === session) ledgered.delete(sid);
+      for (const key of ledgered) if (key.startsWith(`${session} `)) ledgered.delete(key);
       store.messages.release(session);
       store.users.release(session);
       store.conversations.release(session);

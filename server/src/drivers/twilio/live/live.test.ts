@@ -130,6 +130,25 @@ describe("exit check 10.7: Twilio live", () => {
     expect(answer.author).toEqual({ id: "twilio", name: "Twilio", kind: "app" });
   });
 
+  test("a text between two people: both copies are deleted, and STOP isn't sent to a person either", async () => {
+    const stub = twilioStub();
+    const ana = stub.account("ana", ["+14155550101"]);
+    const ben = stub.account("ben", ["+14155550102"]);
+    const twilio = await liveTwilio(stub, `${AGENT_NUMBER},+14155550101,+14155550102`).open();
+    await twilio("GET", "");
+    const anaUser = (await twilio("POST", "/users", { name: "Ana", token: ana.credential })).body;
+    const benUser = (await twilio("POST", "/users", { name: "Ben", token: ben.credential })).body;
+    const user = `/users/${encodeURIComponent(anaUser.id)}`;
+    expect((await twilio("POST", `${user}/text`, { body: "STOP", to: benUser.id })).body.error).toBe(
+      "unsupported_in_live",
+    );
+    await twilio("POST", `${user}/text`, { body: "Lunch?", to: benUser.id });
+    // Ana's outbound copy on her account, and Ben's inbound copy on his.
+    expect(stub.messages.map((message) => message.account).sort()).toEqual([ana.sid, ben.sid].sort());
+    await twilio.close();
+    expect(stub.messages).toEqual([]);
+  });
+
   test("a person whose account has two allowlisted numbers names theirs", async () => {
     const stub = twilioStub();
     const shared = stub.account("shared", ["+14155550102", "+14155550103"]);
@@ -172,13 +191,14 @@ describe("exit check 10.7: Twilio live", () => {
   test("the sweep deletes what a crashed run's ledger lists, with the account each is on", async () => {
     const stub = twilioStub();
     const ana = stub.account("ana", ["+14155550101"]);
+    const since = String(Date.now() - 60_000);
     stub.agentReplies("+14155550101", "Left behind.");
-    const [atAgent, atAna] = stub.messages;
-    const entry = (sid: string, by: string, workspace: string) => ({
-      id: sid,
+    // The agent's answer: on its account, and the copy at Ana's.
+    const entry = (by: string, workspace: string) => ({
+      id: by,
       channel: "twilio",
-      kind: "message",
-      ref: { sid },
+      kind: "messages",
+      ref: { from: AGENT_NUMBER, to: "+14155550101", since },
       workspace,
       by,
       run: "crashed",
@@ -190,7 +210,7 @@ describe("exit check 10.7: Twilio live", () => {
         CHANNELSTACK_TWILIO_USER_ANA_TOKEN: ana.credential,
         CHANNELSTACK_LIVE_TWILIO_NUMBERS: `${AGENT_NUMBER},+14155550101`,
       }),
-      entries: [entry(atAgent?.sid ?? "", "app", AGENT_NUMBER), entry(atAna?.sid ?? "", "user:ANA", "+14155550101")],
+      entries: [entry("app", "+14155550101"), entry("user:ANA", "+14155550101")],
       run: undefined,
       olderThanMs: 0,
       now: Date.now(),

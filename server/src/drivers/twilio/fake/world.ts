@@ -431,6 +431,15 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
     /** The session an agent's call touched: the message's. */
     sessionOf: (message: TwilioMessageRecord) => store.messages.owner(message.id),
 
+    /** The session a number belongs to: its person's, or that of the agent's conversation with it. */
+    sessionOfNumber: (number: string | undefined) => {
+      if (number === undefined) return undefined;
+      const person = store.personAt(number);
+      if (person) return store.users.owner(person.id);
+      const conversation = store.conversationOf(store.app.number, number);
+      return conversation && store.conversations.owner(conversation.id);
+    },
+
     resend: (session: string, id: string, options: { badSignature: boolean }) =>
       deliveries.resend(session, id, options),
     /** Twilio's retry of a webhook: the same request, the same idempotency token, its TwiML acted on. */
