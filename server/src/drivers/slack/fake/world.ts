@@ -922,7 +922,7 @@ export function createFakeWorld(
     action,
     hears,
     emit: (conversation, subscription, event) => builtInDelivery(emitTo(conversation, subscription, event, store.app)),
-    transport: () => socket.of(store.app).transport(),
+    transport: (app = store.app) => socket.of(app).transport(),
     directMessage: (session, userId) => open(session, userId, [store.app.botUserId]),
     replyAsUser: (...args) => world.replyAsUser(...args),
   };

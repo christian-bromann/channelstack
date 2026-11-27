@@ -174,6 +174,30 @@ describe("exit check 12.3: Slack apps", () => {
     );
   });
 
+  test("a button on another app's message is that app's: the click goes to it alone, and it answers as itself", async () => {
+    const { h, mine, theirs, post, app, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id] });
+    const blocks = [
+      {
+        type: "actions",
+        elements: [{ type: "button", action_id: "merge", text: { type: "plain_text", text: "Merge" } }],
+      },
+    ];
+    const ask = await web("chat.postMessage", { channel: channel.id, text: "Merge #12?", blocks }, coder.botToken);
+    await h.app.settled();
+    const before = mine.received.length;
+
+    await post(`/users/${ana.id}/click`, { button: { label: "Merge" }, message: { channel: channel.id, ts: ask.ts } });
+    await h.app.settled();
+
+    expect(mine.received.length).toBe(before);
+    const click = theirs.received.at(-1);
+    const payload = JSON.parse(new URLSearchParams(click?.body).get("payload") ?? "{}");
+    expect(payload).toMatchObject({ type: "block_actions", api_app_id: coder.id, actions: [{ action_id: "merge" }] });
+    expect(payload.token).toBe(h.secrets.forApp("slack", "coder", "verificationToken"));
+  });
+
   test("a person and an app of one session can't share a name", async () => {
     const { post } = await twoApps();
     expect(await refusal(post("/users", { name: "coder" }))).toBe("invalid_argument");

@@ -28,6 +28,8 @@ export interface SlackFault {
 /** A `response_url`: where the app answers one interaction, a few times, for a while. */
 export interface SlackResponseUrl {
   readonly session: string;
+  /** The app the interaction went to, which answers through this URL. */
+  readonly app: string;
   readonly conversation: string;
   /** Who acted: an answer that isn't `in_channel` is for them alone. */
   readonly user: string;
