@@ -16,6 +16,7 @@ export class AlreadyInChannelError extends ChannelstackError {}
 export class AlreadyReactedError extends ChannelstackError {}
 export class CannotDmBotError extends ChannelstackError {}
 export class CannotEditOthersMessageError extends ChannelstackError {}
+export class CannotMessageUserError extends ChannelstackError {}
 export class CantDeleteMessageError extends ChannelstackError {}
 export class CantUpdateMessageError extends ChannelstackError {}
 export class CrossWorkspaceCredentialError extends ChannelstackError {}
@@ -58,6 +59,7 @@ const ERRORS: ErrorClasses = {
   already_reacted: AlreadyReactedError,
   cannot_dm_bot: CannotDmBotError,
   cannot_edit_others_message: CannotEditOthersMessageError,
+  cannot_message_user: CannotMessageUserError,
   cant_delete_message: CantDeleteMessageError,
   cant_update_message: CantUpdateMessageError,
   cross_workspace_credential: CrossWorkspaceCredentialError,
@@ -1114,6 +1116,19 @@ export interface DiscordGuild {
   name: string;
 }
 
+export type DiscordApps = DiscordApp[];
+
+export type DiscordAppsWire = DiscordAppData[];
+
+function decodeDiscordApps(ctx: HandleContext, data: DiscordAppsWire): DiscordApps {
+  return data.map((item) => new DiscordApp(ctx, item));
+}
+
+export interface DiscordMessageInput {
+  content?: string;
+  embeds?: unknown[];
+}
+
 export type DiscordUsers = DiscordUser[];
 
 export type DiscordUsersWire = DiscordUserData[];
@@ -1128,11 +1143,6 @@ export type DiscordChannelsWire = DiscordChannelData[];
 
 function decodeDiscordChannels(ctx: HandleContext, data: DiscordChannelsWire): DiscordChannels {
   return data.map((item) => new DiscordChannel(ctx, item));
-}
-
-export interface DiscordMessageInput {
-  content?: string;
-  embeds?: unknown[];
 }
 
 export interface DiscordButtonRef {
@@ -5555,6 +5565,20 @@ export class DiscordFixture {
     return decodeDiscordUsers(ctx, data);
   }
 
+  /** Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection. Experimental. */
+  async createApp(options: { name: string; privilegedIntents?: Array<"GUILD_MEMBERS" | "GUILD_PRESENCES" | "MESSAGE_CONTENT"> }): Promise<DiscordApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps`, { body: { name: options.name, privilegedIntents: options.privilegedIntents } })) as DiscordAppData;
+    return new DiscordApp(ctx, data);
+  }
+
+  /** The guild's apps: the built-in one first, then the others in the order they were made. Experimental. */
+  async apps(): Promise<DiscordApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/apps`)) as DiscordAppsWire;
+    return decodeDiscordApps(ctx, data);
+  }
+
   /** Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental. */
   async createChannel(options: { name?: string; participants?: Array<DiscordUser | DiscordApp>; readOnly?: boolean; topic?: string } = {}): Promise<DiscordChannel> {
     const ctx = this.#ctx;
@@ -5642,6 +5666,34 @@ export class DiscordApp {
     this.botToken = data.botToken;
     this.publicKey = data.publicKey;
     this.guildId = data.guildId;
+  }
+
+  /** An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007). Experimental. */
+  async say(text: string | DiscordMessageInput, options: { channel?: DiscordChannel; to?: DiscordUser | DiscordApp | Array<DiscordUser | DiscordApp> } = {}): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/say`, { body: { text: typeof text === "string" ? { content: text } : text, channel: options.channel === undefined ? undefined : options.channel.id, to: options.to === undefined ? undefined : [options.to].flat().map((item) => item.id) } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it. Experimental. */
+  async reply(text: string | DiscordMessageInput, options: { message: DiscordMessage }): Promise<DiscordMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/reply`, { body: { text: typeof text === "string" ? { content: text } : text, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordMessageData;
+    return new DiscordMessage(ctx, data);
+  }
+
+  /** An app a test made reacts to a message. Experimental. */
+  async react(emoji: string, options: { message: DiscordMessage }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/react`, { body: { emoji, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** An app a test made takes its reaction back. Experimental. */
+  async unreact(emoji: string, options: { message: DiscordMessage }): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/apps/${segment(this.id)}/unreact`, { body: { emoji, message: { channelId: options.message.channelId, id: options.message.id } } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -5744,10 +5796,10 @@ export class DiscordUser {
     await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/invite`, { body: { participants: [participants].flat().map((item) => item.id), channel: options.channel.id } });
   }
 
-  /** Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental. */
-  async runCommand(command: string, options: { channel: DiscordChannel }): Promise<DiscordDelivery | undefined> {
+  /** Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it. Experimental. */
+  async runCommand(command: string, options: { channel: DiscordChannel; app?: DiscordApp }): Promise<DiscordDelivery | undefined> {
     const ctx = this.#ctx;
-    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id } }))) as DiscordDeliveryData | null;
+    const data = (await retryWhile(["not_found"], () => ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/commands`, { body: { command, channel: options.channel.id, app: options.app === undefined ? undefined : options.app.id } }))) as DiscordDeliveryData | null;
     return (data === null ? undefined : new DiscordDelivery(ctx, data));
   }
 
@@ -5764,76 +5816,6 @@ export class DiscordUser {
     await untilQuiet(() => quietOf(ctx));
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/users/${segment(this.id)}/ephemeral`)) as DiscordEphemeralMessagesWire;
     return decodeDiscordEphemeralMessages(ctx, data);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
-/** Wire data of a {@link DiscordChannel}. */
-export interface DiscordChannelData {
-  id: string;
-  kind: "text" | "dm" | "public_thread";
-  channel: "discord";
-  name?: string;
-  parentId?: string;
-  starterId?: string;
-}
-
-export class DiscordChannel {
-  readonly id: string;
-  readonly kind: "text" | "dm" | "public_thread";
-  readonly channel: "discord";
-  readonly name: string | undefined;
-  readonly parentId: string | undefined;
-  readonly starterId: string | undefined;
-  readonly #ctx: HandleContext;
-  readonly #seen = new Map<string, number>();
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: DiscordChannelData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.kind = data.kind;
-    this.channel = data.channel;
-    this.name = data.name;
-    this.parentId = data.parentId;
-    this.starterId = data.starterId;
-  }
-
-  /** A channel's or thread's messages, oldest first. Experimental. */
-  async messages(): Promise<DiscordMessages> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/messages`)) as DiscordMessagesWire;
-    return decodeDiscordMessages(ctx, data);
-  }
-
-  /** Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental. */
-  async members(): Promise<DiscordMembers> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/members`)) as DiscordMembersWire;
-    return decodeDiscordMembers(ctx, data);
-  }
-
-  /** The threads in a channel. Experimental. */
-  async threads(): Promise<DiscordThreads> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/threads`)) as DiscordThreadsWire;
-    return decodeDiscordThreads(ctx, data);
-  }
-
-  /** A channel or thread as a person reads it, each thread under the message that starts it. Experimental. */
-  async transcript(options: { as?: DiscordUser | DiscordApp } = {}): Promise<DiscordTranscript> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as DiscordTranscriptWire;
-    return decodeDiscordTranscript(ctx, data);
-  }
-
-  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
-  async waitForMessage(options: { from?: DiscordUser | DiscordApp | string } & WaitOptions = {}): Promise<DiscordMessage> {
-    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -5925,7 +5907,14 @@ export class DiscordMessage {
     return decodeDiscordReactions(ctx, data);
   }
 
-  /** Every Gateway dispatch this message caused to the bot. Experimental. */
+  /** The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told. Experimental. */
+  async deliveryFor(app: DiscordApp): Promise<DiscordDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/delivery-for`, { query: { app: app.id } })) as DiscordDeliveryData | null;
+    return (data === null ? undefined : new DiscordDelivery(ctx, data));
+  }
+
+  /** Every Gateway dispatch this message caused to the apps' bots. Experimental. */
   async deliveries(): Promise<DiscordMessageDeliveries> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.channelId)}/messages/${segment(this.id)}/deliveries`)) as DiscordMessageDeliveriesWire;
@@ -5948,10 +5937,81 @@ export class DiscordMessage {
   }
 }
 
+/** Wire data of a {@link DiscordChannel}. */
+export interface DiscordChannelData {
+  id: string;
+  kind: "text" | "dm" | "public_thread";
+  channel: "discord";
+  name?: string;
+  parentId?: string;
+  starterId?: string;
+}
+
+export class DiscordChannel {
+  readonly id: string;
+  readonly kind: "text" | "dm" | "public_thread";
+  readonly channel: "discord";
+  readonly name: string | undefined;
+  readonly parentId: string | undefined;
+  readonly starterId: string | undefined;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: DiscordChannelData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.kind = data.kind;
+    this.channel = data.channel;
+    this.name = data.name;
+    this.parentId = data.parentId;
+    this.starterId = data.starterId;
+  }
+
+  /** A channel's or thread's messages, oldest first. Experimental. */
+  async messages(): Promise<DiscordMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/messages`)) as DiscordMessagesWire;
+    return decodeDiscordMessages(ctx, data);
+  }
+
+  /** Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental. */
+  async members(): Promise<DiscordMembers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/members`)) as DiscordMembersWire;
+    return decodeDiscordMembers(ctx, data);
+  }
+
+  /** The threads in a channel. Experimental. */
+  async threads(): Promise<DiscordThreads> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/threads`)) as DiscordThreadsWire;
+    return decodeDiscordThreads(ctx, data);
+  }
+
+  /** A channel or thread as a person reads it, each thread under the message that starts it. Experimental. */
+  async transcript(options: { as?: DiscordUser | DiscordApp } = {}): Promise<DiscordTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/discord/channels/${segment(this.id)}/transcript`, { query: { as: options.as === undefined ? undefined : options.as.id } })) as DiscordTranscriptWire;
+    return decodeDiscordTranscript(ctx, data);
+  }
+
+  /** Wait for the next new message matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForMessage(options: { from?: DiscordUser | DiscordApp | string } & WaitOptions = {}): Promise<DiscordMessage> {
+    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a message", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
 /** Wire data of a {@link DiscordDelivery}. */
 export interface DiscordDeliveryData {
   id: string;
   channel: "discord";
+  app: string;
   type: string;
   payload?: unknown;
   attempts: DeliveryAttempt[];
@@ -5961,6 +6021,7 @@ export interface DiscordDeliveryData {
 export class DiscordDelivery {
   readonly id: string;
   readonly channel: "discord";
+  readonly app: string;
   readonly type: string;
   readonly payload: unknown | undefined;
   readonly attempts: DeliveryAttempt[];
@@ -5972,6 +6033,7 @@ export class DiscordDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.payload = data.payload;
     this.attempts = data.attempts;

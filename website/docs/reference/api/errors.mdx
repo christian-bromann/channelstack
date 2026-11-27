@@ -153,6 +153,14 @@ SDK class: `CannotEditOthersMessageError` in TypeScript and Python, a subclass o
 
 Raised by [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
 
+### cannot_message_user
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `CannotMessageUserError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANNOT_MESSAGE_USER`.
+
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say).
+
 ### cant_delete_message
 
 The Slack fake refuses with it where the platform refuses the same request.
@@ -183,7 +191,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `EmptyMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::EMPTY_MESSAGE`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
 
 ### forbidden
 
@@ -207,7 +215,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `InvalidFormBodyError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INVALID_FORM_BODY`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
 
 ### missing_access
 
@@ -215,7 +223,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `MissingAccessError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MISSING_ACCESS`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordApp.react()`](/docs/reference/api/discord#react), [`DiscordApp.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1).
 
 ### missing_permissions
 
@@ -223,7 +231,7 @@ The Discord fake refuses with it where the platform refuses the same request.
 
 SDK class: `MissingPermissionsError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MISSING_PERMISSIONS`.
 
-Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.delete()`](/docs/reference/api/discord#delete), [`DiscordUser.react()`](/docs/reference/api/discord#react), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread), [`DiscordUser.invite()`](/docs/reference/api/discord#invite), [`DiscordUser.runCommand()`](/docs/reference/api/discord#runcommand).
+Raised by [`DiscordApp.say()`](/docs/reference/api/discord#say), [`DiscordApp.reply()`](/docs/reference/api/discord#reply), [`DiscordApp.react()`](/docs/reference/api/discord#react), [`DiscordApp.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.say()`](/docs/reference/api/discord#say-1), [`DiscordUser.reply()`](/docs/reference/api/discord#reply-1), [`DiscordUser.delete()`](/docs/reference/api/discord#delete), [`DiscordUser.react()`](/docs/reference/api/discord#react-1), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact-1), [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread), [`DiscordUser.invite()`](/docs/reference/api/discord#invite), [`DiscordUser.runCommand()`](/docs/reference/api/discord#runcommand).
 
 ### msg_too_long
 

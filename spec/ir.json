@@ -21031,6 +21031,107 @@
           "dispose": false
         },
         {
+          "name": "createApp",
+          "kind": "factory",
+          "summary": "Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/discord/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "privilegedIntents",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "enum",
+                  "values": [
+                    "GUILD_MEMBERS",
+                    "GUILD_PRESENCES",
+                    "MESSAGE_CONTENT"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "DiscordApp"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+          }
+        },
+        {
+          "name": "apps",
+          "kind": "method",
+          "summary": "The guild's apps: the built-in one first, then the others in the order they were made",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/discord/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DiscordApps"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+          }
+        },
+        {
           "name": "createChannel",
           "kind": "factory",
           "summary": "Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it",
@@ -21458,7 +21559,307 @@
           "optional": false
         }
       ],
-      "methods": []
+      "methods": [
+        {
+          "name": "say",
+          "kind": "method",
+          "summary": "An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/discord/apps/{app}/say",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "named",
+                "name": "DiscordMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "content"
+            }
+          ],
+          "options": [
+            {
+              "name": "channel",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordChannel"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "to",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "DiscordUser",
+                    "DiscordApp"
+                  ]
+                },
+                "oneOrMany": true
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "DiscordMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "missing_access",
+            "empty_message",
+            "cannot_message_user",
+            "missing_permissions",
+            "invalid_form_body"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+          }
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/discord/apps/{app}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "named",
+                "name": "DiscordMessageInput"
+              },
+              "optional": false,
+              "in": "body",
+              "shorthand": "content"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "DiscordMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "missing_access",
+            "empty_message",
+            "missing_permissions",
+            "invalid_form_body"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+          }
+        },
+        {
+          "name": "react",
+          "kind": "method",
+          "summary": "An app a test made reacts to a message",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/discord/apps/{app}/react",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "DiscordDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "missing_access",
+            "missing_permissions"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+          }
+        },
+        {
+          "name": "unreact",
+          "kind": "method",
+          "summary": "An app a test made takes its reaction back",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/discord/apps/{app}/unreact",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "emoji",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "message",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordMessage"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "DiscordDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "missing_access",
+            "missing_permissions"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+          }
+        }
+      ]
     },
     {
       "name": "DiscordUser",
@@ -22125,7 +22526,7 @@
         {
           "name": "runCommand",
           "kind": "method",
-          "summary": "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+          "summary": "Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -22162,6 +22563,17 @@
                 ]
               },
               "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordApp"
+                ]
+              },
+              "optional": true,
               "in": "body"
             }
           ],
@@ -22323,255 +22735,6 @@
             "requires": "proxy",
             "reason": "Discord shows an ephemeral message to its person alone, and no bot API reads it back; proxy mode sees the agent's own calls"
           }
-        }
-      ]
-    },
-    {
-      "name": "DiscordChannel",
-      "idFields": [
-        "id"
-      ],
-      "role": "resource",
-      "fields": [
-        {
-          "name": "id",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "kind",
-          "type": {
-            "kind": "enum",
-            "values": [
-              "text",
-              "dm",
-              "public_thread"
-            ]
-          },
-          "optional": false
-        },
-        {
-          "name": "channel",
-          "type": {
-            "kind": "literal",
-            "value": "discord"
-          },
-          "optional": false
-        },
-        {
-          "name": "name",
-          "type": {
-            "kind": "string"
-          },
-          "optional": true
-        },
-        {
-          "name": "parentId",
-          "type": {
-            "kind": "string"
-          },
-          "optional": true
-        },
-        {
-          "name": "starterId",
-          "type": {
-            "kind": "string"
-          },
-          "optional": true
-        }
-      ],
-      "methods": [
-        {
-          "name": "messages",
-          "kind": "method",
-          "summary": "A channel's or thread's messages, oldest first",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/discord/channels/{channel}/messages",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "DiscordMessages"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "members",
-          "kind": "method",
-          "summary": "Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/discord/channels/{channel}/members",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "DiscordMembers"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "threads",
-          "kind": "method",
-          "summary": "The threads in a channel",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/discord/channels/{channel}/threads",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "DiscordThreads"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "transcript",
-          "kind": "method",
-          "summary": "A channel or thread as a person reads it, each thread under the message that starts it",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/discord/channels/{channel}/transcript",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "channel",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [
-            {
-              "name": "as",
-              "type": {
-                "kind": "ref",
-                "resources": [
-                  "DiscordUser",
-                  "DiscordApp"
-                ]
-              },
-              "optional": true,
-              "in": "query"
-            }
-          ],
-          "returns": {
-            "kind": "named",
-            "name": "DiscordTranscript"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        }
-      ],
-      "waits": [
-        {
-          "name": "waitForMessage",
-          "mode": "next",
-          "read": "messages",
-          "item": {
-            "kind": "resource",
-            "name": "DiscordMessage"
-          },
-          "from": "author",
-          "what": "a message"
         }
       ]
     },
@@ -22901,9 +23064,73 @@
           "dispose": false
         },
         {
+          "name": "deliveryFor",
+          "kind": "method",
+          "summary": "The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/discord/channels/{channel}/messages/{message}/delivery-for",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channelId"
+              },
+              {
+                "name": "message",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordApp"
+                ]
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "DiscordDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
           "name": "deliveries",
           "kind": "method",
-          "summary": "Every Gateway dispatch this message caused to the bot",
+          "summary": "Every Gateway dispatch this message caused to the apps' bots",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -22976,6 +23203,255 @@
       ]
     },
     {
+      "name": "DiscordChannel",
+      "idFields": [
+        "id"
+      ],
+      "role": "resource",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "text",
+              "dm",
+              "public_thread"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "discord"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "parentId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "starterId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "A channel's or thread's messages, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/discord/channels/{channel}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DiscordMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "members",
+          "kind": "method",
+          "summary": "Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/discord/channels/{channel}/members",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DiscordMembers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "threads",
+          "kind": "method",
+          "summary": "The threads in a channel",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/discord/channels/{channel}/threads",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DiscordThreads"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "A channel or thread as a person reads it, each thread under the message that starts it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/discord/channels/{channel}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "as",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordUser",
+                  "DiscordApp"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DiscordTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForMessage",
+          "mode": "next",
+          "read": "messages",
+          "item": {
+            "kind": "resource",
+            "name": "DiscordMessage"
+          },
+          "from": "author",
+          "what": "a message"
+        }
+      ]
+    },
+    {
       "name": "DiscordDelivery",
       "idFields": [
         "id"
@@ -22993,6 +23469,13 @@
           "type": {
             "kind": "literal",
             "value": "discord"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "string"
           },
           "optional": false
         },
@@ -26933,22 +27416,12 @@
       }
     },
     {
-      "name": "DiscordUsers",
+      "name": "DiscordApps",
       "type": {
         "kind": "array",
         "items": {
           "kind": "resource",
-          "name": "DiscordUser"
-        }
-      }
-    },
-    {
-      "name": "DiscordChannels",
-      "type": {
-        "kind": "array",
-        "items": {
-          "kind": "resource",
-          "name": "DiscordChannel"
+          "name": "DiscordApp"
         }
       }
     },
@@ -26976,6 +27449,26 @@
           }
         ],
         "shorthand": "content"
+      }
+    },
+    {
+      "name": "DiscordUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "DiscordUser"
+        }
+      }
+    },
+    {
+      "name": "DiscordChannels",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "DiscordChannel"
+        }
       }
     },
     {
@@ -27576,6 +28069,7 @@
     "already_reacted",
     "cannot_dm_bot",
     "cannot_edit_others_message",
+    "cannot_message_user",
     "cant_delete_message",
     "cant_update_message",
     "cross_workspace_credential",

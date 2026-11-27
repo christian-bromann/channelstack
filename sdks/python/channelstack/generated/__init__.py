@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CannotMessageUserError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordApps", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -43,6 +43,10 @@ class CannotDmBotError(ChannelstackError):
 
 
 class CannotEditOthersMessageError(ChannelstackError):
+    pass
+
+
+class CannotMessageUserError(ChannelstackError):
     pass
 
 
@@ -189,6 +193,7 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "already_reacted": AlreadyReactedError,
     "cannot_dm_bot": CannotDmBotError,
     "cannot_edit_others_message": CannotEditOthersMessageError,
+    "cannot_message_user": CannotMessageUserError,
     "cant_delete_message": CantDeleteMessageError,
     "cant_update_message": CantUpdateMessageError,
     "cross_workspace_credential": CrossWorkspaceCredentialError,
@@ -1371,10 +1376,7 @@ class DiscordGuild:
         )
 
 
-type DiscordUsers = list[DiscordUser]
-
-
-type DiscordChannels = list[DiscordChannel]
+type DiscordApps = list[DiscordApp]
 
 
 @dataclass(frozen=True)
@@ -1392,6 +1394,12 @@ class DiscordMessageInput:
     def _to_wire(self) -> dict[str, Any]:
         wire = {"content": self.content, "embeds": self.embeds}
         return {key: value for key, value in wire.items() if value is not None}
+
+
+type DiscordUsers = list[DiscordUser]
+
+
+type DiscordChannels = list[DiscordChannel]
 
 
 @dataclass(frozen=True)
@@ -4193,6 +4201,18 @@ class DiscordFixture:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users")
         return [DiscordUser(ctx, item) for item in data]
 
+    async def create_app(self, *, name: str, privileged_intents: list[Literal["GUILD_MEMBERS", "GUILD_PRESENCES", "MESSAGE_CONTENT"]] | None = None) -> DiscordApp:
+        """Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps", body={"name": name, "privilegedIntents": privileged_intents})
+        return DiscordApp(ctx, data)
+
+    async def apps(self) -> DiscordApps:
+        """The guild's apps: the built-in one first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps")
+        return [DiscordApp(ctx, item) for item in data]
+
     async def create_channel(self, *, name: str | None = None, participants: list[DiscordUser | DiscordApp] | None = None, read_only: bool | None = None, topic: str | None = None) -> DiscordChannel:
         """Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental."""
         ctx = self._ctx
@@ -4245,6 +4265,30 @@ class DiscordApp:
         self.bot_token: str = data["botToken"]
         self.public_key: str = data["publicKey"]
         self.guild_id: str = data["guildId"]
+
+    async def say(self, text: str | DiscordMessageInput, *, channel: DiscordChannel | None = None, to: DiscordUser | DiscordApp | list[DiscordUser | DiscordApp] | None = None) -> DiscordMessage:
+        """An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/say", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        return DiscordMessage(ctx, data)
+
+    async def reply(self, text: str | DiscordMessageInput, *, message: DiscordMessage) -> DiscordMessage:
+        """An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/reply", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "message": {"channelId": message.channel_id, "id": message.id}})
+        return DiscordMessage(ctx, data)
+
+    async def react(self, emoji: str, *, message: DiscordMessage) -> DiscordDelivery | None:
+        """An app a test made reacts to a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "message": {"channelId": message.channel_id, "id": message.id}})
+        return (None if data is None else DiscordDelivery(ctx, data))
+
+    async def unreact(self, emoji: str, *, message: DiscordMessage) -> DiscordDelivery | None:
+        """An app a test made takes its reaction back. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/apps/{quote(str(self.id), safe='')}/unreact", body={"emoji": emoji, "message": {"channelId": message.channel_id, "id": message.id}})
+        return (None if data is None else DiscordDelivery(ctx, data))
 
 
 class DiscordUser:
@@ -4310,10 +4354,10 @@ class DiscordUser:
         ctx = self._ctx
         await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/invite", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])], "channel": channel.id})
 
-    async def run_command(self, command: str, *, channel: DiscordChannel) -> DiscordDelivery | None:
-        """Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental."""
+    async def run_command(self, command: str, *, channel: DiscordChannel, app: DiscordApp | None = None) -> DiscordDelivery | None:
+        """Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it. Experimental."""
         ctx = self._ctx
-        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id}))
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id, "app": None if app is None else app.id}))
         return (None if data is None else DiscordDelivery(ctx, data))
 
     async def click(self, button: str | DiscordButtonRef, *, message: DiscordMessage | None = None, channel: DiscordChannel | None = None) -> DiscordDelivery | None:
@@ -4328,46 +4372,6 @@ class DiscordUser:
         await until_quiet(lambda: quiet_of(ctx))
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/ephemeral")
         return [DiscordMessage(ctx, item) for item in data]
-
-
-class DiscordChannel:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.kind: Literal["text", "dm", "public_thread"] = data["kind"]
-        self.channel: Literal["discord"] = data["channel"]
-        self.name: str | None = data.get("name")
-        self.parent_id: str | None = data.get("parentId")
-        self.starter_id: str | None = data.get("starterId")
-
-    async def messages(self) -> DiscordMessages:
-        """A channel's or thread's messages, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/messages")
-        return [DiscordMessage(ctx, item) for item in data]
-
-    async def members(self) -> DiscordMembers:
-        """Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/members")
-        return [DiscordUser(ctx, item) if item["kind"] == "user" else DiscordApp(ctx, item) for item in data]
-
-    async def threads(self) -> DiscordThreads:
-        """The threads in a channel. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/threads")
-        return [DiscordChannel(ctx, item) for item in data]
-
-    async def transcript(self, *, as_: DiscordUser | DiscordApp | None = None) -> DiscordTranscript:
-        """A channel or thread as a person reads it, each thread under the message that starts it. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
-        return DiscordTranscript._from_wire(ctx, data)
-
-    async def wait_for_message(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None) -> DiscordMessage:
-        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
 
 
 class DiscordMessage:
@@ -4413,8 +4417,14 @@ class DiscordMessage:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/reactions")
         return [DiscordReaction._from_wire(ctx, item) for item in data]
 
+    async def delivery_for(self, app: DiscordApp) -> DiscordDelivery | None:
+        """The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else DiscordDelivery(ctx, data))
+
     async def deliveries(self) -> DiscordMessageDeliveries:
-        """Every Gateway dispatch this message caused to the bot. Experimental."""
+        """Every Gateway dispatch this message caused to the apps' bots. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/deliveries")
         return [DiscordDelivery(ctx, item) for item in data]
@@ -4428,11 +4438,52 @@ class DiscordMessage:
         return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
 
 
+class DiscordChannel:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.kind: Literal["text", "dm", "public_thread"] = data["kind"]
+        self.channel: Literal["discord"] = data["channel"]
+        self.name: str | None = data.get("name")
+        self.parent_id: str | None = data.get("parentId")
+        self.starter_id: str | None = data.get("starterId")
+
+    async def messages(self) -> DiscordMessages:
+        """A channel's or thread's messages, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/messages")
+        return [DiscordMessage(ctx, item) for item in data]
+
+    async def members(self) -> DiscordMembers:
+        """Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/members")
+        return [DiscordUser(ctx, item) if item["kind"] == "user" else DiscordApp(ctx, item) for item in data]
+
+    async def threads(self) -> DiscordThreads:
+        """The threads in a channel. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/threads")
+        return [DiscordChannel(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: DiscordUser | DiscordApp | None = None) -> DiscordTranscript:
+        """A channel or thread as a person reads it, each thread under the message that starts it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return DiscordTranscript._from_wire(ctx, data)
+
+    async def wait_for_message(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None) -> DiscordMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
+
+
 class DiscordDelivery:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["discord"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.payload: Any | None = data.get("payload")
         self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]

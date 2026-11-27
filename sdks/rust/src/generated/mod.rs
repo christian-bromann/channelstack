@@ -39,6 +39,7 @@ pub mod codes {
     pub const ALREADY_REACTED: &str = "already_reacted";
     pub const CANNOT_DM_BOT: &str = "cannot_dm_bot";
     pub const CANNOT_EDIT_OTHERS_MESSAGE: &str = "cannot_edit_others_message";
+    pub const CANNOT_MESSAGE_USER: &str = "cannot_message_user";
     pub const CANT_DELETE_MESSAGE: &str = "cant_delete_message";
     pub const CANT_UPDATE_MESSAGE: &str = "cant_update_message";
     pub const CROSS_WORKSPACE_CREDENTIAL: &str = "cross_workspace_credential";
@@ -8932,6 +8933,53 @@ fn run_discord_fixture_users<'a>(
     })
 }
 
+fn run_discord_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_privileged_intents = options
+            .get("privilegedIntents")
+            .cloned()
+            .unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/discord/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("privilegedIntents".into(), p_privileged_intents.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/discord/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_discord_fixture_create_channel<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -9104,6 +9152,167 @@ fn run_discord_fixture_fault<'a>(
                     (&|v: &Value| enc::duration(v))(&p_retry_after)?,
                 );
                 wire.insert("times".into(), p_times.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_say<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/say",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "text".into(),
+                    enc::shorthand(&p_text, "content", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "channel".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "to".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_to,
+                    )?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "text".into(),
+                    enc::shorthand(&p_text, "content", &|v: &Value| enc::plain(v))?,
+                );
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channelId", "id"]))(&p_message)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_react<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/react",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channelId", "id"]))(&p_message)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_discord_app_unreact<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_emoji = args.next().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/apps/{}/unreact",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("emoji".into(), p_emoji.clone());
+                wire.insert(
+                    "message".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["channelId", "id"]))(&p_message)?,
+                );
                 wire
             }),
             None,
@@ -9480,6 +9689,7 @@ fn run_discord_user_run_command<'a>(
         let mut args = args.into_iter();
         let p_command = args.next().unwrap_or(Value::Null);
         let p_channel = options.get("channel").cloned().unwrap_or(Value::Null);
+        let p_app = options.get("app").cloned().unwrap_or(Value::Null);
         let path = format!(
             "/sessions/{}/discord/users/{}/commands",
             encode_segment(ctx.session()?),
@@ -9495,6 +9705,10 @@ fn run_discord_user_run_command<'a>(
                 wire.insert(
                     "channel".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_channel)?,
+                );
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
                 );
                 wire
             }),
@@ -9566,92 +9780,6 @@ fn run_discord_user_ephemeral<'a>(
             path_value(&me["id"])?
         );
         send(ctx, "GET", path, None, None, true, &[]).await
-    })
-}
-
-fn run_discord_channel_messages<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/messages",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_discord_channel_members<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/members",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_discord_channel_threads<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/threads",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(ctx, "GET", path, None, None, false, &[]).await
-    })
-}
-
-fn run_discord_channel_transcript<'a>(
-    ctx: &'a Ctx,
-    me: &'a Value,
-    args: Vec<Value>,
-    options: Map<String, Value>,
-) -> BoxFuture<'a, Result<Value>> {
-    Box::pin(async move {
-        let _ = (&me, &options);
-        let mut args = args.into_iter();
-        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
-        let path = format!(
-            "/sessions/{}/discord/channels/{}/transcript",
-            encode_segment(ctx.session()?),
-            path_value(&me["id"])?
-        );
-        send(
-            ctx,
-            "GET",
-            path,
-            None,
-            Some({
-                let mut wire = Map::new();
-                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
-                wire
-            }),
-            false,
-            &[],
-        )
-        .await
     })
 }
 
@@ -9745,6 +9873,42 @@ fn run_discord_message_reactions<'a>(
     })
 }
 
+fn run_discord_message_delivery_for<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_app = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/messages/{}/delivery-for",
+            encode_segment(ctx.session()?),
+            path_value(&me["channelId"])?,
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "app".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_app)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
 fn run_discord_message_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -9761,6 +9925,92 @@ fn run_discord_message_deliveries<'a>(
             path_value(&me["id"])?
         );
         send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_members<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/members",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_threads<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/threads",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_discord_channel_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_as = options.get("as").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/discord/channels/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("as".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_as)?);
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -24609,6 +24859,28 @@ impl DiscordFixture {
         )
     }
 
+    /// Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection. Experimental.
+    pub fn create_app(&self) -> DiscordFixtureCreateApp {
+        DiscordFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_fixture_create_app,
+            DiscordApp::wrap,
+        ))
+    }
+
+    /// The guild's apps: the built-in one first, then the others in the order they were made. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental.
     pub fn create_channel(&self) -> DiscordFixtureCreateChannel {
         DiscordFixtureCreateChannel(Call::new(
@@ -24719,6 +24991,32 @@ impl DiscordFixtureCreateUser {
 impl IntoFuture for DiscordFixtureCreateUser {
     type Output = Result<DiscordUser>;
     type IntoFuture = BoxFuture<'static, Result<DiscordUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordFixtureCreateApp(Call<DiscordApp>);
+
+impl DiscordFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `privilegedIntents`.
+    pub fn privileged_intents(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("privilegedIntents", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<DiscordApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordFixtureCreateApp {
+    type Output = Result<DiscordApp>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordApp>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -25015,6 +25313,142 @@ impl DiscordApp {
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
+
+    /// An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007). Experimental.
+    pub fn say(&self, text: impl IntoArg) -> DiscordAppSay {
+        DiscordAppSay(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_discord_app_say,
+            DiscordMessage::wrap,
+        ))
+    }
+
+    /// An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it. Experimental.
+    pub fn reply(&self, text: impl IntoArg) -> DiscordAppReply {
+        DiscordAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_discord_app_reply,
+            DiscordMessage::wrap,
+        ))
+    }
+
+    /// An app a test made reacts to a message. Experimental.
+    pub fn react(&self, emoji: impl IntoArg) -> DiscordAppReact {
+        DiscordAppReact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_discord_app_react,
+            DiscordDelivery::wrap_opt,
+        ))
+    }
+
+    /// An app a test made takes its reaction back. Experimental.
+    pub fn unreact(&self, emoji: impl IntoArg) -> DiscordAppUnreact {
+        DiscordAppUnreact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![emoji.into_arg()],
+            run_discord_app_unreact,
+            DiscordDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`DiscordApp::say`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppSay(Call<DiscordMessage>);
+
+impl DiscordAppSay {
+    /// `channel`.
+    pub fn channel(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("channel", value))
+    }
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppSay {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppReply(Call<DiscordMessage>);
+
+impl DiscordAppReply {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppReply {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordApp::react`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppReact(Call<Option<DiscordDelivery>>);
+
+impl DiscordAppReact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<DiscordDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppReact {
+    type Output = Result<Option<DiscordDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<DiscordDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordApp::unreact`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordAppUnreact(Call<Option<DiscordDelivery>>);
+
+impl DiscordAppUnreact {
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<DiscordDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordAppUnreact {
+    type Output = Result<Option<DiscordDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<DiscordDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
 }
 
 /// A handle: `DiscordUser`.
@@ -25214,7 +25648,7 @@ impl DiscordUser {
         ))
     }
 
-    /// Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental.
+    /// Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it. Experimental.
     pub fn run_command(&self, command: impl IntoArg) -> DiscordUserRunCommand {
         DiscordUserRunCommand(Call::new(
             &self.ctx,
@@ -25440,6 +25874,10 @@ impl DiscordUserRunCommand {
     pub fn channel(self, value: impl IntoArg) -> Self {
         Self(self.0.option("channel", value))
     }
+    /// `app`.
+    pub fn app(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("app", value))
+    }
     /// Send the request.
     pub async fn send(self) -> Result<Option<DiscordDelivery>> {
         self.0.send().await
@@ -25477,6 +25915,396 @@ impl IntoFuture for DiscordUserClick {
     type IntoFuture = BoxFuture<'static, Result<Option<DiscordDelivery>>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
+    }
+}
+
+/// A handle: `DiscordMessage`.
+#[derive(Clone)]
+pub struct DiscordMessage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for DiscordMessage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl DiscordMessage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channelId`.
+    pub fn channel_id(&self) -> String {
+        self.data
+            .get("channelId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> DiscordChannel {
+        DiscordChannel::from_wire_in(
+            &self.ctx,
+            self.data.get("channel").cloned().unwrap_or(Value::Null),
+            self.seen.field("channel"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `content`.
+    pub fn content(&self) -> String {
+        self.data
+            .get("content")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `embeds`.
+    pub fn embeds(&self) -> &Value {
+        self.data.get("embeds").unwrap_or(&Value::Null)
+    }
+    /// `components`.
+    pub fn components(&self) -> &Value {
+        self.data.get("components").unwrap_or(&Value::Null)
+    }
+    /// `postedAt`.
+    pub fn posted_at(&self) -> String {
+        self.data
+            .get("postedAt")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `edited`.
+    pub fn edited(&self) -> bool {
+        self.data
+            .get("edited")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `replyTo`.
+    pub fn reply_to(&self) -> Option<String> {
+        self.data
+            .get("replyTo")
+            .and_then(|v| v.as_str().map(str::to_owned))
+    }
+    /// `thread`.
+    pub fn thread(&self) -> Option<DiscordChannel> {
+        self.data
+            .get("thread")
+            .filter(|v| !v.is_null())
+            .map(|v| DiscordChannel::from_wire_in(&self.ctx, v.clone(), self.seen.field("thread")))
+    }
+    /// `visibleTo`.
+    pub fn visible_to(&self) -> Option<DiscordUser> {
+        self.data
+            .get("visibleTo")
+            .filter(|v| !v.is_null())
+            .map(|v| DiscordUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<DiscordDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            DiscordDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
+    }
+
+    /// Re-read a message: its latest text, edits and thread. Experimental.
+    pub fn refresh(&self) -> Call<DiscordMessage> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_refresh,
+            DiscordMessage::wrap,
+        )
+    }
+
+    /// What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it. Experimental.
+    pub fn replies(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_replies,
+            as_value,
+        )
+    }
+
+    /// A message and what answers it, as a person reads them. Experimental.
+    pub fn transcript(&self) -> DiscordMessageTranscript {
+        DiscordMessageTranscript(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_transcript,
+            as_value,
+        ))
+    }
+
+    /// The reactions on a message, and who added each. Experimental.
+    pub fn reactions(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_reactions,
+            as_value,
+        )
+    }
+
+    /// The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told. Experimental.
+    pub fn delivery_for(&self, app: impl IntoArg) -> Call<Option<DiscordDelivery>> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![app.into_arg()],
+            run_discord_message_delivery_for,
+            DiscordDelivery::wrap_opt,
+        )
+    }
+
+    /// Every Gateway dispatch this message caused to the apps' bots. Experimental.
+    pub fn deliveries(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_discord_message_deliveries,
+            as_value,
+        )
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_reply(&self) -> DiscordMessageWaitForReply {
+        DiscordMessageWaitForReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn latest_reply(&self) -> DiscordMessageLatestReply {
+        DiscordMessageLatestReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`DiscordMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct DiscordMessageTranscript(Call<Value>);
+
+impl DiscordMessageTranscript {
+    /// `as`.
+    pub fn r#as(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("as", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for DiscordMessageTranscript {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`DiscordMessage::wait_for_reply`].
+pub struct DiscordMessageWaitForReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl DiscordMessageWaitForReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForReply",
+            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        DiscordMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for DiscordMessageWaitForReply {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// The options of [`DiscordMessage::latest_reply`].
+pub struct DiscordMessageLatestReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl DiscordMessageLatestReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// `quietFor`.
+    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("quietFor".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<DiscordMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let quiet_for = options
+            .get("quietFor")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = latest_once_quiet(
+            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            || ctx.quiet(),
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+            &quiet_for,
+        )
+        .await?;
+        DiscordMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for DiscordMessageLatestReply {
+    type Output = Result<DiscordMessage>;
+    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
     }
 }
 
@@ -25713,385 +26541,6 @@ impl IntoFuture for DiscordChannelWaitForMessage {
     }
 }
 
-/// A handle: `DiscordMessage`.
-#[derive(Clone)]
-pub struct DiscordMessage {
-    ctx: Ctx,
-    data: Value,
-    seen: Seen,
-}
-
-impl Handle for DiscordMessage {
-    fn data(&self) -> &Value {
-        &self.data
-    }
-    fn ctx(&self) -> &Ctx {
-        &self.ctx
-    }
-}
-
-impl DiscordMessage {
-    #[doc(hidden)]
-    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
-        Self::from_wire_in(ctx, data, Seen::default())
-    }
-    /// A handle read from a field of another: it keeps the wait state that field's handle had.
-    #[doc(hidden)]
-    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
-        let ctx = ctx.clone();
-        Self { ctx, data, seen }
-    }
-    #[doc(hidden)]
-    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
-        Ok(Self::from_wire(ctx, data))
-    }
-    #[doc(hidden)]
-    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
-        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
-    }
-    #[doc(hidden)]
-    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
-        Ok(data
-            .as_array()
-            .map(|items| {
-                items
-                    .iter()
-                    .map(|item| Self::from_wire(ctx, item.clone()))
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-    /// `id`.
-    pub fn id(&self) -> String {
-        self.data
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channelId`.
-    pub fn channel_id(&self) -> String {
-        self.data
-            .get("channelId")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `channel`.
-    pub fn channel(&self) -> DiscordChannel {
-        DiscordChannel::from_wire_in(
-            &self.ctx,
-            self.data.get("channel").cloned().unwrap_or(Value::Null),
-            self.seen.field("channel"),
-        )
-    }
-    /// `author`.
-    pub fn author(&self) -> &Value {
-        self.data.get("author").unwrap_or(&Value::Null)
-    }
-    /// `text`.
-    pub fn text(&self) -> String {
-        self.data
-            .get("text")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `content`.
-    pub fn content(&self) -> String {
-        self.data
-            .get("content")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `embeds`.
-    pub fn embeds(&self) -> &Value {
-        self.data.get("embeds").unwrap_or(&Value::Null)
-    }
-    /// `components`.
-    pub fn components(&self) -> &Value {
-        self.data.get("components").unwrap_or(&Value::Null)
-    }
-    /// `postedAt`.
-    pub fn posted_at(&self) -> String {
-        self.data
-            .get("postedAt")
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(String::new())
-    }
-    /// `edited`.
-    pub fn edited(&self) -> bool {
-        self.data
-            .get("edited")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-    }
-    /// `replyTo`.
-    pub fn reply_to(&self) -> Option<String> {
-        self.data
-            .get("replyTo")
-            .and_then(|v| v.as_str().map(str::to_owned))
-    }
-    /// `thread`.
-    pub fn thread(&self) -> Option<DiscordChannel> {
-        self.data
-            .get("thread")
-            .filter(|v| !v.is_null())
-            .map(|v| DiscordChannel::from_wire_in(&self.ctx, v.clone(), self.seen.field("thread")))
-    }
-    /// `visibleTo`.
-    pub fn visible_to(&self) -> Option<DiscordUser> {
-        self.data
-            .get("visibleTo")
-            .filter(|v| !v.is_null())
-            .map(|v| DiscordUser::from_wire_in(&self.ctx, v.clone(), self.seen.field("visibleTo")))
-    }
-    /// `delivery`.
-    pub fn delivery(&self) -> Option<DiscordDelivery> {
-        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
-            DiscordDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
-        })
-    }
-
-    /// Re-read a message: its latest text, edits and thread. Experimental.
-    pub fn refresh(&self) -> Call<DiscordMessage> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_refresh,
-            DiscordMessage::wrap,
-        )
-    }
-
-    /// What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it. Experimental.
-    pub fn replies(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_replies,
-            as_value,
-        )
-    }
-
-    /// A message and what answers it, as a person reads them. Experimental.
-    pub fn transcript(&self) -> DiscordMessageTranscript {
-        DiscordMessageTranscript(Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_transcript,
-            as_value,
-        ))
-    }
-
-    /// The reactions on a message, and who added each. Experimental.
-    pub fn reactions(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_reactions,
-            as_value,
-        )
-    }
-
-    /// Every Gateway dispatch this message caused to the bot. Experimental.
-    pub fn deliveries(&self) -> Call<Value> {
-        Call::new(
-            &self.ctx,
-            &self.data,
-            vec![],
-            run_discord_message_deliveries,
-            as_value,
-        )
-    }
-
-    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn wait_for_reply(&self) -> DiscordMessageWaitForReply {
-        DiscordMessageWaitForReply {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-
-    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
-    pub fn latest_reply(&self) -> DiscordMessageLatestReply {
-        DiscordMessageLatestReply {
-            ctx: self.ctx.clone(),
-            me: self.data.clone(),
-            seen: self.seen.clone(),
-            options: Map::new(),
-        }
-    }
-}
-
-/// The options of [`DiscordMessage::transcript`]: set the ones you need, then `.send().await` (or `.await`).
-pub struct DiscordMessageTranscript(Call<Value>);
-
-impl DiscordMessageTranscript {
-    /// `as`.
-    pub fn r#as(self, value: impl IntoArg) -> Self {
-        Self(self.0.option("as", value))
-    }
-    /// Send the request.
-    pub async fn send(self) -> Result<Value> {
-        self.0.send().await
-    }
-}
-
-impl IntoFuture for DiscordMessageTranscript {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
-    fn into_future(self) -> Self::IntoFuture {
-        self.0.into_future()
-    }
-}
-
-/// The options of [`DiscordMessage::wait_for_reply`].
-pub struct DiscordMessageWaitForReply {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl DiscordMessageWaitForReply {
-    /// `from`.
-    pub fn from(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("from".into(), value.into_arg());
-        self
-    }
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<DiscordMessage> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let from = options.get("from").cloned().unwrap_or(Value::Null);
-        let item = wait_for_next(
-            &seen.positions,
-            "waitForReply",
-            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
-            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
-            None,
-            &match &from {
-                Value::Null => "a reply".to_owned(),
-                Value::String(name) => format!("{} from {}", "a reply", name),
-                other => format!(
-                    "{} from {}",
-                    "a reply",
-                    other.get("name").and_then(Value::as_str).unwrap_or("")
-                ),
-            },
-            &timeout,
-        )
-        .await?;
-        DiscordMessage::wrap(&ctx, item)
-    }
-}
-
-impl IntoFuture for DiscordMessageWaitForReply {
-    type Output = Result<DiscordMessage>;
-    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
-    }
-}
-
-/// The options of [`DiscordMessage::latest_reply`].
-pub struct DiscordMessageLatestReply {
-    ctx: Ctx,
-    me: Value,
-    seen: Seen,
-    options: Map<String, Value>,
-}
-
-impl DiscordMessageLatestReply {
-    /// `from`.
-    pub fn from(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("from".into(), value.into_arg());
-        self
-    }
-    /// `timeout`.
-    pub fn timeout(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("timeout".into(), value.into_arg());
-        self
-    }
-    /// `quietFor`.
-    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
-        self.options.insert("quietFor".into(), value.into_arg());
-        self
-    }
-    /// Wait.
-    pub async fn send(self) -> Result<DiscordMessage> {
-        let Self {
-            ctx,
-            me,
-            seen,
-            options,
-        } = self;
-        let _ = &seen;
-        let filters: Map<String, Value> = options
-            .iter()
-            .filter(|(name, _)| [].contains(&name.as_str()))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        let timeout = options
-            .get("timeout")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
-        let quiet_for = options
-            .get("quietFor")
-            .cloned()
-            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
-        let from = options.get("from").cloned().unwrap_or(Value::Null);
-        let item = latest_once_quiet(
-            || run_discord_message_replies(&ctx, &me, vec![], filters.clone()),
-            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
-            || ctx.quiet(),
-            &match &from {
-                Value::Null => "a reply".to_owned(),
-                Value::String(name) => format!("{} from {}", "a reply", name),
-                other => format!(
-                    "{} from {}",
-                    "a reply",
-                    other.get("name").and_then(Value::as_str).unwrap_or("")
-                ),
-            },
-            &timeout,
-            &quiet_for,
-        )
-        .await?;
-        DiscordMessage::wrap(&ctx, item)
-    }
-}
-
-impl IntoFuture for DiscordMessageLatestReply {
-    type Output = Result<DiscordMessage>;
-    type IntoFuture = BoxFuture<'static, Result<DiscordMessage>>;
-    fn into_future(self) -> Self::IntoFuture {
-        Box::pin(self.send())
-    }
-}
-
 /// A handle: `DiscordDelivery`.
 #[derive(Clone)]
 pub struct DiscordDelivery {
@@ -26151,6 +26600,13 @@ impl DiscordDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -27751,6 +28207,12 @@ pub async fn call_by_name(
         ("DiscordFixture", "users") => {
             run_discord_fixture_users(&target.ctx, &target.data, args, options).await?
         }
+        ("DiscordFixture", "createApp") => {
+            run_discord_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordFixture", "apps") => {
+            run_discord_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("DiscordFixture", "createChannel") => {
             run_discord_fixture_create_channel(&target.ctx, &target.data, args, options).await?
         }
@@ -27768,6 +28230,18 @@ pub async fn call_by_name(
         }
         ("DiscordFixture", "fault") => {
             run_discord_fixture_fault(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "say") => {
+            run_discord_app_say(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "reply") => {
+            run_discord_app_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "react") => {
+            run_discord_app_react(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordApp", "unreact") => {
+            run_discord_app_unreact(&target.ctx, &target.data, args, options).await?
         }
         ("DiscordUser", "say") => {
             run_discord_user_say(&target.ctx, &target.data, args, options).await?
@@ -27805,18 +28279,6 @@ pub async fn call_by_name(
         ("DiscordUser", "ephemeral") => {
             run_discord_user_ephemeral(&target.ctx, &target.data, args, options).await?
         }
-        ("DiscordChannel", "messages") => {
-            run_discord_channel_messages(&target.ctx, &target.data, args, options).await?
-        }
-        ("DiscordChannel", "members") => {
-            run_discord_channel_members(&target.ctx, &target.data, args, options).await?
-        }
-        ("DiscordChannel", "threads") => {
-            run_discord_channel_threads(&target.ctx, &target.data, args, options).await?
-        }
-        ("DiscordChannel", "transcript") => {
-            run_discord_channel_transcript(&target.ctx, &target.data, args, options).await?
-        }
         ("DiscordMessage", "refresh") => {
             run_discord_message_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -27829,8 +28291,23 @@ pub async fn call_by_name(
         ("DiscordMessage", "reactions") => {
             run_discord_message_reactions(&target.ctx, &target.data, args, options).await?
         }
+        ("DiscordMessage", "deliveryFor") => {
+            run_discord_message_delivery_for(&target.ctx, &target.data, args, options).await?
+        }
         ("DiscordMessage", "deliveries") => {
             run_discord_message_deliveries(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "messages") => {
+            run_discord_channel_messages(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "members") => {
+            run_discord_channel_members(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "threads") => {
+            run_discord_channel_threads(&target.ctx, &target.data, args, options).await?
+        }
+        ("DiscordChannel", "transcript") => {
+            run_discord_channel_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("DiscordDelivery", "refresh") => {
             run_discord_delivery_refresh(&target.ctx, &target.data, args, options).await?
@@ -28380,6 +28857,11 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("DiscordFixture", "createApp") => Dyn {
+            resource: Some("DiscordApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("DiscordFixture", "createChannel") => Dyn {
             resource: Some("DiscordChannel"),
             ctx: target.ctx.clone(),
@@ -28387,6 +28869,16 @@ pub async fn call_by_name(
         },
         ("DiscordFixture", "fault") => Dyn {
             resource: Some("DiscordFault"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("DiscordApp", "say") => Dyn {
+            resource: Some("DiscordMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("DiscordApp", "reply") => Dyn {
+            resource: Some("DiscordMessage"),
             ctx: target.ctx.clone(),
             data,
         },

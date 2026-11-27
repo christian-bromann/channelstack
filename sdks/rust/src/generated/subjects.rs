@@ -3,8 +3,8 @@ transcript_as!(
     crate::SlackMessage,
     crate::SlackConversation,
     crate::SlackThread,
-    crate::DiscordChannel,
-    crate::DiscordMessage
+    crate::DiscordMessage,
+    crate::DiscordChannel
 );
 transcript!(
     crate::GitHubIssue,

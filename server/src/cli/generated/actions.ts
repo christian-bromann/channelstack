@@ -3084,7 +3084,7 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
       },
       {
         "name": "runCommand",
-        "summary": "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+        "summary": "Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it",
         "method": "POST",
         "path": "/users/{user}/commands",
         "params": [
@@ -3106,6 +3106,18 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
               ]
             },
             "optional": false,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "app",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordApp"
+              ]
+            },
+            "optional": true,
             "in": "body",
             "positional": false
           }

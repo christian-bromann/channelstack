@@ -8251,88 +8251,35 @@
           "name"
         ]
       },
-      "DiscordUsers": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/DiscordUser"
-        }
-      },
-      "DiscordChannel": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "text",
-              "dm",
-              "public_thread"
-            ],
-            "description": "A guild text channel, a DM, or a thread."
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "discord"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "description": "Without `#`. Undefined for a DM."
-          },
-          "parentId": {
-            "type": "string",
-            "description": "For a thread: the channel it is in."
-          },
-          "starterId": {
-            "type": "string",
-            "description": "For a thread started from a message: that message."
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "channel"
-        ],
-        "x-channelstack-resource": {
-          "id": "id",
-          "role": "resource"
-        }
-      },
-      "DiscordChannelOptions": {
+      "DiscordAppOptions": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 100
+            "description": "How people mention it: 1 to 32 lower-case letters, digits and hyphens"
           },
-          "participants": {
+          "privilegedIntents": {
             "type": "array",
             "items": {
               "type": "string",
-              "x-channelstack-ref": [
-                "DiscordUser",
-                "DiscordApp"
+              "enum": [
+                "GUILD_MEMBERS",
+                "GUILD_PRESENCES",
+                "MESSAGE_CONTENT"
               ]
             },
-            "default": []
-          },
-          "readOnly": {
-            "type": "boolean",
-            "description": "Everyone reads; only admins write."
-          },
-          "topic": {
-            "type": "string"
+            "description": "The privileged intents switched on in its developer portal. Default: the built-in app's (`GUILD_MEMBERS`, `MESSAGE_CONTENT`)"
           }
-        }
+        },
+        "required": [
+          "name"
+        ]
       },
-      "DiscordChannels": {
+      "DiscordApps": {
         "type": "array",
         "items": {
-          "$ref": "#/components/schemas/DiscordChannel"
+          "$ref": "#/components/schemas/DiscordApp"
         }
       },
       "DiscordMessage": {
@@ -8419,6 +8366,50 @@
           ]
         }
       },
+      "DiscordChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "dm",
+              "public_thread"
+            ],
+            "description": "A guild text channel, a DM, or a thread."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "discord"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Without `#`. Undefined for a DM."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "For a thread: the channel it is in."
+          },
+          "starterId": {
+            "type": "string",
+            "description": "For a thread started from a message: that message."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "channel"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "resource"
+        }
+      },
       "DiscordDelivery": {
         "type": "object",
         "properties": {
@@ -8430,6 +8421,10 @@
             "enum": [
               "discord"
             ]
+          },
+          "app": {
+            "type": "string",
+            "description": "The app it went to, by name: `my-agent`, or another (decision 0027)."
           },
           "type": {
             "type": "string",
@@ -8458,6 +8453,7 @@
         "required": [
           "id",
           "channel",
+          "app",
           "type",
           "attempts",
           "status"
@@ -8466,7 +8462,7 @@
           "id": "id"
         }
       },
-      "DiscordSayBody": {
+      "DiscordAppSayBody": {
         "type": "object",
         "properties": {
           "text": {
@@ -8507,6 +8503,167 @@
           }
         },
         "x-channelstack-shorthand": "content"
+      },
+      "DiscordAppReplyBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/DiscordMessageInput"
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "message"
+        ]
+      },
+      "DiscordAppReactBody": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "emoji",
+          "message"
+        ]
+      },
+      "DiscordAppUnreactBody": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "channelId",
+              "id"
+            ],
+            "x-channelstack-ref": [
+              "DiscordMessage"
+            ]
+          }
+        },
+        "required": [
+          "emoji",
+          "message"
+        ]
+      },
+      "DiscordUsers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordUser"
+        }
+      },
+      "DiscordChannelOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "default": []
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Everyone reads; only admins write."
+          },
+          "topic": {
+            "type": "string"
+          }
+        }
+      },
+      "DiscordChannels": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/DiscordChannel"
+        }
+      },
+      "DiscordSayBody": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "$ref": "#/components/schemas/DiscordMessageInput"
+          },
+          "channel": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "DiscordChannel"
+            ]
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "minItems": 1,
+            "x-channelstack-one-or-many": true
+          }
+        },
+        "required": [
+          "text"
+        ]
       },
       "DiscordReplyBody": {
         "type": "object",
@@ -8746,6 +8903,13 @@
             "type": "string",
             "x-channelstack-ref": [
               "DiscordChannel"
+            ]
+          },
+          "app": {
+            "type": "string",
+            "description": "Whose command: an app's id or name. Default: the built-in app's when it has a command of that name, or another app's that has one (decision 0027)",
+            "x-channelstack-ref": [
+              "DiscordApp"
             ]
           }
         },
@@ -33500,6 +33664,524 @@
         }
       }
     },
+    "/sessions/{session}/discord/apps": {
+      "post": {
+        "summary": "Make another app in the guild, with its own application, bot user, token and Ed25519 key (decision 0027), or return the one made with this name and settings. Its bot connects to the Gateway with its own token; its interactions go to CHANNELSTACK_DISCORD_APP_<NAME>_WEBHOOK_URL, or over its Gateway connection",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "DiscordFixture",
+          "name": "createApp",
+          "options": [
+            "name",
+            "privilegedIntents"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordAppOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordApp"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The guild's apps: the built-in one first, then the others in the order they were made",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordFixture",
+          "name": "apps"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordApps"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/apps/{app}/say": {
+      "post": {
+        "summary": "An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel or thread its bot sees, or in a DM with the person in `to`. No bot writes to another bot in a DM (50007)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordApp",
+          "name": "say",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "channel",
+            "to"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_access",
+          "empty_message",
+          "cannot_message_user",
+          "missing_permissions",
+          "invalid_form_body"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordAppSayBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/apps/{app}/reply": {
+      "post": {
+        "summary": "An app a test made replies to a message: Discord's reply, in the message's channel, which quotes it",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordApp",
+          "name": "reply",
+          "args": [
+            "text"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_access",
+          "empty_message",
+          "missing_permissions",
+          "invalid_form_body"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordAppReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscordMessage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/apps/{app}/react": {
+      "post": {
+        "summary": "An app a test made reacts to a message",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordApp",
+          "name": "react",
+          "args": [
+            "emoji"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_access",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordAppReactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/discord/apps/{app}/unreact": {
+      "post": {
+        "summary": "An app a test made takes its reaction back",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordApp",
+          "name": "unreact",
+          "args": [
+            "emoji"
+          ],
+          "options": [
+            "message"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found",
+          "missing_access",
+          "missing_permissions"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the guild holds only the app channelstack has credentials for"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscordAppUnreactBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/discord/channels": {
       "post": {
         "summary": "Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it",
@@ -34418,7 +35100,7 @@
     },
     "/sessions/{session}/discord/users/{user}/commands": {
       "post": {
-        "summary": "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+        "summary": "Run one of an app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`: the built-in app's, or `app`'s, as a person picks one app's command when several have it",
         "security": [
           {
             "bearer": []
@@ -34431,7 +35113,8 @@
             "command"
           ],
           "options": [
-            "channel"
+            "channel",
+            "app"
           ],
           "retryWhile": [
             "not_found"
@@ -35340,9 +36023,114 @@
         }
       }
     },
+    "/sessions/{session}/discord/channels/{channel}/messages/{message}/delivery-for": {
+      "get": {
+        "summary": "The first Gateway dispatch this message caused to this app's bot (decision 0027), or nothing when it wasn't told",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "DiscordMessage",
+          "name": "deliveryFor",
+          "args": [
+            "app"
+          ],
+          "bind": {
+            "channel": "channelId",
+            "message": "id"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "DiscordApp"
+              ]
+            },
+            "required": true,
+            "name": "app",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DiscordDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/discord/channels/{channel}/messages/{message}/deliveries": {
       "get": {
-        "summary": "Every Gateway dispatch this message caused to the bot",
+        "summary": "Every Gateway dispatch this message caused to the apps' bots",
         "security": [
           {
             "bearer": []
