@@ -7,6 +7,7 @@ import type { LiveContext } from "../../../core/router/index.ts";
 import { LiveCredential } from "../../../core/secrets/index.ts";
 import type { TwilioWorld } from "../backend.ts";
 import { TwilioStore } from "../fake/store.ts";
+import { isTwilioAnswer, optOutTypeOf } from "../sms.ts";
 import type { TwilioMessageRecord, TwilioMessageStatus } from "../world.ts";
 import { accountOf, type TwilioRestClient } from "./client.ts";
 import { checkTwilioCredential, identifyTwilio } from "./identity.ts";
@@ -104,7 +105,8 @@ export function createLiveTwilioWorld(deps: {
       status: wire.status,
       errorCode: wire.error_code ?? undefined,
       author,
-      automatic: false,
+      // Twilio's own answer to `START` or `HELP`, from the agent's number: not the agent's.
+      automatic: wire.from === store.app.number && isTwilioAnswer(wire.body ?? ""),
       conversation: store.conversationFor(wire.from, wire.to, wire.sid, at, session),
       messagingServiceSid: undefined,
       statusCallback: undefined,
@@ -188,6 +190,12 @@ export function createLiveTwilioWorld(deps: {
       input: { to: string; body: string; media: readonly string[] },
     ) {
       live.allowlist.assert(input.to, `the number ${input.to}`);
+      if (input.to === store.app.number && optOutTypeOf(input.body) === "STOP") {
+        throw unsupportedInLive(
+          "texting STOP to the agent",
+          "the sandbox number would stay opted out of the agent's for every later run",
+        );
+      }
       const credential = people.actingAs(session, person.id, () => fakeActorInLiveWorld(person.name, "twilio"));
       const sent = await client.call<WireMessage>(credential, "POST", "/Messages.json", {
         To: input.to,

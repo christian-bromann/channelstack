@@ -53,3 +53,6 @@ export const OPT_OUT_REPLIES: Readonly<Record<OptOutType, string>> = {
     "You have successfully been re-subscribed to messages from this number. Reply HELP for help. Reply STOP to unsubscribe. Msg&Data Rates May Apply.",
   HELP: "Reply STOP to unsubscribe. Msg&Data Rates May Apply.",
 };
+
+/** Whether a text from the agent's number is one of Twilio's own answers, as a live world reads it back. */
+export const isTwilioAnswer = (body: string): boolean => Object.values(OPT_OUT_REPLIES).includes(body);

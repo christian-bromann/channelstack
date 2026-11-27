@@ -66,9 +66,9 @@ describe("text conversations", () => {
 
     // The agent got the text as it was; Twilio answered it, and the agent didn't try to.
     expect(stop.delivery?.payload.Body).toBe("STOP");
+    await expect(twilio).not.toHaveReceivedCall("messages.create");
     const transcript = await stop.conversation.transcript();
     expect(transcript.entries.at(-1)?.text).toMatch(/unsubscribed/);
-    expect(await twilio.calls({ error: true })).toEqual([]);
   });
 });
 

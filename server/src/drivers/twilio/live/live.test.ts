@@ -113,6 +113,23 @@ describe("exit check 10.7: Twilio live", () => {
     expect(stub.messages).toEqual([]);
   });
 
+  test("STOP isn't sent live; Twilio's answer to HELP is Twilio's, not the agent's", async () => {
+    const stub = twilioStub();
+    const ana = stub.account("ana", ["+14155550101"]);
+    const twilio = await liveTwilio(stub, `${AGENT_NUMBER},+14155550101`).open();
+    const { app } = (await twilio("GET", "")).body;
+    const person = (await twilio("POST", "/users", { name: "Ana", token: ana.credential })).body;
+    const user = `/users/${encodeURIComponent(person.id)}`;
+    expect((await twilio("POST", `${user}/text`, { body: " stop ", to: app.id })).body.error).toBe(
+      "unsupported_in_live",
+    );
+    expect(stub.messages).toEqual([]);
+    const help = (await twilio("POST", `${user}/text`, { body: "HELP", to: app.id })).body;
+    stub.agentReplies("+14155550101", "Reply STOP to unsubscribe. Msg&Data Rates May Apply.");
+    const [answer] = (await twilio("GET", `/conversations/${help.conversation.id}/replies`)).body;
+    expect(answer.author).toEqual({ id: "twilio", name: "Twilio", kind: "app" });
+  });
+
   test("a person whose account has two allowlisted numbers names theirs", async () => {
     const stub = twilioStub();
     const shared = stub.account("shared", ["+14155550102", "+14155550103"]);

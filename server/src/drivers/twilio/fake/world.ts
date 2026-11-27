@@ -166,7 +166,6 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
     );
   };
 
-  /** What happens to a sent message after Twilio took it: on its way, then on the phone, or not. */
   /**
    * What happens to a sent message after Twilio took it. A callback tells of each change from the
    * status it was answered with: through a Messaging Service, `accepted`, then `queued` once a sender

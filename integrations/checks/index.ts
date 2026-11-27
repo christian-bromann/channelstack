@@ -662,11 +662,12 @@ export function twilioChecks(options: ChecksOptions): void {
   describe(`twilio checks: ${app}`, () => {
     check("twilio.reply-to-sender", "answers a text, to the number that sent it", async (context) => {
       const { text } = await texted(context);
-      // An answer to any number but `From` never reaches Ana's conversation with the agent (to its
-      // own number, `To`, Twilio refuses it), so waiting for it there is the check.
+      // An answer to any number but `From` never reaches Ana's conversation with the agent, so
+      // waiting for it there is the check. Its failure can't say which number the agent chose: a
+      // send to its own number (`To`) is refused before it is any test's message.
       await text.conversation.waitForReply({ from: app, ...wait }).catch((error: unknown) => {
         throw new Error(
-          `No answer reached ${text.from}, the number that texted: answer the webhook's \`From\`, not \`To\``,
+          `No answer reached ${text.from}, the number that texted. An answer goes to the webhook's \`From\`; one to \`To\`, the agent's own number, Twilio refuses (21266)`,
           { cause: error },
         );
       });

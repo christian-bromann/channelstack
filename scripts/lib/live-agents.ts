@@ -128,20 +128,28 @@ function eventType(headers: IncomingHttpHeaders, body: string): string {
 }
 
 /**
- * A local hop between a relay and its agent: each request, its body as `change` makes it, goes on
- * to `target` with its headers, and the agent's answer goes back. Answers where it listens.
+ * A local hop between a relay and its agent: each request, its body (and any header) as `change`
+ * makes it, goes on to `target` with its headers, and the agent's answer goes back. Answers where it listens.
  */
-async function hop(target: string, stops: Stop[], change: (body: Buffer, request: IncomingMessage) => Buffer | string) {
+async function hop(
+  target: string,
+  stops: Stop[],
+  change: (body: Buffer, request: IncomingMessage) => { body: Buffer | string; headers?: Record<string, string> },
+) {
   const server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", async () => {
-      const body = change(Buffer.concat(chunks), request);
-      const headers = Object.fromEntries(
-        Object.entries(request.headers).flatMap(([name, value]) =>
-          typeof value === "string" && name !== "host" && name !== "content-length" ? [[name, value]] : [],
+      const changed = change(Buffer.concat(chunks), request);
+      const { body } = changed;
+      const headers = {
+        ...Object.fromEntries(
+          Object.entries(request.headers).flatMap(([name, value]) =>
+            typeof value === "string" && name !== "host" && name !== "content-length" ? [[name, value]] : [],
+          ),
         ),
-      );
+        ...changed.headers,
+      };
       try {
         const answer = await fetch(target, { method: request.method ?? "POST", headers, body });
         response.writeHead(answer.status, { "content-type": answer.headers.get("content-type") ?? "text/plain" });
@@ -160,23 +168,27 @@ async function hop(target: string, stops: Stop[], change: (body: Buffer, request
  * Between a relay and its agent: each webhook's shape is recorded (live-mode.md 6, the platforms'
  * real payloads), then the delivery goes on to the agent as it came, and the agent's answer back.
  */
-const tapped = (channel: string, target: string, recorder: Recorder, stops: Stop[]): Promise<string> =>
+export const tapped = (channel: string, target: string, recorder: Recorder, stops: Stop[]): Promise<string> =>
   hop(target, stops, (body, request) => {
     recorder.webhook(channel, eventType(request.headers, body.toString("utf8")), body.toString("utf8"));
-    return body;
+    return { body };
   });
 
 /**
  * Between a relay and an agent whose platform posts forms (Twilio): smee.io parses a form and its
- * client posts the fields as JSON, so this puts them back as the form the platform sent, with its
- * headers. The fields and their order are the platform's.
+ * client posts the fields as JSON (`content-type: application/json`), so this puts them back as the
+ * form the platform sent, with its content type. The fields and their order are the platform's.
  */
-const asForm = (target: string, stops: Stop[]): Promise<string> =>
+export const asForm = (target: string, stops: Stop[]): Promise<string> =>
   hop(target, stops, (body) => {
     try {
-      return new URLSearchParams(JSON.parse(body.toString("utf8")) as Record<string, string>).toString();
+      const fields = JSON.parse(body.toString("utf8")) as Record<string, string>;
+      return {
+        body: new URLSearchParams(fields).toString(),
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+      };
     } catch {
-      return body;
+      return { body };
     }
   });
 
