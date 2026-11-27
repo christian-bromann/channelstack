@@ -27,10 +27,9 @@ their own machine, and no machine but GitHub's holds what publishing needs.
    - moves the changelog's "Unreleased" section under `## [0.1.0] - <today>`, with a draft from the
      pull requests' titles below the hand-written lines (see "The changelog" below).
 
-   It then opens the pull request `chore(ci): release v0.1.0` from the branch `release/v0.1.0`. To
-   check that every package and binary builds before merging it, run **Release** from the Actions
-   tab on that branch: started by hand, it is a dry run that publishes nothing. No pull request
-   starts it on its own.
+   It then opens the pull request `chore(ci): release v0.1.0` from the branch `release/v0.1.0`. Its
+   CI compiles the binaries for every target, as on every pull request. The release workflow itself
+   runs only for the tag (step 3): no pull request starts it, and it has no manual trigger.
 2. **Review it.** Edit the changelog's section on the branch into sentences a user reads (merge the
    draft into the hand-written lines, drop what isn't worth saying), and merge the pull request
    once CI is green. Merge nothing else in the meantime: a pull request merged after the draft
