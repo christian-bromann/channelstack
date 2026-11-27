@@ -6,20 +6,16 @@ import type { LiveCredential } from "../../../core/secrets/index.ts";
 export const TWILIO_API = "https://api.twilio.com";
 
 /**
- * One way into a Twilio account: who signs in (the Account SID, or an API key's SID) and the secret
- * (its Auth Token, or the key's secret), and the account it opens.
+ * The account a credential opens. Every Twilio credential here is `<Account SID>:<Auth Token>`,
+ * the pair basic auth sends; the SID before the colon is no secret.
  */
-export interface TwilioAuth {
-  readonly username: string;
-  readonly accountSid: string;
-  readonly secret: LiveCredential;
-}
+export const accountOf = (credential: LiveCredential): string => credential.reveal().split(":")[0] ?? "";
 
 /** Twilio refusing a call, with its error code as the refusal's (`21211`, `20003`). */
 export class TwilioRefusal extends LivePlatformRefusal {}
 
 /**
- * Calls Twilio's REST API (2010-04-01) with one account's credentials per call, form-encoded as
+ * Calls Twilio's REST API (2010-04-01) with one account's credential per call, form-encoded as
  * Twilio takes them. A refusal is a `TwilioRefusal` with Twilio's error code and message; a rate
  * limit (429, 20429) is waited out, as `Retry-After` says. The secret goes into the header only.
  */
@@ -36,7 +32,7 @@ export class TwilioRestClient {
 
   /** `path` is under the account: `/Messages.json`; `""` is the account itself. */
   async call<T>(
-    auth: TwilioAuth,
+    credential: LiveCredential,
     method: "GET" | "POST" | "DELETE",
     path: string,
     form?: Readonly<Record<string, string | readonly string[] | undefined>>,
@@ -45,12 +41,12 @@ export class TwilioRestClient {
     for (const [name, value] of Object.entries(form ?? {})) {
       for (const each of typeof value === "string" ? [value] : (value ?? [])) body.append(name, each);
     }
-    const url = `${this.#base}/2010-04-01/Accounts/${auth.accountSid}${path === "" ? ".json" : path}`;
+    const url = `${this.#base}/2010-04-01/Accounts/${accountOf(credential)}${path === "" ? ".json" : path}`;
     for (let attempt = 0; ; attempt++) {
       const response = await this.#fetch(url, {
         method,
         headers: {
-          authorization: `Basic ${Buffer.from(`${auth.username}:${auth.secret.reveal()}`).toString("base64")}`,
+          authorization: `Basic ${Buffer.from(credential.reveal()).toString("base64")}`,
           accept: "application/json",
           ...(method === "POST" ? { "content-type": "application/x-www-form-urlencoded" } : {}),
         },
