@@ -4,6 +4,7 @@
  * (`test/acceptance/schemas.setup.ts`); a channel's unit tests use them directly. A channel with
  * a pinned schema adds its entry here.
  */
+import { discordDispatchProblems, discordResponseProblems } from "./discord.ts";
 import { restProblems, webhookProblems } from "./github.ts";
 import { googlePushProblems, googleResponseProblems } from "./google.ts";
 import { linearResponseProblems, linearWebhookProblems } from "./linear.ts";
@@ -48,5 +49,9 @@ export const SCHEMAS: Readonly<Record<string, ChannelSchemas>> = {
   google: {
     call: (call) => googleResponseProblems(call.method, call.path, call.responseStatus, call.response),
     webhook: (_type, payload) => googlePushProblems(payload),
+  },
+  discord: {
+    call: (call) => discordResponseProblems(call.method, call.path, call.responseStatus, call.response),
+    webhook: discordDispatchProblems,
   },
 };

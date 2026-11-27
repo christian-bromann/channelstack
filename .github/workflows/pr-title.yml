@@ -46,6 +46,7 @@ jobs:
             notion
             resend
             gmail
+            discord
             server
             sdk-ts
             sdk-python

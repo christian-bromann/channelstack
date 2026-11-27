@@ -83,16 +83,13 @@ export const slack: DriverDefinition = {
           .flatMap((conversation) => fake.store.messagesIn(conversation.id))
           .filter((message) => message.stream?.state === "open")
           .map((message) => `a stream ${fake.store.app.name} started and never stopped: "${excerpt(message.text)}"`),
-      // Live, the agent talks to Slack with its own configuration, and live credentials never leave the server.
-      env: () =>
-        live
-          ? {}
-          : {
-              SLACK_API_URL: `${context.apiUrl()}/api/`,
-              SLACK_BOT_TOKEN: context.secret("botToken"),
-              SLACK_APP_TOKEN: context.secret("appToken"),
-              SLACK_SIGNING_SECRET: context.secret("signingSecret"),
-            },
+      // Live, `channelstack env` prints nothing for Slack (app.ts): the agent talks to it with its own configuration.
+      env: () => ({
+        SLACK_API_URL: `${context.apiUrl()}/api/`,
+        SLACK_BOT_TOKEN: context.secret("botToken"),
+        SLACK_APP_TOKEN: context.secret("appToken"),
+        SLACK_SIGNING_SECRET: context.secret("signingSecret"),
+      }),
     };
   },
 };

@@ -15,7 +15,7 @@ import { composeMime } from "../../../core/email/mime.ts";
 import type { EmailMessageInput } from "../../../core/email/routes.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
-import { fakeActorInLiveWorld, liveMisconfigured } from "../../../core/reality/index.ts";
+import { checkOnce, fakeActorInLiveWorld, liveMisconfigured } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
 import { taggedNames } from "../../../core/safety/index.ts";
@@ -196,7 +196,6 @@ export function createLiveGoogleWorld(deps: {
     };
   };
 
-  let readying: Promise<void> | undefined;
   const prepare = async () => {
     app = live.vault.fromEnv("CHANNELSTACK_GOOGLE_REFRESH_TOKEN");
     if (!app) {
@@ -274,8 +273,8 @@ export function createLiveGoogleWorld(deps: {
   const world = {
     store,
 
-    /** The check before the first live action, run once: its outcome, a failure too, is kept. */
-    ready: () => (readying ??= prepare()),
+    /** The check before the first live action: a definitive answer is kept, a network error, 5xx or 429 is asked again (`checkOnce`). */
+    ready: checkOnce(prepare),
 
     async createUser(
       session: string,

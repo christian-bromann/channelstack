@@ -74,7 +74,7 @@ A person who isn't in the conversation yet joins it first, so Ben can reply in A
 
 ## Every channel the same way
 
-`say`, `reply`, `react`, `show` and the actions work on every channel: `slack`, `github`, `linear`, `notion`, `resend` and `google`. A place is what people talk in there, by its name, made the first time with the app in it:
+`say`, `reply`, `react`, `show` and the actions work on every channel: `slack`, `github`, `linear`, `notion`, `resend`, `google` and `discord`. A place is what people talk in there, by its name, made the first time with the app in it:
 
 ```bash
 npx channelstack github say --as mo --in "Login fails" "@my-agent can you look?"   # opens the issue in the org's dev repository
@@ -83,8 +83,11 @@ npx channelstack linear say --as lu --in "Crash on start" "the app crashes"     
 npx channelstack linear delegate --as lu                                         # to the app, on the newest issue
 npx channelstack notion say --as nu --in "Roadmap" "@my-agent summarize this"    # a page connected to the integration
 npx channelstack resend say --as re --in "Refund for order 1234" "Where is it?"  # an email to the agent
+npx channelstack discord say --as di --in "#support" "@my-agent what broke?"     # a channel only its people and the bot see
 npx channelstack github show                                                     # the most recently active issue
 ```
+
+A Discord channel is private to its participants, as a channel the bot makes is: the first person who acts on Discord in the dev session is the guild's admin, and adds the others when they first speak there.
 
 A reference an action needs and isn't given (the message, the issue, the app) comes from the newest entry, or from the place `--in` names, or the entry `--on` names. The [CLI reference](/docs/reference/cli#channelstack-channel-action) has the details.
 
@@ -133,7 +136,7 @@ npx channelstack redeliver slack Ev0A1B2C3D4E
 Retried Ev0A1B2C3D4E (slack)
 ```
 
-On Slack this is Slack's own retry, with its retry headers, so an app that answers twice doesn't handle retries. GitHub, Linear, Notion, Resend and Google redeliver the event instead (`Redelivered … (github)`). Without an id, `redeliver` sends the newest delivery again; without a channel, `deliveries` lists every channel's and `redeliver` finds the id in any. Both take `slack`, `github`, `linear` or `notion`, but only Slack has commands that act in the dev session so far, so the other lists stay empty there. For delivery failures in tests, see [Delivery and failures](/docs/guide/delivery-and-failures).
+On Slack this is Slack's own retry, with its retry headers, so an app that answers twice doesn't handle retries. GitHub, Linear, Notion, Resend, Google and Discord redeliver the event instead (`Redelivered … (github)`; on Discord, the dispatch again, as after a RESUME). Without an id, `redeliver` sends the newest delivery again; without a channel, `deliveries` lists every channel's and `redeliver` finds the id in any. Both take `slack`, `github`, `linear` or `notion`, but only Slack has commands that act in the dev session so far, so the other lists stay empty there. For delivery failures in tests, see [Delivery and failures](/docs/guide/delivery-and-failures).
 
 ## The shared `dev` session
 

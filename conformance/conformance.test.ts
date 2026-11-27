@@ -62,6 +62,17 @@ describe("exit check 6.4: the differential run's comparison", () => {
     expect(normalize("Work on [ENG-12](https://linear.app/acme/issue/ENG-12)")).toBe("Work on [<issue>](<url>)");
   });
 
+  test("Discord's snowflakes are ids, alone or in a mention, and its app's public key is how the app is set up", () => {
+    const fake = {
+      channelId: "1575937482757767444",
+      content: "<@204772274377444028> hi",
+      author: { publicKey: "4404" },
+    };
+    const live = { channelId: "1575937502433251350", content: "<@1575928936762843407> hi", author: { publicKey: "" } };
+    expect(diff(normalize(fake), normalize(live))).toEqual([]);
+    expect(normalize(fake)).toEqual({ channelId: "<id>", content: "<@<id>> hi", author: {} });
+  });
+
   test("a result never holds a secret field or an email, whatever a recording had", () => {
     const recording = {
       author: { kind: "app", token: "ntn_x", privateKey: "k", signingSecret: "s", password: "p" },

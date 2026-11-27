@@ -90,7 +90,11 @@ export class ProtocolError extends Error {
  * channelstack's routes surface as a 409. Each driver names its own (`class SlackRefusal extends LivePlatformRefusal {}`).
  */
 export class LivePlatformRefusal extends ProtocolError {
-  constructor(code: string, message: string, data: Record<string, unknown> = {}) {
+  /** The platform's HTTP status, where it answered with one: a 5xx or a 429 may pass (`checkOnce`). */
+  readonly httpStatus: number | undefined;
+
+  constructor(code: string, message: string, data: Record<string, unknown> = {}, httpStatus?: number) {
     super({ platform: code, status: 409 }, message, data);
+    this.httpStatus = httpStatus;
   }
 }

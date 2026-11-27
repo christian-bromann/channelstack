@@ -9,6 +9,7 @@
         "integrations/vitest/*.ts",
         "examples/agents/*/agent.ts",
         "scripts/lib/slack-event-tap.ts",
+        "scripts/lib/discord-event-tap.ts",
         "test/acceptance/*.ts",
         "test/acceptance/examples/*.ts",
         "test/acceptance/stand-ins/*.ts",

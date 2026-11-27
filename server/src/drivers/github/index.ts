@@ -63,21 +63,18 @@ export const github: DriverDefinition = {
           .list(fake.store.checkRuns, session)
           .filter((run) => run.status !== "completed")
           .map((run) => `a check run "${run.name}" on ${run.headSha.slice(0, 7)} that never completed`),
-      // Live, the agent talks to GitHub with its own configuration, and live credentials never leave the server.
-      env: () =>
-        live
-          ? {}
-          : {
-              GITHUB_API_URL: context.apiUrl(),
-              GITHUB_APP_ID: String(fake.store.app.id),
-              GITHUB_APP_SLUG: fake.store.app.slug,
-              GITHUB_INSTALLATION_ID: String(fake.store.app.installationId),
-              GITHUB_BOT_USER_ID: String(fake.store.app.botId),
-              // A PEM in one line, with `\n` for its line breaks: an .env line is one line, and Probot,
-              // Octokit's App auth and most deploy targets take the key this way.
-              GITHUB_PRIVATE_KEY: context.secret("privateKey").replaceAll("\n", "\\n"),
-              GITHUB_WEBHOOK_SECRET: context.secret("webhookSecret"),
-            },
+      // Live, `channelstack env` prints nothing for GitHub (app.ts): the agent talks to it with its own configuration.
+      env: () => ({
+        GITHUB_API_URL: context.apiUrl(),
+        GITHUB_APP_ID: String(fake.store.app.id),
+        GITHUB_APP_SLUG: fake.store.app.slug,
+        GITHUB_INSTALLATION_ID: String(fake.store.app.installationId),
+        GITHUB_BOT_USER_ID: String(fake.store.app.botId),
+        // A PEM in one line, with `\n` for its line breaks: an .env line is one line, and Probot,
+        // Octokit's App auth and most deploy targets take the key this way.
+        GITHUB_PRIVATE_KEY: context.secret("privateKey").replaceAll("\n", "\\n"),
+        GITHUB_WEBHOOK_SECRET: context.secret("webhookSecret"),
+      }),
     };
   },
 };

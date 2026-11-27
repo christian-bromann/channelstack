@@ -80,3 +80,11 @@ export type EmailSendOptions<TRecipient = unknown> = Omit<Option<G.ResendUser["s
   cc?: readonly TRecipient[];
 };
 export type EmailReplyOptions = NonNullable<Parameters<G.ResendUser["reply"]>[1]>;
+
+// Discord.
+export type DiscordParticipant = G.DiscordUser | G.DiscordApp;
+export type DiscordUserOptions = Option<G.DiscordFixture["createUser"]>;
+export type DiscordChannelOptions = Option<G.DiscordFixture["createChannel"]>;
+export type DiscordFaultOptions = Option<G.DiscordFixture["fault"]>;
+/** Read as one person: Discord shows an ephemeral message only to its person. */
+export type DiscordHasTranscript = { transcript(options?: { as?: DiscordParticipant }): Promise<G.DiscordTranscript> };

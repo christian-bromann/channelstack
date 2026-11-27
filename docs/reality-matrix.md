@@ -244,6 +244,31 @@ Sent email can't be taken back. Live, every recipient must be an address in `CHA
 | `delivery.resend()` / redelivery | Done | No | — | Fake-only. Pub/Sub pushes again only what wasn't acknowledged |
 | `google.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Gmail doesn't report the mailbox's calls |
 
+## Discord
+
+Built in phase 11 ([decision 0026](decisions/0026-discord.md)), against stand-ins; checked against a real sandbox guild once its accounts exist (exit check 11.7). The agent is a bot in a guild: it hears people over the Gateway, a WebSocket it opens itself, and answers through REST v10. With its token set (`CHANNELSTACK_DISCORD_BOT_TOKEN`), Discord runs live in the first guild of `CHANNELSTACK_LIVE_DISCORD_GUILDS` the bot is in.
+
+Discord has no API that acts as a person, and a user token or a scripted account (a self-bot) breaks Discord's terms. So a live person is a second bot, of an application of its own in the sandbox guild, and writes through REST v10 with its token, `CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN`. What it writes carries `author.bot`, a recorded difference (`conformance/divergences.yaml`); an agent that ignores bots takes those bots as people for a live run (the reference agent's `DISCORD_PEOPLE_BOTS`). Discord lets no bot DM another bot, run another app's command or press its button, so those are fake-only. The bot makes each session's channels, private to their participants and tagged with the run, and deletes them when the session closes; the sweep deletes what a crashed run left. The bot needs *Manage Channels* and *Manage Roles* in the sandbox guild.
+
+| Feature | Fake | Live | How (live) | Notes |
+|---|---|---|---|---|
+| `discord.createUser({ name, id, admin, bot, token })` | Done | Built | A second application's bot in the guild (`CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN`) | Live, `admin` must match the bot's roles (`ADMINISTRATOR`), and the token can't be the agent's own. `id` and `bot` are fake-only: a live person has their bot's id, and is a bot already |
+| `discord.createChannel({ name, participants, readOnly, topic })` | Done | Built | App credentials: the bot makes it with a permission overwrite per participant | Only the participants see it, as a private channel. Live, the app must be among them: the bot reads everything back |
+| `ana.say(text, { channel })`, `ana.reply(text, { message })` | Done | Built | The person's bot token | Posted as the person's bot; what it writes carries `author.bot` |
+| `ana.edit`, `delete`, `react`, `unreact`, `startThread` | Done | Built | The person's bot token | As the person's bot. Live there is no delivery: Discord tells the agent |
+| `ana.say(text, { to: discord.app })`, `openDM(discord.app)` | Done | No | — | Fake-only: a live person is a bot, and Discord lets no bot DM another |
+| `ana.runCommand("/deploy web", { channel })`, `ana.click(label, …)` | Done | No | — | Fake-only: Discord makes interactions of people only, and no bot runs another app's command or presses its button |
+| `ana.invite(participants, { channel })` | Done | Built | App credentials | The agent's bot changes the channel's overwrites |
+| `ana.ephemeral()` | Done | Yes, with proxy | Proxy mode | No bot API reads back what only a person sees |
+| `channel.messages()`, `transcript()`, `message.replies()`, `reactions()`, `refresh()`, `toHaveReplyFrom` | Done | Built | App credentials: the bot reads the channel | A message's replies are Discord's replies to it and the messages of the thread started from it |
+| The bot's REST API (messages, reactions, typing, threads, DMs, the guild, commands, the interaction callback, followups) | Done | Agent's concern | — | The fake answers as Discord's description says (exit check 11.2), with Discord's error shape and JSON codes, permissions from roles and overwrites, per-route rate limits (`X-RateLimit-*`, 429 with `retry_after`) and the 2000-character limit |
+| The Gateway (HELLO, IDENTIFY, heartbeats, READY, RESUME, dispatches) | Done | Agent's concern | — | Intents are enforced: without `MESSAGE_CONTENT` a guild message's content is empty unless it mentions the bot. JSON only, no compression |
+| Interactions over HTTP (`CHANNELSTACK_DISCORD_WEBHOOK_URL`) and over the Gateway | Done | Agent's concern | — | Signed with Ed25519 over the timestamp and the body; answered within 3 seconds, never retried. Late, the person sees "This interaction failed" and the callback is 10062 |
+| `discord.verifyEndpoint()` | Done | No | — | Fake-only: Discord checks an endpoint when it is saved in the developer portal |
+| `delivery.resend({ badSignature })`, `redeliver()` | Done | No | — | Fake-only. Discord never sends an interaction twice; a replay after RESUME is the Gateway's |
+| `discord.fault({ type: "rate_limit" })`, `{ type: "drop_gateway" }` | Done | No | — | Fake-only. A fault changes what the bot's calls and its Gateway connection get; discord.js's Gateway doesn't go through the proxy ([decision 0026](decisions/0026-discord.md)), and Discord drops connections when it likes |
+| `discord.calls()`, `waitForCall`, `toHaveReceivedCall` | Done | Yes, with proxy | Proxy mode | Discord doesn't report the bot's calls |
+
 ---
 
 ## OpenAI (the fake model)
@@ -259,9 +284,9 @@ Built in phase 13 ([decision 0029](decisions/0029-fake-openai.md)). The fake Ope
 | `openai.problems()`, `unattributed()`, `sentSecrets()` | Done | Done | — | An unscripted call is a 400 `channelstack_no_script`, and the test fails |
 | Chat Completions, streamed or not | Done | Done | — | Every answer and chunk holds to OpenAI's pinned description (exit check 13.2). Dialects: OpenRouter's `reasoning`, DeepSeek's `reasoning_content`, Azure's deployment paths |
 | Responses, stored responses, `previous_response_id`, Conversations | Done | Done | — | Every event of a stream numbered, `response.failed` and `error` when a stream breaks with an error |
-| Background responses, `n > 1` | No | No | — | Refused with `unsupported_in_fake` |
 | Built-in tools, images, audio, files | Yes | Yes | — | Phase 14 |
-| Embeddings, vector stores, Realtime, batches | No | No | — | Not served (OpenAI's 404) |
+
+Not in the fake at all: background responses and `n > 1` (refused with `unsupported_in_fake`), and embeddings, vector stores, Realtime and batches (OpenAI's 404).
 
 ## What this means for test authors
 
@@ -272,7 +297,7 @@ Built in phase 13 ([decision 0029](decisions/0029-fake-openai.md)). The fake Ope
    - Linear: Stop.
    - Notion: adding connections. (Resolving discussions is not yet supported live.)
 
-   They need the browser actor live, with a saved session ([Browser sessions](#browser-sessions)). It is built for Slack's `say`, `reply` and `click`; the others report `action_requires` live, and the framework skips the step.
+   They need the browser actor live, with a saved session ([Browser sessions](#browser-sessions)). It is built for Slack's `say`, `reply` and `click`; the others report `action_requires` live, and the framework skips the step. Discord has none: a live person there is a second bot acting through the API, and what a bot can't do (DMs with the app, commands, buttons) is fake-only.
 3. **Live mode acts and observes; it never relays.** channelstack acts on the real platform and reads the results back to check that the agent reacted. The platform delivers events to the agent directly; delivery chaos (retries, bad signatures, redelivery) is fake-only. On GitHub, the App's delivery log still lets tests read what was delivered to the agent ([live-mode.md](live-mode.md)).
 4. **Agent-side visibility works live only through proxy.** That covers API calls, the status line, streams, ephemeral messages and faults.
 5. **A live run without a piece a step needs skips that step and says why,** instead of failing (`action_requires`, `unsupported_in_live`). The fake run never skips.

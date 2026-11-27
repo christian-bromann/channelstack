@@ -106,6 +106,17 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   9: [
     { name: "9.2 Gmail's discovery document is the pinned one", script: ["google:schema", "--check"], group: "static" },
   ],
+  // 11.1 and 11.2 (the examples against discord.js, every answer and dispatch held to the
+  // description), 11.4 to 11.6 run in the acceptance and unit checks above; 11.3 (delivery cases
+  // D1 to D8 against discord.js and verifyKey) in `test:integration`; 11.7 and 11.8 in the nightly
+  // live run.
+  11: [
+    {
+      name: "11.2 Discord's OpenAPI description is the pinned one",
+      script: ["discord:schema", "--check"],
+      group: "static",
+    },
+  ],
   // 13.1 and 13.6 (the examples and the pytest port against both OpenAI agents) run in the
   // acceptance check's `openai` part; 13.2 to 13.5, 13.7, 13.8, 13.10 and 13.11 in the unit tests
   // (`server/src/providers/openai`, `server/src/core/{attribution,stream}`) and `test/acceptance`;

@@ -30,6 +30,19 @@ function liveResend(stub: ResendStub, allowlist: string) {
 }
 
 describe("exit check 8.7: Resend live", () => {
+  test("a failure of Resend's own on the first check isn't kept: the next action asks again", async () => {
+    const stub = resendStub();
+    let failures = 1;
+    // The platform's own failure, once: a 503 with no body of its own.
+    const flaky = (async (input: string | URL | Request, init?: RequestInit) =>
+      failures-- > 0 ? new Response("", { status: 503 }) : stub.fetch(input, init)) as typeof fetch;
+    const resend = await liveResend({ ...stub, fetch: flaky }, "agent.example.org").open();
+    const first = await resend("GET", "");
+    expect([first.status, first.body.error]).toEqual([409, "http_503"]);
+    const second = await resend("GET", "");
+    expect(second.status).toBe(200);
+  });
+
   test("the agent's team outside CHANNELSTACK_LIVE_RESEND_DOMAINS is refused before anything is sent", async () => {
     const stub = resendStub();
     const resend = await liveResend(stub, "people.example.org").open();

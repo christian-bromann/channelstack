@@ -63,6 +63,11 @@ const CASES: Record<
     act: { action: "send", values: { to: "app", subject: "Another", text: "one more" } },
     acted: /ana: one more/,
   },
+  discord: {
+    place: "#support",
+    act: { action: "edit", values: { text: "hello there" } },
+    acted: /hello there \(edited\)/,
+  },
 };
 
 describe("the dev tools on every channel", () => {

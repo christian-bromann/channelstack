@@ -79,3 +79,59 @@ divergences:
       tokens last 7 days), as the sandbox's is. The fake's client is a published one, whose tokens
       don't expire.
     expires: 2027-02-28
+  - scenario: shapes/discord
+    path: "webhook MESSAGE_CREATE referenced_message.author.bot"
+    reason: >-
+      Discord has no API that acts as a person, and automating a person's account breaks its terms,
+      so a live person is a second bot in the sandbox guild (decision 0026). The agent's answer
+      quotes the person's message, whose author live carries `bot: true`; in the fake that author is
+      a person, without the flag. (A message's own `author.bot` is in the fake's shape already, from
+      the agent's messages, and a bot's null `global_name` isn't a difference the shapes report.)
+      The difference comes from who writes live, not from drift in the fake.
+    expires: 2027-05-31
+  - scenario: shapes/discord
+    path:
+      - "webhook READY user.avatar"
+      - "webhook GUILD_CREATE icon"
+      - "webhook GUILD_CREATE system_channel_id"
+      - "webhook GUILD_CREATE members.[].user.avatar"
+      - "webhook MESSAGE_CREATE author.avatar"
+      - "webhook MESSAGE_CREATE mentions.[].avatar"
+      - "webhook MESSAGE_CREATE referenced_message.author.avatar"
+      - "webhook MESSAGE_CREATE referenced_message.mentions.[].avatar"
+      - "webhook MESSAGE_REACTION_ADD member.user.avatar"
+    reason: >-
+      Discord documents each of these as nullable: a user without an avatar, a guild without an
+      icon or a system channel has `null`. The sandbox's bots have avatars and its guild has an
+      icon and a system channel; the fake's have none. A difference in the sandbox's setup, not
+      drift in the fake.
+    expires: 2027-05-31
+  - scenario: shapes/discord
+    path:
+      - "webhook READY game_relationships"
+      - "webhook GUILD_CREATE members.[].user.display_name"
+      - "webhook GUILD_CREATE experiments"
+      - "webhook GUILD_CREATE profile"
+      - "webhook GUILD_CREATE roles.[].version"
+      - "webhook GUILD_CREATE channel_settings"
+      - "webhook GUILD_CREATE moderator_reporting"
+      - "webhook GUILD_CREATE game_application_ids"
+      - "webhook GUILD_CREATE guild_space_settings"
+      - "webhook GUILD_CREATE theme"
+      - "webhook GUILD_CREATE official_message_color"
+      - "webhook GUILD_CREATE verification_role_id"
+      - "webhook GUILD_CREATE latest_onboarding_question_id"
+      - "webhook GUILD_CREATE premium_features"
+      - "webhook GUILD_CREATE owner_configured_content_level"
+      - "webhook GUILD_CREATE version"
+      - "webhook GUILD_CREATE linked_game_organization"
+      - "webhook CHANNEL_CREATE version"
+      - "webhook MESSAGE_CREATE referenced_message.channel_type"
+      - "webhook MESSAGE_REACTION_ADD member.user.display_name"
+    reason: >-
+      Real Discord's Gateway sends these fields, which neither the pinned discord-api-spec nor
+      discord-api-types (0.38.60) declares, so neither their shape nor a plain guild's value can be
+      checked against one. The fake sends what Discord documents (its guild's `hub_type`, READY's
+      `flags_new`, a mention's `member` are documented and sent); these join it once a pinned
+      schema describes them.
+    expires: 2027-05-31

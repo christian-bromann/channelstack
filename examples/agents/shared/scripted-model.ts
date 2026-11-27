@@ -38,7 +38,8 @@ export function writer(prompt: string) {
     ...(/\blong\b/i.test(prompt)
       ? Array.from(
           { length: 16 },
-          (_, index) => `\n## Appendix ${index + 1}\n\nMore detail, for those who asked for a long one.\n`,
+          (_, index) =>
+            `\n## Appendix ${index + 1}\n\nMore detail, for those who asked for a long one: what was measured, how often, and what it means for the next release.\n`,
         )
       : []),
   ];

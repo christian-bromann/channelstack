@@ -1,0 +1,39 @@
+name: discord/mention
+description: A person mentions the bot in a channel and the agent answers with Discord's reply to the message. Runs against the fake and against the sandbox guild (the differential run).
+requires: [discord-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers:
+  [
+    DiscordFixture.createUser,
+    DiscordFixture.createChannel,
+    DiscordUser.say,
+    DiscordMessage.replies,
+    DiscordMessage.refresh,
+  ]
+steps:
+  - call: session.discord
+    as: discord
+  - call: discord.createUser
+    options: { name: Ana }
+    as: ana
+  - call: discord.createChannel
+    options: { participants: [$ana, $discord.app] }
+    as: channel
+  - call: ana.say
+    args: ["@my-agent summarize #support today"]
+    options: { channel: $channel }
+    as: message
+  - call: message.waitForReply
+    options: { from: my-agent, timeout: 60s }
+    as: reply
+  - call: message.replies
+    as: replies
+  # The answer is Discord's reply to the question.
+  - expect:
+      - value: $reply.replyTo
+        equals: $message.id
+  - call: message.refresh
+    as: question
+  - record:
+      question: $question
+      replies: $replies

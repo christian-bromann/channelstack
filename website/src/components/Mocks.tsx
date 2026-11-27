@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 /**
  * What each example's test produces, drawn to look like the platform it runs on: a Slack
  * conversation, a GitHub issue, a Linear issue with an agent session, a Notion page with
- * comments. Every part carries the playback step at which it appears, so the mock-up plays
+ * comments, an email thread, a Discord channel. Every part carries the playback step at which it appears, so the mock-up plays
  * in step with the highlighted line of the test.
  */
 
@@ -517,6 +517,85 @@ export function GmailMock({ step }: MockProps) {
             <GmIcon d={GM.forward} /> Forward
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Discord: a guild's text channel, its layout and colours, no Discord artwork.
+
+function DiscordMessage({
+  who,
+  bot = false,
+  time,
+  className,
+  quote,
+  children,
+}: {
+  who: string;
+  bot?: boolean;
+  time: string;
+  className: string;
+  /** Discord's reply: the message it answers, quoted above it. */
+  quote?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className={className}>
+      {quote ? (
+        <p className="dc-quote">
+          <span className="dc-quote-line" aria-hidden="true" />
+          {quote}
+        </p>
+      ) : null}
+      <div className="dc-row">
+        <span className={bot ? "dc-avatar bot" : "dc-avatar"} aria-hidden="true">
+          {who[0]!.toUpperCase()}
+        </span>
+        <div>
+          <p className="dc-who">
+            <b>{who}</b> {bot ? <span className="dc-app">APP</span> : null} <small>{time}</small>
+          </p>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A mention in a channel, answered once with Discord's reply. */
+export function DiscordMock({ step }: MockProps) {
+  return (
+    <div className="app app-discord">
+      <div className="dc-head">
+        <span className="dc-hash" aria-hidden="true">
+          #
+        </span>
+        <b>support</b>
+      </div>
+      <div className="dc-body">
+        <DiscordMessage who="Ana" time="Today at 10:42 AM" className={when(step, 1, "dc-msg")}>
+          <p>
+            <Mention>@my-agent</Mention> why is the build red?
+          </p>
+        </DiscordMessage>
+        <DiscordMessage
+          who="my-agent"
+          bot
+          time="Today at 10:42 AM"
+          className={when(step, 2, step >= 3 ? "dc-msg is-replied" : "dc-msg")}
+          quote={
+            <>
+              <b>@Ana</b> why is the build red?
+            </>
+          }
+        >
+          <p>The lint step fails on main since 9:58: an unused import in api/routes.ts.</p>
+        </DiscordMessage>
+      </div>
+      <div className="dc-composer" aria-hidden="true">
+        <span>Message #support</span>
       </div>
     </div>
   );

@@ -6,25 +6,12 @@ name: Release
 #   - PyPI: `channelstack` and `pytest-channelstack`;
 #   - crates.io: `channelstack`;
 #   - a GitHub release with the five binaries, their checksums and the changelog's section.
-# A pull request that changes how a release is built runs everything up to publishing, as a dry
-# run: it gets no secrets and publishes nothing.
+# Nothing else starts it: the tag is pushed by release-tag.yml, once the version pull request that
+# **Prepare a release** (release-prepare.yml, started by hand) opened is merged.
 
 on:
   push:
     tags: ["v*.*.*"]
-  pull_request:
-    paths:
-      - .github/workflows/release.yml
-      - .github/actions/setup/action.yml
-      - scripts/release.ts
-      - scripts/build-binary.ts
-      - scripts/bun-compile.ts
-      - scripts/lib/packages.ts
-      - sdks/typescript/package.json
-      - sdks/typescript/tsconfig.build.json
-      - sdks/python/pyproject.toml
-      - sdks/rust/Cargo.toml
-      - integrations/pytest-channelstack/pyproject.toml
 
 permissions:
   contents: read
@@ -57,17 +44,11 @@ jobs:
       - id: version
         name: The versions agree (and match the tag, which is on main, with a changelog section)
         env:
-          EVENT: ${{ github.event_name }}
           TAG: ${{ github.ref_name }}
         run: |
-          if [ "$EVENT" = push ]; then
-            node scripts/release.ts check --tag "$TAG"
-            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$TAG isn't on main"; exit 1; }
-            version="${TAG#v}"
-          else
-            node scripts/release.ts check
-            version="$(node -p 'require("./sdks/typescript/package.json").version')"
-          fi
+          node scripts/release.ts check --tag "$TAG"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$TAG isn't on main"; exit 1; }
+          version="${TAG#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           case "$version" in
             *-*) echo "npm-tag=next" >> "$GITHUB_OUTPUT"; echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
@@ -160,6 +141,7 @@ jobs:
           # From where the npm job publishes, with the path it uses (a leading ./: npm reads
           # "packs/x.tgz" as the GitHub repository packs/x.tgz).
           (cd dist && npm publish --dry-run "./packs/channelstack-$VERSION.tgz")
+      # The same two steps run in ci.yml's `packages` job on every pull request: change both.
       - name: PyPI, channelstack and pytest-channelstack
         run: |
           uv build --project sdks/python --out-dir dist/python
@@ -177,7 +159,6 @@ jobs:
 
   npm:
     name: publish to npm
-    if: github.event_name == 'push'
     needs: [check, binaries, windows, packages]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -217,7 +198,6 @@ jobs:
 
   pypi:
     name: publish to PyPI
-    if: github.event_name == 'push'
     needs: [check, packages]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -237,7 +217,6 @@ jobs:
 
   crate:
     name: publish to crates.io
-    if: github.event_name == 'push'
     needs: [check, packages]
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -258,7 +237,6 @@ jobs:
 
   github:
     name: GitHub release
-    if: github.event_name == 'push'
     needs: [check, npm, pypi, crate]
     runs-on: ubuntu-latest
     timeout-minutes: 5

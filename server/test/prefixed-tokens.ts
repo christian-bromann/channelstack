@@ -30,12 +30,18 @@ function literalPrefix(pattern: RegExp): string {
 
 /**
  * Every secret format a driver declares, and the tokens it issues beyond them, that has a
- * recognisable prefix (`xoxb-`, `ntn_`, `GOCSPX-`, `ya29.`): the redactor scrubs those by their
- * shape, and the rest by value once loaded. A private key's armour isn't a token's prefix.
+ * recognisable prefix (`xoxb-`, `ntn_`, `GOCSPX-`, `ya29.`), or a shape the driver's token patterns
+ * know without one (Discord's bot token, `<id in base 64>.<6>.<38>`): the redactor scrubs those by
+ * their shape, and the rest by value once loaded. A private key's armour isn't a token's prefix.
  */
-export const PREFIXED_TOKENS: ReadonlyArray<readonly [name: string, format: SecretFormat]> = DRIVERS.flatMap(
-  (driver) => [
+export const PREFIXED_TOKENS: ReadonlyArray<readonly [name: string, format: SecretFormat]> = DRIVERS.flatMap((driver) =>
+  [
     ...Object.entries(driver.secrets).map(([name, format]) => [`${driver.name}.${name}`, format] as const),
     ...(driver.liveTokens ?? []).map((format, at) => [`${driver.name} token ${at + 1}`, format] as const),
-  ],
-).filter(([, format]) => literalPrefix(format.pattern).length >= 3 && !format.pattern.source.includes("PRIVATE KEY"));
+  ].filter(([, format]) => {
+    if (format.pattern.source.includes("PRIVATE KEY")) return false;
+    if (literalPrefix(format.pattern).length >= 3) return true;
+    const sample = format.generate();
+    return driver.tokenPatterns.some((pattern) => new RegExp(pattern.source).test(sample));
+  }),
+);
