@@ -10,6 +10,7 @@
         "examples/agents/*/agent.ts",
         "scripts/lib/slack-event-tap.ts",
         "test/acceptance/*.ts",
+        "test/acceptance/examples/*.ts",
         "test/acceptance/stand-ins/*.ts",
         "test/acceptance/default-timeout/*.ts",
         "test/acceptance/wait-defaults/*.ts",
@@ -37,12 +38,8 @@
       "entry": ["client.ts", "**/*.test.ts"],
       "project": ["**/*.ts"],
       "ignoreDependencies": ["vitest"]
-    },
-    "api": {
-      "entry": ["*.d.ts", "examples/*.ts"],
-      "project": ["**/*.ts"]
     }
   },
   "ignoreBinaries": ["uv", "portless", "rustfmt"],
-  "ignore": ["api/examples/fixtures/**"]
+  "ignore": ["test/acceptance/examples/fixtures/**"]
 }

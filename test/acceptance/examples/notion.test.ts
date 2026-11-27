@@ -2,12 +2,16 @@
  * Notion examples. Every test runs against the in-memory fake by default.
  * Tests marked "fake only" use delivery chaos, or features not yet supported live.
  */
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 
 describe("comments and discussions", () => {
   test("a mention in a page comment gets a reply in the same discussion", async ({ notion }) => {
     const ana = await notion.createUser({ name: "Ana" });
-    const page = await notion.createPage({ title: "Roadmap", content: "# Q1\n- ship search\n- ship billing", connections: [notion.app] });
+    const page = await notion.createPage({
+      title: "Roadmap",
+      content: "# Q1\n- ship search\n- ship billing",
+      connections: [notion.app],
+    });
 
     const comment = await ana.comment("@my-agent summarize this page", { page });
 
@@ -17,7 +21,11 @@ describe("comments and discussions", () => {
 
   test("a comment anchored to a block", async ({ notion }) => {
     const ana = await notion.createUser({ name: "Ana" });
-    const page = await notion.createPage({ title: "Spec", content: "## Rate limits\n100 req/min per token", connections: [notion.app] });
+    const page = await notion.createPage({
+      title: "Spec",
+      content: "## Rate limits\n100 req/min per token",
+      connections: [notion.app],
+    });
 
     const comment = await ana.comment("@my-agent is this enough for the mobile app?", { page, anchor: "Rate limits" });
 
@@ -81,7 +89,11 @@ describe("connections", () => {
 describe("pages and databases", () => {
   test("the agent edits the page it was asked about", async ({ notion }) => {
     const ana = await notion.createUser({ name: "Ana" });
-    const page = await notion.createPage({ title: "Meeting notes", content: "- talked about Q1", connections: [notion.app] });
+    const page = await notion.createPage({
+      title: "Meeting notes",
+      content: "- talked about Q1",
+      connections: [notion.app],
+    });
 
     await ana.comment("@my-agent add action items at the end", { page });
 

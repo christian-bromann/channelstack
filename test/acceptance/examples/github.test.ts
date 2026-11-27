@@ -2,7 +2,7 @@
  * GitHub examples. Every test runs against the in-memory fake by default.
  * Tests marked "fake only" use delivery chaos, which live mode doesn't support.
  */
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 
 describe("issues", () => {
   test("a mention in an issue gets one comment, and no self-trigger loop", async ({ github }) => {
@@ -59,7 +59,11 @@ describe("pull requests and reviews", () => {
     const ana = await github.createUser({ login: "ana" });
     const repo = await github.createRepo({ files: "./fixtures/web", collaborators: [ana], apps: [github.app] });
     const pr = await ana.openPullRequest(
-      { from: "fix-login", title: "Fix login redirect", changes: { "src/login.ts": "export const redirect = '/home';\n" } },
+      {
+        from: "fix-login",
+        title: "Fix login redirect",
+        changes: { "src/login.ts": "export const redirect = '/home';\n" },
+      },
       { repo },
     );
 
@@ -87,7 +91,10 @@ describe("pull requests and reviews", () => {
     const ana = await github.createUser({ login: "ana" });
     const ben = await github.createUser({ login: "ben" });
     const repo = await github.createRepo({ files: "./fixtures/web", collaborators: [ana, ben], apps: [github.app] });
-    const pr = await ana.openPullRequest({ from: "feat", draft: true, changes: { "src/app.ts": "export const x = 1\n" } }, { repo });
+    const pr = await ana.openPullRequest(
+      { from: "feat", draft: true, changes: { "src/app.ts": "export const x = 1\n" } },
+      { repo },
+    );
 
     await ana.markReady({ pr });
     await ben.review({
@@ -111,7 +118,10 @@ describe("pushes and check runs", () => {
     const repo = await github.createRepo({ files: "./fixtures/web", collaborators: [ana], apps: [github.app] });
     const pr = await ana.openPullRequest({ from: "feat", changes: { "src/app.ts": "export {}\n" } }, { repo });
 
-    const commit = await ana.push({ "src/app.ts": "export const broken = ;\n" }, { repo, branch: "feat", message: "wip" });
+    const commit = await ana.push(
+      { "src/app.ts": "export const broken = ;\n" },
+      { repo, branch: "feat", message: "wip" },
+    );
 
     await expect(commit).toHaveCheckRun("my-agent", { conclusion: "failure" });
     const [run] = await commit.checkRuns();
@@ -122,7 +132,10 @@ describe("pushes and check runs", () => {
   test("a requested action on a check run", async ({ github }) => {
     const ana = await github.createUser({ login: "ana" });
     const repo = await github.createRepo({ files: "./fixtures/web", collaborators: [ana], apps: [github.app] });
-    const pr = await ana.openPullRequest({ from: "feat", changes: { "src/app.ts": "export const broken = ;\n" } }, { repo });
+    const pr = await ana.openPullRequest(
+      { from: "feat", changes: { "src/app.ts": "export const broken = ;\n" } },
+      { repo },
+    );
     await expect(pr).toHaveCheckRun("my-agent", { conclusion: "action_required" });
     const [run] = await pr.checkRuns();
 
@@ -175,19 +188,22 @@ describe("live mode", () => {
   // With the App's credentials and CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN (a machine account's
   // fine-grained PAT) set, this runs in the real test org. GitHub delivers to the agent itself;
   // channelstack creates the repo, acts as Ana and reads the result back.
-  test.skipIf(!process.env.CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN)("a real comment on a real repo", async ({ github }) => {
-    const ana = await github.createUser({ login: "ana-channelstack" });
-    const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
-    const issue = await ana.openIssue({ title: "Live smoke test" }, { repo });
+  test.skipIf(!process.env.CHANNELSTACK_GITHUB_USER_ANA_CHANNELSTACK_TOKEN)(
+    "a real comment on a real repo",
+    async ({ github }) => {
+      const ana = await github.createUser({ login: "ana-channelstack" });
+      const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
+      const issue = await ana.openIssue({ title: "Live smoke test" }, { repo });
 
-    await ana.comment("@my-agent please triage", { issue });
+      await ana.comment("@my-agent please triage", { issue });
 
-    await expect(issue).toHaveCommentFrom(github.app, { timeout: "60s" });
-    // GitHub's delivery log is readable live, so this works too. It shows a delivery a few
-    // seconds after GitHub sent it.
-    const comments = () => github.deliveries({ type: "issue_comment", resource: repo });
-    await expect.poll(async () => (await comments()).length, { timeout: 30_000 }).toBeGreaterThan(0);
-    const [delivery] = await comments();
-    await expect(delivery!).toBeAccepted();
-  });
+      await expect(issue).toHaveCommentFrom(github.app, { timeout: "60s" });
+      // GitHub's delivery log is readable live, so this works too. It shows a delivery a few
+      // seconds after GitHub sent it.
+      const comments = () => github.deliveries({ type: "issue_comment", resource: repo });
+      await expect.poll(async () => (await comments()).length, { timeout: 30_000 }).toBeGreaterThan(0);
+      const [delivery] = await comments();
+      await expect(delivery!).toBeAccepted();
+    },
+  );
 });

@@ -89,7 +89,7 @@ The reference is generated wherever there's one source for it, so it can't drift
 ## Writing a page
 
 - **Open with what the page is for,** in one or two sentences, before any heading. Then H2 sections; the right-hand outline is built from H2 and H3.
-- **Show, then explain.** A code block early, then what it does. Every example is compiled and type-checked in every language it's shown in; the ones that run against the reference agents are in `api/examples/`.
+- **Show, then explain.** A code block early, then what it does. Every example is compiled and type-checked in every language it's shown in; the ones that run against the reference agents are in `test/acceptance/examples/`.
 - **Plain words, short sentences,** the way the rest of the repository is written. Name things the way the API does.
 - **Describe what's built.** A feature that isn't built yet isn't documented as if it were; at most a sentence says it's coming, with its issue.
 - **Link across kinds** instead of mixing them: a how-to links to the explanation of why, and to the reference for every option.
@@ -129,7 +129,7 @@ Fenced blocks are highlighted at build time (`ts`, `tsx`, `js`, `python`, `rust`
 
 A test, or anything that uses the test API (actors, fixtures, `expect`), is never a fenced block. It's an `<Example id="slack-mention-one-reply" />`: three real files in `website/examples/`, shown as TypeScript, Python and Rust tabs and checked in CI, so they can't rot.
 
-- `ts/<id>.test.ts`, type-checked against `api/*.d.ts` (`pnpm typecheck:samples` here).
+- `ts/<id>.test.ts`, type-checked against the TypeScript SDK and its Vitest integration (`pnpm typecheck:samples` here).
 - `python/test_<id_with_underscores>.py`, an `async def test_…(slack: SlackFixture)` checked by pyright, strict (`pnpm typecheck` at the root).
 - `rust/src/<id_with_underscores>.rs`, a `#[tokio::test] #[ignore]` that gets its session from `fixtures::session()`, compiled by clippy (`pnpm test:rust` at the root).
 

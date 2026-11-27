@@ -2,7 +2,7 @@
  * Resend examples: an agent people email. Every test runs against the in-memory fake by default.
  * Tests marked "fake only" use delivery chaos.
  */
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 
 describe("email conversations", () => {
   test("an email to the agent gets one reply, in its thread", async ({ resend }) => {
@@ -97,11 +97,14 @@ describe("live mode", () => {
   // With the agent team's key and CHANNELSTACK_RESEND_USER_ANA_TOKEN (Ana's own team's key) set,
   // Ana's email goes through real Resend to the agent's receiving address, and Resend delivers to
   // the agent itself.
-  test.skipIf(!process.env.CHANNELSTACK_RESEND_USER_ANA_TOKEN)("a real email gets a real answer", async ({ resend }) => {
-    const ana = await resend.createUser({ name: "Ana" });
+  test.skipIf(!process.env.CHANNELSTACK_RESEND_USER_ANA_TOKEN)(
+    "a real email gets a real answer",
+    async ({ resend }) => {
+      const ana = await resend.createUser({ name: "Ana" });
 
-    const email = await ana.send({ to: [resend.app], subject: "Live smoke test", text: "Where is my refund?" });
+      const email = await ana.send({ to: [resend.app], subject: "Live smoke test", text: "Where is my refund?" });
 
-    await expect(email.thread).toHaveReplyFrom(resend.app, { timeout: "60s" });
-  });
+      await expect(email.thread).toHaveReplyFrom(resend.app, { timeout: "60s" });
+    },
+  );
 });

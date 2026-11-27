@@ -4,8 +4,10 @@
     "noEmit": true,
     "types": ["node", "bun"],
     "paths": {
+      "channelstack": ["./sdks/typescript/client.ts"],
       "channelstack/client": ["./sdks/typescript/client.ts"],
-      "channelstack/vitest": ["./integrations/vitest/index.ts"]
+      "channelstack/vitest": ["./integrations/vitest/index.ts"],
+      "channelstack/checks": ["./integrations/checks/index.ts"]
     }
   },
   "include": [
@@ -20,5 +22,5 @@
     "test",
     "vitest.config.ts"
   ],
-  "exclude": ["**/dist", "**/node_modules"]
+  "exclude": ["**/dist", "**/node_modules", "test/acceptance/examples/fixtures"]
 }

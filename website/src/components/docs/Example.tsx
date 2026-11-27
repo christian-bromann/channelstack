@@ -7,7 +7,7 @@ import { CodeGroup } from "./CodeGroup";
  * One test in every SDK's language, as tabs: `<Example id="slack-mention-one-reply" />`.
  *
  * The three versions are real files in `website/examples/`, type-checked and compiled in CI:
- *   ts/slack-mention-one-reply.test.ts     (pnpm typecheck:samples, against ../api/*.d.ts)
+ *   ts/slack-mention-one-reply.test.ts     (pnpm typecheck:samples, against the TypeScript SDK)
  *   python/test_slack_mention_one_reply.py (pnpm typecheck at the root: pyright, strict)
  *   rust/src/slack_mention_one_reply.rs    (pnpm test:rust at the root: clippy)
  * Their `@show:start` … `@show:end` markers pick what the page shows (plugins/samples-plugin.ts).

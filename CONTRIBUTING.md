@@ -35,7 +35,7 @@ them too.
   concern has one owner, and a second implementation won't be merged.
 - **A fake does what the real platform does:** the same ids, payloads and error codes, and the same
   refusals.
-- **`api/*.d.ts` is the contract.** If a change needs it to change, say why in the pull request.
+- **The server's routes are the API.** The SDKs are generated from them; a change to what a test can call is a change to the routes, and the examples in `test/acceptance/examples/` show it.
 - **Generated files** (`spec/`, `sdks/*/generated/`, the API reference) are regenerated with
   `pnpm spec` and `pnpm sdk`, never edited by hand.
 - **Format and check** with `pnpm format`, then `pnpm lint`.

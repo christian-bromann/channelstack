@@ -401,7 +401,7 @@ export function registerGitHubRoutes(
   const person = (session: string, id: string) => store.users.get(session, id).id;
   /**
    * The people, or the App's bot, an issue is assigned to or a review is requested from. The
-   * contract (`api/github.d.ts`) takes the App here; whether GitHub itself accepts an App's bot is
+   * SDK takes the App here (`ana.assign(github.app, { issue })`); whether GitHub itself accepts an App's bot is
    * not verified (docs/reality-matrix.md).
    */
   const people = (session: string, ids: readonly string[], operation: string) =>

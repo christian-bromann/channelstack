@@ -1,11 +1,12 @@
+import { githubChecks, googleChecks, linearChecks, notionChecks, resendChecks, slackChecks } from "channelstack/checks";
 /**
  * Patterns shared by every channel: people as reusable fixtures, and the standard checks.
  * Per-channel examples: slack.test.ts, github.test.ts, linear.test.ts, notion.test.ts, resend.test.ts,
  * google.test.ts.
  */
 import { expect } from "vitest";
-import { test } from "./fixtures";
-import { slackChecks, githubChecks, linearChecks, notionChecks, resendChecks, googleChecks } from "channelstack/checks";
+
+import { test } from "./fixtures.ts";
 
 // People and places as fixtures: created per test, cleaned up after it.
 test("answers in #support", async ({ support, ana }) => {

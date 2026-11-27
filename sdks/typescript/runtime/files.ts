@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-/** Files in a test: inline contents, or a path to a fixture file or directory (`api/common.d.ts`). */
+/** Files in a test: inline contents, or a path to a fixture file or directory. */
 export type FileInput =
   { name: string; content: string | Uint8Array; mimeType?: string } | { path: string; name?: string };
 

@@ -2,7 +2,7 @@
  * `import sample from "../samples/slack.test.ts?sample"` gives the highlighted sample.
  *
  * Samples are real files (../samples, and the docs' examples in ../examples). `pnpm typecheck:samples`
- * checks the TypeScript ones against ../api/*.d.ts; the Python ones are checked with pyright and the
+ * checks the TypeScript ones against the TypeScript SDK; the Python ones are checked with pyright and the
  * Rust ones compiled by clippy, at the repository root (samples/python/README.md).
  * Two comment markers control what the site shows:
  *   // @show:start … // @show:end   show only this region (the whole file otherwise)

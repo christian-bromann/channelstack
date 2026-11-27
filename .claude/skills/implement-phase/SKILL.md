@@ -77,7 +77,7 @@ Phase <n> of docs/phases.md: <goal>. Plan: phase-log/phase-<n>/plan.md
 - **Follow the driver contract** (`docs/architecture.md` 3.3): each action is written once against `World`; payloads come from `payloads.ts`; drivers never import each other.
 - **Dependencies:** follow the policy in `AGENTS.md`, and add each new one to the plan's table and the PR body.
 - **Tests first for exit checks.** Turn each exit check into its test before building the feature, and make sure it fails for the right reason.
-- **Don't weaken acceptance tests** (`api/examples/*.test.ts`, exit-check tests) to make them pass. If one is wrong, fix it and its spec together and say why in the PR.
+- **Don't weaken acceptance tests** (`test/acceptance/examples/*.test.ts`, exit-check tests) to make them pass. If one is wrong, fix it and its spec together and say why in the PR.
 - **Small commits, pushed often,** each naming the exit check it moves. Tick the PR's boxes as checks go green in CI.
 
 ## 4. Gate

@@ -26,27 +26,21 @@ import { capture, run } from "./lib/process.ts";
 import { startBinary } from "./lib/server.ts";
 import { runSmoke } from "./smoke.ts";
 
-/**
- * The type names the contract exports as `channelstack`, but the test framework's own, which
- * `channelstack/vitest` has, and `SlackInjectedFault`, the SDK's `SlackFault` (#37).
- */
-function contractTypeNames(): string[] {
-  const elsewhere = new Set([
-    "ChannelstackFixture",
-    "ChannelstackIntegrationOptions",
-    "ChannelstackMatchers",
-    "TextOptions",
-    "SlackInjectedFault",
-  ]);
-  const contract = join(ROOT, "api", "index.d.ts");
-  const program = ts.createProgram([contract], { noEmit: true });
+/** Every type the SDK's root module (`sdks/typescript/client.ts`) exports: the types `channelstack` gives a test. */
+function sdkTypeNames(): string[] {
+  const root = join(ROOT, "sdks", "typescript", "client.ts");
+  const program = ts.createProgram([root], { noEmit: true, allowImportingTsExtensions: true });
   const checker = program.getTypeChecker();
-  const module = checker.getSymbolAtLocation(program.getSourceFile(contract) as ts.SourceFile);
-  if (!module) throw new Error(`Can't read ${contract}`);
+  const module = checker.getSymbolAtLocation(program.getSourceFile(root) as ts.SourceFile);
+  if (!module) throw new Error(`Can't read ${root}`);
+  const isType = (symbol: ts.Symbol) => {
+    const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+    return (target.flags & (ts.SymbolFlags.Type | ts.SymbolFlags.Class)) !== 0;
+  };
   return checker
     .getExportsOfModule(module)
+    .filter(isType)
     .map((symbol) => symbol.name)
-    .filter((name) => !elsewhere.has(name))
     .sort();
 }
 
@@ -163,15 +157,16 @@ try {
     { cwd: project },
   ).trim();
   if (sameModule !== "true") throw new Error('`import "channelstack"` is not the client that `channelstack/client` is');
-  // Every type name the contract (`api/index.d.ts`) gives `channelstack`, imported from the installed package.
-  const names = contractTypeNames();
+  // Every type the SDK's sources export from `channelstack`, imported from the installed package: the
+  // packed declarations leave none out.
+  const names = sdkTypeNames();
   writeFileSync(
     join(project, "types.ts"),
     [
       `import type { ${names.join(", ")} } from "channelstack";`,
       'import { connect } from "channelstack";',
       `export type Every = [${names.join(", ")}];`,
-      // The contract's generic types take their type arguments here too.
+      // The generic types take their type arguments here too.
       'export const narrowed = (delivery: Delivery<"app_mention">): "app_mention" => delivery.type;',
       "export const inspected = (slack: SlackFixture): Inspectable<SlackDelivery> => slack;",
       "export const open = connect;",
@@ -184,7 +179,7 @@ try {
     { cwd: project },
   );
   console.log(
-    `import type { … } from "channelstack": the contract's ${names.length} type names type-check against the installed package`,
+    `import type { … } from "channelstack": the SDK's ${names.length} exported types type-check against the installed package`,
   );
 
   // The scenario runner is copied in, so its `channelstack/client` import resolves to the installed package.

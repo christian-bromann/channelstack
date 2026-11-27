@@ -32,11 +32,6 @@ const STANDING: readonly Check[] = [
   { name: "Spec is current", script: ["spec:check"], group: "static" },
   { name: "SDKs are current", script: ["sdk:check"], group: "static" },
   { name: "Linear's schema module matches its SDL", script: ["linear:schema:check"], group: "static" },
-  {
-    name: "The contract against the generated SDK: the examples, and every member",
-    script: ["api:check"],
-    group: "static",
-  },
   { name: "No secrets in output", script: ["test:redaction"], group: "unit" },
   { name: "No duplicate code", script: ["check:dupes"], group: "static" },
   { name: "Architecture boundaries", script: ["check:deps"], group: "static" },
@@ -57,7 +52,7 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
     { name: "0.4 The stale checks catch drift", script: ["test:stale"], group: "static" },
   ],
   // Phase 1's exit checks all run in checks above. The acceptance run (standing) covers 1.1 and
-  // 1.2 (`api/examples` against both reference agents), 1.5 and 1.7 (`test/acceptance/stack`),
+  // 1.2 (`test/acceptance/examples` against both reference agents), 1.5 and 1.7 (`test/acceptance/stack`),
   // 1.4 and 1.6 (`test/acceptance`). 1.3 (delivery cases against Bolt) is in `test:integration`.
   1: [],
   // Phase 2 likewise. The acceptance run covers 2.1 (every fake Slack example against both
@@ -77,7 +72,7 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   // agent), 4.3 for that whole run (`test/acceptance/linear-schemas.setup.ts` holds every GraphQL
   // answer and webhook to Linear's schema), 4.5 (`test/acceptance/checks` against the agents,
   // `checks-broken.test.ts` against the agents with one fault per check) and 4.6
-  // (`api/examples/shared.test.ts` with one agent per channel). Delivery cases L1 to L3 and N1 to N3
+  // (`test/acceptance/examples/shared.test.ts` with one agent per channel). Delivery cases L1 to L3 and N1 to N3
   // (4.4) are in `test:integration`; the schema module is a standing check.
   4: [],
   // Phase 5's checks that need no sandbox are unit tests: 5.3 (`drivers/slack/live/live.test.ts`,

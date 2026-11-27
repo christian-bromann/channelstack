@@ -1,5 +1,5 @@
 /**
- * Runs `api/examples` unchanged against a reference agent and the compiled binary: the acceptance
+ * Runs `test/acceptance/examples` unchanged against a reference agent and the compiled binary: the acceptance
  * suite. Each phase enables the `describe` blocks it has built.
  */
 import { spawnSync } from "node:child_process";
@@ -13,11 +13,11 @@ import { run } from "./lib/process.ts";
 import { withStack } from "./lib/stack.ts";
 
 /**
- * Every channel in one run (exit check 4.6): `api/examples/shared.test.ts` against one server with
+ * Every channel in one run (exit check 4.6): `test/acceptance/examples/shared.test.ts` against one server with
  * one reference agent per channel, each with its own endpoint.
  */
 const SHARED = {
-  examples: "api/examples/shared.test.ts",
+  examples: "test/acceptance/examples/shared.test.ts",
   agents: HARNESS_CHANNELS.map(referenceOf),
   enabled: ["answers in #support", "an admin and a regular member", `(${HARNESS_CHANNELS.join("|")}) checks: `],
 };
@@ -38,11 +38,6 @@ const PROXY = {
   ],
 } as const;
 
-/** Matches the full name ("describe > test") of every example test this phase has enabled, in any channel. */
-export const ENABLED_TESTS = new RegExp(
-  `^(${[...HARNESS_CHANNELS.flatMap((channel) => HARNESS[channel].enabled), ...SHARED.enabled].join("|")})`,
-);
-
 /**
  * The examples against each reference agent (all, or these), then `shared.test.ts` with one agent
  * per channel (`shared`, by default only when every agent runs).
@@ -58,7 +53,7 @@ export async function runExamples(
     const { channel, path } = agentOf;
     const examples = examplesOf(channel);
     const { enabled, suites } = HARNESS[channel];
-    console.log(`\napi/examples against ${name}`);
+    console.log(`\ntest/acceptance/examples against ${name}`);
     const agent = join(ROOT, "examples", "agents", name, "agent.ts");
     await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
       const vitest = ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts"];
@@ -75,7 +70,7 @@ export async function runProxyExamples(options: { bin?: string } = {}): Promise<
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
   const { channel, path } = AGENTS[PROXY.agent] as { channel: "slack"; path: string };
-  console.log(`\napi/examples against ${PROXY.agent} in proxy mode`);
+  console.log(`\ntest/acceptance/examples against ${PROXY.agent} in proxy mode`);
   const agent = join(ROOT, "examples", "agents", PROXY.agent, "agent.ts");
   await withStack({ bin, agent, webhook: { driver: channel, path }, proxy: true }, ({ env }) => {
     run(
@@ -109,7 +104,7 @@ export async function runGoDockerExamples(options: { bin?: string } = {}): Promi
   }
   const dir = join(ROOT, "examples", "agents", "go-slack");
   run("docker", ["build", "--quiet", "--tag", "channelstack-go-slack:local", dir], { cwd: ROOT });
-  console.log("\napi/examples against the Go agent in Docker, in proxy mode");
+  console.log("\ntest/acceptance/examples against the Go agent in Docker, in proxy mode");
   await withStack(
     { bin, agent: join(dir, "agent.ts"), webhook: { driver: "slack", path: "/slack/events" }, proxy: true },
     ({ env }) => {

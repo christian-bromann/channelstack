@@ -4,7 +4,7 @@ import { type EventLog, WORLD_SCOPE } from "../events/index.ts";
 
 /**
  * What every channel's fixture lets a test inspect, in one shape for all of them: deliveries with
- * their attempts, and the API calls the agent made (`Inspectable` in api/common.d.ts).
+ * their attempts, and the API calls the agent made (the SDKs' `deliveries`, `calls` and their waits).
  */
 export const DeliveryStatus = z.enum(["pending", "acknowledged", "failed", "timed_out", "unreachable"]);
 
@@ -141,7 +141,7 @@ export interface TranscriptPrincipal {
   kind: "user" | "app";
 }
 
-/** One line of a transcript, in the shape every channel's transcript has (`api/common.d.ts`). */
+/** One line of a transcript, in the shape every channel's transcript has. */
 export interface TranscriptEntry {
   id: string;
   author: TranscriptPrincipal;

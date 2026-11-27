@@ -2,7 +2,7 @@
  * Google examples: an agent people email at its Gmail address. Every test runs against the
  * in-memory fake by default. Tests marked "fake only" use delivery chaos.
  */
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 
 describe("email conversations", () => {
   test("an email to the agent gets one reply, in its thread", async ({ google }) => {
@@ -132,11 +132,14 @@ describe("live mode", () => {
   // With the agent's OAuth client and refresh token, and CHANNELSTACK_GOOGLE_USER_ANA_TOKEN (Ana's
   // own Gmail account's refresh token) set, Ana's email goes through real Gmail to the agent's
   // mailbox, and Gmail tells the agent through its own Pub/Sub topic.
-  test.skipIf(!process.env.CHANNELSTACK_GOOGLE_USER_ANA_TOKEN)("a real email gets a real answer", async ({ google }) => {
-    const ana = await google.createUser({ name: "Ana" });
+  test.skipIf(!process.env.CHANNELSTACK_GOOGLE_USER_ANA_TOKEN)(
+    "a real email gets a real answer",
+    async ({ google }) => {
+      const ana = await google.createUser({ name: "Ana" });
 
-    const email = await ana.send({ to: [google.app], subject: "Live smoke test", text: "Where is my refund?" });
+      const email = await ana.send({ to: [google.app], subject: "Live smoke test", text: "Where is my refund?" });
 
-    await expect(email.thread).toHaveReplyFrom(google.app, { timeout: "90s" });
-  });
+      await expect(email.thread).toHaveReplyFrom(google.app, { timeout: "90s" });
+    },
+  );
 });

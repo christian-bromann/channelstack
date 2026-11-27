@@ -20,7 +20,6 @@ const need = (ok: boolean, problem: string) => {
 
 // --- What a channel needs, each piece where adding-a-channel.md says ------------------------------
 
-const api = read("api/index.d.ts") ?? "";
 const matrix = read("docs/reality-matrix.md") ?? "";
 const live = read(".github/workflows/live.yml") ?? "";
 const envDocs = read("website/docs/reference/environment-variables.md") ?? "";
@@ -30,9 +29,10 @@ for (const channel of CHANNELS) {
   const { name, title } = channel;
   const upper = name.toUpperCase();
   const of = `${title} (${name})`;
-  need(existsSync(join(ROOT, `api/${name}.d.ts`)), `${of}: no contract, api/${name}.d.ts`);
-  need(api.includes(`export * from "./${name}"`), `${of}: api/index.d.ts doesn't export ./${name}`);
-  need(existsSync(join(ROOT, `api/examples/${name}.test.ts`)), `${of}: no examples, api/examples/${name}.test.ts`);
+  need(
+    existsSync(join(ROOT, `test/acceptance/examples/${name}.test.ts`)),
+    `${of}: no examples, test/acceptance/examples/${name}.test.ts`,
+  );
   const harness = (HARNESS as Record<string, (typeof HARNESS)[keyof typeof HARNESS] | undefined>)[name];
   need(harness !== undefined, `${of}: no entry in scripts/lib/channels.ts (HARNESS)`);
   for (const agent of [...Object.keys(harness?.agents ?? {}), ...(harness ? [harness.broken.agent] : [])]) {

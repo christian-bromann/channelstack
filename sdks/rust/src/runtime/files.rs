@@ -1,7 +1,7 @@
 //! Files a test hands over: read from disk or given inline, sent as paths with base64 contents.
 //!
 //! A file input is inline contents (`{ "name", "content" }`, the content text or bytes) or a path
-//! to a fixture file or directory (`{ "path", "name"? }`), as in `api/common.d.ts`.
+//! to a fixture file or directory (`{ "path", "name"? }`), as in the TypeScript SDK.
 
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;

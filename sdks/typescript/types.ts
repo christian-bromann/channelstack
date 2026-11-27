@@ -1,8 +1,8 @@
 /**
- * The contract's type names (`api/*.d.ts`) that the generated SDK has no type of its own for: unions
- * of its handles, the option bags of its methods, and the values of its fields. Each one is read
- * from the generated code, so it can't drift from it. With them, `import type { AuthorRef } from
- * "channelstack"` works as the contract says.
+ * The type names tests import that the generated SDK has no type of its own for: unions of its
+ * handles, the option bags of its methods, and the values of its fields. Each one is read from the
+ * generated code, so it can't drift from it. With them, `import type { AuthorRef } from
+ * "channelstack"` works.
  *
  * Not here: the test framework's own types (`ChannelstackFixture`, `ChannelstackIntegrationOptions`,
  * `ChannelstackMatchers`, `TextOptions`, in `channelstack/vitest`), and `SlackInjectedFault`, which
@@ -37,7 +37,7 @@ export type NotionAuthor = G.NotionUser | G.NotionIntegration;
 export type Principal = User | App;
 /** Anything that can be named as an author in a matcher: a handle or its `name`. */
 export type AuthorRef = Principal | string;
-/** A delivery of any channel, narrowed by its `type` and `payload` as the contract's `Delivery<TType, TPayload>` is. */
+/** A delivery of any channel, narrowed by its `type` and `payload` as `Delivery<TType, TPayload>`. */
 export type Delivery<TType extends string = string, TPayload = unknown> = AnyDelivery & {
   readonly type: TType;
   readonly payload: TPayload;

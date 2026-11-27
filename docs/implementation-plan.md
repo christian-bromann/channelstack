@@ -2,7 +2,7 @@
 
 Status: draft, 2026-11-19. Builds on the research in `docs/research/` and `docs/competitive-analysis.html`.
 
-The public test API follows `docs/devx.md` and the type definitions in `api/`. Highlights:
+The public test API follows `docs/devx.md`; the examples in `test/acceptance/examples/` show it in use. Highlights:
 - Actions are methods on the person, with the content first and the place as an option: `ana.say("…", { channel })`.
 - Users, channels, repos and pages are created per test.
 - There is no config file: each fake has a built-in app named `my-agent`, and where its events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`.
@@ -53,7 +53,7 @@ This plan and `docs/devx.md` describe the same product. Where they used to diffe
 | Sessions | A session is a **scope inside that world**, not a world of its own. It owns the users, channels, repos and pages it created, filters the event log to deliveries its actions caused, and cleans everything up on `DELETE`. Each test-framework fixture opens one session per test, and the CLI and UI share a long-lived `dev` session |
 | Starting the agent | channelstack never starts or wraps the agent. `channelstack exec` is dropped; you run `channelstack env` and then `portless run my-agent pnpm dev` |
 | Config | No config file. Each fake has a built-in app named `my-agent`; where events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, and live credentials from `CHANNELSTACK_<CHANNEL>_*` env vars. People and places are created per test |
-| Test API | Actor-first and per-framework (`api/*.d.ts`): `ana.say(text, { channel })`, with fixtures and matchers in `channelstack/vitest` and `pytest-channelstack` |
+| Test API | Actor-first and per-framework: `ana.say(text, { channel })`, with fixtures and matchers in `channelstack/vitest` and `pytest-channelstack` |
 | Secrets | Fake tokens and signing secrets are generated with a CSPRNG **once per install** and kept in `~/.channelstack/secrets.json` (mode 0600). They stay stable across restarts so `.env.local` stays valid. `channelstack secrets rotate` replaces them |
 | State | In memory. A restart starts a fresh world |
 | Scope | Slack, GitHub, Linear and Notion. No Teams for now |
@@ -501,7 +501,7 @@ The exact shapes, with the IR they produce, are in [architecture.md](architectur
 
 | Language | Style |
 |---|---|
-| TypeScript | `async` methods; ESM and CJS builds; types from the IR (checked against the hand-designed `api/*.d.ts`); fixtures and matchers through `channelstack/vitest`; the client, the session and `SlackFault` implement `AsyncDisposable` for use outside fixtures |
+| TypeScript | `async` methods; ESM and CJS builds; types from the IR; fixtures and matchers through `channelstack/vitest`; the client, the session and `SlackFault` implement `AsyncDisposable` for use outside fixtures |
 | Python | Async-first (`httpx`) with a sync facade; Pydantic models; `pytest-channelstack` fixtures (`slack`, `github`, `linear`, `notion`); `await ana.say("hi", channel=channel)`; snake_case |
 | Rust | `reqwest` + `serde` + `tokio`; builder structs for optional arguments; `Drop` handles cleanup best-effort, plus an explicit `close().await` |
 
@@ -544,7 +544,6 @@ channelstack/
   ui/                        the functional browser UI (transcript view, inspector, chaos controls), served at channelstack.localhost
   spec/                      openapi.json, ir.json (generated, committed)
   codegen/                   ir builder + emitters/{ts,python,rust}
-  api/                       hand-designed public types (*.d.ts) + examples; the generated TS SDK must satisfy them
   sdks/{typescript,python,rust}/   runtime/ (hand-written) + generated/ (Python: inside the `channelstack` package)
   integrations/              vitest (TS) · pytest-channelstack (Python) · checks (standard behaviour checks)
   scenarios/                 smoke/*.yaml (protocol parity), runners/, agents/ + <driver>/*.test.ts (differential suite)
