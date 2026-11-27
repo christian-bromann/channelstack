@@ -106,6 +106,13 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   9: [
     { name: "9.2 Gmail's discovery document is the pinned one", script: ["google:schema", "--check"], group: "static" },
   ],
+  // 13.1 and 13.6 (the examples and the pytest port against both OpenAI agents) run in the
+  // acceptance check's `openai` part; 13.2 to 13.5, 13.7, 13.8, 13.10 and 13.11 in the unit tests
+  // (`server/src/providers/openai`, `server/src/core/{attribution,stream}`) and `test/acceptance`;
+  // 13.6 in the Rust SDK's tests (7.1); 13.13 in the nightly job.
+  13: [
+    { name: "13.2 OpenAI's description is the pinned one", script: ["openai:schema", "--check"], group: "static" },
+  ],
 };
 
 const phase = Number(process.argv[2]);
