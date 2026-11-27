@@ -300,7 +300,7 @@ describe("the agent texts a person", () => {
     expect(fetched).toMatchObject({ status: "delivered", price_unit: "USD" });
     expect(fetched.date_sent).toMatch(/^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} \+0000$/);
     const inbox = (await control("GET", `/users/${ana.id}/messages`)).body;
-    expect(inbox).toMatchObject([{ body: "Your order shipped", author: { kind: "app", name: "my-agent" } }]);
+    expect(inbox).toMatchObject([{ text: "Your order shipped", author: { kind: "app", name: "my-agent" } }]);
   });
 
   test("through the Messaging Service, from its number", async () => {

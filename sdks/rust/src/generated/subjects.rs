@@ -14,6 +14,7 @@ transcript!(
     crate::NotionDiscussion,
     crate::ResendThread,
     crate::GoogleThread,
+    crate::TwilioConversation,
     crate::GitHubPullRequest
 );
 deliveries!(
@@ -22,7 +23,8 @@ deliveries!(
     crate::LinearDelivery,
     crate::NotionDelivery,
     crate::ResendDelivery,
-    crate::GoogleDelivery
+    crate::GoogleDelivery,
+    crate::TwilioDelivery
 );
 calls!(
     crate::SlackFixture,
@@ -30,5 +32,6 @@ calls!(
     crate::LinearFixture,
     crate::NotionFixture,
     crate::ResendFixture,
-    crate::GoogleFixture
+    crate::GoogleFixture,
+    crate::TwilioFixture
 );

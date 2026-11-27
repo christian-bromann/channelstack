@@ -368,6 +368,28 @@ let google = session.google().await?;
 
 **Returns** [`GoogleFixture`](/docs/reference/api/google#googlefixture).
 
+### twilio()
+
+The Twilio fixture: the agent's account and number, and where the agent reaches the fake.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const twilio = await session.twilio();
+```
+
+```python title="Python"
+twilio = await session.twilio()
+```
+
+```rust title="Rust"
+let twilio = session.twilio().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`TwilioFixture`](/docs/reference/api/twilio#twiliofixture).
+
 ## Types
 
 Plain values the handles return and take.

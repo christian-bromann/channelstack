@@ -499,6 +499,35 @@
             "cross_workspace_credential"
           ],
           "dispose": false
+        },
+        {
+          "name": "twilio",
+          "kind": "factory",
+          "summary": "The Twilio fixture: the agent's account and number, and where the agent reaches the fake",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "TwilioFixture"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -16388,6 +16417,955 @@
       ]
     },
     {
+      "name": "TwilioFixture",
+      "fields": [
+        {
+          "name": "app",
+          "type": {
+            "kind": "resource",
+            "name": "TwilioApp"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiUrl",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "createUser",
+          "kind": "factory",
+          "summary": "Create a person: a phone, with a number the fake hands out unless a test gives one",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/twilio/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "number",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_TWILIO_USER_{name}_NUMBER"
+            },
+            {
+              "name": "reachable",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "token",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body",
+              "credential": "CHANNELSTACK_TWILIO_USER_{name}_TOKEN"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "TwilioUser"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deliveries",
+          "kind": "method",
+          "summary": "Every webhook and status callback channelstack sent the agent for this session, with every attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/deliveries",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "type",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "resource",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "TwilioConversation"
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "TwilioDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
+          "name": "calls",
+          "kind": "method",
+          "summary": "The REST calls the agent made about this session's messages, by the SDK's method name (`messages.create`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/calls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "operation",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "query"
+            },
+            {
+              "name": "error",
+              "type": {
+                "kind": "union",
+                "types": [
+                  {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  {
+                    "kind": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "in": "query"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "TwilioApiCalls"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "requires": "proxy",
+            "reason": "Twilio doesn't report the account's API calls to anyone else; proxy mode sees them"
+          }
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForCall",
+          "mode": "next",
+          "read": "calls",
+          "item": {
+            "kind": "named",
+            "name": "TwilioApiCall"
+          },
+          "filter": true,
+          "what": "an API call from the agent"
+        }
+      ]
+    },
+    {
+      "name": "TwilioApp",
+      "idFields": [
+        "id"
+      ],
+      "role": "app",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "twilio"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "app"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "botUserId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "number",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": []
+    },
+    {
+      "name": "TwilioUser",
+      "idFields": [
+        "id"
+      ],
+      "role": "user",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "twilio"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "number",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "text",
+          "kind": "method",
+          "summary": "The person texts someone: the agent's number (`twilio.app`), or another person",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/twilio/users/{user}/text",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "to",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "TwilioUser",
+                  "TwilioApp"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "media",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "TwilioMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "What reached the person's phone, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/users/{user}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "TwilioInbox"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForMessage",
+          "mode": "next",
+          "read": "messages",
+          "item": {
+            "kind": "resource",
+            "name": "TwilioMessage"
+          },
+          "from": "author",
+          "what": "a text"
+        }
+      ]
+    },
+    {
+      "name": "TwilioMessage",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "twilio"
+          },
+          "optional": false
+        },
+        {
+          "name": "conversation",
+          "type": {
+            "kind": "resource",
+            "name": "TwilioConversation"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "named",
+            "name": "TwilioPrincipal"
+          },
+          "optional": false
+        },
+        {
+          "name": "from",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "to",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "text",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "segments",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "queued",
+              "sending",
+              "sent",
+              "delivered",
+              "undelivered",
+              "failed",
+              "received",
+              "canceled"
+            ]
+          },
+          "optional": false
+        },
+        {
+          "name": "errorCode",
+          "type": {
+            "kind": "integer"
+          },
+          "optional": true
+        },
+        {
+          "name": "at",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "TwilioDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a message: its status, once Twilio sent it",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/messages/{message}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "message",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "TwilioMessage"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
+      "name": "TwilioConversation",
+      "idFields": [
+        "id"
+      ],
+      "role": "resource",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "twilio"
+          },
+          "optional": false
+        },
+        {
+          "name": "numbers",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "Every message between the two numbers, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/conversations/{conversation}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "conversation",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "TwilioMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "The conversation's answers: every message after the first, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/conversations/{conversation}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "conversation",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "TwilioReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The conversation as a person reads it on their phone",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/conversations/{conversation}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "conversation",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "TwilioTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForReply",
+          "mode": "next",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "TwilioMessage"
+          },
+          "from": "author",
+          "what": "a reply"
+        },
+        {
+          "name": "latestReply",
+          "mode": "latest",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "TwilioMessage"
+          },
+          "from": "author",
+          "what": "a reply"
+        }
+      ]
+    },
+    {
+      "name": "TwilioDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "twilio"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "message",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "record",
+            "values": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/twilio/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "TwilioDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Send the webhook again, as Twilio retries one: the same request and `I-Twilio-Idempotency-Token`, its TwiML acted on",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/twilio/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Twilio has no API to send a webhook again"
+          }
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the webhook again, forged: signed with an Auth Token that isn't the account's",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/twilio/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "TwilioDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
+        }
+      ]
+    },
+    {
       "name": "GitHubPullRequest",
       "idFields": [
         "repoId",
@@ -19684,6 +20662,263 @@
       }
     },
     {
+      "name": "TwilioPrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "TwilioInbox",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "TwilioMessage"
+        }
+      }
+    },
+    {
+      "name": "TwilioMessages",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "TwilioMessage"
+        }
+      }
+    },
+    {
+      "name": "TwilioReplies",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "TwilioMessage"
+        }
+      }
+    },
+    {
+      "name": "TwilioTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "TwilioTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "TwilioTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "TwilioPrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "TwilioDeliveries",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "TwilioDelivery"
+        }
+      }
+    },
+    {
+      "name": "TwilioApiCalls",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "TwilioApiCall"
+        }
+      }
+    },
+    {
+      "name": "TwilioApiCall",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "literal",
+              "value": "twilio"
+            },
+            "optional": false
+          },
+          {
+            "name": "operation",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "method",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "path",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "durationMs",
+            "type": {
+              "kind": "number"
+            },
+            "optional": false
+          },
+          {
+            "name": "request",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "responseStatus",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "response",
+            "type": {
+              "kind": "unknown"
+            },
+            "optional": true
+          },
+          {
+            "name": "error",
+            "type": {
+              "kind": "string"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
       "name": "UiLoginLink",
       "type": {
         "kind": "object",
@@ -19810,6 +21045,10 @@
     {
       "name": "google",
       "title": "Google"
+    },
+    {
+      "name": "twilio",
+      "title": "Twilio"
     }
   ]
 }

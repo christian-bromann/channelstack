@@ -902,6 +902,85 @@ export interface GoogleApiCall {
   error?: string;
 }
 
+export interface TwilioPrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
+export type TwilioInbox = TwilioMessage[];
+
+export type TwilioInboxWire = TwilioMessageData[];
+
+function decodeTwilioInbox(ctx: HandleContext, data: TwilioInboxWire): TwilioInbox {
+  return data.map((item) => new TwilioMessage(ctx, item));
+}
+
+export type TwilioMessages = TwilioMessage[];
+
+export type TwilioMessagesWire = TwilioMessageData[];
+
+function decodeTwilioMessages(ctx: HandleContext, data: TwilioMessagesWire): TwilioMessages {
+  return data.map((item) => new TwilioMessage(ctx, item));
+}
+
+export type TwilioReplies = TwilioMessage[];
+
+export type TwilioRepliesWire = TwilioMessageData[];
+
+function decodeTwilioReplies(ctx: HandleContext, data: TwilioRepliesWire): TwilioReplies {
+  return data.map((item) => new TwilioMessage(ctx, item));
+}
+
+export interface TwilioTranscript {
+  entries: TwilioTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface TwilioTranscriptWire {
+  entries: TwilioTranscriptEntry[];
+  text: string;
+}
+
+function decodeTwilioTranscript(_ctx: HandleContext, data: TwilioTranscriptWire): TwilioTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface TwilioTranscriptEntry {
+  id: string;
+  author: TwilioPrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+}
+
+export type TwilioDeliveries = TwilioDelivery[];
+
+export type TwilioDeliveriesWire = TwilioDeliveryData[];
+
+function decodeTwilioDeliveries(ctx: HandleContext, data: TwilioDeliveriesWire): TwilioDeliveries {
+  return data.map((item) => new TwilioDelivery(ctx, item));
+}
+
+export type TwilioApiCalls = TwilioApiCall[];
+
+export interface TwilioApiCall {
+  id: string;
+  channel: "twilio";
+  operation: string;
+  method: string;
+  path: string;
+  at: string;
+  durationMs: number;
+  request?: unknown;
+  responseStatus: number;
+  response?: unknown;
+  error?: string;
+}
+
 export interface UiLoginLink {
   url: string;
 }
@@ -1039,6 +1118,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google`)) as GoogleFixtureData;
     return new GoogleFixture(ctx, data);
+  }
+
+  /** The Twilio fixture: the agent's account and number, and where the agent reaches the fake. Experimental. */
+  async twilio(): Promise<TwilioFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio`)) as TwilioFixtureData;
+    return new TwilioFixture(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -4561,6 +4647,334 @@ export class GoogleDelivery {
 
   /** Wait for the delivery to settle, and resolve with the value as it is then. */
   async settled(options: WaitOptions = {}): Promise<GoogleDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link TwilioFixture}. */
+export interface TwilioFixtureData {
+  app: TwilioAppData;
+  apiUrl: string;
+}
+
+export class TwilioFixture {
+  readonly app: TwilioApp;
+  readonly apiUrl: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: TwilioFixtureData) {
+    this.#ctx = ctx;
+    this.app = new TwilioApp(ctx, data.app);
+    this.apiUrl = data.apiUrl;
+  }
+
+  /** Create a person: a phone, with a number the fake hands out unless a test gives one. Experimental. */
+  async createUser(options: { name: string; number?: string; reachable?: boolean; token?: string }): Promise<TwilioUser> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/twilio/users`, { body: { name: options.name, number: options.number ?? credential("CHANNELSTACK_TWILIO_USER_{name}_NUMBER", { name: options.name }), reachable: options.reachable, token: options.token ?? credential("CHANNELSTACK_TWILIO_USER_{name}_TOKEN", { name: options.name }) } })) as TwilioUserData;
+    return new TwilioUser(ctx, data);
+  }
+
+  /** Every webhook and status callback channelstack sent the agent for this session, with every attempt. Experimental. */
+  async deliveries(options: { type?: string; resource?: TwilioConversation } = {}): Promise<TwilioDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/deliveries`, { query: { type: options.type, resource: options.resource === undefined ? undefined : options.resource.id } })) as TwilioDeliveriesWire;
+    return decodeTwilioDeliveries(ctx, data);
+  }
+
+  /** The REST calls the agent made about this session's messages, by the SDK's method name (`messages.create`). Experimental. */
+  async calls(options: { operation?: string; error?: true | string } = {}): Promise<TwilioApiCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/calls`, { query: { operation: options.operation, error: options.error } })) as TwilioApiCalls;
+    return data;
+  }
+
+  /** Wait for the next new API call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<TwilioApiCall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link TwilioApp}. */
+export interface TwilioAppData {
+  id: string;
+  channel: "twilio";
+  kind: "app";
+  name: string;
+  botUserId: string;
+  number: string;
+}
+
+export class TwilioApp {
+  readonly id: string;
+  readonly channel: "twilio";
+  readonly kind: "app";
+  readonly name: string;
+  readonly botUserId: string;
+  readonly number: string;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: TwilioAppData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.botUserId = data.botUserId;
+    this.number = data.number;
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link TwilioUser}. */
+export interface TwilioUserData {
+  id: string;
+  channel: "twilio";
+  kind: "user";
+  name: string;
+  number: string;
+}
+
+export class TwilioUser {
+  readonly id: string;
+  readonly channel: "twilio";
+  readonly kind: "user";
+  readonly name: string;
+  readonly number: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: TwilioUserData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.kind = data.kind;
+    this.name = data.name;
+    this.number = data.number;
+  }
+
+  /** The person texts someone: the agent's number (`twilio.app`), or another person. Experimental. */
+  async text(body: string, options: { to: TwilioUser | TwilioApp; media?: string[] }): Promise<TwilioMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/twilio/users/${segment(this.id)}/text`, { body: { body, to: options.to.id, media: options.media } })) as TwilioMessageData;
+    return new TwilioMessage(ctx, data);
+  }
+
+  /** What reached the person's phone, oldest first. Experimental. */
+  async messages(): Promise<TwilioInbox> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/users/${segment(this.id)}/messages`)) as TwilioInboxWire;
+    return decodeTwilioInbox(ctx, data);
+  }
+
+  /** Wait for the next new text matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForMessage(options: { from?: TwilioPrincipal | string } & WaitOptions = {}): Promise<TwilioMessage> {
+    return waitForNext(this.#seen, "waitForMessage", () => this.messages(), (item) => fromMatches(item.author, options.from), describeWait("a text", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link TwilioMessage}. */
+export interface TwilioMessageData {
+  id: string;
+  channel: "twilio";
+  conversation: TwilioConversationData;
+  author: TwilioPrincipal;
+  from: string;
+  to: string;
+  text: string;
+  segments: number;
+  status: "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
+  errorCode?: number;
+  at: string;
+  delivery?: TwilioDeliveryData;
+}
+
+export class TwilioMessage {
+  readonly id: string;
+  readonly channel: "twilio";
+  readonly conversation: TwilioConversation;
+  readonly author: TwilioPrincipal;
+  readonly from: string;
+  readonly to: string;
+  readonly text: string;
+  readonly segments: number;
+  readonly status: "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
+  readonly errorCode: number | undefined;
+  readonly at: string;
+  readonly delivery: TwilioDelivery | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: TwilioMessageData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.conversation = new TwilioConversation(ctx, data.conversation);
+    this.author = data.author;
+    this.from = data.from;
+    this.to = data.to;
+    this.text = data.text;
+    this.segments = data.segments;
+    this.status = data.status;
+    this.errorCode = data.errorCode;
+    this.at = data.at;
+    this.delivery = data.delivery === undefined ? undefined : new TwilioDelivery(ctx, data.delivery);
+  }
+
+  /** Re-read a message: its status, once Twilio sent it. Experimental. */
+  async refresh(): Promise<TwilioMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/messages/${segment(this.id)}`)) as TwilioMessageData;
+    return new TwilioMessage(ctx, data);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link TwilioConversation}. */
+export interface TwilioConversationData {
+  id: string;
+  channel: "twilio";
+  numbers: string[];
+}
+
+export class TwilioConversation {
+  readonly id: string;
+  readonly channel: "twilio";
+  readonly numbers: string[];
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: TwilioConversationData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.numbers = data.numbers;
+  }
+
+  /** Every message between the two numbers, oldest first. Experimental. */
+  async messages(): Promise<TwilioMessages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/conversations/${segment(this.id)}/messages`)) as TwilioMessagesWire;
+    return decodeTwilioMessages(ctx, data);
+  }
+
+  /** The conversation's answers: every message after the first, oldest first. Experimental. */
+  async replies(): Promise<TwilioReplies> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/conversations/${segment(this.id)}/replies`)) as TwilioRepliesWire;
+    return decodeTwilioReplies(ctx, data);
+  }
+
+  /** The conversation as a person reads it on their phone. Experimental. */
+  async transcript(): Promise<TwilioTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/conversations/${segment(this.id)}/transcript`)) as TwilioTranscriptWire;
+    return decodeTwilioTranscript(ctx, data);
+  }
+
+  /** Wait for the next new reply matching `from` (anyone if omitted), after the last one this handle saw. */
+  async waitForReply(options: { from?: TwilioPrincipal | string } & WaitOptions = {}): Promise<TwilioMessage> {
+    return waitForNext(this.#seen, "waitForReply", () => this.replies(), (item) => fromMatches(item.author, options.from), describeWait("a reply", options.from), options);
+  }
+
+  /** The latest reply matching `from`, once the agent is quiet. Waits for at least one. */
+  async latestReply(options: { from?: TwilioPrincipal | string } & QuietOptions = {}): Promise<TwilioMessage> {
+    return latestOnceQuiet(() => this.replies(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a reply", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link TwilioDelivery}. */
+export interface TwilioDeliveryData {
+  id: string;
+  channel: "twilio";
+  type: string;
+  message: string;
+  payload: Record<string, string>;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class TwilioDelivery {
+  readonly id: string;
+  readonly channel: "twilio";
+  readonly type: string;
+  readonly message: string;
+  readonly payload: Record<string, string>;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: TwilioDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.type = data.type;
+    this.message = data.message;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<TwilioDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/twilio/deliveries/${segment(this.id)}`)) as TwilioDeliveryData;
+    return new TwilioDelivery(ctx, data);
+  }
+
+  /** Send the webhook again, as Twilio retries one: the same request and `I-Twilio-Idempotency-Token`, its TwiML acted on. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/twilio/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send the webhook again, forged: signed with an Auth Token that isn't the account's. Experimental. */
+  async resend(options: { badSignature?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/twilio/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<TwilioDelivery> {
     return waitFor("the delivery to settle", async () => {
       const value = await this.refresh();
       return value.status === "pending" ? undefined : value;

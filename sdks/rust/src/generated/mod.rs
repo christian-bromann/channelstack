@@ -317,6 +317,20 @@ fn run_session_google<'a>(
     })
 }
 
+fn run_session_twilio<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/twilio", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_echo_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6641,6 +6655,322 @@ fn run_google_delivery_resend<'a>(
     })
 }
 
+fn run_twilio_fixture_create_user<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_number = options.get("number").cloned().unwrap_or(Value::Null);
+        let p_reachable = options.get("reachable").cloned().unwrap_or(Value::Null);
+        let p_token = options.get("token").cloned().unwrap_or(Value::Null);
+        let raw: Map<String, Value> = [
+            ("name".to_owned(), p_name.clone()),
+            ("number".to_owned(), p_number.clone()),
+            ("reachable".to_owned(), p_reachable.clone()),
+            ("token".to_owned(), p_token.clone()),
+        ]
+        .into_iter()
+        .collect();
+        let path = format!("/sessions/{}/twilio/users", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert(
+                    "number".into(),
+                    enc::credential_or(
+                        p_number.clone(),
+                        "CHANNELSTACK_TWILIO_USER_{name}_NUMBER",
+                        &raw,
+                    ),
+                );
+                wire.insert("reachable".into(), p_reachable.clone());
+                wire.insert(
+                    "token".into(),
+                    enc::credential_or(
+                        p_token.clone(),
+                        "CHANNELSTACK_TWILIO_USER_{name}_TOKEN",
+                        &raw,
+                    ),
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_twilio_fixture_deliveries<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_type = options.get("type").cloned().unwrap_or(Value::Null);
+        let p_resource = options.get("resource").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/twilio/deliveries",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("type".into(), p_type.clone());
+                wire.insert(
+                    "resource".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_resource)?,
+                );
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_twilio_fixture_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_operation = options.get("operation").cloned().unwrap_or(Value::Null);
+        let p_error = options.get("error").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/twilio/calls", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("operation".into(), p_operation.clone());
+                wire.insert("error".into(), p_error.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_twilio_user_text<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_to = options.get("to").cloned().unwrap_or(Value::Null);
+        let p_media = options.get("media").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/twilio/users/{}/text",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert("to".into(), (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_to)?);
+                wire.insert("media".into(), p_media.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_twilio_user_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/users/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_message_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/messages/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_conversation_messages<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/conversations/{}/messages",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_conversation_replies<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/conversations/{}/replies",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_conversation_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/conversations/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_delivery_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/deliveries/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_delivery_redeliver<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/twilio/deliveries/{}/redeliver",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_twilio_delivery_resend<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_bad_signature = options.get("badSignature").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/twilio/deliveries/{}/resend",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("badSignature".into(), p_bad_signature.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
 fn run_git_hub_pull_request_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -7071,6 +7401,17 @@ impl Session {
             vec![],
             run_session_google,
             GoogleFixture::wrap,
+        )
+    }
+
+    /// The Twilio fixture: the agent's account and number, and where the agent reaches the fake. Experimental.
+    pub fn twilio(&self) -> Call<TwilioFixture> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_session_twilio,
+            TwilioFixture::wrap,
         )
     }
 }
@@ -19294,6 +19635,1189 @@ impl IntoFuture for GoogleDeliverySettled {
     }
 }
 
+/// A handle: `TwilioFixture`.
+#[derive(Clone)]
+pub struct TwilioFixture {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for TwilioFixture {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl TwilioFixture {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `app`.
+    pub fn app(&self) -> TwilioApp {
+        TwilioApp::from_wire_in(
+            &self.ctx,
+            self.data.get("app").cloned().unwrap_or(Value::Null),
+            self.seen.field("app"),
+        )
+    }
+    /// `apiUrl`.
+    pub fn api_url(&self) -> String {
+        self.data
+            .get("apiUrl")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Create a person: a phone, with a number the fake hands out unless a test gives one. Experimental.
+    pub fn create_user(&self) -> TwilioFixtureCreateUser {
+        TwilioFixtureCreateUser(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_fixture_create_user,
+            TwilioUser::wrap,
+        ))
+    }
+
+    /// Every webhook and status callback channelstack sent the agent for this session, with every attempt. Experimental.
+    pub fn deliveries(&self) -> TwilioFixtureDeliveries {
+        TwilioFixtureDeliveries(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_fixture_deliveries,
+            as_value,
+        ))
+    }
+
+    /// The REST calls the agent made about this session's messages, by the SDK's method name (`messages.create`). Experimental.
+    pub fn calls(&self) -> TwilioFixtureCalls {
+        TwilioFixtureCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_fixture_calls,
+            as_value,
+        ))
+    }
+
+    /// Wait for an API call from the agent. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_call(&self) -> TwilioFixtureWaitForCall {
+        TwilioFixtureWaitForCall {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`TwilioFixture::create_user`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct TwilioFixtureCreateUser(Call<TwilioUser>);
+
+impl TwilioFixtureCreateUser {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `number`.
+    pub fn number(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("number", value))
+    }
+    /// `reachable`.
+    pub fn reachable(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("reachable", value))
+    }
+    /// `token`.
+    pub fn token(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("token", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<TwilioUser> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for TwilioFixtureCreateUser {
+    type Output = Result<TwilioUser>;
+    type IntoFuture = BoxFuture<'static, Result<TwilioUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`TwilioFixture::deliveries`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct TwilioFixtureDeliveries(Call<Value>);
+
+impl TwilioFixtureDeliveries {
+    /// `type`.
+    pub fn r#type(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("type", value))
+    }
+    /// `resource`.
+    pub fn resource(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("resource", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for TwilioFixtureDeliveries {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`TwilioFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct TwilioFixtureCalls(Call<Value>);
+
+impl TwilioFixtureCalls {
+    /// `operation`.
+    pub fn operation(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("operation", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for TwilioFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`TwilioFixture::wait_for_call`].
+pub struct TwilioFixtureWaitForCall {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl TwilioFixtureWaitForCall {
+    /// `operation`.
+    pub fn operation(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("operation".into(), value.into_arg());
+        self
+    }
+    /// `error`.
+    pub fn error(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("error".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<Value> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| ["operation", "error"].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let item = wait_for_next(
+            &seen.positions,
+            &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
+            || run_twilio_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| {
+                let _ = item;
+                true
+            },
+            None,
+            "an API call from the agent",
+            &timeout,
+        )
+        .await?;
+        as_value(&ctx, item)
+    }
+}
+
+impl IntoFuture for TwilioFixtureWaitForCall {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `TwilioApp`.
+#[derive(Clone)]
+pub struct TwilioApp {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for TwilioApp {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl TwilioApp {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `kind`.
+    pub fn kind(&self) -> String {
+        self.data
+            .get("kind")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `botUserId`.
+    pub fn bot_user_id(&self) -> String {
+        self.data
+            .get("botUserId")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `number`.
+    pub fn number(&self) -> String {
+        self.data
+            .get("number")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+}
+
+/// A handle: `TwilioUser`.
+#[derive(Clone)]
+pub struct TwilioUser {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for TwilioUser {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl TwilioUser {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `kind`.
+    pub fn kind(&self) -> String {
+        self.data
+            .get("kind")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `number`.
+    pub fn number(&self) -> String {
+        self.data
+            .get("number")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// The person texts someone: the agent's number (`twilio.app`), or another person. Experimental.
+    pub fn text(&self, body: impl IntoArg) -> TwilioUserText {
+        TwilioUserText(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_twilio_user_text,
+            TwilioMessage::wrap,
+        ))
+    }
+
+    /// What reached the person's phone, oldest first. Experimental.
+    pub fn messages(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_user_messages,
+            as_value,
+        )
+    }
+
+    /// Wait for a text. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_message(&self) -> TwilioUserWaitForMessage {
+        TwilioUserWaitForMessage {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`TwilioUser::text`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct TwilioUserText(Call<TwilioMessage>);
+
+impl TwilioUserText {
+    /// `to`.
+    pub fn to(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("to", value))
+    }
+    /// `media`.
+    pub fn media(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("media", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<TwilioMessage> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for TwilioUserText {
+    type Output = Result<TwilioMessage>;
+    type IntoFuture = BoxFuture<'static, Result<TwilioMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`TwilioUser::wait_for_message`].
+pub struct TwilioUserWaitForMessage {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl TwilioUserWaitForMessage {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<TwilioMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForMessage",
+            || run_twilio_user_messages(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "a text".to_owned(),
+                Value::String(name) => format!("{} from {}", "a text", name),
+                other => format!(
+                    "{} from {}",
+                    "a text",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        TwilioMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for TwilioUserWaitForMessage {
+    type Output = Result<TwilioMessage>;
+    type IntoFuture = BoxFuture<'static, Result<TwilioMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `TwilioMessage`.
+#[derive(Clone)]
+pub struct TwilioMessage {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for TwilioMessage {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl TwilioMessage {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `conversation`.
+    pub fn conversation(&self) -> TwilioConversation {
+        TwilioConversation::from_wire_in(
+            &self.ctx,
+            self.data
+                .get("conversation")
+                .cloned()
+                .unwrap_or(Value::Null),
+            self.seen.field("conversation"),
+        )
+    }
+    /// `author`.
+    pub fn author(&self) -> &Value {
+        self.data.get("author").unwrap_or(&Value::Null)
+    }
+    /// `from`.
+    pub fn from(&self) -> String {
+        self.data
+            .get("from")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `to`.
+    pub fn to(&self) -> String {
+        self.data
+            .get("to")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `text`.
+    pub fn text(&self) -> String {
+        self.data
+            .get("text")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `segments`.
+    pub fn segments(&self) -> i64 {
+        self.data
+            .get("segments")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `errorCode`.
+    pub fn error_code(&self) -> Option<i64> {
+        self.data.get("errorCode").and_then(Value::as_i64)
+    }
+    /// `at`.
+    pub fn at(&self) -> String {
+        self.data
+            .get("at")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `delivery`.
+    pub fn delivery(&self) -> Option<TwilioDelivery> {
+        self.data.get("delivery").filter(|v| !v.is_null()).map(|v| {
+            TwilioDelivery::from_wire_in(&self.ctx, v.clone(), self.seen.field("delivery"))
+        })
+    }
+
+    /// Re-read a message: its status, once Twilio sent it. Experimental.
+    pub fn refresh(&self) -> Call<TwilioMessage> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_message_refresh,
+            TwilioMessage::wrap,
+        )
+    }
+}
+
+/// A handle: `TwilioConversation`.
+#[derive(Clone)]
+pub struct TwilioConversation {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for TwilioConversation {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl TwilioConversation {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `numbers`.
+    pub fn numbers(&self) -> &Value {
+        self.data.get("numbers").unwrap_or(&Value::Null)
+    }
+
+    /// Every message between the two numbers, oldest first. Experimental.
+    pub fn messages(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_conversation_messages,
+            as_value,
+        )
+    }
+
+    /// The conversation's answers: every message after the first, oldest first. Experimental.
+    pub fn replies(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_conversation_replies,
+            as_value,
+        )
+    }
+
+    /// The conversation as a person reads it on their phone. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_conversation_transcript,
+            as_value,
+        )
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_reply(&self) -> TwilioConversationWaitForReply {
+        TwilioConversationWaitForReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+
+    /// Wait for a reply. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn latest_reply(&self) -> TwilioConversationLatestReply {
+        TwilioConversationLatestReply {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`TwilioConversation::wait_for_reply`].
+pub struct TwilioConversationWaitForReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl TwilioConversationWaitForReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<TwilioMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForReply",
+            || run_twilio_conversation_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            None,
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+        )
+        .await?;
+        TwilioMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for TwilioConversationWaitForReply {
+    type Output = Result<TwilioMessage>;
+    type IntoFuture = BoxFuture<'static, Result<TwilioMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// The options of [`TwilioConversation::latest_reply`].
+pub struct TwilioConversationLatestReply {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl TwilioConversationLatestReply {
+    /// `from`.
+    pub fn from(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("from".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// `quietFor`.
+    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("quietFor".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<TwilioMessage> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let quiet_for = options
+            .get("quietFor")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
+        let from = options.get("from").cloned().unwrap_or(Value::Null);
+        let item = latest_once_quiet(
+            || run_twilio_conversation_replies(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| from_matches(item.get("author").unwrap_or(&Value::Null), &from),
+            || ctx.quiet(),
+            &match &from {
+                Value::Null => "a reply".to_owned(),
+                Value::String(name) => format!("{} from {}", "a reply", name),
+                other => format!(
+                    "{} from {}",
+                    "a reply",
+                    other.get("name").and_then(Value::as_str).unwrap_or("")
+                ),
+            },
+            &timeout,
+            &quiet_for,
+        )
+        .await?;
+        TwilioMessage::wrap(&ctx, item)
+    }
+}
+
+impl IntoFuture for TwilioConversationLatestReply {
+    type Output = Result<TwilioMessage>;
+    type IntoFuture = BoxFuture<'static, Result<TwilioMessage>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `TwilioDelivery`.
+#[derive(Clone)]
+pub struct TwilioDelivery {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for TwilioDelivery {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl TwilioDelivery {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `type`.
+    pub fn r#type(&self) -> String {
+        self.data
+            .get("type")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `message`.
+    pub fn message(&self) -> String {
+        self.data
+            .get("message")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `payload`.
+    pub fn payload(&self) -> &Value {
+        self.data.get("payload").unwrap_or(&Value::Null)
+    }
+    /// `attempts`.
+    pub fn attempts(&self) -> &Value {
+        self.data.get("attempts").unwrap_or(&Value::Null)
+    }
+    /// `status`.
+    pub fn status(&self) -> String {
+        self.data
+            .get("status")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Re-read a delivery: its attempts and status. Experimental.
+    pub fn refresh(&self) -> Call<TwilioDelivery> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_delivery_refresh,
+            TwilioDelivery::wrap,
+        )
+    }
+
+    /// Send the webhook again, as Twilio retries one: the same request and `I-Twilio-Idempotency-Token`, its TwiML acted on. Experimental.
+    pub fn redeliver(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_delivery_redeliver,
+            as_value,
+        )
+    }
+
+    /// Send the webhook again, forged: signed with an Auth Token that isn't the account's. Experimental.
+    pub fn resend(&self) -> TwilioDeliveryResend {
+        TwilioDeliveryResend(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_twilio_delivery_resend,
+            as_value,
+        ))
+    }
+
+    /// Wait for the delivery to settle. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn settled(&self) -> TwilioDeliverySettled {
+        TwilioDeliverySettled {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`TwilioDelivery::resend`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct TwilioDeliveryResend(Call<Value>);
+
+impl TwilioDeliveryResend {
+    /// `badSignature`.
+    pub fn bad_signature(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("badSignature", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for TwilioDeliveryResend {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`TwilioDelivery::settled`].
+pub struct TwilioDeliverySettled {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl TwilioDeliverySettled {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<TwilioDelivery> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let value = wait_for("the delivery to settle", &timeout, || {
+            let read = run_twilio_delivery_refresh(&ctx, &me, vec![], filters.clone());
+            async move {
+                let value = read.await?;
+                Ok((!["pending"]
+                    .contains(&value.get("status").and_then(Value::as_str).unwrap_or("")))
+                .then_some(value))
+            }
+        })
+        .await?;
+        TwilioDelivery::wrap(&ctx, value)
+    }
+}
+
+impl IntoFuture for TwilioDeliverySettled {
+    type Output = Result<TwilioDelivery>;
+    type IntoFuture = BoxFuture<'static, Result<TwilioDelivery>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
 /// A handle: `GitHubPullRequest`.
 #[derive(Clone)]
 pub struct GitHubPullRequest {
@@ -19749,6 +21273,9 @@ pub async fn call_by_name(
         }
         ("Session", "google") => {
             run_session_google(&target.ctx, &target.data, args, options).await?
+        }
+        ("Session", "twilio") => {
+            run_session_twilio(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "createUser") => {
             run_echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
@@ -20373,6 +21900,42 @@ pub async fn call_by_name(
         ("GoogleDelivery", "resend") => {
             run_google_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
+        ("TwilioFixture", "createUser") => {
+            run_twilio_fixture_create_user(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioFixture", "deliveries") => {
+            run_twilio_fixture_deliveries(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioFixture", "calls") => {
+            run_twilio_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioUser", "text") => {
+            run_twilio_user_text(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioUser", "messages") => {
+            run_twilio_user_messages(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioMessage", "refresh") => {
+            run_twilio_message_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioConversation", "messages") => {
+            run_twilio_conversation_messages(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioConversation", "replies") => {
+            run_twilio_conversation_replies(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioConversation", "transcript") => {
+            run_twilio_conversation_transcript(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioDelivery", "refresh") => {
+            run_twilio_delivery_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioDelivery", "redeliver") => {
+            run_twilio_delivery_redeliver(&target.ctx, &target.data, args, options).await?
+        }
+        ("TwilioDelivery", "resend") => {
+            run_twilio_delivery_resend(&target.ctx, &target.data, args, options).await?
+        }
         ("GitHubPullRequest", "refresh") => {
             run_git_hub_pull_request_refresh(&target.ctx, &target.data, args, options).await?
         }
@@ -20458,6 +22021,11 @@ pub async fn call_by_name(
         },
         ("Session", "google") => Dyn {
             resource: Some("GoogleFixture"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("Session", "twilio") => Dyn {
+            resource: Some("TwilioFixture"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -20781,6 +22349,26 @@ pub async fn call_by_name(
             ctx: target.ctx.clone(),
             data,
         },
+        ("TwilioFixture", "createUser") => Dyn {
+            resource: Some("TwilioUser"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("TwilioUser", "text") => Dyn {
+            resource: Some("TwilioMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("TwilioMessage", "refresh") => Dyn {
+            resource: Some("TwilioMessage"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("TwilioDelivery", "refresh") => Dyn {
+            resource: Some("TwilioDelivery"),
+            ctx: target.ctx.clone(),
+            data,
+        },
         ("GitHubPullRequest", "refresh") => Dyn {
             resource: Some("GitHubPullRequest"),
             ctx: target.ctx.clone(),
@@ -20837,6 +22425,9 @@ pub fn field_resource(resource: &str, field: &str) -> Option<&'static str> {
         ("GoogleFixture", "app") => Some("GoogleApp"),
         ("GoogleEmail", "thread") => Some("GoogleThread"),
         ("GoogleEmail", "delivery") => Some("GoogleDelivery"),
+        ("TwilioFixture", "app") => Some("TwilioApp"),
+        ("TwilioMessage", "conversation") => Some("TwilioConversation"),
+        ("TwilioMessage", "delivery") => Some("TwilioDelivery"),
         ("GitHubPullRequest", "repo") => Some("GitHubRepo"),
         _ => None,
     }

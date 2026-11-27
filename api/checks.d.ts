@@ -69,3 +69,9 @@ export declare function resendChecks(options: ChecksOptions): void;
  * for another audience · rejects an expired push token.
  */
 export declare function googleChecks(options: ChecksOptions): void;
+
+/**
+ * Registers: answers a text, to its sender · a webhook Twilio sends again doesn't answer twice ·
+ * rejects a webhook with a bad signature.
+ */
+export declare function twilioChecks(options: ChecksOptions): void;

@@ -64,7 +64,7 @@ const TwilioDelivery = z
     channel,
     type: z.string().openapi({ description: "`message`: a text to the agent's number; `status`: a status callback." }),
     message: z.string().openapi({ description: "The SID of the message it is about." }),
-    payload: z.unknown().openapi({ description: "The form's parameters, as Twilio posted them." }),
+    payload: z.record(z.string(), z.string()).openapi({ description: "The form's parameters, as Twilio posted them." }),
     attempts: z.array(DeliveryAttempt),
     status: DeliveryStatus,
   })
@@ -89,7 +89,7 @@ const TwilioMessage = z
     author: TwilioPrincipal,
     from: z.string(),
     to: z.string(),
-    body: z.string(),
+    text: z.string().openapi({ description: "What was sent." }),
     segments: z.number().int().openapi({ description: "How many SMS segments it was sent in, as Twilio counts them." }),
     status: MessageStatus,
     errorCode: z
@@ -145,7 +145,7 @@ export function registerTwilioRoutes(
     channel: "twilio" as const,
     type: request.type,
     message: String(request.meta?.message ?? ""),
-    payload: request.meta?.payload,
+    payload: (request.meta?.payload ?? {}) as Record<string, string>,
     attempts,
     status: attempts.at(-1)?.status ?? ("pending" as const),
   });
@@ -176,7 +176,7 @@ export function registerTwilioRoutes(
     author: world.principalOf(message),
     from: message.from,
     to: message.to,
-    body: message.body,
+    text: message.body,
     segments: message.segments,
     status: message.status,
     ...(message.errorCode === undefined ? {} : { errorCode: message.errorCode }),
@@ -224,13 +224,9 @@ export function registerTwilioRoutes(
             "Their number, in E.164. Live, one of the account's numbers; left out, the account's one allowlisted number besides the agent's. Read from CHANNELSTACK_TWILIO_USER_<NAME>_NUMBER when left out.",
           "x-channelstack-credential": "CHANNELSTACK_TWILIO_USER_{name}_NUMBER",
         }),
-        reachable: z
-          .boolean()
-          .optional()
-          .openapi({
-            description:
-              "False for a phone that's off: what the agent sends them ends `undelivered` (30003). Fake only.",
-          }),
+        reachable: z.boolean().optional().openapi({
+          description: "False for a phone that's off: what the agent sends them ends `undelivered` (30003). Fake only.",
+        }),
         token: z.string().min(1).optional().openapi({
           description:
             "Live: `<Account SID>:<Auth Token>` of the account that owns the person's number. Read from CHANNELSTACK_TWILIO_USER_<NAME>_TOKEN when left out.",

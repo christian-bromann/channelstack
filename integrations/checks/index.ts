@@ -97,6 +97,9 @@ export const GOOGLE_CHECKS = [
   "google.stale",
 ] as const;
 
+/** The ids of the Twilio checks, in the order they are registered. */
+export const TWILIO_CHECKS = ["twilio.reply-to-sender", "twilio.redelivery", "twilio.bad-signature"] as const;
+
 /**
  * The delivery a check retries, redelivers, forges or times: the one thing every delivery check
  * needs, on every channel. Live, the platform delivers to the agent itself and channelstack has no
@@ -129,6 +132,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
       notion,
       resend,
       google,
+      twilio,
       task,
       expect,
       skip,
@@ -145,6 +149,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
         notion,
         resend,
         google,
+        twilio,
         task,
         expect,
         skip,
@@ -634,6 +639,47 @@ export function googleChecks(options: ChecksOptions): void {
       const push = deliveryOf((await emailed(context)).email, context, "Gmail");
       await push.resend({ stale: true });
       await expect(push).toBeRejected(wait);
+    });
+  });
+}
+
+/**
+ * The Twilio checks: a person texts the agent's number. `prompt` is the text (default `hello`); the
+ * agent should answer once, to the number that texted it, whatever Twilio sends again.
+ */
+export function twilioChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const prompt = options.prompt ?? "hello";
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar(options, TWILIO_CHECKS);
+  /** Ana, and her text to the agent. */
+  const texted = async ({ twilio }: TestContext) => {
+    const ana = await twilio.createUser({ name: "Ana" });
+    const text = await ana.text(prompt, { to: twilio.app });
+    return { ana, text };
+  };
+
+  describe(`twilio checks: ${app}`, () => {
+    check("twilio.reply-to-sender", "answers a text, to the number that sent it", async (context) => {
+      const { ana } = await texted(context);
+      // The answer reaches Ana's phone: it went to `From`, not to the agent's own number.
+      const answer = await ana.waitForMessage({ from: app, ...wait });
+      expect(answer.to, "the answer went to another number: answer the webhook's `From`").toBe(ana.number);
+    });
+
+    check("twilio.redelivery", "a webhook Twilio sends again doesn't produce a second answer", async (context) => {
+      const { text } = await texted(context);
+      const delivery = deliveryOf(text, context, "Twilio");
+      await expect(text.conversation).toHaveReplyFrom(app, wait);
+      // Twilio retries with the same MessageSid and I-Twilio-Idempotency-Token.
+      await delivery.redeliver();
+      await expect(text.conversation).toHaveRepliesFrom(app, { count: 1, ...wait });
+    });
+
+    check("twilio.bad-signature", "rejects a webhook with a bad signature", async (context) => {
+      const delivery = deliveryOf((await texted(context)).text, context, "Twilio");
+      await delivery.resend({ badSignature: true });
+      await expect(delivery).toBeRejected(wait);
     });
   });
 }
