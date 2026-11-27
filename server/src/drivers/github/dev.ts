@@ -9,7 +9,6 @@ interface Repo {
 interface Listed {
   readonly issue: { readonly repoId: string; readonly number: number };
   readonly pullRequest: boolean;
-  readonly updatedAt: string;
 }
 
 /**
@@ -76,13 +75,6 @@ export const githubDev: DevAdapter = {
     transcript: "/repos/{issue.repoId}/issues/{issue.number}/transcript",
   },
   personBody: (name) => ({ login: name }),
-  // GitHub writes times to the second. The newest entry of an issue is what last changed it, so
-  // within that second, when the issue changed is when it was written.
-  time(entry, place) {
-    const written = Date.parse(entry.at);
-    const changed = Date.parse(listed(place.item).updatedAt);
-    return Math.floor(changed / 1000) === Math.floor(written / 1000) ? changed : written;
-  },
   async create({ api, person, app, name, text }) {
     const repo = await devRepo(api, app, person);
     const issue = await api.post(`/users/${segment(person.id)}/issues`, {

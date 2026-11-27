@@ -1,5 +1,5 @@
 import { type TranscriptEntry, transcriptText } from "../../core/router/inspect.ts";
-import { githubTime, minimizedReason } from "./payloads.ts";
+import { minimizedReason } from "./payloads.ts";
 import type { GitHubCommentRecord, GitHubIssueRecord, GitHubReviewCommentRecord, GitHubReviewRecord } from "./world.ts";
 
 const REVIEW_VERDICT: Readonly<Record<string, string>> = {
@@ -34,7 +34,9 @@ export function renderTranscript(
   ): TranscriptEntry => ({
     id: String(id),
     author: principal(author),
-    at: githubTime(at),
+    // GitHub's pages and API show times to the second; the transcript keeps the fake's own, to the
+    // millisecond, so an entry orders against other channels' within that second.
+    at: new Date(at).toISOString(),
     text,
     controls: [],
     edited,
