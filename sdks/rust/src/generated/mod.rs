@@ -20175,6 +20175,45 @@ impl OpenAIFixture {
         ))
     }
 
+    /// Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added, with a function the test answers each call with: it runs in this process, and gets the call's request.
+    pub async fn respond_with<F, Fut, T>(&self, respond: F) -> Result<OpenAIScript>
+    where
+        F: Fn(Value) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = T> + Send + 'static,
+        T: IntoArg + Send + 'static,
+    {
+        let script = self.respond(Value::Null).responder(true).send().await?;
+        let held = script.clone();
+        let answer = script.clone();
+        crate::runtime::responder::respond_with(
+            Box::new(move |since, wait_ms| {
+                let held = held.clone();
+                Box::pin(async move {
+                    let mut read = held.held_calls().wait_ms(wait_ms);
+                    if let Some(since) = since {
+                        read = read.since(since);
+                    }
+                    read.send().await
+                })
+            }),
+            std::sync::Arc::new(move |id, turn, error| {
+                let answer = answer.clone();
+                Box::pin(async move {
+                    let mut call = answer.answer_held(id);
+                    if let Some(turn) = turn {
+                        call = call.turn(turn);
+                    }
+                    if let Some(error) = error {
+                        call = call.error(error);
+                    }
+                    call.send().await
+                })
+            }),
+            respond,
+        );
+        Ok(script)
+    }
+
     /// Every model call attributed to this session, oldest first. Experimental.
     pub fn calls(&self) -> OpenAIFixtureCalls {
         OpenAIFixtureCalls(Call::new(

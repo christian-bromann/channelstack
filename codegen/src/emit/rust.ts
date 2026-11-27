@@ -293,6 +293,51 @@ export function emitRust(ir: Ir): Map<string, string> {
       };
     }
     const builder = builderName(resource, m.name);
+    const { responder } = m;
+    // `respond_with(fn)`: the same call with the responder's flag, then the test answers what the server holds for it.
+    const withFunction = responder
+      ? [
+          "",
+          `    /// ${m.summary}, with a function the test answers each call with: it runs in this process, and gets the call's request.`,
+          `    pub async fn ${ident(m.name)}_with<F, Fut, T>(&self, respond: F) -> Result<${type}>`,
+          "    where",
+          "        F: Fn(Value) -> Fut + Send + Sync + 'static,",
+          "        Fut: std::future::Future<Output = T> + Send + 'static,",
+          "        T: IntoArg + Send + 'static,",
+          "    {",
+          `        let script = self.${ident(m.name)}(${m.args.map(() => "Value::Null").join(", ")}).${ident(responder.flag)}(true).send().await?;`,
+          "        let held = script.clone();",
+          "        let answer = script.clone();",
+          "        crate::runtime::responder::respond_with(",
+          "            Box::new(move |since, wait_ms| {",
+          "                let held = held.clone();",
+          "                Box::pin(async move {",
+          `                    let mut read = held.${ident(responder.held)}().wait_ms(wait_ms);`,
+          "                    if let Some(since) = since {",
+          "                        read = read.since(since);",
+          "                    }",
+          "                    read.send().await",
+          "                })",
+          "            }),",
+          "            std::sync::Arc::new(move |id, turn, error| {",
+          "                let answer = answer.clone();",
+          "                Box::pin(async move {",
+          `                    let mut call = answer.${ident(responder.answer)}(id);`,
+          "                    if let Some(turn) = turn {",
+          "                        call = call.turn(turn);",
+          "                    }",
+          "                    if let Some(error) = error {",
+          "                        call = call.error(error);",
+          "                    }",
+          "                    call.send().await",
+          "                })",
+          "            }),",
+          "            respond,",
+          "        );",
+          "        Ok(script)",
+          "    }",
+        ]
+      : [];
     return {
       inherent: [
         "",
@@ -300,6 +345,7 @@ export function emitRust(ir: Ir): Map<string, string> {
         `    pub fn ${ident(m.name)}(&self${args.map((arg) => `, ${arg}`).join("")}) -> ${builder} {`,
         `        ${builder}(${call})`,
         "    }",
+        ...withFunction,
       ],
       builder: [
         "",

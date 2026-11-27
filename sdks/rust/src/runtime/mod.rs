@@ -6,5 +6,6 @@ pub mod duration;
 pub mod error;
 pub mod files;
 pub mod launcher;
+pub mod responder;
 pub mod transport;
 pub mod wait;

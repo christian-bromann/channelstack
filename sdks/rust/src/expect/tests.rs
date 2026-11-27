@@ -52,6 +52,7 @@ impl Subject for StandIn {
                 busy: false,
                 quiet_for_ms: 60_000.0,
                 open,
+                problems: vec![],
             })
         })
     }

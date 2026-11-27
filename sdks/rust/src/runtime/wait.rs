@@ -162,6 +162,20 @@ pub struct QuietState {
     pub busy: bool,
     pub quiet_for_ms: f64,
     pub open: Vec<String>,
+    /// What should fail a test at once: a model call no script answered (decision 0029).
+    pub problems: Vec<String>,
+}
+
+/// The session's model problems as the error a wait stops with.
+pub fn model_problems(problems: &[String]) -> Error {
+    let lines: Vec<String> = problems
+        .iter()
+        .map(|problem| format!("  {problem}"))
+        .collect();
+    Error::Expectation(format!(
+        "The model calls of this test went wrong:\n{}",
+        lines.join("\n")
+    ))
 }
 
 impl QuietState {
@@ -172,17 +186,22 @@ impl QuietState {
                 .get("quietForMs")
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0),
-            open: state
-                .get("open")
-                .and_then(Value::as_array)
-                .map(|open| {
-                    open.iter()
-                        .filter_map(|item| item.as_str().map(str::to_owned))
-                        .collect()
-                })
-                .unwrap_or_default(),
+            open: strings(state.get("open")),
+            problems: strings(state.get("problems")),
         }
     }
+}
+
+/// A list of strings the server answered, or none.
+fn strings(list: Option<&Value>) -> Vec<String> {
+    list.and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Resolve once the agent has been quiet for `quiet_for`. A wait that gives up says what the agent
@@ -213,6 +232,9 @@ where
             async move {
                 let state = state.await?;
                 *still_open.lock().expect("what is still open") = state.open.clone();
+                if !state.problems.is_empty() {
+                    return Err(model_problems(&state.problems));
+                }
                 if watching && started.elapsed().as_secs_f64() * 1000.0 < quiet_for_ms {
                     return Ok(None);
                 }
@@ -428,6 +450,7 @@ mod tests {
                 busy: true,
                 quiet_for_ms: 0.0,
                 open: vec!["a stream my-agent never stopped".into()],
+                problems: vec![],
             })
         };
         let gave_up = super::until_quiet(busy, &json!("120ms"), &json!("50ms"), false)
@@ -447,6 +470,7 @@ mod tests {
                 busy: false,
                 quiet_for_ms: 60_000.0,
                 open: vec![],
+                problems: vec![],
             })
         };
         let started = std::time::Instant::now();

@@ -11,8 +11,8 @@ use crate::runtime::error::Result;
 use crate::runtime::wait::QuietState;
 use crate::{
     GitHubCommit, GitHubIssue, GitHubPullRequest, GoogleThread, LinearAgentSession, LinearIssue,
-    NotionDiscussion, NotionPage, ResendThread, SlackConversation, SlackMessage, SlackThread,
-    SlackUser,
+    NotionDiscussion, NotionPage, OpenAICall, OpenAIFixture, OpenAIScript, ResendThread,
+    SlackConversation, SlackMessage, SlackThread, SlackUser,
 };
 
 /// Something checked in a session: every handle. A check that waits for quiet asks its session.
@@ -323,3 +323,72 @@ macro_rules! calls {
 // Which handles have the reads every channel has the same way (a transcript, deliveries, calls),
 // generated with the SDK from the IR, so a new channel's handles are subjects without listing them here.
 include!("../generated/subjects.rs");
+
+// --- The model (decision 0029) -------------------------------------------------------------------
+
+/// The model calls a check reads: the fixture's or a script's, or one call (as a list of one).
+pub trait ModelCalls: Subject {
+    fn read_model_calls(&self) -> BoxFuture<'_, Result<Value>>;
+}
+
+/// The calls that sent the model a secret, by kind: `[{ call, kinds }]`.
+pub trait SentSecretsRead: Subject {
+    fn read_sent_secrets(&self) -> BoxFuture<'_, Result<Value>>;
+}
+
+/// The tool calls the model made, each with the agent's result: `[{ name, result?: { text } }]`.
+pub trait ModelToolCalls: Subject {
+    fn read_tool_calls<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Value>>;
+}
+
+/// A model call as it is now.
+pub trait ModelCallRefresh: Subject {
+    fn read_call(&self) -> BoxFuture<'_, Result<Value>>;
+}
+
+/// A script as it is now: `{ id, used, problems }`.
+pub trait ScriptRefresh: Subject {
+    fn read_script(&self) -> BoxFuture<'_, Result<Value>>;
+}
+
+impl ModelCalls for OpenAIFixture {
+    fn read_model_calls(&self) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(self.calls().into_future())
+    }
+}
+impl ModelCalls for OpenAIScript {
+    fn read_model_calls(&self) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(self.calls().into_future())
+    }
+}
+impl ModelCalls for OpenAICall {
+    fn read_model_calls(&self) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move { Ok(Value::Array(vec![self.refresh().await?.data().clone()])) })
+    }
+}
+impl SentSecretsRead for OpenAIFixture {
+    fn read_sent_secrets(&self) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(self.sent_secrets().into_future())
+    }
+}
+impl ModelToolCalls for OpenAIFixture {
+    fn read_tool_calls<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Value>> {
+        Box::pin(self.tool_calls().name(name).into_future())
+    }
+}
+impl ModelToolCalls for OpenAIScript {
+    fn read_tool_calls<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Value>> {
+        Box::pin(self.tool_calls().name(name).into_future())
+    }
+}
+impl ModelCallRefresh for OpenAICall {
+    fn read_call(&self) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move { Ok(self.refresh().await?.data().clone()) })
+    }
+}
+impl ScriptRefresh for OpenAIScript {
+    fn read_script(&self) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move { Ok(self.refresh().await?.data().clone()) })
+    }
+}
+calls!(OpenAIFixture);
