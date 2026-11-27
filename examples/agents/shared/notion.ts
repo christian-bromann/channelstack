@@ -10,7 +10,8 @@ import type { Client } from "@notionhq/client";
 type RichText = Array<{ plain_text: string; type: string; mention?: { type: string; user?: { id: string } } }>;
 
 /** The integration's name, as people mention it. */
-const AGENT = process.env.NOTION_BOT_USERNAME ?? "my-agent";
+// The integration it runs as: the stack names another one in AGENT_NAME (decision 0027).
+const AGENT = process.env.NOTION_BOT_USERNAME ?? process.env.AGENT_NAME ?? "my-agent";
 
 const text = (content: string) => [{ type: "text" as const, text: { content } }];
 const plain = (rich: RichText) => rich.map((item) => item.plain_text).join("");

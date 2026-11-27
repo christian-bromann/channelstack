@@ -186,6 +186,35 @@ describe("delivery and failures (fake only)", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the integration `coder`, with its own token and webhook.
+  test("a mention gets a reply from the integration it names, and only that one", async ({ notion }) => {
+    const coder = await notion.createApp({ name: "coder" });
+    const ana = await notion.createUser({ name: "Ana" });
+    const page = await notion.createPage({
+      title: "Roadmap",
+      content: "# Q1\n- ship search\n- ship billing",
+      connections: [notion.app, coder],
+    });
+
+    const comment = await ana.comment("@coder summarize this page", { page });
+
+    await expect(comment.discussion).toHaveCommentsFrom(coder, { count: 1 });
+    await expect(comment.discussion).not.toHaveCommentFrom(notion.app);
+    await expect(comment.discussion).toGoQuiet({ within: "10s", maxReplies: 1 });
+  });
+
+  test("an integration sees only the pages connected to it", async ({ notion }) => {
+    const coder = await notion.createApp({ name: "coder" });
+    const ana = await notion.createUser({ name: "Ana" });
+    const page = await notion.createPage({ title: "Private notes", connections: [notion.app] });
+
+    const comment = await ana.comment("@coder are you there?", { page });
+
+    await expect(comment.discussion).not.toHaveCommentFrom(coder);
+  });
+});
+
 describe("live mode", () => {
   // With the integration token and CHANNELSTACK_NOTION_USER_ANA_TOKEN (Ana's personal access
   // token) set, this runs in the real test workspace, under a parent page the integration

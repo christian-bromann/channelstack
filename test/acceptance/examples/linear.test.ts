@@ -192,6 +192,37 @@ describe("inspecting what the agent did", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the app `coder`, with its own token and webhook.
+  test("an issue delegated to one app opens a session for that app alone", async ({ linear }) => {
+    const coder = await linear.createApp({ name: "coder" });
+    const ana = await linear.createUser({ name: "Ana" });
+    const team = await linear.createTeam({ members: [ana] });
+    const issue = await ana.createIssue({ title: "Checkout fails on Safari" }, { team });
+
+    const session = await ana.delegate(coder, { issue });
+
+    await expect(session).toHaveActivity({ type: "thought" }, { timeout: "10s" });
+    await expect(issue).toBeDelegatedTo(coder);
+    expect(await issue.sessions()).toHaveLength(1);
+  });
+
+  test("a mention of each app opens a session for each, and each answers in its own", async ({ linear }) => {
+    const coder = await linear.createApp({ name: "coder" });
+    const ana = await linear.createUser({ name: "Ana" });
+    const team = await linear.createTeam({ members: [ana] });
+    const issue = await ana.createIssue({ title: "Flaky e2e test" }, { team });
+
+    await ana.comment("@coder can you take a look?", { issue });
+    await ana.comment("@my-agent and you too?", { issue });
+
+    const sessions = await issue.sessions();
+    expect(sessions).toHaveLength(2);
+    for (const session of sessions) await expect(session).toHaveActivity({ type: "thought" }, { timeout: "10s" });
+    await expect(issue).toGoQuiet({ within: "10s", maxReplies: 4 });
+  });
+});
+
 describe("live mode", () => {
   // With the OAuth app's token and CHANNELSTACK_LINEAR_USER_ANA_TOKEN (Ana's personal API key) set,
   // this runs in the real test workspace. Linear delivers to the agent itself.

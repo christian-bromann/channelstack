@@ -27,7 +27,7 @@ const answered = new Map<string, number>();
 type Event = {
   id: string;
   type: string;
-  authors: Array<{ id: string }>;
+  authors: Array<{ id: string; type?: string }>;
   entity: { id: string };
   data: { page_id: string; discussion_id: string };
 };
@@ -38,6 +38,8 @@ async function commentCreated(event: Event) {
   const discussion = event.data.discussion_id;
   // Bug: answers every comment, its own included (three times, then it stops, so the test ends).
   if (own && !(broken("notion.ignores-own-comments") && (answered.get(discussion) ?? 0) < 3)) return;
+  // Bug: answers another integration's comments too, so two integrations answer each other without end.
+  if (!own && event.authors.some((author) => author.type === "bot") && !broken("notion.no-reply-loop")) return;
   answered.set(discussion, (answered.get(discussion) ?? 0) + 1);
   // Bug: answers in a new discussion on the page, not where it was asked.
   if (broken("notion.reply-in-discussion"))

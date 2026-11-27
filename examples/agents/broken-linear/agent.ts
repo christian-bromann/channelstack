@@ -59,9 +59,23 @@ async function work(session: string) {
   await say(session, "response", "Done.");
 }
 
+const me = linear.viewer.then((viewer) => viewer.id);
+
+/** A comment on an issue. A correct agent leaves other apps' comments alone; this one doesn't, with its fault. */
+async function commented(comment: { issueId?: string; userId?: string }) {
+  if (!comment.issueId || comment.userId === (await me)) return;
+  await linear.createComment({ issueId: comment.issueId, body: "On it." });
+}
+
 serve(Number(PORT), "/webhooks/linear", async (request, body) => {
   const event = verified(body, request.headers.get("linear-signature") ?? "");
   if (!event) return new Response("invalid webhook", { status: 400 });
+  const raw = event as unknown as { type: string; action: string; data: { issueId?: string; userId?: string } };
+  // Bug: answers every comment, another app's included, so two apps answer each other without end.
+  if (raw.type === "Comment" && raw.action === "create" && broken("linear.no-reply-loop")) {
+    commented(raw.data).catch((error: unknown) => console.error("The agent failed:", error));
+    return new Response(null, { status: 200 });
+  }
   if (event.type !== "AgentSessionEvent") return new Response(null, { status: 200 });
   const session = event.agentSession.id;
   if (event.action === "created") {

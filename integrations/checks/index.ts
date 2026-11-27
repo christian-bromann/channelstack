@@ -9,7 +9,17 @@
  */
 import { describe, expect, test, type TestContext } from "vitest";
 
-import type { Duration, SlackApp, SlackFixture, SlackMessage } from "../../sdks/typescript/client.ts";
+import type {
+  Duration,
+  LinearApp,
+  LinearFixture,
+  NotionDelivery,
+  NotionFixture,
+  NotionIntegration,
+  SlackApp,
+  SlackFixture,
+  SlackMessage,
+} from "../../sdks/typescript/client.ts";
 // The fixtures and matchers the checks use come from the Vitest integration.
 import type {} from "../vitest/index.ts";
 
@@ -78,6 +88,7 @@ export const LINEAR_CHECKS = [
   "linear.redelivery",
   "linear.stale",
   "linear.bad-signature",
+  "linear.no-reply-loop",
 ] as const;
 
 /** The ids of the Notion checks, in the order they are registered. */
@@ -86,6 +97,7 @@ export const NOTION_CHECKS = [
   "notion.ignores-own-comments",
   "notion.redelivery",
   "notion.bad-signature",
+  "notion.no-reply-loop",
 ] as const;
 
 /** The ids of the Resend checks, in the order they are registered. */
@@ -471,13 +483,18 @@ export function linearChecks(options: ChecksOptions): void {
   const title = options.prompt ?? "Look into this";
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, LINEAR_CHECKS);
+  const turns = options.loopTurns ?? 3;
+  /** The app under test: the built-in one, or the app of that name (decision 0027). A session's delivery is its own. */
+  const agentOf = async (linear: LinearFixture): Promise<LinearApp> =>
+    app === linear.app.name ? linear.app : linear.createApp({ name: app });
   /** Ana in a team, an issue, and a session from delegating it to the app. */
   const delegated = async ({ linear }: TestContext) => {
+    const agent = await agentOf(linear);
     const ana = await linear.createUser({ name: "Ana" });
     const team = await linear.createTeam({ members: [ana] });
     const issue = await ana.createIssue({ title }, { team });
-    const session = await ana.delegate(linear.app, { issue });
-    return { ana, issue, session };
+    const session = await ana.delegate(agent, { issue });
+    return { ana, agent, issue, session };
   };
   const ended = ["complete", "awaitingInput", "error"] as const;
 
@@ -524,6 +541,24 @@ export function linearChecks(options: ChecksOptions): void {
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
+
+    check("linear.no-reply-loop", "stops answering another app that comments on everything", async (context) => {
+      const { agent, issue, session } = await delegated(context);
+      const peer = await context.linear.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+      await session.waitForState([...ended], wait);
+      const agentComments = async () => (await issue.comments()).filter((one) => one.author.id === agent.id).length;
+      // The peer comments after each comment of the agent's, as a second agent without a loop guard would.
+      const before = await agentComments();
+      let seen = before;
+      for (let turn = 0; turn <= turns; turn++) {
+        await peer.comment("Thanks! Anything else?", { issue });
+        await context.channelstack.quiet(wait);
+        const now = await agentComments();
+        if (now === seen) break;
+        seen = now;
+      }
+      expect(seen - before, "times it answered the other app").toBeLessThanOrEqual(turns);
+    });
   });
 }
 
@@ -536,13 +571,27 @@ export function notionChecks(options: ChecksOptions): void {
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, NOTION_CHECKS);
+  const turns = options.loopTurns ?? 3;
+  /** The integration under test: the built-in one, or the integration of that name (decision 0027). */
+  const agentOf = async (notion: NotionFixture): Promise<NotionIntegration> =>
+    app === notion.app.name ? notion.app : notion.createApp({ name: app });
   /** Ana, and her comment on a page the integration is connected to. */
-  const commented = async ({ notion }: TestContext) => {
+  const commented = async ({ notion }: TestContext, also: readonly NotionIntegration[] = []) => {
+    const agent = await agentOf(notion);
     const ana = await notion.createUser({ name: "Ana" });
-    const page = await notion.createPage({ title: "Notes", content: "- a first note", connections: [notion.app] });
+    const page = await notion.createPage({
+      title: "Notes",
+      content: "- a first note",
+      connections: [agent, ...also],
+    });
     const comment = await ana.comment(prompt, { page });
-    return { ana, page, comment };
+    return { ana, agent, page, comment };
   };
+  /** The delivery checks read the built-in integration's delivery: another's has no `delivery` on a comment yet. */
+  const notionDelivery = (comment: { readonly delivery?: NotionDelivery | undefined }, context: TestContext) =>
+    app === context.notion.app.name
+      ? deliveryOf(comment, context, "Notion")
+      : context.skip(`the Notion delivery checks read the built-in integration's delivery, not ${app}'s`);
 
   describe(`notion checks: ${app}`, () => {
     check("notion.reply-in-discussion", "answers a comment in its discussion", async (context) => {
@@ -561,7 +610,7 @@ export function notionChecks(options: ChecksOptions): void {
 
     check("notion.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
       const { comment } = await commented(context);
-      const delivery = deliveryOf(comment, context, "Notion");
+      const delivery = notionDelivery(comment, context);
       await expect(comment.discussion).toHaveCommentFrom(app, wait);
       // Notion retries with the same event id.
       await delivery.redeliver();
@@ -569,9 +618,28 @@ export function notionChecks(options: ChecksOptions): void {
     });
 
     check("notion.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const delivery = deliveryOf((await commented(context)).comment, context, "Notion");
+      const delivery = notionDelivery((await commented(context)).comment, context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
+    });
+
+    check("notion.no-reply-loop", "stops answering another integration that answers everything", async (context) => {
+      const peer = await context.notion.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+      const { agent, comment } = await commented(context, [peer]);
+      await expect(comment.discussion).toHaveCommentFrom(agent, wait);
+      const agentComments = async () =>
+        (await comment.discussion.comments()).filter((one) => one.author.id === agent.id).length;
+      // The peer answers each comment of the agent's in the discussion, as a second agent without a loop guard would.
+      const before = await agentComments();
+      let seen = before;
+      for (let turn = 0; turn <= turns; turn++) {
+        await peer.reply("Thanks! Anything else?", { discussion: comment.discussion });
+        await context.channelstack.quiet(wait);
+        const now = await agentComments();
+        if (now === seen) break;
+        seen = now;
+      }
+      expect(seen - before, "times it answered the other integration").toBeLessThanOrEqual(turns);
     });
   });
 }

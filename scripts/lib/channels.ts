@@ -67,9 +67,15 @@ export const HARNESS = {
       "issue workflow > ",
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
     // The standard checks as a developer adds them (exit check 4.5).
-    suites: ["test/acceptance/checks/linear-checks.test.ts"],
+    suites: [
+      "test/acceptance/checks/linear-checks.test.ts",
+      // The checks against the second app, `coder` (exit check 12.7).
+      "test/acceptance/checks/linear-checks-coder.test.ts",
+    ],
     agents: { "linear-sdk": "/webhooks/linear", "chat-sdk-linear": "/api/webhooks/linear" },
     broken: { agent: "broken-linear", path: "/webhooks/linear" },
   },
@@ -79,8 +85,14 @@ export const HARNESS = {
       "connections > ",
       "pages and databases > ",
       "delivery and failures \\(fake only\\) > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
-    suites: ["test/acceptance/checks/notion-checks.test.ts"],
+    suites: [
+      "test/acceptance/checks/notion-checks.test.ts",
+      // The checks against the second app, `coder` (exit check 12.7).
+      "test/acceptance/checks/notion-checks-coder.test.ts",
+    ],
     agents: { "notion-sdk": "/webhooks/notion" },
     broken: { agent: "broken-notion", path: "/webhooks/notion" },
   },
