@@ -9,6 +9,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { harness, type RecordingAgent, recordingAgent, refusal } from "../../../test/app-harness.ts";
+import { LOOP_LIMIT } from "../../core/loops/index.ts";
 
 const agents: RecordingAgent[] = [];
 afterEach(() => {
@@ -196,6 +197,33 @@ describe("exit check 12.3: Slack apps", () => {
     const payload = JSON.parse(new URLSearchParams(click?.body).get("payload") ?? "{}");
     expect(payload).toMatchObject({ type: "block_actions", api_app_id: coder.id, actions: [{ action_id: "merge" }] });
     expect(payload.token).toBe(h.secrets.forApp("slack", "coder", "verificationToken"));
+  });
+
+  test("exit check 12.6: two apps answering each other are stopped at the guard's limit, and the session says so", async () => {
+    const { h, mine, post, app, coder, sessionId } = await twoApps();
+    const reviewer = await post("/apps", { name: "reviewer" });
+    const ana = await post("/users", { name: "Ana" });
+    const channel = await post("/channels", { participants: [ana.id, app.id, coder.id, reviewer.id] });
+    await post(`/users/${ana.id}/say`, { message: { text: "go" }, channel: channel.id });
+    for (let i = 0; i < LOOP_LIMIT + 5; i++) {
+      await post(`/apps/${i % 2 === 0 ? coder.id : reviewer.id}/say`, {
+        message: { text: `turn ${i}` },
+        channel: channel.id,
+      });
+    }
+    await h.app.settled();
+
+    // my-agent heard Ana, then each app message up to the limit, and nothing after.
+    expect(mine.received.length).toBe(1 + LOOP_LIMIT);
+    const quiet = (await h.call("GET", `/sessions/${sessionId}/quiet`)).body;
+    expect(quiet.loops).toEqual([
+      expect.stringMatching(/^a bot loop in slack C0[0-9A-Z]+ was stopped after 50 app messages/),
+    ]);
+    // A person writing again starts the conversation over.
+    await post(`/users/${ana.id}/say`, { message: { text: "again" }, channel: channel.id });
+    await post(`/apps/${coder.id}/say`, { message: { text: "back" }, channel: channel.id });
+    await h.app.settled();
+    expect(mine.received.length).toBe(3 + LOOP_LIMIT);
   });
 
   test("a person and an app of one session can't share a name", async () => {

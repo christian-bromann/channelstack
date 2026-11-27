@@ -116,7 +116,8 @@
               "action",
               "delivery",
               "delivery_attempt",
-              "api_call"
+              "api_call",
+              "bot_loop"
             ]
           },
           "data": {
@@ -168,6 +169,13 @@
               "type": "string"
             },
             "description": "What is still open, in words: deliveries in flight or about to be retried, streams never stopped."
+          },
+          "loops": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The bot loops the fake stopped in this session, in words (decision 0027), when there are any. The test fixtures fail a test that left one"
           }
         },
         "required": [

@@ -14,6 +14,7 @@ import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
 import { Ledger } from "./core/ledger/index.ts";
 import type { Logger } from "./core/log/index.ts";
+import { LoopGuard } from "./core/loops/index.ts";
 import { nodeOptions } from "./core/proxy/node.ts";
 import type { Recorder } from "./core/proxy/record.ts";
 import { QuietDetector } from "./core/quiet/index.ts";
@@ -161,7 +162,7 @@ const LogEvent = z
   .object({
     at: z.string(),
     driver: z.string(),
-    kind: z.enum(["action", "delivery", "delivery_attempt", "api_call"]),
+    kind: z.enum(["action", "delivery", "delivery_attempt", "api_call", "bot_loop"]),
     data: z.record(z.string(), z.unknown()),
     summary: z.object({ text: z.string(), outcome: z.string(), ok: z.boolean() }).optional().openapi({
       description: "Delivery attempts and API calls in one line, e.g. `← slack chat.postMessage` and `200`.",
@@ -182,6 +183,10 @@ const Quiet = z
     quietForMs: z.number().openapi({ description: "Milliseconds since the last event in the session. 0 while busy." }),
     open: z.array(z.string()).openapi({
       description: "What is still open, in words: deliveries in flight or about to be retried, streams never stopped.",
+    }),
+    loops: z.array(z.string()).optional().openapi({
+      description:
+        "The bot loops the fake stopped in this session, in words (decision 0027), when there are any. The test fixtures fail a test that left one",
     }),
   })
   .openapi("Quiet");
@@ -206,6 +211,7 @@ export function createApp(options: AppOptions): App {
   });
 
   const quiet = new QuietDetector(clock);
+  const loops = new LoopGuard(events);
   events.onAppend((session) => quiet.touch(session));
 
   const liveEnv = options.live?.env ?? {};
@@ -242,6 +248,7 @@ export function createApp(options: AppOptions): App {
         secret: (app, name) => secrets.forApp(definition.name, app, name),
         ids: (app) => ids.named(`${definition.name}:${app}`),
       },
+      loops: loops.for(definition.name),
       live: {
         active: driverReality(liveEnv, definition.live?.credentials ?? [], undefined).mode === "live",
         strict: forcedReality(liveEnv) === "live",
@@ -276,6 +283,7 @@ export function createApp(options: AppOptions): App {
     registry.release(session.id);
     events.drop(session.id);
     quiet.forget(session.id);
+    loops.forget(session.id);
   });
 
   const control = new OpenAPIHono({
@@ -388,7 +396,8 @@ export function createApp(options: AppOptions): App {
       const pending = delivery.pending(session);
       const deliveries = `${pending} ${pending === 1 ? "delivery" : "deliveries"} in flight or about to be retried`;
       const open = [...(pending > 0 ? [deliveries] : []), ...drivers.flatMap((driver) => driver.openWork(session))];
-      return { ...quiet.state(session, open.length), open };
+      const stopped = loops.stopped(session);
+      return { ...quiet.state(session, open.length), open, ...(stopped.length === 0 ? {} : { loops: stopped }) };
     },
   });
 

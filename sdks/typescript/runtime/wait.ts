@@ -104,6 +104,8 @@ export interface QuietState {
   quietForMs: number;
   /** What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped. */
   open: string[];
+  /** The bot loops the fake stopped in the session (decision 0027), when there are any. */
+  loops?: string[];
 }
 
 /** Anyone who can author something: a handle with an id and a name. */

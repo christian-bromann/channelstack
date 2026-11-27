@@ -90,7 +90,7 @@ export interface EventPage {
 export interface LogEvent {
   at: string;
   driver: string;
-  kind: "action" | "delivery" | "delivery_attempt" | "api_call";
+  kind: "action" | "delivery" | "delivery_attempt" | "api_call" | "bot_loop";
   data: Record<string, unknown>;
   summary?: { text: string; outcome: string; ok: boolean };
 }
@@ -99,6 +99,7 @@ export interface Quiet {
   busy: boolean;
   quietForMs: number;
   open: string[];
+  loops?: string[];
 }
 
 export type Env = Record<string, string>;

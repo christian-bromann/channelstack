@@ -8,6 +8,7 @@ import type { EventLog } from "../events/index.ts";
 import type { IdFormat, IdGenerator } from "../ids/index.ts";
 import type { Ledger, LedgerEntry } from "../ledger/index.ts";
 import type { Logger } from "../log/index.ts";
+import type { DriverLoops } from "../loops/index.ts";
 import type { Registry } from "../registry/index.ts";
 import type { Allowlist } from "../safety/index.ts";
 import type { LiveVault, SecretFormat, SecretSpec } from "../secrets/index.ts";
@@ -172,6 +173,8 @@ export interface DriverContext {
   readonly webhookUrl: string | undefined;
   /** The channel's extra apps (decision 0027): their endpoints, secrets and ids. */
   readonly apps: AppsContext;
+  /** The loop guard: who wrote where, and whether an app's message may still be delivered there. */
+  readonly loops: DriverLoops;
   readonly live: LiveContext;
 }
 

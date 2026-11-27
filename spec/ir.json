@@ -17330,7 +17330,8 @@
                 "action",
                 "delivery",
                 "delivery_attempt",
-                "api_call"
+                "api_call",
+                "bot_loop"
               ]
             },
             "optional": false
@@ -17406,6 +17407,16 @@
               }
             },
             "optional": false
+          },
+          {
+            "name": "loops",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": true
           }
         ]
       }

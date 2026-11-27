@@ -395,7 +395,7 @@ Plain values the handles return and take.
 |---|---|
 | `at` | `string` |
 | `driver` | `string` |
-| `kind` | `"action" \| "delivery" \| "delivery_attempt" \| "api_call"` |
+| `kind` | `"action" \| "delivery" \| "delivery_attempt" \| "api_call" \| "bot_loop"` |
 | `data` | `Record<string, unknown>` |
 | `summary` | `{ text: string; outcome: string; ok: boolean } \| undefined` |
 
@@ -406,6 +406,7 @@ Plain values the handles return and take.
 | `busy` | `busy` | `boolean` |
 | `quietForMs` | `quiet_for_ms` | `number` |
 | `open` | `open` | `string[]` |
+| `loops` | `loops` | `string[] \| undefined` |
 
 ### Env
 

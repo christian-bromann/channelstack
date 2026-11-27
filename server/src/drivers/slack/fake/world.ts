@@ -382,6 +382,13 @@ export function createFakeWorld(
     store.messagesIn(conversation.id).push(message);
     // An ephemeral message exists only for its recipient: Slack sends no event for it.
     if (message.ephemeralFor !== undefined) return message;
+    // The loop guard counts what apps write where no person writes in between (decision 0027).
+    const owner = store.conversations.owner(conversation.id);
+    const writing = store.apps.all().find((app) => app.botUserId === userId);
+    if (owner !== undefined) {
+      context.loops.wrote(owner, conversation.id, writing ? { kind: "app", name: writing.name } : { kind: "person" });
+      if (writing && !context.loops.allows(owner, conversation.id)) return message;
+    }
     const { team } = store;
     const apps = store.apps.all();
     const mentions = mentionedUsers(message.text);

@@ -85,6 +85,22 @@ type Fixtures = Pick<TestContext, "channelstack" | ChannelKind> & {
 };
 const auto = { auto: true } as const;
 
+/**
+ * A test fails when the fake had to stop a bot loop in its session (decision 0027): apps that
+ * answer each other without end are a bug, whether or not the test asserted anything. Where the
+ * server can't tell (live, without proxy mode), there is nothing to report.
+ */
+async function failOnLoops(session: Session): Promise<void> {
+  let loops: string[] | undefined;
+  try {
+    loops = (await session.quiet()).loops;
+  } catch (error) {
+    if (error instanceof ChannelstackError) return;
+    throw error;
+  }
+  if (loops !== undefined && loops.length > 0) throw new Error(`The fake stopped ${loops.join("; ")}`);
+}
+
 (test as unknown as { override(fixtures: Record<string, unknown>): void }).override({
   channelstackSession: [
     async (
@@ -97,6 +113,7 @@ const auto = { auto: true } as const;
       skips.set(session.sessionId, skip);
       try {
         await use(session);
+        await failOnLoops(session);
       } finally {
         skips.delete(session.sessionId);
         // Closing the session removes everything the test created. Disposing never fails a test.

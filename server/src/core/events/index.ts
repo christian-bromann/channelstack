@@ -54,7 +54,8 @@ export class CursorList<T> {
 export const WORLD_SCOPE = "world";
 const WORLD_SCOPE_LIMIT = 10_000;
 
-export type EventKind = "action" | "delivery" | "delivery_attempt" | "api_call";
+/** `bot_loop`: the loop guard stopped apps answering each other in a conversation (decision 0027). */
+export type EventKind = "action" | "delivery" | "delivery_attempt" | "api_call" | "bot_loop";
 
 /** An event in one line, for `channelstack tail` and the UI's inspector. */
 interface EventSummary {
@@ -88,6 +89,13 @@ function summarize(
       text: `→ ${driver} ${deliveryType ?? "event"}${retry}`,
       outcome: ok ? String(data.responseStatus) : String(data.status),
       ok,
+    };
+  }
+  if (kind === "bot_loop") {
+    return {
+      text: `■ ${driver} bot loop in ${String(data.conversation)}`,
+      outcome: `stopped after ${String(data.messages)} app messages`,
+      ok: false,
     };
   }
   if (kind === "api_call") {

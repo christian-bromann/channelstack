@@ -43,6 +43,7 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
       secret: (app, name) => (app === BUILT_IN_APP ? secret(name) : `secret-for-${app}-${name}`),
       ids: (app) => ids.named(app),
     },
+    loops: { wrote: () => {}, allows: () => true },
     live: {
       active: false,
       strict: false,

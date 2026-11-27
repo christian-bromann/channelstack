@@ -213,7 +213,7 @@ class EventPage:
 class LogEvent:
     at: str
     driver: str
-    kind: Literal["action", "delivery", "delivery_attempt", "api_call"]
+    kind: Literal["action", "delivery", "delivery_attempt", "api_call", "bot_loop"]
     data: dict[str, Any]
     summary: dict[str, Any] | None = None
 
@@ -233,6 +233,7 @@ class Quiet:
     busy: bool
     quiet_for_ms: float
     open: list[str]
+    loops: list[str] | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> Quiet:
@@ -240,6 +241,7 @@ class Quiet:
             busy=data["busy"],
             quiet_for_ms=data["quietForMs"],
             open=data["open"],
+            loops=data.get("loops"),
         )
 
 
