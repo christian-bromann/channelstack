@@ -632,7 +632,7 @@ type OpenAITurnInput = string | OpenAITurn;
 | `failAfter` | `fail_after` | `{ chunks: number; how?: "error" \| "drop" \| "stall" } \| undefined` |
 | `pauseAfter` | `pause_after` | `number \| undefined` |
 | `error` | `error` | `"rate_limit" \| "slow_down" \| "insufficient_quota" \| "credit_balance_exhausted" \| "organization_spend_limit_exceeded" \| "project_spend_limit_exceeded" \| "organization_usage_limit_exceeded" \| "server_error" \| "overloaded" \| "timeout" \| "context_length_exceeded" \| "content_policy" \| "invalid_api_key" \| "not_in_organization" \| "ip_not_authorized" \| "unsupported_region" \| undefined` |
-| `retryAfter` | `retry_after` | `Duration \| undefined` |
+| `retryAfter` | `retry_after` | `number \| string \| undefined` |
 | `shouldRetry` | `should_retry` | `boolean \| undefined` |
 | `message` | `message` | `string \| undefined` |
 
@@ -648,8 +648,8 @@ type OpenAITurnInput = string | OpenAITurn;
 
 | Field | Python / Rust | Type |
 |---|---|---|
-| `firstToken` | `first_token` | `Duration \| undefined` |
-| `betweenChunks` | `between_chunks` | `Duration \| undefined` |
+| `firstToken` | `first_token` | `number \| string \| undefined` |
+| `betweenChunks` | `between_chunks` | `number \| string \| undefined` |
 
 ### OpenAIMatch
 

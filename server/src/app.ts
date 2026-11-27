@@ -265,10 +265,19 @@ export function createApp(options: AppOptions): App {
     const source = attributed?.source;
     if (!attributed || !source) return {};
     const definition = DRIVERS.find((candidate) => candidate.name === source.driver);
+    const records = delivery.list(attributed.session);
+    // A tag that is a person's id: the newest message that person wrote, not any delivery naming them.
+    const byAuthor =
+      attributed.by === "tag" && attributed.matched !== undefined
+        ? records
+            .toReversed()
+            .map((record) => ({ record, at: DRIVERS.find((candidate) => candidate.name === record.request.driver) }))
+            .map(({ record, at }) => ({ driver: record.request.driver, found: at?.place?.(record.request.body) }))
+            .find(({ found }) => found?.from === attributed.matched)
+        : undefined;
+    if (byAuthor?.found) return { channel: byAuthor.driver, ...byAuthor.found };
     const record =
-      source.delivery === undefined
-        ? undefined
-        : delivery.list(attributed.session).find((candidate) => candidate.request.id === source.delivery);
+      source.delivery === undefined ? undefined : records.find((candidate) => candidate.request.id === source.delivery);
     const found = record ? definition?.place?.(record.request.body) : undefined;
     return { channel: source.driver, ...(found ?? {}) };
   };

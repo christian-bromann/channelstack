@@ -8,7 +8,7 @@
  */
 import { join } from "node:path";
 
-import { runExamples, runGoDockerExamples, runProxyExamples, runPytestExamples } from "./examples.ts";
+import { runExamples, runGoDockerExamples, runProviderExamples, runProxyExamples, runPytestExamples } from "./examples.ts";
 import { HARNESS, HARNESS_CHANNELS } from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { run } from "./lib/process.ts";
@@ -50,6 +50,8 @@ const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
   },
   // Each conformance scenario against the fake (exit check 6.4); the nightly job runs them live too.
   conformance: () => run(process.execPath, [join(ROOT, "scripts", "conformance.ts"), "--fake-only"], { cwd: ROOT }),
+  // The fake OpenAI's examples against the agents on the official SDK and the AI SDK (exit check 13.1).
+  openai: () => runProviderExamples("openai"),
   "broken-slack": broken("slack"),
   "broken-others": broken(HARNESS_CHANNELS.filter((channel) => channel !== "slack").join(",")),
   ...Object.fromEntries(

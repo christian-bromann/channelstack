@@ -1,6 +1,17 @@
 import { z } from "@hono/zod-openapi";
 
-import { duration, textPattern } from "../../core/router/inspect.ts";
+import { textPattern } from "../../core/router/inspect.ts";
+
+/** A length of time inside a turn: milliseconds, or `"5s"`, `"100ms"`, `"1m"` (turns are values the SDKs send as they are). */
+const duration = (description: string) =>
+  z
+    .union([z.number().int().min(0), z.string().regex(/^\d+(\.\d+)?(ms|s|m)$/)])
+    .transform((value) => {
+      if (typeof value === "number") return value;
+      const amount = Number.parseFloat(value);
+      return Math.round(value.endsWith("ms") ? amount : value.endsWith("s") ? amount * 1000 : amount * 60_000);
+    })
+    .openapi({ description });
 
 /** Every error a script can answer with: OpenAI's documented ones, by the name a test uses. */
 export const ERROR_KINDS = [

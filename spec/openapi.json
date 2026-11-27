@@ -7517,10 +7517,17 @@
             "description": "An error the API answers with instead: OpenAI's documented errors."
           },
           "retryAfter": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "For an error: what `retry-after` and `retry-after-ms` say. Default 0.",
-            "x-channelstack-duration": true
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?(ms|s|m)$"
+              }
+            ],
+            "description": "For an error: what `retry-after` and `retry-after-ms` say. Default 0."
           },
           "shouldRetry": {
             "type": "boolean",
@@ -7565,16 +7572,30 @@
         "type": "object",
         "properties": {
           "firstToken": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "From the request's arrival to the response headers and the first chunk (the whole body if not streaming).",
-            "x-channelstack-duration": true
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?(ms|s|m)$"
+              }
+            ],
+            "description": "From the request's arrival to the response headers and the first chunk (the whole body if not streaming)."
           },
           "betweenChunks": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Between the chunks of a stream.",
-            "x-channelstack-duration": true
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?(ms|s|m)$"
+              }
+            ],
+            "description": "Between the chunks of a stream."
           }
         }
       },

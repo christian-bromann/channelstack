@@ -247,7 +247,6 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     const stream = sseStream(
       {
         frames,
-        firstDelayMs: 0,
         betweenMs: timing.betweenChunks ?? 0,
         ...(breaking ? { break: breaking } : {}),
         ...(turn.pauseAfter === undefined ? {} : { pauseAfter: turn.pauseAfter }),

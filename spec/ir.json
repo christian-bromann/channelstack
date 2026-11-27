@@ -21741,7 +21741,15 @@
           {
             "name": "retryAfter",
             "type": {
-              "kind": "duration"
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "integer"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
             },
             "optional": true
           },
@@ -21810,14 +21818,30 @@
           {
             "name": "firstToken",
             "type": {
-              "kind": "duration"
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "integer"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
             },
             "optional": true
           },
           {
             "name": "betweenChunks",
             "type": {
-              "kind": "duration"
+              "kind": "union",
+              "types": [
+                {
+                  "kind": "integer"
+                },
+                {
+                  "kind": "string"
+                }
+              ]
             },
             "optional": true
           }

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 import channelstack from "../../integrations/vitest/index.ts";
-import { examplesOf, HARNESS_CHANNELS } from "../../scripts/lib/channels.ts";
+import { examplesOf, HARNESS_CHANNELS, PROVIDERS } from "../../scripts/lib/channels.ts";
 
 /**
  * The acceptance suite: `test/acceptance/examples` run unchanged against a reference agent and the compiled
@@ -23,6 +23,7 @@ export default defineConfig({
     root: fileURLToPath(new URL("../..", import.meta.url)),
     include: [
       ...HARNESS_CHANNELS.map(examplesOf),
+      ...Object.keys(PROVIDERS).map((provider) => `test/acceptance/examples/${provider}.test.ts`),
       "test/acceptance/examples/shared.test.ts",
       "test/acceptance/stack/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",

@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { AGENTS, examplesOf, HARNESS, HARNESS_CHANNELS, referenceOf } from "./lib/channels.ts";
+import { AGENTS, examplesOf, HARNESS, HARNESS_CHANNELS, PROVIDERS, referenceOf } from "./lib/channels.ts";
 import { ROOT } from "./lib/generate.ts";
 import { binaryPath } from "./lib/packages.ts";
 import { run } from "./lib/process.ts";
@@ -63,6 +63,33 @@ export async function runExamples(
   }
   if (!(options.shared ?? options.agents === undefined)) return;
   await runSharedExamples(bin);
+}
+
+/** A provider's examples against each of its agents (exit check 13.1): `test/acceptance/examples/<provider>.test.ts`. */
+export async function runProviderExamples(provider: keyof typeof PROVIDERS, options: { bin?: string } = {}): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  const { enabled, agents } = PROVIDERS[provider];
+  for (const [name, { channel, path }] of Object.entries(agents)) {
+    console.log(`\ntest/acceptance/examples/${provider}.test.ts against ${name}`);
+    const agent = join(ROOT, "examples", "agents", name, "agent.ts");
+    await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
+      run(
+        "pnpm",
+        [
+          "exec",
+          "vitest",
+          "run",
+          "--config",
+          "test/acceptance/vitest.config.ts",
+          `test/acceptance/examples/${provider}.test.ts`,
+          "-t",
+          `^(${enabled.join("|")})`,
+        ],
+        { cwd: ROOT, env },
+      );
+    });
+  }
 }
 
 /** The phase 1 Slack examples in proxy mode (exit check 6.1). */

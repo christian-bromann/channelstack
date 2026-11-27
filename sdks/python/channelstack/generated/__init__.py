@@ -1299,7 +1299,7 @@ class OpenAITurn:
     fail_after: dict[str, Any] | None = None
     pause_after: int | None = None
     error: Literal["rate_limit", "slow_down", "insufficient_quota", "credit_balance_exhausted", "organization_spend_limit_exceeded", "project_spend_limit_exceeded", "organization_usage_limit_exceeded", "server_error", "overloaded", "timeout", "context_length_exceeded", "content_policy", "invalid_api_key", "not_in_organization", "ip_not_authorized", "unsupported_region"] | None = None
-    retry_after: Duration | None = None
+    retry_after: int | str | None = None
     should_retry: bool | None = None
     message: str | None = None
 
@@ -1339,8 +1339,8 @@ class OpenAIToolCallSpec:
 
 @dataclass(frozen=True)
 class OpenAITiming:
-    first_token: Duration | None = None
-    between_chunks: Duration | None = None
+    first_token: int | str | None = None
+    between_chunks: int | str | None = None
 
     @classmethod
     def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> OpenAITiming:

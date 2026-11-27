@@ -95,6 +95,30 @@ export const HARNESS = {
 
 export type HarnessChannel = keyof typeof HARNESS;
 
+/** A provider's examples (`test/acceptance/examples/<provider>.test.ts`), and the agents they run against. */
+interface ProviderHarness {
+  readonly enabled: readonly string[];
+  /** The reference agents, the channel each lives in, and where it takes that channel's webhooks. */
+  readonly agents: Readonly<Record<string, { readonly channel: HarnessChannel; readonly path: string }>>;
+}
+
+/** The fakes the agent calls that aren't channels (decision 0029): their examples run against agents of a channel. */
+export const PROVIDERS = {
+  openai: {
+    enabled: [
+      "scripting the model > ",
+      "timing and failures \\(fake only\\) > ",
+      "several calls at once > ",
+      "what the agent sends the model > ",
+      "a missing script fails the test > ",
+    ],
+    agents: {
+      "openai-node": { channel: "slack", path: "/slack/events" },
+      "openai-ai-sdk": { channel: "slack", path: "/slack/events" },
+    },
+  },
+} as const satisfies Readonly<Record<string, ProviderHarness>>;
+
 /** The channels the harness knows, in the drivers' order. */
 export const HARNESS_CHANNELS = Object.keys(HARNESS) as HarnessChannel[];
 

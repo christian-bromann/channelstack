@@ -1045,7 +1045,7 @@ export interface OpenAITurn {
   failAfter?: { chunks: number; how?: "error" | "drop" | "stall" };
   pauseAfter?: number;
   error?: "rate_limit" | "slow_down" | "insufficient_quota" | "credit_balance_exhausted" | "organization_spend_limit_exceeded" | "project_spend_limit_exceeded" | "organization_usage_limit_exceeded" | "server_error" | "overloaded" | "timeout" | "context_length_exceeded" | "content_policy" | "invalid_api_key" | "not_in_organization" | "ip_not_authorized" | "unsupported_region";
-  retryAfter?: Duration;
+  retryAfter?: number | string;
   shouldRetry?: boolean;
   message?: string;
 }
@@ -1057,8 +1057,8 @@ export interface OpenAIToolCallSpec {
 }
 
 export interface OpenAITiming {
-  firstToken?: Duration;
-  betweenChunks?: Duration;
+  firstToken?: number | string;
+  betweenChunks?: number | string;
 }
 
 export interface OpenAIMatch {

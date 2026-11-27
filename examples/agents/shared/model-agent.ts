@@ -78,7 +78,11 @@ export function modelAgent(app: App, model: Model): void {
     );
   };
 
-  const respond = async (client: App["client"], channel: string, thread: string, user: string, self: string | undefined) => {
+  const respond = async (
+    client: App["client"],
+    where: { channel: string; thread: string; user: string; team: string | undefined; self: string | undefined },
+  ) => {
+    const { channel, thread, user, team, self } = where;
     const key = `${channel}:${thread}`;
     joined.add(key);
     await client.assistant.threads.setStatus({ channel_id: channel, thread_ts: thread, status: "is thinking…" });
@@ -95,7 +99,10 @@ export function modelAgent(app: App, model: Model): void {
         onText: async (text) => {
           if (stop.signal.aborted || text === "") return;
           if (stream === undefined) {
-            stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text })).ts;
+            // Outside a DM, Slack streams to someone: the person who asked, in their workspace.
+            const recipient =
+              channel.startsWith("D") || team === undefined ? {} : { recipient_user_id: user, recipient_team_id: team };
+            stream = (await client.chat.startStream({ channel, thread_ts: thread, markdown_text: text, ...recipient })).ts;
           } else await client.chat.appendStream({ channel, ts: stream, markdown_text: text });
         },
       });
@@ -121,7 +128,13 @@ export function modelAgent(app: App, model: Model): void {
 
   app.event("app_mention", async ({ event, body, client, context }) => {
     if ("bot_id" in event || !firstTime(body.event_id)) return;
-    await respond(client, event.channel, event.thread_ts ?? event.ts, event.user ?? "", context.botUserId);
+    await respond(client, {
+      channel: event.channel,
+      thread: event.thread_ts ?? event.ts,
+      user: event.user ?? "",
+      team: context.teamId,
+      self: context.botUserId,
+    });
   });
 
   app.message(async ({ message, body, client, context }) => {
@@ -132,6 +145,6 @@ export function modelAgent(app: App, model: Model): void {
     const followUp = message.thread_ts !== undefined && joined.has(`${message.channel}:${thread}`);
     // A mention is answered by the app_mention handler.
     if ((!direct && !followUp) || ((message.text ?? "").includes("<@") && !direct)) return;
-    await respond(client, message.channel, thread, message.user, context.botUserId);
+    await respond(client, { channel: message.channel, thread, user: message.user, team: context.teamId, self: context.botUserId });
   });
 }
