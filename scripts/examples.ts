@@ -72,7 +72,7 @@ export async function runProviderExamples(
 ): Promise<void> {
   const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
   if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
-  const { enabled, agents } = PROVIDERS[provider];
+  const { enabled, agents, suites } = PROVIDERS[provider];
   for (const [name, { channel, path }] of Object.entries(agents)) {
     console.log(`\ntest/acceptance/examples/${provider}.test.ts against ${name}`);
     const agent = join(ROOT, "examples", "agents", name, "agent.ts");
@@ -91,6 +91,12 @@ export async function runProviderExamples(
         ],
         { cwd: ROOT, env },
       );
+      for (const suite of suites) {
+        run("pnpm", ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", suite], {
+          cwd: ROOT,
+          env,
+        });
+      }
       // The pytest port (exit check 13.6), against the provider's first agent.
       if (name === Object.keys(agents)[0]) {
         const project = join(ROOT, "integrations", "pytest-channelstack");
@@ -106,6 +112,39 @@ export async function runProviderExamples(
       }
     });
   }
+}
+
+/**
+ * A provider in proxy mode (exit check 13.12): its first agent as it is, configured only from
+ * `channelstack env --proxy`. With no `OPENAI_BASE_URL` the official SDK calls `api.openai.com`,
+ * and the proxy sends that to the fake.
+ */
+export async function runProviderProxyExamples(
+  provider: keyof typeof PROVIDERS,
+  options: { bin?: string } = {},
+): Promise<void> {
+  const bin = options.bin ?? process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath();
+  if (!existsSync(bin)) throw new Error(`No server binary at ${bin}. Run \`pnpm build\` first.`);
+  const [name, where] = Object.entries(PROVIDERS[provider].agents)[0] ?? [];
+  if (name === undefined || where === undefined) return;
+  console.log(`\ntest/acceptance/examples/${provider}.test.ts against ${name} in proxy mode`);
+  const agent = join(ROOT, "examples", "agents", name, "agent.ts");
+  await withStack({ bin, agent, webhook: { driver: where.channel, path: where.path }, proxy: true }, ({ env }) => {
+    run(
+      "pnpm",
+      [
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "test/acceptance/vitest.config.ts",
+        `test/acceptance/examples/${provider}.test.ts`,
+        "-t",
+        "^scripting the model > ",
+      ],
+      { cwd: ROOT, env },
+    );
+  });
 }
 
 /** The phase 1 Slack examples in proxy mode (exit check 6.1). */

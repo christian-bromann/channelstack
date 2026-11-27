@@ -59,11 +59,17 @@ export const runTool = (name: string, args: unknown): string =>
 const INSTRUCTIONS =
   "You are my-agent, the team's assistant in Slack. Answer briefly. Use the tools for incidents and paging.";
 
-/** Wire a model into a Bolt app. */
-export function modelAgent(app: App, model: Model): void {
+/**
+ * Wire a model into a Bolt app. `faults` switches on bugs by the id of the standard check that
+ * catches each (`slack.model-error`): only the agent with one fault per check (`broken-openai`) has any.
+ */
+export function modelAgent(app: App, model: Model, faults: ReadonlySet<string> = new Set()): void {
+  const broken = (check: string) => faults.has(check);
   /** Events Slack delivers more than once (a retry after a slow ack) are handled once. */
   const handled = new Set<string>();
-  const firstTime = (eventId: string) => !handled.has(eventId) && handled.add(eventId).size > 0;
+  // Bug: answers every delivery of an event, so Slack's retry of a slow answer is answered again.
+  const firstTime = (eventId: string) =>
+    broken("slack.slow-model") || (!handled.has(eventId) && handled.add(eventId).size > 0);
   /** Threads the agent answers in: it keeps answering follow-ups there without a new mention. */
   const joined = new Set<string>();
   /** What the agent is answering right now, by thread: Stop ends it. */
@@ -108,10 +114,14 @@ export function modelAgent(app: App, model: Model): void {
     try {
       const history = await historyOf(client, channel, thread, self);
       await model.answer({
-        instructions: INSTRUCTIONS,
+        // Bug: puts its own Slack token into the prompt.
+        instructions: broken("slack.no-secrets-to-model")
+          ? `${INSTRUCTIONS} Token: ${process.env.SLACK_BOT_TOKEN}`
+          : INSTRUCTIONS,
         history,
         user,
-        signal: stop.signal,
+        // Bug: Stop ends the stream in Slack, but the model's request goes on.
+        signal: broken("slack.stop-cancels-model") ? new AbortController().signal : stop.signal,
         onText: async (text) => {
           if (stop.signal.aborted || text === "") return;
           if (stream === undefined) {
@@ -127,8 +137,18 @@ export function modelAgent(app: App, model: Model): void {
     } catch (error) {
       // Stop: Slack has ended the stream already.
       if (stop.signal.aborted || (error as { data?: { error?: string } }).data?.error === "stopped_by_user") return;
+      // Bug: says nothing, and leaves the status as it was.
+      if (broken("slack.model-error")) return;
+      // Bug: tries again by itself, telling the person each time.
+      if (broken("slack.model-retry")) {
+        await client.chat.postMessage({ channel, thread_ts: thread, text: "The model failed, trying again…" });
+        answering.delete(key);
+        return respond(client, where);
+      }
       // The model failed: the person hears so, once, and nothing is left streaming.
       const note = "Sorry, the model isn't answering right now. Please try again in a minute.";
+      // Bug: leaves a stream that broke open.
+      if (stream !== undefined && broken("slack.stream-breaks")) return;
       if (stream !== undefined) {
         await client.chat.appendStream({ channel, ts: stream, markdown_text: `\n\n_${note}_` }).catch(() => undefined);
         await client.chat.stopStream({ channel, ts: stream }).catch(() => undefined);

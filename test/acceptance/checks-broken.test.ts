@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 import * as checkIds from "../../integrations/checks/index.ts";
-import { HARNESS, HARNESS_CHANNELS } from "../../scripts/lib/channels.ts";
+import { HARNESS, HARNESS_CHANNELS, PROVIDERS } from "../../scripts/lib/channels.ts";
 import { ROOT } from "../../scripts/lib/generate.ts";
 import { binaryPath } from "../../scripts/lib/packages.ts";
 import { withStack } from "../../scripts/lib/stack.ts";
@@ -26,18 +26,23 @@ async function checks(
   fault: string | undefined,
   only: string | undefined,
   agentEnv: Record<string, string> = {},
+  suite: { agent: string; path: string; file: string; driver: string } = {
+    ...(CHANNELS[channel] as { agent: string; path: string }),
+    file: `test/acceptance/checks/${channel}-checks.test.ts`,
+    driver: channel,
+  },
 ) {
-  const { agent, path } = CHANNELS[channel] as { agent: string; path: string };
+  const { agent, path } = suite;
   let run = { status: null as number | null, output: "" };
   await withStack(
     {
       bin: process.env.CHANNELSTACK_SERVER_BIN ?? binaryPath(),
       agent: join(ROOT, "examples", "agents", agent, "agent.ts"),
-      webhook: { driver: channel, path },
+      webhook: { driver: suite.driver, path },
       agentEnv: { ...agentEnv, ...(fault ? { BROKEN: fault } : {}) },
     },
     ({ env }) => {
-      const file = `test/acceptance/checks/${channel}-checks.test.ts`;
+      const { file } = suite;
       const result = spawnSync(
         "pnpm",
         ["exec", "vitest", "run", "--config", "test/acceptance/vitest.config.ts", file],
@@ -73,6 +78,22 @@ describe.for(channels)("the standard %s checks catch what they are for", ([name,
     expect(run.output).toContain(`[${id}]`);
     expect(run.status).toBe(1);
   });
+});
+
+// Exit check 13.9: each model check fails against the agent on the fake OpenAI with that fault.
+const providers = Object.entries(PROVIDERS).filter(([name]) => only === undefined || only.includes(name));
+describe.for(providers)("the model checks of %s catch what they are for", ([name, { broken }]) => {
+  const suite = { ...broken, file: `test/acceptance/checks/${name}-checks.test.ts`, driver: broken.channel };
+  test.concurrent.for([...checkIds.SLACK_MODEL_CHECKS])(
+    "%s fails against the agent with that fault",
+    { timeout: 120_000 },
+    async (id) => {
+      const run = await checks(name, id, id, {}, suite);
+      expect(run.output, run.output).toContain("1 failed");
+      expect(run.output).toContain(`[${id}]`);
+      expect(run.status).toBe(1);
+    },
+  );
 });
 
 test("an agent that takes the button away after the first click passes the double-click check", async () => {

@@ -12,6 +12,7 @@ import {
   runExamples,
   runGoDockerExamples,
   runProviderExamples,
+  runProviderProxyExamples,
   runProxyExamples,
   runPytestExamples,
 } from "./examples.ts";
@@ -53,11 +54,17 @@ const PARTS: Readonly<Record<string, () => Promise<void> | void>> = {
   proxy: async () => {
     await runProxyExamples();
     await runGoDockerExamples();
+    // The OpenAI agent with a hard-coded api.openai.com (exit check 13.12).
+    await runProviderProxyExamples("openai");
   },
   // Each conformance scenario against the fake (exit check 6.4); the nightly job runs them live too.
   conformance: () => run(process.execPath, [join(ROOT, "scripts", "conformance.ts"), "--fake-only"], { cwd: ROOT }),
   // The fake OpenAI's examples against the agents on the official SDK and the AI SDK (exit check 13.1).
-  openai: () => runProviderExamples("openai"),
+  openai: async () => {
+    await runProviderExamples("openai");
+    // The model checks against the agent with one fault per check (exit check 13.9).
+    await broken("openai")();
+  },
   "broken-slack": broken("slack"),
   "broken-others": broken(HARNESS_CHANNELS.filter((channel) => channel !== "slack").join(",")),
   ...Object.fromEntries(
