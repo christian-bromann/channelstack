@@ -138,9 +138,9 @@ jobs:
           pnpm build:sdk
           mkdir -p dist/packs
           npm pack ./sdks/typescript --pack-destination dist/packs
-          # No `npm publish --dry-run` here: it refuses a version npm has, so this run could never be
-          # run again once npm had published (#114). CI's `packaging` job packs this package and
-          # installs it on every pull request, and the npm job skips what npm has already.
+          # Packed, not checked against the registry, so the whole run can be run again after npm has
+          # published: CI's `packaging` job installs this package on every pull request, and the npm
+          # job skips a version npm has already.
           test -f "dist/packs/channelstack-$VERSION.tgz"
       # The same two steps run in ci.yml's `packages` job on every pull request: change both.
       - name: PyPI, channelstack and pytest-channelstack
