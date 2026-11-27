@@ -7,17 +7,18 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, cast
 from urllib.parse import quote
 
-from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of
+from ..runtime.client import ClientBase, HandleContext, Protocol, connect_with, dispose_quietly, quiet_of, session_of, to_wire
 from ..runtime.credentials import credential
 from ..runtime.duration import Duration, parse_duration
 from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes, read_document, read_tree
+from ..runtime.responder import respond_with
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "OpenAICall", "OpenAICalls", "OpenAIContext", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMessage", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "OpenAICall", "OpenAICalls", "OpenAIContext", "OpenAIFixture", "OpenAIHeldCall", "OpenAIHeldPage", "OpenAIMatch", "OpenAIMessage", "OpenAIPausedCalls", "OpenAIProblems", "OpenAIRateLimit", "OpenAIRef", "OpenAIRequest", "OpenAIScript", "OpenAISentSecret", "OpenAISentSecrets", "OpenAISessionCalls", "OpenAISessionToolCalls", "OpenAITiming", "OpenAITool", "OpenAIToolCall", "OpenAIToolCallSpec", "OpenAIToolCalls", "OpenAITurn", "OpenAITurnInput", "OpenAIUnattributedCall", "OpenAIUnattributedCalls", "PROVIDER_NAMES", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -407,7 +408,7 @@ class SlackMessageInput:
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"text": self.text, "blocks": self.blocks, "metadata": self.metadata}
+        wire = {"text": self.text, "blocks": self.blocks, "metadata": None if self.metadata is None else self.metadata._to_wire()}
         return {key: value for key, value in wire.items() if value is not None}
 
 
@@ -422,6 +423,10 @@ class SlackMessageMetadata:
             event_type=data["event_type"],
             event_payload=data["event_payload"],
         )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"event_type": self.event_type, "event_payload": self.event_payload}
+        return wire
 
 
 @dataclass(frozen=True)
@@ -1321,6 +1326,10 @@ class OpenAITurn:
             message=data.get("message"),
         )
 
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"text": self.text, "toolCalls": None if self.tool_calls is None else [item._to_wire() for item in self.tool_calls], "reasoning": self.reasoning, "refusal": self.refusal, "finish": self.finish, "usage": self.usage, "timing": None if self.timing is None else self.timing._to_wire(), "failAfter": self.fail_after, "pauseAfter": self.pause_after, "error": self.error, "retryAfter": self.retry_after, "shouldRetry": self.should_retry, "message": self.message}
+        return {key: value for key, value in wire.items() if value is not None}
+
 
 @dataclass(frozen=True)
 class OpenAIToolCallSpec:
@@ -1335,6 +1344,10 @@ class OpenAIToolCallSpec:
             arguments=data.get("arguments"),
             input=data.get("input"),
         )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"name": self.name, "arguments": self.arguments, "input": self.input}
+        return {key: value for key, value in wire.items() if value is not None}
 
 
 @dataclass(frozen=True)
@@ -1381,7 +1394,7 @@ class OpenAIMatch:
         )
 
     def _to_wire(self) -> dict[str, Any]:
-        wire = {"text": self.text, "prompt": self.prompt, "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": self.model, "stream": self.stream, "from": self.from_, "in": self.in_}
+        wire = {"text": None if self.text is None else pattern_on_wire(self.text), "prompt": None if self.prompt is None else pattern_on_wire(self.prompt), "tools": self.tools, "toolResult": self.tool_result, "endpoint": self.endpoint, "model": None if self.model is None else pattern_on_wire(self.model), "stream": self.stream, "from": self.from_, "in": self.in_}
         return {key: value for key, value in wire.items() if value is not None}
 
 
@@ -3874,11 +3887,15 @@ class OpenAIFixture:
         self._seen: dict[str, int] = {}
         self.base_url: str = data["baseUrl"]
 
-    async def respond(self, turns: OpenAITurnInput | list[OpenAITurnInput] | None = None, *, when: OpenAIMatch | None = None, times: int | None = None, timing: OpenAITiming | None = None, responder: bool | None = None) -> OpenAIScript:
+    async def respond(self, turns: OpenAITurnInput | list[OpenAITurnInput] | Callable[[OpenAIRequest], OpenAITurnInput | Awaitable[OpenAITurnInput]] | None = None, *, when: OpenAIMatch | None = None, times: int | None = None, timing: OpenAITiming | None = None) -> OpenAIScript:
         """Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts", body={"turns": None if turns is None else (turns if isinstance(turns, list) else [turns]), "when": None if when is None else when._to_wire(), "times": times, "timing": None if timing is None else timing._to_wire(), "responder": responder})
-        return OpenAIScript(ctx, data)
+        answer = turns if callable(turns) else None
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts", body={"turns": None if answer is not None or turns is None else to_wire(cast(Any, turns) if isinstance(turns, list) else [turns]), "when": None if when is None else when._to_wire(), "times": times, "timing": None if timing is None else timing._to_wire(), "responder": answer is not None})
+        handle = OpenAIScript(ctx, data)
+        if answer is not None:
+            respond_with(lambda since, wait_ms: handle.held_calls(since=since, wait_ms=wait_ms), lambda held, turn, error: handle.answer_held(held, turn=turn, error=error), answer)
+        return handle
 
     async def calls(self, *, endpoint: Literal["chat.completions", "responses"] | None = None, error: Literal[True] | str | None = None) -> OpenAISessionCalls:
         """Every model call attributed to this session, oldest first. Experimental."""
@@ -3978,7 +3995,7 @@ class OpenAIScript:
     async def answer_held(self, held: str, *, turn: OpenAITurnInput | None = None, error: str | None = None) -> None:
         """For a responder's SDK: answer a held call with a turn, or report that the test's function threw. Experimental."""
         ctx = self._ctx
-        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/answers", body={"held": held, "turn": turn, "error": error})
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/openai/scripts/{quote(str(self.id), safe='')}/answers", body={"held": held, "turn": None if turn is None else to_wire(turn), "error": error})
 
     async def wait_for_call(self, *, timeout: Duration | None = None) -> OpenAICall:
         """Wait for the next new model call this script answers, after the last one this handle saw."""
@@ -4106,6 +4123,9 @@ class GitHubPullRequest(GitHubIssue):
 
 CHANNEL_NAMES: tuple[str, ...] = ("slack", "github", "linear", "notion", "resend", "google")
 """Every channel, by name, in the server's order: what pytest-channelstack makes a fixture of."""
+
+PROVIDER_NAMES: tuple[str, ...] = ("openai",)
+"""The fakes the agent calls that aren't channels (the fake OpenAI): pytest-channelstack makes a fixture of each too."""
 
 
 async def connect(*, mode: Literal["auto", "attach", "start"] = "auto", server: str | None = None, token: str | None = None) -> Channelstack:

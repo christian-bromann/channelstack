@@ -19,6 +19,7 @@ import pytest_asyncio
 
 from channelstack import (
     CHANNEL_NAMES,
+    PROVIDER_NAMES,
     Channelstack,
     ChannelstackError,
     Session,
@@ -95,6 +96,15 @@ async def channelstack_session(channelstack: Channelstack, request: pytest.Fixtu
     set_files_root(request.path.parent)
     async with session:
         yield session
+        # What went wrong with the model fails the test even if it asserted nothing about it
+        # (decision 0029): read while the session is still open.
+        try:
+            problems = (await session.quiet()).problems
+        except ChannelstackError:
+            problems = []
+    if problems:
+        lines = "\n".join(f"  {problem}" for problem in problems)
+        pytest.fail(f"The model calls of this test went wrong:\n{lines}", pytrace=False)
 
 
 def _channel_fixture(name: str) -> object:
@@ -108,6 +118,6 @@ def _channel_fixture(name: str) -> object:
     return pytest_asyncio.fixture(loop_scope="session", name=name)(fixture)
 
 
-# One fixture per channel, by its name, from the SDK's generated list.
-for _name in CHANNEL_NAMES:
+# One fixture per channel, and per provider (`openai`), by its name, from the SDK's generated lists.
+for _name in (*CHANNEL_NAMES, *PROVIDER_NAMES):
     globals()[f"_{_name}_fixture"] = _channel_fixture(_name)

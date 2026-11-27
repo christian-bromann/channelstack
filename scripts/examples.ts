@@ -91,6 +91,19 @@ export async function runProviderExamples(
         ],
         { cwd: ROOT, env },
       );
+      // The pytest port (exit check 13.6), against the provider's first agent.
+      if (name === Object.keys(agents)[0]) {
+        const project = join(ROOT, "integrations", "pytest-channelstack");
+        const port = `test/acceptance/pytest/test_${provider}.py`;
+        run(
+          "uv",
+          ["run", "--project", project, "--frozen", "pytest", port, "-c", "test/acceptance/pytest/pytest.ini"],
+          {
+            cwd: ROOT,
+            env,
+          },
+        );
+      }
     });
   }
 }
@@ -183,6 +196,11 @@ export async function runPytestExamples(options: { bin?: string } = {}): Promise
   const agent = join(ROOT, "examples", "agents", "bolt-ai-sdk", "agent.ts");
   await withStack({ bin, agent, webhook: { driver: channel, path } }, ({ env }) => {
     const project = join(ROOT, "integrations", "pytest-channelstack");
-    run("uv", ["run", "--project", project, "--frozen", "pytest", "test/acceptance/pytest"], { cwd: ROOT, env });
+    // The model's port runs against a model agent, with the provider's examples.
+    const ignored = Object.keys(PROVIDERS).map((provider) => `--ignore=test/acceptance/pytest/test_${provider}.py`);
+    run("uv", ["run", "--project", project, "--frozen", "pytest", "test/acceptance/pytest", ...ignored], {
+      cwd: ROOT,
+      env,
+    });
   });
 }

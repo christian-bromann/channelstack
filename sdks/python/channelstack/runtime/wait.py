@@ -99,6 +99,17 @@ class QuietState:
     quiet_for_ms: float
     open: Sequence[str] = ()
     """What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped."""
+    problems: Sequence[str] = ()
+    """What should fail a test at once: a model call no script answered (decision 0029)."""
+
+
+class ModelProblemError(Exception):
+    """A wait stopped because the session's model calls went wrong: no script answered one, a script ran out."""
+
+    def __init__(self, problems: Sequence[str]) -> None:
+        lines = "\n".join(f"  {problem}" for problem in problems)
+        super().__init__(f"The model calls of this test went wrong:\n{lines}")
+        self.problems = tuple(problems)
 
 
 class Author(Protocol):
@@ -199,6 +210,8 @@ async def until_quiet(
         nonlocal still_open
         state = await quiet()
         still_open = state.open
+        if state.problems:
+            raise ModelProblemError(state.problems)
         if watching and (time.monotonic() - started) * 1000 < quiet_for_ms:
             return None
         return True if not state.busy and state.quiet_for_ms >= quiet_for_ms else None

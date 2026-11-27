@@ -2,7 +2,7 @@
 
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from typing import Self
+from typing import Any, Self, cast
 from urllib.parse import quote
 
 from .launcher import Mode, launch
@@ -30,7 +30,10 @@ async def quiet_of(context: HandleContext) -> QuietState:
     session = quote(session_of(context), safe="")
     state = await context.transport.request("GET", f"/sessions/{session}/quiet")
     return QuietState(
-        busy=bool(state["busy"]), quiet_for_ms=float(state["quietForMs"]), open=tuple(state.get("open", ()))
+        busy=bool(state["busy"]),
+        quiet_for_ms=float(state["quietForMs"]),
+        open=tuple(state.get("open", ())),
+        problems=tuple(state.get("problems", ())),
     )
 
 
@@ -98,3 +101,14 @@ async def connect_with[T](
         await connection.stop()
         raise
     return create(transport, connection.stop)
+
+
+def to_wire(value: Any) -> Any:
+    """A value as it goes on the wire: dataclasses as their wire form, through lists and dicts."""
+    if hasattr(value, "_to_wire"):
+        return value._to_wire()
+    if isinstance(value, list):
+        return [to_wire(item) for item in cast("list[Any]", value)]
+    if isinstance(value, dict):
+        return {key: to_wire(item) for key, item in cast("dict[str, Any]", value).items()}
+    return value

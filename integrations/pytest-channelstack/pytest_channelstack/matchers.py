@@ -13,13 +13,14 @@ Each check reads plain SDK methods, the way the TypeScript matchers do (`integra
 import json
 import re
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from channelstack import ChannelstackError
 from channelstack.runtime.client import quiet_of
 from channelstack.runtime.duration import Duration, parse_duration
 from channelstack.runtime.transport import unreported_refusals
 from channelstack.runtime.wait import (
+    ModelProblemError,
     WaitTimeoutError,
     from_matches,
     pattern_on_wire,
@@ -86,6 +87,66 @@ def _streaming(message: Any) -> str | None:
     return getattr(stream, "state", None) if stream is not None else getattr(message, "streaming", None)
 
 
+def _operation(call: Any) -> str:
+    """A channel's call has an operation; a model call has its endpoint (`chat.completions`)."""
+    return str(getattr(call, "operation", None) or getattr(call, "endpoint", ""))
+
+
+def _normalised(text: str) -> str:
+    """Text as the server compares it: mentions gone, whitespace collapsed, case ignored."""
+    text = re.sub(r"<[@#!][^>]*>", " ", text)
+    text = re.sub(r"(^|\s)@[\w.-]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _text_of(item: Any) -> Text:
+    """What to look for: a string or pattern as it is, a message, comment or email by its text."""
+    if isinstance(item, str):
+        return item
+    if isinstance(item, re.Pattern):
+        return cast("re.Pattern[str]", item)
+    return str(item.text)
+
+
+def _sent_in(text: str, wanted: Sequence[Any], ordered: bool) -> bool:
+    """Whether a request's text has every wanted piece, in order when asked."""
+    haystack = _normalised(text)
+    start = 0
+    for item in wanted:
+        piece = _text_of(item)
+        if isinstance(piece, re.Pattern):
+            if piece.search(text) is None:
+                return False
+            continue
+        needle = _normalised(piece)
+        at = haystack.find(needle, start if ordered else 0)
+        if at == -1:
+            return False
+        start = at + len(needle)
+    return True
+
+
+async def _model_calls(subject: Any) -> list[Any]:
+    """The model calls a check reads: the fixture's or a script's (a list), or one call."""
+    if hasattr(subject, "calls"):
+        return list(await subject.calls())
+    if hasattr(subject, "refresh") and hasattr(subject, "request"):
+        return [await subject.refresh()]
+    raise TypeError("This check needs the openai fixture, a script or a model call")
+
+
+def _result_text(result: Any) -> str:
+    """What the agent sent back for a tool call: a plain object on the wire, so a dict here."""
+    if isinstance(result, dict):
+        return str(cast("dict[str, Any]", result).get("text", ""))
+    return str(getattr(result, "text", ""))
+
+
+def _excerpt(text: str) -> str:
+    line = re.sub(r"\s+", " ", text).strip()
+    return f"{line[:119]}…" if len(line) > 120 else line
+
+
 def _listing(lines: Sequence[str]) -> str:
     return "\n".join(f"  {line}" for line in lines) if lines else "  (nothing)"
 
@@ -144,6 +205,15 @@ class Expectation:
     def __init__(self, subject: Any) -> None:
         self._subject = subject
 
+    async def _fail_on_problems(self) -> None:
+        """Fail with the session's model problems, if it has any. Nothing for a subject outside a session."""
+        try:
+            problems = (await unreported_refusals(lambda: quiet_of(self._subject._ctx))).problems
+        except (ChannelstackError, AttributeError, RuntimeError):
+            return
+        if problems:
+            raise AssertionError(str(ModelProblemError(problems)))
+
     async def _still_open(self) -> list[str]:
         """What the agent left open in the subject's session, in words: it only adds to a failure's message.
 
@@ -168,24 +238,35 @@ class Expectation:
         """Run a check the way its kind needs, and fail with what was expected and what was there."""
         if once_quiet or negate:
             # The check watches for the whole quiet window: what arrives while it looks counts.
-            await until_quiet(
-                lambda: quiet_of(self._subject._ctx),
-                timeout=timeout,
-                quiet_for=quiet_for,
-                watching=True,
-            )
+            try:
+                await until_quiet(
+                    lambda: quiet_of(self._subject._ctx),
+                    timeout=timeout,
+                    quiet_for=quiet_for,
+                    watching=True,
+                )
+            except ModelProblemError as error:
+                raise AssertionError(str(error)) from None
             value = await read()
         else:
             last: list[T] = []
+            polls = [0]
 
             async def attempt() -> tuple[T] | None:
                 current = await read()
                 last[:] = [current]
-                return (current,) if holds(current) else None
+                if holds(current):
+                    return (current,)
+                # A model call no script answered won't be answered by waiting: fail now, with why.
+                polls[0] += 1
+                if polls[0] % 5 == 0:
+                    await self._fail_on_problems()
+                return None
 
             try:
                 value = (await wait_for("the condition", attempt, timeout=timeout))[0]
             except WaitTimeoutError:
+                await self._fail_on_problems()
                 value = last[0] if last else await read()
         if holds(value) == negate:
             open_work = await self._still_open()
@@ -441,14 +522,16 @@ class Expectation:
     ) -> None:
         async def read() -> tuple[list[Any], list[Any]]:
             calls = list(await (self._subject.calls(error=error) if error is not None else self._subject.calls()))
-            return calls, [call for call in calls if _named(call.operation, operation)]
+            return calls, [call for call in calls if _named(_operation(call), operation)]
 
         def described(value: tuple[list[Any], list[Any]]) -> str:
             calls, matching = value
             wanted = f"the agent {'not ' if negate else ''}to call {_show(operation)}"
             wanted += "" if times is None else f" {times} times"
             wanted += "" if error is None else f" with error {error}"
-            listed = _listing([f"{call.operation} → {call.error}" if call.error else call.operation for call in calls])
+            listed = _listing(
+                [f"{_operation(call)} → {call.error}" if call.error else _operation(call) for call in calls]
+            )
             return f"Expected {wanted}, found {len(matching)}. Its calls:\n{listed}"
 
         await self._settle(
@@ -1229,6 +1312,162 @@ class Expectation:
     ) -> None:
         """Once the agent is quiet, the property has another value."""
         await self._property_value(name, expected, timeout, quiet_for, negate=True)
+
+    # The model (decision 0029)
+
+    async def _sent(self, expected: Any, ordered: bool | None, timeout: Duration | None, negate: bool) -> None:
+        wanted: list[Any] = list(cast("list[Any]", expected)) if isinstance(expected, list) else [expected]
+        in_order = (isinstance(expected, list)) if ordered is None else ordered
+
+        async def read() -> list[str]:
+            return [call.request.text for call in await _model_calls(self._subject)]
+
+        def described(texts: list[str]) -> str:
+            shown = ", then ".join(_show(_text_of(item)) for item in wanted)
+            order = " in that order" if in_order and len(wanted) > 1 else ""
+            sent = (
+                "It made no model call."
+                if not texts
+                else f"What it sent, newest first:\n{_listing([_excerpt(text) for text in reversed(texts)])}"
+            )
+            return f"Expected the agent {'not ' if negate else ''}to send the model {shown}{order}. {sent}"
+
+        await self._settle(
+            read=read,
+            holds=lambda texts: any(_sent_in(text, wanted, in_order) for text in texts),
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+        )
+
+    async def to_have_sent(
+        self, expected: Any, *, ordered: bool | None = None, timeout: Duration | None = None
+    ) -> None:
+        """Subject: the openai fixture, a script, or a call. The agent sent the model this text, pattern, message's
+        text, or these messages in order (a list: thread history)."""
+        await self._sent(expected, ordered, timeout, negate=False)
+
+    async def not_to_have_sent(
+        self, expected: Any, *, ordered: bool | None = None, timeout: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, it sent the model none of it: no text from a channel it shouldn't read."""
+        await self._sent(expected, ordered, timeout, negate=True)
+
+    async def _secrets(self, timeout: Duration | None, negate: bool) -> None:
+        def described(sent: list[Any]) -> str:
+            if not sent:
+                return "Expected the agent to send the model a secret, it sent none"
+            return "Expected the agent not to send the model any secret, it sent:\n" + _listing(
+                [f"{one.call}: {', '.join(one.kinds)}" for one in sent]
+            )
+
+        await self._settle(
+            read=lambda: self._subject.sent_secrets(),
+            holds=lambda sent: len(sent) > 0,
+            describe=described,
+            negate=negate,
+            timeout=timeout,
+        )
+
+    async def to_have_sent_secrets(self, *, timeout: Duration | None = None) -> None:
+        """Subject: the openai fixture. A secret channelstack knows was sent to the model: its kind, never its value."""
+        await self._secrets(timeout, negate=False)
+
+    async def not_to_have_sent_secrets(self, *, timeout: Duration | None = None) -> None:
+        """Once the agent is quiet, no token, signing secret or key reached the model."""
+        await self._secrets(timeout, negate=True)
+
+    async def to_have_offered_tool(self, name: str, *, schema: object = None, timeout: Duration | None = None) -> None:
+        """Subject: a call (or the fixture, a script). The agent offered the model this tool (with this JSON Schema)."""
+
+        async def read() -> list[Any]:
+            return [tool for call in await _model_calls(self._subject) for tool in call.request.tools]
+
+        def offered(tool: Any) -> bool:
+            return (tool.name or tool.type) == name and (schema is None or tool.parameters == schema)
+
+        await self._settle(
+            read=read,
+            holds=lambda tools: any(offered(tool) for tool in tools),
+            describe=lambda tools: (
+                f"Expected the agent to offer the model the tool {json.dumps(name)}, it offered "
+                + (", ".join(sorted({tool.name or tool.type for tool in tools})) or "none")
+            ),
+            negate=False,
+            timeout=timeout,
+        )
+
+    async def to_have_sent_tool_result(
+        self, name: str, *, text: Text | None = None, timeout: Duration | None = None
+    ) -> None:
+        """Subject: the openai fixture or a script. The agent ran the model's call to this tool and sent back its
+        result (with this text)."""
+
+        def described(calls: list[Any]) -> str:
+            answered = [call for call in calls if call.result is not None]
+            wanted = "" if text is None else f" with {_show(text)}"
+            return (
+                f"Expected the agent to send back a result for {json.dumps(name)}{wanted}. The model called it "
+                f"{len(calls)} times; {len(answered)} got a result"
+            )
+
+        await self._settle(
+            read=lambda: self._subject.tool_calls(name=name),
+            holds=lambda calls: any(
+                call.result is not None and text_matches(_result_text(call.result), text) for call in calls
+            ),
+            describe=described,
+            negate=False,
+            timeout=timeout,
+        )
+
+    async def to_be_aborted(self, *, timeout: Duration | None = None) -> None:
+        """Subject: a model call. The agent hung up before the answer was complete: Stop, or its own timeout."""
+
+        async def read() -> Any:
+            return (await self._subject.refresh()).response
+
+        await self._settle(
+            read=read,
+            holds=lambda response: bool(response.aborted),
+            describe=lambda response: (
+                f"Expected model call {self._subject.id} to be aborted by the agent, it "
+                + ("is still going" if response.end is None else f"ended {response.end}")
+            ),
+            negate=False,
+            timeout=timeout,
+        )
+
+    async def _answered(
+        self, times: int | None, timeout: Duration | None, quiet_for: Duration | None, negate: bool
+    ) -> None:
+        def described(script: Any) -> str:
+            wanted = "a call" if times is None else f"{times} {'call' if times == 1 else 'calls'}"
+            problems = f". Its problems:\n{_listing(list(script.problems))}" if script.problems else ""
+            expected = f"Expected script {script.id} {'not ' if negate else ''}to answer {wanted}"
+            return f"{expected}, it answered {script.used}{problems}"
+
+        await self._settle(
+            read=lambda: self._subject.refresh(),
+            holds=lambda script: script.used > 0 if times is None else script.used == times,
+            describe=described,
+            negate=negate,
+            once_quiet=times is not None,
+            timeout=timeout,
+            quiet_for=quiet_for,
+        )
+
+    async def to_have_answered(
+        self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Subject: a script. It answered calls (exactly `times` of them, once the agent is quiet)."""
+        await self._answered(times, timeout, quiet_for, negate=False)
+
+    async def not_to_have_answered(
+        self, *, times: int | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None
+    ) -> None:
+        """Once the agent is quiet, the script answered no call (any number but `times`, if given)."""
+        await self._answered(times, timeout, quiet_for, negate=True)
 
 
 def expect(subject: Any) -> Expectation:
