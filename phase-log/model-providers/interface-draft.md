@@ -1,12 +1,12 @@
 # A fake OpenAI: interface draft
 
-> Status: **draft, third round**, 2026-11-27, revised after the maintainer's second review (§16 lists what is settled). Nothing is built, and there is no decision record yet.
+> Status: **approved**, 2026-11-27, after three rounds of the maintainer's review (§16 lists what was settled). Recorded as [decision 0029](../../docs/decisions/0029-fake-openai.md), and built in phases 13 and 14 ([phases.md](../../docs/phases.md)). Nothing is built yet.
 > Scope: **OpenAI only**: Chat Completions and the Responses API at `https://openai.localhost/v1`. No other model provider is planned.
 > It reverses the settled `AGENTS.md` row **Models**: "channelstack doesn't mock LLMs". The new rule: **realistic on the wire, never realistic content.** Answer-quality evals stay out of scope.
 
 ## 1. Why
 
-The primary persona ([audience.md](../../docs/audience.md) §1) builds on the raw OpenAI SDK, on the AI SDK, LangChain or Mastra, or on an OpenAI-compatible gateway. Today [devx.md §6](../../docs/devx.md#6-the-model-is-yours) sends them to their framework's fake model. That fails in three ways:
+The primary persona ([audience.md](../../docs/audience.md) §1) builds on the raw OpenAI SDK, on the AI SDK, LangChain or Mastra, or on an OpenAI-compatible gateway. Today [devx.md §6](../../docs/devx.md#6-the-model) sends them to their framework's fake model. That fails in three ways:
 
 1. **The raw SDK has no fake model.** Someone using `openai` directly mocks `fetch` or calls the real API.
 2. **The worst channel bugs come from the model's timing and failures, and in-process fakes can't produce them.** A slow first token plus Slack's 3-second retry gives duplicate replies. A stream that fails halfway never finalises its Slack stream. A 429 or a 503 leaves the agent's status stuck on "Thinking…". Stop doesn't cancel the model request. An in-process fake returns instantly and never fails like the network does.
@@ -666,6 +666,7 @@ A tool call without `result` is one the agent never answered, which is a bug cla
 - **Responses:** `input` as a string or items (messages, `function_call`, `function_call_output`, `reasoning`), `instructions`, `tools` (functions), `tool_choice`, `text.format`, `reasoning`, `include`, `store` (default true: stored responses serve `GET /v1/responses/{id}` and `previous_response_id`), `max_output_tokens` (`incomplete` with its reason), `background: false`, every streaming event with its `sequence_number`.
 - **Images, audio, files:** the endpoints and parts of §5.5. `/v1/files` takes uploads (`purpose: "user_data"`, `"vision"`, …), serves `GET`, `content` and `DELETE`, and its ids work in `file_id` parts. A container's files are downloadable when a `codeInterpreter` call wrote them.
 - **Built-in tools:** those of §5.6, on Responses.
+- **Conversations:** `/v1/conversations` (create, retrieve, update, delete) and its items (list, add, retrieve, delete), and Responses' `conversation` parameter, which reads the conversation's items as input and adds the new input and output to it. It is on the same store as `previous_response_id`, and a request with both is refused as OpenAI refuses it. Conversation ids are `conv_` and 48 hex characters.
 - **Models:** any model name is accepted, so gateways' names (`openai/gpt-…`, `llama-3.3-70b`) work. `GET /v1/models` lists current OpenAI model ids, plus every name the agent has used.
 
 ### 10.2 What it refuses, as OpenAI does
@@ -677,9 +678,9 @@ A missing `model` or `messages`, an unknown role, a `tool` message whose `tool_c
 - **Refused with a 400** (`invalid_request_error`, code `unsupported_in_fake`, the counterpart of live mode's `unsupported_in_live`), naming what isn't supported: background responses and `n > 1` on Chat Completions.
 - **Not served (OpenAI's 404):** embeddings, the vector store API, cancelling a response, Realtime, batches and fine-tuning.
 - **Gone from OpenAI itself:** the Assistants API (sunset on 2026-08-26) and the Videos API (2026-09-24).
-- **The Conversations API** (`/v1/conversations` and Responses' `conversation` parameter) is current, not legacy: it replaced the Assistants API's threads. Whether it's in is open question 1.
 
-Compared with emulate: emulate refuses hosted tools and the Conversations API, which channelstack scripts (and may serve). It also serves video, which OpenAI has since shut down.
+
+Compared with emulate: emulate refuses hosted tools and the Conversations API, which channelstack scripts and serves. It also serves video, which OpenAI has since shut down.
 
 Each gap is a row in the reality matrix.
 
@@ -1023,13 +1024,9 @@ It needs a few decisions in code. `check:channels` must not treat a provider as 
 
 Dependencies: none new in the server for the protocol. JSON Schema validation of tool arguments and structured output needs a validator (Ajv, MIT, pure JS) unless Zod 4's JSON Schema support is enough. The official `openai` package becomes a dev dependency for conformance tests and the reference agent.
 
-## 15. Open questions for the maintainer
+## 15. Open questions
 
-1. **The Conversations API.** It isn't legacy: it's what OpenAI offers for server-side state with Responses, and what replaced the Assistants API (shut down 2026-08-26). The OpenAI Agents SDK's conversation sessions use it. Serving it is small: create and read a conversation, list, add and delete its items, and the `conversation` parameter on Responses, on the store `previous_response_id` already uses. *Default: serve it.*
-2. **Splitting the phase.** It has grown. *Default: two phases: first the core (Chat Completions, Responses, function tools, streams, timing, errors, rate limits, attribution, responders, matchers, checks), then images, audio, files and built-in tools.*
-3. **Where it goes.** *Default: after phase 12 (multiple apps). It's independent of apps, so it could also go before.*
-4. **MCP servers.** The fake scripts what a remote MCP server answers (proposed), or it could really call the `server_url` with the MCP SDK it already depends on, when the URL is local. *Default: scripted only.*
-5. **The refusal codes.** `channelstack_no_script` and `unsupported_in_fake` are channelstack's own codes inside OpenAI's error body. OpenAI never sends them, so they're unmistakable in the agent's logs. *Default: these names.*
+None. The last five were answered in the third round (§16).
 
 ## 16. Settled in review
 
@@ -1047,8 +1044,12 @@ Dependencies: none new in the server for the protocol. JSON Schema validation of
 | Multi-modal | Images, audio and files in and out (§5.5); no video, since OpenAI shut that API down |
 | Built-in tools | All of them, scripted, never run (§5.6) |
 | Embeddings | Not served |
+| Conversations API | Served (§10.1): it's current, and it replaced the Assistants API |
+| MCP servers | Scripted only; the fake never calls a `server_url` |
+| Refusal codes | `channelstack_no_script` and `unsupported_in_fake` |
+| Phases | The next two: phase 13 (the core) and phase 14 (images, audio, files, built-in tools), as stacked pull requests |
 | Gateway dialects | OpenRouter's `reasoning`, DeepSeek's `reasoning_content` and Azure's deployment paths, because they're cheap (§11.1) |
 | Proxy mode | `api.openai.com` is always routed to the fake (§12.3) |
 | `channelstack check` | Not added. The checks run in the developer's own Vitest or pytest suite |
 | Other providers | None: no Anthropic |
-| Decision record | 0028, written once the interface is approved. It reverses the `AGENTS.md` **Models** row and `devx.md` §6 |
+| Decision record | [0029](../../docs/decisions/0029-fake-openai.md) (0028 is taken by PR #107). It reverses the `AGENTS.md` **Models** row and `devx.md` §6 |
