@@ -9,9 +9,11 @@ import type { Logger } from "../../../core/log/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
 import {
   actionRequires,
+  checkOnce,
   checkRoles,
   fakeActorInLiveWorld,
   liveMisconfigured,
+  personWithoutToken,
   unsupportedInLive,
 } from "../../../core/reality/index.ts";
 import { richTextPieces } from "../../../core/rich-text/index.ts";
@@ -138,7 +140,6 @@ export function createLiveWorld(deps: {
   const appId = live.vault.setting("CHANNELSTACK_SLACK_APP_ID") ?? "";
 
   let identity: { team: SlackTeam; app: SlackAppRecord } | undefined;
-  let checked: Promise<void> | undefined;
   const people = new Map<string, Map<string, LivePerson>>();
   /** The real people of open sessions, with their credentials (core's one place for them). */
   const real = new LivePeople();
@@ -488,8 +489,9 @@ export function createLiveWorld(deps: {
   };
 
   const world: LiveSlackWorld = {
-    async ready() {
-      checked ??= (async () => {
+    // A network error, a rate limit or the platform's own failure is asked again; anything else is kept.
+    ready: checkOnce(
+      async () => {
         const who = await identify(client, botCredential());
         checkSlackCredential(who, { role: "app", who: "CHANNELSTACK_SLACK_BOT_TOKEN", allowlist: live.allowlist });
         const domain = /^https:\/\/([^.]+)\./.exec(who.url)?.[1] ?? "";
@@ -506,16 +508,9 @@ export function createLiveWorld(deps: {
             installed: true,
           },
         };
-      })().catch((error: unknown) => {
-        // A definitive answer is kept, so the next action is refused the same way without asking
-        // Slack again. A network error or a rate limit isn't: the next action asks again.
-        if (!(error instanceof ProtocolError) || error.code === "ratelimited" || error.code === "unexpected") {
-          checked = undefined;
-        }
-        throw error;
-      });
-      return checked;
-    },
+      },
+      (error) => error.code === "ratelimited" || error.code === "unexpected",
+    ),
 
     release(session) {
       people.delete(session);
@@ -554,10 +549,7 @@ export function createLiveWorld(deps: {
       people.set(session, map);
       if (options.token === undefined) {
         if (live.strict) {
-          throw liveMisconfigured(
-            `CHANNELSTACK_REALITY is live and ${options.name} has no token`,
-            "set CHANNELSTACK_SLACK_USER_<NAME>_TOKEN for them, or run without CHANNELSTACK_REALITY=live",
-          );
+          throw personWithoutToken(options.name, "slack");
         }
         // A fake person can exist next to a live workspace, but can't act in it.
         const id = ids.next(SLACK_IDS.user);

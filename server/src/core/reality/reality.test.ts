@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { ProtocolError } from "../errors/index.ts";
-import { admitLive, driverReality, forcedReality } from "./index.ts";
+import { LivePlatformRefusal, ProtocolError } from "../errors/index.ts";
+import { admitLive, checkOnce, driverReality, forcedReality, personWithoutToken } from "./index.ts";
 
 const SLACK = ["CHANNELSTACK_SLACK_APP_ID", "CHANNELSTACK_SLACK_BOT_TOKEN"];
 const backend = { ready: async () => {} };
@@ -62,5 +62,62 @@ describe("reality rules", () => {
       },
     });
     expect(await outcome(admitLive(refused, "SlackUser.say", undefined, "slack"))).toBe("live_not_allowlisted");
+  });
+
+  test("a live world's check is kept when definitive, and made again after a failure that will pass", async () => {
+    const answers: Array<() => void> = [
+      () => {
+        throw new TypeError("fetch failed");
+      },
+      () => {
+        throw new LivePlatformRefusal("http_502", "Bad gateway", {}, 502);
+      },
+      () => {
+        throw new LivePlatformRefusal("http_429", "Slow down", {}, 429);
+      },
+      () => {
+        throw new LivePlatformRefusal("missing_access", "Missing Access", {}, 403);
+      },
+    ];
+    let checks = 0;
+    const ready = checkOnce(async () => answers[checks++]?.());
+    const seen = [];
+    for (let attempt = 0; attempt < 5; attempt++) seen.push(await outcome(ready()));
+    // A network error, Discord's own failure and a rate limit are asked again; a refusal is kept.
+    expect(seen).toEqual(["TypeError: fetch failed", "http_502", "http_429", "missing_access", "missing_access"]);
+    expect(checks).toBe(4);
+
+    // A driver's own rule for what will pass, and a check that passes is made once.
+    let tries = 0;
+    const slack = checkOnce(
+      async () => {
+        tries++;
+        if (tries === 1) throw new LivePlatformRefusal("ratelimited", "Slow down");
+      },
+      (error) => error.code === "ratelimited",
+    );
+    expect([await outcome(slack()), await outcome(slack()), await outcome(slack())]).toEqual([
+      "ratelimited",
+      "admitted",
+      "admitted",
+    ]);
+    expect(tries).toBe(2);
+  });
+
+  test("a person without a token in a strict live run names the variable to set", () => {
+    const plain = personWithoutToken("Ana", "slack");
+    expect(plain.code).toBe("live_misconfigured");
+    expect(plain.message).toBe(
+      "CHANNELSTACK_REALITY is live and Ana has no token: set CHANNELSTACK_SLACK_USER_<NAME>_TOKEN for them, or run without CHANNELSTACK_REALITY=live",
+    );
+    expect(personWithoutToken("octocat", "github", { variable: "<LOGIN>" }).message).toContain(
+      "CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN",
+    );
+    expect(
+      personWithoutToken("Ana", "discord", { lacks: "bot to act as them", as: "a second application's bot token" })
+        .message,
+    ).toBe(
+      "CHANNELSTACK_REALITY is live and Ana has no bot to act as them: set CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN for them to a second application's bot token, or run without CHANNELSTACK_REALITY=live",
+    );
   });
 });

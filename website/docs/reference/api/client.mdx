@@ -368,9 +368,31 @@ let google = session.google().await?;
 
 **Returns** [`GoogleFixture`](/docs/reference/api/google#googlefixture).
 
+### discord()
+
+The Discord fixture: the agent's app, the guild, and where the agent reaches the fake.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const discord = await session.discord();
+```
+
+```python title="Python"
+discord = await session.discord()
+```
+
+```rust title="Rust"
+let discord = session.discord().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DiscordFixture`](/docs/reference/api/discord#discordfixture).
+
 ### places()
 
-Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last.
+Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last.
 
 <CodeGroup>
 

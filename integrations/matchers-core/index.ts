@@ -8,6 +8,7 @@
  */
 import {
   ChannelstackError,
+  type DiscordChannel,
   type Duration,
   fromMatches,
   type InSession,
@@ -60,8 +61,14 @@ interface TranscriptEntry {
   readonly streaming?: string | undefined;
 }
 
-/** Who a transcript is read as: the SDK's own type, so a change to that signature fails to compile here. */
-type Viewer = NonNullable<NonNullable<Parameters<SlackConversation["transcript"]>[0]>["as"]>;
+/**
+ * Who a transcript is read as, in the channels that show some messages to one person only (Slack's
+ * and Discord's ephemeral ones): the SDK's own types, so a change to that signature fails to compile here.
+ */
+type ViewerOf<Handle extends { transcript(options?: { as?: unknown }): unknown }> = NonNullable<
+  NonNullable<Parameters<Handle["transcript"]>[0]>["as"]
+>;
+type Viewer = ViewerOf<SlackConversation> | ViewerOf<DiscordChannel>;
 
 interface HasTranscript {
   transcript(options?: { as?: Viewer }): Promise<{ entries: readonly TranscriptEntry[] }>;
@@ -342,17 +349,19 @@ export const matchers = {
 
   /** The message has a button with this label; for a thread or a conversation, the agent's latest message there. */
   toHaveButton(state: MatcherState, subject: unknown, label: string | RegExp, options?: Timing) {
-    const handle = subject as { thread?: HasTranscript; ts?: string } & Partial<HasTranscript>;
+    const handle = subject as { thread?: HasTranscript; ts?: string; id?: string } & Partial<HasTranscript>;
     return settle(subject, state, options, {
       onceQuiet: false,
       read: async () => {
-        // A message (it has a thread) is one entry of its thread's transcript.
-        if (handle.thread) {
+        // A Slack message (it has a thread and a `ts`) is one entry of its thread's transcript.
+        if (handle.thread && handle.ts !== undefined) {
           const { entries } = await handle.thread.transcript();
           return entries.filter((entry) => entry.id === handle.ts).flatMap((entry) => entry.controls);
         }
+        // A message whose own transcript starts with it (Discord's), or the app's latest message in a thread or channel.
         const { entries } = await (handle as HasTranscript).transcript();
-        return entries.filter((entry) => entry.author.kind === "app").at(-1)?.controls ?? [];
+        const own = handle.id === undefined ? undefined : entries.find((entry) => entry.id === handle.id);
+        return (own ?? entries.filter((entry) => entry.author.kind === "app").at(-1))?.controls ?? [];
       },
       holds: (controls) => controls.some((control) => textMatches(control, label)),
       describe: (controls) =>

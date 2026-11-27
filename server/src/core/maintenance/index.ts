@@ -20,6 +20,21 @@ export interface FoundCredential<Who> {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
+ * The people's credentials of a channel in the environment, `CHANNELSTACK_<CHANNEL>_USER_<NAME>_TOKEN`
+ * that are set, in order, each with its owner (`user:<NAME>`).
+ */
+export function personVariables(
+  env: Readonly<Record<string, string | undefined>>,
+  channel: string,
+): Array<{ variable: string; owner: string }> {
+  const person = new RegExp(`^CHANNELSTACK_${channel.toUpperCase()}_USER_([A-Z0-9_]+)_TOKEN$`);
+  return Object.keys(env)
+    .filter((variable) => person.test(variable) && env[variable])
+    .sort()
+    .map((variable) => ({ variable, owner: `user:${person.exec(variable)?.[1]}` }));
+}
+
+/**
  * A driver's live credentials in the environment: its own (`own`, in order), then every person's
  * (`CHANNELSTACK_<CHANNEL>_USER_<NAME>_TOKEN`, owner `user:<NAME>`), each identified.
  */
@@ -32,11 +47,7 @@ export async function liveCredentials<Who>(
   },
 ): Promise<Array<FoundCredential<Who>>> {
   const vault = new LiveVault(env, () => {});
-  const person = new RegExp(`^CHANNELSTACK_${spec.channel.toUpperCase()}_USER_([A-Z0-9_]+)_TOKEN$`);
-  const people = Object.keys(env)
-    .filter((variable) => person.test(variable))
-    .sort()
-    .map((variable) => ({ variable, owner: `user:${person.exec(variable)?.[1]}` }));
+  const people = personVariables(env, spec.channel);
   const found: Array<FoundCredential<Who>> = [];
   for (const { variable, owner } of [...spec.own, ...people]) {
     const credential = vault.fromEnv(variable, owner);

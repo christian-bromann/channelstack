@@ -1,6 +1,7 @@
 import type { DeliveryRequest, DeliveryTransport } from "../../../core/delivery/index.ts";
 import type { DriverContext, SocketPeer, SocketSession } from "../../../core/router/index.ts";
 import { randomToken } from "../../../core/secrets/index.ts";
+import { OpenConnections } from "../../../core/socket/index.ts";
 import { SLACK_IDS } from "../ids.ts";
 
 /** How long a ticket from `apps.connections.open` is good for. */
@@ -40,11 +41,9 @@ export interface SocketMode {
 export function createSocketMode(context: DriverContext, appId: () => string): SocketMode {
   const { ids, clock } = context;
   const tickets = new Map<string, number>();
-  const peers = new Set<SocketPeer>();
+  const peers = new OpenConnections<SocketPeer>();
   /** Envelopes sent and not yet acknowledged, by `envelope_id`. */
   const awaiting = new Map<string, (payload: unknown) => void>();
-  /** Attempts waiting for the app to (re)connect. */
-  let waiting: Array<() => void> = [];
   let chosen = false;
   /** When the app last had, or asked for, a connection: an app that reconnects does so within seconds. */
   let lastSeen = 0;
@@ -54,31 +53,8 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
 
   const url = () => `${context.apiUrl().replace(/^http/, "ws")}/link`;
 
-  /** Resolves with a connection, waiting for the app to connect if it has none right now. */
-  const connection = (signal: AbortSignal): Promise<SocketPeer> =>
-    new Promise((resolve, reject) => {
-      signal.throwIfAborted();
-      const ready = () => {
-        const [peer] = [...peers].slice(-1);
-        if (!peer) return false;
-        resolve(peer);
-        return true;
-      };
-      if (ready()) return;
-      const retry = () => void ready();
-      waiting.push(retry);
-      signal.addEventListener(
-        "abort",
-        () => {
-          waiting = waiting.filter((other) => other !== retry);
-          reject(signal.reason);
-        },
-        { once: true },
-      );
-    });
-
   const send: DeliveryTransport["send"] = async ({ request, headers, signal }) => {
-    const peer = await connection(signal);
+    const peer = await peers.next(signal);
     const envelopeId = ids.next(SLACK_IDS.envelope);
     const acknowledged = new Promise<unknown>((resolve, reject) => {
       signal.throwIfAborted();
@@ -125,16 +101,15 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
       return {
         open(peer) {
           self = peer;
-          peers.add(peer);
           peer.send(
             JSON.stringify({
               type: "hello",
-              num_connections: peers.size,
+              num_connections: peers.size + 1,
               debug_info: { host: "channelstack", build_number: 1, approximate_connection_time: 18_060 },
               connection_info: { app_id: appId() },
             }),
           );
-          for (const retry of waiting.splice(0)) retry();
+          peers.add(peer);
         },
         message(text) {
           let ack: { envelope_id?: unknown; payload?: unknown } | null;
@@ -159,10 +134,7 @@ export function createSocketMode(context: DriverContext, appId: () => string): S
     transport: () => (chosen && !backOnHttp() ? { url: url(), send } : undefined),
 
     drop() {
-      for (const peer of [...peers]) {
-        peers.delete(peer);
-        peer.close();
-      }
+      for (const peer of peers.drain()) peer.close();
       lastSeen = clock();
     },
   };

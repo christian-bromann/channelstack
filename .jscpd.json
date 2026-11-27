@@ -12,7 +12,8 @@
     "**/.venv/**",
     "**/linear/schema/**",
     "**/resend-openapi.json",
-    "**/gmail-discovery.json"
+    "**/gmail-discovery.json",
+    "**/discord-openapi.json"
   ],
   "reporters": ["console"],
   "exitCode": 1

@@ -58,7 +58,7 @@ export function registerPlaceRoutes(
     method: "get",
     path: "/sessions/{session}/places",
     summary:
-      "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last",
+      "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last",
     params: SessionParams,
     response: z.array(Place).openapi("Places"),
     errors: ["session_not_found"],

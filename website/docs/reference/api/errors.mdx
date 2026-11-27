@@ -137,6 +137,14 @@ SDK class: `AlreadyReactedError` in TypeScript and Python, a subclass of `Channe
 
 Raised by [`SlackUser.react()`](/docs/reference/api/slack#react).
 
+### cannot_edit_others_message
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `CannotEditOthersMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::CANNOT_EDIT_OTHERS_MESSAGE`.
+
+Raised by [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+
 ### cant_delete_message
 
 The Slack fake refuses with it where the platform refuses the same request.
@@ -161,6 +169,14 @@ SDK class: `DispatchFailedError` in TypeScript and Python, a subclass of `Channe
 
 Raised by [`SlackUser.click()`](/docs/reference/api/slack#click), [`SlackUser.select()`](/docs/reference/api/slack#select), [`SlackUser.shortcut()`](/docs/reference/api/slack#shortcut), [`SlackUser.runCommand()`](/docs/reference/api/slack#runcommand), [`SlackModal.submit()`](/docs/reference/api/slack#submit), [`SlackModal.close()`](/docs/reference/api/slack#close).
 
+### empty_message
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `EmptyMessageError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::EMPTY_MESSAGE`.
+
+Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+
 ### forbidden
 
 The GitHub, Linear and Notion fakes refuse with it where the platform refuses the same request.
@@ -176,6 +192,30 @@ The Slack fake refuses with it where the platform refuses the same request.
 SDK class: `InvalidAuthError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INVALID_AUTH`.
 
 Raised by [`SlackFixture.createUser()`](/docs/reference/api/slack#createuser).
+
+### invalid_form_body
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `InvalidFormBodyError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::INVALID_FORM_BODY`.
+
+Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.edit()`](/docs/reference/api/discord#edit).
+
+### missing_access
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `MissingAccessError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MISSING_ACCESS`.
+
+Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply).
+
+### missing_permissions
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `MissingPermissionsError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::MISSING_PERMISSIONS`.
+
+Raised by [`DiscordUser.say()`](/docs/reference/api/discord#say), [`DiscordUser.reply()`](/docs/reference/api/discord#reply), [`DiscordUser.delete()`](/docs/reference/api/discord#delete), [`DiscordUser.react()`](/docs/reference/api/discord#react), [`DiscordUser.unreact()`](/docs/reference/api/discord#unreact), [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread), [`DiscordUser.invite()`](/docs/reference/api/discord#invite), [`DiscordUser.runCommand()`](/docs/reference/api/discord#runcommand).
 
 ### msg_too_long
 
@@ -240,6 +280,14 @@ The Slack fake refuses with it where the platform refuses the same request.
 SDK class: `StopUnavailableError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::STOP_UNAVAILABLE`.
 
 Raised by [`SlackUser.stop()`](/docs/reference/api/slack#stop).
+
+### thread_already_created
+
+The Discord fake refuses with it where the platform refuses the same request.
+
+SDK class: `ThreadAlreadyCreatedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::THREAD_ALREADY_CREATED`.
+
+Raised by [`DiscordUser.startThread()`](/docs/reference/api/discord#startthread).
 
 ### validation_failed
 

@@ -1,7 +1,7 @@
 # channelstack: interface and developer experience (draft)
 
 > Status: draft v2, 2026-11-19. Nothing is built.
-> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear, Notion and email, Resend and Google ([decision 0021](decisions/0021-email-channels.md); no Teams for now) · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
+> Decided: `slack.localhost`-style names · one workspace per service · Slack, GitHub, Linear, Notion, email (Resend and Google, [decision 0021](decisions/0021-email-channels.md)) and Discord ([decision 0026](decisions/0026-discord.md)); no Teams for now · in-memory state · integrate into existing test frameworks, no separate test package · extend the test framework's `expect` · no model mocking · MCP plus an attach CLI.
 > Also decided: tests use an actor-first API (`ana.say("…", { channel })`). The UI is functional, not a faithful copy of each product ([section 7](#7-the-ui-is-functional-not-faithful)).
 > How it's built (server, protocol, SDK generation, live verification) is in [implementation-plan.md](implementation-plan.md); its section 1.1 lists the decisions both documents share. The architecture in short: [architecture.md](architecture.md).
 
@@ -27,7 +27,7 @@ The names don't collide with emulate: its portless mode uses `*.emulate.localhos
 
 ### Scope
 
-- **Channels:** Slack, GitHub, Linear, Notion, and email: Resend and Google (Gmail), [decision 0021](decisions/0021-email-channels.md). No Teams for now.
+- **Channels:** Slack, GitHub, Linear, Notion, email (Resend and Google (Gmail), [decision 0021](decisions/0021-email-channels.md)), and Discord ([decision 0026](decisions/0026-discord.md)). No Teams for now.
 - **One workspace or org per channel:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. Multi-workspace installs are out of scope until a real test case needs them.
 - **State lives in memory.** Restarting the server gives a fresh world.
 - **No model mocking.** channelstack fakes the channel, not the LLM. Use your framework's own fake model, or a real one (see [section 6](#6-the-model-is-yours)).
@@ -46,6 +46,7 @@ channelstack is an independent project: the fake platforms are channelstack's ow
 | Notion | Pages, blocks, databases, comments and discussions, connections, signed integration webhooks |
 | Resend | Email to and from the agent's team: sending, the receiving API, Svix-signed webhooks, Resend's test addresses ([decision 0021](decisions/0021-email-channels.md)) |
 | Google | A Gmail mailbox: messages, threads, labels, history and watch, Google's token endpoint, Pub/Sub pushes with OIDC tokens, one push a second ([decision 0022](decisions/0022-gmail-push-rate.md)) |
+| Discord | A guild: the Gateway (intents, RESUME), REST v10, threads, reactions, slash commands and buttons as interactions over HTTP (Ed25519) or the Gateway, permissions, rate limits ([decision 0026](decisions/0026-discord.md)) |
 
 ## 2. First run
 
@@ -82,6 +83,7 @@ Point the agent at it, using only options the SDKs already have. When the variab
 | Notion (`@notionhq/client`) | `baseUrl` | `NOTION_BASE_URL=https://notion.localhost` |
 | Resend (`resend`) | the environment | `RESEND_BASE_URL=https://resend.localhost` |
 | Google (`googleapis`, `google-auth-library`) | `rootUrl` per API; `endpoints` | `GOOGLE_API_URL=https://google.localhost/`, `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL` |
+| Discord (discord.js) | `rest: { api }`; the Gateway from `GET /gateway/bot` | `DISCORD_API_URL=https://discord.localhost/api`, with `DISCORD_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `DISCORD_GUILD_ID` |
 | Chat SDK, Mastra, Flue | the adapter's API URL option | the same variables |
 
 ```bash
@@ -103,8 +105,9 @@ There is no config file. Each fake comes with your agent's app already installed
 | Notion | An integration with every capability, subscribed to `page.*` and `comment.*` events |
 | Resend | A team with one verified domain (`acme.example`) that sends and receives, its address `my-agent@acme.example`, its webhook subscribed to every `email.*` event |
 | Google | A mailbox, `my-agent@acme.example`, with an OAuth client and its refresh token, and a Pub/Sub topic its watch pushes to |
+| Discord | A bot, `my-agent`, in the guild `Acme`, with the privileged intents `GUILD_MEMBERS` and `MESSAGE_CONTENT` switched on, and the permissions a conversational bot's invite asks for. Its interactions endpoint is `CHANNELSTACK_DISCORD_WEBHOOK_URL`; without one, interactions come over its Gateway connection |
 
-Where each fake delivers events comes from the server's environment, one variable per channel: `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, with `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND` or `GOOGLE`.
+Where each fake delivers events comes from the server's environment, one variable per channel: `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, with `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE` or `DISCORD`.
 
 ```bash
 CHANNELSTACK_SLACK_WEBHOOK_URL=https://my-agent.localhost/slack/events \
@@ -131,7 +134,7 @@ The link signs one browser in and works once; `channelstack ui` prints a fresh o
 The CLI attaches to a running server. It finds it through portless (`channelstack.localhost`), or through `--server <url>` or `CHANNELSTACK_URL`. It's for poking the agent by hand while developing, and for shell scripts.
 
 ```bash
-# Any channel: slack, github, linear, notion, resend, google (people and places are created the first time they're named)
+# Any channel: slack, github, linear, notion, resend, google, discord (people and places are created the first time they're named)
 channelstack slack say   --as ana --in "#support" "@my-agent what broke last night?"
 channelstack slack reply --as ben --to last "and the one before?"         # --thread works too
 channelstack slack react --as ben :eyes: --on last
@@ -173,7 +176,7 @@ channelstack login slack --user ana                       # sign Ana in by hand,
 channelstack sweep                                        # remove leftovers from crashed runs; --older-than-hours, --run, --check
 ```
 
-`--as <name>` creates that person the first time it's used, and `--in <place>` does the same for places, with the agent's app in them, so the dev loop needs no seed data either. A place is what people talk in on the channel, by its name: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository, whose admin is whoever first acted on GitHub; the others may do what anyone may on a public repository), a Linear issue by its title (in a team named Dev), a Notion page by its title (connected to the integration), an email thread by its subject (started with an email to the agent). Every channel has `say`, `reply`, `show` and its actions; `react` where its people react (Slack, GitHub, Linear). `deliveries` and `redeliver` cover every channel.
+`--as <name>` creates that person the first time it's used, and `--in <place>` does the same for places, with the agent's app in them, so the dev loop needs no seed data either. A place is what people talk in on the channel, by its name: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository, whose admin is whoever first acted on GitHub; the others may do what anyone may on a public repository), a Linear issue by its title (in a team named Dev), a Notion page by its title (connected to the integration), an email thread by its subject (started with an email to the agent), a Discord channel (`"#support"`, private to its participants: the first person on Discord is the dev guild's admin, who adds the others). Every channel has `say`, `reply`, `show` and its actions; `react` where its people react (Slack, GitHub, Linear, Discord). `deliveries` and `redeliver` cover every channel.
 
 `last` always refers to the most recent entry, thread or delivery, so a loop of "say, look, fix the code, say again" needs no IDs: on a channel, the newest entry of its most recently active place; for `show` without a channel, of any channel's. Any other entry is `<place>:<entry>`, as the commands print them and `show --json` lists the ids.
 
@@ -282,6 +285,7 @@ await ana.reply("thanks!", { discussion });
 | Linear | `createIssue({ title }, { team })` · `comment(text, { issue })` · `reply(text, { comment })` · `delegate(linear.app, { issue })` · `prompt(text, { session })` · `answer(text, { elicitation })` · `stop({ session })` · `assign(user, { issue })` · `setState(name, { issue })` |
 | Notion | `comment(text, { page, anchor? })` · `reply(text, { discussion })` · `resolve({ discussion })` · `edit({ append }, { page })` · `mention(notion.app, { page })` · `setProperty(name, value, { page })` · `addRow(values, { database })` · `connect(notion.app, { page })` |
 | Resend, Google | `send({ to, cc, subject, text, html })` · `reply(email, { text, all })` · `inbox()` · `waitForEmail({ from })` |
+| Discord | `say(text, { channel } \| { to })` · `reply(text, { message })` · `edit(text, { message })` · `delete({ message })` · `react(emoji, { message })` · `startThread(name, { message } \| { channel })` · `runCommand("/deploy web", { channel })` · `click(label, { message } \| { channel })` · `openDM(app)` · `invite(people, { channel })` · `ephemeral()` |
 
 Why this shape:
 - **It reads as a sentence:** "Ana says … in the channel", "Ben clicks Approve on the reply". Autocomplete on `ana.` shows everything a person can do on that platform.
@@ -340,7 +344,7 @@ Each test still gets fresh users and a fresh channel (fixtures are created per t
 |---|---|
 | People exist for the UI and CLI before any test runs | The CLI and UI create users on first use (`--as ana`, or the user picker) |
 | Stable user IDs, for agents that allowlist admins by ID (`ADMINS=U0ADMIN01`) | `createUser({ name: "Cara", id: "U0ADMIN01" })` accepts a fixed ID |
-| The same person across Slack, GitHub, Linear, Notion, Resend and Google | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
+| The same person across Slack, GitHub, Linear, Notion, Resend, Google and Discord | A test creates one user per channel under the same name (`slack.createUser({ name: "Ana" })`, `github.createUser({ login: "ana" })`). Most tests don't need more |
 | Less setup per test | Shared fixtures (above) are one line per test and visible where they're used |
 
 So predefined users would add nothing worth keeping, and they'd bring hidden shared state, which parallel tests can't afford.
@@ -414,6 +418,7 @@ Every matcher reads the **transcript**: each channel's state reduced to what a p
 | Linear | `toHaveSessionState("pending" \| "active" \| "stopping" \| "awaitingInput" \| "complete" \| "error")`, `toHaveActivity({ type, from, text })`, `toHaveCommentFrom(app)`, `toBeDelegatedTo(app)`, `toBeAssignedTo(user)`, `toHaveState(name)` |
 | Notion | `toHaveCommentFrom(app)` and `toHaveCommentsFrom(app, { count })` on a discussion, `toHaveBlock(text \| RegExp)`, `toHavePropertyValue(name, value)` (asymmetric matchers such as `expect.any(Number)` work) |
 | Resend, Google | `toHaveReplyFrom(app)` and `toHaveRepliesFrom(app, { count })` on a thread: its answers, without the quoted history |
+| Discord | As Slack's: `toHaveReplyFrom(app)` and `toHaveRepliesFrom(app, { count })` on a message (Discord's replies to it and its thread), a thread or a DM, `toContainText`, `toHaveButton`, `toHaveReaction`, `toBeEphemeralFor` |
 | Any delivery | `toBeAccepted({ within: "3s" })`, `toBeRejected()` (bad signature), `toBeRetried({ times })` |
 
 The matchers assert on **behaviour** (once, in the thread, stopped, acknowledged in time, on the right line), not on exact wording. So they hold whether the agent uses a real model or a fake one.

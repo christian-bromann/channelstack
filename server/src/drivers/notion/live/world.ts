@@ -4,8 +4,10 @@ import type { IdGenerator } from "../../../core/ids/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
 import {
   actionRequires,
+  checkOnce,
   fakeActorInLiveWorld,
   liveMisconfigured,
+  personWithoutToken,
   unsupportedInLive,
 } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
@@ -142,7 +144,6 @@ export function createLiveNotionWorld(deps: {
   /** The page each session's pages go in: one the integration sees, and one it doesn't. */
   const homes = new Map<string, { seen?: Promise<string>; unseen?: Promise<string> }>();
   const readAt = new Map<string, number>();
-  let checked: Promise<void> | undefined;
   /** The page the integration is connected to, by hand, once. */
   let root = "";
   const homeName = taggedNames(live.tag);
@@ -396,51 +397,45 @@ export function createLiveNotionWorld(deps: {
     links,
     objects,
 
-    async ready() {
-      checked ??= (async () => {
-        const who = await identifyNotion(client, app());
-        checkNotionCredential(who, { role: "app", who: "CHANNELSTACK_NOTION_TOKEN", allowlist: live.allowlist });
-        store.seed(
-          { id: who.workspace.id, name: who.workspace.name },
-          {
-            id: who.bot,
-            integrationId: who.bot,
-            subscriptionId: "",
-            name: deps.appName,
-            events: [],
-            capabilities: [],
-          },
-          { id: NOBODY, name: "Workspace owner", email: "", avatarUrl: null, fixedId: false },
+    // A network error, a rate limit or the platform's own failure is asked again; anything else is kept.
+    ready: checkOnce(async () => {
+      const who = await identifyNotion(client, app());
+      checkNotionCredential(who, { role: "app", who: "CHANNELSTACK_NOTION_TOKEN", allowlist: live.allowlist });
+      store.seed(
+        { id: who.workspace.id, name: who.workspace.name },
+        {
+          id: who.bot,
+          integrationId: who.bot,
+          subscriptionId: "",
+          name: deps.appName,
+          events: [],
+          capabilities: [],
+        },
+        { id: NOBODY, name: "Workspace owner", email: "", avatarUrl: null, fixedId: false },
+      );
+      // The page the integration is connected to: named, or the only top-level page it sees.
+      const named = live.vault.setting("CHANNELSTACK_NOTION_PAGE");
+      const pages = named
+        ? [await client.call<WirePage>(app(), "get", `pages/${named}`)]
+        : (
+            await client.all<WirePage>(app(), "post", "search", {
+              body: { filter: { property: "object", value: "page" } },
+            })
+          ).filter((page) => page.parent.type === "workspace" && !trashed(page));
+      if (pages.length !== 1) {
+        throw liveMisconfigured(
+          pages.length === 0
+            ? "the integration is connected to no page"
+            : `the integration sees ${pages.length} top-level pages`,
+          "connect it to one page for the tests (… → Connections), or set CHANNELSTACK_NOTION_PAGE to it",
         );
-        // The page the integration is connected to: named, or the only top-level page it sees.
-        const named = live.vault.setting("CHANNELSTACK_NOTION_PAGE");
-        const pages = named
-          ? [await client.call<WirePage>(app(), "get", `pages/${named}`)]
-          : (
-              await client.all<WirePage>(app(), "post", "search", {
-                body: { filter: { property: "object", value: "page" } },
-              })
-            ).filter((page) => page.parent.type === "workspace" && !trashed(page));
-        if (pages.length !== 1) {
-          throw liveMisconfigured(
-            pages.length === 0
-              ? "the integration is connected to no page"
-              : `the integration sees ${pages.length} top-level pages`,
-            "connect it to one page for the tests (… → Connections), or set CHANNELSTACK_NOTION_PAGE to it",
-          );
-        }
-        const [page] = pages as [WirePage];
-        root = page.id;
-        // The integration's page: every session's pages are under it, and no session can name it,
-        // so nothing a test does lands there, outside its own page and the ledger.
-        toPage(INTEGRATION_PAGE, page, [who.bot]);
-      })().catch((error: unknown) => {
-        // A definitive answer is kept; a network error, a rate limit or Notion's own failure isn't: the next action asks again.
-        if (!(error instanceof ProtocolError) || passing(error)) checked = undefined;
-        throw error;
-      });
-      return checked;
-    },
+      }
+      const [page] = pages as [WirePage];
+      root = page.id;
+      // The integration's page: every session's pages are under it, and no session can name it,
+      // so nothing a test does lands there, outside its own page and the ledger.
+      toPage(INTEGRATION_PAGE, page, [who.bot]);
+    }, passing),
 
     release(session) {
       // A person another open session holds stays theirs.
@@ -478,10 +473,7 @@ export function createLiveNotionWorld(deps: {
         throw new ProtocolError("invalid_argument", `There is already a person "${input.name}" in this session`);
       if (input.token === undefined) {
         if (live.strict) {
-          throw liveMisconfigured(
-            `CHANNELSTACK_REALITY is live and ${input.name} has no token`,
-            "set CHANNELSTACK_NOTION_USER_<NAME>_TOKEN for them, or run without CHANNELSTACK_REALITY=live",
-          );
+          throw personWithoutToken(input.name, "notion");
         }
         // A fake person can exist next to a live workspace, but can't act in it.
         const id = ids.next(NOTION_IDS.uuid);

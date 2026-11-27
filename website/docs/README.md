@@ -77,7 +77,7 @@ The reference is generated wherever there's one source for it, so it can't drift
 | Page | What it lists | Source |
 |---|---|---|
 | Vitest plugin | `channelstack()` options, the `channelstack` fixture, modes | Written by hand |
-| Client and sessions, Slack API, GitHub API, Linear API, Notion API, Resend API, Google API (`api/`) | Every handle, field, method and wait: the call in each SDK's language, every parameter with its name in each language, what it returns, its errors, and what it needs live | **Generated** from `spec/ir.json` by `codegen/src/emit/docs.ts`, with the SDKs' own naming |
+| Client and sessions, Slack API, GitHub API, Linear API, Notion API, Resend API, Google API, Discord API (`api/`) | Every handle, field, method and wait: the call in each SDK's language, every parameter with its name in each language, what it returns, its errors, and what it needs live | **Generated** from `spec/ir.json` by `codegen/src/emit/docs.ts`, with the SDKs' own naming |
 | Errors (`api/errors.mdx`) | Every error code: what channelstack's own mean, which platform's a fake's codes are, the SDK class, and the methods that raise it | **Generated**, from the IR and `x-channelstack-errors` |
 | Matchers | Every matcher: subject, arguments, waits how, fails with what. The pytest names next to each | Written by hand; to be generated from `integrations/matchers-core` |
 | CLI | Every command and flag | Written by hand; to be generated once the CLI's commands are one table |

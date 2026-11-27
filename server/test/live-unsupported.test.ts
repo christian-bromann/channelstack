@@ -215,6 +215,27 @@ const CASES: Record<string, Case | Case[]> = {
     { channel: "notion", method: "GET", path: "/pages/p/property?name=Status", reason: /databases/ },
     { channel: "notion", method: "POST", path: "/databases/d/rows", body: {}, reason: /databases/ },
   ],
+  "`ana.say(text, { to: discord.app })`, `openDM(discord.app)`": {
+    channel: "discord",
+    method: "POST",
+    path: "/users/x/open-dm",
+    body: { participant: "a" },
+    reason: /DM/,
+  },
+  '`ana.runCommand("/deploy web", { channel })`, `ana.click(label, …)`': [
+    { channel: "discord", method: "POST", path: "/users/x/commands", body: { command: "/deploy", channel: "c" } },
+    { channel: "discord", method: "POST", path: "/users/x/click", body: { button: { label: "Go" }, channel: "c" } },
+  ],
+  '`discord.fault({ type: "rate_limit" })`, `{ type: "drop_gateway" }`': [
+    { channel: "discord", method: "POST", path: "/faults", body: { type: "rate_limit" } },
+    { channel: "discord", method: "POST", path: "/faults", body: { type: "drop_gateway" } },
+    { channel: "discord", method: "DELETE", path: "/faults/1" },
+  ],
+  "`discord.verifyEndpoint()`": { channel: "discord", method: "POST", path: "/verify-endpoint", reason: /portal/ },
+  "`delivery.resend({ badSignature })`, `redeliver()`": [
+    { channel: "discord", method: "POST", path: "/deliveries/x/resend", body: { badSignature: true } },
+    { channel: "discord", method: "POST", path: "/deliveries/x/redeliver" },
+  ],
 };
 
 /** Every driver live: Slack and GitHub against their stubs, Linear and Notion with stand-in credentials. */
@@ -242,6 +263,7 @@ function liveEverywhere() {
           CHANNELSTACK_GOOGLE_CLIENT_ID: "not-a-client",
           CHANNELSTACK_GOOGLE_CLIENT_SECRET: "not-a-secret",
           CHANNELSTACK_GOOGLE_REFRESH_TOKEN: "not-a-token",
+          CHANNELSTACK_DISCORD_BOT_TOKEN: "not-a-token",
         },
         fetch,
         apiBase: { slack: stub.apiBase, github: github.url },

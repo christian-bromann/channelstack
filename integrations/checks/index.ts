@@ -28,6 +28,16 @@ export interface ChecksOptions {
    * workspace admin may press it; anyone else may not. Without it the click checks are left out.
    */
   approval?: { prompt: string; button: string };
+  /**
+   * Discord: a slash command the agent answers, as a person types it (`/deploy web`). Without it
+   * the interaction checks are left out.
+   */
+  command?: `/${string}`;
+  /**
+   * Discord: text that makes the agent write an answer longer than one message may be (2000
+   * characters). Without it the long-answer check is left out.
+   */
+  longPrompt?: string;
   /** Leave out checks by id, e.g. `["slack.stream-stop"]`. */
   skip?: string[];
   /** How long each check waits for the agent. Default: the integration's timeout. */
@@ -97,6 +107,17 @@ export const GOOGLE_CHECKS = [
   "google.stale",
 ] as const;
 
+/** The ids of the Discord checks, in the order they are registered. */
+export const DISCORD_CHECKS = [
+  "discord.mention-once",
+  "discord.dm-once",
+  "discord.ignores-bots",
+  "discord.resume",
+  "discord.long-answer",
+  "discord.interaction-3s",
+  "discord.bad-signature",
+] as const;
+
 /**
  * The delivery a check retries, redelivers, forges or times: the one thing every delivery check
  * needs, on every channel. Live, the platform delivers to the agent itself and channelstack has no
@@ -129,6 +150,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
       notion,
       resend,
       google,
+      discord,
       task,
       expect,
       skip,
@@ -145,6 +167,7 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
         notion,
         resend,
         google,
+        discord,
         task,
         expect,
         skip,
@@ -635,5 +658,102 @@ export function googleChecks(options: ChecksOptions): void {
       await push.resend({ stale: true });
       await expect(push).toBeRejected(wait);
     });
+  });
+}
+
+/**
+ * Registers: answers a mention once · answers a DM once · ignores other bots · after a dropped
+ * Gateway connection, answers what it missed once · writes a long answer in messages Discord
+ * takes · answers an interaction within 3 s · rejects an interaction with a bad signature.
+ */
+export function discordChecks(options: ChecksOptions): void {
+  const { app } = options;
+  const prompt = options.prompt ?? `@${app} hello`;
+  const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
+  const check = registrar(options, DISCORD_CHECKS);
+  /** A channel with Ana and the bot. */
+  const inChannel = async ({ discord }: TestContext) => {
+    const ana = await discord.createUser({ name: "Ana" });
+    const channel = await discord.createChannel({ participants: [ana, discord.app] });
+    return { ana, channel };
+  };
+
+  describe(`discord checks: ${app}`, () => {
+    check("discord.mention-once", "answers a mention once", async (context) => {
+      const { ana, channel } = await inChannel(context);
+      const msg = await ana.say(prompt, { channel });
+      await expect(msg).toHaveRepliesFrom(app, { count: 1, ...wait });
+    });
+
+    check("discord.dm-once", "answers a DM once", async ({ discord }) => {
+      const ana = await discord.createUser({ name: "Ana" });
+      const msg = await ana.say(prompt, { to: discord.app });
+      await expect(msg.channel).toHaveRepliesFrom(app, { count: 1, ...wait });
+    });
+
+    check("discord.ignores-bots", "ignores what other bots write", async ({ discord }) => {
+      const bot = await discord.createUser({ name: "Deploy Bot", bot: true });
+      const channel = await discord.createChannel({ participants: [bot, discord.app] });
+      const msg = await bot.say(prompt, { channel });
+      await expect(msg).not.toHaveReplyFrom(app, wait);
+    });
+
+    check("discord.resume", "after a dropped connection, answers what it missed once", async (context) => {
+      const { discord } = context;
+      const ana = await discord.createUser({ name: "Ana" });
+      // Live, Discord drops connections itself: the fault is fake-only, and the test skips there.
+      await using _drop = await discord.fault({ type: "drop_gateway" });
+      // The connection drops just before Ana's message reaches the bot: a bot that resumes gets it then.
+      const msg = await ana.say(prompt, { to: discord.app });
+      await expect(msg.channel).toHaveRepliesFrom(app, { count: 1, timeout: "20s", ...wait });
+    });
+
+    check(
+      "discord.long-answer",
+      "writes a long answer in messages of at most 2000 characters",
+      async ({ discord }) => {
+        const ana = await discord.createUser({ name: "Ana" });
+        const msg = await ana.say(options.longPrompt ?? "", { to: discord.app });
+        await expect(msg.channel).toHaveReplyFrom(app, wait);
+        // Discord refuses a longer message (50035, Invalid Form Body): the agent must split it. This waits for quiet.
+        await expect(discord).not.toHaveReceivedCall(/.*/, { error: "50035", ...wait });
+        // Split, not cut: the whole answer takes more than one message.
+        const answers = (await msg.channel.messages()).filter((message) => message.author.name === app);
+        expect(answers.length, "the long answer came in one message: it was cut, not split").toBeGreaterThan(1);
+      },
+      options.longPrompt,
+    );
+
+    check(
+      "discord.interaction-3s",
+      "answers an interaction within 3 seconds",
+      async (context) => {
+        const { ana, channel } = await inChannel(context);
+        const delivery = await ana.runCommand(options.command ?? "/", { channel });
+        // Late, Discord shows the person "This interaction failed", and takes no answer any more.
+        await expect(channel).not.toContainText("This interaction failed", { as: ana, ...wait });
+        if (delivery) await expect(delivery).toBeAccepted({ within: "3s", ...wait });
+      },
+      options.command,
+    );
+
+    check(
+      "discord.bad-signature",
+      "rejects an interaction with a bad signature",
+      async (context) => {
+        const { ana, channel } = await inChannel(context);
+        const delivery = deliveryOf(
+          { delivery: await ana.runCommand(options.command ?? "/", { channel }) },
+          context,
+          "Discord",
+        );
+        const first = await delivery.settled(wait);
+        // Over the Gateway there is no signature to check: the connection is the bot's own.
+        if (first.attempts[0]?.transport !== "http") return;
+        await delivery.resend({ badSignature: true });
+        await expect(delivery).toBeRejected(wait);
+      },
+      options.command,
+    );
   });
 }

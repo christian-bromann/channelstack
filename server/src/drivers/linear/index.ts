@@ -74,17 +74,14 @@ export const linear: DriverDefinition = {
             (record) =>
               `an agent session on ${fake.store.issue(record.issue).identifier} that is still ${record.status}`,
           ),
-      // Live, the agent talks to Linear with its own configuration, and live credentials never leave the server.
-      env: () =>
-        live
-          ? {}
-          : {
-              LINEAR_API_URL: `${context.apiUrl()}/graphql`,
-              LINEAR_ACCESS_TOKEN: context.secret("oauthToken"),
-              LINEAR_WEBHOOK_SECRET: context.secret("webhookSecret"),
-              LINEAR_CLIENT_ID: context.secret("clientId"),
-              LINEAR_CLIENT_SECRET: context.secret("clientSecret"),
-            },
+      // Live, `channelstack env` prints nothing for Linear (app.ts): the agent talks to it with its own configuration.
+      env: () => ({
+        LINEAR_API_URL: `${context.apiUrl()}/graphql`,
+        LINEAR_ACCESS_TOKEN: context.secret("oauthToken"),
+        LINEAR_WEBHOOK_SECRET: context.secret("webhookSecret"),
+        LINEAR_CLIENT_ID: context.secret("clientId"),
+        LINEAR_CLIENT_SECRET: context.secret("clientSecret"),
+      }),
     };
   },
 };

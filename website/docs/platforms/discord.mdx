@@ -1,0 +1,402 @@
+---
+title: "Discord"
+order: 7
+description: "Test a Discord bot or agent: point discord.js at the fake, script people in a guild, run slash commands and press buttons, and check the bot's answers."
+---
+
+# Discord
+
+This page shows how to test a bot built on Discord's APIs: how to point it at the fake, which people and channels a test creates, what those people can do, and what you check afterwards. It assumes you have run [Getting started](/docs/getting-started) once.
+
+> [!TIP]
+> Every method, option and wait of the Discord fake, with each call in TypeScript, Python and Rust, is in the [Discord API reference](/docs/reference/api/discord).
+
+## How a Discord bot works
+
+The agent is a bot in a guild. It opens a WebSocket to Discord's Gateway itself, identifies with its token and the intents it wants, and from then on hears what happens in the channels it can see as dispatches: `MESSAGE_CREATE`, `MESSAGE_REACTION_ADD`, `THREAD_CREATE` and the others. It answers through the REST API, v10.
+
+Slash commands and buttons are interactions. An app with an interactions endpoint URL gets them there over HTTP, signed with Ed25519, and answers in the HTTP response. An app without one gets them over its Gateway connection as `INTERACTION_CREATE`, and answers with a callback. Either way the answer must come within 3 seconds.
+
+## What the fake covers
+
+The fake Discord is one guild, `Acme`, with one app in it as a bot, named `my-agent`. It serves REST at `https://discord.localhost/api/v10` and the Gateway at `/gateway` on the same host. In [proxy mode](/docs/guide/proxy-mode) it answers for `discord.com` and `gateway.discord.gg`.
+
+| Area | What's there |
+|---|---|
+| Messages | Get one and list, post (with `message_reference`, embeds and components), edit, delete; `POST /channels/{id}/typing` |
+| Reactions | `PUT` and `DELETE …/reactions/{emoji}/@me`, and who reacted |
+| Threads and DMs | A thread from a message or in a channel, joining and leaving one; `POST /users/@me/channels` for a DM |
+| The guild | `GET /guilds/{id}`, its channels and members, `/users/@me`, `/users/{id}`, `/applications/@me` |
+| Commands | Global and guild application commands: list, create, bulk overwrite |
+| Interactions | The callback (`POST /interactions/{id}/{token}/callback`), followups and the original response (`/webhooks/{app}/{token}/messages/@original`) for 15 minutes |
+| The Gateway | v10, JSON, no compression: `GET /gateway/bot`, HELLO, IDENTIFY, heartbeats and their ACKs, READY, then `GUILD_CREATE`, RESUME |
+| Dispatches | `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`, `MESSAGE_REACTION_ADD` and `REMOVE`, `CHANNEL_CREATE` and `UPDATE`, `THREAD_CREATE`, `TYPING_START`, `INTERACTION_CREATE` |
+
+Ids are snowflakes, with Discord's epoch, and the bot's id is in its token, as on Discord. Answers are held to Discord's own OpenAPI description, and a refusal has Discord's shape, `{ code, message, errors }`, with Discord's JSON error codes.
+
+Intents are enforced. A dispatch goes only to a bot that asked for its intent (`GUILD_MESSAGES`, `DIRECT_MESSAGES`, `GUILD_MESSAGE_REACTIONS`, …) and can see the channel. The app has the privileged intents `GUILD_MEMBERS` and `MESSAGE_CONTENT` switched on; it must still ask for them when it identifies. Without `MESSAGE_CONTENT`, a guild message's `content`, `embeds`, `attachments` and `components` arrive empty, unless the message mentions the bot: a DM and the bot's own messages are always whole.
+
+Permissions come from the roles and the channel's overwrites, as Discord computes them. Rate limits are per route, with Discord's `X-RateLimit-Limit`, `-Remaining`, `-Reset`, `-Reset-After` and `-Bucket` headers, and a 429 with `retry_after` past them.
+
+## Connecting a Discord bot
+
+Ask the running server for the bot's settings:
+
+```bash
+npx channelstack env
+```
+
+```ini
+DISCORD_API_URL=https://discord.localhost/api
+DISCORD_TOKEN=…
+DISCORD_APPLICATION_ID=…
+DISCORD_PUBLIC_KEY=…
+DISCORD_GUILD_ID=…
+```
+
+The token and the interactions key are random, made once for your machine and kept in `~/.channelstack/secrets.json`; `DISCORD_PUBLIC_KEY` is the public half the bot checks interactions with. They stay the same across restarts until you run `channelstack secrets rotate`. With `--no-portless`, the URL is `http://127.0.0.1:4500/discord/api` instead.
+
+discord.js takes the REST API's base as `rest.api`. Set it from `DISCORD_API_URL`, and leave it unset in production, where discord.js falls back to `https://discord.com/api`. It finds the Gateway itself, from `GET /gateway/bot`, so the WebSocket goes to the fake too.
+
+```ts title="agent.ts"
+import { Client, Events, GatewayIntentBits, Partials, Routes } from "discord.js";
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.DirectMessages,
+  ],
+  // A DM channel isn't cached when its first message arrives: without this, discord.js drops it.
+  partials: [Partials.Channel],
+  ...(process.env.DISCORD_API_URL ? { rest: { api: process.env.DISCORD_API_URL } } : {}),
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  if (message.author.bot) return;
+  if (message.guild && !message.mentions.users.has(client.user!.id)) return;
+  await message.reply("On it.");
+});
+
+client.once(Events.ClientReady, async () => {
+  // A person can only run the commands the bot registered.
+  const deploy = {
+    name: "deploy",
+    description: "Deploy a service",
+    options: [{ type: 3, name: "service", description: "What to deploy", required: true }],
+  };
+  await client.rest.put(
+    Routes.applicationGuildCommands(process.env.DISCORD_APPLICATION_ID!, process.env.DISCORD_GUILD_ID!),
+    { body: [deploy] },
+  );
+});
+
+await client.login(process.env.DISCORD_TOKEN);
+```
+
+> [!NOTE]
+> discord.js's Gateway client (`ws`) doesn't go through `HTTPS_PROXY`, so a discord.js bot can't run in proxy mode: give it `rest.api` instead. The fake's certificate needs trusting as for every other channel; see [TLS trust](/docs/guide/connecting-your-agent#tls-trust-per-runtime).
+
+The bot hears only what happens while it is connected. A message sent before it has identified is never dispatched to it, as on Discord. `discord.gatewayConnections` says how many connections the bot held when the test's `discord` fixture was made: it's a snapshot, and nothing refreshes it during the test.
+
+### Interactions over HTTP
+
+Start the server with `CHANNELSTACK_DISCORD_WEBHOOK_URL` set to the bot's interactions endpoint, the URL you'd save as *Interactions Endpoint URL* in the developer portal:
+
+```bash
+CHANNELSTACK_DISCORD_WEBHOOK_URL=http://localhost:3000/interactions npx channelstack start
+```
+
+Slash commands and button presses then go there as a POST. Each carries `X-Signature-Ed25519` and `X-Signature-Timestamp`, an Ed25519 signature over the timestamp and the exact body. Check it with `discord-interactions`'s `verifyKey`, as Discord's guide shows, answer a PING with a PONG, and answer the interaction in the response body:
+
+```ts title="interactions.ts"
+import { InteractionResponseType, InteractionType, verifyKey } from "discord-interactions";
+
+export async function interactions(request: Request): Promise<Response> {
+  const body = await request.text();
+  const signature = request.headers.get("x-signature-ed25519") ?? "";
+  const timestamp = request.headers.get("x-signature-timestamp") ?? "";
+  if (!(await verifyKey(body, signature, timestamp, process.env.DISCORD_PUBLIC_KEY!))) {
+    return new Response("invalid request signature", { status: 401 });
+  }
+  const interaction = JSON.parse(body);
+  if (interaction.type === InteractionType.PING) return Response.json({ type: InteractionResponseType.PONG });
+  if (interaction.type === InteractionType.APPLICATION_COMMAND && interaction.data.name === "deploy") {
+    return Response.json({
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: { content: `Deploying ${interaction.data.options[0].value}.` },
+    });
+  }
+  return new Response("unknown interaction", { status: 400 });
+}
+```
+
+Verify against the exact bytes sent: a body parsed and serialized again no longer matches its signature. An interaction is never retried.
+
+### Interactions over the Gateway
+
+Without `CHANNELSTACK_DISCORD_WEBHOOK_URL`, interactions arrive over the bot's Gateway connection as `INTERACTION_CREATE`, and the bot answers with a callback to `POST /interactions/{id}/{token}/callback`. In discord.js that is `interactionCreate` and `interaction.reply`:
+
+```ts
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isChatInputCommand() && interaction.commandName === "deploy") {
+    await interaction.reply(`Deploying ${interaction.options.getString("service")}.`);
+  }
+});
+```
+
+Over HTTP or the Gateway, the bot has 3 seconds. A late answer is refused with 10062 (Unknown interaction), and the person sees "This interaction failed", only to them. To take longer, answer with a deferred response (type 5): the person sees "my-agent is thinking…" until the bot edits the original. A second answer to the same interaction is refused with 40060.
+
+## People and channels in a test
+
+A test creates the people it needs and the channels they talk in. Nothing is declared in a config file.
+
+```ts
+const ana = await discord.createUser({ name: "Ana" });
+const ben = await discord.createUser({ name: "Ben", admin: true });
+const deployBot = await discord.createUser({ name: "deploy-bot", bot: true });
+
+const channel = await discord.createChannel({ participants: [ana, ben, discord.app] });
+const announcements = await discord.createChannel({ name: "announcements", participants: [ana, ben, discord.app], readOnly: true });
+```
+
+| Option | What it does |
+|---|---|
+| `name` | Required. How mentions (`@Ana`) and matchers find the person |
+| `id` | A fixed user id, a snowflake, for bots that allowlist people by id. Generated otherwise |
+| `admin` | Has the guild's Admin role (`ADMINISTRATOR`): the agent sees it in `member.permissions` |
+| `bot` | Another bot, not the agent's: what it writes carries `author.bot`, to check that the agent ignores bots |
+
+A channel is seen only by the participants you list, as a private channel is made in Discord: a permission overwrite each. The bot hears a channel and writes in it only when you include `discord.app`; anywhere else its calls are refused with 50001 (Missing Access).
+
+| Option | What it does |
+|---|---|
+| `participants` | People and the app. Only they see the channel |
+| `name` | Without `#`. Generated (`test-<id>`) if omitted, so parallel tests never collide |
+| `readOnly` | Everyone who sees it reads it; only admins write |
+| `topic` | Shown in the channel's `topic` |
+
+`channel.members()` lists who sees a channel (a thread's are its channel's); admins see every channel without being listed.
+
+A DM needs no channel: `ana.say("hi", { to: discord.app })` opens one, and `ana.openDM(discord.app)` returns it. To let the bot see a channel later, an admin invites it: `await ana.invite(discord.app, { channel })` changes the channel's overwrites and sends `CHANNEL_UPDATE`.
+
+## What people do
+
+Every action is a method on the person who takes it. The content comes first, and where it happens is an option.
+
+### Mentions, replies and threads
+
+```ts
+test("a mention gets exactly one reply", async ({ discord }) => {
+  const ana = await discord.createUser({ name: "Ana" });
+  const channel = await discord.createChannel({ participants: [ana, discord.app] });
+
+  const msg = await ana.say("@my-agent summarize yesterday's incidents", { channel });
+
+  await expect(msg).toHaveReplyFrom("my-agent", { text: /incidents/i });
+  await expect(msg).toHaveRepliesFrom(discord.app, { count: 1 });
+});
+```
+
+`@name` in a message becomes a real mention (`<@id>`) of that person or the bot. `ana.reply(text, { message })` is Discord's reply: in the message's channel, quoting it, with `message_reference`. `ana.edit` and `ana.delete` send `MESSAGE_UPDATE` and `MESSAGE_DELETE`; `react` and `unreact` send the reaction dispatches and resolve with the delivery, if the bot heard it.
+
+A thread is a channel of its own. `ana.startThread("Checkout 500s", { message })` starts one from a message, and `{ channel }` one in a channel; `ana.say(text, { channel: thread })` writes in it:
+
+```ts
+const report = await ana.say("checkout returns 500 for EU users", { channel });
+const thread = await ana.startThread("Checkout 500s", { message: report });
+
+await ana.say("@my-agent what changed in checkout?", { channel: thread });
+
+await expect(thread).toHaveReplyFrom("my-agent", { text: /checkout/i });
+await expect(channel).not.toHaveChannelMessageFrom("my-agent");
+```
+
+A message's replies are Discord's replies to it and the messages of the thread started from it, so a bot that answers a long question in a thread of its own still answers the message.
+
+### Direct messages
+
+```ts
+test("a DM to the bot gets one reply in the DM", async ({ discord }) => {
+  const ana = await discord.createUser({ name: "Ana" });
+
+  const msg = await ana.say("what's on my plate today?", { to: discord.app });
+
+  await expect(msg.channel).toHaveRepliesFrom("my-agent", { count: 1 });
+});
+```
+
+A DM arrives as `MESSAGE_CREATE` without a `guild_id`, with the `DIRECT_MESSAGES` intent. discord.js drops it unless the client has `partials: [Partials.Channel]`.
+
+### Slash commands
+
+```ts
+test("a slash command is answered within 3 seconds", async ({ discord }) => {
+  const ana = await discord.createUser({ name: "Ana" });
+  const channel = await discord.createChannel({ participants: [ana, discord.app] });
+
+  const command = await ana.runCommand("/deploy web staging", { channel });
+
+  await expect(command!).toBeAccepted({ within: "3s" });
+  await expect(channel).toContainText(/deploying web to staging/i);
+});
+```
+
+`runCommand` runs one of the commands the bot registered, with its options in the order the command lists them, or as `name:value`. It resolves with the interaction's delivery; live there is none, because Discord tells the bot itself.
+
+### Buttons
+
+```ts
+test("approval buttons act once, even on a double click", async ({ discord }) => {
+  const ana = await discord.createUser({ name: "Ana" });
+  const ben = await discord.createUser({ name: "Ben", admin: true });
+  const channel = await discord.createChannel({ participants: [ana, ben, discord.app] });
+  const msg = await ana.say("@my-agent deploy web to staging", { channel });
+
+  const ask = await msg.latestReply({ from: "my-agent" });
+  await expect(ask).toHaveButton("Approve");
+
+  await ben.click("Approve", { message: ask });
+  await ben.click("Approve", { message: ask }).catch(() => undefined);
+
+  await expect(channel).toContainText("Deploying web to staging", { count: 1 });
+});
+```
+
+A button is found by its label or by `{ customId }`. With `{ channel }` instead of `{ message }`, `click` uses the bot's newest message in the channel that has it. The interaction carries the person as `member`, with their permissions, so the bot can tell an admin from anyone else.
+
+`ana.ephemeral()` returns the messages only Ana sees: the bot's ephemeral responses (flag 64) and "This interaction failed". `toBeEphemeralFor(ana)` checks one.
+
+## What to check
+
+The matchers read what a person would see: mentions as `@name`, embeds' titles and descriptions as text, buttons as controls, edits applied, deleted messages gone, an ephemeral message only for its person. Positive matchers resolve as soon as the condition holds; `.not` and exact counts wait until the bot is quiet first. [Waiting and quiet](/docs/guide/waiting-and-quiet) explains why.
+
+| Matcher | Subject | Reads |
+|---|---|---|
+| `toHaveReplyFrom(author, { text })` | message, thread, DM | `message.replies()`, `channel.messages()` |
+| `toHaveRepliesFrom(author, { count })` | message, thread, DM | The same, once quiet |
+| `toHaveChannelMessageFrom(author)` | channel | `channel.messages()` |
+| `toContainText(text, { count, from, as })` | anything with a transcript | `transcript()` |
+| `toHaveButton(label)` | message, channel, thread | `transcript()`: the message's buttons, or the bot's latest message's |
+| `toHaveReaction(emoji, { by })` | message | `message.reactions()` |
+| `toBeEphemeralFor(user)` | message | `message.visibleTo` |
+| `toBeAccepted`, `toBeRejected` | delivery | `delivery.attempts` |
+| `toHaveReceivedCall(operation, { times, error })` | `discord` | `discord.calls()` |
+
+Operations are named by method and route, as Discord's description names them: `POST /channels/{channel.id}/messages`. Errors are Discord's JSON codes, as strings:
+
+```ts
+const post = await discord.waitForCall({ operation: "POST /channels/{channel.id}/messages" });
+expect(post.responseStatus).toBe(200);
+await expect(discord).not.toHaveReceivedCall(/.*/, { error: "50001" });
+```
+
+Every matcher is built on a read you can call yourself: `channel.messages()`, `channel.threads()`, `channel.waitForMessage({ from })`, `message.replies()`, `message.waitForReply({ from })`, `message.latestReply({ from })` (once the bot is quiet), `message.reactions()`, `message.refresh()`, `discord.calls({ operation, error })`, `discord.deliveries()`. A transcript reads like the conversation and makes a good snapshot: `expect((await msg.channel.transcript()).toString()).toMatchSnapshot()`.
+
+### What the fake refuses
+
+The fake refuses what Discord refuses, with Discord's HTTP status and JSON code. The ones bots meet most:
+
+| Code | When |
+|---|---|
+| `0` | No token or a bad one (401), or a route that doesn't exist (404) |
+| `10003`, `10008` | Unknown Channel, Unknown Message |
+| `10062` | Unknown interaction: the callback came after 3 seconds, or the token is unknown |
+| `40060` | The interaction has been acknowledged already |
+| `50001` | Missing Access: a channel the bot can't see |
+| `50013` | Missing Permissions: what the bot's roles and the channel's overwrites don't allow |
+| `50005` | Editing another user's message |
+| `50006` | An empty message |
+| `50035` | Invalid Form Body, with `errors`: a message over 2000 characters, among others |
+
+The Gateway closes a connection as Discord does: 4004 for a bad token, 4013 for invalid intents, 4014 for a privileged intent the app doesn't have, 4002 for a payload that isn't JSON, 4003 for one before IDENTIFY. A RESUME of a session it doesn't know gets INVALID_SESSION (`d: false`).
+
+## Standard checks
+
+The checks every Discord bot should pass register in one line, from `channelstack/checks`:
+
+```ts
+import { discordChecks } from "channelstack/checks";
+
+discordChecks({ app: "my-agent", command: "/deploy web", longPrompt: "write a long report on Q3" });
+```
+
+| Id | Checks that the bot |
+|---|---|
+| `discord.mention-once` | Answers a mention once |
+| `discord.dm-once` | Answers a DM once |
+| `discord.ignores-bots` | Ignores what other bots write |
+| `discord.resume` | After a dropped Gateway connection, resumes and answers what it missed, once |
+| `discord.long-answer` | Writes a long answer in messages of at most 2000 characters: no 50035 |
+| `discord.interaction-3s` | Answers `command` within 3 seconds, so nobody sees "This interaction failed" |
+| `discord.bad-signature` | Rejects `command` again with a bad signature, over HTTP |
+
+Without `command`, the two interaction checks are left out; without `longPrompt`, the long-answer check is. `prompt` (default `@my-agent hello`) is what Ana says. See [Standard checks](/docs/guide/standard-checks).
+
+## Delivery and faults
+
+Every dispatch and every interaction is a delivery a test can read: `msg.delivery` is the `MESSAGE_CREATE` that told the bot of a message, `msg.deliveries()` lists all a message caused, and `runCommand` and `click` resolve with theirs. A Gateway dispatch is accepted once it is written: the Gateway has no ack. An interaction over HTTP is accepted when the bot answers it with a 2xx within 3 seconds.
+
+- `delivery.resend({ badSignature: true })` sends an interaction over HTTP again, signed with a key that isn't the app's. The bot must refuse it with a 401. A dispatch over the Gateway has no signature: the connection is the bot's own.
+- `delivery.redeliver()` dispatches it again, as a replay after a RESUME would.
+- `discord.verifyEndpoint()` is Discord's check of the interactions endpoint, as when it is saved in the developer portal: a PING it must answer with a PONG, and one with a bad signature it must refuse with 401. `check.problems` says what went wrong.
+
+```ts
+const check = await discord.verifyEndpoint();
+expect(check.problems).toEqual([]);
+```
+
+`discord.fault(...)` changes what the bot's own calls and connection get, until it's undone or the session closes. `await using` undoes it:
+
+| Fault | Effect |
+|---|---|
+| `{ type: "rate_limit", route, retryAfter, times }` | The next calls of `route` get a 429 with `retry_after` and `Retry-After`, as past a rate limit |
+| `{ type: "drop_gateway" }` | The bot's Gateway connection drops just before the next dispatch, without a close frame. A bot that resumes gets the dispatch then; one that identifies anew has lost it, as on Discord |
+
+```ts
+test("backs off on rate limits and still answers", async ({ discord }) => {
+  const ana = await discord.createUser({ name: "Ana" });
+  const route = "POST /channels/{channel.id}/messages";
+  await using _fault = await discord.fault({ type: "rate_limit", route, retryAfter: "1s", times: 1 });
+
+  const msg = await ana.say("hi", { to: discord.app });
+
+  await expect(msg.channel).toHaveRepliesFrom("my-agent", { count: 1 });
+  await expect(discord).toHaveReceivedCall(route, { times: 2 });
+});
+```
+
+[Delivery and failures](/docs/guide/delivery-and-failures) covers what each proves.
+
+## Live mode
+
+The same tests can run against a real sandbox guild. Set the agent's real bot token, `CHANNELSTACK_DISCORD_BOT_TOKEN`, and allowlist the guild with `CHANNELSTACK_LIVE_DISCORD_GUILDS`: Discord then runs live in the first allowlisted guild the bot is in. The agent connects to Discord with its own configuration; channelstack acts and reads the results back, and never relays anything to the bot.
+
+Discord has no API that acts as a person, and a user token or a scripted account (a self-bot) breaks Discord's terms. So a live person is a **second bot**: make a second application in the developer portal, add its bot to the sandbox guild, and set its token as `CHANNELSTACK_DISCORD_USER_ANA_TOKEN` for `createUser({ name: "Ana" })`. The test is the same as in the fake; Ana's messages go out through the API as her bot.
+
+What Ana writes live carries `author.bot`. An agent that ignores other bots (as it should) has to take Ana's bot as a person for a live run: the reference agent reads those bot ids from `DISCORD_PEOPLE_BOTS`, which `pnpm live` sets from the people's tokens.
+
+```ts
+test("a real person asks the real bot", async ({ discord }) => {
+  // Live, Ana's bot token comes from CHANNELSTACK_DISCORD_USER_ANA_TOKEN.
+  const ana = await discord.createUser({ name: "Ana" });
+  const channel = await discord.createChannel({ participants: [ana, discord.app] });
+
+  const msg = await ana.say("@my-agent summarize #support today", { channel });
+
+  await expect(msg).toHaveReplyFrom("my-agent", { timeout: "30s" });
+});
+```
+
+Setting up the sandbox guild, once:
+
+1. In the [developer portal](https://discord.com/developers/applications), the agent's application: on the **Bot** tab, switch on the *Server Members* and *Message Content* intents. Without Message Content the bot gets every message with empty `content`.
+2. Add the bot to the guild with an OAuth2 link (scope `bot`) that grants *View Channels*, *Send Messages*, *Send Messages in Threads*, *Create Public Threads*, *Read Message History*, *Add Reactions*, *Manage Channels* and *Manage Roles*. A private application (Public Bot off, Install Link *None*) can be added only by its owner.
+3. One more application per person a test makes (`ana`, `ben`), each with *Message Content* on, added the same way without the two *Manage* permissions. Its bot token is `CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN`.
+4. `channelstack doctor` names each bot, its guild and its intents, and says what is missing.
+
+The bot makes each session's channels, private to their participants and tagged with the run (`channelstack-run-<id>`), and deletes them when the session closes; `channelstack sweep` deletes what a crashed run left. The bot needs *Manage Channels* and *Manage Roles* in the sandbox guild. A person's `admin` must match their bot's roles there.
+
+Live, `say`, `reply`, `edit`, `delete`, `react`, `unreact` and `startThread` go out as the person's bot, and every read goes through the agent's bot. Fake only, because Discord lets no bot do them: a DM with the app (`say({ to })`, `openDM`), `runCommand` and `click`. Fake only too: a fixed `id`, another bot (`bot: true`), `verifyEndpoint`, `resend` and `redeliver`; `ephemeral()`, faults and `discord.calls()` need proxy mode. Live runs skip those steps and say why. See [Live mode](/docs/guide/live-mode).

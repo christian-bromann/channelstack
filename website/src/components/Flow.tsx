@@ -36,7 +36,7 @@ export function Flow() {
           </ul>
           <p className="node-foot">
             slack.localhost · github.localhost · linear.localhost · notion.localhost · resend.localhost ·
-            google.localhost
+            google.localhost · discord.localhost
           </p>
         </div>
 

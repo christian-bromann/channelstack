@@ -44,7 +44,7 @@ The server knows what the app is doing, because every delivery and every API cal
 - **A delivery is in flight, or about to be retried.** The fake is waiting for the app to acknowledge an event, or the platform's next retry is due within 5 seconds.
 - **A Gmail push is held.** Gmail pushes at most once a second; a change within the second is pushed when it's over, and the session is busy until then.
 - **The app was told to come back.** After a rate limit (a 429 with `Retry-After`), the session stays busy until the app calls that method again, or until `Retry-After` plus 3 seconds of grace has passed. Slack's own client adds 1 to 2 seconds of backoff, so the grace covers it.
-- **Something the app started is still open.** Each platform says what that means: a Slack stream the app started and hasn't stopped, a GitHub check run that hasn't completed, a Linear agent session still `pending`, `active` or `stopping`, a Notion `page.content_updated` event the platform is still batching. On Resend, nothing stays open: an email is sent or it isn't.
+- **Something the app started is still open.** Each platform says what that means: a Slack stream the app started and hasn't stopped, a GitHub check run that hasn't completed, a Linear agent session still `pending`, `active` or `stopping`, a Notion `page.content_updated` event the platform is still batching, a Discord interaction the app deferred and hasn't answered yet. On Resend, nothing stays open: an email is sent or it isn't.
 
 Once nothing is busy, the quiet window starts. Anything the app does restarts it. When the session has been quiet for `quietFor`, 750 ms by default, the check reads once and passes or fails.
 

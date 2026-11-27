@@ -1,8 +1,16 @@
-import { githubChecks, googleChecks, linearChecks, notionChecks, resendChecks, slackChecks } from "channelstack/checks";
+import {
+  discordChecks,
+  githubChecks,
+  googleChecks,
+  linearChecks,
+  notionChecks,
+  resendChecks,
+  slackChecks,
+} from "channelstack/checks";
 /**
  * Patterns shared by every channel: people as reusable fixtures, and the standard checks.
  * Per-channel examples: slack.test.ts, github.test.ts, linear.test.ts, notion.test.ts, resend.test.ts,
- * google.test.ts.
+ * google.test.ts, discord.test.ts.
  */
 import { expect } from "vitest";
 
@@ -27,3 +35,4 @@ linearChecks({ app: "my-agent" });
 notionChecks({ app: "my-agent", prompt: "@my-agent summarize this page" });
 resendChecks({ app: "my-agent", prompt: "Where is my refund?" });
 googleChecks({ app: "my-agent", prompt: "Where is my refund?" });
+discordChecks({ app: "my-agent", command: "/deploy web", longPrompt: "write a long report on Q3" });
