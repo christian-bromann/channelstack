@@ -77,9 +77,11 @@ interface Dispatched {
   readonly d: unknown;
 }
 
-/** A Gateway session: what the bot identified with, and what was dispatched to it, for a RESUME. */
+/** A Gateway session: the app whose bot identified, with which intents, and what was dispatched to it, for a RESUME. */
 interface GatewaySession {
   readonly id: string;
+  /** The app whose token identified it, by name. */
+  readonly app: string;
   readonly intents: number;
   seq: number;
   readonly sent: Dispatched[];
@@ -90,33 +92,44 @@ interface GatewaySession {
   leftAt: number | undefined;
 }
 
+/** One app's bot on the Gateway: its connections, and how dispatches reach them. */
 export interface Gateway {
-  /** Where the bot connects, as `GET /gateway/bot` gives it. */
-  url(): string;
-  /** A WebSocket request from the bot: the connection, at the Gateway's path. */
-  accept(request: Request): SocketSession | undefined;
   /** How many connections are identified (or resumed) and receive dispatches. */
   connections(): number;
   /** The intents of the bot's newest session, or undefined before it has identified. */
   intents(): number | undefined;
   /** How deliveries reach the bot: over its newest session, waiting for one while there is none. */
   transport(): DeliveryTransport;
-  /** Cut every connection without a close frame, the way a network drop does. */
-  drop(): void;
+}
+
+/**
+ * Every app's bot on the one Gateway (decision 0027): each identifies with its own token, and
+ * gets only its own dispatches, on its own sessions.
+ */
+export interface Gateways {
+  /** Where every bot connects, as `GET /gateway/bot` gives it. */
+  url(): string;
+  /** A WebSocket request from a bot: the connection, at the Gateway's path. Which bot it is, IDENTIFY says. */
+  accept(request: Request): SocketSession | undefined;
+  /** An app's bot, by the app's name. */
+  of(app: string): Gateway;
   /** Forget every session: a reset. */
   reset(): void;
 }
 
+/** What the Gateway needs of the world: the apps and their tokens, and what a new session is sent. */
 export interface GatewayWorld {
-  botToken(): string;
+  /** The names of the apps whose bots may identify. */
+  apps(): readonly string[];
+  botToken(app: string): string;
   /** The privileged intents the app has switched on. */
-  privilegedIntents(): readonly string[];
-  /** READY's `d`, for a new session. */
-  ready(session: string, resumeUrl: string): Record<string, unknown>;
+  privilegedIntents(app: string): readonly string[];
+  /** READY's `d`, for a new session of this app's bot. */
+  ready(app: string, session: string, resumeUrl: string): Record<string, unknown>;
   /** Whether a test session asked for a drop before its next dispatch: if so, it is taken (it fires once). */
   takeDrop(session: string): boolean;
-  /** What is dispatched right after READY: the guild, as GUILD_CREATE. */
-  afterReady(): Array<{ t: string; d: unknown }>;
+  /** What is dispatched right after READY: the guild, as GUILD_CREATE, as this app's bot sees it. */
+  afterReady(app: string): Array<{ t: string; d: unknown }>;
 }
 
 const parse = (text: string): { op?: unknown; d?: unknown } | undefined => {
@@ -128,22 +141,40 @@ const parse = (text: string): { op?: unknown; d?: unknown } | undefined => {
   }
 };
 
+/** One bot's sessions with a connection, newest last, and its newest session, connected or not. */
+interface BotSessions {
+  readonly live: OpenConnections<GatewaySession>;
+  newest: GatewaySession | undefined;
+}
+
 /**
- * Discord's Gateway: the bot opens a WebSocket, identifies with its token and intents, and from
+ * Discord's Gateway: a bot opens a WebSocket, identifies with its token and intents, and from
  * then on gets every event as a dispatch with a sequence number; after a drop it resumes and is
  * sent what it missed. There is no acknowledgement: a dispatch is delivered once it is written.
  */
-export function createGateway(context: DriverContext, world: GatewayWorld): Gateway {
+export function createGateways(context: DriverContext, world: GatewayWorld): Gateways {
   const { ids, clock } = context;
   const sessions = new Map<string, GatewaySession>();
-  /** Sessions with a connection, newest last: where dispatches go. */
-  const live = new OpenConnections<GatewaySession>();
-  /** The newest session, connected or not: dispatches go to it while it can be resumed. */
-  let newest: GatewaySession | undefined;
+  /** Each app's bot: where its dispatches go, by app name. */
+  const bots = new Map<string, BotSessions>();
+  const botOf = (app: string): BotSessions => {
+    let bot = bots.get(app);
+    if (!bot) {
+      bot = { live: new OpenConnections<GatewaySession>(), newest: undefined };
+      bots.set(app, bot);
+    }
+    return bot;
+  };
 
   const url = () => `${context.apiUrl().replace(/^http/, "ws")}/gateway`;
   const resumable = (session: GatewaySession) =>
     !session.overflowed && (session.peer !== undefined || clock() - (session.leftAt ?? 0) <= RESUME_WINDOW_MS);
+
+  /** The app a token is the bot token of, compared in constant time. */
+  const appWithToken = (token: unknown): string | undefined =>
+    typeof token === "string"
+      ? world.apps().find((app) => constantTimeEqual(token.replace(/^Bot /, ""), world.botToken(app)))
+      : undefined;
 
   const send = (session: GatewaySession, payload: Record<string, unknown>) =>
     session.peer?.send(JSON.stringify(payload));
@@ -168,28 +199,42 @@ export function createGateway(context: DriverContext, world: GatewayWorld): Gate
   };
 
   const leave = (session: GatewaySession) => {
-    live.delete(session);
+    botOf(session.app).live.delete(session);
     session.peer = undefined;
     session.leftAt = clock();
   };
 
-  const transport: DeliveryTransport = {
-    get url() {
-      return url();
-    },
-    async send({ request, signal }) {
-      // A session the bot can still resume keeps what it misses; with none, the delivery waits for the bot to connect.
-      const session = newest && resumable(newest) ? newest : await live.next(signal);
-      dispatch(session, request.type, request.meta?.payload, request.session);
-      return { contentType: "application/json", body: "" };
-    },
+  const gatewayOf = (app: string): Gateway => {
+    const bot = botOf(app);
+    const transport: DeliveryTransport = {
+      get url() {
+        return url();
+      },
+      async send({ request, signal }) {
+        // A session the bot can still resume keeps what it misses; with none, the delivery waits for the bot to connect.
+        const session = bot.newest && resumable(bot.newest) ? bot.newest : await bot.live.next(signal);
+        dispatch(session, request.type, request.meta?.payload, request.session);
+        return { contentType: "application/json", body: "" };
+      },
+    };
+    return {
+      connections: () => bot.live.size,
+      intents: () => bot.newest?.intents,
+      transport: () => transport,
+    };
   };
+  const gateways = new Map<string, Gateway>();
 
   return {
     url,
-    connections: () => live.size,
-    intents: () => newest?.intents,
-    transport: () => transport,
+    of(app) {
+      let gateway = gateways.get(app);
+      if (!gateway) {
+        gateway = gatewayOf(app);
+        gateways.set(app, gateway);
+      }
+      return gateway;
+    },
 
     accept(request) {
       const { pathname, searchParams } = new URL(request.url);
@@ -200,9 +245,9 @@ export function createGateway(context: DriverContext, world: GatewayWorld): Gate
 
       const identify = (d: Record<string, unknown>) => {
         if (session) return close(CLOSE.ALREADY_AUTHENTICATED, "Already authenticated.");
-        if (typeof d.token !== "string" || !constantTimeEqual(d.token.replace(/^Bot /, ""), world.botToken())) {
-          return close(CLOSE.AUTHENTICATION_FAILED, "Authentication failed.");
-        }
+        // Which bot this is, its token says: each app's bot gets its own sessions and dispatches.
+        const app = appWithToken(d.token);
+        if (app === undefined) return close(CLOSE.AUTHENTICATION_FAILED, "Authentication failed.");
         const intents = d.intents;
         if (
           typeof intents !== "number" ||
@@ -212,13 +257,14 @@ export function createGateway(context: DriverContext, world: GatewayWorld): Gate
         ) {
           return close(CLOSE.INVALID_INTENTS, "Invalid intent(s).");
         }
-        const allowed = world.privilegedIntents();
+        const allowed = world.privilegedIntents(app);
         if (PRIVILEGED.some((name) => (intents & INTENTS[name]) !== 0 && !allowed.includes(name))) {
           return close(CLOSE.DISALLOWED_INTENTS, "Disallowed intent(s).");
         }
         const id = ids.next(DISCORD_IDS.session);
         const created: GatewaySession = {
           id,
+          app,
           intents,
           seq: 0,
           sent: [],
@@ -228,21 +274,21 @@ export function createGateway(context: DriverContext, world: GatewayWorld): Gate
         };
         sessions.set(id, created);
         session = created;
-        newest = created;
-        dispatch(created, "READY", world.ready(id, url()));
-        for (const event of world.afterReady()) dispatch(created, event.t, event.d);
-        live.add(created);
+        botOf(app).newest = created;
+        dispatch(created, "READY", world.ready(app, id, url()));
+        for (const event of world.afterReady(app)) dispatch(created, event.t, event.d);
+        botOf(app).live.add(created);
       };
 
       const resume = (d: Record<string, unknown>) => {
         if (session) return close(CLOSE.ALREADY_AUTHENTICATED, "Already authenticated.");
-        if (typeof d.token !== "string" || !constantTimeEqual(d.token.replace(/^Bot /, ""), world.botToken())) {
-          return close(CLOSE.AUTHENTICATION_FAILED, "Authentication failed.");
-        }
+        const app = appWithToken(d.token);
+        if (app === undefined) return close(CLOSE.AUTHENTICATION_FAILED, "Authentication failed.");
         const found = typeof d.session_id === "string" ? sessions.get(d.session_id) : undefined;
         const seq = typeof d.seq === "number" ? d.seq : -1;
         const oldest = found?.sent[0]?.s ?? 1;
-        if (!found || !resumable(found) || seq > found.seq || seq < oldest - 1) {
+        // A session is its bot's: another bot's token can't resume it.
+        if (!found || found.app !== app || !resumable(found) || seq > found.seq || seq < oldest - 1) {
           // Discord: the session can't be resumed; identify again.
           peer?.send(JSON.stringify({ op: OP.INVALID_SESSION, d: false }));
           return undefined;
@@ -252,10 +298,10 @@ export function createGateway(context: DriverContext, world: GatewayWorld): Gate
         found.peer = peer;
         found.leftAt = undefined;
         session = found;
-        newest = found;
+        botOf(app).newest = found;
         for (const missed of found.sent.filter((entry) => entry.s > seq)) send(found, { op: OP.DISPATCH, ...missed });
         dispatch(found, "RESUMED", null);
-        live.add(found);
+        botOf(app).live.add(found);
         return undefined;
       };
 
@@ -298,19 +344,12 @@ export function createGateway(context: DriverContext, world: GatewayWorld): Gate
       };
     },
 
-    drop() {
-      for (const session of live.drain()) {
-        const peer = session.peer;
-        session.peer = undefined;
-        session.leftAt = clock();
-        peer?.close();
-      }
-    },
-
     reset() {
-      for (const session of live.drain()) session.peer?.close(4000, "Unknown error.");
+      for (const bot of bots.values()) {
+        for (const session of bot.live.drain()) session.peer?.close(4000, "Unknown error.");
+        bot.newest = undefined;
+      }
       sessions.clear();
-      newest = undefined;
     },
   };
 }

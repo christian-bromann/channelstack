@@ -1,3 +1,4 @@
+import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
 import type { DeliveryAttempt, DeliveryRecord } from "../../../core/delivery/index.ts";
 import { deliveryKit } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
@@ -26,9 +27,10 @@ import {
   type Permission,
   permissionsIn,
 } from "../permissions.ts";
-import { DISCORD_SECRETS } from "../secrets.ts";
+import { botIdOf, DISCORD_SECRETS } from "../secrets.ts";
 import { signInteraction } from "../signing.ts";
 import {
+  type DiscordAppRecord,
   type DiscordButtonRef,
   type DiscordChannelOptions,
   type DiscordChannelRecord,
@@ -43,7 +45,7 @@ import {
   INTERACTION_WINDOW_MS,
   MAX_CONTENT,
 } from "../world.ts";
-import { type Gateway, type Intent, INTENTS } from "./gateway.ts";
+import { type Gateways, type Intent, INTENTS } from "./gateway.ts";
 import { createInteractions, type Interactions } from "./interactions.ts";
 import type { DiscordFault, DiscordStore } from "./store.ts";
 
@@ -57,16 +59,16 @@ type Member = { id: string; roles: Array<{ id: string; permissions: bigint }> };
 export interface FakeDiscordWorld extends DiscordWorld {
   readonly store: DiscordStore;
   readonly interactions: Interactions;
-  /** Who wrote something: a person, or the bot. Undefined for an id nobody in the guild has. */
+  /** Who wrote something: a person, or an app's bot. Undefined for an id nobody in the guild has. */
   authorOf(id: string): Author | undefined;
-  /** What the bot may do in a channel, as Discord computes it. */
-  botPermissions(channel: DiscordChannelRecord): bigint;
-  /** Refuse unless the bot sees the channel and may do this there, with Discord's codes (50001, 50013). */
-  requireBot(channel: DiscordChannelRecord, ...needed: Permission[]): void;
-  /** A message as REST answers it to the bot. */
-  messageWire(message: DiscordMessageRecord): Record<string, unknown>;
-  /** A channel as REST answers it to the bot. */
-  channelWire(channel: DiscordChannelRecord): Record<string, unknown>;
+  /** What an app's bot (the built-in one unless named) may do in a channel, as Discord computes it. */
+  botPermissions(channel: DiscordChannelRecord, app?: DiscordAppRecord): bigint;
+  /** Refuse unless the app's bot sees the channel and may do this there, with Discord's codes (50001, 50013). */
+  requireBot(app: DiscordAppRecord, channel: DiscordChannelRecord, ...needed: Permission[]): void;
+  /** A message as REST answers it to an app's bot (the built-in one unless named). */
+  messageWire(message: DiscordMessageRecord, reader?: DiscordAppRecord): Record<string, unknown>;
+  /** A channel as REST answers it to an app's bot (the built-in one unless named). */
+  channelWire(channel: DiscordChannelRecord, reader?: DiscordAppRecord): Record<string, unknown>;
   /**
    * The content checks every message goes through: empty, too long, too many embeds. `within`
    * nests the fields Discord names, as it does for an interaction's response (`data.content`).
@@ -74,9 +76,9 @@ export interface FakeDiscordWorld extends DiscordWorld {
   checkContent(input: { content?: unknown; embeds?: unknown; components?: unknown }, within?: "data"): void;
   /** The guild's roles, as `GET /guilds/{id}/roles` and GUILD_CREATE list them. */
   guildRoles(): Array<Record<string, unknown>>;
-  /** A member's role ids: the bot's own role, an admin's Admin. */
+  /** A member's role ids: a bot's own role, an admin's Admin. */
   rolesOf(id: string): string[];
-  /** The bot posts. The caller has checked it may. */
+  /** An app's bot posts (the built-in one unless named). The caller has checked it may. */
   postAsBot(
     channel: DiscordChannelRecord,
     input: { content: string; embeds: unknown[]; components: unknown[] },
@@ -87,32 +89,60 @@ export interface FakeDiscordWorld extends DiscordWorld {
       ephemeralFor?: string | undefined;
       interaction?: DiscordMessageRecord["interaction"];
     },
+    app?: DiscordAppRecord,
   ): DiscordMessageRecord;
-  /** Change a message's content and tell the bot. The caller has checked who may. */
+  /** Change a message's content and tell the bots. The caller has checked who may. */
   update(
     message: DiscordMessageRecord,
     changes: { content?: string; embeds?: unknown[]; components?: unknown[]; flags?: number },
   ): DiscordMessageRecord;
-  /** Remove a message and tell the bot. */
+  /** Remove a message and tell the bots. */
   remove(message: DiscordMessageRecord): void;
-  /** Add or remove someone's reaction, and tell the bot. Returns the delivery. */
+  /** Add or remove someone's reaction, and tell the bots. Returns the built-in app's delivery. */
   reactAs(message: DiscordMessageRecord, who: string, emoji: string, direction: "add" | "remove"): string | undefined;
-  /** Start a thread, from a message or in a channel, and tell the bot. */
+  /** Start a thread, from a message or in a channel, and tell the bots. */
   threadAs(
     owner: string,
     parent: DiscordChannelRecord,
     name: string,
     starter: DiscordMessageRecord | undefined,
   ): DiscordChannelRecord;
-  /** The DM between the bot and a person, opened if it isn't yet. */
-  dmWith(userId: string): DiscordChannelRecord;
+  /** The DM between an app's bot (the built-in one unless named) and a person, opened if it isn't yet. */
+  dmWith(userId: string, app?: DiscordAppRecord): DiscordChannelRecord;
   /**
    * The bot typed in a channel (`POST /channels/{id}/typing`). The fake takes it, as Discord does,
    * and shows nothing: a transcript is what was written.
    */
   typing(channel: DiscordChannelRecord): void;
-  /** Send a Gateway event to the bot, if it hears it. Returns the delivery. */
-  dispatch(session: string | undefined, type: string, payload: unknown, intent: Intent | undefined): string | undefined;
+  /** Send a Gateway event to one app's bot, if it hears it. Returns the delivery. */
+  dispatchTo(
+    app: DiscordAppRecord,
+    session: string | undefined,
+    type: string,
+    payload: unknown,
+    intent: Intent | undefined,
+  ): string | undefined;
+  /** The guild's apps, the built-in one first. */
+  apps(): DiscordAppRecord[];
+  /** The app whose application or bot user this is. */
+  appOf(id: string): DiscordAppRecord | undefined;
+  /** Make an app by name, or return the one made with the same settings (decision 0027). */
+  createApp(
+    session: string | undefined,
+    options: { name: string; privilegedIntents?: readonly string[] | undefined },
+  ): DiscordAppRecord;
+  /** An app a test made writes, as its own `POST /channels/{id}/messages` would: in a channel, or in a DM with a person. */
+  sayAsApp(session: string, app: string, input: DiscordMessageInput, where: DiscordWhere): DiscordMessageRecord;
+  /** An app a test made replies to a message, as Discord's reply. */
+  replyAsApp(session: string, app: string, input: DiscordMessageInput, to: DiscordMessageRef): DiscordMessageRecord;
+  /** An app a test made reacts to a message, or takes its reaction back. Returns the built-in app's delivery. */
+  reactAsApp(
+    session: string,
+    app: string,
+    emoji: string,
+    message: DiscordMessageRef,
+    direction: "add" | "remove",
+  ): string | undefined;
   deliveries(session: string): DeliveryRecord[];
   delivery(session: string, id: string): DeliveryRecord;
   resend(session: string, id: string, options: { badSignature: boolean }): Promise<DeliveryAttempt>;
@@ -132,27 +162,43 @@ const mentionsIn = (content: string): string[] => [
   ...new Set([...content.matchAll(/<@!?(\d{17,20})>/g)].map((match) => match[1] as string)),
 ];
 
-export function createFakeWorld(context: DriverContext, store: DiscordStore, gateway: Gateway): FakeDiscordWorld {
+/** A delivery an event caused, and the app it went to. */
+interface Sent {
+  readonly app: string;
+  readonly id: string;
+}
+
+/** The built-in app's delivery among those an event caused: what an action's delivery is. */
+const builtInDelivery = (sent: readonly Sent[]): string | undefined => sent.find((one) => one.app === BUILT_IN_APP)?.id;
+
+export function createFakeWorld(
+  context: DriverContext,
+  store: DiscordStore,
+  gateways: Gateways,
+  defaults: { privilegedIntents: readonly string[] },
+): FakeDiscordWorld {
   const { ids, clock } = context;
-  /** Discord's deliveries: interactions over HTTP, signed with Ed25519, never retried; dispatches over the Gateway. */
+  /** Discord's deliveries: interactions over HTTP, signed with Ed25519 with each app's own key, never retried; dispatches over the Gateway. */
   const kit = deliveryKit(context, {
     driver: "discord",
     timeoutMs: INTERACTION_WINDOW_MS,
     sign: (secret, body, atMs) => signInteraction(secret, body, atMs),
-    secret: () => context.secret("interactionsKey"),
+    secret: (app) => context.apps.secret(app, "interactionsKey"),
     forgedSecret: () => DISCORD_SECRETS.interactionsKey.generate(),
   });
 
   const app = () => store.app;
   const guild = () => store.guild;
   const authorOf = (id: string): Author | undefined => {
-    if (id === app().botUserId) return { kind: "app", app: app() };
+    const bot = store.appOf(id);
+    if (bot) return { kind: "app", app: bot };
     const user = store.users.find(id);
     return user ? { kind: "user", user } : undefined;
   };
 
   const memberOf = (id: string): Member => {
-    if (id === app().botUserId) return { id, roles: [{ id: app().roleId, permissions: BOT_PERMISSIONS }] };
+    const bot = store.appOf(id);
+    if (bot) return { id, roles: [{ id: bot.roleId, permissions: BOT_PERMISSIONS }] };
     const user = store.users.find(id);
     return { id, roles: user?.admin ? [{ id: store.adminRole, permissions: ADMIN_PERMISSIONS }] : [] };
   };
@@ -173,11 +219,13 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     );
   };
 
-  const botPermissions = (channel: DiscordChannelRecord) => permissionsOf(app().botUserId, channel);
-  const botSees = (channel: DiscordChannelRecord) => has(botPermissions(channel), "VIEW_CHANNEL");
+  const botPermissions = (channel: DiscordChannelRecord, of: DiscordAppRecord = app()) =>
+    permissionsOf(of.botUserId, channel);
+  const botSees = (channel: DiscordChannelRecord, of: DiscordAppRecord = app()) =>
+    has(botPermissions(channel, of), "VIEW_CHANNEL");
 
-  const requireBot = (channel: DiscordChannelRecord, ...needed: Permission[]) => {
-    const permissions = botPermissions(channel);
+  const requireBot = (of: DiscordAppRecord, channel: DiscordChannelRecord, ...needed: Permission[]) => {
+    const permissions = botPermissions(channel, of);
     if (!has(permissions, "VIEW_CHANNEL")) throw new DiscordRefusal(50001);
     for (const permission of needed) if (!has(permissions, permission)) throw new DiscordRefusal(50013);
   };
@@ -191,16 +239,20 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
 
   const lastMessageId = (channel: string) => store.messagesIn(channel).at(-1)?.id ?? null;
 
-  const channelWire = (channel: DiscordChannelRecord): Record<string, unknown> =>
+  const channelWire = (channel: DiscordChannelRecord, reader: DiscordAppRecord = app()): Record<string, unknown> =>
     channelObject(channel, {
       guild: guild(),
       overwrites: overwritesOf(channel, store.everyoneRole),
-      recipients: [...channel.members].filter((id) => id !== app().botUserId).map(userWire),
+      recipients: [...channel.members].filter((id) => id !== reader.botUserId).map(userWire),
       lastMessageId: lastMessageId(channel.id),
       messageCount: store.messagesIn(channel.id).length,
     });
 
-  const messageWire = (message: DiscordMessageRecord, depth = 0): Record<string, unknown> => {
+  const messageWire = (
+    message: DiscordMessageRecord,
+    reader: DiscordAppRecord = app(),
+    depth = 0,
+  ): Record<string, unknown> => {
     const channel = store.channels.find(message.channelId);
     const referenced =
       message.replyTo === undefined || depth > 0 ? undefined : store.findMessage(message.channelId, message.replyTo);
@@ -208,26 +260,45 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     return messageObject(message, {
       author: authorOf(message.authorId) ?? { kind: "app", app: app() },
       mentions: message.mentions.map(userWire),
-      referenced: referenced ? messageWire(referenced, depth + 1) : message.replyTo === undefined ? undefined : null,
-      ...(thread ? { thread: channelWire(thread) } : {}),
+      referenced: referenced
+        ? messageWire(referenced, reader, depth + 1)
+        : message.replyTo === undefined
+          ? undefined
+          : null,
+      ...(thread ? { thread: channelWire(thread, reader) } : {}),
       guildId: channel?.kind === "dm" ? undefined : guild().id,
-      reader: app().botUserId,
-      applicationId: app().id,
+      reader: reader.botUserId,
+      // An interaction's response is its app's: the one whose bot wrote it.
+      applicationId: (store.appOf(message.authorId) ?? app()).id,
       interactionUser: message.interaction ? userWire(message.interaction.userId) : undefined,
     });
   };
 
-  /** The delivery queue's record for one Gateway event, if the bot hears it: its session, its intent. */
-  const dispatch = (session: string | undefined, type: string, payload: unknown, intent: Intent | undefined) => {
-    if (session === undefined) return undefined;
+  /**
+   * Whether an app's bot can be sent anything: the built-in one always (a dispatch waits for it to
+   * connect), another once its bot has identified, since an app nobody drives has no connection.
+   */
+  const reachable = (of: DiscordAppRecord) => of === app() || gateways.of(of.name).intents() !== undefined;
+
+  /** The delivery queue's record for one Gateway event to one app's bot, if it hears it: its session, its intent. */
+  const dispatchTo = (
+    of: DiscordAppRecord,
+    session: string | undefined,
+    type: string,
+    payload: unknown,
+    intent: Intent | undefined,
+  ) => {
+    if (session === undefined || !reachable(of)) return undefined;
+    const gateway = gateways.of(of.name);
     const intents = gateway.intents();
     if (intent !== undefined && intents !== undefined && (intents & INTENTS[intent]) === 0) return undefined;
     const id = discordSnowflake(ids);
     kit.send({
       id,
       session,
+      app: of.name,
       type,
-      url: gateway.url(),
+      url: gateways.url(),
       transport: gateway.transport,
       body: JSON.stringify(payload),
       retry: false,
@@ -236,10 +307,30 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     return id;
   };
 
-  /** A message as the bot's Gateway gets it: the guild's member, and no content without the intent unless it may have it. */
-  const messageEvent = (message: DiscordMessageRecord, channel: DiscordChannelRecord) => {
+  /**
+   * Send a Gateway event about a channel to every app's bot that sees it, each with the payload as
+   * that bot reads it (decision 0027): Discord sends one bot's messages to the others as a person's.
+   */
+  const broadcast = (
+    channel: DiscordChannelRecord,
+    type: string,
+    payloadFor: (reader: DiscordAppRecord) => unknown,
+    intent: Intent | undefined,
+    sees: (reader: DiscordAppRecord) => boolean = (reader) => botSees(channel, reader),
+  ): Sent[] =>
+    store.apps.all().flatMap((reader) => {
+      if (!sees(reader)) return [];
+      const id = dispatchTo(reader, sessionOf(channel.id), type, payloadFor(reader), intent);
+      return id === undefined ? [] : [{ app: reader.name, id }];
+    });
+
+  /**
+   * A message as an app's Gateway gets it: the guild's member, and no content without the intent
+   * unless the bot may have it anyway (its own, a DM, one that mentions it).
+   */
+  const messageEvent = (message: DiscordMessageRecord, channel: DiscordChannelRecord, reader: DiscordAppRecord) => {
     const guildId = channel.kind === "dm" ? undefined : guild().id;
-    const wire = messageWire(message);
+    const wire = messageWire(message, reader);
     // In a guild, the Gateway's MESSAGE_CREATE gives each mentioned user their partial member too (REST doesn't).
     if (guildId)
       wire.mentions = (wire.mentions as Array<Record<string, unknown>>).map((user) => ({
@@ -251,29 +342,38 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
       member: guildId ? memberObject(rolesOf(message.authorId), JOINED_AT) : undefined,
       channelType: CHANNEL_TYPE[channel.kind],
     });
-    const intents = gateway.intents();
+    const intents = gateways.of(reader.name).intents();
     const mayRead =
       intents === undefined ||
       (intents & INTENTS.MESSAGE_CONTENT) !== 0 ||
       channel.kind === "dm" ||
-      message.authorId === app().botUserId ||
-      message.mentions.includes(app().botUserId);
+      message.authorId === reader.botUserId ||
+      message.mentions.includes(reader.botUserId);
     return mayRead ? object : withoutContent(object);
   };
 
   const messageIntent = (channel: DiscordChannelRecord): Intent =>
     channel.kind === "dm" ? "DIRECT_MESSAGES" : "GUILD_MESSAGES";
 
-  /** Tell the bot about a new message, if it sees the channel and the message isn't for one person alone. */
+  /**
+   * Tell every bot that sees the channel about a new message, unless it is for one person alone.
+   * The one message path: the loop guard counts here what apps write (decision 0027).
+   */
   const announce = (message: DiscordMessageRecord, channel: DiscordChannelRecord) => {
-    if (message.ephemeralFor !== undefined || !botSees(channel)) return;
-    const delivery = dispatch(
-      sessionOf(channel.id),
+    if (message.ephemeralFor !== undefined) return;
+    const session = sessionOf(channel.id);
+    const writer = store.appOf(message.authorId);
+    if (session !== undefined) {
+      context.loops.wrote(session, channel.id, writer ? { kind: "app", name: writer.name } : { kind: "person" });
+      if (writer && !context.loops.allows(session, channel.id)) return;
+    }
+    const sent = broadcast(
+      channel,
       "MESSAGE_CREATE",
-      messageEvent(message, channel),
+      (reader) => messageEvent(message, channel, reader),
       messageIntent(channel),
     );
-    if (delivery) message.deliveries.push(delivery);
+    for (const one of sent) message.deliveries.push(one.id);
   };
 
   const checkContent: FakeDiscordWorld["checkContent"] = (input, within) => {
@@ -324,8 +424,8 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
       ...(options.system ? { system: true } : {}),
     });
 
-  const postAsBot: FakeDiscordWorld["postAsBot"] = (channel, input, options = {}) => {
-    const message = newMessage(channel, app().botUserId, input, options);
+  const postAsBot: FakeDiscordWorld["postAsBot"] = (channel, input, options = {}, by = app()) => {
+    const message = newMessage(channel, by.botUserId, input, options);
     announce(message, channel);
     return message;
   };
@@ -340,14 +440,14 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     if (changes.flags !== undefined) message.flags = changes.flags;
     message.editedAt = clock();
     const channel = store.channels.find(message.channelId);
-    if (channel && message.ephemeralFor === undefined && botSees(channel)) {
-      const delivery = dispatch(
-        sessionOf(channel.id),
+    if (channel && message.ephemeralFor === undefined) {
+      const sent = broadcast(
+        channel,
         "MESSAGE_UPDATE",
-        messageEvent(message, channel),
+        (reader) => messageEvent(message, channel, reader),
         messageIntent(channel),
       );
-      if (delivery) message.deliveries.push(delivery);
+      for (const one of sent) message.deliveries.push(one.id);
     }
     return message;
   };
@@ -355,11 +455,11 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
   const remove: FakeDiscordWorld["remove"] = (message) => {
     store.removeMessage(message.channelId, message.id);
     const channel = store.channels.find(message.channelId);
-    if (channel && message.ephemeralFor === undefined && botSees(channel)) {
-      dispatch(
-        sessionOf(channel.id),
+    if (channel && message.ephemeralFor === undefined) {
+      broadcast(
+        channel,
         "MESSAGE_DELETE",
-        { id: message.id, channel_id: channel.id, ...(channel.kind === "dm" ? {} : { guild_id: guild().id }) },
+        () => ({ id: message.id, channel_id: channel.id, ...(channel.kind === "dm" ? {} : { guild_id: guild().id }) }),
         messageIntent(channel),
       );
     }
@@ -381,12 +481,11 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
       reaction.users.splice(reaction.users.indexOf(who), 1);
       if (reaction.users.length === 0) message.reactions.splice(message.reactions.indexOf(reaction), 1);
     }
-    if (!botSees(channel)) return undefined;
     const guildId = channel.kind === "dm" ? undefined : guild().id;
-    return dispatch(
-      sessionOf(channel.id),
+    const sent = broadcast(
+      channel,
       direction === "add" ? "MESSAGE_REACTION_ADD" : "MESSAGE_REACTION_REMOVE",
-      {
+      () => ({
         user_id: who,
         channel_id: channel.id,
         message_id: message.id,
@@ -405,9 +504,10 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
             }
           : {}),
         ...(direction === "add" ? { burst_colors: [] } : {}),
-      },
+      }),
       channel.kind === "dm" ? "DIRECT_MESSAGE_REACTIONS" : "GUILD_MESSAGE_REACTIONS",
     );
+    return builtInDelivery(sent);
   };
 
   const threadAs: FakeDiscordWorld["threadAs"] = (owner, parent, name, starter) => {
@@ -429,14 +529,17 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
       session,
     );
     if (starter) starter.threadId = thread.id;
-    if (botSees(thread)) {
-      dispatch(session, "THREAD_CREATE", { ...channelWire(thread), newly_created: true, member: undefined }, "GUILDS");
-    }
+    broadcast(
+      thread,
+      "THREAD_CREATE",
+      (reader) => ({ ...channelWire(thread, reader), newly_created: true, member: undefined }),
+      "GUILDS",
+    );
     return thread;
   };
 
-  const dmWith: FakeDiscordWorld["dmWith"] = (userId) => {
-    const key = [app().botUserId, userId].sort().join(":");
+  const dmWith: FakeDiscordWorld["dmWith"] = (userId, by = app()) => {
+    const key = [by.botUserId, userId].sort().join(":");
     const existing = store.dms.get(key);
     const found = existing === undefined ? undefined : store.channels.find(existing);
     if (found) return found;
@@ -446,7 +549,7 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
         id: discordSnowflake(ids),
         kind: "dm",
         name: undefined,
-        members: new Set([app().botUserId, userId]),
+        members: new Set([by.botUserId, userId]),
         readOnly: false,
         createdAt: clock(),
       },
@@ -460,7 +563,8 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
 
   const mentionText = (session: string, text: string) => {
     const lookup = (name: string) => {
-      if (name === app().name) return app().botUserId;
+      const named = store.apps.named(name);
+      if (named) return named.botUserId;
       const wanted = name.toLowerCase();
       return store.usersOf(session).find((user) => user.name.toLowerCase() === wanted || user.username === wanted)?.id;
     };
@@ -513,11 +617,39 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     return message;
   };
 
+  /** An app a test made and acts as: never the built-in one, which the agent under test acts as. */
+  const scripted = (id: string): DiscordAppRecord => {
+    const found = store.appOf(id) ?? store.apps.named(id);
+    if (!found) throw new ProtocolError("not_found", `There is no Discord app "${id}"`, { app: id });
+    if (found === app()) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `${found.name} is the built-in app, which the agent under test acts as: script another app`,
+        { app: found.id },
+      );
+    }
+    return found;
+  };
+
+  /** A bot writes where it sees the channel and may send there, as Discord refuses its own call (50001, 50013). */
+  const botWrites = (
+    session: string,
+    by: DiscordAppRecord,
+    channel: DiscordChannelRecord,
+    input: DiscordMessageInput,
+    replyTo?: string,
+  ) => {
+    requireBot(by, channel, channel.kind === "public_thread" ? "SEND_MESSAGES_IN_THREADS" : "SEND_MESSAGES");
+    const { content } = mentionText(session, input.content ?? "");
+    const embeds = [...(input.embeds ?? [])];
+    checkContent({ content, embeds });
+    return postAsBot(channel, { content, embeds, components: [] }, { replyTo }, by);
+  };
+
   const interactions = createInteractions(context, {
     store,
     kit,
-    gateway,
-    dispatch,
+    dispatchTo,
     app,
     guild,
     authorOf,
@@ -537,24 +669,29 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     interactions,
     app,
     guild,
-    gatewayConnections: () => gateway.connections(),
+    gatewayConnections: () => gateways.of(app().name).connections(),
     authorOf,
     botPermissions,
     requireBot,
-    messageWire: (message) => messageWire(message),
+    messageWire: (message, reader) => messageWire(message, reader),
     channelWire,
     checkContent,
     rolesOf,
     guildRoles: () => [
       roleObject({ id: store.everyoneRole, name: "@everyone", permissions: EVERYONE_PERMISSIONS, position: 0 }),
       roleObject({ id: store.adminRole, name: "Admin", permissions: ADMIN_PERMISSIONS, position: 2 }),
-      roleObject({
-        id: app().roleId,
-        name: app().name,
-        permissions: BOT_PERMISSIONS,
-        position: 1,
-        managed: app().botUserId,
-      }),
+      // Each app's bot has the role Discord made for it when it joined.
+      ...store.apps
+        .all()
+        .map((bot) =>
+          roleObject({
+            id: bot.roleId,
+            name: bot.name,
+            permissions: BOT_PERMISSIONS,
+            position: 1,
+            managed: bot.botUserId,
+          }),
+        ),
     ],
     postAsBot,
     update,
@@ -563,11 +700,71 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
     threadAs,
     dmWith,
     typing,
-    dispatch,
+    dispatchTo,
     sessionOf,
     mentionText,
+    apps: () => store.apps.all(),
+    appOf: (id) => store.appOf(id),
+
+    createApp(session, options) {
+      if (session !== undefined) {
+        checkNameFree(
+          options.name,
+          store.usersOf(session).map((user) => user.name),
+          "app",
+        );
+      }
+      const privilegedIntents = [...(options.privilegedIntents ?? defaults.privilegedIntents)];
+      return store.apps.make(options.name, { privilegedIntents }, () => {
+        // A bot's id is in its token, as Discord's are: the app's token is made once per install, so its bot is too.
+        const token = context.apps.secret(options.name, "botToken");
+        const id = botIdOf(token);
+        if (id === undefined) throw new Error(`The Discord app "${options.name}" has a token without a bot id`);
+        return {
+          id,
+          name: options.name,
+          botUserId: id,
+          roleId: context.apps.ids(options.name).next(DISCORD_IDS.role),
+          privilegedIntents,
+        };
+      });
+    },
+
+    sayAsApp(session, name, input, where) {
+      const by = scripted(name);
+      if ("channel" in where) return botWrites(session, by, store.channels.get(session, where.channel), input);
+      const [other, ...more] = where.to;
+      if (other === undefined || more.length > 0) {
+        throw new ProtocolError("invalid_argument", "A DM is with one other: a person");
+      }
+      // Discord lets no bot open a DM with another bot: an app's, or a person's kind of bot.
+      if (store.appOf(other) || store.users.find(other)?.bot) throw new DiscordRefusal(50007);
+      return botWrites(session, by, dmWith(personIn(session, other).id, by), input);
+    },
+
+    replyAsApp(session, name, input, to) {
+      const by = scripted(name);
+      const message = findMessage(session, to);
+      return botWrites(session, by, store.channels.get(session, to.channel), input, message.id);
+    },
+
+    reactAsApp(session, name, emoji, ref, direction) {
+      const by = scripted(name);
+      const message = findMessage(session, ref);
+      const channel = store.channels.get(session, ref.channel);
+      requireBot(by, channel, "READ_MESSAGE_HISTORY");
+      if (direction === "add" && !message.reactions.some((reaction) => reaction.emoji === emoji)) {
+        requireBot(by, channel, "ADD_REACTIONS");
+      }
+      return reactAs(message, by.botUserId, emoji, direction);
+    },
 
     createUser(session, options: DiscordUserOptions) {
+      checkNameFree(
+        options.name,
+        store.apps.all().map((bot) => bot.name),
+        "person",
+      );
       const id = options.id === undefined ? ids.next(DISCORD_IDS.user) : ids.reserve(DISCORD_IDS.user, options.id);
       const username = options.name.toLowerCase().replace(/[^a-z0-9._]/g, "") || "user";
       return store.users.add(
@@ -588,7 +785,7 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
 
     createChannel(session, options: DiscordChannelOptions) {
       for (const participant of options.participants) {
-        if (participant !== app().botUserId) personIn(session, participant);
+        if (!store.appOf(participant)) personIn(session, participant);
       }
       const id = discordSnowflake(ids);
       const channel = store.addChannel(
@@ -603,8 +800,8 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
         },
         session,
       );
-      // Discord tells everyone who can see a new channel; the bot only if it is among them.
-      if (botSees(channel)) dispatch(session, "CHANNEL_CREATE", channelWire(channel), "GUILDS");
+      // Discord tells everyone who can see a new channel; a bot only if it is among them.
+      broadcast(channel, "CHANNEL_CREATE", (reader) => channelWire(channel, reader), "GUILDS");
       return channel;
     },
     channel: (session, id) => store.channels.get(session, id),
@@ -667,7 +864,8 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
 
     openDM(session, user, other) {
       personIn(session, user);
-      if (other === app().botUserId) return dmWith(user);
+      const bot = store.appOf(other);
+      if (bot) return dmWith(user, bot);
       const person = personIn(session, other);
       const key = [user, person.id].sort().join(":");
       const existing = store.dms.get(key);
@@ -699,17 +897,27 @@ export function createFakeWorld(context: DriverContext, store: DiscordStore, gat
           message: `${personIn(session, user).name} may not change who sees this channel`,
         });
       }
-      const botBefore = botSees(channel);
+      const before = new Set(store.apps.all().filter((bot) => botSees(channel, bot)));
       for (const participant of participants) {
-        if (participant !== app().botUserId) personIn(session, participant);
+        if (!store.appOf(participant)) personIn(session, participant);
         channel.members.add(participant);
       }
-      // The channel's overwrites changed: whoever sees it hears CHANNEL_UPDATE, the bot too once it may.
-      if (botSees(channel) || botBefore) dispatch(session, "CHANNEL_UPDATE", channelWire(channel), "GUILDS");
+      // The channel's overwrites changed: whoever sees it hears CHANNEL_UPDATE, a bot too once it may.
+      broadcast(
+        channel,
+        "CHANNEL_UPDATE",
+        (reader) => channelWire(channel, reader),
+        "GUILDS",
+        (reader) => before.has(reader) || botSees(channel, reader),
+      );
     },
 
-    runCommand: (session, user, command, channel) =>
-      interactions.command(session, user, command, visibleTo(session, user, channel)),
+    runCommand(session, user, command, channel, appId) {
+      const only = appId === undefined ? undefined : (store.appOf(appId) ?? store.apps.named(appId));
+      if (appId !== undefined && !only)
+        throw new ProtocolError("not_found", `There is no Discord app "${appId}"`, { app: appId });
+      return interactions.command(session, user, command, visibleTo(session, user, channel), only);
+    },
 
     click(session, user, button: DiscordButtonRef, where: DiscordControlWhere) {
       const message =
