@@ -5360,6 +5360,161 @@
           "dispose": false
         },
         {
+          "name": "installationId",
+          "kind": "method",
+          "summary": "The id of the built-in App's installation, for a repository it is installed on",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/installation-id",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "integer"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "createApp",
+          "kind": "factory",
+          "summary": "Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "permissions",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "enum",
+                  "values": [
+                    "read",
+                    "write"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "events",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubApp"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "apps",
+          "kind": "method",
+          "summary": "The org's Apps: the built-in one first, then the others in the order they were made",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubApps"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "deliveries",
           "kind": "method",
           "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
@@ -5635,15 +5790,20 @@
         {
           "name": "installationId",
           "kind": "method",
-          "summary": "The id of the App's installation, for a repository it is installed on",
+          "summary": "The id of this App's installation, for a repository it is installed on",
           "stability": "experimental",
           "http": {
             "verb": "POST",
-            "path": "/sessions/{session}/github/installation-id",
+            "path": "/sessions/{session}/github/apps/{app}/installation-id",
             "pathParams": [
               {
                 "name": "session",
                 "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
               }
             ]
           },
@@ -5678,6 +5838,1725 @@
             "not_found"
           ],
           "dispose": false
+        },
+        {
+          "name": "push",
+          "kind": "method",
+          "summary": "Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/push",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "changes",
+              "type": {
+                "kind": "files",
+                "mode": "changes"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "branch",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "message",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubCommit"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "openIssue",
+          "kind": "method",
+          "summary": "Open an issue. Sends `issues` (action `opened`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/issues",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "labels",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "string"
+                      }
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "assignees",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "ref",
+                        "resources": [
+                          "GitHubUser",
+                          "GitHubApp"
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubIssue"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "openPullRequest",
+          "kind": "method",
+          "summary": "Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/pulls",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "from",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "to",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "changes",
+                    "type": {
+                      "kind": "files",
+                      "mode": "changes"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "draft",
+                    "type": {
+                      "kind": "boolean"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "reviewers",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "ref",
+                        "resources": [
+                          "GitHubUser",
+                          "GitHubApp"
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "repo",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubRepo"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubPullRequest"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "editIssue",
+          "kind": "method",
+          "summary": "Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/edit-issue",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "changes",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "close",
+          "kind": "method",
+          "summary": "Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/close",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "reopen",
+          "kind": "method",
+          "summary": "Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/reopen",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "label",
+          "kind": "method",
+          "summary": "Put labels on an issue or a pull request. Sends one `labeled` event per label",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/label",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubLabelDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "unlabel",
+          "kind": "method",
+          "summary": "Take labels off an issue or a pull request. Sends one `unlabeled` event per label",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/unlabel",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "labels",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "string"
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubUnlabelDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "assign",
+          "kind": "method",
+          "summary": "Assign people or the App's bot. Sends one `assigned` event per assignee",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/assign",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "assignees",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GitHubUser",
+                    "GitHubApp"
+                  ]
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubAssignDeliveries"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "comment",
+          "kind": "method",
+          "summary": "Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "edit",
+          "kind": "method",
+          "summary": "Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/edit",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment",
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "delete",
+          "kind": "method",
+          "summary": "Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/delete",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment",
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "react",
+          "kind": "method",
+          "summary": "React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/react",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "content",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "+1",
+                  "-1",
+                  "laugh",
+                  "confused",
+                  "heart",
+                  "hooray",
+                  "rocket",
+                  "eyes"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "issue",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubIssue"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment",
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "minimize",
+          "kind": "method",
+          "summary": "Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/minimize",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "reason",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "OUTDATED",
+                  "SPAM",
+                  "OFF_TOPIC",
+                  "RESOLVED"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": null,
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "review",
+          "kind": "method",
+          "summary": "Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/review",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "review",
+              "type": {
+                "kind": "object",
+                "fields": [
+                  {
+                    "name": "pr",
+                    "type": {
+                      "kind": "ref",
+                      "resources": [
+                        "GitHubPullRequest"
+                      ]
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "event",
+                    "type": {
+                      "kind": "enum",
+                      "values": [
+                        "COMMENT",
+                        "APPROVE",
+                        "REQUEST_CHANGES"
+                      ]
+                    },
+                    "optional": false
+                  },
+                  {
+                    "name": "body",
+                    "type": {
+                      "kind": "string"
+                    },
+                    "optional": true
+                  },
+                  {
+                    "name": "comments",
+                    "type": {
+                      "kind": "array",
+                      "items": {
+                        "kind": "object",
+                        "fields": [
+                          {
+                            "name": "path",
+                            "type": {
+                              "kind": "string"
+                            },
+                            "optional": false
+                          },
+                          {
+                            "name": "line",
+                            "type": {
+                              "kind": "integer"
+                            },
+                            "optional": false
+                          },
+                          {
+                            "name": "side",
+                            "type": {
+                              "kind": "enum",
+                              "values": [
+                                "LEFT",
+                                "RIGHT"
+                              ]
+                            },
+                            "optional": true
+                          },
+                          {
+                            "name": "startLine",
+                            "type": {
+                              "kind": "integer"
+                            },
+                            "optional": true
+                          },
+                          {
+                            "name": "body",
+                            "type": {
+                              "kind": "string"
+                            },
+                            "optional": false
+                          }
+                        ]
+                      }
+                    },
+                    "optional": true
+                  }
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubReview"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "reviewComment",
+          "kind": "method",
+          "summary": "One comment on the diff, outside a review. Sends `pull_request_review_comment`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/review-comment",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "path",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "line",
+              "type": {
+                "kind": "integer"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "side",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "LEFT",
+                  "RIGHT"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubReviewComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "Reply in a thread on the diff. Sends `pull_request_review_comment`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "body",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubReviewComment"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "resolve",
+          "kind": "method",
+          "summary": "Resolve a thread on the diff. Sends `pull_request_review_thread`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/resolve",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "unresolve",
+          "kind": "method",
+          "summary": "Reopen a thread on the diff. Sends `pull_request_review_thread`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/unresolve",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "comment",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubReviewComment"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "requestReview",
+          "kind": "method",
+          "summary": "Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/request-review",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "reviewers",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GitHubUser",
+                    "GitHubApp"
+                  ]
+                },
+                "oneOrMany": true
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "markReady",
+          "kind": "method",
+          "summary": "Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/mark-ready",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "validation_failed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
+        },
+        {
+          "name": "merge",
+          "kind": "method",
+          "summary": "Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged)",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/apps/{app}/merge",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "pr",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GitHubPullRequest"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "method",
+              "type": {
+                "kind": "enum",
+                "values": [
+                  "merge",
+                  "squash",
+                  "rebase"
+                ]
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found",
+            "forbidden",
+            "not_allowed"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the org holds only the App channelstack has credentials for"
+          }
         }
       ]
     },
@@ -7624,7 +9503,7 @@
         {
           "name": "installApp",
           "kind": "method",
-          "summary": "Install the App on this repository. Sends `installation_repositories`",
+          "summary": "Install an App on this repository. Sends that App `installation_repositories`",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -7684,7 +9563,7 @@
         {
           "name": "uninstallApp",
           "kind": "method",
-          "summary": "Take the App off this repository. Sends `installation_repositories`",
+          "summary": "Take an App off this repository. Sends that App `installation_repositories`",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -7979,6 +9858,13 @@
           "type": {
             "kind": "literal",
             "value": "github"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "string"
           },
           "optional": false
         },
@@ -19251,6 +21137,16 @@
         "items": {
           "kind": "resource",
           "name": "SlackDelivery"
+        }
+      }
+    },
+    {
+      "name": "GitHubApps",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubApp"
         }
       }
     },

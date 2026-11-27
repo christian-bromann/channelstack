@@ -88,6 +88,84 @@ let repo = github.create_repo().name("…").await?;
 
 **Returns** [`GitHubRepo`](/docs/reference/api/github#githubrepo).
 
+### installationId()
+
+The id of the built-in App's installation, for a repository it is installed on.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await github.installationId(repo);
+```
+
+```python title="Python"
+result = await github.installation_id(repo)
+```
+
+```rust title="Rust"
+let result = github.installation_id(&repo).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `repo` | `GitHubRepo` | yes | positional |
+
+**Returns** `number`.
+
+### createApp()
+
+Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_&lt;NAME>_WEBHOOK_URL.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const app = await github.createApp({ name: "…" });
+```
+
+```python title="Python"
+app = await github.create_app(name="…")
+```
+
+```rust title="Rust"
+let app = github.create_app().name("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `name` | `string` | yes | option |
+| `permissions` | `Record<string, "read" \| "write">` | no | option |
+| `events` | `string[]` | no | option |
+
+**Returns** [`GitHubApp`](/docs/reference/api/github#githubapp).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### apps()
+
+The org's Apps: the built-in one first, then the others in the order they were made.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const apps = await github.apps();
+```
+
+```python title="Python"
+apps = await github.apps()
+```
+
+```rust title="Rust"
+let apps = github.apps().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GitHubApps`](/docs/reference/api/github#githubapps).
+
 ### deliveries()
 
 Every webhook channelstack sent the agent for this session, with every attempt.
@@ -203,6 +281,8 @@ let api_call = github.wait_for_call().operation("…").await?;
 
 ## GitHubApp
 
+Returned by [`GitHubFixture.createApp()`](/docs/reference/api/github#createapp).
+
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
@@ -217,7 +297,7 @@ let api_call = github.wait_for_call().operation("…").await?;
 
 ### installationId()
 
-The id of the App's installation, for a repository it is installed on.
+The id of this App's installation, for a repository it is installed on.
 
 <CodeGroup>
 
@@ -240,6 +320,687 @@ let result = app.installation_id(&repo).await?;
 | `repo` | `GitHubRepo` | yes | positional |
 
 **Returns** `number`.
+
+### push()
+
+Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const commit = await app.push(changes, { repo, branch: "…" });
+```
+
+```python title="Python"
+commit = await app.push(changes, repo=repo, branch="…")
+```
+
+```rust title="Rust"
+let commit = app.push(changes).repo(&repo).branch("…").await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `changes` | `FileInput[] \| Record<string, string \| null>` | yes | positional |
+| `repo` | `GitHubRepo` | yes | option |
+| `branch` | `string` | yes | option |
+| `message` | `string` | no | option |
+
+**Returns** [`GitHubCommit`](/docs/reference/api/github#githubcommit).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### openIssue()
+
+Open an issue. Sends `issues` (action `opened`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await app.openIssue(issue, { repo });
+```
+
+```python title="Python"
+result = await app.open_issue(issue, repo=repo)
+```
+
+```rust title="Rust"
+let result = app.open_issue(issue).repo(&repo).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `issue` | `{ title: string; body?: string; labels?: string[]; assignees?: Array<GitHubUser \| GitHubApp> }` | yes | positional |
+| `repo` | `GitHubRepo` | yes | option |
+
+**Returns** [`GitHubIssue`](/docs/reference/api/github#githubissue).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### openPullRequest()
+
+Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const pullRequest = await app.openPullRequest(pr, { repo });
+```
+
+```python title="Python"
+pull_request = await app.open_pull_request(pr, repo=repo)
+```
+
+```rust title="Rust"
+let pull_request = app.open_pull_request(pr).repo(&repo).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `pr` | `{ from: string; to?: string; title?: string; body?: string; changes?: FileInput[] \| Record<string, string \| null>; draft?: boolean; reviewers?: Array<GitHubUser \| GitHubApp> }` | yes | positional |
+| `repo` | `GitHubRepo` | yes | option |
+
+**Returns** [`GitHubPullRequest`](/docs/reference/api/github#githubpullrequest).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### editIssue()
+
+Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.editIssue(changes, { issue });
+```
+
+```python title="Python"
+delivery = await app.edit_issue(changes, issue=issue)
+```
+
+```rust title="Rust"
+let delivery = app.edit_issue(changes).issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `changes` | `{ title?: string; body?: string }` | yes | positional |
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### close()
+
+Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.close({ issue });
+```
+
+```python title="Python"
+delivery = await app.close(issue=issue)
+```
+
+```rust title="Rust"
+let delivery = app.close().issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### reopen()
+
+Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.reopen({ issue });
+```
+
+```python title="Python"
+delivery = await app.reopen(issue=issue)
+```
+
+```rust title="Rust"
+let delivery = app.reopen().issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### label()
+
+Put labels on an issue or a pull request. Sends one `labeled` event per label.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const labelDeliveries = await app.label(labels, { issue });
+```
+
+```python title="Python"
+label_deliveries = await app.label(labels, issue=issue)
+```
+
+```rust title="Rust"
+let label_deliveries = app.label(labels).issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `labels` | `string \| string[]` | yes | positional |
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubLabelDeliveries`](/docs/reference/api/github#githublabeldeliveries).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### unlabel()
+
+Take labels off an issue or a pull request. Sends one `unlabeled` event per label.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const unlabelDeliveries = await app.unlabel(labels, { issue });
+```
+
+```python title="Python"
+unlabel_deliveries = await app.unlabel(labels, issue=issue)
+```
+
+```rust title="Rust"
+let unlabel_deliveries = app.unlabel(labels).issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `labels` | `string \| string[]` | yes | positional |
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubUnlabelDeliveries`](/docs/reference/api/github#githubunlabeldeliveries).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### assign()
+
+Assign people or the App's bot. Sends one `assigned` event per assignee.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const assignDeliveries = await app.assign(assignees, { issue });
+```
+
+```python title="Python"
+assign_deliveries = await app.assign(assignees, issue=issue)
+```
+
+```rust title="Rust"
+let assign_deliveries = app.assign(assignees).issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `assignees` | `GitHubUser \| GitHubApp \| Array<GitHubUser \| GitHubApp>` | yes | positional |
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubAssignDeliveries`](/docs/reference/api/github#githubassigndeliveries).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### comment()
+
+Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const comment = await app.comment("…", { issue });
+```
+
+```python title="Python"
+comment = await app.comment("…", issue=issue)
+```
+
+```rust title="Rust"
+let comment = app.comment("…").issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `issue` | `GitHubIssue` | yes | option |
+
+**Returns** [`GitHubComment`](/docs/reference/api/github#githubcomment).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### edit()
+
+Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.edit("…", { comment });
+```
+
+```python title="Python"
+delivery = await app.edit("…", comment=comment)
+```
+
+```rust title="Rust"
+let delivery = app.edit("…").comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `comment` | `GitHubComment \| GitHubReviewComment` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### delete()
+
+Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.delete({ comment });
+```
+
+```python title="Python"
+delivery = await app.delete(comment=comment)
+```
+
+```rust title="Rust"
+let delivery = app.delete().comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `comment` | `GitHubComment \| GitHubReviewComment` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### react()
+
+React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+await app.react(content, { issue });
+```
+
+```python title="Python"
+await app.react(content, issue=issue)
+```
+
+```rust title="Rust"
+app.react(content).issue(&issue).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `content` | `"+1" \| "-1" \| "laugh" \| "confused" \| "heart" \| "hooray" \| "rocket" \| "eyes"` | yes | positional |
+| `issue` | `GitHubIssue` | no | option |
+| `comment` | `GitHubComment \| GitHubReviewComment` | no | option |
+
+**Returns** nothing.
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### minimize()
+
+Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+await app.minimize({ comment });
+```
+
+```python title="Python"
+await app.minimize(comment=comment)
+```
+
+```rust title="Rust"
+app.minimize().comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `comment` | `GitHubComment` | yes | option |
+| `reason` | `"OUTDATED" \| "SPAM" \| "OFF_TOPIC" \| "RESOLVED"` | no | option |
+
+**Returns** nothing.
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### review()
+
+Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const result = await app.review(review);
+```
+
+```python title="Python"
+result = await app.review(review)
+```
+
+```rust title="Rust"
+let result = app.review(review).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `review` | `{ pr: GitHubPullRequest; event: "COMMENT" \| "APPROVE" \| "REQUEST_CHANGES"; body?: string; comments?: Array<{ path: string; line: number; side?: "LEFT" \| "RIGHT"; startLine?: number; body: string }> }` | yes | positional |
+
+**Returns** [`GitHubReview`](/docs/reference/api/github#githubreview).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### reviewComment()
+
+One comment on the diff, outside a review. Sends `pull_request_review_comment`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const reviewComment = await app.reviewComment("…", { pr, path: "…", line });
+```
+
+```python title="Python"
+review_comment = await app.review_comment("…", pr=pr, path="…", line=line)
+```
+
+```rust title="Rust"
+let review_comment = app.review_comment("…").pr(&pr).path("…").line(line).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `pr` | `GitHubPullRequest` | yes | option |
+| `path` | `string` | yes | option |
+| `line` | `number` | yes | option |
+| `side` | `"LEFT" \| "RIGHT"` | no | option |
+
+**Returns** [`GitHubReviewComment`](/docs/reference/api/github#githubreviewcomment).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### reply()
+
+Reply in a thread on the diff. Sends `pull_request_review_comment`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const reviewComment = await app.reply("…", { comment });
+```
+
+```python title="Python"
+review_comment = await app.reply("…", comment=comment)
+```
+
+```rust title="Rust"
+let review_comment = app.reply("…").comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `body` | `string` | yes | positional |
+| `comment` | `GitHubReviewComment` | yes | option |
+
+**Returns** [`GitHubReviewComment`](/docs/reference/api/github#githubreviewcomment).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### resolve()
+
+Resolve a thread on the diff. Sends `pull_request_review_thread`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.resolve({ comment });
+```
+
+```python title="Python"
+delivery = await app.resolve(comment=comment)
+```
+
+```rust title="Rust"
+let delivery = app.resolve().comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `comment` | `GitHubReviewComment` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### unresolve()
+
+Reopen a thread on the diff. Sends `pull_request_review_thread`.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.unresolve({ comment });
+```
+
+```python title="Python"
+delivery = await app.unresolve(comment=comment)
+```
+
+```rust title="Rust"
+let delivery = app.unresolve().comment(&comment).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `comment` | `GitHubReviewComment` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### requestReview()
+
+Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.requestReview(reviewers, { pr });
+```
+
+```python title="Python"
+delivery = await app.request_review(reviewers, pr=pr)
+```
+
+```rust title="Rust"
+let delivery = app.request_review(reviewers).pr(&pr).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `reviewers` | `GitHubUser \| GitHubApp \| Array<GitHubUser \| GitHubApp>` | yes | positional |
+| `pr` | `GitHubPullRequest` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### markReady()
+
+Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.markReady({ pr });
+```
+
+```python title="Python"
+delivery = await app.mark_ready(pr=pr)
+```
+
+```rust title="Rust"
+let delivery = app.mark_ready().pr(&pr).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `pr` | `GitHubPullRequest` | yes | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`validation_failed`](/docs/reference/api/errors#validation-failed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
+
+### merge()
+
+Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged).
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const delivery = await app.merge({ pr });
+```
+
+```python title="Python"
+delivery = await app.merge(pr=pr)
+```
+
+```rust title="Rust"
+let delivery = app.merge().pr(&pr).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `pr` | `GitHubPullRequest` | yes | option |
+| `method` | `"merge" \| "squash" \| "rebase"` | no | option |
+
+**Returns** [`GitHubDelivery | undefined`](/docs/reference/api/github#githubdelivery).
+
+**Errors** [`forbidden`](/docs/reference/api/errors#forbidden), [`not_allowed`](/docs/reference/api/errors#not-allowed).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the org holds only the App channelstack has credentials for.
 
 ## GitHubUser
 
@@ -991,7 +1752,7 @@ Returned by [`GitHubFixture.createRepo()`](/docs/reference/api/github#createrepo
 
 ### installApp()
 
-Install the App on this repository. Sends `installation_repositories`.
+Install an App on this repository. Sends that App `installation_repositories`.
 
 <CodeGroup>
 
@@ -1021,7 +1782,7 @@ let delivery = repo.install_app(&app).await?;
 
 ### uninstallApp()
 
-Take the App off this repository. Sends `installation_repositories`.
+Take an App off this repository. Sends that App `installation_repositories`.
 
 <CodeGroup>
 
@@ -1160,12 +1921,13 @@ let commits = repo.commits().branch("…").await?;
 
 ## GitHubDelivery
 
-Returned by [`GitHubUser.editIssue()`](/docs/reference/api/github#editissue), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.edit()`](/docs/reference/api/github#edit).
+Returned by [`GitHubApp.editIssue()`](/docs/reference/api/github#editissue), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.edit()`](/docs/reference/api/github#edit).
 
 | Field | Python / Rust | Type |
 |---|---|---|
 | `id` | `id` | `string` |
 | `channel` | `channel` | `"github"` |
+| `app` | `app` | `string` |
 | `type` | `type` · `r#type` | `string` |
 | `action` | `action` | `string \| undefined` |
 | `guid` | `guid` | `string` |
@@ -1273,7 +2035,7 @@ let updated = delivery.settled().await?;
 
 ## GitHubIssue
 
-Returned by [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubRepo.issue()`](/docs/reference/api/github#issue), [`GitHubIssue.refresh()`](/docs/reference/api/github#refresh-1).
+Returned by [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue-1), [`GitHubRepo.issue()`](/docs/reference/api/github#issue), [`GitHubIssue.refresh()`](/docs/reference/api/github#refresh-1).
 
 | Field | Python / Rust | Type |
 |---|---|---|
@@ -1495,7 +2257,7 @@ let comment = issue.latest_comment().from("my-agent").await?;
 
 ## GitHubCommit
 
-Returned by [`GitHubUser.push()`](/docs/reference/api/github#push), [`GitHubPullRequest.headCommit()`](/docs/reference/api/github#headcommit).
+Returned by [`GitHubApp.push()`](/docs/reference/api/github#push), [`GitHubUser.push()`](/docs/reference/api/github#push-1), [`GitHubPullRequest.headCommit()`](/docs/reference/api/github#headcommit).
 
 | Field | Python / Rust | Type |
 |---|---|---|
@@ -1571,7 +2333,7 @@ let statuses = commit.statuses().await?;
 
 ## GitHubComment
 
-Returned by [`GitHubUser.comment()`](/docs/reference/api/github#comment), [`GitHubComment.refresh()`](/docs/reference/api/github#refresh-2).
+Returned by [`GitHubApp.comment()`](/docs/reference/api/github#comment), [`GitHubUser.comment()`](/docs/reference/api/github#comment-1), [`GitHubComment.refresh()`](/docs/reference/api/github#refresh-2).
 
 | Field | Python / Rust | Type |
 |---|---|---|
@@ -1631,7 +2393,7 @@ let reactions = comment.reactions().await?;
 
 ## GitHubReviewComment
 
-Returned by [`GitHubUser.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubUser.reply()`](/docs/reference/api/github#reply).
+Returned by [`GitHubApp.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubApp.reply()`](/docs/reference/api/github#reply), [`GitHubUser.reviewComment()`](/docs/reference/api/github#reviewcomment-1), [`GitHubUser.reply()`](/docs/reference/api/github#reply-1).
 
 | Field | Type |
 |---|---|
@@ -1720,7 +2482,7 @@ let transcript = review_comment.transcript().await?;
 
 A kind of [`GitHubIssue`](/docs/reference/api/github#githubissue): it has all its fields and methods.
 
-Returned by [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubRepo.pullRequest()`](/docs/reference/api/github#pullrequest), [`GitHubPullRequest.refresh()`](/docs/reference/api/github#refresh-3).
+Returned by [`GitHubApp.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest-1), [`GitHubRepo.pullRequest()`](/docs/reference/api/github#pullrequest), [`GitHubPullRequest.refresh()`](/docs/reference/api/github#refresh-3).
 
 | Field | Python / Rust | Type |
 |---|---|---|
@@ -1879,6 +2641,12 @@ let result = pull_request.merged().await?;
 ## Types
 
 Plain values the handles return and take.
+
+### GitHubApps
+
+```ts
+type GitHubApps = GitHubApp[];
+```
 
 ### GitHubCommits
 

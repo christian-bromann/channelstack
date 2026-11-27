@@ -175,7 +175,7 @@ The GitHub, Linear and Notion fakes refuse with it where the platform refuses th
 
 SDK class: `ForbiddenError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::FORBIDDEN`.
 
-Raised by [`GitHubUser.push()`](/docs/reference/api/github#push), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.editIssue()`](/docs/reference/api/github#editissue), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.label()`](/docs/reference/api/github#label), [`GitHubUser.unlabel()`](/docs/reference/api/github#unlabel), [`GitHubUser.assign()`](/docs/reference/api/github#assign), [`GitHubUser.comment()`](/docs/reference/api/github#comment), [`GitHubUser.edit()`](/docs/reference/api/github#edit), [`GitHubUser.delete()`](/docs/reference/api/github#delete), and 29 more.
+Raised by [`GitHubApp.push()`](/docs/reference/api/github#push), [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubApp.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubApp.editIssue()`](/docs/reference/api/github#editissue), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.label()`](/docs/reference/api/github#label), [`GitHubApp.unlabel()`](/docs/reference/api/github#unlabel), [`GitHubApp.assign()`](/docs/reference/api/github#assign), [`GitHubApp.comment()`](/docs/reference/api/github#comment), [`GitHubApp.edit()`](/docs/reference/api/github#edit), [`GitHubApp.delete()`](/docs/reference/api/github#delete), and 51 more.
 
 ### invalid_auth
 
@@ -223,7 +223,7 @@ The GitHub fake refuses with it where the platform refuses the same request.
 
 SDK class: `NotAllowedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::NOT_ALLOWED`.
 
-Raised by [`GitHubUser.merge()`](/docs/reference/api/github#merge).
+Raised by [`GitHubApp.merge()`](/docs/reference/api/github#merge), [`GitHubUser.merge()`](/docs/reference/api/github#merge-1).
 
 ### not_in_channel
 
@@ -279,4 +279,4 @@ The GitHub fake refuses with it where the platform refuses the same request.
 
 SDK class: `ValidationFailedError` in TypeScript and Python, a subclass of `ChannelstackError`. Rust: `Error::Api { code, .. }` with `code` equal to `codes::VALIDATION_FAILED`.
 
-Raised by [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubUser.close()`](/docs/reference/api/github#close), [`GitHubUser.reopen()`](/docs/reference/api/github#reopen), [`GitHubUser.assign()`](/docs/reference/api/github#assign), [`GitHubUser.review()`](/docs/reference/api/github#review), [`GitHubUser.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubUser.requestReview()`](/docs/reference/api/github#requestreview), [`GitHubUser.markReady()`](/docs/reference/api/github#markready), [`GitHubRepo.installApp()`](/docs/reference/api/github#installapp), [`GitHubRepo.uninstallApp()`](/docs/reference/api/github#uninstallapp).
+Raised by [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubApp.openPullRequest()`](/docs/reference/api/github#openpullrequest), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.assign()`](/docs/reference/api/github#assign), [`GitHubApp.review()`](/docs/reference/api/github#review), [`GitHubApp.reviewComment()`](/docs/reference/api/github#reviewcomment), [`GitHubApp.requestReview()`](/docs/reference/api/github#requestreview), [`GitHubApp.markReady()`](/docs/reference/api/github#markready), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue-1), [`GitHubUser.openPullRequest()`](/docs/reference/api/github#openpullrequest-1), [`GitHubUser.close()`](/docs/reference/api/github#close-1), and 8 more.

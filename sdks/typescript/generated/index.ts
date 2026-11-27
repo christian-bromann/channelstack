@@ -377,6 +377,14 @@ function decodeSlackUninstallDeliveries(ctx: HandleContext, data: SlackUninstall
   return data.map((item) => new SlackDelivery(ctx, item));
 }
 
+export type GitHubApps = GitHubApp[];
+
+export type GitHubAppsWire = GitHubAppData[];
+
+function decodeGitHubApps(ctx: HandleContext, data: GitHubAppsWire): GitHubApps {
+  return data.map((item) => new GitHubApp(ctx, item));
+}
+
 export type GitHubCommits = GitHubCommit[];
 
 export type GitHubCommitsWire = GitHubCommitData[];
@@ -2092,6 +2100,27 @@ export class GitHubFixture {
     return new GitHubRepo(ctx, data);
   }
 
+  /** The id of the built-in App's installation, for a repository it is installed on. Experimental. */
+  async installationId(repo: GitHubRepo): Promise<number> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/installation-id`, { body: { repo: repo.id } })) as number;
+    return data;
+  }
+
+  /** Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string; permissions?: Record<string, "read" | "write">; events?: string[] }): Promise<GitHubApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps`, { body: { name: options.name, permissions: options.permissions, events: options.events } })) as GitHubAppData;
+    return new GitHubApp(ctx, data);
+  }
+
+  /** The org's Apps: the built-in one first, then the others in the order they were made. Experimental. */
+  async apps(): Promise<GitHubApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/apps`)) as GitHubAppsWire;
+    return decodeGitHubApps(ctx, data);
+  }
+
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
   async deliveries(options: { type?: string; resource?: GitHubRepo } = {}): Promise<GitHubDeliveries> {
     const ctx = this.#ctx;
@@ -2163,11 +2192,163 @@ export class GitHubApp {
     this.webhookSecret = data.webhookSecret;
   }
 
-  /** The id of the App's installation, for a repository it is installed on. Experimental. */
+  /** The id of this App's installation, for a repository it is installed on. Experimental. */
   async installationId(repo: GitHubRepo): Promise<number> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/installation-id`, { body: { repo: repo.id } })) as number;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/installation-id`, { body: { repo: repo.id } })) as number;
     return data;
+  }
+
+  /** Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it. Experimental. */
+  async push(changes: FileInput[] | Record<string, string | null>, options: { repo: GitHubRepo; branch: string; message?: string }): Promise<GitHubCommit> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/push`, { body: { changes: readChanges(changes), repo: options.repo.id, branch: options.branch, message: options.message } })) as GitHubCommitData;
+    return new GitHubCommit(ctx, data);
+  }
+
+  /** Open an issue. Sends `issues` (action `opened`). Experimental. */
+  async openIssue(issue: { title: string; body?: string; labels?: string[]; assignees?: Array<GitHubUser | GitHubApp> }, options: { repo: GitHubRepo }): Promise<GitHubIssue> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/issues`, { body: { issue: { ...issue, assignees: issue.assignees === undefined ? undefined : issue.assignees.map((item) => item.id) }, repo: options.repo.id } })) as GitHubIssueData;
+    return new GitHubIssue(ctx, data);
+  }
+
+  /** Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`). Experimental. */
+  async openPullRequest(pr: { from: string; to?: string; title?: string; body?: string; changes?: FileInput[] | Record<string, string | null>; draft?: boolean; reviewers?: Array<GitHubUser | GitHubApp> }, options: { repo: GitHubRepo }): Promise<GitHubPullRequest> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/pulls`, { body: { pr: { ...pr, changes: pr.changes === undefined ? undefined : readChanges(pr.changes), reviewers: pr.reviewers === undefined ? undefined : pr.reviewers.map((item) => item.id) }, repo: options.repo.id } })) as GitHubPullRequestData;
+    return new GitHubPullRequest(ctx, data);
+  }
+
+  /** Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental. */
+  async editIssue(changes: { title?: string; body?: string }, options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/edit-issue`, { body: { changes, issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental. */
+  async close(options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/close`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental. */
+  async reopen(options: { issue: GitHubIssue }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/reopen`, { body: { issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental. */
+  async label(labels: string | string[], options: { issue: GitHubIssue }): Promise<GitHubLabelDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/label`, { body: { labels: [labels].flat(), issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubLabelDeliveriesWire;
+    return decodeGitHubLabelDeliveries(ctx, data);
+  }
+
+  /** Take labels off an issue or a pull request. Sends one `unlabeled` event per label. Experimental. */
+  async unlabel(labels: string | string[], options: { issue: GitHubIssue }): Promise<GitHubUnlabelDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/unlabel`, { body: { labels: [labels].flat(), issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubUnlabelDeliveriesWire;
+    return decodeGitHubUnlabelDeliveries(ctx, data);
+  }
+
+  /** Assign people or the App's bot. Sends one `assigned` event per assignee. Experimental. */
+  async assign(assignees: GitHubUser | GitHubApp | Array<GitHubUser | GitHubApp>, options: { issue: GitHubIssue }): Promise<GitHubAssignDeliveries> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/assign`, { body: { assignees: [assignees].flat().map((item) => item.id), issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubAssignDeliveriesWire;
+    return decodeGitHubAssignDeliveries(ctx, data);
+  }
+
+  /** Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`). Experimental. */
+  async comment(body: string, options: { issue: GitHubIssue }): Promise<GitHubComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/comment`, { body: { body, issue: { repoId: options.issue.repoId, number: options.issue.number } } })) as GitHubCommentData;
+    return new GitHubComment(ctx, data);
+  }
+
+  /** Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental. */
+  async edit(body: string, options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/edit`, { body: { body, comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental. */
+  async delete(options: { comment: GitHubComment | GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/delete`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental. */
+  async react(content: "+1" | "-1" | "laugh" | "confused" | "heart" | "hooray" | "rocket" | "eyes", options: { issue?: GitHubIssue; comment?: GitHubComment | GitHubReviewComment } = {}): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/react`, { body: { content, issue: options.issue === undefined ? undefined : { repoId: options.issue.repoId, number: options.issue.number }, comment: options.comment === undefined ? undefined : options.comment.id } });
+  }
+
+  /** Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it. Experimental. */
+  async minimize(options: { comment: GitHubComment; reason?: "OUTDATED" | "SPAM" | "OFF_TOPIC" | "RESOLVED" }): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/minimize`, { body: { comment: options.comment.id, reason: options.reason } });
+  }
+
+  /** Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment. Experimental. */
+  async review(review: { pr: GitHubPullRequest; event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES"; body?: string; comments?: Array<{ path: string; line: number; side?: "LEFT" | "RIGHT"; startLine?: number; body: string }> }): Promise<GitHubReview> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/review`, { body: { review: { ...review, pr: { repoId: review.pr.repoId, number: review.pr.number } } } })) as GitHubReviewWire;
+    return decodeGitHubReview(ctx, data);
+  }
+
+  /** One comment on the diff, outside a review. Sends `pull_request_review_comment`. Experimental. */
+  async reviewComment(body: string, options: { pr: GitHubPullRequest; path: string; line: number; side?: "LEFT" | "RIGHT" }): Promise<GitHubReviewComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/review-comment`, { body: { body, pr: { repoId: options.pr.repoId, number: options.pr.number }, path: options.path, line: options.line, side: options.side } })) as GitHubReviewCommentData;
+    return new GitHubReviewComment(ctx, data);
+  }
+
+  /** Reply in a thread on the diff. Sends `pull_request_review_comment`. Experimental. */
+  async reply(body: string, options: { comment: GitHubReviewComment }): Promise<GitHubReviewComment> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/reply`, { body: { body, comment: options.comment.id } })) as GitHubReviewCommentData;
+    return new GitHubReviewComment(ctx, data);
+  }
+
+  /** Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental. */
+  async resolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/resolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental. */
+  async unresolve(options: { comment: GitHubReviewComment }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/unresolve`, { body: { comment: options.comment.id } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental. */
+  async requestReview(reviewers: GitHubUser | GitHubApp | Array<GitHubUser | GitHubApp>, options: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/request-review`, { body: { reviewers: [reviewers].flat().map((item) => item.id), pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental. */
+  async markReady(options: { pr: GitHubPullRequest }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/mark-ready`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number } } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
+  }
+
+  /** Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental. */
+  async merge(options: { pr: GitHubPullRequest; method?: "merge" | "squash" | "rebase" }): Promise<GitHubDelivery | undefined> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/apps/${segment(this.id)}/merge`, { body: { pr: { repoId: options.pr.repoId, number: options.pr.number }, method: options.method } })) as GitHubDeliveryData | null;
+    return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -2414,14 +2595,14 @@ export class GitHubRepo {
     this.private = data.private;
   }
 
-  /** Install the App on this repository. Sends `installation_repositories`. Experimental. */
+  /** Install an App on this repository. Sends that App `installation_repositories`. Experimental. */
   async installApp(app: GitHubApp): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/install`, { body: { app: app.id } })) as GitHubDeliveryData | null;
     return (data === null ? undefined : new GitHubDelivery(ctx, data));
   }
 
-  /** Take the App off this repository. Sends `installation_repositories`. Experimental. */
+  /** Take an App off this repository. Sends that App `installation_repositories`. Experimental. */
   async uninstallApp(app: GitHubApp): Promise<GitHubDelivery | undefined> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos/${segment(this.id)}/uninstall`, { body: { app: app.id } })) as GitHubDeliveryData | null;
@@ -2467,6 +2648,7 @@ export class GitHubRepo {
 export interface GitHubDeliveryData {
   id: string;
   channel: "github";
+  app: string;
   type: string;
   action?: string;
   guid: string;
@@ -2478,6 +2660,7 @@ export interface GitHubDeliveryData {
 export class GitHubDelivery {
   readonly id: string;
   readonly channel: "github";
+  readonly app: string;
   readonly type: string;
   readonly action: string | undefined;
   readonly guid: string;
@@ -2491,6 +2674,7 @@ export class GitHubDelivery {
     this.#ctx = ctx;
     this.id = data.id;
     this.channel = data.channel;
+    this.app = data.app;
     this.type = data.type;
     this.action = data.action;
     this.guid = data.guid;

@@ -2409,6 +2409,86 @@ fn run_git_hub_fixture_create_repo<'a>(
     })
 }
 
+fn run_git_hub_fixture_installation_id<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_repo = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/installation-id",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let p_permissions = options.get("permissions").cloned().unwrap_or(Value::Null);
+        let p_events = options.get("events").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/github/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire.insert("permissions".into(), p_permissions.clone());
+                wire.insert("events".into(), p_events.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/github/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_git_hub_fixture_deliveries<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -2519,8 +2599,9 @@ fn run_git_hub_app_installation_id<'a>(
         let mut args = args.into_iter();
         let p_repo = args.next().unwrap_or(Value::Null);
         let path = format!(
-            "/sessions/{}/github/installation-id",
-            encode_segment(ctx.session()?)
+            "/sessions/{}/github/apps/{}/installation-id",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
         );
         send(
             ctx,
@@ -2532,6 +2613,871 @@ fn run_git_hub_app_installation_id<'a>(
                     "repo".into(),
                     (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
                 );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_push<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_changes = args.next().unwrap_or(Value::Null);
+        let p_repo = options.get("repo").cloned().unwrap_or(Value::Null);
+        let p_branch = options.get("branch").cloned().unwrap_or(Value::Null);
+        let p_message = options.get("message").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/push",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "changes".into(),
+                    (&|v: &Value| files::read_changes(v))(&p_changes)?,
+                );
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire.insert("branch".into(), p_branch.clone());
+                wire.insert("message".into(), p_message.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_open_issue<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_issue = args.next().unwrap_or(Value::Null);
+        let p_repo = options.get("repo").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/issues",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[("assignees", &|v: &Value| {
+                                enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
+                            })],
+                        )
+                    })(&p_issue)?,
+                );
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_open_pull_request<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_pr = args.next().unwrap_or(Value::Null);
+        let p_repo = options.get("repo").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/pulls",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[
+                                ("changes", &|v: &Value| files::read_changes(v)),
+                                ("reviewers", &|v: &Value| {
+                                    enc::array(v, false, &|v: &Value| enc::ref_ids(v, &["id"]))
+                                }),
+                            ],
+                        )
+                    })(&p_pr)?,
+                );
+                wire.insert(
+                    "repo".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_repo)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_edit_issue<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_changes = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/edit-issue",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("changes".into(), p_changes.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_close<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/close",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_reopen<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/reopen",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_label<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_labels = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/label",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "labels".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::plain(v)))(&p_labels)?,
+                );
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_unlabel<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_labels = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/unlabel",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "labels".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::plain(v)))(&p_labels)?,
+                );
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_assign<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_assignees = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/assign",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "assignees".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_assignees,
+                    )?,
+                );
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_edit<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/edit",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_delete<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/delete",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_react<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_content = args.next().unwrap_or(Value::Null);
+        let p_issue = options.get("issue").cloned().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/react",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("content".into(), p_content.clone());
+                wire.insert(
+                    "issue".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_issue)?,
+                );
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_minimize<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let p_reason = options.get("reason").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/minimize",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire.insert("reason".into(), p_reason.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_review<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_review = args.next().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/review",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "review".into(),
+                    (&|v: &Value| {
+                        enc::object(
+                            v,
+                            None,
+                            &[("pr", &|v: &Value| enc::ref_ids(v, &["repoId", "number"]))],
+                        )
+                    })(&p_review)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_review_comment<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let p_path = options.get("path").cloned().unwrap_or(Value::Null);
+        let p_line = options.get("line").cloned().unwrap_or(Value::Null);
+        let p_side = options.get("side").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/review-comment",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire.insert("path".into(), p_path.clone());
+                wire.insert("line".into(), p_line.clone());
+                wire.insert("side".into(), p_side.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_reply<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_body = args.next().unwrap_or(Value::Null);
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/reply",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("body".into(), p_body.clone());
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_resolve<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/resolve",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_unresolve<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_comment = options.get("comment").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/unresolve",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "comment".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_comment)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_request_review<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_reviewers = args.next().unwrap_or(Value::Null);
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/request-review",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "reviewers".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::ref_ids(v, &["id"])))(
+                        &p_reviewers,
+                    )?,
+                );
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_mark_ready<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/mark-ready",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_git_hub_app_merge<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_pr = options.get("pr").cloned().unwrap_or(Value::Null);
+        let p_method = options.get("method").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/github/apps/{}/merge",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "pr".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["repoId", "number"]))(&p_pr)?,
+                );
+                wire.insert("method".into(), p_method.clone());
                 wire
             }),
             None,
@@ -11294,6 +12240,39 @@ impl GitHubFixture {
         ))
     }
 
+    /// The id of the built-in App's installation, for a repository it is installed on. Experimental.
+    pub fn installation_id(&self, repo: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![repo.into_arg()],
+            run_git_hub_fixture_installation_id,
+            as_value,
+        )
+    }
+
+    /// Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> GitHubFixtureCreateApp {
+        GitHubFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_fixture_create_app,
+            GitHubApp::wrap,
+        ))
+    }
+
+    /// The org's Apps: the built-in one first, then the others in the order they were made. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Every webhook channelstack sent the agent for this session, with every attempt. Experimental.
     pub fn deliveries(&self) -> GitHubFixtureDeliveries {
         GitHubFixtureDeliveries(Call::new(
@@ -11421,6 +12400,36 @@ impl GitHubFixtureCreateRepo {
 impl IntoFuture for GitHubFixtureCreateRepo {
     type Output = Result<GitHubRepo>;
     type IntoFuture = BoxFuture<'static, Result<GitHubRepo>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubFixtureCreateApp(Call<GitHubApp>);
+
+impl GitHubFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// `permissions`.
+    pub fn permissions(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("permissions", value))
+    }
+    /// `events`.
+    pub fn events(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("events", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubFixtureCreateApp {
+    type Output = Result<GitHubApp>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubApp>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -11680,7 +12689,7 @@ impl GitHubApp {
             .unwrap_or(String::new())
     }
 
-    /// The id of the App's installation, for a repository it is installed on. Experimental.
+    /// The id of this App's installation, for a repository it is installed on. Experimental.
     pub fn installation_id(&self, repo: impl IntoArg) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -11689,6 +12698,742 @@ impl GitHubApp {
             run_git_hub_app_installation_id,
             as_value,
         )
+    }
+
+    /// Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it. Experimental.
+    pub fn push(&self, changes: impl IntoArg) -> GitHubAppPush {
+        GitHubAppPush(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![changes.into_arg()],
+            run_git_hub_app_push,
+            GitHubCommit::wrap,
+        ))
+    }
+
+    /// Open an issue. Sends `issues` (action `opened`). Experimental.
+    pub fn open_issue(&self, issue: impl IntoArg) -> GitHubAppOpenIssue {
+        GitHubAppOpenIssue(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![issue.into_arg()],
+            run_git_hub_app_open_issue,
+            GitHubIssue::wrap,
+        ))
+    }
+
+    /// Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`). Experimental.
+    pub fn open_pull_request(&self, pr: impl IntoArg) -> GitHubAppOpenPullRequest {
+        GitHubAppOpenPullRequest(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![pr.into_arg()],
+            run_git_hub_app_open_pull_request,
+            GitHubPullRequest::wrap,
+        ))
+    }
+
+    /// Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental.
+    pub fn edit_issue(&self, changes: impl IntoArg) -> GitHubAppEditIssue {
+        GitHubAppEditIssue(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![changes.into_arg()],
+            run_git_hub_app_edit_issue,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental.
+    pub fn close(&self) -> GitHubAppClose {
+        GitHubAppClose(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_close,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental.
+    pub fn reopen(&self) -> GitHubAppReopen {
+        GitHubAppReopen(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_reopen,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental.
+    pub fn label(&self, labels: impl IntoArg) -> GitHubAppLabel {
+        GitHubAppLabel(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![labels.into_arg()],
+            run_git_hub_app_label,
+            as_value,
+        ))
+    }
+
+    /// Take labels off an issue or a pull request. Sends one `unlabeled` event per label. Experimental.
+    pub fn unlabel(&self, labels: impl IntoArg) -> GitHubAppUnlabel {
+        GitHubAppUnlabel(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![labels.into_arg()],
+            run_git_hub_app_unlabel,
+            as_value,
+        ))
+    }
+
+    /// Assign people or the App's bot. Sends one `assigned` event per assignee. Experimental.
+    pub fn assign(&self, assignees: impl IntoArg) -> GitHubAppAssign {
+        GitHubAppAssign(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![assignees.into_arg()],
+            run_git_hub_app_assign,
+            as_value,
+        ))
+    }
+
+    /// Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`). Experimental.
+    pub fn comment(&self, body: impl IntoArg) -> GitHubAppComment {
+        GitHubAppComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_comment,
+            GitHubComment::wrap,
+        ))
+    }
+
+    /// Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental.
+    pub fn edit(&self, body: impl IntoArg) -> GitHubAppEdit {
+        GitHubAppEdit(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_edit,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental.
+    pub fn delete(&self) -> GitHubAppDelete {
+        GitHubAppDelete(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_delete,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental.
+    pub fn react(&self, content: impl IntoArg) -> GitHubAppReact {
+        GitHubAppReact(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![content.into_arg()],
+            run_git_hub_app_react,
+            as_unit,
+        ))
+    }
+
+    /// Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it. Experimental.
+    pub fn minimize(&self) -> GitHubAppMinimize {
+        GitHubAppMinimize(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_minimize,
+            as_unit,
+        ))
+    }
+
+    /// Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment. Experimental.
+    pub fn review(&self, review: impl IntoArg) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![review.into_arg()],
+            run_git_hub_app_review,
+            as_value,
+        )
+    }
+
+    /// One comment on the diff, outside a review. Sends `pull_request_review_comment`. Experimental.
+    pub fn review_comment(&self, body: impl IntoArg) -> GitHubAppReviewComment {
+        GitHubAppReviewComment(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_review_comment,
+            GitHubReviewComment::wrap,
+        ))
+    }
+
+    /// Reply in a thread on the diff. Sends `pull_request_review_comment`. Experimental.
+    pub fn reply(&self, body: impl IntoArg) -> GitHubAppReply {
+        GitHubAppReply(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![body.into_arg()],
+            run_git_hub_app_reply,
+            GitHubReviewComment::wrap,
+        ))
+    }
+
+    /// Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental.
+    pub fn resolve(&self) -> GitHubAppResolve {
+        GitHubAppResolve(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_resolve,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental.
+    pub fn unresolve(&self) -> GitHubAppUnresolve {
+        GitHubAppUnresolve(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_unresolve,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental.
+    pub fn request_review(&self, reviewers: impl IntoArg) -> GitHubAppRequestReview {
+        GitHubAppRequestReview(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![reviewers.into_arg()],
+            run_git_hub_app_request_review,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental.
+    pub fn mark_ready(&self) -> GitHubAppMarkReady {
+        GitHubAppMarkReady(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_mark_ready,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+
+    /// Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental.
+    pub fn merge(&self) -> GitHubAppMerge {
+        GitHubAppMerge(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_git_hub_app_merge,
+            GitHubDelivery::wrap_opt,
+        ))
+    }
+}
+
+/// The options of [`GitHubApp::push`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppPush(Call<GitHubCommit>);
+
+impl GitHubAppPush {
+    /// `repo`.
+    pub fn repo(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("repo", value))
+    }
+    /// `branch`.
+    pub fn branch(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("branch", value))
+    }
+    /// `message`.
+    pub fn message(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("message", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubCommit> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppPush {
+    type Output = Result<GitHubCommit>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubCommit>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::open_issue`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppOpenIssue(Call<GitHubIssue>);
+
+impl GitHubAppOpenIssue {
+    /// `repo`.
+    pub fn repo(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("repo", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubIssue> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppOpenIssue {
+    type Output = Result<GitHubIssue>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubIssue>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::open_pull_request`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppOpenPullRequest(Call<GitHubPullRequest>);
+
+impl GitHubAppOpenPullRequest {
+    /// `repo`.
+    pub fn repo(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("repo", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubPullRequest> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppOpenPullRequest {
+    type Output = Result<GitHubPullRequest>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubPullRequest>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::edit_issue`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppEditIssue(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppEditIssue {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppEditIssue {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::close`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppClose(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppClose {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppClose {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::reopen`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReopen(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppReopen {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReopen {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::label`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppLabel(Call<Value>);
+
+impl GitHubAppLabel {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppLabel {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::unlabel`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppUnlabel(Call<Value>);
+
+impl GitHubAppUnlabel {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppUnlabel {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::assign`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppAssign(Call<Value>);
+
+impl GitHubAppAssign {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppAssign {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppComment(Call<GitHubComment>);
+
+impl GitHubAppComment {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppComment {
+    type Output = Result<GitHubComment>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::edit`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppEdit(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppEdit {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppEdit {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::delete`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppDelete(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppDelete {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppDelete {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::react`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReact(Call<()>);
+
+impl GitHubAppReact {
+    /// `issue`.
+    pub fn issue(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("issue", value))
+    }
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<()> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReact {
+    type Output = Result<()>;
+    type IntoFuture = BoxFuture<'static, Result<()>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::minimize`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppMinimize(Call<()>);
+
+impl GitHubAppMinimize {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// `reason`.
+    pub fn reason(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("reason", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<()> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppMinimize {
+    type Output = Result<()>;
+    type IntoFuture = BoxFuture<'static, Result<()>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::review_comment`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReviewComment(Call<GitHubReviewComment>);
+
+impl GitHubAppReviewComment {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// `path`.
+    pub fn path(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("path", value))
+    }
+    /// `line`.
+    pub fn line(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("line", value))
+    }
+    /// `side`.
+    pub fn side(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("side", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubReviewComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReviewComment {
+    type Output = Result<GitHubReviewComment>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubReviewComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::reply`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppReply(Call<GitHubReviewComment>);
+
+impl GitHubAppReply {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<GitHubReviewComment> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppReply {
+    type Output = Result<GitHubReviewComment>;
+    type IntoFuture = BoxFuture<'static, Result<GitHubReviewComment>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::resolve`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppResolve(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppResolve {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppResolve {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::unresolve`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppUnresolve(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppUnresolve {
+    /// `comment`.
+    pub fn comment(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("comment", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppUnresolve {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::request_review`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppRequestReview(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppRequestReview {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppRequestReview {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::mark_ready`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppMarkReady(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppMarkReady {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppMarkReady {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`GitHubApp::merge`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct GitHubAppMerge(Call<Option<GitHubDelivery>>);
+
+impl GitHubAppMerge {
+    /// `pr`.
+    pub fn pr(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("pr", value))
+    }
+    /// `method`.
+    pub fn method(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("method", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Option<GitHubDelivery>> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for GitHubAppMerge {
+    type Output = Result<Option<GitHubDelivery>>;
+    type IntoFuture = BoxFuture<'static, Result<Option<GitHubDelivery>>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -12689,7 +14434,7 @@ impl GitHubRepo {
             .unwrap_or(false)
     }
 
-    /// Install the App on this repository. Sends `installation_repositories`. Experimental.
+    /// Install an App on this repository. Sends that App `installation_repositories`. Experimental.
     pub fn install_app(&self, app: impl IntoArg) -> Call<Option<GitHubDelivery>> {
         Call::new(
             &self.ctx,
@@ -12700,7 +14445,7 @@ impl GitHubRepo {
         )
     }
 
-    /// Take the App off this repository. Sends `installation_repositories`. Experimental.
+    /// Take an App off this repository. Sends that App `installation_repositories`. Experimental.
     pub fn uninstall_app(&self, app: impl IntoArg) -> Call<Option<GitHubDelivery>> {
         Call::new(
             &self.ctx,
@@ -12859,6 +14604,13 @@ impl GitHubDelivery {
     pub fn channel(&self) -> String {
         self.data
             .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `app`.
+    pub fn app(&self) -> String {
+        self.data
+            .get("app")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
     }
@@ -21329,6 +23081,15 @@ pub async fn call_by_name(
         ("GitHubFixture", "createRepo") => {
             run_git_hub_fixture_create_repo(&target.ctx, &target.data, args, options).await?
         }
+        ("GitHubFixture", "installationId") => {
+            run_git_hub_fixture_installation_id(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubFixture", "createApp") => {
+            run_git_hub_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubFixture", "apps") => {
+            run_git_hub_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("GitHubFixture", "deliveries") => {
             run_git_hub_fixture_deliveries(&target.ctx, &target.data, args, options).await?
         }
@@ -21340,6 +23101,72 @@ pub async fn call_by_name(
         }
         ("GitHubApp", "installationId") => {
             run_git_hub_app_installation_id(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "push") => {
+            run_git_hub_app_push(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "openIssue") => {
+            run_git_hub_app_open_issue(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "openPullRequest") => {
+            run_git_hub_app_open_pull_request(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "editIssue") => {
+            run_git_hub_app_edit_issue(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "close") => {
+            run_git_hub_app_close(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "reopen") => {
+            run_git_hub_app_reopen(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "label") => {
+            run_git_hub_app_label(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "unlabel") => {
+            run_git_hub_app_unlabel(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "assign") => {
+            run_git_hub_app_assign(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "comment") => {
+            run_git_hub_app_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "edit") => {
+            run_git_hub_app_edit(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "delete") => {
+            run_git_hub_app_delete(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "react") => {
+            run_git_hub_app_react(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "minimize") => {
+            run_git_hub_app_minimize(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "review") => {
+            run_git_hub_app_review(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "reviewComment") => {
+            run_git_hub_app_review_comment(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "reply") => {
+            run_git_hub_app_reply(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "resolve") => {
+            run_git_hub_app_resolve(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "unresolve") => {
+            run_git_hub_app_unresolve(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "requestReview") => {
+            run_git_hub_app_request_review(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "markReady") => {
+            run_git_hub_app_mark_ready(&target.ctx, &target.data, args, options).await?
+        }
+        ("GitHubApp", "merge") => {
+            run_git_hub_app_merge(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubUser", "push") => {
             run_git_hub_user_push(&target.ctx, &target.data, args, options).await?
@@ -22044,6 +23871,41 @@ pub async fn call_by_name(
         },
         ("GitHubFixture", "createRepo") => Dyn {
             resource: Some("GitHubRepo"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubFixture", "createApp") => Dyn {
+            resource: Some("GitHubApp"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "push") => Dyn {
+            resource: Some("GitHubCommit"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "openIssue") => Dyn {
+            resource: Some("GitHubIssue"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "openPullRequest") => Dyn {
+            resource: Some("GitHubPullRequest"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "comment") => Dyn {
+            resource: Some("GitHubComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "reviewComment") => Dyn {
+            resource: Some("GitHubReviewComment"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("GitHubApp", "reply") => Dyn {
+            resource: Some("GitHubReviewComment"),
             ctx: target.ctx.clone(),
             data,
         },

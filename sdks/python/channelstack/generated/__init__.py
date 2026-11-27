@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "ObjectNotFoundError", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "ObjectNotFoundError", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -641,6 +641,9 @@ class SlackApiCall:
 
 
 type SlackUninstallDeliveries = list[SlackDelivery]
+
+
+type GitHubApps = list[GitHubApp]
 
 
 type GitHubCommits = list[GitHubCommit]
@@ -1964,6 +1967,24 @@ class GitHubFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos", body={"name": name, "private": private, "defaultBranch": default_branch, "files": None if files is None else read_tree(files), "collaborators": None if collaborators is None else [({"user": item.id} if isinstance(item, (GitHubUser,)) else {key: value for key, value in {**item, "user": None if item.get("user") is None else item["user"].id}.items() if value is not None}) for item in collaborators], "apps": None if apps is None else [item.id for item in apps], "labels": None if labels is None else [({"name": item} if isinstance(item, str) else item) for item in labels]})
         return GitHubRepo(ctx, data)
 
+    async def installation_id(self, repo: GitHubRepo) -> int:
+        """The id of the built-in App's installation, for a repository it is installed on. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/installation-id", body={"repo": repo.id})
+        return data
+
+    async def create_app(self, *, name: str, permissions: dict[str, Literal["read", "write"]] | None = None, events: list[str] | None = None) -> GitHubApp:
+        """Make another GitHub App on the org, with its own App id, bot user, installation, private key and webhook secret (decision 0027), or return the one made with this name and settings. It reaches no repository until it is installed on one; its webhooks go to CHANNELSTACK_GITHUB_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps", body={"name": name, "permissions": permissions, "events": events})
+        return GitHubApp(ctx, data)
+
+    async def apps(self) -> GitHubApps:
+        """The org's Apps: the built-in one first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps")
+        return [GitHubApp(ctx, item) for item in data]
+
     async def deliveries(self, *, type: str | None = None, resource: GitHubRepo | None = None) -> GitHubDeliveries:
         """Every webhook channelstack sent the agent for this session, with every attempt. Experimental."""
         ctx = self._ctx
@@ -2001,10 +2022,140 @@ class GitHubApp:
         self.webhook_secret: str = data["webhookSecret"]
 
     async def installation_id(self, repo: GitHubRepo) -> int:
-        """The id of the App's installation, for a repository it is installed on. Experimental."""
+        """The id of this App's installation, for a repository it is installed on. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/installation-id", body={"repo": repo.id})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/installation-id", body={"repo": repo.id})
         return data
+
+    async def push(self, changes: ChangesInput, *, repo: GitHubRepo, branch: str, message: str | None = None) -> GitHubCommit:
+        """Push a commit to a branch (created from the default branch if it isn't there). Sends `push`, and `pull_request` `synchronize` for open pull requests from it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/push", body={"changes": read_changes(changes), "repo": repo.id, "branch": branch, "message": message})
+        return GitHubCommit(ctx, data)
+
+    async def open_issue(self, issue: dict[str, Any], *, repo: GitHubRepo) -> GitHubIssue:
+        """Open an issue. Sends `issues` (action `opened`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/issues", body={"issue": {key: value for key, value in {**issue, "assignees": None if issue.get("assignees") is None else [item.id for item in issue["assignees"]]}.items() if value is not None}, "repo": repo.id})
+        return GitHubIssue(ctx, data)
+
+    async def open_pull_request(self, pr: dict[str, Any], *, repo: GitHubRepo) -> GitHubPullRequest:
+        """Open a pull request. With `changes`, they are pushed to `from` first; without, `from` is an existing branch. Sends `pull_request` (action `opened`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/pulls", body={"pr": {key: value for key, value in {**pr, "changes": None if pr.get("changes") is None else read_changes(pr["changes"]), "reviewers": None if pr.get("reviewers") is None else [item.id for item in pr["reviewers"]]}.items() if value is not None}, "repo": repo.id})
+        return GitHubPullRequest(ctx, data)
+
+    async def edit_issue(self, changes: dict[str, Any], *, issue: GitHubIssue) -> GitHubDelivery | None:
+        """Edit the title or the body of an issue or a pull request. Sends `issues` or `pull_request` (action `edited`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/edit-issue", body={"changes": changes, "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def close(self, *, issue: GitHubIssue) -> GitHubDelivery | None:
+        """Close an issue or a pull request. Sends `issues` or `pull_request` (action `closed`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/close", body={"issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def reopen(self, *, issue: GitHubIssue) -> GitHubDelivery | None:
+        """Reopen an issue or a pull request. Sends `issues` or `pull_request` (action `reopened`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/reopen", body={"issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def label(self, labels: str | list[str], *, issue: GitHubIssue) -> GitHubLabelDeliveries:
+        """Put labels on an issue or a pull request. Sends one `labeled` event per label. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/label", body={"labels": (labels if isinstance(labels, list) else [labels]), "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return [GitHubDelivery(ctx, item) for item in data]
+
+    async def unlabel(self, labels: str | list[str], *, issue: GitHubIssue) -> GitHubUnlabelDeliveries:
+        """Take labels off an issue or a pull request. Sends one `unlabeled` event per label. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/unlabel", body={"labels": (labels if isinstance(labels, list) else [labels]), "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return [GitHubDelivery(ctx, item) for item in data]
+
+    async def assign(self, assignees: GitHubUser | GitHubApp | list[GitHubUser | GitHubApp], *, issue: GitHubIssue) -> GitHubAssignDeliveries:
+        """Assign people or the App's bot. Sends one `assigned` event per assignee. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/assign", body={"assignees": [item.id for item in (assignees if isinstance(assignees, list) else [assignees])], "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return [GitHubDelivery(ctx, item) for item in data]
+
+    async def comment(self, body: str, *, issue: GitHubIssue) -> GitHubComment:
+        """Comment on an issue or a pull request's conversation. Sends `issue_comment` (action `created`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/comment", body={"body": body, "issue": {"repoId": issue.repo_id, "number": issue.number}})
+        return GitHubComment(ctx, data)
+
+    async def edit(self, body: str, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery | None:
+        """Edit a conversation comment or a comment on the diff. Sends the comment's event with action `edited`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/edit", body={"body": body, "comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def delete(self, *, comment: GitHubComment | GitHubReviewComment) -> GitHubDelivery | None:
+        """Delete a conversation comment or a comment on the diff. Sends the comment's event with action `deleted`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/delete", body={"comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def react(self, content: Literal["+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"], *, issue: GitHubIssue | None = None, comment: GitHubComment | GitHubReviewComment | None = None) -> None:
+        """React to an issue, a pull request or a comment. GitHub sends no webhook for a reaction. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/react", body={"content": content, "issue": None if issue is None else {"repoId": issue.repo_id, "number": issue.number}, "comment": None if comment is None else comment.id})
+
+    async def minimize(self, *, comment: GitHubComment, reason: Literal["OUTDATED", "SPAM", "OFF_TOPIC", "RESOLVED"] | None = None) -> None:
+        """Hide a comment as outdated, spam, off-topic or resolved. GitHub sends no webhook for it. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/minimize", body={"comment": comment.id, "reason": reason})
+
+    async def review(self, review: dict[str, Any]) -> GitHubReview:
+        """Submit a review, with comments on the diff if any. Sends `pull_request_review`, and one `pull_request_review_comment` per comment. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/review", body={"review": {key: value for key, value in {**review, "pr": None if review.get("pr") is None else {"repoId": review["pr"].repo_id, "number": review["pr"].number}}.items() if value is not None}})
+        return GitHubReview._from_wire(ctx, data)
+
+    async def review_comment(self, body: str, *, pr: GitHubPullRequest, path: str, line: int, side: Literal["LEFT", "RIGHT"] | None = None) -> GitHubReviewComment:
+        """One comment on the diff, outside a review. Sends `pull_request_review_comment`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/review-comment", body={"body": body, "pr": {"repoId": pr.repo_id, "number": pr.number}, "path": path, "line": line, "side": side})
+        return GitHubReviewComment(ctx, data)
+
+    async def reply(self, body: str, *, comment: GitHubReviewComment) -> GitHubReviewComment:
+        """Reply in a thread on the diff. Sends `pull_request_review_comment`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/reply", body={"body": body, "comment": comment.id})
+        return GitHubReviewComment(ctx, data)
+
+    async def resolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery | None:
+        """Resolve a thread on the diff. Sends `pull_request_review_thread`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/resolve", body={"comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def unresolve(self, *, comment: GitHubReviewComment) -> GitHubDelivery | None:
+        """Reopen a thread on the diff. Sends `pull_request_review_thread`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/unresolve", body={"comment": comment.id})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def request_review(self, reviewers: GitHubUser | GitHubApp | list[GitHubUser | GitHubApp], *, pr: GitHubPullRequest) -> GitHubDelivery | None:
+        """Request a review from people or the App's bot. Sends `pull_request` (action `review_requested`) per reviewer. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/request-review", body={"reviewers": [item.id for item in (reviewers if isinstance(reviewers, list) else [reviewers])], "pr": {"repoId": pr.repo_id, "number": pr.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def mark_ready(self, *, pr: GitHubPullRequest) -> GitHubDelivery | None:
+        """Mark a draft pull request as ready for review. Sends `pull_request` (action `ready_for_review`). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/mark-ready", body={"pr": {"repoId": pr.repo_id, "number": pr.number}})
+        return (None if data is None else GitHubDelivery(ctx, data))
+
+    async def merge(self, *, pr: GitHubPullRequest, method: Literal["merge", "squash", "rebase"] | None = None) -> GitHubDelivery | None:
+        """Merge a pull request. Sends `push` for the base branch, then `pull_request` (action `closed`, merged). Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/apps/{quote(str(self.id), safe='')}/merge", body={"pr": {"repoId": pr.repo_id, "number": pr.number}, "method": method})
+        return (None if data is None else GitHubDelivery(ctx, data))
 
 
 class GitHubUser:
@@ -2173,13 +2324,13 @@ class GitHubRepo:
         self.private: bool = data["private"]
 
     async def install_app(self, app: GitHubApp) -> GitHubDelivery | None:
-        """Install the App on this repository. Sends `installation_repositories`. Experimental."""
+        """Install an App on this repository. Sends that App `installation_repositories`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.id), safe='')}/install", body={"app": app.id})
         return (None if data is None else GitHubDelivery(ctx, data))
 
     async def uninstall_app(self, app: GitHubApp) -> GitHubDelivery | None:
-        """Take the App off this repository. Sends `installation_repositories`. Experimental."""
+        """Take an App off this repository. Sends that App `installation_repositories`. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/github/repos/{quote(str(self.id), safe='')}/uninstall", body={"app": app.id})
         return (None if data is None else GitHubDelivery(ctx, data))
@@ -2215,6 +2366,7 @@ class GitHubDelivery:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["github"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.action: str | None = data.get("action")
         self.guid: str = data["guid"]
