@@ -5,7 +5,7 @@ Status: draft, 2026-11-19. Builds on the research in `docs/research/` and `docs/
 The public test API follows `docs/devx.md`; the examples in `test/acceptance/examples/` show it in use. Highlights:
 - Actions are methods on the person, with the content first and the place as an option: `ana.say("…", { channel })`.
 - Users, channels, repos and pages are created per test.
-- There is no config file: each fake has a built-in app named `my-agent`, and where its events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`.
+- There is no config file: each fake has a built-in app named `my-agent`, and where its events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`. A test adds more apps by name (`createApp({ name: "coder" })`), whose events go to `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL` ([decision 0027](decisions/0027-multiple-apps.md)).
 - Matchers come through each test framework's `expect`.
 
 ## 1. What we are building
@@ -52,7 +52,7 @@ This plan and `docs/devx.md` describe the same product. Where they used to diffe
 | The world | **One shared fake world per server:** one Slack workspace, one GitHub org, one Linear workspace, one Notion workspace. The agent is configured once (one token and one base URL per channel), so there can't be a separate world per test |
 | Sessions | A session is a **scope inside that world**, not a world of its own. It owns the users, channels, repos and pages it created, filters the event log to deliveries its actions caused, and cleans everything up on `DELETE`. Each test-framework fixture opens one session per test, and the CLI and UI share a long-lived `dev` session |
 | Starting the agent | channelstack never starts or wraps the agent. `channelstack exec` is dropped; you run `channelstack env` and then `portless run my-agent pnpm dev` |
-| Config | No config file. Each fake has a built-in app named `my-agent`; where events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL`, and live credentials from `CHANNELSTACK_<CHANNEL>_*` env vars. People and places are created per test |
+| Config | No config file. Each fake has a built-in app named `my-agent`, and a test adds others with `createApp({ name })` (decision 0027); where events go comes from `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` (`CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL` for another app), and live credentials from `CHANNELSTACK_<CHANNEL>_*` env vars. People and places are created per test |
 | Test API | Actor-first and per-framework: `ana.say(text, { channel })`, with fixtures and matchers in `channelstack/vitest` and `pytest-channelstack` |
 | Secrets | Fake tokens and signing secrets are generated with a CSPRNG **once per install** and kept in `~/.channelstack/secrets.json` (mode 0600). They stay stable across restarts so `.env.local` stays valid. `channelstack secrets rotate` replaces them |
 | State | In memory. A restart starts a fresh world |

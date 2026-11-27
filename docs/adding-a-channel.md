@@ -16,6 +16,8 @@ The kit the driver is built on, all in `server/src/core/`:
 | A REST platform's fake API | `restApi(context, { driver, authorize, refusal, invalidJson, notFound })` from `core/fake/endpoint.ts`: each endpoint authorized, its JSON body parsed, a refusal answered in the platform's shape, the call on record. An endpoint that takes a form (an OAuth token request) says so: `endpoint(…, { form: true })`; a 204 answers no body. For routes that answer Hono responses and check their own credentials (GitHub), `wrapRest(context, { driver, refusal, decorate, internal }, router, { sessions, recorded })` answers refusals in the platform's shape and puts each call on record; the routes parse bodies with `bodyOf` |
 | SDKs that keep their paths at the root | the definition's `rootPaths` (`/gmail/v1/`): served at the server's root too, without portless, for an SDK that rebuilds each URL against its base and drops the base's path (`googleapis`) |
 | An email channel | `core/email`: the store (`EmailStore`: the agent's mailbox, people, emails, conversations), the control routes (`registerEmailRoutes` over an `EmailWorld`: the fixture, people who send, reply and read their inbox, the threads), MIME (`composeMime`, `parseMime`, `mimeHeaders`, `withHeaders`), and `replyOf`, `emailAuthor`, `threadOf`, `threadTranscript`. Resend and Google are built on it; their reference agents share `examples/agents/shared/email.ts` |
+| Apps | `core/apps` ([decision 0027](decisions/0027-multiple-apps.md)): `AppRoster` holds the built-in `my-agent` and the apps tests make by name (`make`, `named`, `all`, `extra`), with the name rules and the limit of 10; `checkNameFree` keeps a person's and an app's names apart in a session; the context's `apps` gives each app's webhook URL (`CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `appWebhookVariable`), secrets (`secret(app, name)`, kept by `core/secrets`) and ids (`ids(app)`, from `IdGenerator.named`). `deliveryKit`'s `send({ app })` signs with that app's secret |
+| The loop guard | `core/loops`, the context's `loops`: the driver's one message path tells it who wrote where (`wrote`), and asks before delivering an event an app's message caused (`allows`) |
 | The dev tools | `DevAdapter` from `core/dev`, as the definition's `dev`: the CLI, `channelstack mcp` and the UI act on the channel through it ([decision 0027](decisions/0027-dev-tools-on-every-channel.md)) |
 | Route helpers | `refTo`, `pathParam`, `Awaitable`, `DeliveryView` from `core/router`; `iso` from `core/clock` |
 | Live clients | `LivePlatformRefusal` (`core/errors`), `waitRetryAfter` and `RATE_LIMIT_RETRIES` (`core/clock`), and `core/reality`, `core/people`, `core/ledger`, `core/safety`, `core/maintenance` as the other drivers use them |
@@ -28,15 +30,26 @@ The kit the driver is built on, all in `server/src/core/`:
    Then the fake (`fake/`), its payloads, its routes, its transcript, following `docs/architecture.md`
    3.3. Its handles' schemas say what they are on the channel: `x-channelstack-resource: { id: "id",
    role: "user" | "app" | "resource" }` for the person, the app and the places things happen in.
+   **Apps:** `POST` and `GET /apps` (`createApp({ name, … })` and `apps()` on the fixture), an app
+   handle with the acting methods a person has, refused for `my-agent`, `env(app)` on the definition
+   (another app's lines under the built-in app's keys), every delivery to the app it went to, and the
+   platform's bot-to-bot rules, tested in `server/src/drivers/<name>/<name>-apps.test.ts`.
 2. **Generate**: `pnpm spec` and `pnpm sdk`. The SDKs, their channel unions and fixtures, and the
    Rust matcher subjects follow from the routes.
 3. **The examples**: `test/acceptance/examples/<name>.test.ts`, written against the generated SDK.
-   `pnpm typecheck` holds them to it, and the acceptance run plays them against the agents.
+   `pnpm typecheck` holds them to it, and the acceptance run plays them against the agents. They
+   include a `describe("several apps")` block, played against the reference agent running twice,
+   as `my-agent` and as `coder`.
 4. **The agents**: a reference agent on the platform's official SDK in `examples/agents/<agent>/`,
    and one with one fault per check, `examples/agents/broken-<name>/`. Both go into
-   `scripts/lib/channels.ts` (`HARNESS`), with what of the examples is enabled.
+   `scripts/lib/channels.ts` (`HARNESS`), with what of the examples is enabled (`"several apps > "`
+   among them). The reference agent takes its app's name from `AGENT_NAME`, as the stack starts it a
+   second time with `channelstack env --app coder --channel <name>`.
 5. **The standard checks**: `<NAME>_CHECKS` and `<name>Checks()` in `integrations/checks/`, and
-   `test/acceptance/checks/<name>-checks.test.ts`.
+   `test/acceptance/checks/<name>-checks.test.ts`, with `<name>.no-reply-loop` among the checks
+   (and its fault in the broken agent: answering every app), and
+   `test/acceptance/checks/<name>-checks-coder.test.ts`, the checks against `coder`, in the
+   channel's `HARNESS` suites.
 6. **Delivery cases**: `server/test/integration/<name>-delivery.test.ts`, the platform's own
    receiver against the binary (`docs/phases.md`, appendix).
 7. **Live mode**: `live/` (client, identity, world, cleanup, maintenance), the definition's `live`
