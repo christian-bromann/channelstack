@@ -57,15 +57,18 @@ export const resend: DriverDefinition = {
       openWork: () => [],
       // What the agent needs: the `resend` SDK reads `RESEND_BASE_URL`; the address is where it sends from.
       // Live, the agent talks to Resend with its own configuration, and live keys never leave the server.
-      env: () =>
-        live
-          ? {}
-          : {
-              RESEND_BASE_URL: context.apiUrl(),
-              RESEND_API_KEY: context.secret("apiKey"),
-              RESEND_WEBHOOK_SECRET: context.secret("webhookSecret"),
-              RESEND_FROM: `${fake.store.app.name} <${fake.store.app.address}>`,
-            },
+      // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
+      env: (app) => {
+        if (live) return {};
+        const team = fake.store.appForEnv(app, (name) => fake.world.createApp(undefined, { name }));
+        const { apiKey, webhookSecret } = fake.world.credentials(team);
+        return {
+          RESEND_BASE_URL: context.apiUrl(),
+          RESEND_API_KEY: apiKey,
+          RESEND_WEBHOOK_SECRET: webhookSecret,
+          RESEND_FROM: `${team.name} <${team.address}>`,
+        };
+      },
     };
   },
 };

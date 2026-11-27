@@ -1,7 +1,7 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { fakeGoogleWorld } from "./backend.ts";
 import { createGoogleFake } from "./fake/index.ts";
-import { PUBSUB } from "./fake/world.ts";
+import { PUBSUB, pubsubOf } from "./fake/world.ts";
 import { GOOGLE_IDS } from "./ids.ts";
 import { GoogleRestClient } from "./live/client.ts";
 import { googleMaintenance } from "./live/maintenance.ts";
@@ -79,22 +79,26 @@ export const google: DriverDefinition = {
       openWork: () => [],
       // What the agent needs: `googleapis` takes `rootUrl` per API, `google-auth-library` its endpoints.
       // Live, the agent talks to Gmail with its own configuration, and live credentials never leave the server.
-      env: () => {
+      // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
+      env: (app) => {
         if (live) return {};
+        const mailbox = fake.store.appForEnv(app, (name) => fake.world.createApp(undefined, { name }));
         const url = context.apiUrl();
+        const audience = context.apps.webhookUrl(mailbox.name);
+        const { clientId, clientSecret, refreshToken } = fake.world.credentials(mailbox);
         return {
           // `googleapis` drops a `rootUrl`'s path: the root of the fake's host (rootPaths).
           GOOGLE_API_URL: `${new URL(url).origin}/`,
           GOOGLE_TOKEN_URL: `${url}/token`,
           GOOGLE_CERTS_URL: `${url}/oauth2/v1/certs`,
-          GOOGLE_CLIENT_ID: context.secret("clientId"),
-          GOOGLE_CLIENT_SECRET: context.secret("clientSecret"),
-          GOOGLE_REFRESH_TOKEN: context.secret("refreshToken"),
-          GMAIL_ADDRESS: fake.store.app.address,
-          GOOGLE_PUBSUB_TOPIC: PUBSUB.topic,
+          GOOGLE_CLIENT_ID: clientId,
+          GOOGLE_CLIENT_SECRET: clientSecret,
+          GOOGLE_REFRESH_TOKEN: refreshToken,
+          GMAIL_ADDRESS: mailbox.address,
+          GOOGLE_PUBSUB_TOPIC: pubsubOf(mailbox.name).topic,
           GOOGLE_PUSH_SERVICE_ACCOUNT: PUBSUB.serviceAccount,
-          // The audience Pub/Sub's tokens are for: the push endpoint, as a subscription's default.
-          ...(context.webhookUrl === undefined ? {} : { GOOGLE_PUSH_AUDIENCE: context.webhookUrl }),
+          // The audience Pub/Sub's tokens are for: the app's push endpoint, as a subscription's default.
+          ...(audience === undefined ? {} : { GOOGLE_PUSH_AUDIENCE: audience }),
         };
       },
     };

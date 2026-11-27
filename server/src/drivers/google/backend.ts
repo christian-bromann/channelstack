@@ -1,13 +1,13 @@
 import type { EmailWorld } from "../../core/email/routes.ts";
 import type { FakeGoogleWorld } from "./fake/world.ts";
-import type { GoogleEmailRecord } from "./world.ts";
+import type { GoogleAppRecord, GoogleEmailRecord } from "./world.ts";
 
 /**
  * What people do on Gmail that works live: the email core's world, and the labels of an email's
  * copy in the agent's mailbox. The fake implements it over its world (`fakeGoogleWorld`); live mode
  * over the Gmail API with each person's own account. Routes use `live ?? fake`.
  */
-export interface GoogleWorld extends EmailWorld<GoogleEmailRecord> {
+export interface GoogleWorld extends EmailWorld<GoogleEmailRecord, GoogleAppRecord> {
   /** The labels of an email's copy in the agent's mailbox, fake and live (without the run's own). */
   labelsOf(email: GoogleEmailRecord): readonly string[];
 }
