@@ -36,7 +36,7 @@ import {
 import { Allowlist, runId, runTag } from "./core/safety/index.ts";
 import { LiveVault, randomString, randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
-import { channelsExtension, DRIVERS } from "./drivers/index.ts";
+import { channelsExtension, DEV_CHANNELS, DRIVERS } from "./drivers/index.ts";
 
 export const CONTROL_PREFIX = "/_channelstack";
 
@@ -448,6 +448,11 @@ export function createApp(options: AppOptions): App {
     driver.routes(new DriverRouter(control, driver.name, sessions, definition.live ? () => reality : undefined));
   });
 
+  // What the UI lists: each channel's places as its dev adapter declares them, as JSON in the page
+  // (a `<` can't end the script element it is in).
+  const uiChannels = JSON.stringify(
+    DEV_CHANNELS.map(({ name, title, adapter }) => ({ name, title, listing: adapter.listing })),
+  ).replaceAll("<", "\\u003c");
   const uiLoginLink = () => `${options.urls().control}/?login=${ui.issueCode()}`;
   registerRoute(control, {
     method: "post",
@@ -486,7 +491,12 @@ export function createApp(options: AppOptions): App {
       "content-security-policy",
       `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
     );
-    return c.html(options.ui.replaceAll("__NONCE__", nonce).replaceAll("__SESSION__", sessions.open("dev").id));
+    return c.html(
+      options.ui
+        .replaceAll("__NONCE__", nonce)
+        .replaceAll("__SESSION__", sessions.open("dev").id)
+        .replaceAll('["__CHANNELS__"]', uiChannels),
+    );
   });
   for (const driver of drivers) root.route(`/${driver.name}`, driver.fake.api);
   /** The fakes whose SDKs call paths at the server's root (`googleapis`), by those paths. */
