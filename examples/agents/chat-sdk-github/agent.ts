@@ -39,6 +39,8 @@ const octokit = (installationId: number) =>
   });
 
 bot.onNewMention(async (thread, message) => {
+  // Another App's mention gets no answer, as the Probot agent's doesn't: two agents would answer each other.
+  if (message.author.isBot === true) return;
   const { owner, repo, prNumber, reviewCommentId, type } = github.decodeThreadId(thread.id);
   // A mention in a thread on the diff is answered there.
   if (reviewCommentId !== undefined) return void (await thread.post(agent.words.thread));
