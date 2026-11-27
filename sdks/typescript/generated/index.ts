@@ -1028,6 +1028,47 @@ export interface GoogleApiCall {
   error?: string;
 }
 
+export type Places = Place[];
+
+export type PlacesWire = PlaceData[];
+
+function decodePlaces(ctx: HandleContext, data: PlacesWire): Places {
+  return data.map((item) => new Place(ctx, item));
+}
+
+export interface PlaceTranscript {
+  entries: PlaceTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface PlaceTranscriptWire {
+  entries: PlaceTranscriptEntry[];
+  text: string;
+}
+
+function decodePlaceTranscript(_ctx: HandleContext, data: PlaceTranscriptWire): PlaceTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface PlaceTranscriptEntry {
+  id: string;
+  author: PlacePrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+  streaming?: "open" | "stopped" | "completed";
+  visibleTo?: PlacePrincipal;
+}
+
+export interface PlacePrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
+}
+
 export interface UiLoginLink {
   url: string;
 }
@@ -1165,6 +1206,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google`)) as GoogleFixtureData;
     return new GoogleFixture(ctx, data);
+  }
+
+  /** Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last. Experimental. */
+  async places(): Promise<Places> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/places`)) as PlacesWire;
+    return decodePlaces(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -2116,7 +2164,7 @@ export class GitHubFixture {
     return decodeGitHubRepos(ctx, data);
   }
 
-  /** The issues and pull requests in this session's repositories, oldest first. Experimental. */
+  /** The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last. Experimental. */
   async issues(): Promise<GitHubIssues> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/issues`)) as GitHubIssuesWire;
@@ -2921,7 +2969,7 @@ export class LinearFixture {
     return new LinearTeam(ctx, data);
   }
 
-  /** The issues in this session's teams, oldest first. Experimental. */
+  /** The issues in this session's teams, read again from Linear live, oldest first. Experimental. */
   async issues(): Promise<LinearIssues> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues`)) as LinearIssuesWire;
@@ -3572,7 +3620,7 @@ export class NotionFixture {
     return decodeNotionUsers(ctx, data);
   }
 
-  /** The pages this session created, a database's rows included, oldest first. Not those in the trash. Experimental. */
+  /** The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash. Experimental. */
   async pages(): Promise<NotionPages> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages`)) as NotionPagesWire;
@@ -4775,6 +4823,46 @@ export class GoogleDelivery {
       const value = await this.refresh();
       return value.status === "pending" ? undefined : value;
     }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link Place}. */
+export interface PlaceData {
+  channel: string;
+  title: string;
+  id: string;
+  name: string;
+  active?: string;
+}
+
+export class Place {
+  readonly channel: string;
+  readonly title: string;
+  readonly id: string;
+  readonly name: string;
+  readonly active: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: PlaceData) {
+    this.#ctx = ctx;
+    this.channel = data.channel;
+    this.title = data.title;
+    this.id = data.id;
+    this.name = data.name;
+    this.active = data.active;
+  }
+
+  /** A place as a person reads it: the transcript its channel's own transcript route has. Experimental. */
+  async transcript(): Promise<PlaceTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/places/${segment(this.channel)}/${segment(this.id)}/transcript`)) as PlaceTranscriptWire;
+    return decodePlaceTranscript(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

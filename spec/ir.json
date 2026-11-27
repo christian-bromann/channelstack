@@ -499,6 +499,35 @@
             "cross_workspace_credential"
           ],
           "dispose": false
+        },
+        {
+          "name": "places",
+          "kind": "method",
+          "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/places",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "Places"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -4817,7 +4846,7 @@
         {
           "name": "issues",
           "kind": "method",
-          "summary": "The issues and pull requests in this session's repositories, oldest first",
+          "summary": "The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -9085,7 +9114,7 @@
         {
           "name": "issues",
           "kind": "method",
-          "summary": "The issues in this session's teams, oldest first",
+          "summary": "The issues in this session's teams, read again from Linear live, oldest first",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -11963,7 +11992,7 @@
         {
           "name": "pages",
           "kind": "method",
-          "summary": "The pages this session created, a database's rows included, oldest first. Not those in the trash",
+          "summary": "The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash",
           "stability": "experimental",
           "http": {
             "verb": "GET",
@@ -16808,6 +16837,92 @@
       ]
     },
     {
+      "name": "Place",
+      "idFields": [
+        "channel",
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "channel",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "active",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "A place as a person reads it: the transcript its channel's own transcript route has",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/places/{channel}/{place}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "place",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "PlaceTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ]
+    },
+    {
       "name": "GitHubPullRequest",
       "idFields": [
         "repoId",
@@ -20272,6 +20387,157 @@
               "kind": "string"
             },
             "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Places",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "Place"
+        }
+      }
+    },
+    {
+      "name": "PlaceTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "PlaceTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "PlaceTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "PlacePrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "streaming",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "open",
+                "stopped",
+                "completed"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "visibleTo",
+            "type": {
+              "kind": "named",
+              "name": "PlacePrincipal"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlacePrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
           }
         ]
       }

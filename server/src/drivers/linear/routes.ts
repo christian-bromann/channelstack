@@ -358,7 +358,7 @@ export function registerLinearRoutes(
   router.route({
     method: "get",
     path: "/issues",
-    summary: "The issues in this session's teams, oldest first",
+    summary: "The issues in this session's teams, read again from Linear live, oldest first",
     response: z
       .array(
         z
@@ -368,8 +368,11 @@ export function registerLinearRoutes(
       .openapi("LinearIssues"),
     sdkMethod: { on: "LinearFixture", name: "issues" },
     stability,
-    handler: ({ session }) =>
-      store.issues.list(session.id).map((issue) => ({ issue: issueWire(issue), title: issue.title })),
+    handler: async ({ session }) => {
+      const issues = store.issues.list(session.id);
+      for (const issue of issues) await world.refresh(session.id, { issue: issue.id });
+      return issues.map((issue) => ({ issue: issueWire(issue), title: issue.title }));
+    },
   });
 
   router.route({

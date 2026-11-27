@@ -564,7 +564,8 @@ export function registerGitHubRoutes(
   router.route({
     method: "get",
     path: "/issues",
-    summary: "The issues and pull requests in this session's repositories, oldest first",
+    summary:
+      "The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last",
     response: z
       .array(
         z
@@ -578,10 +579,14 @@ export function registerGitHubRoutes(
       .openapi("GitHubIssues"),
     sdkMethod: { on: "GitHubFixture", name: "issues" },
     stability,
-    handler: ({ session }) =>
-      store.issues
-        .list(session.id)
-        .map((issue) => ({ issue: issueWire(issue), title: issue.title, pullRequest: issue.pull !== undefined })),
+    handler: async ({ session }) => {
+      const issues = store.issues.list(session.id);
+      for (const issue of issues) await world.refresh(session.id, issue);
+      // A comment updates its issue, as on GitHub: the most recently active is listed last.
+      return issues
+        .toSorted((a, b) => a.updatedAt - b.updatedAt)
+        .map((issue) => ({ issue: issueWire(issue), title: issue.title, pullRequest: issue.pull !== undefined }));
+    },
   });
 
   router.route({

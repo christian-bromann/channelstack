@@ -369,11 +369,18 @@ describe("the UI", () => {
     const transcript = `${slack}/conversations/${channel.id}/transcript`;
     expect((await h.call("GET", transcript)).body.text).toBe(`Ana: my token is ${botToken}`);
     expect(((await (await as("GET", transcript)).json()) as { text: string }).text).toBe("Ana: my token is [redacted]");
+    // The UI lists every channel's places through the dev tools' own routes, scrubbed the same way.
+    const places = (await (await as("GET", `/sessions/${sessionId}/places`)).json()) as Array<Record<string, unknown>>;
+    expect(places).toEqual([expect.objectContaining({ channel: "slack", title: "Slack", id: channel.id })]);
+    const read = await as("GET", `/sessions/${sessionId}/places/slack/${channel.id}/transcript`);
+    expect(((await read.json()) as { text: string }).text).toBe("Ana: my token is [redacted]");
 
     // Not the agent's tokens, and no writes: a page that tricks the browser into a request gains nothing.
     for (const [method, path] of [
       ["GET", "/env"],
       ["GET", `/sessions/${sessionId}/slack`],
+      // A channel's own lists hold its handles, and the app's carries its credentials in the fake.
+      ["GET", `/sessions/${sessionId}/github/issues`],
       ["POST", "/sessions"],
       ["POST", "/reset"],
       ["POST", "/ui/login-links"],

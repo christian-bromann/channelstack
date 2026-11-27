@@ -317,6 +317,20 @@ fn run_session_google<'a>(
     })
 }
 
+fn run_session_places<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/places", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_echo_fixture_create_user<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6815,6 +6829,25 @@ fn run_google_delivery_resend<'a>(
     })
 }
 
+fn run_place_transcript<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/places/{}/{}/transcript",
+            encode_segment(ctx.session()?),
+            path_value(&me["channel"])?,
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_git_hub_pull_request_refresh<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -7246,6 +7279,11 @@ impl Session {
             run_session_google,
             GoogleFixture::wrap,
         )
+    }
+
+    /// Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last. Experimental.
+    pub fn places(&self) -> Call<Value> {
+        Call::new(&self.ctx, &self.data, vec![], run_session_places, as_value)
     }
 }
 
@@ -10452,7 +10490,7 @@ impl GitHubFixture {
         )
     }
 
-    /// The issues and pull requests in this session's repositories, oldest first. Experimental.
+    /// The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last. Experimental.
     pub fn issues(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -13090,7 +13128,7 @@ impl LinearFixture {
         ))
     }
 
-    /// The issues in this session's teams, oldest first. Experimental.
+    /// The issues in this session's teams, read again from Linear live, oldest first. Experimental.
     pub fn issues(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -15309,7 +15347,7 @@ impl NotionFixture {
         )
     }
 
-    /// The pages this session created, a database's rows included, oldest first. Not those in the trash. Experimental.
+    /// The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash. Experimental.
     pub fn pages(&self) -> Call<Value> {
         Call::new(
             &self.ctx,
@@ -19600,6 +19638,101 @@ impl IntoFuture for GoogleDeliverySettled {
     }
 }
 
+/// A handle: `Place`.
+#[derive(Clone)]
+pub struct Place {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for Place {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl Place {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `channel`.
+    pub fn channel(&self) -> String {
+        self.data
+            .get("channel")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `title`.
+    pub fn title(&self) -> String {
+        self.data
+            .get("title")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `name`.
+    pub fn name(&self) -> String {
+        self.data
+            .get("name")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `active`.
+    pub fn active(&self) -> Option<String> {
+        self.data
+            .get("active")
+            .and_then(|v| v.as_str().map(str::to_owned))
+    }
+
+    /// A place as a person reads it: the transcript its channel's own transcript route has. Experimental.
+    pub fn transcript(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_place_transcript,
+            as_value,
+        )
+    }
+}
+
 /// A handle: `GitHubPullRequest`.
 #[derive(Clone)]
 pub struct GitHubPullRequest {
@@ -20055,6 +20188,9 @@ pub async fn call_by_name(
         }
         ("Session", "google") => {
             run_session_google(&target.ctx, &target.data, args, options).await?
+        }
+        ("Session", "places") => {
+            run_session_places(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "createUser") => {
             run_echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
@@ -20714,6 +20850,9 @@ pub async fn call_by_name(
         }
         ("GoogleDelivery", "resend") => {
             run_google_delivery_resend(&target.ctx, &target.data, args, options).await?
+        }
+        ("Place", "transcript") => {
+            run_place_transcript(&target.ctx, &target.data, args, options).await?
         }
         ("GitHubPullRequest", "refresh") => {
             run_git_hub_pull_request_refresh(&target.ctx, &target.data, args, options).await?

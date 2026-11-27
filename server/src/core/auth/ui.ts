@@ -9,7 +9,8 @@ export const UI_COOKIE = "channelstack_ui";
  * `/env` or a fixture (they return the agent's tokens), and it can't change anything, so a
  * page that tricks the browser into a request gains nothing.
  */
-const UI_READS = /^\/(status|sessions\/[^/]+\/(events|quiet|[a-z]+\/(users|conversations)(\/.*)?))$/;
+const UI_READS =
+  /^\/(status|sessions\/[^/]+\/(events|quiet|places(\/[a-z]+\/[^/]+\/transcript)?|[a-z]+\/(users|conversations)(\/.*)?))$/;
 
 /**
  * Browser access to the UI. The server prints a one-time login link; opening it trades the code

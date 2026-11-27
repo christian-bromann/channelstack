@@ -27,8 +27,10 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
   person says, replies and reacts there, and which handles an entry stands for (`refs`).
 - **Written once in the kit:** a person by name, made on first use; a place by name, made on first
   use; `last` (the newest entry of the most recently active place, by the transcripts' times, of
-  equal times the one listed later; Slack says which entry is newest itself, `newest`); references,
+  equal times the one listed later, so GitHub's list is the most recently updated last; Slack says
+  which entry is newest itself, `newest`); references,
   `<place>:<entry>` with the ids `show --json` lists, or a place by name; and who started a thread.
+  Times are compared as instants: channels write them to different precisions.
 - **List routes, one per channel and kind:** `GET /users` on every channel, GitHub's `/repos` and
   `/issues`, Linear's `/teams` and `/issues`, Notion's `/pages`, the email channels' `/threads`.
   Slack had `/users` and `/conversations`. They are fixture reads in the SDKs too
@@ -50,8 +52,12 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
   target's handle, and a reference the action needs and wasn't given is filled from the target (the
   entry `--on` names, the newest one `--in` a place, or `last`), as is the place itself when the
   action takes it and no reference was given. Without `--as`, whoever started the target's thread acts.
-- **The UI lists every channel** from the same `listing` declarations, which the server puts into
-  the page as JSON. Its controls stay read-only.
+- **The UI lists every channel** through two control routes the server answers with the same
+  adapters (`core/dev/routes.ts`, calling each channel's control API in process): `GET
+  /sessions/{session}/places`, every channel's places in the order `last` reads them (the most
+  recently active last), and `GET /sessions/{session}/places/{channel}/{place}/transcript`. They are
+  SDK reads too (`session.places()`, `place.transcript()`), and the only new routes a UI login may
+  read. So the page has no copy of `last` or of the listings. Its controls stay read-only.
 - **`pnpm check:channels` requires the adapter** for every channel, and a case for it in
   `server/src/cli/dev.test.ts`, which drives say, reply, react, show and an action of each channel
   against the server in memory.
@@ -78,5 +84,7 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
 - **Generate the shared verbs too**, from a marker on the routes (`x-channelstack-dev: say`). Rejected
   for now: which route is a channel's "say" depends on whether the place exists yet (GitHub opens an
   issue or comments on it), which is code, not a marker.
-- **The UI reads a new control route** that runs the adapters on the server. Rejected: a route only
-  the UI needs, in every SDK; the listing declarations are plain data the page can read itself.
+- **The UI reads each channel's list routes itself**, with the adapters' listings put into the page
+  as JSON (the first round of this PR). Rejected in review: the page then had a second `last`, which
+  already differed from the kit's, and a browser login would have to read every channel's lists,
+  whose handles carry the app's credentials in the fake.

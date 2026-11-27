@@ -8,6 +8,8 @@ import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
 import { type Clock, systemClock, systemTimers, type Timers } from "./core/clock/index.ts";
 import { DeliveryQueue } from "./core/delivery/index.ts";
+import type { DevApi } from "./core/dev/index.ts";
+import { registerPlaceRoutes } from "./core/dev/routes.ts";
 import { CORE_ERRORS, ProtocolError } from "./core/errors/index.ts";
 import { EventLog, WORLD_SCOPE } from "./core/events/index.ts";
 import { IdGenerator } from "./core/ids/index.ts";
@@ -448,11 +450,30 @@ export function createApp(options: AppOptions): App {
     driver.routes(new DriverRouter(control, driver.name, sessions, definition.live ? () => reality : undefined));
   });
 
-  // What the UI lists: each channel's places as its dev adapter declares them, as JSON in the page
-  // (a `<` can't end the script element it is in).
-  const uiChannels = JSON.stringify(
-    DEV_CHANNELS.map(({ name, title, adapter }) => ({ name, title, listing: adapter.listing })),
-  ).replaceAll("<", "\\u003c");
+  // Every channel's places as the dev tools name them, for the UI: each channel's control API,
+  // called in process with the server's own token.
+  registerPlaceRoutes(control, {
+    sessions,
+    channels: DEV_CHANNELS,
+    api: (session, channel): DevApi => {
+      const call = async <T>(method: string, path: string, body?: unknown): Promise<T> => {
+        const response = await control.request(`/sessions/${encodeURIComponent(session)}/${channel}${path}`, {
+          method,
+          headers: {
+            authorization: `Bearer ${options.token}`,
+            ...(body === undefined ? {} : { "content-type": "application/json" }),
+          },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        });
+        const data = (await response.json()) as T & { error?: string; message?: string };
+        if (!response.ok) {
+          throw new ProtocolError({ platform: data.error ?? "internal", status: response.status }, data.message ?? "");
+        }
+        return data;
+      };
+      return { get: (path) => call("GET", path), post: (path, body) => call("POST", path, body) };
+    },
+  });
   const uiLoginLink = () => `${options.urls().control}/?login=${ui.issueCode()}`;
   registerRoute(control, {
     method: "post",
@@ -491,12 +512,7 @@ export function createApp(options: AppOptions): App {
       "content-security-policy",
       `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
     );
-    return c.html(
-      options.ui
-        .replaceAll("__NONCE__", nonce)
-        .replaceAll("__SESSION__", sessions.open("dev").id)
-        .replaceAll('["__CHANNELS__"]', uiChannels),
-    );
+    return c.html(options.ui.replaceAll("__NONCE__", nonce).replaceAll("__SESSION__", sessions.open("dev").id));
   });
   for (const driver of drivers) root.route(`/${driver.name}`, driver.fake.api);
   /** The fakes whose SDKs call paths at the server's root (`googleapis`), by those paths. */

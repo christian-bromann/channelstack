@@ -7286,6 +7286,141 @@
           "responseStatus"
         ]
       },
+      "Places": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Place"
+        }
+      },
+      "Place": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "The channel's name as people write it: `GitHub`."
+          },
+          "id": {
+            "type": "string",
+            "description": "How a reference writes it: `<id>:<entry id>` names one of its entries."
+          },
+          "name": {
+            "type": "string",
+            "description": "What a person calls it: `#support`, an issue's or a page's title, a subject."
+          },
+          "active": {
+            "type": "string",
+            "description": "When its newest entry was written. Absent while nothing was said in it."
+          }
+        },
+        "required": [
+          "channel",
+          "title",
+          "id",
+          "name"
+        ],
+        "x-channelstack-resource": {
+          "id": [
+            "channel",
+            "id"
+          ]
+        }
+      },
+      "PlaceTranscript": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceTranscriptEntry"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcript as plain text, one entry per line."
+          }
+        },
+        "required": [
+          "entries",
+          "text"
+        ],
+        "x-channelstack-string": "text"
+      },
+      "PlaceTranscriptEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/PlacePrincipal"
+          },
+          "at": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "edited": {
+            "type": "boolean"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "streaming": {
+            "type": "string",
+            "enum": [
+              "open",
+              "stopped",
+              "completed"
+            ],
+            "description": "A message the agent streams (Slack)."
+          },
+          "visibleTo": {
+            "$ref": "#/components/schemas/PlacePrincipal"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "at",
+          "text",
+          "controls",
+          "edited",
+          "depth"
+        ]
+      },
+      "PlacePrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "app"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ]
+      },
       "UiLoginLink": {
         "type": "object",
         "properties": {
@@ -12534,7 +12669,7 @@
     },
     "/sessions/{session}/github/issues": {
       "get": {
-        "summary": "The issues and pull requests in this session's repositories, oldest first",
+        "summary": "The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last",
         "security": [
           {
             "bearer": []
@@ -17852,7 +17987,7 @@
     },
     "/sessions/{session}/linear/issues": {
       "get": {
-        "summary": "The issues in this session's teams, oldest first",
+        "summary": "The issues in this session's teams, read again from Linear live, oldest first",
         "security": [
           {
             "bearer": []
@@ -21202,7 +21337,7 @@
     },
     "/sessions/{session}/notion/pages": {
       "get": {
-        "summary": "The pages this session created, a database's rows included, oldest first. Not those in the trash",
+        "summary": "The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash",
         "security": [
           {
             "bearer": []
@@ -26483,6 +26618,135 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GoogleApiCalls"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/places": {
+      "get": {
+        "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Session",
+          "name": "places"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Places"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/places/{channel}/{place}/transcript": {
+      "get": {
+        "summary": "A place as a person reads it: the transcript its channel's own transcript route has",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "Place",
+          "name": "transcript",
+          "bind": {
+            "channel": "channel",
+            "place": "id"
+          }
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channel",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "place",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceTranscript"
                 }
               }
             }
