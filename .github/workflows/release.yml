@@ -123,7 +123,7 @@ jobs:
           if ($out -ne $env:VERSION) { throw "channelstack.exe --version said '$out', not '$env:VERSION'" }
 
   packages:
-    # Everything that isn't a binary, built and checked the way the registries will take it.
+    # Everything that isn't a binary, built as the registries will take it.
     name: npm, PyPI and crates.io packages
     needs: check
     runs-on: ubuntu-latest
@@ -139,8 +139,8 @@ jobs:
           mkdir -p dist/packs
           npm pack ./sdks/typescript --pack-destination dist/packs
           # Packed, not checked against the registry, so the whole run can be run again after npm has
-          # published: CI's `packaging` job installs this package on every pull request, and the npm
-          # job skips a version npm has already.
+          # published: CI's `packaging` job packs and installs a build of the same package on every
+          # pull request, and the npm job skips a version npm has already.
           test -f "dist/packs/channelstack-$VERSION.tgz"
       # The same two steps run in ci.yml's `packages` job on every pull request: change both.
       - name: PyPI, channelstack and pytest-channelstack
