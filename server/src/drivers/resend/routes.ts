@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { registerEmailRoutes } from "../../core/email/routes.ts";
 import type { EventLog } from "../../core/events/index.ts";
@@ -9,12 +10,14 @@ import { apiCallSchema, DeliveryAttempt, DeliveryStatus } from "../../core/route
 import type { ResendWorld } from "./backend.ts";
 import type { FakeResendWorld } from "./fake/world.ts";
 import { RESEND_API } from "./live/client.ts";
-import type { ResendEmailRecord } from "./world.ts";
+import type { ResendAppRecord, ResendEmailRecord } from "./world.ts";
 
 const ResendDelivery = z
   .object({
     id: z.string().openapi({ description: "The webhook message's id (`svix-id`)." }),
     channel: z.literal("resend"),
+    /** The app whose team's webhook it went to, by name: `my-agent`, or one a test made. */
+    app: z.string(),
     type: z.string().openapi({ description: "`email.received`, `email.sent`, `email.delivered`, `email.bounced`, …" }),
     email: z.string().openapi({ description: "The email the event is about." }),
     payload: z.unknown(),
@@ -50,6 +53,7 @@ export function registerResendRoutes(
   const deliveryWire = ({ request, attempts }: DeliveryView) => ({
     id: request.id,
     channel: "resend" as const,
+    app: request.app ?? BUILT_IN_APP,
     type: request.type,
     email: String(request.meta?.email ?? ""),
     payload: request.meta?.payload,
@@ -75,6 +79,42 @@ export function registerResendRoutes(
         deps.live || email.delivery === undefined
           ? undefined
           : deliveryWire(fake.delivery(session, email.delivery) as DeliveryRecord),
+      // The first webhook the email caused at that app's team: `email.received`, or for its sender `email.sent`.
+      wireFor: (session, email, app) => {
+        const found = fake
+          .deliveries(session)
+          .find(({ request }) => (request.app ?? BUILT_IN_APP) === app && request.meta?.email === email.id);
+        return found === undefined ? undefined : deliveryWire(found);
+      },
+    },
+    // What the sender set itself: the agent's own headers (`Auto-Submitted`), by lower-case name.
+    headers: (email) =>
+      Object.fromEntries(Object.entries(email.headers).map(([name, value]) => [name.toLowerCase(), value])),
+    apps: {
+      options: {
+        domain: z.string().optional().openapi({
+          description:
+            "The team's receiving domain, which no other team has. Default `<name>.acme.example`; its address is `<name>@<domain>`.",
+        }),
+      },
+      fields: {
+        shape: {
+          domain: z.string().openapi({ description: "The team's domain: it sends and receives there." }),
+          apiKey: z.string().openapi({ description: "The team's API key (`RESEND_API_KEY`). Fake only: empty live." }),
+          webhookSecret: z
+            .string()
+            .openapi({ description: "Its webhook's signing secret (`RESEND_WEBHOOK_SECRET`). Fake only: empty live." }),
+        },
+        // A live team's key stays on the server: the control API never returns it.
+        wire: (app: ResendAppRecord) => ({
+          domain: app.domain,
+          ...(deps.live ? { apiKey: "", webhookSecret: "" } : fake.credentials(app)),
+        }),
+      },
+      create: (session, input) =>
+        fake.createApp(session, { name: input.name, domain: input.domain as string | undefined }),
+      send: (session, app, input) => fake.sendAs(session, app, input),
+      reply: (session, app, to, input) => fake.replyAs(session, app, to, input),
     },
   });
 

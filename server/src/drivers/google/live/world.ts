@@ -401,7 +401,7 @@ export function createLiveGoogleWorld(deps: {
     /** The labels of the email's copy in the agent's mailbox, as the last read found them. */
     labelsOf: (email: GoogleEmailRecord) => agentLabels.get(email.id) ?? [],
 
-    principalOf: (email: GoogleEmailRecord) => emailAuthor(email, store.app, (id) => store.users.find(id)),
+    principalOf: (email: GoogleEmailRecord) => emailAuthor(email, store.apps.all(), (id) => store.users.find(id)),
 
     /** Whose credential removes a ledger entry: the agent's (`app`), or a person's of the session. */
     credential: (owner: string, session: string) => (owner === "app" ? app : people.byOwner(session, owner)),

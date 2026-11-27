@@ -25,7 +25,7 @@ type ForgeOption = "badSignature" | "stale" | "wrongAudience" | "headers";
 
 /** What the routes read of a delivery: the fake's whole record, or what a live platform's log says (GitHub's). */
 export type DeliveryView = Pick<DeliveryRecord, "attempts"> & {
-  request: Pick<DeliveryRecord["request"], "id" | "type" | "meta">;
+  request: Pick<DeliveryRecord["request"], "id" | "type" | "meta" | "app">;
 };
 
 /** A channel's deliveries, as its routes read and resend them: the fake's, or a live platform's log. */

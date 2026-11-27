@@ -30,6 +30,28 @@ export interface MimeMessage {
   readonly references: readonly string[];
 }
 
+/** The fields a message is made of, which `composeMime` writes from the message itself. */
+const MESSAGE_FIELDS = new Set([
+  "from",
+  "to",
+  "cc",
+  "bcc",
+  "reply-to",
+  "subject",
+  "date",
+  "message-id",
+  "in-reply-to",
+  "references",
+]);
+
+/**
+ * The headers a sender set of its own (`Auto-Submitted`, `X-…`), without the message's own fields,
+ * which the message carries already: what `composeMime` takes as `headers`.
+ */
+export function ownHeaders(headers: Readonly<Record<string, string>>): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !MESSAGE_FIELDS.has(name.toLowerCase())));
+}
+
 /**
  * Build a message: the bytes a mail server would send, CRLF line ends, `Date` at `at`, and any
  * `headers` of its own. Its attachments are parts of their own (`multipart/mixed`), one with a
