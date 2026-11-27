@@ -75,6 +75,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; the pytest integration; MCP drives a conversation |
 | 8 | The channel kit, the email core and Resend | Every channel is on the kit; all fake Resend examples and `resendChecks()` pass; Resend passes live |
 | 9 | Google (Gmail) | All fake Google examples and `googleChecks()` pass on the kit; Gmail passes live |
+| 12 | Any number of agent apps per channel | Every channel's "several apps" examples pass against two agents; the reply loop is caught on every channel; no existing test changed |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
 
@@ -350,6 +351,44 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ---
 
+## Phase 12: any number of agent apps per channel
+
+[Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 starts once phases 10 (Twilio) and 11 (Discord) are merged, and covers all eight channels. Its open questions are answered by the maintainer before it starts, or it takes their defaults.
+
+**Build:**
+- **Apps by name, on every channel and echo:** `createApp({ name, … })` and `apps()` on each fixture; apps in the shared world, ids derived from `CHANNELSTACK_SEED` and the name, secrets per app in `secrets.json`, `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `channelstack env --app` and `channelstack.env({ app })`.
+- **Each fake answers and delivers per app:** each token answers as its app; each delivery goes to one app, signed with its secret, at its URL or connection (Socket Mode, the Gateway), with `deliveries({ app })` and `msg.deliveryFor(app)`; faults and Slack's `uninstallApp` take an app.
+- **What one app's actions send the others,** per channel, as the decision's tables say, including what the platforms refuse between bots (`cannot_dm_bot`, Discord's 50007, interactions and agent sessions of one app only).
+- **Scripted apps:** an extra app's handle has the acting methods a person has on its channel, through the fake's API with the app's token; refused for `my-agent`.
+- **The reply loop:** `toGoQuiet` in matchers-core, the pytest `expect` and the Rust crate; the loop guard and its `bot_loop` event; `<channel>.no-reply-loop` in every `<channel>Checks()`, and a variant of each broken agent that answers every app.
+- **Matchers and transcripts:** authors resolved among all of a channel's apps and people; the UI shows each app and its deliveries.
+- **The examples:** a `describe("several apps")` block in each `test/acceptance/examples/<channel>.test.ts`, run against two instances of the channel's reference agent, as `my-agent` and as a second app, both in `scripts/lib/channels.ts`.
+- **Live:** per-app credentials (`CHANNELSTACK_<CHANNEL>_APP_<NAME>_*`), checked when the app is made; the second sandbox apps of the channels the maintainer chooses, their agents deployed with public URLs, and their Request URLs on the nightly run's internal receivers for B1–B9.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 12.1 | Nothing that exists changed | Every example, check suite and smoke scenario passes as before, and `git diff phase-12-start -- test/acceptance/examples scenarios` only adds lines: no existing test was edited to pass |
+| 12.2 | Every channel's "several apps" examples pass | The `describe("several apps")` blocks of all eight example files, except "live mode", against two instances of each reference agent |
+| 12.3 | The platforms' bot-to-bot rules | Integration tests per channel, one per row of the decision's "what it hears from another app" and "what another app can't do": the event is sent with the platform's fields (`bot_id`, `app_id`, `sender.type: "Bot"`, `authors[].type: "bot"`, `author.bot`), or the action is refused with the platform's code, and every webhook validates against the channel's schema |
+| 12.4 | Each app is signed for alone | Delivery cases A1–A3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with each channel's official receiver |
+| 12.5 | Credentials per app | Unit tests: an app's secrets are made once, kept in `secrets.json` (0600), the same after a restart and new after `secrets rotate`; the same seed and name give the same ids in any order of creation; `channelstack env --app coder` prints the app's variables under `my-agent`'s keys; `pnpm test:redaction` runs with two apps per channel |
+| 12.6 | The loop is caught | Against each channel's broken variant, `<channel>.no-reply-loop` fails with a message naming the authors in turn, and `toGoQuiet` fails the same way; against the reference agent both pass. Two looping agents trip the guard, which stops the deliveries, records `bot_loop` and fails the test |
+| 12.7 | Checks run against any app | `<channel>Checks({ app: "coder" })` passes for every channel against the reference agent driving `coder` |
+| 12.8 | Every SDK | `scenarios/smoke/apps.yaml` (two echo apps, a scripted app's message, `toGoQuiet`) passes through the TypeScript, Python and Rust SDKs against the binary |
+| 12.9 | The kit holds | `pnpm check:channels` requires each channel's apps routes, per-app env, delivery cases A1–A3, "several apps" examples and `no-reply-loop`, and passes |
+| 12.10 | Parallel sessions stay apart | 20 copies of a two-app Slack test and a two-App GitHub test run in parallel and pass, with no delivery from one session's conversation in another's |
+| 12.11 | Live | The "live mode" part of the "several apps" blocks passes nightly on the channels with second sandbox apps; B1–B9 are answered in the reality matrix's "Still to confirm" list, and the fake follows the answers |
+
+**Docs to update:**
+- `AGENTS.md` (the "Test API" row: already done with decision 0027), README, `index.html` and the skill;
+- `devx.md` section 3 and the `channelstack env` section, `architecture.md` (the world holds apps; the id table's app ids per app), `implementation-plan.md` (the no-config-file lines), `live-mode.md` (per-app credentials and the spike), decision 0013 (one installation per App);
+- reality-matrix (a "several apps" row per channel, B1–B9), `code-map.md`, `adding-a-channel.md` (apps in the checklist);
+- the website: the environment-variable reference, "How it works", "Writing tests", "Standard checks", each platform page, and a guide to testing agents together.
+
+---
+
 ## After 0.1
 
 Discord and Stripe drivers, more email providers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
@@ -387,5 +426,8 @@ Checks that each fake sends deliveries the platform's **official** receiver acce
 | M1 | `google-auth-library`'s `verifyIdToken` accepts a Pub/Sub push token against the fake's certificates, with the push endpoint as audience | phase 9 |
 | M2 | A token for another audience, or signed by another key, is rejected | phase 9 |
 | M3 | An expired token is rejected | phase 9 |
+| A1 | On every channel, an event two apps hear is two deliveries, each with its own id and signed with its own app's secret (GitHub: its own `installation.id` and `X-GitHub-Hook-Installation-Target-ID`; Google: its own push audience). Each app's official receiver (Bolt, `@octokit/webhooks`, `LinearWebhookClient`, `verifyWebhookSignature`, the `resend` SDK's `webhooks.verify`, `verifyIdToken`, `twilio`'s `validateRequest`, `discord-interactions`'s `verifyKey`) accepts its own and rejects the other's | phase 12 |
+| A2 | Bolt with `ignoreSelf` drops the app's own message, and hands another app's (`bot_id`, `app_id`, `bot_profile`, no subtype) to the message handler; Probot receives an `issue_comment` by `other[bot]` with `sender.type: "Bot"` | phase 12 |
+| A3 | Two apps connected at once, over Socket Mode (Bolt) and the Gateway (discord.js), each get only their own envelopes and dispatches, and an ack or a reply on one connection is never taken as the other's | phase 12 |
 
 Side finding: Bolt with a single `token` calls `auth.test` on every incoming request, so the Slack fake serves `auth.test` from phase 1.

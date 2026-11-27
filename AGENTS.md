@@ -99,7 +99,8 @@ Don't reopen these without asking.
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |
 | Default mode | Base-URL mode through portless. Proxy mode is opt-in |
-| Test API | Actor-first: `ana.say(text, { channel })`. Resources are only read and waited on. Users are created per test (`createUser`); there is no config file (each fake has a built-in app named `my-agent`, and `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` says where its events go); the app joins conversations explicitly (`participants: [ana, slack.app]`) |
+| Test API | Actor-first: `ana.say(text, { channel })`. Resources are only read and waited on. Users are created per test (`createUser`); there is no config file (each fake has a built-in app named `my-agent`, and `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` says where its events go); apps join conversations explicitly (`participants: [ana, slack.app]`) |
+| Apps | A channel holds any number of apps, each a real app of its platform with its own identity, credentials and endpoint (`createApp({ name })`, `participants: [ana, slack.app, coder]`; `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, `channelstack env --app <name>`). `my-agent` stays the default, and apps belong to the shared world, not to a session. [Decision 0027](docs/decisions/0027-multiple-apps.md), reopened on the maintainer's instruction; built in phase 12 |
 | Ids | Every handle uses the platform's own id format, in fake mode too (architecture.md 3.2) |
 | Tests | Integrate into Vitest and pytest with fixtures and matchers. No separate test package, no own runner. No Jest ([decision 0017](docs/decisions/0017-no-jest.md)) |
 | Models | channelstack doesn't mock LLMs. Agents use their framework's own fake model |
@@ -117,6 +118,7 @@ These are for the maintainer. Don't decide them alone; ask, or flag them in the 
 | # | Question | Default if unanswered |
 |---|---|---|
 | D5 | License | MIT |
+| D6 | Multiple apps: the loop guard, `createApp({ webhookUrl })`, the app limit, scripted apps, Slack's scripted bots, Resend teams, Twilio subaccounts, which channels get live sandbox apps | The defaults in [decision 0027](docs/decisions/0027-multiple-apps.md#open-questions-for-the-maintainer) |
 
 ## Conventions
 
