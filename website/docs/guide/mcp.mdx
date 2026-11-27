@@ -33,42 +33,41 @@ npx channelstack env > .env.local    # then start the bot with it
 
 ## The tools
 
-Every tool acts in the shared `dev` session, the same one the CLI and the UI use, and prints what the matching CLI command prints.
+Every tool acts in the shared `dev` session, the same one the CLI and the UI use, and prints what the matching CLI command prints. Every channel has the same tools ([decision 0027](https://github.com/christian-bromann/channelstack/blob/main/docs/decisions/0027-dev-tools-on-every-channel.md)): `channel` is `slack`, `github`, `linear`, `notion`, `resend` or `google`.
 
 | Tool              | Inputs                                                                          | Same as                                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `slack_say`       | `as`, `channel` (e.g. `"#support"`), `text`                                     | `channelstack slack say`                                                                                      |
-| `slack_reply`     | `as`, `text`, `thread`?                                                         | `channelstack slack reply`                                                                                    |
-| `slack_react`     | `as`, `emoji` (e.g. `":eyes:"`), `on`?                                          | `channelstack slack react`                                                                                    |
-| `slack_click`     | `as`, `label` (the button's label)                                              | `channelstack slack click`                                                                                    |
-| `slack_stop`      | `as`?, `thread`?                                                                | `channelstack slack stop`                                                                                     |
-| `show_thread`     | `thread`?, `json`?                                                              | `channelstack show`                                                                                           |
+| `say`             | `channel`, `as`, `in` (a place by name, e.g. `"#support"`), `text`              | `channelstack <channel> say`                                                                                  |
+| `reply`           | `channel`, `as`, `text`, `to`?                                                  | `channelstack <channel> reply`                                                                                |
+| `react`           | `channel`, `as`, `emoji` (e.g. `":eyes:"`), `on`?                               | `channelstack <channel> react` (Slack, GitHub and Linear)                                                     |
+| `show`            | `channel`?, `in`?, `thread`?, `json`?                                           | `channelstack <channel> show`; without `channel`, `channelstack show`                                         |
+| `<channel>_act`   | `action`, `params`?, `as`?, `in`?, `on`?                                        | `channelstack <channel> <action>`: everything else its people do (`slack_act`, `github_act`, …)              |
 | `tail`            | none                                                                            | `channelstack tail`, but each call returns only what happened since the last one (everything, the first time) |
-| `list_deliveries` | `channel`?: `slack`, `github`, `linear`, `notion`, `resend` or `google`; every channel's without it | `channelstack deliveries`                                                                                     |
+| `list_deliveries` | `channel`?; every channel's without it                                          | `channelstack deliveries`                                                                                     |
 | `redeliver`       | `channel`?, `delivery`? (`last`, the default, or an id from `list_deliveries`)  | `channelstack redeliver`                                                                                      |
 
 - **`as`** is a person's name, such as `ana`. The person is created the first time the name is used.
-- **`channel`** in `slack_say` is created the first time, with the person and the bot in it.
-- **`thread`** and **`on`** take `"last"` (the default: the newest message) or `"<channel id>:<ts>"`, as `slack_say` and `slack_reply` print it.
-- **`slack_stop`** without `as` is pressed by the person who started the thread.
+- **`in`** names a place: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository), a Linear issue by its title (in a team named Dev), a Notion page by its title, an email thread by its subject. `say` makes it the first time, with the person and the bot in it.
+- **`to`**, **`on`** and **`thread`** take `"last"` (the default: the newest entry of the channel's most recently active place), or `"<place>:<entry>"`, as `say` and `reply` print it and `show` with `json` lists the entries' ids.
+- **`<channel>_act`**'s actions are generated from the channel's routes: each thing its people do that isn't a read (`click`, `stop`, `select` on Slack; `review`, `merge`, `label` on GitHub; `delegate`, `setState`, `prompt` on Linear; …). The tool's description lists each action with its values. `params` takes them by name; a person or the app (`"app"`) by name, a reference as `"last"` or an id. A reference the action needs and isn't given comes from the target: the entry `on` names, the newest one in the place `in` names, or the newest anywhere. Without `as`, whoever started the target's thread acts (`slack_act` `stop` presses Stop as the person who asked).
 
 ## The loop
 
 This is what a coding agent does with the tools while it works on the bot:
 
-1. **Act as a person.** `slack_say` with `{ "as": "ana", "channel": "#support", "text": "@my-agent summarize today" }` returns `ana said it in #support (C0A1B2C3D4E:1732451234.000100)`. Follow up with `slack_reply`, `slack_react`, `slack_click` or `slack_stop`.
-2. **Read the answer.** `show_thread` returns the latest conversation as a person reads it:
+1. **Act as a person.** `say` with `{ "channel": "slack", "as": "ana", "in": "#support", "text": "@my-agent summarize today" }` returns `ana said it in #support (C0A1B2C3D4E:1732451234.000100)`. Follow up with `reply`, `react`, or `slack_act` with `{ "action": "click", "params": { "button": "Approve" } }`.
+2. **Read the answer.** `show` returns the most recently active place as a person reads it:
 
    ```
    ana: @my-agent summarize today
      my-agent: Here's what I found about "summarize today".
    ```
 
-   The bot answers asynchronously. If its reply isn't there yet, call `show_thread` again.
+   The bot answers asynchronously. If its reply isn't there yet, call `show` again.
 
 3. **See why.** `tail` returns the events delivered to the bot (`→ slack app_mention  200`) and the API calls it made (`← slack chat.postMessage  200`). A failed delivery, or a call refused with an error code, is usually the bug.
 4. **Change the bot, then send the same event again.** `list_deliveries` with `{ "channel": "slack" }` lists each delivery's id, event, outcome and attempts. `redeliver` with that id sends it again, the way Slack retries it, and returns `Retried Ev0A1B2C3D4E (slack)`. A bot that now answers twice doesn't handle retries.
-5. **Check again** with `show_thread`.
+5. **Check again** with `show`.
 
 Once the bot behaves, the agent pins it down in a test ([Writing tests](/docs/guide/writing-tests)), which gets a fresh session and creates its own people.
 
@@ -83,10 +82,6 @@ The tools return the same text as `show`, `tail` and `deliveries`. None of it ca
 ## The skill
 
 channelstack's repository has a skill for coding agents in [`skills/channelstack/SKILL.md`](https://github.com/christian-bromann/channelstack/blob/main/skills/channelstack/SKILL.md). It tells the agent how to set up the server and the MCP config, runs it through the loop above, and shows the test to write afterwards. Copy it into your coding agent's skills folder, for example `.claude/skills/channelstack/SKILL.md` for Claude Code.
-
-## Slack only
-
-The tools that act as a person are Slack's. `list_deliveries` and `redeliver` take every channel, but nothing acts on GitHub, Linear, Notion, Resend or Google in the dev session: drive those from a test.
 
 ## The docs, for your coding agent
 

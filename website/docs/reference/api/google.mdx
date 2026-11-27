@@ -102,6 +102,50 @@ let user = google.create_user().name("…").await?;
 
 **Returns** [`GoogleUser`](/docs/reference/api/google#googleuser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await google.users();
+```
+
+```python title="Python"
+users = await google.users()
+```
+
+```rust title="Rust"
+let users = google.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleUsers`](/docs/reference/api/google#googleusers).
+
+### threads()
+
+The threads this session's people started, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const threads = await google.threads();
+```
+
+```python title="Python"
+threads = await google.threads()
+```
+
+```rust title="Rust"
+let threads = google.threads().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleThreads`](/docs/reference/api/google#googlethreads).
+
 ### deliveries()
 
 Every push channelstack sent the agent for this session, with every attempt.
@@ -726,6 +770,18 @@ type GoogleApps = GoogleApp[];
 | `id` | `string` |
 | `name` | `string` |
 | `kind` | `"user" \| "app"` |
+
+### GoogleUsers
+
+```ts
+type GoogleUsers = GoogleUser[];
+```
+
+### GoogleThreads
+
+```ts
+type GoogleThreads = GoogleThread[];
+```
 
 ### GoogleInbox
 

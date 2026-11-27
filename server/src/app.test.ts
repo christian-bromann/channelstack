@@ -354,7 +354,7 @@ describe("the UI", () => {
     const as = (method: string, path: string) =>
       h.app.fetch(new Request(`http://127.0.0.1:4500/_channelstack${path}`, { method, headers: { cookie } }));
 
-    for (const path of ["/status", `/sessions/${sessionId}/events`, `/sessions/${sessionId}/slack/conversations`]) {
+    for (const path of ["/status", `/sessions/${sessionId}/events`, `/sessions/${sessionId}/places`]) {
       expect((await as("GET", path)).status, path).toBe(200);
     }
     // What the browser reads is scrubbed: a token someone pasted into a message doesn't show in the UI.
@@ -368,12 +368,22 @@ describe("the UI", () => {
     });
     const transcript = `${slack}/conversations/${channel.id}/transcript`;
     expect((await h.call("GET", transcript)).body.text).toBe(`Ana: my token is ${botToken}`);
-    expect(((await (await as("GET", transcript)).json()) as { text: string }).text).toBe("Ana: my token is [redacted]");
+    // The UI lists every channel's places through the dev tools' own routes, scrubbed the same way.
+    const places = (await (await as("GET", `/sessions/${sessionId}/places`)).json()) as Array<Record<string, unknown>>;
+    expect(places).toEqual([expect.objectContaining({ channel: "slack", title: "Slack", id: channel.id })]);
+    const read = await as("GET", `/sessions/${sessionId}/places/slack/${channel.id}/transcript`);
+    expect(((await read.json()) as { text: string }).text).toBe("Ana: my token is [redacted]");
 
     // Not the agent's tokens, and no writes: a page that tricks the browser into a request gains nothing.
     for (const [method, path] of [
       ["GET", "/env"],
       ["GET", `/sessions/${sessionId}/slack`],
+      // A channel's own routes: its lists hold its handles (the app's carries its credentials in the
+      // fake) and people's addresses. The UI reads its places through `/places` instead.
+      ["GET", `/sessions/${sessionId}/github/issues`],
+      ["GET", `/sessions/${sessionId}/github/users`],
+      ["GET", `/sessions/${sessionId}/slack/conversations`],
+      ["GET", transcript],
       ["POST", "/sessions"],
       ["POST", "/reset"],
       ["POST", "/ui/login-links"],

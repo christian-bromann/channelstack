@@ -103,6 +103,50 @@ let user = resend.create_user().name("…").await?;
 
 **Returns** [`ResendUser`](/docs/reference/api/resend#resenduser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await resend.users();
+```
+
+```python title="Python"
+users = await resend.users()
+```
+
+```rust title="Rust"
+let users = resend.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`ResendUsers`](/docs/reference/api/resend#resendusers).
+
+### threads()
+
+The threads this session's people started, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const threads = await resend.threads();
+```
+
+```python title="Python"
+threads = await resend.threads()
+```
+
+```rust title="Rust"
+let threads = resend.threads().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`ResendThreads`](/docs/reference/api/resend#resendthreads).
+
 ### deliveries()
 
 Every webhook channelstack sent the agent for this session, with every attempt.
@@ -724,6 +768,18 @@ type ResendApps = ResendApp[];
 | `id` | `string` |
 | `name` | `string` |
 | `kind` | `"user" \| "app"` |
+
+### ResendUsers
+
+```ts
+type ResendUsers = ResendUser[];
+```
+
+### ResendThreads
+
+```ts
+type ResendThreads = ResendThread[];
+```
 
 ### ResendInbox
 

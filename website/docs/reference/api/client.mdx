@@ -370,6 +370,60 @@ let google = session.google().await?;
 
 **Returns** [`GoogleFixture`](/docs/reference/api/google#googlefixture).
 
+### places()
+
+Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const places = await session.places();
+```
+
+```python title="Python"
+places = await session.places()
+```
+
+```rust title="Rust"
+let places = session.places().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`Places`](/docs/reference/api/client#places-1).
+
+## Place
+
+| Field | Type |
+|---|---|
+| `channel` | `string` |
+| `title` | `string` |
+| `id` | `string` |
+| `name` | `string` |
+| `active` | `string \| undefined` |
+
+### transcript()
+
+A place as a person reads it: the transcript its channel's own transcript route has.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const placeTranscript = await place.transcript();
+```
+
+```python title="Python"
+place_transcript = await place.transcript()
+```
+
+```rust title="Rust"
+let place_transcript = place.transcript().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`PlaceTranscript`](/docs/reference/api/client#placetranscript).
+
 ## Types
 
 Plain values the handles return and take.
@@ -442,6 +496,41 @@ type Capabilities = Record<string, Capability>;
 | `responseBody` | `response_body` | `string \| undefined` |
 | `durationMs` | `duration_ms` | `number \| undefined` |
 | `forgedSignature` | `forged_signature` | `boolean` |
+
+### Places
+
+```ts
+type Places = Place[];
+```
+
+### PlaceTranscript
+
+| Field | Type |
+|---|---|
+| `entries` | `PlaceTranscriptEntry[]` |
+| `text` | `string` |
+
+### PlaceTranscriptEntry
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `author` | `author` | `PlacePrincipal` |
+| `at` | `at` | `string` |
+| `text` | `text` | `string` |
+| `controls` | `controls` | `string[]` |
+| `edited` | `edited` | `boolean` |
+| `depth` | `depth` | `number` |
+| `streaming` | `streaming` | `"open" \| "stopped" \| "completed" \| undefined` |
+| `visibleTo` | `visible_to` | `PlacePrincipal \| undefined` |
+
+### PlacePrincipal
+
+| Field | Type |
+|---|---|
+| `id` | `string` |
+| `name` | `string` |
+| `kind` | `"user" \| "app"` |
 
 ### UiLoginLink
 

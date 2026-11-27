@@ -56,6 +56,28 @@ let user = github.create_user().login("…").await?;
 
 **Returns** [`GitHubUser`](/docs/reference/api/github#githubuser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await github.users();
+```
+
+```python title="Python"
+users = await github.users()
+```
+
+```rust title="Rust"
+let users = github.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GitHubUsers`](/docs/reference/api/github#githubusers).
+
 ### createRepo()
 
 Create a repository in the org. The App hears about it only when it is listed in `apps`: an App must be installed on a repository.
@@ -87,6 +109,50 @@ let repo = github.create_repo().name("…").await?;
 | `labels` | `labels` | `Array<string \| { name: string; color?: string; description?: string }>` | no | option |
 
 **Returns** [`GitHubRepo`](/docs/reference/api/github#githubrepo).
+
+### repos()
+
+The repositories this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const repos = await github.repos();
+```
+
+```python title="Python"
+repos = await github.repos()
+```
+
+```rust title="Rust"
+let repos = github.repos().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GitHubRepos`](/docs/reference/api/github#githubrepos).
+
+### issues()
+
+The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const issues = await github.issues();
+```
+
+```python title="Python"
+issues = await github.issues()
+```
+
+```rust title="Rust"
+let issues = github.issues().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GitHubIssues`](/docs/reference/api/github#githubissues).
 
 ### installationId()
 
@@ -1919,123 +1985,9 @@ let commits = repo.commits().branch("…").await?;
 
 **Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: pull requests, reviews, pushes, checks and installs aren't built live.
 
-## GitHubDelivery
-
-Returned by [`GitHubApp.editIssue()`](/docs/reference/api/github#editissue), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.edit()`](/docs/reference/api/github#edit).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"github"` |
-| `app` | `app` | `string` |
-| `type` | `type` · `r#type` | `string` |
-| `action` | `action` | `string \| undefined` |
-| `guid` | `guid` | `string` |
-| `payload` | `payload` | `unknown \| undefined` |
-| `attempts` | `attempts` | `DeliveryAttempt[]` |
-| `status` | `status` | `"pending" \| "acknowledged" \| "failed" \| "timed_out" \| "unreachable"` |
-
-### refresh()
-
-Re-read a delivery: its attempts and status.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await delivery.refresh();
-```
-
-```python title="Python"
-updated = await delivery.refresh()
-```
-
-```rust title="Rust"
-let updated = delivery.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`GitHubDelivery`](/docs/reference/api/github#githubdelivery).
-
-### redeliver()
-
-Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const deliveryAttempt = await delivery.redeliver();
-```
-
-```python title="Python"
-delivery_attempt = await delivery.redeliver()
-```
-
-```rust title="Rust"
-let delivery_attempt = delivery.redeliver().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
-
-### resend()
-
-Send the delivery again, unchanged or signed with a secret that isn't the App's.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const deliveryAttempt = await delivery.resend({ badSignature });
-```
-
-```python title="Python"
-delivery_attempt = await delivery.resend(bad_signature=bad_signature)
-```
-
-```rust title="Rust"
-let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
-```
-
-</CodeGroup>
-
-| Parameter | Python / Rust | Type | Required |  |
-|---|---|---|---|---|
-| `badSignature` | `bad_signature` | `boolean` | no | option |
-
-**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
-
-**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
-
-### settled()
-
-Waits for the delivery to settle: it polls `refresh()` and never sleeps longer than it must.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await delivery.settled();
-```
-
-```python title="Python"
-updated = await delivery.settled()
-```
-
-```rust title="Rust"
-let updated = delivery.settled().await?;
-```
-
-</CodeGroup>
-
-| Parameter | Type | Required |  |
-|---|---|---|---|
-| `timeout` | `Duration` | no | default 10s |
-
-**Returns** [`GitHubDelivery`](/docs/reference/api/github#githubdelivery). When the time is up, it fails with what it was waiting for.
-
 ## GitHubIssue
 
-Returned by [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue-1), [`GitHubRepo.issue()`](/docs/reference/api/github#issue), [`GitHubIssue.refresh()`](/docs/reference/api/github#refresh-1).
+Returned by [`GitHubApp.openIssue()`](/docs/reference/api/github#openissue), [`GitHubUser.openIssue()`](/docs/reference/api/github#openissue-1), [`GitHubRepo.issue()`](/docs/reference/api/github#issue), [`GitHubIssue.refresh()`](/docs/reference/api/github#refresh).
 
 | Field | Python / Rust | Type |
 |---|---|---|
@@ -2254,6 +2206,120 @@ let comment = issue.latest_comment().from("my-agent").await?;
 | `quietFor` | `quiet_for` | `Duration` | no | default 750ms |
 
 **Returns** [`GitHubComment`](/docs/reference/api/github#githubcomment). When the time is up, it fails with what it was waiting for.
+
+## GitHubDelivery
+
+Returned by [`GitHubApp.editIssue()`](/docs/reference/api/github#editissue), [`GitHubApp.close()`](/docs/reference/api/github#close), [`GitHubApp.reopen()`](/docs/reference/api/github#reopen), [`GitHubApp.edit()`](/docs/reference/api/github#edit).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `channel` | `channel` | `"github"` |
+| `app` | `app` | `string` |
+| `type` | `type` · `r#type` | `string` |
+| `action` | `action` | `string \| undefined` |
+| `guid` | `guid` | `string` |
+| `payload` | `payload` | `unknown \| undefined` |
+| `attempts` | `attempts` | `DeliveryAttempt[]` |
+| `status` | `status` | `"pending" \| "acknowledged" \| "failed" \| "timed_out" \| "unreachable"` |
+
+### refresh()
+
+Re-read a delivery: its attempts and status.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await delivery.refresh();
+```
+
+```python title="Python"
+updated = await delivery.refresh()
+```
+
+```rust title="Rust"
+let updated = delivery.refresh().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GitHubDelivery`](/docs/reference/api/github#githubdelivery).
+
+### redeliver()
+
+Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const deliveryAttempt = await delivery.redeliver();
+```
+
+```python title="Python"
+delivery_attempt = await delivery.redeliver()
+```
+
+```rust title="Rust"
+let delivery_attempt = delivery.redeliver().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
+
+### resend()
+
+Send the delivery again, unchanged or signed with a secret that isn't the App's.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const deliveryAttempt = await delivery.resend({ badSignature });
+```
+
+```python title="Python"
+delivery_attempt = await delivery.resend(bad_signature=bad_signature)
+```
+
+```rust title="Rust"
+let delivery_attempt = delivery.resend().bad_signature(bad_signature).await?;
+```
+
+</CodeGroup>
+
+| Parameter | Python / Rust | Type | Required |  |
+|---|---|---|---|---|
+| `badSignature` | `bad_signature` | `boolean` | no | option |
+
+**Returns** [`DeliveryAttempt`](/docs/reference/api/client#deliveryattempt).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only).
+
+### settled()
+
+Waits for the delivery to settle: it polls `refresh()` and never sleeps longer than it must.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await delivery.settled();
+```
+
+```python title="Python"
+updated = await delivery.settled()
+```
+
+```rust title="Rust"
+let updated = delivery.settled().await?;
+```
+
+</CodeGroup>
+
+| Parameter | Type | Required |  |
+|---|---|---|---|
+| `timeout` | `Duration` | no | default 10s |
+
+**Returns** [`GitHubDelivery`](/docs/reference/api/github#githubdelivery). When the time is up, it fails with what it was waiting for.
 
 ## GitHubCommit
 
@@ -2641,6 +2707,33 @@ let result = pull_request.merged().await?;
 ## Types
 
 Plain values the handles return and take.
+
+### GitHubUsers
+
+```ts
+type GitHubUsers = GitHubUser[];
+```
+
+### GitHubRepos
+
+```ts
+type GitHubRepos = GitHubRepo[];
+```
+
+### GitHubIssues
+
+```ts
+type GitHubIssues = GitHubIssueListing[];
+```
+
+### GitHubIssueListing
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `issue` | `issue` | `GitHubIssue` |
+| `title` | `title` | `string` |
+| `pullRequest` | `pull_request` | `boolean` |
+| `updatedAt` | `updated_at` | `string` |
 
 ### GitHubApps
 

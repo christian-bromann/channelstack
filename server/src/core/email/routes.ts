@@ -397,6 +397,29 @@ export function registerEmailRoutes<Email extends EmailRecord, App extends Email
     handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
   });
 
+  router.route({
+    method: "get",
+    path: "/users",
+    summary: "The people this session created",
+    response: z.array(User).openapi(`${title}Users`),
+    sdkMethod: { on: `${title}Fixture`, name: "users" },
+    stability,
+    handler: ({ session }) => store.users.list(session.id).map(userWire),
+  });
+
+  router.route({
+    method: "get",
+    path: "/threads",
+    summary: "The threads this session's people started, oldest first",
+    response: z.array(Thread).openapi(`${title}Threads`),
+    sdkMethod: { on: `${title}Fixture`, name: "threads" },
+    stability,
+    handler: async ({ session }) => {
+      await world.refresh(session.id);
+      return store.threads.list(session.id).map((thread) => threadWire(thread.id));
+    },
+  });
+
   // --- What people do -------------------------------------------------------------------------
 
   router.route({

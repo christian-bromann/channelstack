@@ -1,8 +1,10 @@
 <!doctype html>
 <!--
-  The channelstack UI, v0: the dev session's conversations as a person would read them, and an
-  inspector for what went to the agent and what the agent called. One page, no build step. It only
-  reads; everything it shows comes from the control API, the same data the matchers read.
+  The channelstack UI, v0: the dev session's places on every channel (Slack channels, GitHub and
+  Linear issues, Notion pages, email threads) as a person would read them, and an inspector for what
+  went to the agent and what the agent called. One page, no build step. It only reads; everything it
+  shows comes from the control API, the same data the matchers read: the places as the dev tools
+  name them (`/places`, each channel's dev adapter in `core/dev`, as the CLI and MCP read them).
   The server fills in __NONCE__ (this response's CSP nonce) and __SESSION__ (the dev session).
 -->
 <html lang="en">
@@ -28,6 +30,7 @@
       ul { list-style: none; margin: 0; padding: 0; }
       nav button { all: unset; display: block; width: 100%; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; }
       nav button[aria-current="true"] { background: var(--accent); color: white; }
+      nav h2 + ul { margin-bottom: 0.8rem; }
       .entry { padding: 0.3rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
       .entry .author { font-weight: 600; }
       .entry .app { color: var(--accent); }
@@ -46,10 +49,7 @@
     </header>
     <main>
       <section>
-        <nav aria-label="Conversations">
-          <h2>Slack</h2>
-          <ul id="conversations" data-testid="conversations"></ul>
-        </nav>
+        <nav aria-label="Places" id="conversations" data-testid="conversations"></nav>
       </section>
       <section aria-label="Transcript">
         <h2 id="title">Transcript</h2>
@@ -76,45 +76,56 @@
       };
       const $ = (id) => document.getElementById(id);
 
-      let chosen; // The conversation the person picked; the most recent one until they do.
+      let chosen; // The place the person picked (`<channel>/<id>`); the most recently active one until they do.
       let shown = ""; // What the transcript pane last rendered, to leave it alone while nothing changes.
       let cursor; // How far into the event log the inspector has read.
 
-      const label = (conversation) =>
-        conversation.name ? `#${conversation.name}` : conversation.kind === "im" ? "Direct message" : "Group message";
+      // The server lists every channel's places, the most recently active last.
+      const keyOf = (place) => `${place.channel}/${place.id}`;
 
       async function conversations() {
-        const list = await api("/slack/conversations");
-        const current = list.find((conversation) => conversation.id === chosen) ?? list.at(-1);
+        const places = await api("/places");
+        const current = places.find((place) => keyOf(place) === chosen) ?? places.at(-1);
+        const channels = [...new Map(places.map((place) => [place.channel, place.title])).entries()];
         $("conversations").replaceChildren(
-          ...list.toReversed().map((conversation) => {
-            const button = element("button", label(conversation));
-            button.setAttribute("aria-current", String(conversation.id === current?.id));
-            button.addEventListener("click", () => {
-              chosen = conversation.id;
-              refresh();
-            });
-            const item = element("li");
-            item.append(button);
-            return item;
+          ...channels.flatMap(([channel, title]) => {
+            const list = element("ul");
+            list.append(
+              ...places
+                .filter((place) => place.channel === channel)
+                .toReversed()
+                .map((place) => {
+                  const button = element("button", place.name);
+                  button.setAttribute("aria-current", String(current !== undefined && keyOf(place) === keyOf(current)));
+                  button.addEventListener("click", () => {
+                    chosen = keyOf(place);
+                    refresh();
+                  });
+                  const item = element("li");
+                  item.append(button);
+                  return item;
+                }),
+            );
+            return [element("h2", title), list];
           }),
         );
         return current;
       }
 
-      async function transcript(conversation) {
-        if (!conversation) {
+      async function transcript(place) {
+        if (!place) {
           $("title").textContent = "Transcript";
           $("transcript").replaceChildren(
             element("p", 'Nothing yet. Try: channelstack slack say --as ana --in "#support" "@my-agent hi"', "empty"),
           );
           return;
         }
-        const { entries } = await api(`/slack/conversations/${encodeURIComponent(conversation.id)}/transcript`);
-        const signature = conversation.id + JSON.stringify(entries);
+        const path = `/places/${encodeURIComponent(place.channel)}/${encodeURIComponent(place.id)}/transcript`;
+        const { entries } = await api(path);
+        const signature = keyOf(place) + JSON.stringify(entries);
         if (signature === shown) return;
         shown = signature;
-        $("title").textContent = label(conversation);
+        $("title").textContent = `${place.title}: ${place.name}`;
         $("transcript").replaceChildren(
           ...entries.map((entry) => {
             const row = element("div", undefined, "entry");

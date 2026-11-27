@@ -516,6 +516,35 @@
             "cross_workspace_credential"
           ],
           "dispose": false
+        },
+        {
+          "name": "places",
+          "kind": "method",
+          "summary": "Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/places",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "Places"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -5204,6 +5233,41 @@
           "dispose": false
         },
         {
+          "name": "users",
+          "kind": "method",
+          "summary": "The people this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubUsers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "createRepo",
           "kind": "factory",
           "summary": "Create a repository in the org. The App hears about it only when it is listed in `apps`: an App must be installed on a repository",
@@ -5344,6 +5408,76 @@
           "returns": {
             "kind": "resource",
             "name": "GitHubRepo"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "repos",
+          "kind": "method",
+          "summary": "The repositories this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/repos",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubRepos"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "issues",
+          "kind": "method",
+          "summary": "The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/issues",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GitHubIssues"
           },
           "errors": [
             "unauthorized",
@@ -9841,242 +9975,6 @@
       ]
     },
     {
-      "name": "GitHubDelivery",
-      "idFields": [
-        "id"
-      ],
-      "fields": [
-        {
-          "name": "id",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "channel",
-          "type": {
-            "kind": "literal",
-            "value": "github"
-          },
-          "optional": false
-        },
-        {
-          "name": "app",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "type",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "action",
-          "type": {
-            "kind": "string"
-          },
-          "optional": true
-        },
-        {
-          "name": "guid",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "payload",
-          "type": {
-            "kind": "unknown"
-          },
-          "optional": true
-        },
-        {
-          "name": "attempts",
-          "type": {
-            "kind": "array",
-            "items": {
-              "kind": "named",
-              "name": "DeliveryAttempt"
-            }
-          },
-          "optional": false
-        },
-        {
-          "name": "status",
-          "type": {
-            "kind": "enum",
-            "values": [
-              "pending",
-              "acknowledged",
-              "failed",
-              "timed_out",
-              "unreachable"
-            ]
-          },
-          "optional": false
-        }
-      ],
-      "methods": [
-        {
-          "name": "refresh",
-          "kind": "method",
-          "summary": "Re-read a delivery: its attempts and status",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/github/deliveries/{delivery}",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "redeliver",
-          "kind": "method",
-          "summary": "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
-          "stability": "experimental",
-          "http": {
-            "verb": "POST",
-            "path": "/sessions/{session}/github/deliveries/{delivery}/redeliver",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "DeliveryAttempt"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "resend",
-          "kind": "method",
-          "summary": "Send the delivery again, unchanged or signed with a secret that isn't the App's",
-          "stability": "experimental",
-          "http": {
-            "verb": "POST",
-            "path": "/sessions/{session}/github/deliveries/{delivery}/resend",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [
-            {
-              "name": "badSignature",
-              "type": {
-                "kind": "boolean"
-              },
-              "optional": true,
-              "in": "body"
-            }
-          ],
-          "returns": {
-            "kind": "named",
-            "name": "DeliveryAttempt"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false,
-          "live": {
-            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
-          }
-        }
-      ],
-      "waits": [
-        {
-          "name": "settled",
-          "mode": "until",
-          "read": "refresh",
-          "item": {
-            "kind": "resource",
-            "name": "GitHubDelivery"
-          },
-          "field": "status",
-          "not": [
-            "pending"
-          ],
-          "what": "the delivery to settle"
-        }
-      ]
-    },
-    {
       "name": "GitHubIssue",
       "idFields": [
         "repoId",
@@ -10496,6 +10394,242 @@
           },
           "from": "author",
           "what": "a comment"
+        }
+      ]
+    },
+    {
+      "name": "GitHubDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "github"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "action",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        },
+        {
+          "name": "guid",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/github/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the delivery again, unchanged or signed with a secret that isn't the App's",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/github/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "GitHubDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
         }
       ]
     },
@@ -11297,6 +11431,41 @@
           "dispose": false
         },
         {
+          "name": "users",
+          "kind": "method",
+          "summary": "The people this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearUsers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "createApp",
           "kind": "factory",
           "summary": "Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL",
@@ -11374,6 +11543,41 @@
           "returns": {
             "kind": "named",
             "name": "LinearApps"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "teams",
+          "kind": "method",
+          "summary": "The teams this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/teams",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearTeams"
           },
           "errors": [
             "unauthorized",
@@ -11486,6 +11690,41 @@
           "returns": {
             "kind": "resource",
             "name": "LinearTeam"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "issues",
+          "kind": "method",
+          "summary": "The issues in this session's teams, read again from Linear live, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/linear/issues",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "LinearIssues"
           },
           "errors": [
             "unauthorized",
@@ -14507,6 +14746,41 @@
           "dispose": false
         },
         {
+          "name": "users",
+          "kind": "method",
+          "summary": "The people this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionUsers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "createApp",
           "kind": "factory",
           "summary": "Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it",
@@ -14596,6 +14870,41 @@
           "returns": {
             "kind": "named",
             "name": "NotionIntegrations"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "pages",
+          "kind": "method",
+          "summary": "The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/notion/pages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "NotionPages"
           },
           "errors": [
             "unauthorized",
@@ -17535,6 +17844,76 @@
           "dispose": false
         },
         {
+          "name": "users",
+          "kind": "method",
+          "summary": "The people this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "ResendUsers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "threads",
+          "kind": "method",
+          "summary": "The threads this session's people started, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/threads",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "ResendThreads"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "deliveries",
           "kind": "method",
           "summary": "Every webhook channelstack sent the agent for this session, with every attempt",
@@ -19027,6 +19406,76 @@
           "dispose": false
         },
         {
+          "name": "users",
+          "kind": "method",
+          "summary": "The people this session created",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/users",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleUsers"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "threads",
+          "kind": "method",
+          "summary": "The threads this session's people started, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/threads",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleThreads"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "deliveries",
           "kind": "method",
           "summary": "Every push channelstack sent the agent for this session, with every attempt",
@@ -20377,6 +20826,92 @@
           },
           "from": "author",
           "what": "an email"
+        }
+      ]
+    },
+    {
+      "name": "Place",
+      "idFields": [
+        "channel",
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "channel",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "active",
+          "type": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "A place as a person reads it: the transcript its channel's own transcript route has",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/places/{channel}/{place}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "channel",
+                "from": "self",
+                "field": "channel"
+              },
+              {
+                "name": "place",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "PlaceTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "not_found"
+          ],
+          "dispose": false
         }
       ]
     },
@@ -21913,6 +22448,73 @@
       }
     },
     {
+      "name": "GitHubUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubUser"
+        }
+      }
+    },
+    {
+      "name": "GitHubRepos",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GitHubRepo"
+        }
+      }
+    },
+    {
+      "name": "GitHubIssues",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "GitHubIssueListing"
+        }
+      }
+    },
+    {
+      "name": "GitHubIssueListing",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "issue",
+            "type": {
+              "kind": "resource",
+              "name": "GitHubIssue"
+            },
+            "optional": false
+          },
+          {
+            "name": "title",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "pullRequest",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "updatedAt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
       "name": "GitHubApps",
       "type": {
         "kind": "array",
@@ -22448,6 +23050,59 @@
       }
     },
     {
+      "name": "LinearUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearUser"
+        }
+      }
+    },
+    {
+      "name": "LinearTeams",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "LinearTeam"
+        }
+      }
+    },
+    {
+      "name": "LinearIssues",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "named",
+          "name": "LinearIssueListing"
+        }
+      }
+    },
+    {
+      "name": "LinearIssueListing",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "issue",
+            "type": {
+              "kind": "resource",
+              "name": "LinearIssue"
+            },
+            "optional": false
+          },
+          {
+            "name": "title",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      }
+    },
+    {
       "name": "LinearIssueState",
       "type": {
         "kind": "object",
@@ -22822,6 +23477,26 @@
         "items": {
           "kind": "resource",
           "name": "NotionIntegration"
+        }
+      }
+    },
+    {
+      "name": "NotionUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionUser"
+        }
+      }
+    },
+    {
+      "name": "NotionPages",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "NotionPage"
         }
       }
     },
@@ -23281,6 +23956,26 @@
       }
     },
     {
+      "name": "ResendUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "ResendUser"
+        }
+      }
+    },
+    {
+      "name": "ResendThreads",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "ResendThread"
+        }
+      }
+    },
+    {
       "name": "ResendInbox",
       "type": {
         "kind": "array",
@@ -23548,6 +24243,26 @@
       }
     },
     {
+      "name": "GoogleUsers",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleUser"
+        }
+      }
+    },
+    {
+      "name": "GoogleThreads",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleThread"
+        }
+      }
+    },
+    {
       "name": "GoogleInbox",
       "type": {
         "kind": "array",
@@ -23767,6 +24482,157 @@
               "kind": "string"
             },
             "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Places",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "Place"
+        }
+      }
+    },
+    {
+      "name": "PlaceTranscript",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "entries",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "named",
+                "name": "PlaceTranscriptEntry"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          }
+        ]
+      },
+      "stringField": "text"
+    },
+    {
+      "name": "PlaceTranscriptEntry",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "named",
+              "name": "PlacePrincipal"
+            },
+            "optional": false
+          },
+          {
+            "name": "at",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "text",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "controls",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "string"
+              }
+            },
+            "optional": false
+          },
+          {
+            "name": "edited",
+            "type": {
+              "kind": "boolean"
+            },
+            "optional": false
+          },
+          {
+            "name": "depth",
+            "type": {
+              "kind": "integer"
+            },
+            "optional": false
+          },
+          {
+            "name": "streaming",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "open",
+                "stopped",
+                "completed"
+              ]
+            },
+            "optional": true
+          },
+          {
+            "name": "visibleTo",
+            "type": {
+              "kind": "named",
+              "name": "PlacePrincipal"
+            },
+            "optional": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlacePrincipal",
+      "type": {
+        "kind": "object",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
+          },
+          {
+            "name": "kind",
+            "type": {
+              "kind": "enum",
+              "values": [
+                "user",
+                "app"
+              ]
+            },
+            "optional": false
           }
         ]
       }

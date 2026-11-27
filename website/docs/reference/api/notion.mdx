@@ -54,6 +54,28 @@ let user = notion.create_user().name("…").await?;
 
 **Returns** [`NotionUser`](/docs/reference/api/notion#notionuser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await notion.users();
+```
+
+```python title="Python"
+users = await notion.users()
+```
+
+```rust title="Rust"
+let users = notion.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionUsers`](/docs/reference/api/notion#notionusers).
+
 ### createApp()
 
 Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_&lt;NAME>_WEBHOOK_URL, and it sees only the pages connected to it.
@@ -105,6 +127,28 @@ let integrations = notion.apps().await?;
 </CodeGroup>
 
 **Returns** [`NotionIntegrations`](/docs/reference/api/notion#notionintegrations).
+
+### pages()
+
+The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const pages = await notion.pages();
+```
+
+```python title="Python"
+pages = await notion.pages()
+```
+
+```rust title="Rust"
+let pages = notion.pages().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionPages`](/docs/reference/api/notion#notionpages).
 
 ### createPage()
 
@@ -1340,6 +1384,18 @@ type NotionCapability = "read_content" | "update_content" | "insert_content" | "
 
 ```ts
 type NotionIntegrations = NotionIntegration[];
+```
+
+### NotionUsers
+
+```ts
+type NotionUsers = NotionUser[];
+```
+
+### NotionPages
+
+```ts
+type NotionPages = NotionPage[];
 ```
 
 ### NotionPropertySchema

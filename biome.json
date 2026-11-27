@@ -12,6 +12,7 @@
       "!index.html",
       "!spec",
       "!sdks/typescript/generated",
+      "!server/src/cli/generated",
       "!sdks/python",
       "!**/dist",
       "!.claude",

@@ -1,26 +1,4 @@
 import { type Attached, segment } from "./attach.ts";
-import { slackDev } from "./slack.ts";
-
-interface Transcript {
-  entries: unknown[];
-  text: string;
-}
-
-/**
- * `channelstack show`: the most recently active conversation as a person would read it;
- * `--thread last` narrows it to the thread of the newest message; `--json` prints the entries.
- */
-export async function runShow(server: Attached, flags: { thread?: string | undefined; json?: boolean | undefined }) {
-  const slack = await slackDev(server);
-  const newest = flags.thread === undefined ? await slack.last() : await slack.message(flags.thread, "--thread");
-  const conversation = `/conversations/${segment(newest.channel)}`;
-  const transcript = await slack.get<Transcript>(
-    flags.thread === undefined
-      ? `${conversation}/transcript`
-      : `${conversation}/threads/${segment(newest.threadTs ?? newest.ts)}/transcript`,
-  );
-  return flags.json ? `${JSON.stringify(transcript.entries, null, 2)}\n` : `${transcript.text}\n`;
-}
 
 interface LogEvent {
   at: string;

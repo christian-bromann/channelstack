@@ -9,6 +9,7 @@ import { ROOT } from "../../scripts/lib/generate.ts";
 import { binaryPath } from "../../scripts/lib/packages.ts";
 import { withStack } from "../../scripts/lib/stack.ts";
 import { waitFor } from "../../sdks/typescript/runtime/wait.ts";
+import { CHANNEL_NAMES } from "../../server/src/drivers/index.ts";
 
 const text = (result: Awaited<ReturnType<Client["callTool"]>>) =>
   (result.content as Array<{ type: string; text?: string }>).map((part) => part.text ?? "").join("");
@@ -36,29 +37,33 @@ test("an MCP client posts as a person and reads the agent's reply", async () => 
       await client.connect(transport);
       try {
         const { tools } = await client.listTools();
-        expect(tools.map((tool) => tool.name).sort()).toEqual([
-          "list_deliveries",
-          "redeliver",
-          "show_thread",
-          "slack_click",
-          "slack_react",
-          "slack_reply",
-          "slack_say",
-          "slack_stop",
-          "tail",
-        ]);
+        // The shared verbs take a channel; everything else a channel's people do is its `<channel>_act`.
+        expect(tools.map((tool) => tool.name).sort()).toEqual(
+          [
+            ...CHANNEL_NAMES.map((channel) => `${channel}_act`),
+            "list_deliveries",
+            "react",
+            "redeliver",
+            "reply",
+            "say",
+            "show",
+            "tail",
+          ].sort(),
+        );
+        const act = tools.find((tool) => tool.name === "slack_act");
+        expect(act?.description).toMatch(/^- click\(button: SlackButtonRef/m);
 
         // Ana doesn't exist yet: the first message creates her, and #support with her and the bot in it.
         const said = await client.callTool({
-          name: "slack_say",
-          arguments: { as: "ana", channel: "#support", text: "@my-agent hi" },
+          name: "say",
+          arguments: { channel: "slack", as: "ana", in: "#support", text: "@my-agent hi" },
         });
         expect(said.isError).toBeFalsy();
         expect(text(said)).toMatch(/^ana said it in #support/);
 
         const reply = 'my-agent: Here\'s what I found about "hi".';
-        const shown = await waitFor("the agent's reply in show_thread", async () => {
-          const result = text(await client.callTool({ name: "show_thread", arguments: {} }));
+        const shown = await waitFor("the agent's reply in show", async () => {
+          const result = text(await client.callTool({ name: "show", arguments: {} }));
           return result.includes(reply) ? result : undefined;
         });
         expect(shown).toBe(`ana: @my-agent hi\n  ${reply}\n`);

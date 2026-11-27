@@ -2,18 +2,22 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { DEV_CHANNELS } from "../drivers/index.ts";
+import { actionsOf, describeAction, runAct } from "./act.ts";
 import { attach, type Attached, type AttachFlags, CliError, ServerGoneError } from "./attach.ts";
 import { DELIVERY_CHANNELS, runDeliveries, runRedeliver } from "./deliveries.ts";
-import { runSlack } from "./slack.ts";
-import { readEvents, runShow } from "./watch.ts";
+import { devChannel, runReact, runReply, runSay, runShow } from "./dev.ts";
+import { readEvents } from "./watch.ts";
 
-/** A message as the tools name it: the newest one, or `<channel id>:<ts>` as `show_thread` prints them. */
-const reference = z
-  .string()
-  .regex(/^(last|[A-Z0-9]+:\d+\.\d+)$/)
-  .optional()
-  .describe('"last" (the default: the newest message) or "<channel id>:<ts>"');
+/** What a reference is, in every tool that takes one. */
+const REFERENCE =
+  '"last" (the default: the newest entry of the most recently active place), "<place>:<entry>" as the tools print them and `show` with `json` lists the entries, or a place by name';
+const reference = z.string().min(1).optional().describe(REFERENCE);
 const person = z.string().min(1).describe("Who acts, by name, e.g. ana. Created the first time the name is used");
+const channelName = z.enum(DEV_CHANNELS.map(({ name }) => name) as [string, ...string[]]);
+const PLACES = DEV_CHANNELS.map(({ title, adapter }) => `${title}: a ${adapter.place}, e.g. ${adapter.example}`).join(
+  "; ",
+);
 
 type Text = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
 
@@ -47,58 +51,93 @@ function mcpServer(flags: AttachFlags, version: string): McpServer {
   const mcp = new McpServer({ name: "channelstack", version });
 
   mcp.registerTool(
-    "slack_say",
+    "say",
     {
-      description: "Post a message in a Slack channel as a person, e.g. to mention the bot.",
+      description: `Say something in a place as a person, e.g. to mention the bot. The place is made, with the person and the bot in it, the first time its name is used (${PLACES}).`,
       inputSchema: {
+        channel: channelName,
         as: person,
-        channel: z.string().min(1).describe('The channel, e.g. "#support". Created with the person and the bot in it'),
+        in: z.string().min(1).describe("The place, by name"),
         text: z.string().min(1).describe('What they say, e.g. "@my-agent summarize today"'),
       },
     },
-    ({ as, channel, text }) => tool((attached) => runSlack(attached, "say", [text], { as, in: channel })),
+    ({ channel, as, in: where, text }) =>
+      tool((attached) => runSay(attached, devChannel(channel), text, { as, in: where })),
   );
   mcp.registerTool(
-    "slack_reply",
-    {
-      description: "Reply in a Slack thread as a person.",
-      inputSchema: { as: person, text: z.string().min(1), thread: reference },
-    },
-    ({ as, text, thread }) => tool((attached) => runSlack(attached, "reply", [text], { as, thread })),
-  );
-  mcp.registerTool(
-    "slack_react",
-    {
-      description: "React to a Slack message with an emoji, as a person.",
-      inputSchema: { as: person, emoji: z.string().min(1).describe('e.g. ":eyes:"'), on: reference },
-    },
-    ({ as, emoji, on }) => tool((attached) => runSlack(attached, "react", [emoji], { as, on })),
-  );
-  mcp.registerTool(
-    "slack_click",
-    {
-      description: "Click a button, as a person: the one with this label in the latest message that has it.",
-      inputSchema: { as: person, label: z.string().min(1).describe('The button\'s label, e.g. "Approve"') },
-    },
-    ({ as, label }) => tool((attached) => runSlack(attached, "click", [label], { as })),
-  );
-  mcp.registerTool(
-    "slack_stop",
-    {
-      description: "Press Stop on the bot's work in a thread, as the person who started it (or `as`).",
-      inputSchema: { as: person.optional(), thread: reference },
-    },
-    ({ as, thread }) => tool((attached) => runSlack(attached, "stop", [], { as, thread })),
-  );
-  mcp.registerTool(
-    "show_thread",
+    "reply",
     {
       description:
-        "The latest Slack conversation as a person would read it; with `thread`, only that thread. `json` lists the entries with their ids.",
-      inputSchema: { thread: reference, json: z.boolean().optional() },
+        "Reply to an entry as a person: in its thread where the channel has threads, otherwise in its place.",
+      inputSchema: { channel: channelName, as: person, text: z.string().min(1), to: reference },
     },
-    ({ thread, json }) => tool((attached) => runShow(attached, { thread, json })),
+    ({ channel, as, text, to }) => tool((attached) => runReply(attached, devChannel(channel), text, { as, to })),
   );
+  mcp.registerTool(
+    "react",
+    {
+      description: `React to an entry with an emoji, as a person. On ${DEV_CHANNELS.filter(
+        ({ adapter }) => adapter.react,
+      )
+        .map(({ title }) => title)
+        .join(", ")}.`,
+      inputSchema: {
+        channel: channelName,
+        as: person,
+        emoji: z.string().min(1).describe('e.g. ":eyes:"'),
+        on: reference,
+      },
+    },
+    ({ channel, as, emoji, on }) => tool((attached) => runReact(attached, devChannel(channel), emoji, { as, on })),
+  );
+  mcp.registerTool(
+    "show",
+    {
+      description:
+        "A place as a person reads it: the most recently active one (on any channel, without `channel`), the one `in` names, or with `thread` only that entry's thread. `json` lists the entries with their ids.",
+      inputSchema: {
+        channel: channelName.optional(),
+        in: z.string().min(1).optional().describe("A place, by name"),
+        thread: reference,
+        json: z.boolean().optional(),
+      },
+    },
+    ({ channel, in: where, thread, json }) =>
+      tool((attached) =>
+        runShow(attached, channel === undefined ? undefined : devChannel(channel), { in: where, thread, json }),
+      ),
+  );
+  // One tool per channel for everything else its people do, generated from its routes.
+  for (const channel of DEV_CHANNELS) {
+    const actions = actionsOf(channel.name);
+    const [first, ...others] = actions.map((action) => action.name);
+    if (first === undefined) continue;
+    mcp.registerTool(
+      `${channel.name}_act`,
+      {
+        description: [
+          `Act on ${channel.title} as a person. References the action needs and isn't given (the message, the issue, the app) are the target's: the entry \`on\` names, the newest one in the place \`in\` names, or the newest anywhere on ${channel.title}. A person or the app is given by name, a reference as "last" or an id. Without \`as\`, whoever started the target's thread acts.`,
+          "Actions, with the values `params` takes (? is optional):",
+          ...actions.map((action) => `- ${describeAction(action)}`),
+        ].join("\n"),
+        inputSchema: {
+          action: z.enum([first, ...others]),
+          as: person.optional(),
+          in: z
+            .string()
+            .min(1)
+            .optional()
+            .describe(`A ${channel.adapter.place} by name, e.g. ${channel.adapter.example}`),
+          on: reference,
+          params: z.record(z.string(), z.unknown()).optional().describe("The action's values by name"),
+        },
+      },
+      ({ action, as, in: where, on, params }) =>
+        tool((attached) =>
+          runAct(attached, channel, action, { positional: [], values: params ?? {}, flags: { as, in: where, on } }),
+        ),
+    );
+  }
   mcp.registerTool(
     "list_deliveries",
     {

@@ -1,6 +1,6 @@
 ---
 name: channelstack
-description: Try a Slack bot you are building against channelstack's fake Slack, through the channelstack MCP tools or CLI. Post as a person, read what the bot answered, see what was delivered to it and what it called, redeliver, and check again. Use when changing an agent that lives in Slack, GitHub, Linear or Notion and you want to see it answer before you write the test.
+description: Try a bot you are building against channelstack's fake Slack, GitHub, Linear, Notion, Resend or Gmail, through the channelstack MCP tools or CLI. Post as a person, read what the bot answered, act as people do on the platform (click, review, delegate, …), see what was delivered to it and what it called, redeliver, and check again. Use when changing an agent that lives in Slack, GitHub, Linear, Notion or email and you want to see it answer before you write the test.
 ---
 
 # channelstack
@@ -17,17 +17,17 @@ channelstack fakes Slack, GitHub, Linear, Notion, Resend and Gmail (`google`) in
    { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
    ```
 
-Everything happens in one long-lived `dev` session, shared with the CLI and the UI. People and channels are created the first time you name them.
+Everything happens in one long-lived `dev` session, shared with the CLI and the UI. People and places are created the first time you name them, with the bot in them. A place is what people talk in, by its name: a Slack channel (`"#support"`), a GitHub issue or pull request by its title, a Linear issue by its title, a Notion page by its title, an email thread by its subject (`resend` or `google`).
 
 ## The loop
 
-1. **Act as a person.** `slack_say` with `as: "ana"`, `channel: "#support"`, `text: "@my-agent summarize today"`. Follow up with `slack_reply`, `slack_react`, `slack_click` (a button's label) or `slack_stop`.
-2. **Read the answer.** `show_thread` shows the latest conversation as a person reads it. The bot works asynchronously: if its reply isn't there yet, call it again.
+1. **Act as a person.** `say` with `channel: "slack"`, `as: "ana"`, `in: "#support"`, `text: "@my-agent summarize today"` (or `channel: "github"`, `in: "Login fails"`, …). Follow up with `reply` or `react`, which take `last` by default. Everything else people do on a channel is its `<channel>_act` tool: `slack_act` with `action: "click"` and `params: { "button": "Approve" }`, `github_act` with `action: "review"`, `linear_act` with `action: "delegate"`. Its description lists the actions and their values; references an action needs (the message, the issue, the app) come from the newest entry, or from `on` / `in`.
+2. **Read the answer.** `show` shows the most recently active place as a person reads it (`channel` and `in` for another, `json: true` for the entries' ids). The bot works asynchronously: if its reply isn't there yet, call it again.
 3. **See why.** `tail` returns what happened since its last call: events delivered to the bot (`→ slack app_mention  200`) and the API calls it made (`← slack chat.postMessage  200`). A delivery that failed, or a call refused with an error code, is usually the bug.
 4. **Change the bot, then send the same event again.** `list_deliveries` lists them with ids (`channel: "slack"` for Slack's only); `redeliver` sends the newest again (or one by `delivery` id), the way Slack retries (with its retry headers). A bot that answers twice doesn't handle retries.
-5. **Check again** with `show_thread`.
+5. **Check again** with `show`.
 
-The same commands exist on the CLI: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, `channelstack show`, `channelstack tail`, `channelstack deliveries`, `channelstack redeliver last`.
+The same commands exist on the CLI: `channelstack slack say --as ana --in "#support" "@my-agent hi"`, `channelstack github say --as mo --in "Login fails" "@my-agent look"`, `channelstack slack click --as ana Approve`, `channelstack slack actions`, `channelstack show`, `channelstack tail`, `channelstack deliveries`, `channelstack redeliver last`.
 
 ## Then write the test
 
@@ -51,4 +51,4 @@ pytest is the same with `pytest-channelstack`: `await expect(msg.thread).to_have
 - State is in memory: restarting the server starts from nothing. Run `npx channelstack env` again only after `channelstack secrets rotate`.
 - channelstack doesn't run the bot or its model. Use your framework's fake model in tests.
 - The tools never return the server's token. Don't paste tokens from `.env` into chat either.
-- GitHub, Linear, Notion, Resend and Google have no MCP tools beyond `list_deliveries` and `redeliver`; drive them from a test.
+- Notion and email have no reactions: `react` says so. A Linear reaction is on a comment, not the issue.

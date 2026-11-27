@@ -377,6 +377,48 @@ function decodeSlackUninstallDeliveries(ctx: HandleContext, data: SlackUninstall
   return data.map((item) => new SlackDelivery(ctx, item));
 }
 
+export type GitHubUsers = GitHubUser[];
+
+export type GitHubUsersWire = GitHubUserData[];
+
+function decodeGitHubUsers(ctx: HandleContext, data: GitHubUsersWire): GitHubUsers {
+  return data.map((item) => new GitHubUser(ctx, item));
+}
+
+export type GitHubRepos = GitHubRepo[];
+
+export type GitHubReposWire = GitHubRepoData[];
+
+function decodeGitHubRepos(ctx: HandleContext, data: GitHubReposWire): GitHubRepos {
+  return data.map((item) => new GitHubRepo(ctx, item));
+}
+
+export type GitHubIssues = GitHubIssueListing[];
+
+export type GitHubIssuesWire = GitHubIssueListingWire[];
+
+function decodeGitHubIssues(ctx: HandleContext, data: GitHubIssuesWire): GitHubIssues {
+  return data.map((item) => decodeGitHubIssueListing(ctx, item));
+}
+
+export interface GitHubIssueListing {
+  issue: GitHubIssue;
+  title: string;
+  pullRequest: boolean;
+  updatedAt: string;
+}
+
+export interface GitHubIssueListingWire {
+  issue: GitHubIssueData;
+  title: string;
+  pullRequest: boolean;
+  updatedAt: string;
+}
+
+function decodeGitHubIssueListing(ctx: HandleContext, data: GitHubIssueListingWire): GitHubIssueListing {
+  return { ...data, issue: new GitHubIssue(ctx, data.issue) };
+}
+
 export type GitHubApps = GitHubApp[];
 
 export type GitHubAppsWire = GitHubAppData[];
@@ -582,6 +624,44 @@ function decodeLinearApps(ctx: HandleContext, data: LinearAppsWire): LinearApps 
   return data.map((item) => new LinearApp(ctx, item));
 }
 
+export type LinearUsers = LinearUser[];
+
+export type LinearUsersWire = LinearUserData[];
+
+function decodeLinearUsers(ctx: HandleContext, data: LinearUsersWire): LinearUsers {
+  return data.map((item) => new LinearUser(ctx, item));
+}
+
+export type LinearTeams = LinearTeam[];
+
+export type LinearTeamsWire = LinearTeamData[];
+
+function decodeLinearTeams(ctx: HandleContext, data: LinearTeamsWire): LinearTeams {
+  return data.map((item) => new LinearTeam(ctx, item));
+}
+
+export type LinearIssues = LinearIssueListing[];
+
+export type LinearIssuesWire = LinearIssueListingWire[];
+
+function decodeLinearIssues(ctx: HandleContext, data: LinearIssuesWire): LinearIssues {
+  return data.map((item) => decodeLinearIssueListing(ctx, item));
+}
+
+export interface LinearIssueListing {
+  issue: LinearIssue;
+  title: string;
+}
+
+export interface LinearIssueListingWire {
+  issue: LinearIssueData;
+  title: string;
+}
+
+function decodeLinearIssueListing(ctx: HandleContext, data: LinearIssueListingWire): LinearIssueListing {
+  return { ...data, issue: new LinearIssue(ctx, data.issue) };
+}
+
 export interface LinearIssueState {
   name: string;
   type: "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage" | "duplicate";
@@ -686,6 +766,22 @@ export type NotionIntegrationsWire = NotionIntegrationData[];
 
 function decodeNotionIntegrations(ctx: HandleContext, data: NotionIntegrationsWire): NotionIntegrations {
   return data.map((item) => new NotionIntegration(ctx, item));
+}
+
+export type NotionUsers = NotionUser[];
+
+export type NotionUsersWire = NotionUserData[];
+
+function decodeNotionUsers(ctx: HandleContext, data: NotionUsersWire): NotionUsers {
+  return data.map((item) => new NotionUser(ctx, item));
+}
+
+export type NotionPages = NotionPage[];
+
+export type NotionPagesWire = NotionPageData[];
+
+function decodeNotionPages(ctx: HandleContext, data: NotionPagesWire): NotionPages {
+  return data.map((item) => new NotionPage(ctx, item));
 }
 
 export type NotionPropertySchema = "title" | "rich_text" | "number" | "checkbox" | "date" | "people" | "url" | "email" | { select: string[] } | { multi_select: string[] } | { status: string[] } | { relation: NotionDatabase };
@@ -809,6 +905,22 @@ export interface ResendPrincipal {
   kind: "user" | "app";
 }
 
+export type ResendUsers = ResendUser[];
+
+export type ResendUsersWire = ResendUserData[];
+
+function decodeResendUsers(ctx: HandleContext, data: ResendUsersWire): ResendUsers {
+  return data.map((item) => new ResendUser(ctx, item));
+}
+
+export type ResendThreads = ResendThread[];
+
+export type ResendThreadsWire = ResendThreadData[];
+
+function decodeResendThreads(ctx: HandleContext, data: ResendThreadsWire): ResendThreads {
+  return data.map((item) => new ResendThread(ctx, item));
+}
+
 export type ResendInbox = ResendEmail[];
 
 export type ResendInboxWire = ResendEmailData[];
@@ -896,6 +1008,22 @@ export interface GooglePrincipal {
   kind: "user" | "app";
 }
 
+export type GoogleUsers = GoogleUser[];
+
+export type GoogleUsersWire = GoogleUserData[];
+
+function decodeGoogleUsers(ctx: HandleContext, data: GoogleUsersWire): GoogleUsers {
+  return data.map((item) => new GoogleUser(ctx, item));
+}
+
+export type GoogleThreads = GoogleThread[];
+
+export type GoogleThreadsWire = GoogleThreadData[];
+
+function decodeGoogleThreads(ctx: HandleContext, data: GoogleThreadsWire): GoogleThreads {
+  return data.map((item) => new GoogleThread(ctx, item));
+}
+
 export type GoogleInbox = GoogleEmail[];
 
 export type GoogleInboxWire = GoogleEmailData[];
@@ -967,6 +1095,47 @@ export interface GoogleApiCall {
   responseStatus: number;
   response?: unknown;
   error?: string;
+}
+
+export type Places = Place[];
+
+export type PlacesWire = PlaceData[];
+
+function decodePlaces(ctx: HandleContext, data: PlacesWire): Places {
+  return data.map((item) => new Place(ctx, item));
+}
+
+export interface PlaceTranscript {
+  entries: PlaceTranscriptEntry[];
+  text: string;
+  toString(): string;
+}
+
+export interface PlaceTranscriptWire {
+  entries: PlaceTranscriptEntry[];
+  text: string;
+}
+
+function decodePlaceTranscript(_ctx: HandleContext, data: PlaceTranscriptWire): PlaceTranscript {
+  return printsAs({ ...data }, data.text);
+}
+
+export interface PlaceTranscriptEntry {
+  id: string;
+  author: PlacePrincipal;
+  at: string;
+  text: string;
+  controls: string[];
+  edited: boolean;
+  depth: number;
+  streaming?: "open" | "stopped" | "completed";
+  visibleTo?: PlacePrincipal;
+}
+
+export interface PlacePrincipal {
+  id: string;
+  name: string;
+  kind: "user" | "app";
 }
 
 export interface UiLoginLink {
@@ -1106,6 +1275,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google`)) as GoogleFixtureData;
     return new GoogleFixture(ctx, data);
+  }
+
+  /** Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last. Experimental. */
+  async places(): Promise<Places> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/places`)) as PlacesWire;
+    return decodePlaces(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -2109,11 +2285,32 @@ export class GitHubFixture {
     return new GitHubUser(ctx, data);
   }
 
+  /** The people this session created. Experimental. */
+  async users(): Promise<GitHubUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/users`)) as GitHubUsersWire;
+    return decodeGitHubUsers(ctx, data);
+  }
+
   /** Create a repository in the org. The App hears about it only when it is listed in `apps`: an App must be installed on a repository. Experimental. */
   async createRepo(options: { name?: string; private?: boolean; defaultBranch?: string; files?: string | FileInput[]; collaborators?: Array<GitHubUser | { user: GitHubUser; permission?: "read" | "triage" | "write" | "maintain" | "admin" }>; apps?: GitHubApp[]; labels?: Array<string | { name: string; color?: string; description?: string }> } = {}): Promise<GitHubRepo> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/repos`, { body: { name: options.name, private: options.private, defaultBranch: options.defaultBranch, files: options.files === undefined ? undefined : readTree(options.files), collaborators: options.collaborators === undefined ? undefined : options.collaborators.map((item) => (item instanceof GitHubUser ? { user: item.id } : { ...item, user: item.user.id })), apps: options.apps === undefined ? undefined : options.apps.map((item) => item.id), labels: options.labels === undefined ? undefined : options.labels.map((item) => (typeof item === "string" ? { name: item } : item)) } })) as GitHubRepoData;
     return new GitHubRepo(ctx, data);
+  }
+
+  /** The repositories this session created. Experimental. */
+  async repos(): Promise<GitHubRepos> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/repos`)) as GitHubReposWire;
+    return decodeGitHubRepos(ctx, data);
+  }
+
+  /** The issues and pull requests in this session's repositories, read again from GitHub live, the most recently updated last. Experimental. */
+  async issues(): Promise<GitHubIssues> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/issues`)) as GitHubIssuesWire;
+    return decodeGitHubIssues(ctx, data);
   }
 
   /** The id of the built-in App's installation, for a repository it is installed on. Experimental. */
@@ -2660,80 +2857,6 @@ export class GitHubRepo {
   }
 }
 
-/** Wire data of a {@link GitHubDelivery}. */
-export interface GitHubDeliveryData {
-  id: string;
-  channel: "github";
-  app: string;
-  type: string;
-  action?: string;
-  guid: string;
-  payload?: unknown;
-  attempts: DeliveryAttempt[];
-  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
-}
-
-export class GitHubDelivery {
-  readonly id: string;
-  readonly channel: "github";
-  readonly app: string;
-  readonly type: string;
-  readonly action: string | undefined;
-  readonly guid: string;
-  readonly payload: unknown | undefined;
-  readonly attempts: DeliveryAttempt[];
-  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
-  readonly #ctx: HandleContext;
-
-  /** @internal Handles come from the SDK, never from `new`. */
-  constructor(ctx: HandleContext, data: GitHubDeliveryData) {
-    this.#ctx = ctx;
-    this.id = data.id;
-    this.channel = data.channel;
-    this.app = data.app;
-    this.type = data.type;
-    this.action = data.action;
-    this.guid = data.guid;
-    this.payload = data.payload;
-    this.attempts = data.attempts;
-    this.status = data.status;
-  }
-
-  /** Re-read a delivery: its attempts and status. Experimental. */
-  async refresh(): Promise<GitHubDelivery> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries/${segment(this.id)}`)) as GitHubDeliveryData;
-    return new GitHubDelivery(ctx, data);
-  }
-
-  /** Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt. Experimental. */
-  async redeliver(): Promise<DeliveryAttempt> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
-    return data;
-  }
-
-  /** Send the delivery again, unchanged or signed with a secret that isn't the App's. Experimental. */
-  async resend(options: { badSignature?: boolean } = {}): Promise<DeliveryAttempt> {
-    const ctx = this.#ctx;
-    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature } })) as DeliveryAttempt;
-    return data;
-  }
-
-  /** Wait for the delivery to settle, and resolve with the value as it is then. */
-  async settled(options: WaitOptions = {}): Promise<GitHubDelivery> {
-    return waitFor("the delivery to settle", async () => {
-      const value = await this.refresh();
-      return value.status === "pending" ? undefined : value;
-    }, options);
-  }
-
-  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
-  [QUIET](): Promise<QuietState> {
-    return quietOf(this.#ctx);
-  }
-}
-
 /** Wire data of a {@link GitHubIssue}. */
 export interface GitHubIssueData {
   repoId: string;
@@ -2820,6 +2943,80 @@ export class GitHubIssue {
   /** The latest comment matching `from`, once the agent is quiet. Waits for at least one. */
   async latestComment(options: { from?: GitHubUser | GitHubApp | string } & QuietOptions = {}): Promise<GitHubComment> {
     return latestOnceQuiet(() => this.comments(), (item) => fromMatches(item.author, options.from), () => quietOf(this.#ctx), describeWait("a comment", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link GitHubDelivery}. */
+export interface GitHubDeliveryData {
+  id: string;
+  channel: "github";
+  app: string;
+  type: string;
+  action?: string;
+  guid: string;
+  payload?: unknown;
+  attempts: DeliveryAttempt[];
+  status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+}
+
+export class GitHubDelivery {
+  readonly id: string;
+  readonly channel: "github";
+  readonly app: string;
+  readonly type: string;
+  readonly action: string | undefined;
+  readonly guid: string;
+  readonly payload: unknown | undefined;
+  readonly attempts: DeliveryAttempt[];
+  readonly status: "pending" | "acknowledged" | "failed" | "timed_out" | "unreachable";
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: GitHubDeliveryData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.channel = data.channel;
+    this.app = data.app;
+    this.type = data.type;
+    this.action = data.action;
+    this.guid = data.guid;
+    this.payload = data.payload;
+    this.attempts = data.attempts;
+    this.status = data.status;
+  }
+
+  /** Re-read a delivery: its attempts and status. Experimental. */
+  async refresh(): Promise<GitHubDelivery> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/github/deliveries/${segment(this.id)}`)) as GitHubDeliveryData;
+    return new GitHubDelivery(ctx, data);
+  }
+
+  /** Redeliver from the App's delivery log, as GitHub's UI and API do: the same GUID, a new attempt. Experimental. */
+  async redeliver(): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/deliveries/${segment(this.id)}/redeliver`)) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Send the delivery again, unchanged or signed with a secret that isn't the App's. Experimental. */
+  async resend(options: { badSignature?: boolean } = {}): Promise<DeliveryAttempt> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/github/deliveries/${segment(this.id)}/resend`, { body: { badSignature: options.badSignature } })) as DeliveryAttempt;
+    return data;
+  }
+
+  /** Wait for the delivery to settle, and resolve with the value as it is then. */
+  async settled(options: WaitOptions = {}): Promise<GitHubDelivery> {
+    return waitFor("the delivery to settle", async () => {
+      const value = await this.refresh();
+      return value.status === "pending" ? undefined : value;
+    }, options);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
@@ -3069,6 +3266,13 @@ export class LinearFixture {
     return new LinearUser(ctx, data);
   }
 
+  /** The people this session created. Experimental. */
+  async users(): Promise<LinearUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/users`)) as LinearUsersWire;
+    return decodeLinearUsers(ctx, data);
+  }
+
   /** Make another OAuth app in the workspace, installed with `actor=app`: its own app user (mentionable and assignable), access token, client and webhook secret. Or return the one made with this name and settings. Its webhooks go to CHANNELSTACK_LINEAR_APP_<NAME>_WEBHOOK_URL. Experimental. */
   async createApp(options: { name: string; events?: string[] }): Promise<LinearApp> {
     const ctx = this.#ctx;
@@ -3083,11 +3287,25 @@ export class LinearFixture {
     return decodeLinearApps(ctx, data);
   }
 
+  /** The teams this session created. Experimental. */
+  async teams(): Promise<LinearTeams> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/teams`)) as LinearTeamsWire;
+    return decodeLinearTeams(ctx, data);
+  }
+
   /** Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one. Experimental. */
   async createTeam(options: { key?: string; name?: string; members?: LinearUser[]; states?: Array<{ name: string; type: "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage" }>; labels?: string[] } = {}): Promise<LinearTeam> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/linear/teams`, { body: { key: options.key, name: options.name, members: options.members === undefined ? undefined : options.members.map((item) => item.id), states: options.states, labels: options.labels } })) as LinearTeamData;
     return new LinearTeam(ctx, data);
+  }
+
+  /** The issues in this session's teams, read again from Linear live, oldest first. Experimental. */
+  async issues(): Promise<LinearIssues> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/linear/issues`)) as LinearIssuesWire;
+    return decodeLinearIssues(ctx, data);
   }
 
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
@@ -3751,6 +3969,13 @@ export class NotionFixture {
     return new NotionUser(ctx, data);
   }
 
+  /** The people this session created. Experimental. */
+  async users(): Promise<NotionUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/users`)) as NotionUsersWire;
+    return decodeNotionUsers(ctx, data);
+  }
+
   /** Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it. Experimental. */
   async createApp(options: { name: string; capabilities?: NotionCapability[]; events?: string[] }): Promise<NotionIntegration> {
     const ctx = this.#ctx;
@@ -3763,6 +3988,13 @@ export class NotionFixture {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/apps`)) as NotionIntegrationsWire;
     return decodeNotionIntegrations(ctx, data);
+  }
+
+  /** The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash. Experimental. */
+  async pages(): Promise<NotionPages> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/notion/pages`)) as NotionPagesWire;
+    return decodeNotionPages(ctx, data);
   }
 
   /** Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds. Experimental. */
@@ -4336,6 +4568,20 @@ export class ResendFixture {
     return new ResendUser(ctx, data);
   }
 
+  /** The people this session created. Experimental. */
+  async users(): Promise<ResendUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/users`)) as ResendUsersWire;
+    return decodeResendUsers(ctx, data);
+  }
+
+  /** The threads this session's people started, oldest first. Experimental. */
+  async threads(): Promise<ResendThreads> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/resend/threads`)) as ResendThreadsWire;
+    return decodeResendThreads(ctx, data);
+  }
+
   /** Every webhook channelstack sent the agent for this session, with every attempt. Experimental. */
   async deliveries(options: { type?: string; resource?: ResendThread } = {}): Promise<ResendDeliveries> {
     const ctx = this.#ctx;
@@ -4721,6 +4967,20 @@ export class GoogleFixture {
     return new GoogleUser(ctx, data);
   }
 
+  /** The people this session created. Experimental. */
+  async users(): Promise<GoogleUsers> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/users`)) as GoogleUsersWire;
+    return decodeGoogleUsers(ctx, data);
+  }
+
+  /** The threads this session's people started, oldest first. Experimental. */
+  async threads(): Promise<GoogleThreads> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google/threads`)) as GoogleThreadsWire;
+    return decodeGoogleThreads(ctx, data);
+  }
+
   /** Every push channelstack sent the agent for this session, with every attempt. Experimental. */
   async deliveries(options: { type?: string; resource?: GoogleThread } = {}): Promise<GoogleDeliveries> {
     const ctx = this.#ctx;
@@ -5064,6 +5324,46 @@ export class GoogleUser {
   /** Wait for the next new email matching `from` (anyone if omitted), after the last one this handle saw. */
   async waitForEmail(options: { from?: GooglePrincipal | string } & WaitOptions = {}): Promise<GoogleEmail> {
     return waitForNext(this.#seen, "waitForEmail", () => this.inbox(), (item) => fromMatches(item.author, options.from), describeWait("an email", options.from), options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link Place}. */
+export interface PlaceData {
+  channel: string;
+  title: string;
+  id: string;
+  name: string;
+  active?: string;
+}
+
+export class Place {
+  readonly channel: string;
+  readonly title: string;
+  readonly id: string;
+  readonly name: string;
+  readonly active: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: PlaceData) {
+    this.#ctx = ctx;
+    this.channel = data.channel;
+    this.title = data.title;
+    this.id = data.id;
+    this.name = data.name;
+    this.active = data.active;
+  }
+
+  /** A place as a person reads it: the transcript its channel's own transcript route has. Experimental. */
+  async transcript(): Promise<PlaceTranscript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/places/${segment(this.channel)}/${segment(this.id)}/transcript`)) as PlaceTranscriptWire;
+    return decodePlaceTranscript(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

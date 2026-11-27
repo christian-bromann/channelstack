@@ -1,3 +1,4 @@
+import { emailDev } from "../../core/email/dev.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { fakeGoogleWorld } from "./backend.ts";
 import { createGoogleFake } from "./fake/index.ts";
@@ -13,6 +14,7 @@ import { GOOGLE_SECRETS } from "./secrets.ts";
 export const google: DriverDefinition = {
   name: "google",
   title: "Google",
+  dev: emailDev("Google"),
   ids: GOOGLE_IDS,
   tokenPatterns: [/ya29\.[A-Za-z0-9_-]{20,}/g, /1\/\/0[A-Za-z0-9_-]{40,}/g, /GOCSPX-[A-Za-z0-9_-]{28}/g],
   // Gmail's API, Google's token endpoint, and where its certificates are.

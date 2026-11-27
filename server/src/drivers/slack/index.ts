@@ -1,5 +1,6 @@
 import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
+import { slackDev } from "./dev.ts";
 import { createSlackFake } from "./fake/index.ts";
 import { SLACK_IDS } from "./ids.ts";
 import { removeSlackEntry } from "./live/cleanup.ts";
@@ -19,6 +20,7 @@ const excerpt = (text: string): string => {
 export const slack: DriverDefinition = {
   name: "slack",
   title: "Slack",
+  dev: slackDev,
   ids: SLACK_IDS,
   tokenPatterns: [/xox[abeoprs]-[A-Za-z0-9-]{10,}/g, /xapp-\d-[A-Za-z0-9-]{10,}/g],
   liveTokens: [SLACK_SECRETS.userToken],

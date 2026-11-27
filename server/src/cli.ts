@@ -3,19 +3,20 @@ import { parseArgs } from "node:util";
 
 import pkg from "../package.json" with { type: "json" };
 import { CONTROL_PREFIX } from "./app.ts";
+import { actionOptionNames, runChannel } from "./cli/act.ts";
 import { attach, type Attached } from "./cli/attach.ts";
 import { runDeliveries, runRedeliver } from "./cli/deliveries.ts";
+import { runShow } from "./cli/dev.ts";
 import { runDoctor, runLogin, runSweep } from "./cli/live.ts";
 import { runMcp } from "./cli/mcp.ts";
-import { runSlack } from "./cli/slack.ts";
-import { runShow, runTail } from "./cli/watch.ts";
+import { runTail } from "./cli/watch.ts";
 import { appWebhookVariable } from "./core/apps/index.ts";
 import { rotateCa } from "./core/ca/index.ts";
 import { homeDir } from "./core/home/index.ts";
 import { parseSeed } from "./core/ids/index.ts";
 import { parseLogLevel } from "./core/log/index.ts";
 import { randomSeed, Secrets } from "./core/secrets/index.ts";
-import { DRIVERS, proxyHosts, secretSpecs } from "./drivers/index.ts";
+import { DEV_CHANNELS, DRIVERS, proxyHosts, secretSpecs } from "./drivers/index.ts";
 import { start } from "./serve.ts";
 import { UI_PAGE } from "./ui/page.ts";
 
@@ -38,13 +39,17 @@ Usage:
       --channel <name>            Only that channel's lines
   channelstack ca rotate          Replace proxy mode's CA (<home>/ca); restart the server and run \`channelstack env --proxy\`
 
-  Attached to the running server (a shared "dev" session; people and channels are created on first use):
-  channelstack slack say   --as <name> --in "#channel" "<text>"
-  channelstack slack reply --as <name> [--thread last] "<text>"
-  channelstack slack react --as <name> <:emoji:> [--on last]
-  channelstack slack click --as <name> "<button>"       The button in the latest message that has it
-  channelstack slack stop  [--as <name>] [--thread last]   Press Stop on the agent's work in a thread
-  channelstack show [--thread last] [--json]    The latest conversation as a person would read it
+  Attached to the running server (a shared "dev" session; people and places are created on first use).
+  <channel> is slack, github, linear, notion, resend or google; a place is a Slack channel, a GitHub issue,
+  a Linear issue, a Notion page or an email thread, by its name:
+  channelstack <channel> say   --as <name> --in <place> "<text>"
+  channelstack <channel> reply --as <name> [--to last|<ref>] "<text>"
+  channelstack <channel> react --as <name> <emoji> [--on last|<ref>]
+  channelstack <channel> show  [--in <place>] [--thread last|<ref>] [--json]   A place as a person reads it
+  channelstack <channel> actions                What else its people do (click, stop, review, delegate, …)
+  channelstack <channel> <action> [--as <name>] [--in <place>] [--on last|<ref>] [<value>…] [--<value> <v>…]
+                                  One of those, e.g. \`channelstack slack click --as ana Approve\`
+  channelstack show [--thread last] [--json]    The most recently active place on any channel
   channelstack tail [--once]                    Events to the agent and its API calls, as they happen
   channelstack deliveries [<channel>]           What was delivered to the agent: ids, events, outcomes, attempts
   channelstack redeliver [<channel>] [last|<id>]   Deliver it again, the way the platform does (Slack retries it)
@@ -203,6 +208,9 @@ async function main() {
     args: process.argv.slice(2),
     allowPositionals: true,
     options: {
+      // The values the channels' actions take, by name (`--button Approve`, `--issue last`); the
+      // commands' own options below come after, so none of them is taken for a value.
+      ...Object.fromEntries(actionOptionNames().map((name) => [name, { type: "string" as const }])),
       version: { type: "boolean", short: "v" },
       help: { type: "boolean", short: "h" },
       "no-portless": { type: "boolean" },
@@ -219,6 +227,7 @@ async function main() {
       in: { type: "string" },
       thread: { type: "string" },
       on: { type: "string" },
+      to: { type: "string" },
       json: { type: "boolean" },
       once: { type: "boolean" },
       "storage-state": { type: "string", multiple: true },
@@ -272,12 +281,13 @@ async function main() {
       await runEnv(attach(values), { proxy: values.proxy === true, app: values.app, channel: values.channel }),
     );
   }
-  if (command === "slack") return print(await runSlack(attach(values), action, rest, values));
+  if (DEV_CHANNELS.some((channel) => channel.name === command))
+    return print(await runChannel(attach(values), command, action, rest, values));
   if (command === "ui") {
     const { url } = await attach(values).request<{ url: string }>("POST", "/ui/login-links");
     return print(`${url}\n`);
   }
-  if (command === "show") return print(await runShow(attach(values), values));
+  if (command === "show") return print(await runShow(attach(values), undefined, values));
   if (command === "tail") return runTail(attach(values), values, print);
   if (command === "deliveries") return print(await runDeliveries(attach(values), action));
   if (command === "redeliver")
