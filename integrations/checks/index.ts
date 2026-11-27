@@ -32,7 +32,21 @@ export interface ChecksOptions {
   skip?: string[];
   /** How long each check waits for the agent. Default: the integration's timeout. */
   timeout?: Duration;
+  /**
+   * The agent's model is the fake OpenAI (decision 0029): the checks script it themselves (the
+   * stream checks need no `streamPrompt`), and the model checks are added (`SLACK_MODEL_CHECKS`).
+   */
+  model?: "openai";
 }
+
+/** What a check's model answers when the check scripts nothing of its own. */
+const FALLBACK_ANSWER = "Here's what I found.";
+
+/** A long answer, streamed slowly: what the stream and Stop checks script. */
+const LONG_ANSWER = {
+  text: Array.from({ length: 40 }, (_, at) => `Part ${at + 1} of the report. `),
+  timing: { betweenChunks: "100ms" },
+};
 
 /** The ids of the Slack checks, in the order they are registered. */
 export const SLACK_CHECKS = [
@@ -50,6 +64,19 @@ export const SLACK_CHECKS = [
   "slack.click-unauthorized",
   "slack.double-click",
 ] as const;
+
+/** The ids of the Slack checks of an agent on the fake OpenAI (`model: "openai"`), in the order they are registered. */
+export const SLACK_MODEL_CHECKS = [
+  "slack.slow-model",
+  "slack.model-error",
+  "slack.model-retry",
+  "slack.stream-breaks",
+  "slack.stop-cancels-model",
+  "slack.no-secrets-to-model",
+] as const;
+
+/** The checks that script the model themselves: no fallback answer goes in front of theirs. */
+const SCRIPTS_THE_MODEL = new Set<string>([...SLACK_MODEL_CHECKS, "slack.stream-stop", "slack.stop"]);
 
 /** The ids of the GitHub checks, in the order they are registered. */
 export const GITHUB_CHECKS = [
@@ -121,8 +148,9 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
   return (id: Id, title: string, run: (context: TestContext) => Promise<void>, ...needs: unknown[]): void => {
     if (options.skip?.includes(id) || (needs.length > 0 && needs[0] === undefined)) return;
     // Vitest reads which fixtures a test uses from how it destructures its context: name them all.
-    test(`${title} [${id}]`, ({
+    test(`${title} [${id}]`, async ({
       channelstack,
+      openai,
       slack,
       github,
       linear,
@@ -136,9 +164,13 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
       onTestFailed,
       onTestFinished,
       annotate,
-    }) =>
-      run({
+    }) => {
+      // On the fake OpenAI, a check that scripts nothing itself gets a plain answer for every call.
+      if (options.model === "openai" && !SCRIPTS_THE_MODEL.has(id))
+        await openai.respond(FALLBACK_ANSWER, { times: -1 });
+      return run({
         channelstack,
+        openai,
         slack,
         github,
         linear,
@@ -152,7 +184,8 @@ const registrar = <Id extends string>(options: ChecksOptions, ids: readonly Id[]
         onTestFailed,
         onTestFinished,
         annotate,
-      } as TestContext));
+      } as TestContext);
+    });
   };
 };
 
@@ -166,7 +199,13 @@ export function slackChecks(options: ChecksOptions): void {
   const { app } = options;
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
-  const check = registrar(options, SLACK_CHECKS);
+  const check = registrar(options, [...SLACK_CHECKS, ...SLACK_MODEL_CHECKS]);
+  /** On the fake OpenAI, the stream checks script a long, slow stream, and need no prompt of their own. */
+  const streamPrompt = options.model === "openai" ? (options.streamPrompt ?? prompt) : options.streamPrompt;
+  const streams = async ({ openai }: TestContext) => {
+    if (options.model === "openai") await openai.respond(LONG_ANSWER);
+  };
+  const withModel = options.model === "openai" ? true : undefined;
 
   describe(`slack checks: ${app}`, () => {
     check("slack.dm-once", "replies once to a DM", async ({ slack }) => {
@@ -255,30 +294,34 @@ export function slackChecks(options: ChecksOptions): void {
     check(
       "slack.stream-stop",
       "a stream it starts, it also stops",
-      async ({ slack }) => {
+      async (context) => {
+        const { slack } = context;
+        await streams(context);
         const ana = await slack.createUser({ name: "Ana" });
-        const msg = await ana.say(options.streamPrompt ?? "", { to: slack.app });
+        const msg = await ana.say(streamPrompt ?? "", { to: slack.app });
         await expect(msg.thread).toHaveStreamingReplyFrom(app, wait);
         const reply = await msg.thread.latestReply({ from: app, ...wait });
         const stream = await reply.stream?.ended(wait);
         expect(stream?.state).toBe("completed");
         await expect(msg.thread).toHaveStatus("idle", wait);
       },
-      options.streamPrompt,
+      streamPrompt,
     );
 
     check(
       "slack.stop",
       "honours Stop: nothing more is written after it",
-      async ({ slack }) => {
+      async (context) => {
+        const { slack } = context;
+        await streams(context);
         const ana = await slack.createUser({ name: "Ana" });
-        const msg = await ana.say(options.streamPrompt ?? "", { to: slack.app });
+        const msg = await ana.say(streamPrompt ?? "", { to: slack.app });
         await expect(msg.thread).toHaveStreamingReplyFrom(app, wait);
         await ana.stop({ thread: msg });
         await expect(msg.thread).toHaveStatus("stopped", wait);
         await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
       },
-      options.streamPrompt,
+      streamPrompt,
     );
 
     check(
@@ -323,6 +366,91 @@ export function slackChecks(options: ChecksOptions): void {
         await expect(msg.thread).toHaveRepliesFrom(app, { count: 2, ...wait });
       },
       options.approval,
+    );
+
+    // --- On the fake OpenAI (decision 0029): one check per bug class the model's timing and failures cause.
+
+    check(
+      "slack.slow-model",
+      "a slow model and Slack's 3s retry still give one reply",
+      async (context) => {
+        const { slack, openai } = context;
+        await openai.respond(FALLBACK_ANSWER, { timing: { firstToken: "5s" }, times: -1 });
+        const ana = await slack.createUser({ name: "Ana" });
+        const msg = await ana.say(prompt, { to: slack.app });
+        await deliveryOf(msg, context, "Slack").retry({ after: "3s", reason: "http_timeout" });
+        await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, timeout: "20s" });
+      },
+      withModel,
+    );
+
+    check(
+      "slack.model-error",
+      "when the model fails, the person hears so and nothing is left working",
+      async ({ slack, openai }) => {
+        await openai.respond({ error: "overloaded" }, { times: -1 });
+        const ana = await slack.createUser({ name: "Ana" });
+        const msg = await ana.say(prompt, { to: slack.app });
+        await expect(msg.thread).toHaveReplyFrom(app, { timeout: "20s" });
+        await expect(msg.thread).not.toHaveStreamingReplyFrom(app, wait);
+        await expect(msg.thread).toHaveStatus("idle", wait);
+      },
+      withModel,
+    );
+
+    check(
+      "slack.model-retry",
+      "a model call that is retried still gives one reply",
+      async ({ slack, openai }) => {
+        await openai.respond([{ error: "overloaded" }, { error: "overloaded" }, FALLBACK_ANSWER]);
+        const ana = await slack.createUser({ name: "Ana" });
+        const msg = await ana.say(prompt, { to: slack.app });
+        await expect(msg.thread).toHaveReplyFrom(app, { text: FALLBACK_ANSWER, timeout: "20s" });
+        await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
+      },
+      withModel,
+    );
+
+    check(
+      "slack.stream-breaks",
+      "a stream that breaks halfway is stopped, and the status clears",
+      async ({ slack, openai }) => {
+        await openai.respond({ ...LONG_ANSWER, failAfter: { chunks: 3, how: "drop" } });
+        const ana = await slack.createUser({ name: "Ana" });
+        const msg = await ana.say(prompt, { to: slack.app });
+        await expect(msg.thread).toHaveReplyFrom(app, wait);
+        await expect(msg.thread).not.toHaveStreamingReplyFrom(app, wait);
+        await expect(msg.thread).toHaveStatus("idle", wait);
+      },
+      withModel,
+    );
+
+    check(
+      "slack.stop-cancels-model",
+      "Stop cancels the model request",
+      async ({ slack, openai }) => {
+        const ai = await openai.respond({ ...LONG_ANSWER, pauseAfter: 3 });
+        const ana = await slack.createUser({ name: "Ana" });
+        const msg = await ana.say(prompt, { to: slack.app });
+        const call = await ai.waitForPause(wait);
+        await ana.stop({ thread: msg });
+        await expect(msg.thread).toHaveStatus("stopped", wait);
+        await expect(call).toBeAborted(wait);
+      },
+      withModel,
+    );
+
+    check(
+      "slack.no-secrets-to-model",
+      "sends the model no token, signing secret or key",
+      async ({ slack, openai }) => {
+        await openai.respond(FALLBACK_ANSWER, { times: -1 });
+        const ana = await slack.createUser({ name: "Ana" });
+        const msg = await ana.say(prompt, { to: slack.app });
+        await expect(msg.thread).toHaveReplyFrom(app, wait);
+        await expect(openai).not.toHaveSentSecrets(wait);
+      },
+      withModel,
     );
   });
 }
