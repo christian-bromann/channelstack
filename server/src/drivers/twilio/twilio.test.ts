@@ -216,7 +216,7 @@ describe("a person texts the agent", () => {
     await h.app.settled();
     const replies = (await control("GET", `/conversations/${sent.conversation.id}/replies`)).body;
     expect(replies).toMatchObject([
-      { body: "On its way & soon", from: app.number, to: ana.number, author: { kind: "app" } },
+      { text: "On its way & soon", from: app.number, to: ana.number, author: { kind: "app" } },
     ]);
   });
 
