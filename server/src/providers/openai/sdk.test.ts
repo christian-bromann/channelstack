@@ -3,7 +3,7 @@
  * 13.8 and 13.11): every turn kind on both endpoints, streamed and not, the errors and the SDK's
  * retries, scripts that run out, and the store behind `previous_response_id` and conversations.
  */
-import OpenAI, { APIError } from "openai";
+import OpenAI, { APIError, AzureOpenAI } from "openai";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { slackWorkspace } from "../../../test/slack-workspace.ts";
@@ -360,5 +360,50 @@ describe("what the agent sent", () => {
         attributedBy: "tag",
       }),
     );
+  });
+});
+
+describe("gateway dialects", () => {
+  test("OpenRouter's reasoning field, when the request asks for it", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: [{ reasoning: { summary: "Checking the log." }, text: "Two incidents." }] });
+
+    const answer = await client.chat.completions.create({
+      model: "openai/gpt-5",
+      messages: ask(prompt),
+      // OpenRouter's own request field, beside OpenAI's.
+      ...({ reasoning: { effort: "low" } } as object),
+    });
+
+    expect(answer.choices[0]?.message).toEqual(
+      expect.objectContaining({ content: "Two incidents.", reasoning: "Checking the log." }),
+    );
+  });
+
+  test("DeepSeek's reasoning_content, for its reasoning models", async () => {
+    const { client, respond, prompt } = await setup();
+    await respond({ turns: [{ reasoning: { summary: "Checking the log." }, text: "Two incidents." }] });
+
+    const answer = await client.chat.completions.create({ model: "deepseek-reasoner", messages: ask(prompt) });
+
+    expect(answer.choices[0]?.message).toEqual(expect.objectContaining({ reasoning_content: "Checking the log." }));
+  });
+
+  test("Azure OpenAI on a deployment path, with its api-key header", async () => {
+    const { h, respond, control, prompt } = await setup();
+    await respond({ turns: ["From Azure."] });
+    const azure = new AzureOpenAI({
+      apiKey: h.secrets.get("openai", "apiKey"),
+      endpoint: "http://127.0.0.1:4500/openai",
+      deployment: "my-gpt-5",
+      apiVersion: "2025-04-01-preview",
+      fetch: (input, init) => Promise.resolve(h.app.fetch(new Request(input as string, init as RequestInit))),
+    });
+
+    const answer = await azure.chat.completions.create({ model: "", messages: ask(prompt) });
+
+    expect(answer.choices[0]?.message.content).toBe("From Azure.");
+    const [call] = await control("GET", "/calls");
+    expect(call.model).toBe("my-gpt-5");
   });
 });
