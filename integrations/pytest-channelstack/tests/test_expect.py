@@ -749,3 +749,35 @@ async def test_not_a_property_value() -> None:
     await expect(row).not_to_have_property_value("Points", 5, timeout="300ms")
     with pytest.raises(AssertionError, match="Expected Points not to be 3, it is 3"):
         await expect(row).not_to_have_property_value("Points", 3, timeout="300ms")
+
+
+@dataclass(frozen=True)
+class Writer:
+    id: str
+    name: str
+    kind: str
+
+
+def _loop(turns: int) -> Thread:
+    agent = Writer("A01", "my-agent", "app")
+    coder = Writer("A02", "coder", "app")
+    ana = Writer("U01", "Ana", "user")
+    messages = [Message(cast(Person, ana), "fix the login page")]
+    messages += [Message(cast(Person, agent if at % 2 == 0 else coder), f"turn {at}") for at in range(turns)]
+    return Thread(messages=messages)
+
+
+async def test_to_go_quiet_passes_when_the_conversation_settles_within_the_bound() -> None:
+    """Exit check 12.6: two app messages after Ana's, with a bound of four."""
+    await expect(_loop(2)).to_go_quiet(max_replies=4)
+
+
+async def test_to_go_quiet_fails_on_apps_answering_each_other_and_names_them_in_turn() -> None:
+    """What came before the check counts, and the message names the apps in turn."""
+    with pytest.raises(AssertionError) as failure:
+        await expect(_loop(5)).to_go_quiet(max_replies=4)
+    assert str(failure.value) == (
+        "Expected the conversation to go quiet within the timeout with at most 4 app messages since a person last "
+        "wrote. It went quiet with 5 app messages and no person between them: "
+        "my-agent → coder → my-agent → coder → my-agent"
+    )
