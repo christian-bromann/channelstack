@@ -6731,6 +6731,18 @@
           "address": {
             "type": "string",
             "description": "Where people email the agent: its team's receiving address."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The team's domain: it sends and receives there."
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "The team's API key (`RESEND_API_KEY`). Fake only: empty live."
+          },
+          "webhookSecret": {
+            "type": "string",
+            "description": "Its webhook's signing secret (`RESEND_WEBHOOK_SECRET`). Fake only: empty live."
           }
         },
         "required": [
@@ -6739,72 +6751,38 @@
           "kind",
           "name",
           "botUserId",
-          "address"
+          "address",
+          "domain",
+          "apiKey",
+          "webhookSecret"
         ],
         "x-channelstack-resource": {
           "id": "id",
           "role": "app"
         }
       },
-      "ResendUser": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The person's address: an email person is their mailbox."
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "resend"
-            ]
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "user"
-            ]
-          },
-          "name": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "channel",
-          "kind",
-          "name",
-          "address"
-        ],
-        "x-channelstack-resource": {
-          "id": "id",
-          "role": "user"
-        }
-      },
-      "ResendUserOptions": {
+      "ResendAppOptions": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "address": {
-            "type": "string",
-            "description": "The person's address. Default `<name>@example.com`."
-          },
-          "token": {
             "type": "string",
             "minLength": 1,
-            "description": "Live: an API key of the person's own Resend team, which sends as them and reads their mail. Read from CHANNELSTACK_RESEND_USER_<NAME>_TOKEN when left out.",
-            "x-channelstack-credential": "CHANNELSTACK_RESEND_USER_{name}_TOKEN"
+            "description": "Its name: 1 to 32 lower-case letters, digits and hyphens, from a letter"
+          },
+          "domain": {
+            "type": "string",
+            "description": "The team's receiving domain, which no other team has. Default `<name>.acme.example`; its address is `<name>@<domain>`."
           }
         },
         "required": [
           "name"
         ]
+      },
+      "ResendApps": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ResendApp"
+        }
       },
       "ResendEmail": {
         "type": "object",
@@ -6852,6 +6830,13 @@
           "messageId": {
             "type": "string"
           },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Its headers by lower-case name, the first of each: those its writer set too (`auto-submitted`, so a check can see an answer marked as automatic)."
+          },
           "delivery": {
             "$ref": "#/components/schemas/ResendDelivery"
           }
@@ -6867,7 +6852,8 @@
           "subject",
           "text",
           "at",
-          "messageId"
+          "messageId",
+          "headers"
         ],
         "x-channelstack-resource": {
           "id": "id"
@@ -6936,6 +6922,9 @@
               "resend"
             ]
           },
+          "app": {
+            "type": "string"
+          },
           "type": {
             "type": "string",
             "description": "`email.received`, `email.sent`, `email.delivered`, `email.bounced`, …"
@@ -6965,6 +6954,7 @@
         "required": [
           "id",
           "channel",
+          "app",
           "type",
           "email",
           "attempts",
@@ -6974,6 +6964,148 @@
           "id": "id"
         },
         "description": "The `email.received` webhook that told the agent, for an email to it."
+      },
+      "ResendAppSendBody": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "ResendUser",
+                "ResendApp"
+              ]
+            },
+            "description": "Who it goes to: apps, people."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "ResendUser",
+                "ResendApp"
+              ]
+            },
+            "default": [],
+            "description": "Who gets a copy."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "description": "Headers of its own, as its API call would set them: `Auto-Submitted: auto-replied`."
+          }
+        },
+        "required": [
+          "to",
+          "subject"
+        ]
+      },
+      "ResendAppReplyBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "ResendEmail"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "all": {
+            "type": "boolean",
+            "default": false,
+            "description": "Reply to everyone on the email, not only its sender."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "description": "Headers of its own, as its API call would set them: `Auto-Submitted: auto-replied`."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResendUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The person's address: an email person is their mailbox."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "resend"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "name",
+          "address"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "user"
+        }
+      },
+      "ResendUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "description": "The person's address. Default `<name>@example.com`."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Live: an API key of the person's own Resend team, which sends as them and reads their mail. Read from CHANNELSTACK_RESEND_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_RESEND_USER_{name}_TOKEN"
+          }
+        },
+        "required": [
+          "name"
+        ]
       },
       "ResendSendBody": {
         "type": "object",
@@ -6987,7 +7119,7 @@
                 "ResendApp"
               ]
             },
-            "description": "Who it goes to: the app, people."
+            "description": "Who it goes to: apps, people."
           },
           "cc": {
             "type": "array",
@@ -7233,6 +7365,18 @@
           "address": {
             "type": "string",
             "description": "Where people email the agent: its mailbox's address."
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Its OAuth client's id (`GOOGLE_CLIENT_ID`). Fake only: empty live."
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "Its OAuth client's secret (`GOOGLE_CLIENT_SECRET`). Fake only: empty live."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Its mailbox's refresh token (`GOOGLE_REFRESH_TOKEN`). Fake only: empty live."
           }
         },
         "required": [
@@ -7241,72 +7385,34 @@
           "kind",
           "name",
           "botUserId",
-          "address"
+          "address",
+          "clientId",
+          "clientSecret",
+          "refreshToken"
         ],
         "x-channelstack-resource": {
           "id": "id",
           "role": "app"
         }
       },
-      "GoogleUser": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The person's address: an email person is their mailbox."
-          },
-          "channel": {
-            "type": "string",
-            "enum": [
-              "google"
-            ]
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "user"
-            ]
-          },
-          "name": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "channel",
-          "kind",
-          "name",
-          "address"
-        ],
-        "x-channelstack-resource": {
-          "id": "id",
-          "role": "user"
-        }
-      },
-      "GoogleUserOptions": {
+      "GoogleAppOptions": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "address": {
-            "type": "string",
-            "description": "The person's address. Default `<name>@example.com`."
-          },
-          "token": {
             "type": "string",
             "minLength": 1,
-            "description": "Live: a refresh token for the person's own Gmail account, from the agent's OAuth client, which sends as them and reads their mail. Read from CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN when left out.",
-            "x-channelstack-credential": "CHANNELSTACK_GOOGLE_USER_{name}_TOKEN"
+            "description": "Its name: 1 to 32 lower-case letters, digits and hyphens, from a letter"
           }
         },
         "required": [
           "name"
         ]
+      },
+      "GoogleApps": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/GoogleApp"
+        }
       },
       "GoogleEmail": {
         "type": "object",
@@ -7354,6 +7460,13 @@
           "messageId": {
             "type": "string"
           },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Its headers by lower-case name, the first of each: those its writer set too (`auto-submitted`, so a check can see an answer marked as automatic)."
+          },
           "labels": {
             "type": "array",
             "items": {
@@ -7377,6 +7490,7 @@
           "text",
           "at",
           "messageId",
+          "headers",
           "labels"
         ],
         "x-channelstack-resource": {
@@ -7446,6 +7560,9 @@
               "google"
             ]
           },
+          "app": {
+            "type": "string"
+          },
           "type": {
             "type": "string",
             "description": "`gmail.history`: the mailbox's history moved on."
@@ -7479,6 +7596,7 @@
         "required": [
           "id",
           "channel",
+          "app",
           "type",
           "emailAddress",
           "historyId",
@@ -7489,6 +7607,148 @@
           "id": "id"
         },
         "description": "The push that told the agent of it, for an email to it."
+      },
+      "GoogleAppSendBody": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GoogleUser",
+                "GoogleApp"
+              ]
+            },
+            "description": "Who it goes to: apps, people."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GoogleUser",
+                "GoogleApp"
+              ]
+            },
+            "default": [],
+            "description": "Who gets a copy."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "description": "Headers of its own, as its API call would set them: `Auto-Submitted: auto-replied`."
+          }
+        },
+        "required": [
+          "to",
+          "subject"
+        ]
+      },
+      "GoogleAppReplyBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "x-channelstack-ref": [
+              "GoogleEmail"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "all": {
+            "type": "boolean",
+            "default": false,
+            "description": "Reply to everyone on the email, not only its sender."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "description": "Headers of its own, as its API call would set them: `Auto-Submitted: auto-replied`."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "GoogleUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The person's address: an email person is their mailbox."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "google"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "user"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "kind",
+          "name",
+          "address"
+        ],
+        "x-channelstack-resource": {
+          "id": "id",
+          "role": "user"
+        }
+      },
+      "GoogleUserOptions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "address": {
+            "type": "string",
+            "description": "The person's address. Default `<name>@example.com`."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Live: a refresh token for the person's own Gmail account, from the agent's OAuth client, which sends as them and reads their mail. Read from CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN when left out.",
+            "x-channelstack-credential": "CHANNELSTACK_GOOGLE_USER_{name}_TOKEN"
+          }
+        },
+        "required": [
+          "name"
+        ]
       },
       "GoogleSendBody": {
         "type": "object",
@@ -7502,7 +7762,7 @@
                 "GoogleApp"
               ]
             },
-            "description": "Who it goes to: the app, people."
+            "description": "Who it goes to: apps, people."
           },
           "cc": {
             "type": "array",
@@ -28055,6 +28315,322 @@
         }
       }
     },
+    "/sessions/{session}/resend/apps": {
+      "post": {
+        "summary": "Make another app: a team of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "ResendFixture",
+          "name": "createApp",
+          "options": [
+            "name",
+            "domain"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendAppOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendApp"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The channel's apps: the agent's team first, then the others in the order they were made",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendFixture",
+          "name": "apps"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendApps"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/apps/{app}/send": {
+      "post": {
+        "summary": "An app a test made sends an email, through its own team's API, as its own call would",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendApp",
+          "name": "send",
+          "options": [
+            "to",
+            "cc",
+            "subject",
+            "text",
+            "html",
+            "headers"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendAppSendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/apps/{app}/reply": {
+      "post": {
+        "summary": "An app a test made replies to an email, in its thread, as its own call would",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendApp",
+          "name": "reply",
+          "args": [
+            "email"
+          ],
+          "options": [
+            "text",
+            "html",
+            "all",
+            "headers"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendAppReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/resend/users": {
       "post": {
         "summary": "Create a person: a mailbox, at `<name>@example.com` unless a test gives the address",
@@ -28132,7 +28708,7 @@
     },
     "/sessions/{session}/resend/users/{user}/send": {
       "post": {
-        "summary": "The person emails someone: the agent (`resend.app`), or another person",
+        "summary": "The person emails someone: the agent (`resend.app`), another app, or another person",
         "security": [
           {
             "bearer": []
@@ -28432,6 +29008,99 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ResendEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/resend/emails/{email}/delivery-for": {
+      "get": {
+        "summary": "The delivery that told this app of the email (decision 0027), or nothing when it wasn't told",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "ResendEmail",
+          "name": "deliveryFor",
+          "args": [
+            "app"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "email",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "ResendApp"
+              ]
+            },
+            "required": true,
+            "name": "app",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ResendDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }
@@ -29165,6 +29834,321 @@
         }
       }
     },
+    "/sessions/{session}/google/apps": {
+      "post": {
+        "summary": "Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-factory": {
+          "on": "GoogleFixture",
+          "name": "createApp",
+          "options": [
+            "name"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAppOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleApp"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The channel's apps: the agent's mailbox first, then the others in the order they were made",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleFixture",
+          "name": "apps"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleApps"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/apps/{app}/send": {
+      "post": {
+        "summary": "An app a test made sends an email, through its own mailbox's API, as its own call would",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleApp",
+          "name": "send",
+          "options": [
+            "to",
+            "cc",
+            "subject",
+            "text",
+            "html",
+            "headers"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAppSendBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/apps/{app}/reply": {
+      "post": {
+        "summary": "An app a test made replies to an email, in its thread, as its own call would",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleApp",
+          "name": "reply",
+          "args": [
+            "email"
+          ],
+          "options": [
+            "text",
+            "html",
+            "all",
+            "headers"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "app",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAppReplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/google/users": {
       "post": {
         "summary": "Create a person: a mailbox, at `<name>@example.com` unless a test gives the address",
@@ -29242,7 +30226,7 @@
     },
     "/sessions/{session}/google/users/{user}/send": {
       "post": {
-        "summary": "The person emails someone: the agent (`google.app`), or another person",
+        "summary": "The person emails someone: the agent (`google.app`), another app, or another person",
         "security": [
           {
             "bearer": []
@@ -29542,6 +30526,99 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GoogleEmail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/google/emails/{email}/delivery-for": {
+      "get": {
+        "summary": "The delivery that told this app of the email (decision 0027), or nothing when it wasn't told",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "GoogleEmail",
+          "name": "deliveryFor",
+          "args": [
+            "app"
+          ]
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "unsupported_in_live",
+          "action_requires",
+          "live_misconfigured",
+          "live_not_allowlisted",
+          "fake_actor_in_live_world",
+          "cross_workspace_credential",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "email",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "x-channelstack-ref": [
+                "GoogleApp"
+              ]
+            },
+            "required": true,
+            "name": "app",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GoogleDelivery"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               }
             }

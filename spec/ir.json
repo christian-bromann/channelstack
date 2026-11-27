@@ -17384,6 +17384,96 @@
       ],
       "methods": [
         {
+          "name": "createApp",
+          "kind": "factory",
+          "summary": "Make another app: a team of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/resend/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "domain",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "ResendApp"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+          }
+        },
+        {
+          "name": "apps",
+          "kind": "method",
+          "summary": "The channel's apps: the agent's team first, then the others in the order they were made",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "ResendApps"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
+        {
           "name": "createUser",
           "kind": "factory",
           "summary": "Create a person: a mailbox, at `<name>@example.com` unless a test gives the address",
@@ -17632,9 +17722,870 @@
             "kind": "string"
           },
           "optional": false
+        },
+        {
+          "name": "domain",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "apiKey",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "webhookSecret",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
         }
       ],
-      "methods": []
+      "methods": [
+        {
+          "name": "send",
+          "kind": "method",
+          "summary": "An app a test made sends an email, through its own team's API, as its own call would",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/resend/apps/{app}/send",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "to",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "ResendUser",
+                    "ResendApp"
+                  ]
+                }
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "cc",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "ResendUser",
+                    "ResendApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "subject",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "html",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "headers",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "ResendEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+          }
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "An app a test made replies to an email, in its thread, as its own call would",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/resend/apps/{app}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "app",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "email",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "ResendEmail"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "html",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "all",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "headers",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "ResendEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ResendEmail",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "resend"
+          },
+          "optional": false
+        },
+        {
+          "name": "thread",
+          "type": {
+            "kind": "resource",
+            "name": "ResendThread"
+          },
+          "optional": false
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "named",
+            "name": "ResendPrincipal"
+          },
+          "optional": false
+        },
+        {
+          "name": "from",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "to",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "cc",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "subject",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "text",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "at",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "messageId",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "headers",
+          "type": {
+            "kind": "record",
+            "values": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "delivery",
+          "type": {
+            "kind": "resource",
+            "name": "ResendDelivery"
+          },
+          "optional": true
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read an email",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/emails/{email}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "email",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "ResendEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "deliveryFor",
+          "kind": "method",
+          "summary": "The delivery that told this app of the email (decision 0027), or nothing when it wasn't told",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/emails/{email}/delivery-for",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "email",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "ResendApp"
+                ]
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "ResendDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ResendThread",
+      "idFields": [
+        "id"
+      ],
+      "role": "resource",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "resend"
+          },
+          "optional": false
+        },
+        {
+          "name": "subject",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "messages",
+          "kind": "method",
+          "summary": "Every email in the thread, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/threads/{thread}/messages",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "thread",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "ResendMessages"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "replies",
+          "kind": "method",
+          "summary": "The thread's answers: every email after the first, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/threads/{thread}/replies",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "thread",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "ResendReplies"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "transcript",
+          "kind": "method",
+          "summary": "The thread as a person reads it: each email's own words, without the quoted history",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/threads/{thread}/transcript",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "thread",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "ResendTranscript"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForReply",
+          "mode": "next",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "ResendEmail"
+          },
+          "from": "author",
+          "what": "a reply"
+        },
+        {
+          "name": "latestReply",
+          "mode": "latest",
+          "read": "replies",
+          "item": {
+            "kind": "resource",
+            "name": "ResendEmail"
+          },
+          "from": "author",
+          "what": "a reply"
+        }
+      ]
+    },
+    {
+      "name": "ResendDelivery",
+      "idFields": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "resend"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "type",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "email",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "type": {
+            "kind": "unknown"
+          },
+          "optional": true
+        },
+        {
+          "name": "attempts",
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "named",
+              "name": "DeliveryAttempt"
+            }
+          },
+          "optional": false
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "values": [
+              "pending",
+              "acknowledged",
+              "failed",
+              "timed_out",
+              "unreachable"
+            ]
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "refresh",
+          "kind": "method",
+          "summary": "Re-read a delivery: its attempts and status",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/resend/deliveries/{delivery}",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "resource",
+            "name": "ResendDelivery"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        },
+        {
+          "name": "redeliver",
+          "kind": "method",
+          "summary": "Send the same webhook again, as Resend retries: the same `svix-id`, signed again",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/resend/deliveries/{delivery}/redeliver",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Resend has no API to redeliver a webhook"
+          }
+        },
+        {
+          "name": "resend",
+          "kind": "method",
+          "summary": "Send the webhook again, forged: signed with a secret that isn't the webhook's, or with a timestamp past the five minutes receivers accept",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/resend/deliveries/{delivery}/resend",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "delivery",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "badSignature",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "stale",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "named",
+            "name": "DeliveryAttempt"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
+        }
+      ],
+      "waits": [
+        {
+          "name": "settled",
+          "mode": "until",
+          "read": "refresh",
+          "item": {
+            "kind": "resource",
+            "name": "ResendDelivery"
+          },
+          "field": "status",
+          "not": [
+            "pending"
+          ],
+          "what": "the delivery to settle"
+        }
+      ]
     },
     {
       "name": "ResendUser",
@@ -17685,7 +18636,7 @@
         {
           "name": "send",
           "kind": "method",
-          "summary": "The person emails someone: the agent (`resend.app`), or another person",
+          "summary": "The person emails someone: the agent (`resend.app`), another app, or another person",
           "stability": "experimental",
           "http": {
             "verb": "POST",
@@ -17913,567 +18864,6 @@
       ]
     },
     {
-      "name": "ResendEmail",
-      "idFields": [
-        "id"
-      ],
-      "fields": [
-        {
-          "name": "id",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "channel",
-          "type": {
-            "kind": "literal",
-            "value": "resend"
-          },
-          "optional": false
-        },
-        {
-          "name": "thread",
-          "type": {
-            "kind": "resource",
-            "name": "ResendThread"
-          },
-          "optional": false
-        },
-        {
-          "name": "author",
-          "type": {
-            "kind": "named",
-            "name": "ResendPrincipal"
-          },
-          "optional": false
-        },
-        {
-          "name": "from",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "to",
-          "type": {
-            "kind": "array",
-            "items": {
-              "kind": "string"
-            }
-          },
-          "optional": false
-        },
-        {
-          "name": "cc",
-          "type": {
-            "kind": "array",
-            "items": {
-              "kind": "string"
-            }
-          },
-          "optional": false
-        },
-        {
-          "name": "subject",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "text",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "at",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "messageId",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "delivery",
-          "type": {
-            "kind": "resource",
-            "name": "ResendDelivery"
-          },
-          "optional": true
-        }
-      ],
-      "methods": [
-        {
-          "name": "refresh",
-          "kind": "method",
-          "summary": "Re-read an email",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/resend/emails/{email}",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "email",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "resource",
-            "name": "ResendEmail"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        }
-      ]
-    },
-    {
-      "name": "ResendThread",
-      "idFields": [
-        "id"
-      ],
-      "role": "resource",
-      "fields": [
-        {
-          "name": "id",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "channel",
-          "type": {
-            "kind": "literal",
-            "value": "resend"
-          },
-          "optional": false
-        },
-        {
-          "name": "subject",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        }
-      ],
-      "methods": [
-        {
-          "name": "messages",
-          "kind": "method",
-          "summary": "Every email in the thread, oldest first",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/resend/threads/{thread}/messages",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "thread",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "ResendMessages"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "replies",
-          "kind": "method",
-          "summary": "The thread's answers: every email after the first, oldest first",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/resend/threads/{thread}/replies",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "thread",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "ResendReplies"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        },
-        {
-          "name": "transcript",
-          "kind": "method",
-          "summary": "The thread as a person reads it: each email's own words, without the quoted history",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/resend/threads/{thread}/transcript",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "thread",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "ResendTranscript"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        }
-      ],
-      "waits": [
-        {
-          "name": "waitForReply",
-          "mode": "next",
-          "read": "replies",
-          "item": {
-            "kind": "resource",
-            "name": "ResendEmail"
-          },
-          "from": "author",
-          "what": "a reply"
-        },
-        {
-          "name": "latestReply",
-          "mode": "latest",
-          "read": "replies",
-          "item": {
-            "kind": "resource",
-            "name": "ResendEmail"
-          },
-          "from": "author",
-          "what": "a reply"
-        }
-      ]
-    },
-    {
-      "name": "ResendDelivery",
-      "idFields": [
-        "id"
-      ],
-      "fields": [
-        {
-          "name": "id",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "channel",
-          "type": {
-            "kind": "literal",
-            "value": "resend"
-          },
-          "optional": false
-        },
-        {
-          "name": "type",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "email",
-          "type": {
-            "kind": "string"
-          },
-          "optional": false
-        },
-        {
-          "name": "payload",
-          "type": {
-            "kind": "unknown"
-          },
-          "optional": true
-        },
-        {
-          "name": "attempts",
-          "type": {
-            "kind": "array",
-            "items": {
-              "kind": "named",
-              "name": "DeliveryAttempt"
-            }
-          },
-          "optional": false
-        },
-        {
-          "name": "status",
-          "type": {
-            "kind": "enum",
-            "values": [
-              "pending",
-              "acknowledged",
-              "failed",
-              "timed_out",
-              "unreachable"
-            ]
-          },
-          "optional": false
-        }
-      ],
-      "methods": [
-        {
-          "name": "refresh",
-          "kind": "method",
-          "summary": "Re-read a delivery: its attempts and status",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/resend/deliveries/{delivery}",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "resource",
-            "name": "ResendDelivery"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false,
-          "live": {
-            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
-          }
-        },
-        {
-          "name": "redeliver",
-          "kind": "method",
-          "summary": "Send the same webhook again, as Resend retries: the same `svix-id`, signed again",
-          "stability": "experimental",
-          "http": {
-            "verb": "POST",
-            "path": "/sessions/{session}/resend/deliveries/{delivery}/redeliver",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "DeliveryAttempt"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false,
-          "live": {
-            "unsupported": "Resend has no API to redeliver a webhook"
-          }
-        },
-        {
-          "name": "resend",
-          "kind": "method",
-          "summary": "Send the webhook again, forged: signed with a secret that isn't the webhook's, or with a timestamp past the five minutes receivers accept",
-          "stability": "experimental",
-          "http": {
-            "verb": "POST",
-            "path": "/sessions/{session}/resend/deliveries/{delivery}/resend",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "delivery",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [
-            {
-              "name": "badSignature",
-              "type": {
-                "kind": "boolean"
-              },
-              "optional": true,
-              "in": "body"
-            },
-            {
-              "name": "stale",
-              "type": {
-                "kind": "boolean"
-              },
-              "optional": true,
-              "in": "body"
-            }
-          ],
-          "returns": {
-            "kind": "named",
-            "name": "DeliveryAttempt"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false,
-          "live": {
-            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
-          }
-        }
-      ],
-      "waits": [
-        {
-          "name": "settled",
-          "mode": "until",
-          "read": "refresh",
-          "item": {
-            "kind": "resource",
-            "name": "ResendDelivery"
-          },
-          "field": "status",
-          "not": [
-            "pending"
-          ],
-          "what": "the delivery to settle"
-        }
-      ]
-    },
-    {
       "name": "GoogleFixture",
       "fields": [
         {
@@ -18493,6 +18883,88 @@
         }
       ],
       "methods": [
+        {
+          "name": "createApp",
+          "kind": "factory",
+          "summary": "Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleApp"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+          }
+        },
+        {
+          "name": "apps",
+          "kind": "method",
+          "summary": "The channel's apps: the agent's mailbox first, then the others in the order they were made",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/apps",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleApps"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential"
+          ],
+          "dispose": false
+        },
         {
           "name": "createUser",
           "kind": "factory",
@@ -18742,49 +19214,23 @@
             "kind": "string"
           },
           "optional": false
-        }
-      ],
-      "methods": []
-    },
-    {
-      "name": "GoogleUser",
-      "idFields": [
-        "id"
-      ],
-      "role": "user",
-      "fields": [
+        },
         {
-          "name": "id",
+          "name": "clientId",
           "type": {
             "kind": "string"
           },
           "optional": false
         },
         {
-          "name": "channel",
-          "type": {
-            "kind": "literal",
-            "value": "google"
-          },
-          "optional": false
-        },
-        {
-          "name": "kind",
-          "type": {
-            "kind": "literal",
-            "value": "user"
-          },
-          "optional": false
-        },
-        {
-          "name": "name",
+          "name": "clientSecret",
           "type": {
             "kind": "string"
           },
           "optional": false
         },
         {
-          "name": "address",
+          "name": "refreshToken",
           "type": {
             "kind": "string"
           },
@@ -18795,18 +19241,18 @@
         {
           "name": "send",
           "kind": "method",
-          "summary": "The person emails someone: the agent (`google.app`), or another person",
+          "summary": "An app a test made sends an email, through its own mailbox's API, as its own call would",
           "stability": "experimental",
           "http": {
             "verb": "POST",
-            "path": "/sessions/{session}/google/users/{user}/send",
+            "path": "/sessions/{session}/google/apps/{app}/send",
             "pathParams": [
               {
                 "name": "session",
                 "from": "session"
               },
               {
-                "name": "user",
+                "name": "app",
                 "from": "self",
                 "field": "id"
               }
@@ -18867,6 +19313,17 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "headers",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
             }
           ],
           "returns": {
@@ -18886,23 +19343,26 @@
             "cross_workspace_credential",
             "not_found"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+          }
         },
         {
           "name": "reply",
           "kind": "method",
-          "summary": "The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`",
+          "summary": "An app a test made replies to an email, in its thread, as its own call would",
           "stability": "experimental",
           "http": {
             "verb": "POST",
-            "path": "/sessions/{session}/google/users/{user}/reply",
+            "path": "/sessions/{session}/google/apps/{app}/reply",
             "pathParams": [
               {
                 "name": "session",
                 "from": "session"
               },
               {
-                "name": "user",
+                "name": "app",
                 "from": "self",
                 "field": "id"
               }
@@ -18945,6 +19405,17 @@
               },
               "optional": true,
               "in": "body"
+            },
+            {
+              "name": "headers",
+              "type": {
+                "kind": "record",
+                "values": {
+                  "kind": "string"
+                }
+              },
+              "optional": true,
+              "in": "body"
             }
           ],
           "returns": {
@@ -18964,61 +19435,10 @@
             "cross_workspace_credential",
             "not_found"
           ],
-          "dispose": false
-        },
-        {
-          "name": "inbox",
-          "kind": "method",
-          "summary": "What reached the person's mailbox, oldest first",
-          "stability": "experimental",
-          "http": {
-            "verb": "GET",
-            "path": "/sessions/{session}/google/users/{user}/inbox",
-            "pathParams": [
-              {
-                "name": "session",
-                "from": "session"
-              },
-              {
-                "name": "user",
-                "from": "self",
-                "field": "id"
-              }
-            ]
-          },
-          "args": [],
-          "options": [],
-          "returns": {
-            "kind": "named",
-            "name": "GoogleInbox"
-          },
-          "errors": [
-            "unauthorized",
-            "invalid_argument",
-            "internal",
-            "session_not_found",
-            "unsupported_in_live",
-            "action_requires",
-            "live_misconfigured",
-            "live_not_allowlisted",
-            "fake_actor_in_live_world",
-            "cross_workspace_credential",
-            "not_found"
-          ],
-          "dispose": false
-        }
-      ],
-      "waits": [
-        {
-          "name": "waitForEmail",
-          "mode": "next",
-          "read": "inbox",
-          "item": {
-            "kind": "resource",
-            "name": "GoogleEmail"
-          },
-          "from": "author",
-          "what": "an email"
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, each app is a sandbox app set up by hand, and this channel has no second one yet (decision 0027)"
+          }
         }
       ]
     },
@@ -19115,6 +19535,16 @@
           "optional": false
         },
         {
+          "name": "headers",
+          "type": {
+            "kind": "record",
+            "values": {
+              "kind": "string"
+            }
+          },
+          "optional": false
+        },
+        {
           "name": "labels",
           "type": {
             "kind": "array",
@@ -19174,6 +19604,65 @@
             "not_found"
           ],
           "dispose": false
+        },
+        {
+          "name": "deliveryFor",
+          "kind": "method",
+          "summary": "The delivery that told this app of the email (decision 0027), or nothing when it wasn't told",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/emails/{email}/delivery-for",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "email",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "app",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GoogleApp"
+                ]
+              },
+              "optional": false,
+              "in": "query"
+            }
+          ],
+          "options": [],
+          "returns": {
+            "kind": "nullable",
+            "type": {
+              "kind": "resource",
+              "name": "GoogleDelivery"
+            }
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false,
+          "live": {
+            "unsupported": "Live, the platform delivers to the agent itself and channelstack isn't in the path (delivery chaos is fake-only)"
+          }
         }
       ]
     },
@@ -19375,6 +19864,13 @@
           "type": {
             "kind": "literal",
             "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "app",
+          "type": {
+            "kind": "string"
           },
           "optional": false
         },
@@ -19605,6 +20101,282 @@
             "pending"
           ],
           "what": "the delivery to settle"
+        }
+      ]
+    },
+    {
+      "name": "GoogleUser",
+      "idFields": [
+        "id"
+      ],
+      "role": "user",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "channel",
+          "type": {
+            "kind": "literal",
+            "value": "google"
+          },
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": {
+            "kind": "literal",
+            "value": "user"
+          },
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        },
+        {
+          "name": "address",
+          "type": {
+            "kind": "string"
+          },
+          "optional": false
+        }
+      ],
+      "methods": [
+        {
+          "name": "send",
+          "kind": "method",
+          "summary": "The person emails someone: the agent (`google.app`), another app, or another person",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/users/{user}/send",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [
+            {
+              "name": "to",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GoogleUser",
+                    "GoogleApp"
+                  ]
+                }
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "cc",
+              "type": {
+                "kind": "array",
+                "items": {
+                  "kind": "ref",
+                  "resources": [
+                    "GoogleUser",
+                    "GoogleApp"
+                  ]
+                }
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "subject",
+              "type": {
+                "kind": "string"
+              },
+              "optional": false,
+              "in": "body"
+            },
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "html",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "reply",
+          "kind": "method",
+          "summary": "The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`",
+          "stability": "experimental",
+          "http": {
+            "verb": "POST",
+            "path": "/sessions/{session}/google/users/{user}/reply",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [
+            {
+              "name": "email",
+              "type": {
+                "kind": "ref",
+                "resources": [
+                  "GoogleEmail"
+                ]
+              },
+              "optional": false,
+              "in": "body"
+            }
+          ],
+          "options": [
+            {
+              "name": "text",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "html",
+              "type": {
+                "kind": "string"
+              },
+              "optional": true,
+              "in": "body"
+            },
+            {
+              "name": "all",
+              "type": {
+                "kind": "boolean"
+              },
+              "optional": true,
+              "in": "body"
+            }
+          ],
+          "returns": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        },
+        {
+          "name": "inbox",
+          "kind": "method",
+          "summary": "What reached the person's mailbox, oldest first",
+          "stability": "experimental",
+          "http": {
+            "verb": "GET",
+            "path": "/sessions/{session}/google/users/{user}/inbox",
+            "pathParams": [
+              {
+                "name": "session",
+                "from": "session"
+              },
+              {
+                "name": "user",
+                "from": "self",
+                "field": "id"
+              }
+            ]
+          },
+          "args": [],
+          "options": [],
+          "returns": {
+            "kind": "named",
+            "name": "GoogleInbox"
+          },
+          "errors": [
+            "unauthorized",
+            "invalid_argument",
+            "internal",
+            "session_not_found",
+            "unsupported_in_live",
+            "action_requires",
+            "live_misconfigured",
+            "live_not_allowlisted",
+            "fake_actor_in_live_world",
+            "cross_workspace_credential",
+            "not_found"
+          ],
+          "dispose": false
+        }
+      ],
+      "waits": [
+        {
+          "name": "waitForEmail",
+          "mode": "next",
+          "read": "inbox",
+          "item": {
+            "kind": "resource",
+            "name": "GoogleEmail"
+          },
+          "from": "author",
+          "what": "an email"
         }
       ]
     },
@@ -22466,6 +23238,16 @@
       }
     },
     {
+      "name": "ResendApps",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "ResendApp"
+        }
+      }
+    },
+    {
       "name": "ResendPrincipal",
       "type": {
         "kind": "object",
@@ -22720,6 +23502,16 @@
             "optional": true
           }
         ]
+      }
+    },
+    {
+      "name": "GoogleApps",
+      "type": {
+        "kind": "array",
+        "items": {
+          "kind": "resource",
+          "name": "GoogleApp"
+        }
       }
     },
     {

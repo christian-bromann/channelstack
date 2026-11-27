@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "ObjectNotFoundError", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "ObjectNotFoundError", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -1056,6 +1056,9 @@ class NotionApiCall:
         )
 
 
+type ResendApps = list[ResendApp]
+
+
 @dataclass(frozen=True)
 class ResendPrincipal:
     id: str
@@ -1154,6 +1157,9 @@ class ResendApiCall:
             response=data.get("response"),
             error=data.get("error"),
         )
+
+
+type GoogleApps = list[GoogleApp]
 
 
 @dataclass(frozen=True)
@@ -3319,6 +3325,18 @@ class ResendFixture:
         self.app: ResendApp = ResendApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
 
+    async def create_app(self, *, name: str, domain: str | None = None) -> ResendApp:
+        """Make another app: a team of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_RESEND_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps", body={"name": name, "domain": domain})
+        return ResendApp(ctx, data)
+
+    async def apps(self) -> ResendApps:
+        """The channel's apps: the agent's team first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps")
+        return [ResendApp(ctx, item) for item in data]
+
     async def create_user(self, *, name: str, address: str | None = None, token: str | None = None) -> ResendUser:
         """Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental."""
         ctx = self._ctx
@@ -3351,39 +3369,21 @@ class ResendApp:
         self.name: str = data["name"]
         self.bot_user_id: str = data["botUserId"]
         self.address: str = data["address"]
+        self.domain: str = data["domain"]
+        self.api_key: str = data["apiKey"]
+        self.webhook_secret: str = data["webhookSecret"]
 
-
-class ResendUser:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.channel: Literal["resend"] = data["channel"]
-        self.kind: Literal["user"] = data["kind"]
-        self.name: str = data["name"]
-        self.address: str = data["address"]
-
-    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> ResendEmail:
-        """The person emails someone: the agent (`resend.app`), or another person. Experimental."""
+    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None, headers: dict[str, str] | None = None) -> ResendEmail:
+        """An app a test made sends an email, through its own team's API, as its own call would. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html, "headers": headers})
         return ResendEmail(ctx, data)
 
-    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> ResendEmail:
-        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None, headers: dict[str, str] | None = None) -> ResendEmail:
+        """An app a test made replies to an email, in its thread, as its own call would. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/apps/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all, "headers": headers})
         return ResendEmail(ctx, data)
-
-    async def inbox(self) -> ResendInbox:
-        """What reached the person's mailbox, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/inbox")
-        return [ResendEmail(ctx, item) for item in data]
-
-    async def wait_for_email(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None) -> ResendEmail:
-        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
 
 
 class ResendEmail:
@@ -3400,6 +3400,7 @@ class ResendEmail:
         self.text: str = data["text"]
         self.at: str = data["at"]
         self.message_id: str = data["messageId"]
+        self.headers: dict[str, str] = data["headers"]
         self.delivery: ResendDelivery | None = None if data.get("delivery") is None else ResendDelivery(ctx, data["delivery"])
 
     async def refresh(self) -> ResendEmail:
@@ -3407,6 +3408,12 @@ class ResendEmail:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/emails/{quote(str(self.id), safe='')}")
         return ResendEmail(ctx, data)
+
+    async def delivery_for(self, app: ResendApp) -> ResendDelivery | None:
+        """The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/emails/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else ResendDelivery(ctx, data))
 
 
 class ResendThread:
@@ -3449,6 +3456,7 @@ class ResendDelivery:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["resend"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.email: str = data["email"]
         self.payload: Any | None = data.get("payload")
@@ -3483,12 +3491,57 @@ class ResendDelivery:
         return await wait_for("the delivery to settle", settled, timeout=timeout)
 
 
+class ResendUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel: Literal["resend"] = data["channel"]
+        self.kind: Literal["user"] = data["kind"]
+        self.name: str = data["name"]
+        self.address: str = data["address"]
+
+    async def send(self, *, to: list[ResendUser | ResendApp], cc: list[ResendUser | ResendApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> ResendEmail:
+        """The person emails someone: the agent (`resend.app`), another app, or another person. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        return ResendEmail(ctx, data)
+
+    async def reply(self, email: ResendEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> ResendEmail:
+        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        return ResendEmail(ctx, data)
+
+    async def inbox(self) -> ResendInbox:
+        """What reached the person's mailbox, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/resend/users/{quote(str(self.id), safe='')}/inbox")
+        return [ResendEmail(ctx, item) for item in data]
+
+    async def wait_for_email(self, *, from_: ResendPrincipal | ResendUser | ResendApp | str | None = None, timeout: Duration | None = None) -> ResendEmail:
+        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
+
+
 class GoogleFixture:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
         self._seen: dict[str, int] = {}
         self.app: GoogleApp = GoogleApp(ctx, data["app"])
         self.api_url: str = data["apiUrl"]
+
+    async def create_app(self, *, name: str) -> GoogleApp:
+        """Make another app: a mailbox of its own, with its own address and credentials (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_GOOGLE_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps", body={"name": name})
+        return GoogleApp(ctx, data)
+
+    async def apps(self) -> GoogleApps:
+        """The channel's apps: the agent's mailbox first, then the others in the order they were made. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps")
+        return [GoogleApp(ctx, item) for item in data]
 
     async def create_user(self, *, name: str, address: str | None = None, token: str | None = None) -> GoogleUser:
         """Create a person: a mailbox, at `<name>@example.com` unless a test gives the address. Experimental."""
@@ -3522,39 +3575,21 @@ class GoogleApp:
         self.name: str = data["name"]
         self.bot_user_id: str = data["botUserId"]
         self.address: str = data["address"]
+        self.client_id: str = data["clientId"]
+        self.client_secret: str = data["clientSecret"]
+        self.refresh_token: str = data["refreshToken"]
 
-
-class GoogleUser:
-    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
-        self._ctx = ctx
-        self._seen: dict[str, int] = {}
-        self.id: str = data["id"]
-        self.channel: Literal["google"] = data["channel"]
-        self.kind: Literal["user"] = data["kind"]
-        self.name: str = data["name"]
-        self.address: str = data["address"]
-
-    async def send(self, *, to: list[GoogleUser | GoogleApp], cc: list[GoogleUser | GoogleApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> GoogleEmail:
-        """The person emails someone: the agent (`google.app`), or another person. Experimental."""
+    async def send(self, *, to: list[GoogleUser | GoogleApp], cc: list[GoogleUser | GoogleApp] | None = None, subject: str, text: str | None = None, html: str | None = None, headers: dict[str, str] | None = None) -> GoogleEmail:
+        """An app a test made sends an email, through its own mailbox's API, as its own call would. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html, "headers": headers})
         return GoogleEmail(ctx, data)
 
-    async def reply(self, email: GoogleEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> GoogleEmail:
-        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+    async def reply(self, email: GoogleEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None, headers: dict[str, str] | None = None) -> GoogleEmail:
+        """An app a test made replies to an email, in its thread, as its own call would. Experimental."""
         ctx = self._ctx
-        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/apps/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all, "headers": headers})
         return GoogleEmail(ctx, data)
-
-    async def inbox(self) -> GoogleInbox:
-        """What reached the person's mailbox, oldest first. Experimental."""
-        ctx = self._ctx
-        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/inbox")
-        return [GoogleEmail(ctx, item) for item in data]
-
-    async def wait_for_email(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
-        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
-        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
 
 
 class GoogleEmail:
@@ -3571,6 +3606,7 @@ class GoogleEmail:
         self.text: str = data["text"]
         self.at: str = data["at"]
         self.message_id: str = data["messageId"]
+        self.headers: dict[str, str] = data["headers"]
         self.labels: list[str] = data["labels"]
         self.delivery: GoogleDelivery | None = None if data.get("delivery") is None else GoogleDelivery(ctx, data["delivery"])
 
@@ -3579,6 +3615,12 @@ class GoogleEmail:
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/emails/{quote(str(self.id), safe='')}")
         return GoogleEmail(ctx, data)
+
+    async def delivery_for(self, app: GoogleApp) -> GoogleDelivery | None:
+        """The delivery that told this app of the email (decision 0027), or nothing when it wasn't told. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/emails/{quote(str(self.id), safe='')}/delivery-for", query={"app": app.id})
+        return (None if data is None else GoogleDelivery(ctx, data))
 
 
 class GoogleThread:
@@ -3621,6 +3663,7 @@ class GoogleDelivery:
         self._ctx = ctx
         self.id: str = data["id"]
         self.channel: Literal["google"] = data["channel"]
+        self.app: str = data["app"]
         self.type: str = data["type"]
         self.email_address: str = data["emailAddress"]
         self.history_id: str = data["historyId"]
@@ -3654,6 +3697,39 @@ class GoogleDelivery:
             return None if value.status in ("pending",) else value
 
         return await wait_for("the delivery to settle", settled, timeout=timeout)
+
+
+class GoogleUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel: Literal["google"] = data["channel"]
+        self.kind: Literal["user"] = data["kind"]
+        self.name: str = data["name"]
+        self.address: str = data["address"]
+
+    async def send(self, *, to: list[GoogleUser | GoogleApp], cc: list[GoogleUser | GoogleApp] | None = None, subject: str, text: str | None = None, html: str | None = None) -> GoogleEmail:
+        """The person emails someone: the agent (`google.app`), another app, or another person. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/send", body={"to": [item.id for item in to], "cc": None if cc is None else [item.id for item in cc], "subject": subject, "text": text, "html": html})
+        return GoogleEmail(ctx, data)
+
+    async def reply(self, email: GoogleEmail, *, text: str | None = None, html: str | None = None, all: bool | None = None) -> GoogleEmail:
+        """The person replies to an email, in its thread: `Re:` its subject, with `In-Reply-To` and `References`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/reply", body={"email": email.id, "text": text, "html": html, "all": all})
+        return GoogleEmail(ctx, data)
+
+    async def inbox(self) -> GoogleInbox:
+        """What reached the person's mailbox, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google/users/{quote(str(self.id), safe='')}/inbox")
+        return [GoogleEmail(ctx, item) for item in data]
+
+    async def wait_for_email(self, *, from_: GooglePrincipal | GoogleUser | GoogleApp | str | None = None, timeout: Duration | None = None) -> GoogleEmail:
+        """Wait for the next new email matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
 
 
 class GitHubPullRequest(GitHubIssue):
