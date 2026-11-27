@@ -24,8 +24,10 @@ pnpm test           # the unit tests, TypeScript and Python
 pnpm test:accept    # the acceptance suite, against the reference agents
 ```
 
-`pnpm verify:phase <n>` runs everything CI runs. [docs/code-map.md](docs/code-map.md) says which
-module owns what, and [AGENTS.md](AGENTS.md) has the rules the code follows. Coding agents follow
+`pnpm verify:phase <n>` runs CI's checks and tests. CI also compiles the binaries for all five
+targets (`binaries`), builds the PyPI packages and the crate (`packages`), runs the packaging test
+on macOS and Linux (`packaging`) and builds the coverage page. [docs/code-map.md](docs/code-map.md)
+says which module owns what, and [AGENTS.md](AGENTS.md) has the rules the code follows. Coding agents follow
 them too.
 
 ## A pull request
