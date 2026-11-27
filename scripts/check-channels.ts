@@ -24,6 +24,13 @@ const matrix = read("docs/reality-matrix.md") ?? "";
 const live = read(".github/workflows/live.yml") ?? "";
 const envDocs = read("website/docs/reference/environment-variables.md") ?? "";
 const checkExports = checks as unknown as Record<string, unknown>;
+/** The SDKs' handles, as the generator reads them from the routes. */
+const resources =
+  (
+    JSON.parse(read("spec/ir.json") ?? "{}") as {
+      resources?: Array<{ name: string; methods: Array<{ name: string }> }>;
+    }
+  ).resources ?? [];
 
 for (const channel of CHANNELS) {
   const { name, title } = channel;
@@ -84,6 +91,29 @@ for (const channel of CHANNELS) {
   need(
     new RegExp(`\\n  ${name}: \\{`).test(read("server/src/cli/dev.test.ts") ?? ""),
     `${of}: no case for the dev tools in server/src/cli/dev.test.ts (CASES)`,
+  );
+  // Any number of apps (decision 0027, exit check 12.9): the routes, the examples, the checks, the tests.
+  const fixture = `${title}Fixture`;
+  const methods = resources.find((resource) => resource.name === fixture)?.methods.map((method) => method.name) ?? [];
+  need(
+    methods.includes("createApp") && methods.includes("apps"),
+    `${of}: no createApp() and apps() on ${fixture} (POST and GET /apps, decision 0027)`,
+  );
+  need(
+    existsSync(join(ROOT, `server/src/drivers/${name}/${name}-apps.test.ts`)),
+    `${of}: no tests of its apps, server/src/drivers/${name}/${name}-apps.test.ts (exit checks 12.3, 12.4)`,
+  );
+  need(
+    (harness?.enabled as readonly string[] | undefined)?.some((pattern) => pattern.startsWith("several apps")) === true,
+    `${of}: its "several apps" examples aren't enabled in scripts/lib/channels.ts (exit check 12.2)`,
+  );
+  need(
+    (checkExports[`${upper}_CHECKS`] as readonly string[] | undefined)?.includes(`${name}.no-reply-loop`) === true,
+    `${of}: ${upper}_CHECKS has no ${name}.no-reply-loop (exit check 12.6)`,
+  );
+  need(
+    existsSync(join(ROOT, `test/acceptance/checks/${name}-checks-coder.test.ts`)),
+    `${of}: no test/acceptance/checks/${name}-checks-coder.test.ts, its checks against another app (exit check 12.7)`,
   );
   if (channel.live) {
     need(
