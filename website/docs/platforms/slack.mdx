@@ -187,7 +187,7 @@ A modal is the one the app opened for that person with `views.open`. `submit` fi
 
 ### Conversations and membership
 
-`ana.openDM(ben)` or `ana.openDM([ben, slack.app])` opens or reuses a DM; `ana.invite(...)` and `ana.kick(...)` change who's in a channel. `ana.ephemeral()` returns the messages only Ana can see, once the app is quiet.
+`ana.openDM(ben)` or `ana.openDM([ben, slack.app])` opens or reuses a DM; `ana.invite(...)` and `ana.kick(...)` change who's in a channel. A DM stays between its two people: inviting a third into it is refused with `method_not_supported_for_channel_type`, as on Slack, so open a group DM with all of them instead. `ana.ephemeral()` returns the messages only Ana can see, once the app is quiet.
 
 ### What only the test does
 

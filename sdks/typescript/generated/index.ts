@@ -28,6 +28,7 @@ export class InvalidAuthError extends ChannelstackError {}
 export class InvalidFormBodyError extends ChannelstackError {}
 export class LiveMisconfiguredError extends ChannelstackError {}
 export class LiveNotAllowlistedError extends ChannelstackError {}
+export class MethodNotSupportedForChannelTypeError extends ChannelstackError {}
 export class MissingAccessError extends ChannelstackError {}
 export class MissingPermissionsError extends ChannelstackError {}
 export class MsgTooLongError extends ChannelstackError {}
@@ -66,6 +67,7 @@ const ERRORS: ErrorClasses = {
   invalid_form_body: InvalidFormBodyError,
   live_misconfigured: LiveMisconfiguredError,
   live_not_allowlisted: LiveNotAllowlistedError,
+  method_not_supported_for_channel_type: MethodNotSupportedForChannelTypeError,
   missing_access: MissingAccessError,
   missing_permissions: MissingPermissionsError,
   msg_too_long: MsgTooLongError,

@@ -601,6 +601,12 @@ export function createFakeWorld(context: DriverContext, store: SlackStore, socke
     invite(session, userId, participants, channel) {
       const conversation = store.conversations.get(session, channel);
       const inviter = member(session, userId, conversation);
+      // A DM is between two; talking with a third is a group DM of its own, as on Slack.
+      if (conversation.kind === "im")
+        throw refuse(
+          "method_not_supported_for_channel_type",
+          `${conversation.id} is a direct message, which can't take another person`,
+        );
       for (const id of participants.map((candidate) => participant(session, candidate))) {
         if (conversation.members.has(id))
           throw refuse("already_in_channel", `${id} is already a member of ${conversation.id}`);
