@@ -1071,3 +1071,38 @@ async fn api_calls_by_name_pattern_count_and_error() -> Result<()> {
         .quiet_for(QUIET)
         .await
 }
+
+#[tokio::test]
+async fn to_go_quiet_counts_app_messages_since_a_person_wrote() -> Result<()> {
+    // Exit check 12.6: two apps answering each other, with what came before the check counted.
+    let coder = || json!({ "id": "B02", "name": "coder", "kind": "app" });
+    let turns = |count: usize| {
+        let mut said = vec![says(ana(), "fix the login page")];
+        said.extend((0..count).map(|at| says(if at % 2 == 0 { agent() } else { coder() }, "turn")));
+        StandIn::saying(said)
+    };
+    expect(&turns(2)).to_go_quiet(4).quiet_for(QUIET).await?;
+    let failed = failure(
+        expect(&turns(5))
+            .to_go_quiet(4)
+            .within("1s")
+            .quiet_for(QUIET)
+            .await,
+    );
+    assert_eq!(
+        failed,
+        "Expected the conversation to go quiet within 1s with at most 4 app messages since a person last wrote. It went quiet with 5 app messages and no person between them: my-agent → coder → my-agent → coder → my-agent"
+    );
+    // A person writing starts the count over.
+    let mut said = vec![
+        says(ana(), "hi"),
+        says(agent(), "a"),
+        says(coder(), "b"),
+        says(ana(), "thanks"),
+    ];
+    said.push(says(agent(), "welcome"));
+    expect(&StandIn::saying(said))
+        .to_go_quiet(1)
+        .quiet_for(QUIET)
+        .await
+}
