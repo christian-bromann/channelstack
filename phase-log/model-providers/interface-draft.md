@@ -1,6 +1,6 @@
 # A fake OpenAI: interface draft
 
-> Status: **draft, second round**, 2026-11-27, revised after the maintainer's first review (§16 lists what was settled). Nothing is built, and there is no decision record yet.
+> Status: **draft, third round**, 2026-11-27, revised after the maintainer's second review (§16 lists what is settled). Nothing is built, and there is no decision record yet.
 > Scope: **OpenAI only**: Chat Completions and the Responses API at `https://openai.localhost/v1`. No other model provider is planned.
 > It reverses the settled `AGENTS.md` row **Models**: "channelstack doesn't mock LLMs". The new rule: **realistic on the wire, never realistic content.** Answer-quality evals stay out of scope.
 
@@ -41,7 +41,7 @@ The official SDKs' retry rules shape the error design (§7.3). openai-node and o
 |---|---|
 | Host | `https://openai.localhost/v1` (portless); `http://localhost:4500/openai/v1` with `--no-portless`; `api.openai.com` in proxy mode, always, like every routed host (§12.3) |
 | `channelstack env` | `OPENAI_BASE_URL=https://openai.localhost/v1`, `OPENAI_API_KEY=sk-proj-…` (random per install, in `secrets.json`, like every fake token) |
-| Endpoints | `POST /v1/chat/completions`, `POST /v1/responses`, `GET`/`DELETE /v1/responses/{id}`, `GET /v1/responses/{id}/input_items`, `GET /v1/models`, `GET /v1/models/{model}`. Everything else gets OpenAI's own 404 |
+| Endpoints | `POST /v1/chat/completions`; `POST /v1/responses`, with `GET`, `DELETE` and `input_items` for stored ones; `POST /v1/images/generations` and `/edits`; `POST /v1/audio/speech`, `/transcriptions` and `/translations`; `/v1/files`; container file downloads; `GET /v1/models`. Everything else gets OpenAI's own 404 (§10.3) |
 | Fixture | `openai` in Vitest and pytest, `client.openai()` in Rust. A provider, not a channel: it has no people, apps or deliveries |
 | Unscripted calls | Refused, and the test fails with a message saying which `openai.respond(…)` is missing (§8.4) |
 | Scripts | Belong to the test's session and go away with it, like faults |
@@ -54,6 +54,11 @@ The official SDKs' retry rules shape the error design (§7.3). openai-node and o
 This sketch is shaped like the generated TypeScript SDK. Most of it comes out of routes as usual. Responders (functions, §6) need one new runtime module and one IR extension (§6.4).
 
 ```ts
+export type Endpoint =
+  | "chat.completions" | "responses"
+  | "images.generations" | "images.edits"
+  | "audio.speech" | "audio.transcriptions" | "audio.translations";
+
 // what `openai` is in a test's context
 export interface OpenAIFixture {
   /** The base URL the agent should use (what `channelstack env` prints as OPENAI_BASE_URL). */
@@ -100,9 +105,14 @@ export interface Match {
   tools?: string[];
   /** The newest input is a tool result (of this tool, with this text). The second step of a tool loop. */
   toolResult?: true | string | { name?: string; text?: string | RegExp };
-  endpoint?: "chat.completions" | "responses";
+  endpoint?: Endpoint;
   model?: string | RegExp;
   stream?: boolean;
+  /** The call answers this person's message, or one in this conversation or thread (its context, §8.6). */
+  from?: ChannelPerson;
+  in?: ChannelPlace | ChannelThread;
+  /** The newest input is an MCP approval response, approving (true) or not (false) (§5.6). */
+  approval?: boolean;
 }
 ```
 
@@ -114,8 +124,14 @@ export type Turn = string | TurnSpec | ErrorTurn;
 export interface TurnSpec {
   /** The answer. A string is streamed in chunks of about four characters; an array gives the chunks exactly. */
   text?: string | string[];
-  /** Function calls, in order. More than one is a parallel tool call. Ids (`call_…`) are minted by the fake. */
-  toolCalls?: { name: string; arguments: Record<string, unknown> | string }[];
+  /** Tool calls, in order: functions, or OpenAI's built-in tools (§5.6). More than one is a parallel call. Ids are minted by the fake. */
+  toolCalls?: ToolCallSpec[];
+  /** Citations on the text (after a web or file search): each marks the first occurrence of `quote`. */
+  citations?: { quote: string; url?: string; title?: string; file?: string }[];
+  /** An image: the Images API's answer (§5.5). */
+  image?: MediaSource | MediaSource[];
+  /** Audio: `/v1/audio/speech`, or Chat Completions' audio output with `text` as its transcript (§5.5). */
+  audio?: MediaSource;
   /** Reasoning. Responses: a `reasoning` item with this summary (and `encrypted_content` when the request
    *  includes it). Chat Completions: only `usage.completion_tokens_details.reasoning_tokens`, as OpenAI sends nothing else. */
   reasoning?: { summary?: string | string[]; tokens?: number };
@@ -131,6 +147,24 @@ export interface TurnSpec {
   /** Hold a stream after this many chunks until `ai.resume()`: a deterministic "while it streams". */
   pauseAfter?: number;
 }
+
+/** A tool call in an answer. A function by default; the other kinds are OpenAI's built-in tools (§5.6). */
+export type ToolCallSpec =
+  // the agent runs these and sends the result back
+  | { name: string; arguments: Record<string, unknown> | string }                  // a function
+  | { custom: string; input: string }                                              // a custom tool: free-form input
+  | { computer: { actions: ComputerAction[] } }
+  | { shell: { commands: string[]; output?: string } }                             // `output` when the request's shell is hosted
+  | { applyPatch: { operations: PatchOperation[] } }                               // create_file, update_file, delete_file
+  // OpenAI runs these: their results are part of this same answer, as the script gives them
+  | { webSearch: { query: string; sources?: { url: string; title?: string }[] } }
+  | { fileSearch: { queries: string[]; results?: { file: string; text: string; score?: number }[] } }
+  | { codeInterpreter: { code: string; logs?: string; files?: MediaSource[] } }
+  | { imageGeneration: { image: MediaSource; revisedPrompt?: string } }
+  | { mcp: { server: string; tool: string; arguments?: Record<string, unknown>; output?: string; error?: string; approval?: boolean } };
+
+/** Media in an answer: a path (read in the test process and uploaded), bytes, or a placeholder the fake makes (a PNG, or WAV/PCM silence). */
+export type MediaSource = string | Uint8Array | { placeholder: { width?: number; height?: number; seconds?: number } };
 
 /** An error the API returns instead of an answer. In a turn list it is one call's answer, so the SDK's retries can be scripted. */
 export interface ErrorTurn {
@@ -195,7 +229,7 @@ export interface ModelScript extends AsyncDisposable {
 ```ts
 export interface ModelCall {
   id: string;                    // the response's own id: chatcmpl-… or resp_…
-  endpoint: "chat.completions" | "responses";
+  endpoint: Endpoint;
   model: string;
   stream: boolean;
   at: string;
@@ -218,19 +252,26 @@ export interface ModelCall {
   /** Which script answered. None when the call was refused for want of one (§8.4). */
   script?: string;
   /** How the call was attributed to this session (§8). */
-  attributedBy: "minted_id" | "tag" | "owned_id" | "text";
+  attributedBy: "minted_id" | "tag" | "owned_id" | "text" | "order";
 }
 
 /** The request, normalised: the same shape for both endpoints. */
 export interface ModelRequest {
-  endpoint: "chat.completions" | "responses";
+  endpoint: Endpoint;
   model: string;
   stream: boolean;
+  /** Where the call belongs in the channels: the message it answers, its author, the conversation (§8.6). */
+  context?: RequestContext;
+  /** The Images API's prompt, or the text speech is made from. */
+  prompt?: string;
+  /** The audio to transcribe, or the image to edit. */
+  file?: ModelPart;
   /** System and developer messages, and Responses' `instructions`, joined. */
   instructions?: string;
   /** The conversation, oldest first. On Responses it includes what `previous_response_id` chains to. */
   messages: ModelMessage[];
-  tools: { name: string; description?: string; parameters?: object; strict?: boolean }[];
+  /** Functions by name; built-in tools by their type (`web_search`, `mcp`, …) with their settings. */
+  tools: { type: string; name?: string; description?: string; parameters?: object; strict?: boolean; settings?: object }[];
   toolChoice?: "auto" | "none" | "required" | { name: string };
   responseFormat?: { type: "text" } | { type: "json_object" } | { type: "json_schema"; name: string; schema: object; strict?: boolean };
   reasoning?: { effort?: string; summary?: string };
@@ -242,9 +283,30 @@ export interface ModelRequest {
   headers: Record<string, string>;
 }
 
+/** An image, file or audio part the agent sent: identified by its hash, so a test can compare it with what a person shared. */
+export type ModelPart =
+  | { type: "text"; text: string }
+  | { type: "image" | "file" | "audio"; mediaType: string; bytes: number; sha256: string; filename?: string;
+      from: "data" | "file_id" | "url"; url?: string };
+
+/** What channelstack knows about a call's place in the channels (§8.6). Handles, like everything a test reads. */
+export interface RequestContext {
+  channel: string;                       // "slack", "github", …
+  message?: ChannelMessage;              // the person's message the call answers, when the evidence names one
+  from?: ChannelPerson;
+  conversation?: ChannelPlace;           // the channel, DM, issue, PR, page or email thread
+  thread?: ChannelThread;
+  /** The same text came more than once in the session: every message it could be, newest first. */
+  candidates: ChannelMessage[];
+}
+
 /** A tool call the model made, joined with the result the agent sent back in a later call. */
 export interface ModelToolCall {
-  id: string;                    // call_…
+  id: string;                    // call_…, or the built-in item's id (ws_…, mcp_…)
+  type: "function" | "custom" | "computer" | "shell" | "apply_patch"
+      | "web_search" | "file_search" | "code_interpreter" | "image_generation" | "mcp";
+  /** OpenAI ran it (a built-in), so `result` is what the script said. Otherwise the agent ran it. */
+  hosted: boolean;
   name: string;
   arguments: unknown;            // parsed JSON, or the string if it isn't JSON
   madeIn: string;                // the ModelCall whose answer made it
@@ -253,7 +315,7 @@ export interface ModelToolCall {
 
 export type ModelMessage =
   | { role: "system" | "developer"; text: string }
-  | { role: "user"; text: string; images: number; files: number }
+  | { role: "user"; text: string; parts: ModelPart[] }
   | { role: "assistant"; text?: string; toolCalls: { id: string; name: string; arguments: unknown }[] }
   | { role: "tool"; callId: string; name?: string; text: string };
 ```
@@ -269,6 +331,7 @@ Like every matcher, they run in the test process, poll a read method, and negati
 | `toHaveSentSecrets()` (used as `not.`) | a call, or `openai` | Any secret channelstack knows appears in the request: a fake or live token, signing secret, webhook secret, private key or refresh token, and the model's own API key in the body |
 | `toHaveOfferedTool(name, { schema? })` | a call | The request offers the tool (with a matching JSON Schema) |
 | `toHaveSentToolResult(name, { text? })` | a script, or `openai` | The agent ran a tool call and sent its result back (with this text) |
+| `toHaveSentFile(path \| bytes)` | a call, or `openai` | The request carries this image, file or audio, compared by hash |
 | `toBeAborted()` | a call | The agent hung up before the answer finished |
 | `toHaveAnswered({ times? })` | a script (`ai`) | The script answered calls |
 
@@ -313,6 +376,62 @@ A script that couldn't happen on the real API is a test bug. So the fake doesn't
 - text that isn't valid JSON for `response_format: json_object`, or that the strict JSON schema refuses.
 
 The agent gets the refusal of §8.4 instead, and the test fails with the script's problem in the message ("script ms_3 called `deploy`, but the request offered `search_incidents`").
+
+### 5.5 Images, audio and files
+
+**What the agent sends.** Image, file and audio parts are read, not just counted. Each is a part of the `ModelRequest` with its media type, size and SHA-256, so a test can check that the agent passed on what a person shared:
+
+```ts
+await openai.respond("The stack trace points at the migration.");
+await ana.say("@my-agent what's wrong here?", { channel, files: "./fixtures/error.png" });
+await expect(await openai.waitForCall()).toHaveSentFile("./fixtures/error.png");   // the same bytes
+```
+
+- Data URLs, `file_id`s from `/v1/files` and URLs are all accepted, on Chat Completions (`image_url`, `file`, `input_audio`) and on Responses (`input_image`, `input_file`).
+- **A URL on a fake host is fetched the way OpenAI would fetch it: without credentials.** An agent that hands the model Slack's `url_private` gets OpenAI's 400 (`invalid_image_url`, "Error while downloading …"), as it would for real. That's a real bug class: the agent must download the file and send its bytes. A public URL on a fake host works. URLs elsewhere aren't fetched, and are recorded as given.
+
+**What the model answers.** A turn can carry media:
+
+| Endpoint | The turn |
+|---|---|
+| `images.generations`, `images.edits` | `image` (one, or several for `n`), base64 or a URL as the request asks |
+| `audio.speech` | `audio`, in the requested `response_format` |
+| `audio.transcriptions`, `audio.translations` | `text`, as JSON, text, SRT or VTT as asked. With `stream: true` it's streamed as transcript deltas, with timing like any stream |
+| `chat.completions` with `modalities: ["text", "audio"]` | `audio`, with `text` as its transcript (`message.audio`, `delta.audio` when streaming) |
+
+```ts
+await openai.respond({ image: "./fixtures/chart.png" }, { when: { endpoint: "images.generations" } });
+await openai.respond({ text: "The deploy fails at the migration step." }, { when: { endpoint: "audio.transcriptions" } });
+await openai.respond({ audio: { placeholder: { seconds: 2 } } }, { when: { endpoint: "audio.speech" } });
+```
+
+A `MediaSource` is a path, which the SDK reads in the test process and uploads, like a repository's `files:`. It can also be bytes, or a placeholder the fake makes: a PNG of a given size, or WAV or PCM silence of a given length. Other formats (JPEG, WebP, MP3, Opus) need a file. A placeholder in a format the fake can't make is a script problem (§5.4), never a body with the wrong media type.
+
+Video isn't served: OpenAI shut the Videos API (Sora) down on 2026-09-24.
+
+### 5.6 Built-in tools
+
+OpenAI's built-in tools are scripted like functions, in `toolCalls`. The fake never runs anything: no search, no container, no call to an MCP server. What a hosted tool found is what the script says. What a client-run tool did is what the agent sends back.
+
+| Tool (`type`) | Who runs it | In the answer | Scripted as |
+|---|---|---|---|
+| `web_search` | OpenAI | `web_search_call` (action `search`, `open_page` or `find_in_page`), then the message with `url_citation` annotations | `{ webSearch: { query, sources } }`, with `citations` on the text |
+| `file_search` | OpenAI | `file_search_call` (its results when `include` asks), then `file_citation` annotations | `{ fileSearch: { queries, results } }` |
+| `code_interpreter` | OpenAI, in a container | `code_interpreter_call` with its code and outputs (logs, images). Files it wrote can be downloaded from the container | `{ codeInterpreter: { code, logs, files } }` |
+| `image_generation` | OpenAI | `image_generation_call` with the base64 `result`, and partial images when asked | `{ imageGeneration: { image, revisedPrompt } }` |
+| `mcp` (remote MCP) | OpenAI calls the server | `mcp_list_tools`, then `mcp_call`, or an `mcp_approval_request` the agent answers with `mcp_approval_response` | `{ mcp: { server, tool, arguments, output \| error, approval } }` |
+| `shell`, hosted | OpenAI | `shell_call` and `shell_call_output` | `{ shell: { commands, output } }` |
+| `shell`, `local` | the agent | `shell_call`; the agent sends `shell_call_output` | `{ shell: { commands } }` |
+| `computer` | the agent | `computer_call` with its `actions`; the agent sends `computer_call_output` with a screenshot | `{ computer: { actions } }` |
+| `apply_patch` | the agent | `apply_patch_call`; the agent sends `apply_patch_call_output` | `{ applyPatch: { operations } }` |
+| `custom` | the agent | `custom_tool_call` with free-form `input` | `{ custom: name, input }` |
+
+- **Built-in tools are on Responses only,** as on the real API. On Chat Completions, a search model with `web_search_options` gives the citations and nothing else. Offering a built-in tool on Chat Completions is refused as OpenAI refuses it.
+- **A script calls only what the request offered** (§5.4). For `mcp`, the `server` must be the request's `server_label`, and the tool must be in its `allowed_tools`. `vector_store_ids` and container ids are accepted as given.
+- **Each tool streams its own events** (`response.web_search_call.searching`, `response.code_interpreter_call_code.delta`, `response.image_generation_call.partial_image`, …), in the order the pinned OpenAPI description gives. OpenAI's guides don't name all of them, so the pinned description is the source.
+- **`toolCalls()` lists them all,** with `hosted` saying who ran each.
+
+The MCP approval flow is a channel test of its own. The agent turns the `mcp_approval_request` into an approval button, a person's click becomes the `mcp_approval_response`, and only then does the tool run (§13).
 
 ## 6. Responses computed from the request
 
@@ -450,14 +569,13 @@ The first piece of evidence that decides gives the answer, and the call records 
 
 People's text and the agent's prompt rarely match byte for byte. The agent strips `<@U08B5K2M9QX>`, resolves it to a name, trims or adds a prefix. Both sides are normalised before comparing: mentions and links are removed, whitespace is collapsed, case is ignored. Then the authored text must appear inside the prompt. Fragments shorter than 8 characters don't count as evidence ("hi" decides nothing).
 
-### 8.3 When two sessions said the same thing
+### 8.3 When two tests sent the same text
 
-Parallel tests often send identical prompts: every `slackChecks` test says `@my-agent hello`. Text then can't decide. The rule:
+Two tests run at the same time, both have a person say `@my-agent hello`, and the model call carries nothing else that tells them apart. That has to be designed out by the test, like any parallel tests that share something:
 
-- **If the tied sessions' scripts would give the same answer** (the same turn, or the same refusal), the oldest unanswered message wins. Which identical test gets which identical answer changes nothing.
-- **Otherwise the call is ambiguous.** It is refused like an unscripted call (§8.4). It is recorded in every tied session as ambiguous, and the next matcher that waits in those sessions fails with the reason: "a model call was ambiguous between this session and 1 other: both sent '@my-agent hello'. Give the prompt something unique, or have the agent send `user`."
-
-Ambiguity is loud, never a silent wrong answer. In practice it's rare: a test that scripts the model almost always says something of its own, and the checks (§12.5) put a unique token in their prompts.
+- **The call goes to the session of the oldest unanswered message,** and is recorded as attributed by order (`attributedBy: "order"`).
+- **If that hands a test the other's answer,** the failing matcher's message says so: "this reply's model call was attributed by order, between 2 sessions that both sent '@my-agent hello'. Give each test's prompt something of its own, or have the agent send `user`."
+- **The docs say so** wherever they show a scripted model, and the checks (§12.5) put a unique token in every prompt.
 
 ### 8.4 When nothing matches
 
@@ -472,7 +590,7 @@ There is no default answer: a model call with no script to answer it is a mistak
 
 **How the test fails,** when the call was attributed to its session:
 
-- **At once, in any matcher or wait that is running.** Each poll also reads the session's model problems, so `toHaveReplyFrom` fails right away with the same message instead of timing out ten seconds later. The same goes for a script problem (§5.4), a responder that threw, or an ambiguous call.
+- **At once, in any matcher or wait that is running.** Each poll also reads the session's model problems, so `toHaveReplyFrom` fails right away with the same message instead of timing out ten seconds later. The same goes for a script problem (§5.4), a responder that threw, or a static list that ran out (§8.6).
 - **At the latest, when the session closes,** even if the test asserts nothing about the model: the Vitest fixture fails the test, pytest's fixture raises in teardown, and Rust's `session.close()` returns the error.
 
 **A call no session claims** (the agent calls the model at startup or from a scheduled job, or rewrites the prompt past recognition) gets the same 400. No test can be blamed for it, so it's recorded in the world scope: `openai.unattributed()` in any session, `channelstack tail`, and the UI's model inspector show its shape and what was compared. Any test whose matcher fails while it's there gets a line saying so ("1 model call in the last 10s couldn't be attributed to a test: 'summarise the backlog…'").
@@ -489,6 +607,22 @@ There is no default answer: a model call with no script to answer it is a mistak
 | Timing ("the session whose delivery is in flight") | In parallel runs many are in flight. It can't decide, and it would make attribution flaky |
 | Injecting a marker into people's text | Changes what the test wrote, and the agent may answer the marker |
 
+### 8.6 Several calls in one test, in an order nobody controls
+
+Inside one test, two mentions can be in flight at once: Ana and Ben both ask, or Ana asks twice quickly. Which model call reaches channelstack first is a race inside the agent, not something the test decides.
+
+- **A static list answers in arrival order.** With `openai.respond(["A", "B"])`, whichever call arrives first gets "A". That's fine when the answers don't depend on which call is which.
+- **When they do, use a responder.** The request carries its **context**: the message it answers, who sent it, and where (`request.context`, from the evidence of §8.1). The function answers each call for what it is:
+
+  ```ts
+  await openai.respond((request) =>
+    request.context?.from?.id === ana.id ? "Your deploy is green." : "Your migration is still running.");
+  ```
+
+  `when: { from: ana }` and `when: { in: thread }` are the same check in static form.
+- **Not enough turns is an error, never a reuse.** If more calls arrive than a static list has turns, the extra ones get the refusal of §8.4, and the test fails with "ms_2 has 2 turns; a 3rd call arrived". A list never repeats its last turn.
+- **A call's context is as exact as its evidence.** With an id the agent sent (`user`), or the person's own text, it names the message. If one session sent the same text twice and nothing else tells them apart, `context.candidates` lists both, and a failing matcher mentions it.
+
 ## 9. Reading and asserting what the agent sent
 
 ```ts
@@ -501,7 +635,7 @@ await expect(call).toHaveOfferedTool("search_incidents");
 
 ### 9.1 Tool calls and their results
 
-`toolCalls()` on `openai`, a script (`ai`) or a call lists the tool calls the model made, each joined with the result the agent sent back in a later request, by its `call_…` id:
+`openai.toolCalls()`, `ai.toolCalls()` and `call.toolCalls` list the tool calls the model made. On a call it's a property, because a call is a finished record. On the fixture and a script it's a method, because it reads what has happened so far; a property there would be a snapshot taken when `respond()` returned, before any call. Each tool call is joined with the result the agent sent back in a later request, by its `call_…` id:
 
 ```ts
 const ai = await openai.respond([
@@ -530,19 +664,22 @@ A tool call without `result` is one the agent never answered, which is a bug cla
 
 - **Chat Completions:** `messages` with every role, text and image and file parts (counted, not read), `tools` with `strict`, `tool_choice`, `parallel_tool_calls`, `response_format` (`json_object`, `json_schema`), `stream` and `stream_options.include_usage`, `max_completion_tokens` (a turn longer than it ends with `finish_reason: "length"`), `n: 1`, `store` (no effect), `metadata`, `user`, `safety_identifier`.
 - **Responses:** `input` as a string or items (messages, `function_call`, `function_call_output`, `reasoning`), `instructions`, `tools` (functions), `tool_choice`, `text.format`, `reasoning`, `include`, `store` (default true: stored responses serve `GET /v1/responses/{id}` and `previous_response_id`), `max_output_tokens` (`incomplete` with its reason), `background: false`, every streaming event with its `sequence_number`.
+- **Images, audio, files:** the endpoints and parts of §5.5. `/v1/files` takes uploads (`purpose: "user_data"`, `"vision"`, …), serves `GET`, `content` and `DELETE`, and its ids work in `file_id` parts. A container's files are downloadable when a `codeInterpreter` call wrote them.
+- **Built-in tools:** those of §5.6, on Responses.
 - **Models:** any model name is accepted, so gateways' names (`openai/gpt-…`, `llama-3.3-70b`) work. `GET /v1/models` lists current OpenAI model ids, plus every name the agent has used.
 
 ### 10.2 What it refuses, as OpenAI does
 
 A missing `model` or `messages`, an unknown role, a `tool` message whose `tool_call_id` doesn't answer a call, `previous_response_id` that doesn't exist (`previous_response_not_found`), `n > 1` with tools, `json_schema` without `name`, an `X-Client-Request-Id` that isn't ASCII or is over 512 characters, and a missing or wrong key (401 `invalid_api_key`). Unknown tool types and unknown fields are recorded on the call rather than refused, unless OpenAI documents a refusal. emulate's refusal of Codex's `namespace` tools (#436) shows the cost of guessing. Each uses OpenAI's error body `{ error: { message, type, param, code } }`.
 
-### 10.3 Not in the first version
+### 10.3 What isn't served
 
-The same line as emulate draws:
+- **Refused with a 400** (`invalid_request_error`, code `unsupported_in_fake`, the counterpart of live mode's `unsupported_in_live`), naming what isn't supported: background responses and `n > 1` on Chat Completions.
+- **Not served (OpenAI's 404):** embeddings, the vector store API, cancelling a response, Realtime, batches and fine-tuning.
+- **Gone from OpenAI itself:** the Assistants API (sunset on 2026-08-26) and the Videos API (2026-09-24).
+- **The Conversations API** (`/v1/conversations` and Responses' `conversation` parameter) is current, not legacy: it replaced the Assistants API's threads. Whether it's in is open question 1.
 
-- **Refused with a 400** (`invalid_request_error`, code `unsupported_in_fake`, the counterpart of live mode's `unsupported_in_live`), naming what isn't supported: hosted tools (`web_search`, `file_search`, `code_interpreter`, `computer_use`, remote MCP), custom tools, background responses, the Conversations API, and `n > 1`.
-- **Not served (OpenAI's 404):** embeddings, listing input items' token counts, cancelling a response, the Assistants API, Realtime, files and batches.
-- **Where it differs from emulate:** emulate also serves images, audio and video. Agents in channels rarely need them, so they're left out, and they can be added later without changing anything here.
+Compared with emulate: emulate refuses hosted tools and the Conversations API, which channelstack scripts (and may serve). It also serves video, which OpenAI has since shut down.
 
 Each gap is a row in the reality matrix.
 
@@ -636,11 +773,11 @@ expect(&openai).not_to_have_sent_secrets().await?;
 
 In pytest the fixture is named `openai`, which shadows the `openai` package inside a test that also imports it. That is accepted: a test seldom needs both.
 
-### 12.5 The standard checks, and a check with no tests
+### 12.5 The standard checks
 
-Each channel's checks take the model: `slackChecks({ app: "my-agent", model: openai })` (and `model="openai"` in pytest). With it:
+Each channel's checks take the model: `slackChecks({ app: "my-agent", model: "openai" })` (and `model="openai"` in pytest). With it:
 
-- **The checks script the model themselves.** The stream and Stop checks no longer need `streamPrompt`, because the check scripts a long, slow stream. Every check's prompt carries a unique token, so parallel checks never tie (§8.3).
+- **The checks script the model themselves.** The stream and Stop checks no longer need `streamPrompt`, because the check scripts a long, slow stream. Every check's prompt carries a unique token, so parallel checks are never attributed by order (§8.3).
 - **New checks, one per model bug class:**
 
   | Check | What it does | The bug |
@@ -652,16 +789,14 @@ Each channel's checks take the model: `slackChecks({ app: "my-agent", model: ope
   | `slack.stop-cancels-model` | `pauseAfter`, then Stop, then the call must be `aborted` | Stop leaves the model running |
   | `<channel>.no-secrets-to-model` | `not.toHaveSentSecrets()` on every call of every check | Tokens in the prompt |
 
-- **`channelstack check`, a new command** (the CLI has no `check` today), with no test files: `channelstack check slack --app my-agent` runs the same checks against a running agent from the CLI and prints one line per check, then exits non-zero if any failed. With the fake model in the agent's environment, an **unmodified agent with no keys** gets the whole suite in CI:
+With the fake model in its environment, an **unmodified agent with no keys** runs them in CI:
 
-  ```bash
-  npx channelstack start --no-portless --port 4500 &
-  npx channelstack env >> "$GITHUB_ENV"         # includes OPENAI_BASE_URL and OPENAI_API_KEY
-  pnpm start &                                 # the agent, unchanged
-  npx channelstack check slack github --app my-agent
-  ```
-
-  The checks are registered with Vitest's `describe` and `test`. So the CLI runs them through Vitest, bundled with the npm package and started on a generated config, rather than through a second runner (open question 2).
+```bash
+npx channelstack start --no-portless --port 4500 &
+npx channelstack env >> "$GITHUB_ENV"     # includes OPENAI_BASE_URL and OPENAI_API_KEY
+pnpm start &                             # the agent, unchanged
+pnpm vitest run                          # a file that calls slackChecks({ app: "my-agent", model: "openai" })
+```
 
 ## 13. Example tests
 
@@ -758,6 +893,70 @@ describe("timing and failures (fake only)", () => {
   });
 });
 
+describe("several calls at once", () => {
+  // The reference agent sends the Slack user id as `user`, so each call's context names its person.
+  test("two people ask at once; each gets the answer to their own question", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    const ben = await slack.createUser({ name: "Ben" });
+    const channel = await slack.createChannel({ participants: [ana, ben, slack.app] });
+    await openai.respond((request) =>
+      request.context?.from?.id === ana.id ? "Your deploy is green." : "Your migration is still running.",
+    );
+
+    const [a, b] = await Promise.all([
+      ana.say("@my-agent how's my change doing?", { channel }),
+      ben.say("@my-agent how's my change doing?", { channel }),
+    ]);
+
+    await expect(a.thread).toHaveReplyFrom("my-agent", { text: /deploy is green/ });
+    await expect(b.thread).toHaveReplyFrom("my-agent", { text: /migration/ });
+  });
+});
+
+describe("images and built-in tools", () => {
+  test("the screenshot Ana shares reaches the model", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app] });
+    await openai.respond("The stack trace points at the migration.");
+
+    await ana.say("@my-agent what's wrong here?", { channel, files: "./fixtures/error.png" });
+
+    const call = await openai.waitForCall();
+    await expect(call).toHaveSentFile("./fixtures/error.png");   // downloaded with the bot token, sent as bytes
+  });
+
+  test("a generated chart is posted in the thread", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    const channel = await slack.createChannel({ participants: [ana, slack.app] });
+    await openai.respond({
+      toolCalls: [{ imageGeneration: { image: "./fixtures/chart.png" } }],
+      text: "Here's this week's deploys.",
+    });
+
+    const msg = await ana.say("@my-agent chart this week's deploys", { channel });
+
+    const reply = await msg.thread.waitForReply({ from: "my-agent" });
+    expect(reply.files).toHaveLength(1);
+  });
+
+  test("an MCP approval becomes a button, and only the click runs the tool", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana", admin: true });
+    const deploy = { server: "deploys", tool: "deploy", arguments: { app: "web" } };
+    const ai = await openai.respond([
+      { toolCalls: [{ mcp: { ...deploy, approval: true } }] },
+      { toolCalls: [{ mcp: { ...deploy, output: "started" } }], text: "Deploying web." },
+    ]);
+
+    const msg = await ana.say("deploy web", { to: slack.app });
+    const ask = await msg.thread.waitForReply({ from: "my-agent" });
+    await expect(ai).toHaveAnswered({ times: 1 });              // nothing runs before the click
+    await ana.click("Approve", { message: ask });
+
+    await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /Deploying web/ });
+    await expect(ai).toHaveAnswered({ times: 2 });
+  });
+});
+
 describe("a missing script fails the test", () => {
   // The agent calls the model, but the test scripted nothing for "status?". The agent gets a 400
   // (channelstack_no_script) and the matcher fails at once with the missing respond(…) in its message.
@@ -812,6 +1011,8 @@ New pieces, each a row in [code-map.md](../../docs/code-map.md) when built:
 | The provider | `server/src/providers/openai/` (a new kind next to `drivers/`: no people, apps, deliveries or transcripts) | `fake/endpoint.ts`'s `restApi` (auth, bodies, refusals in the platform's shape, call recording); ids from the world's random source; `secrets` for the key |
 | SSE writer with timing, pause, break | `server/src/core/stream/` | the injected clock and timers |
 | Attribution | `server/src/core/attribution/`: what each session's people wrote and the ids it owns, looked up per request | the event log (people's actions are already on it); the object registry |
+| Images, audio, files | `server/src/providers/openai/media.ts`: parts and their hashes, multipart bodies, placeholders (PNG, WAV), `/v1/files`, fetching a URL on a fake host without credentials | Hono's body parsing; `node:zlib` for PNG |
+| Built-in tools | `server/src/providers/openai/tools/`, one file per tool: its items, annotations and events | the SSE writer |
 | Scripts, responders, templates, the rate limit | `server/src/providers/openai/scripts.ts`, `rate-limit.ts` | session lifetime, like faults; the injected clock |
 | Routes | `providers/openai/routes.ts`: `respond`, `calls`, `unattributed`, the responder's `requests` and `answer` | `registerRoute`, `readCalls`, `recordCall` |
 | SDK runtime | `responder` in each SDK runtime | `wait`, transport |
@@ -824,28 +1025,30 @@ Dependencies: none new in the server for the protocol. JSON Schema validation of
 
 ## 15. Open questions for the maintainer
 
-1. **Ambiguous calls (§8.3).** Two tests running at the same time send the same text, say `@my-agent hello`, and the agent's model call carries nothing else that tells them apart. If both tests scripted the same answer (or neither scripted one), it doesn't matter which gets the call, and the oldest message gets it. If they scripted different answers, the server can't know whose call it is. The choice:
-   - **(a) refuse it and fail both tests** with "ambiguous: both sent '@my-agent hello'; give the prompt something unique, or have the agent send `user`" (proposed);
-   - **(b) guess:** the oldest unanswered message gets it. The wrong test can then get the other's answer and fail on a confusing reply, or pass by luck.
+1. **The Conversations API.** It isn't legacy: it's what OpenAI offers for server-side state with Responses, and what replaced the Assistants API (shut down 2026-08-26). The OpenAI Agents SDK's conversation sessions use it. Serving it is small: create and read a conversation, list, add and delete its items, and the `conversation` parameter on Responses, on the store `previous_response_id` already uses. *Default: serve it.*
+2. **Splitting the phase.** It has grown. *Default: two phases: first the core (Chat Completions, Responses, function tools, streams, timing, errors, rate limits, attribution, responders, matchers, checks), then images, audio, files and built-in tools.*
+3. **Where it goes.** *Default: after phase 12 (multiple apps). It's independent of apps, so it could also go before.*
+4. **MCP servers.** The fake scripts what a remote MCP server answers (proposed), or it could really call the `server_url` with the MCP SDK it already depends on, when the URL is local. *Default: scripted only.*
+5. **The refusal codes.** `channelstack_no_script` and `unsupported_in_fake` are channelstack's own codes inside OpenAI's error body. OpenAI never sends them, so they're unmistakable in the agent's logs. *Default: these names.*
 
-   *Default: (a).* Tests that script the model nearly always say something of their own, and the checks put a unique token in every prompt, so (a) only trips on tests that couldn't have been told apart anyway.
-2. **`channelstack check` (§12.5) is new.** Today the checks exist only as `slackChecks()` and the like inside a Vitest suite. Keep it in this phase, or make it its own phase? It's what lets an unmodified agent run the checks in CI with no test files. *Default: its own phase, after this one.*
-3. **Where it goes in the phase plan.** *Default: phase 13, after phase 12 (multiple apps). It's independent of apps, so it could also go before.*
-4. **The refusal codes.** `channelstack_no_script` and `unsupported_in_fake` are channelstack's own codes inside OpenAI's error body. OpenAI never sends them, so they're unmistakable in the agent's logs. *Default: these names.*
-
-## 16. Settled in the first review
+## 16. Settled in review
 
 | | Decision |
 |---|---|
 | Fixture name | `openai`, in every language (pytest's shadows the `openai` package inside a test that imports it; accepted) |
 | A script's variable | `ai`: `const ai = await openai.respond(…)` |
-| Tool calls | `toolCalls()` on `openai`, a script and a call, each joined with the agent's result; `toHaveSentToolResult` beside `toHaveOfferedTool` (§9.1) |
+| Tool calls | `openai.toolCalls()` and `ai.toolCalls()` are methods, `call.toolCalls` a property (§9.1). Each is joined with the agent's result; `toHaveSentToolResult` sits beside `toHaveOfferedTool` |
 | Unscripted calls | No default answer. The agent gets a 400 `channelstack_no_script`, and the test fails at once in its matchers, or at the latest when its session closes (§8.4) |
+| Same text from parallel tests | The test's job: give each prompt something of its own. The call goes to the oldest message's session, and a failure says it was attributed by order (§8.3) |
+| Calls in an unknown order | A static list answers in arrival order and fails when it runs out. Answers that depend on which call is which use a responder and `request.context`, or `when: { from, in }` (§8.6) |
 | Unknown model names | Accepted |
 | Token counts | About four characters a token |
 | Rate limits | A per-session limiter with truthful headers (§7.4), and OpenAI's documented plan, spend and access errors as error turns (§4.2) |
-| Embeddings, hosted tools, Conversations | As emulate does it: hosted tools, custom tools, background mode, Conversations and `n > 1` refused with a 400; embeddings not served (§10.3) |
+| Multi-modal | Images, audio and files in and out (§5.5); no video, since OpenAI shut that API down |
+| Built-in tools | All of them, scripted, never run (§5.6) |
+| Embeddings | Not served |
 | Gateway dialects | OpenRouter's `reasoning`, DeepSeek's `reasoning_content` and Azure's deployment paths, because they're cheap (§11.1) |
 | Proxy mode | `api.openai.com` is always routed to the fake (§12.3) |
+| `channelstack check` | Not added. The checks run in the developer's own Vitest or pytest suite |
 | Other providers | None: no Anthropic |
 | Decision record | 0028, written once the interface is approved. It reverses the `AGENTS.md` **Models** row and `devx.md` §6 |
