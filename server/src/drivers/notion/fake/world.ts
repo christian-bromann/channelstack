@@ -1,3 +1,4 @@
+import { BUILT_IN_APP, checkNameFree } from "../../../core/apps/index.ts";
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
@@ -13,6 +14,8 @@ import { plainText, type RichTextItem, textItem, userMention } from "../rich-tex
 import { signNotionWebhook } from "../signing.ts";
 import type {
   NotionBlockRecord,
+  NotionBotRecord,
+  NotionCapability,
   NotionCommentRecord,
   NotionDatabaseRecord,
   NotionDiscussionRecord,
@@ -40,6 +43,9 @@ const unseen = (kind: string, id: string) =>
     "object_not_found",
     `Could not find ${kind} with ID: ${id}. Make sure the relevant pages and databases are shared with your integration.`,
   );
+
+/** One integration's event builders: its subscription and integration ids in every payload. */
+type Payloads = ReturnType<typeof notionPayloads>;
 
 /** A property's value as a test gives it (`NotionPropertyValue`): plain values, option names, ids. */
 export type PlainValue = string | number | boolean | null | string[] | { start: string; end?: string | undefined };
@@ -86,7 +92,8 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     database: (id) => store.database(id),
     discussion: (id) => store.discussion(id),
   });
-  const payloads = notionPayloads({ workspace: () => store.workspace, bot: () => store.bot });
+  /** The events one integration's subscription sends: its own ids in every payload. */
+  const payloadsFor = (app: NotionBotRecord) => notionPayloads({ workspace: () => store.workspace, bot: () => app });
 
   // --- Reading the workspace ------------------------------------------------------------------
 
@@ -94,26 +101,50 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   const { titleOf, isBot, accessible, childrenOf, blockText, blockWith } = reads;
   const author = (id: string): Author => ({ id, type: isBot(id) ? "bot" : "person" });
 
-  /** The page or database an id names, if the integration may see it; Notion's 404 otherwise. */
-  const visiblePage = (id: string): NotionPageRecord => {
+  /**
+   * The page or database an id names, if the integration (whose bot this is; the built-in one
+   * unless named) may see it; Notion's 404 otherwise.
+   */
+  const visiblePage = (id: string, bot = store.bot.id): NotionPageRecord => {
     const page = store.pages.find(id);
-    if (!page || !accessible(page.id)) throw unseen("page", id);
+    if (!page || !accessible(page.id, bot)) throw unseen("page", id);
     return page;
   };
-  const visibleDatabase = (id: string): NotionDatabaseRecord => {
+  const visibleDatabase = (id: string, bot = store.bot.id): NotionDatabaseRecord => {
     const database = store.databases.find(id) ?? store.dataSource(id);
-    if (!database || !accessible(database.id)) throw unseen("database", id);
+    if (!database || !accessible(database.id, bot)) throw unseen("database", id);
     return database;
   };
   /** A block or a page by id: what `blocks.*` takes, since a page is a block too. */
-  const visibleBlock = (id: string): { block?: NotionBlockRecord; page: NotionPageRecord } => {
+  const visibleBlock = (id: string, bot = store.bot.id): { block?: NotionBlockRecord; page: NotionPageRecord } => {
     // A page is a block too: its children are the page's content.
     const page = store.pages.find(id);
-    if (page && accessible(page.id)) return { page };
+    if (page && accessible(page.id, bot)) return { page };
     const block = store.blocks.find(id);
-    if (block && !block.inTrash && block.type !== "child_page" && accessible(block.page))
+    if (block && !block.inTrash && block.type !== "child_page" && accessible(block.page, bot))
       return { block, page: store.page(block.page) };
     throw unseen("block", id);
+  };
+
+  /**
+   * An integration may mention people only (Notion's changelog: "User mentions can only be of
+   * people"), so it hands off by comment or page, not by `@`. Until B7 confirms the refusal and its
+   * code, the fake refuses another integration's bot with `validation_error`; an integration's
+   * mention of its own bot stays as the fake has answered it since phase 4.
+   */
+  const checkMentions = (rich: readonly RichTextItem[], actor: string | undefined): void => {
+    if (actor === undefined || !isBot(actor)) return;
+    rich.forEach((item, index) => {
+      const mentioned = item.type === "mention" && item.mention.type === "user" ? item.mention.user.id : undefined;
+      if (mentioned !== undefined && mentioned !== actor && isBot(mentioned))
+        throw invalid(`body failed validation: rich_text[${index}].mention.user should be a person, not a bot`);
+    });
+  };
+
+  /** An integration may do this only with the capability in its settings: Notion's 403 otherwise. */
+  const requireCapability = (app: NotionBotRecord, capability: NotionCapability): void => {
+    if (!app.capabilities.includes(capability))
+      throw new NotionApiError(403, "restricted_resource", "Insufficient permissions for this endpoint.");
   };
 
   /** Where a page is, as an event names it. */
@@ -136,29 +167,51 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   const pendingContent = new Map<string, { session: string; blocks: Set<string>; authors: Map<string, Author> }>();
 
   /**
-   * Send an event to the agent if the integration is subscribed to it, may see the page and has a
-   * URL. Every attempt is stamped with its number and signed with the verification token.
+   * Send an event to one integration if it is subscribed to it, may see the page and has a URL.
+   * Every attempt is stamped with its number and signed with that integration's verification token.
+   */
+  const emitTo = (
+    app: NotionBotRecord,
+    session: string,
+    page: NotionPageRecord,
+    type: string,
+    build: (id: string, payloads: Payloads) => Record<string, unknown>,
+  ): string | undefined => {
+    const url = context.apps.webhookUrl(app.name);
+    if (!app.events.includes(type) || !accessible(page.id, app.id) || url === undefined) return undefined;
+    if (type.startsWith("comment.") && !app.capabilities.includes("read_comments")) return undefined;
+    const id = ids.next(NOTION_IDS.uuid);
+    const payload = build(id, payloadsFor(app));
+    const entity = payload.entity as { id: string; type: string };
+    deliveries.send({
+      id,
+      session,
+      app: app.name,
+      type,
+      url,
+      body: JSON.stringify(payload),
+      meta: { payload, entity, page: page.id },
+    });
+    return id;
+  };
+
+  /**
+   * Send an event to every integration connected to the page, whoever caused it: a person, another
+   * integration, or the integration itself (decision 0027; to confirm, B7). Each gets its own
+   * delivery. Answers with the built-in integration's, which is what a test's handle carries.
    */
   const emit = (
     session: string,
     page: NotionPageRecord,
     type: string,
-    build: (id: string) => Record<string, unknown>,
+    build: (id: string, payloads: Payloads) => Record<string, unknown>,
   ): string | undefined => {
-    if (!store.bot.events.includes(type) || !accessible(page.id) || context.webhookUrl === undefined) return undefined;
-    if (type.startsWith("comment.") && !store.bot.capabilities.includes("read_comments")) return undefined;
-    const id = ids.next(NOTION_IDS.uuid);
-    const payload = build(id);
-    const entity = payload.entity as { id: string; type: string };
-    deliveries.send({
-      id,
-      session,
-      type,
-      url: context.webhookUrl,
-      body: JSON.stringify(payload),
-      meta: { payload, entity, page: page.id },
-    });
-    return id;
+    let builtIn: string | undefined;
+    for (const app of store.apps.all()) {
+      const id = emitTo(app, session, page, type, build);
+      if (app.name === BUILT_IN_APP) builtIn = id;
+    }
+    return builtIn;
   };
 
   /** Hold a content update for the page's batch; the first one starts the delay. */
@@ -171,7 +224,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         const sent = pendingContent.get(page.id);
         pendingContent.delete(page.id);
         if (!sent || !store.pages.find(page.id)) return;
-        emit(session, page, "page.content_updated", (id) =>
+        emit(session, page, "page.content_updated", (id, payloads) =>
           payloads.contentUpdated(id, clock(), [...sent.authors.values()], page.id, eventParent(page), [
             ...sent.blocks,
           ]),
@@ -189,19 +242,19 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
 
   // --- Blocks ---------------------------------------------------------------------------------
 
-  /** Page content as a test or the API gives it: Markdown, or block objects. */
-  const draftsOf = (content: string | readonly unknown[]): BlockDraft[] =>
-    typeof content === "string" ? markdownToBlocks(content) : content.map(draftFromRequest);
+  /** Page content as a test or the API gives it, written by `actor`: Markdown, or block objects. */
+  const draftsOf = (content: string | readonly unknown[], actor: string | undefined): BlockDraft[] =>
+    typeof content === "string" ? markdownToBlocks(content) : content.map((raw) => draftFromRequest(raw, actor));
 
-  /** A block object as the API takes it (`{ type, [type]: {…}, children? }`). */
-  const draftFromRequest = (raw: unknown): BlockDraft => {
+  /** A block object as the API takes it (`{ type, [type]: {…}, children? }`), written by `actor`. */
+  const draftFromRequest = (raw: unknown, actor: string | undefined): BlockDraft => {
     const input = raw as Record<string, unknown> | null;
     const type =
       typeof input?.type === "string" ? input.type : Object.keys(input ?? {}).find((key) => key !== "object");
     if (!input || type === undefined || typeof input[type] !== "object" || input[type] === null)
       throw invalid("body failed validation: a block needs its type's object, e.g. `paragraph: { rich_text }`");
     const { children, ...data } = input[type] as Record<string, unknown> & { children?: unknown[] };
-    if ("rich_text" in data) data.rich_text = richFromRequest(data.rich_text);
+    if ("rich_text" in data) data.rich_text = richFromRequest(data.rich_text, actor);
     if (type !== "divider" && !("color" in data) && "rich_text" in data) data.color = "default";
     if (type === "to_do") data.checked = data.checked === true;
     if (type === "code") {
@@ -212,14 +265,19 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     return {
       type,
       data,
-      children: (children ?? (input.children as unknown[] | undefined) ?? []).map(draftFromRequest),
+      children: (children ?? (input.children as unknown[] | undefined) ?? []).map((child) =>
+        draftFromRequest(child, actor),
+      ),
     };
   };
 
-  /** Rich text from the API, made complete: plain text worked out, mentions named. */
-  const richFromRequest = (input: unknown): RichTextItem[] => {
+  /**
+   * Rich text from the API, made complete: plain text worked out, mentions named. Written by an
+   * integration (`actor`), it may mention people only.
+   */
+  const richFromRequest = (input: unknown, actor?: string): RichTextItem[] => {
     if (!Array.isArray(input)) throw invalid("body failed validation: rich_text should be an array");
-    return input.map((raw, index) => {
+    const rich = input.map((raw, index): RichTextItem => {
       const item = raw as {
         text?: { content?: unknown; link?: { url?: unknown } | null };
         mention?: { user?: { id?: unknown } };
@@ -235,6 +293,8 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       if (mentioned) return userMention(mentioned.id, mentioned.name, isBot(mentioned.id));
       throw invalid(`body failed validation: rich_text[${index}] should be \`text\` or a user \`mention\``);
     });
+    checkMentions(rich, actor);
+    return rich;
   };
 
   /** Make blocks from drafts under a parent; answers with the top-level ids. */
@@ -284,7 +344,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     const list = target.block ? target.block.children : target.page.children;
     const at = after === undefined ? list.length : list.indexOf(after) + 1;
     if (after !== undefined && at === 0) throw invalid(`body failed validation: ${after} is not a child of this block`);
-    const drafts = draftsOf(content);
+    const drafts = draftsOf(content, actor);
     const added = insertBlocks(session, target.page, parent, drafts, actor);
     list.splice(at, 0, ...added);
     touch(target.page, actor);
@@ -301,7 +361,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     block.data = {
       ...block.data,
       ...rest,
-      ...(rich_text === undefined ? {} : { rich_text: richFromRequest(rich_text) }),
+      ...(rich_text === undefined ? {} : { rich_text: richFromRequest(rich_text, actor) }),
     };
     block.lastEditedAt = clock();
     block.lastEditedBy = actor;
@@ -404,8 +464,8 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     }
   };
 
-  /** A property value as the API takes it (`{ number: 3 }`, `{ status: { name } }`, `{ title: [...] }`). */
-  const fromRequest = (property: NotionPropertyRecord, raw: unknown): NotionValue => {
+  /** A property value as the API takes it (`{ number: 3 }`, `{ status: { name } }`, `{ title: [...] }`), from `actor`. */
+  const fromRequest = (property: NotionPropertyRecord, raw: unknown, actor?: string): NotionValue => {
     const input = raw as Record<string, unknown> | null;
     const inner = input?.[property.type];
     const fail = () => invalid(`body failed validation: ${property.name} is expected to be ${property.type}`);
@@ -413,7 +473,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     switch (property.type) {
       case "title":
       case "rich_text":
-        return { type: property.type, rich: richFromRequest(inner) };
+        return { type: property.type, rich: richFromRequest(inner, actor) };
       case "select":
       case "status": {
         const name = (inner as { name?: unknown } | null)?.name;
@@ -481,7 +541,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     addOptions(changed, values);
     for (const property of changed) page.properties[property.name] = values[property.name] as NotionValue;
     touch(page, actor);
-    return emit(session, page, "page.properties_updated", (id) =>
+    return emit(session, page, "page.properties_updated", (id, payloads) =>
       payloads.propertiesUpdated(
         id,
         clock(),
@@ -555,7 +615,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   };
 
   const announcePage = (session: string, page: NotionPageRecord, actor: string) =>
-    emit(session, page, "page.created", (id) =>
+    emit(session, page, "page.created", (id, payloads) =>
       payloads.pageCreated(id, clock(), [author(actor)], page.id, eventParent(page)),
     );
 
@@ -569,7 +629,13 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       input,
     );
     if (input.content !== undefined)
-      page.children = insertBlocks(session, page, { type: "page_id", id: page.id }, draftsOf(input.content), actor);
+      page.children = insertBlocks(
+        session,
+        page,
+        { type: "page_id", id: page.id },
+        draftsOf(input.content, actor),
+        actor,
+      );
     const sent = options.announce ? announcePage(session, page, actor) : undefined;
     return { page, delivery: sent };
   };
@@ -670,7 +736,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       session,
     );
     const page = store.page(discussion.page);
-    comment.delivery = emit(session, page, "comment.created", (eventId) =>
+    comment.delivery = emit(session, page, "comment.created", (eventId, payloads) =>
       payloads.commentCreated(eventId, now, [author(actor)], {
         id: comment.id,
         page: page.id,
@@ -713,7 +779,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
   ) => {
     const discussion = store.discussion(comment.discussion);
     const page = store.page(comment.page);
-    return emit(session, page, type, (id) =>
+    return emit(session, page, type, (id, payloads) =>
       payloads.commentCreated(
         id,
         clock(),
@@ -729,8 +795,134 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     );
   };
 
+  // --- Pages, for people and integrations -----------------------------------------------------
+
+  const edit = (
+    session: string,
+    page: NotionPageRecord,
+    change: { append?: string | unknown[] | undefined; replace?: string | unknown[] | undefined },
+    actor: string,
+  ) => {
+    if (change.replace !== undefined) {
+      const removed = childrenOf(page.children);
+      for (const block of removed) block.inTrash = true;
+      page.children = [];
+      contentUpdated(
+        session,
+        page,
+        removed.map((block) => block.id),
+        actor,
+      );
+      append(session, { page }, change.replace, actor);
+    }
+    if (change.append !== undefined) append(session, { page }, change.append, actor);
+    touch(page, actor);
+  };
+
+  const rename = (session: string, page: NotionPageRecord, title: string, actor: string) => {
+    const property = schemaOf(page).find((candidate) => candidate.type === "title") as NotionPropertyRecord;
+    return setProperties(session, page, { [property.name]: { type: "title", rich: [textItem(title)] } }, actor);
+  };
+
+  // --- Integrations (decision 0027) -----------------------------------------------------------
+
+  /** An integration a test made and acts as: never the built-in one, which the agent under test acts as. */
+  const scripted = (id: string): NotionBotRecord => {
+    const app = store.integration(id) ?? store.apps.named(id);
+    if (!app) throw new ProtocolError("not_found", `There is no Notion integration "${id}"`, { app: id });
+    if (app === store.bot) {
+      throw new ProtocolError(
+        "invalid_argument",
+        `${app.name} is the built-in integration, which the agent under test acts as: script another integration`,
+        { app: app.id },
+      );
+    }
+    return app;
+  };
+
+  const integrations = {
+    /** The workspace's integrations, the built-in one first. */
+    apps: () => store.apps.all(),
+
+    /**
+     * Make an internal integration by name, with its own bot user, token and webhook subscription,
+     * or return the one made with the same settings. Its capabilities and events default to the
+     * built-in integration's.
+     */
+    createApp(
+      session: string | undefined,
+      options: {
+        name: string;
+        capabilities?: readonly NotionCapability[] | undefined;
+        events?: readonly string[] | undefined;
+      },
+    ): NotionBotRecord {
+      if (session !== undefined) {
+        checkNameFree(
+          options.name,
+          store.users.list(session).map((user) => user.name),
+          "app",
+        );
+      }
+      const capabilities = [...(options.capabilities ?? store.bot.capabilities)];
+      const events = [...(options.events ?? store.bot.events)];
+      return store.apps.make(options.name, { capabilities, events }, () => {
+        const appIds = context.apps.ids(options.name);
+        return {
+          id: appIds.next(NOTION_IDS.uuid),
+          integrationId: appIds.next(NOTION_IDS.uuid),
+          subscriptionId: appIds.next(NOTION_IDS.uuid),
+          name: options.name,
+          events,
+          capabilities,
+        };
+      });
+    },
+
+    /** An integration a test made starts a discussion, as its own `comments.create` would. */
+    commentAsApp(session: string, name: string, page: NotionPageRecord, rich: RichTextItem[], anchor?: TextPattern) {
+      const app = scripted(name);
+      requireCapability(app, "insert_comments");
+      visiblePage(page.id, app.id);
+      checkMentions(rich, app.id);
+      return startDiscussion(session, page, anchor === undefined ? undefined : blockWith(page, anchor), rich, app.id);
+    },
+
+    /** An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. */
+    replyAsApp(session: string, name: string, discussion: NotionDiscussionRecord, rich: RichTextItem[]) {
+      const app = scripted(name);
+      requireCapability(app, "insert_comments");
+      if (!accessible(discussion.page, app.id)) throw unseen("discussion", discussion.id);
+      checkMentions(rich, app.id);
+      return addComment(session, discussion, rich, app.id);
+    },
+
+    /** An integration a test made edits a page's body, as its own `blocks.children.append` (and deletes) would. */
+    editAsApp(
+      session: string,
+      name: string,
+      page: NotionPageRecord,
+      change: { append?: string | unknown[] | undefined; replace?: string | unknown[] | undefined },
+    ) {
+      const app = scripted(name);
+      requireCapability(app, "insert_content");
+      if (change.replace !== undefined) requireCapability(app, "update_content");
+      visiblePage(page.id, app.id);
+      edit(session, page, change, app.id);
+    },
+
+    /** An integration a test made renames a page, as its own `pages.update` would. */
+    renameAsApp(session: string, name: string, page: NotionPageRecord, title: string) {
+      const app = scripted(name);
+      requireCapability(app, "update_content");
+      visiblePage(page.id, app.id);
+      return rename(session, page, title, app.id);
+    },
+  };
+
   return {
     ...reads,
+    ...integrations,
     store,
     objects,
     links,
@@ -758,6 +950,11 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     ) {
       if (store.users.list(session).some((user) => user.name.toLowerCase() === input.name.toLowerCase()))
         throw new ProtocolError("invalid_argument", `There is already a person "${input.name}" in this session`);
+      checkNameFree(
+        input.name,
+        store.apps.all().map((app) => app.name),
+        "person",
+      );
       const id = input.id === undefined ? ids.next(NOTION_IDS.uuid) : ids.reserve(NOTION_IDS.uuid, input.id);
       return store.users.add(
         id,
@@ -778,34 +975,21 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     addRow,
     setProperties,
     fromPlain,
-    edit(
+    edit,
+    rename,
+    /**
+     * A person mentions an integration (the built-in one unless another's bot is named) in the
+     * page body: in the block with this text, or a new paragraph.
+     */
+    mention(
       session: string,
       page: NotionPageRecord,
-      change: { append?: string | unknown[] | undefined; replace?: string | unknown[] | undefined },
+      inBlock: TextPattern | undefined,
       actor: string,
+      integration: string = store.bot.id,
     ) {
-      if (change.replace !== undefined) {
-        const removed = childrenOf(page.children);
-        for (const block of removed) block.inTrash = true;
-        page.children = [];
-        contentUpdated(
-          session,
-          page,
-          removed.map((block) => block.id),
-          actor,
-        );
-        append(session, { page }, change.replace, actor);
-      }
-      if (change.append !== undefined) append(session, { page }, change.append, actor);
-      touch(page, actor);
-    },
-    rename(session: string, page: NotionPageRecord, title: string, actor: string) {
-      const property = schemaOf(page).find((candidate) => candidate.type === "title") as NotionPropertyRecord;
-      return setProperties(session, page, { [property.name]: { type: "title", rich: [textItem(title)] } }, actor);
-    },
-    /** A person mentions the integration in the page body: in the block with this text, or a new paragraph. */
-    mention(session: string, page: NotionPageRecord, inBlock: TextPattern | undefined, actor: string) {
-      const mention = userMention(store.bot.id, store.bot.name, true);
+      const bot = store.integration(integration) ?? store.bot;
+      const mention = userMention(bot.id, bot.name, true);
       if (inBlock === undefined) {
         append(session, { page }, [{ type: "paragraph", paragraph: { rich_text: [] } }], actor);
         const last = store.block(page.children.at(-1) as string);
@@ -820,11 +1004,12 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       touch(page, actor);
       contentUpdated(session, page, [block.id], actor);
     },
-    connect(page: { connections: string[] }) {
-      if (!page.connections.includes(store.bot.id)) page.connections.push(store.bot.id);
+    /** Connect an integration (the built-in one unless another's bot is named) to a page or database. */
+    connect(page: { connections: string[] }, bot: string = store.bot.id) {
+      if (!page.connections.includes(bot)) page.connections.push(bot);
     },
-    disconnect(page: { connections: string[] }) {
-      page.connections = page.connections.filter((id) => id !== store.bot.id);
+    disconnect(page: { connections: string[] }, bot: string = store.bot.id) {
+      page.connections = page.connections.filter((id) => id !== bot);
     },
 
     // Blocks, for the integration
@@ -841,7 +1026,7 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
         const values = Object.fromEntries(
           Object.entries(input.properties).map(([name, raw]) => {
             const property = propertyNamed(page, name);
-            return [property.name, fromRequest(property, raw)];
+            return [property.name, fromRequest(property, raw, actor)];
           }),
         );
         setProperties(session, page, values, actor);
@@ -865,9 +1050,9 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       const values: Record<string, NotionValue> = {};
       for (const [name, raw] of Object.entries(properties)) {
         const property = propertyNamed({ parent }, name);
-        values[property.name] = fromRequest(property, raw);
+        values[property.name] = fromRequest(property, raw, actor);
       }
-      const drafts = children.map(draftFromRequest);
+      const drafts = children.map((raw) => draftFromRequest(raw, actor));
       addOptions(schemaFor(parent), values);
       const draft = makePage(session, parent, values, actor);
       draft.children = insertBlocks(session, draft, { type: "page_id", id: draft.id }, drafts, actor);
@@ -911,23 +1096,28 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
     redeliver: (session: string, id: string) => deliveries.redeliver(session, id),
     deliveries: deliveries.deliveries,
     delivery: deliveries.delivery,
-    /** The subscription's verification request, as Notion sends it once when a subscription is created. */
-    verify(session: string) {
-      if (context.webhookUrl === undefined) return undefined;
+    /**
+     * An integration's subscription's verification request (the built-in one's unless another is
+     * given), as Notion sends it once when a subscription is created. Each subscription has its own.
+     */
+    verify(session: string, app: NotionBotRecord = store.bot) {
+      const url = context.apps.webhookUrl(app.name);
+      if (url === undefined) return undefined;
       const id = ids.next(NOTION_IDS.uuid);
       // Sent once and unsigned: the token is in the body, for the agent to save.
       deliveries.send({
         id,
         session,
+        app: app.name,
         type: "verification",
-        url: context.webhookUrl,
-        body: JSON.stringify({ verification_token: context.secret("verificationToken") }),
+        url,
+        body: JSON.stringify({ verification_token: context.apps.secret(app.name, "verificationToken") }),
         sign: () => ({ "user-agent": "notion-api" }),
         retry: false,
         stamp: false,
         meta: {
           payload: { verification_token: "[redacted]" },
-          entity: { type: "subscription", id: store.bot.subscriptionId },
+          entity: { type: "subscription", id: app.subscriptionId },
         },
       });
       return id;

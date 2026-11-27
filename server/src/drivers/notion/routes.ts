@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
+import { BUILT_IN_APP } from "../../core/apps/index.ts";
 import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
@@ -22,6 +23,7 @@ import { plainText } from "./rich-text.ts";
 import { renderDiscussion, renderPage } from "./transcript.ts";
 import type {
   NotionBlockRecord,
+  NotionBotRecord,
   NotionCommentRecord,
   NotionDatabaseRecord,
   NotionDiscussionRecord,
@@ -69,6 +71,7 @@ const NotionDelivery = z
   .object({
     id: z.string(),
     channel: z.literal("notion"),
+    app: z.string().openapi({ description: "The integration it went to, by name: `my-agent`, or one a test made." }),
     type: z
       .string()
       .openapi({ description: "`comment.created`, `page.content_updated`, `page.properties_updated`, …" }),
@@ -148,6 +151,11 @@ const TextPattern = z
   .openapi({ "x-channelstack-pattern": true });
 
 const UserParams = z.object({ user: pathParam("user") });
+const AppParams = z.object({ app: pathParam("app") });
+/** An integration's capabilities, as Notion's settings name them. */
+const Capability = z
+  .enum(["read_content", "update_content", "insert_content", "read_comments", "insert_comments", "read_user_info"])
+  .openapi("NotionCapability");
 const PageParams = z.object({ page: pathParam("page") });
 const DiscussionParams = z.object({ discussion: pathParam("discussion") });
 
@@ -180,6 +188,8 @@ const CONNECTIONS: LiveSupport = {
   requires: "browser",
   reason: "no API connects a page to an integration; Notion's UI does (… → Connections)",
 };
+/** Integrations beside the built-in one are the fake's, for now (decision 0027's live part is still to come). */
+const APPS: LiveSupport = { unsupported: "not yet: integrations beside the built-in one aren't built live" };
 /** What only the integration's own calls show: live, proxy mode sees them. */
 const AGENT_SIDE: LiveSupport = {
   requires: "proxy",
@@ -195,7 +205,8 @@ export function registerNotionRoutes(
     live: NotionWorld | undefined;
     events: EventLog;
     apiUrl: () => string;
-    secret: (name: string) => string;
+    /** One of an integration's secrets: the built-in one's unless another is named. */
+    secret: (name: string, app?: string) => string;
   },
 ): void {
   const { fake } = deps;
@@ -217,15 +228,15 @@ export function registerNotionRoutes(
 
   // --- Records → wire ---------------------------------------------------------------------------
 
-  const integrationWire = () => ({
-    id: store.bot.id,
-    name: store.bot.name,
+  const integrationWire = (app: NotionBotRecord = store.bot) => ({
+    id: app.id,
+    name: app.name,
     kind: "app" as const,
     channel: "notion" as const,
-    botUserId: store.bot.id,
+    botUserId: app.id,
     // A live integration's credentials stay on the server: the control API never returns them.
-    token: isLive ? "" : deps.secret("token"),
-    webhookSecret: isLive ? "" : deps.secret("verificationToken"),
+    token: isLive ? "" : deps.secret("token", app.name),
+    webhookSecret: isLive ? "" : deps.secret("verificationToken", app.name),
   });
   const userWire = (user: NotionUserRecord) => ({
     id: user.id,
@@ -236,7 +247,8 @@ export function registerNotionRoutes(
     ...(user.email ? { email: user.email } : {}),
   });
   const authorWire = (id: string) => {
-    if (world.isBot(id)) return integrationWire();
+    const app = store.integration(id);
+    if (app) return integrationWire(app);
     const user = store.user(id) as NotionUserRecord;
     return userWire(user);
   };
@@ -259,6 +271,7 @@ export function registerNotionRoutes(
   const deliveryWire = ({ request, attempts }: DeliveryRecord) => ({
     id: request.id,
     channel: "notion" as const,
+    app: request.app ?? BUILT_IN_APP,
     type: request.type,
     entity: (request.meta?.entity as { type: string; id: string } | undefined) ?? { type: "unknown", id: "" },
     payload: request.meta?.payload,
@@ -288,8 +301,11 @@ export function registerNotionRoutes(
   const databaseOf = (session: string, id: string) => store.databases.get(session, id);
   const discussionOf = (session: string, id: string) => store.discussions.get(session, id);
   const commentOf = (session: string, id: string) => store.comments.get(session, id);
-  const integration = (id: string) => {
-    if (id !== store.bot.id) throw new ProtocolError("not_found", `No Notion integration "${id}"`);
+  /** An integration of the workspace by its handle: the built-in one, or one a test made. */
+  const integration = (id: string): NotionBotRecord => {
+    const app = store.integration(id);
+    if (!app) throw new ProtocolError("not_found", `No Notion integration "${id}"`);
+    return app;
   };
   /** A person may only write in a page they could open: the fake's workspace has no private pages for people. */
   const live = (page: NotionPageRecord) => {
@@ -330,6 +346,150 @@ export function registerNotionRoutes(
     factory: { on: "NotionFixture", name: "createUser", options: ["name", "id", "email", "avatarUrl", "token"] },
     stability,
     handler: async ({ session, body }) => userWire(await world.createUser(session.id, body)),
+  });
+
+  // --- Integrations (decision 0027) -----------------------------------------------------------
+
+  /** What Notion's API refuses an integration a test acts as, with Notion's own code (`validation_error`). */
+  const asPlatform = <T>(run: () => T): T => {
+    try {
+      return run();
+    } catch (error) {
+      if (error instanceof NotionApiError)
+        throw new ProtocolError({ platform: error.code, status: error.status }, error.message);
+      throw error;
+    }
+  };
+  const SCRIPTED_ERRORS = ["not_found", "object_not_found", "restricted_resource", "validation_error"];
+
+  router.route({
+    method: "post",
+    path: "/apps",
+    summary:
+      "Make another internal integration in the workspace, with its own bot user, token and webhook subscription (decision 0027), or return the one made with this name and settings. Its events go to CHANNELSTACK_NOTION_APP_<NAME>_WEBHOOK_URL, and it sees only the pages connected to it",
+    body: z
+      .object({
+        name: z
+          .string()
+          .min(1)
+          .openapi({ description: "How people mention it: 1 to 32 lower-case letters, digits and hyphens" }),
+        capabilities: z
+          .array(Capability)
+          .optional()
+          .openapi({ description: "What it may do, as in Notion's settings. Default: the built-in integration's" }),
+        events: z
+          .array(z.string().regex(/^[a-z_]+\.[a-z_]+$/))
+          .optional()
+          .openapi({ description: "The events its webhook subscription sends. Default: the built-in integration's" }),
+      })
+      .openapi("NotionIntegrationOptions"),
+    response: NotionIntegration,
+    errors: ["invalid_argument"],
+    factory: { on: "NotionFixture", name: "createApp", options: ["name", "capabilities", "events"] },
+    live: APPS,
+    stability,
+    handler: ({ session, body }) => integrationWire(fake.createApp(session.id, body)),
+  });
+
+  router.route({
+    method: "get",
+    path: "/apps",
+    summary: "The workspace's integrations: the built-in one first, then the others in the order they were made",
+    response: z.array(NotionIntegration).openapi("NotionIntegrations"),
+    sdkMethod: { on: "NotionFixture", name: "apps" },
+    stability,
+    handler: () => store.apps.all().map((app) => integrationWire(app)),
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/comment",
+    summary:
+      "An integration a test made starts a discussion on a page, or anchored to the block with `anchor` in its text, as its own `comments.create` would: on a page connected to it, mentioning people only. Sends `comment.created` to every integration that sees the page",
+    params: AppParams,
+    body: z
+      .object({ text: z.string().min(1), page: pageRef, anchor: TextPattern.optional() })
+      .openapi("NotionAppCommentBody"),
+    response: NotionComment,
+    errors: SCRIPTED_ERRORS,
+    sdkMethod: { on: "NotionIntegration", name: "comment", args: ["text"], options: ["page", "anchor"] },
+    live: APPS,
+    stability,
+    handler: ({ session, params, body }) => {
+      const page = live(pageOf(session.id, body.page));
+      const rich = fake.richText(session.id, body.text);
+      return commentWire(
+        session.id,
+        asPlatform(() => fake.commentAsApp(session.id, params.app, page, rich, body.anchor)),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/reply",
+    summary:
+      "An integration a test made replies in a discussion, as `comments.create` with `discussion_id` would. Sends `comment.created`",
+    params: AppParams,
+    body: z.object({ text: z.string().min(1), discussion: discussionRef }).openapi("NotionAppReplyBody"),
+    response: NotionComment,
+    errors: SCRIPTED_ERRORS,
+    sdkMethod: { on: "NotionIntegration", name: "reply", args: ["text"], options: ["discussion"] },
+    live: APPS,
+    stability,
+    handler: ({ session, params, body }) => {
+      const discussion = discussionOf(session.id, body.discussion);
+      const rich = fake.richText(session.id, body.text);
+      return commentWire(
+        session.id,
+        asPlatform(() => fake.replyAsApp(session.id, params.app, discussion, rich)),
+      );
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/edit",
+    summary:
+      "An integration a test made edits a page's body, as its own block calls would: append, or replace it. Sends one `page.content_updated` once Notion's batching delay is over",
+    params: AppParams,
+    body: z
+      .object({ change: z.object({ append: Content.optional(), replace: Content.optional() }), page: pageRef })
+      .openapi("NotionAppEditBody"),
+    response: NotionDelivery.nullable(),
+    errors: SCRIPTED_ERRORS,
+    sdkMethod: { on: "NotionIntegration", name: "edit", args: ["change"], options: ["page"] },
+    live: APPS,
+    stability,
+    handler: ({ session, params, body }) => {
+      const page = live(pageOf(session.id, body.page));
+      asPlatform(() => fake.editAsApp(session.id, params.app, page, body.change));
+      // The event goes out when the batch does.
+      return null;
+    },
+  });
+
+  router.route({
+    method: "post",
+    path: "/apps/{app}/rename",
+    summary:
+      "An integration a test made changes a page's title, as its own `pages.update` would. Sends `page.properties_updated`",
+    params: AppParams,
+    body: z.object({ title: z.string().min(1), page: pageRef }).openapi("NotionAppRenameBody"),
+    response: NotionDelivery.nullable(),
+    errors: SCRIPTED_ERRORS,
+    sdkMethod: { on: "NotionIntegration", name: "rename", args: ["title"], options: ["page"] },
+    live: APPS,
+    stability,
+    handler: ({ session, params, body }) => {
+      const page = live(pageOf(session.id, body.page));
+      return (
+        caused(
+          session.id,
+          asPlatform(() => fake.renameAsApp(session.id, params.app, page, body.title)),
+        ) ?? null
+      );
+    },
   });
 
   router.route({
@@ -405,12 +565,17 @@ export function registerNotionRoutes(
     method: "post",
     path: "/verification",
     summary:
-      "Send the subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created",
+      "Send a subscription's verification request (`{ verification_token }`), as Notion does once when a subscription is created: the built-in integration's, or the one given's",
+    body: z.object({ app: integrationRef.optional() }).openapi("NotionVerificationBody"),
     response: NotionDelivery.nullable(),
-    sdkMethod: { on: "NotionFixture", name: "sendVerification" },
+    errors: ["not_found"],
+    sdkMethod: { on: "NotionFixture", name: "sendVerification", options: ["app"] },
     live: FAKE_VERIFICATION,
     stability,
-    handler: ({ session }) => caused(session.id, fake.verify(session.id)) ?? null,
+    handler: ({ session, body }) => {
+      const app = body?.app === undefined ? store.bot : integration(body.app);
+      return caused(session.id, fake.verify(session.id, app)) ?? null;
+    },
   });
 
   // --- What people do: comments ---------------------------------------------------------------
@@ -609,7 +774,7 @@ export function registerNotionRoutes(
       integration(body.integration);
       const page = live(pageOf(session.id, body.page));
       if (body.inBlock !== undefined) await world.refresh(session.id, { page: page.id });
-      await world.mention(session.id, page, body.inBlock, user.id);
+      await world.mention(session.id, page, body.inBlock, user.id, body.integration);
       return null;
     },
   });
@@ -674,10 +839,10 @@ export function registerNotionRoutes(
       stability,
       handler: ({ session, params, body }) => {
         person(session.id, params.user);
-        integration(body.integration);
+        const app = integration(body.integration);
         const page = pageOf(session.id, body.page);
-        if (connected) fake.connect(page);
-        else fake.disconnect(page);
+        if (connected) fake.connect(page, app.id);
+        else fake.disconnect(page, app.id);
       },
     });
 
@@ -772,7 +937,11 @@ export function registerNotionRoutes(
     "connections",
     "The integrations that can see the page: connected to it or to a page above it",
     z.array(NotionIntegration).openapi("NotionConnections"),
-    (page) => (world.accessible(page.id) ? [integrationWire()] : []),
+    (page) =>
+      store.apps
+        .all()
+        .filter((app) => world.accessible(page.id, app.id))
+        .map((app) => integrationWire(app)),
   );
   pageRead(
     "/transcript",

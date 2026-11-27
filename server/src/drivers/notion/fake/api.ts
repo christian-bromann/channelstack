@@ -7,7 +7,13 @@ import { constantTimeEqual } from "../../../core/signing/hmac.ts";
 import { NotionApiError, pagingOf } from "../errors.ts";
 import { NOTION_IDS } from "../ids.ts";
 import { NOTION_API_VERSION } from "../payloads.ts";
-import type { NotionBlockRecord, NotionCapability, NotionDatabaseRecord, NotionPageRecord } from "../world.ts";
+import type {
+  NotionBlockRecord,
+  NotionBotRecord,
+  NotionCapability,
+  NotionDatabaseRecord,
+  NotionPageRecord,
+} from "../world.ts";
 import type { FakeNotionWorld, PlainValue } from "./world.ts";
 
 /** The versions the API takes; the client libraries send one in `Notion-Version`. */
@@ -45,7 +51,14 @@ const param = (c: Context, name: string): string => c.req.param(name) ?? "";
  */
 export function createNotionApi(context: DriverContext, world: FakeNotionWorld): Hono {
   const { store, objects } = world;
-  const bot = () => store.bot.id;
+  /** The integration whose token made each call (decision 0027): every token answers as its own integration. */
+  const callers = new WeakMap<Context, NotionBotRecord>();
+  const caller = (c: Context): NotionBotRecord => callers.get(c) ?? store.bot;
+  /** The calling integration's bot user: who its changes are by, and what it is connected as. */
+  const bot = (c: Context) => caller(c).id;
+  /** The integration a token belongs to, compared in constant time. */
+  const tokenOwner = (token: string): NotionBotRecord | undefined =>
+    store.apps.all().find((app) => constantTimeEqual(token, context.apps.secret(app.name, "token")));
   const requestId = () => context.ids.next(NOTION_IDS.uuid);
 
   const errorBody = (status: number, code: string, message: string) => ({
@@ -69,9 +82,9 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
     driver: "notion",
     authorize(c, operation) {
       const token = bearerFrom(c.req.header("authorization")) ?? "";
-      if (token === "" || !constantTimeEqual(token, context.secret("token"))) {
-        return errorAnswer(401, "unauthorized", "API token is invalid.");
-      }
+      const app = token === "" ? undefined : tokenOwner(token);
+      if (app === undefined) return errorAnswer(401, "unauthorized", "API token is invalid.");
+      callers.set(c, app);
       const version = c.req.header("notion-version");
       if (version === undefined) {
         return errorAnswer(
@@ -88,7 +101,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
         );
       }
       const needs = NEEDS[operation];
-      if (needs && !store.bot.capabilities.includes(needs)) {
+      if (needs && !app.capabilities.includes(needs)) {
         return errorAnswer(403, "restricted_resource", "Insufficient permissions for this endpoint.");
       }
       return undefined;
@@ -117,36 +130,40 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
 
   // --- Users ----------------------------------------------------------------------------------
 
-  endpoint("get", "/v1/users/me", "users.me", () => ({ body: objects.user(store.bot, false), sessions: [] }));
+  endpoint("get", "/v1/users/me", "users.me", (c) => ({ body: objects.user(caller(c), false), sessions: [] }));
   endpoint("get", "/v1/users", "users.list", (c) => {
     const people = [store.owner, ...store.users.values()];
     const list = objects.list(
       "user",
-      [...people.map((user) => objects.user(user, true)), objects.user(store.bot, false)],
+      [...people.map((user) => objects.user(user, true)), ...store.apps.all().map((app) => objects.user(app, false))],
       paging(c),
       (user) => user.id,
     );
     return {
       body: list,
-      sessions: list.results.flatMap((user) => (store.users.owner(user.id) ? [sessionOf(user.id)] : [])),
+      sessions: list.results.flatMap((user) => {
+        // A person belongs to the session that made them.
+        const owner = store.users.owner(user.id);
+        return owner === undefined ? [] : [owner];
+      }),
     };
   });
   endpoint("get", "/v1/users/:id", "users.retrieve", (c) => {
     const id = param(c, "id");
     const user = store.user(id);
     if (!user) throw new NotionApiError(404, "object_not_found", `Could not find user with ID: ${id}.`);
-    return { body: objects.user(user, true), sessions: store.users.owner(id) ? [sessionOf(id)] : [] };
+    return { body: objects.user(user, true), sessions: [store.users.owner(id)].filter((owner) => owner !== undefined) };
   });
 
   // --- Pages ----------------------------------------------------------------------------------
 
   endpoint("get", "/v1/pages/:id", "pages.retrieve", (c) => {
-    const page = world.visiblePage(param(c, "id"));
+    const page = world.visiblePage(param(c, "id"), bot(c));
     return { body: objects.page(page), sessions: [sessionOf(page.id)] };
   });
 
   endpoint("get", "/v1/pages/:id/properties/:property", "pages.properties.retrieve", (c) => {
-    const page = world.visiblePage(param(c, "id"));
+    const page = world.visiblePage(param(c, "id"), bot(c));
     const property = world.schemaOf(page).find((candidate) => candidate.id === param(c, "property"));
     if (!property)
       throw new NotionApiError(404, "object_not_found", `Could not find property with ID: ${param(c, "property")}.`);
@@ -156,19 +173,19 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
     };
   });
 
-  endpoint("post", "/v1/pages", "pages.create", (_c, body) => {
+  endpoint("post", "/v1/pages", "pages.create", (c, body) => {
     const parent = body.parent as
       { page_id?: string; database_id?: string; data_source_id?: string; type?: string } | undefined;
     const children = Array.isArray(body.children) ? body.children : [];
     const properties = (body.properties ?? {}) as Record<string, unknown>;
     if (parent?.page_id) {
-      const above = world.visiblePage(parent.page_id);
+      const above = world.visiblePage(parent.page_id, bot(c));
       const page = world.createPageAs(
         sessionOf(above.id),
         { type: "page_id", id: above.id },
         properties,
         children,
-        bot(),
+        bot(c),
       );
       return { body: objects.page(page), sessions: [sessionOf(page.id)] };
     }
@@ -179,20 +196,20 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
         "validation_error",
         "body failed validation: body.parent should be a page_id, database_id or data_source_id.",
       );
-    const database = world.visibleDatabase(id);
+    const database = world.visibleDatabase(id, bot(c));
     const page = world.createPageAs(
       sessionOf(database.id),
       { type: "database_id", id: database.id, dataSource: database.dataSource },
       properties,
       children,
-      bot(),
+      bot(c),
     );
     return { body: objects.page(page), sessions: [sessionOf(page.id)] };
   });
 
   endpoint("patch", "/v1/pages/:id", "pages.update", (c, body) => {
-    const page = world.visiblePage(param(c, "id"));
-    world.updatePage(sessionOf(page.id), page, body, bot());
+    const page = world.visiblePage(param(c, "id"), bot(c));
+    world.updatePage(sessionOf(page.id), page, body, bot(c));
     return { body: objects.page(page), sessions: [sessionOf(page.id)] };
   });
 
@@ -200,7 +217,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
 
   endpoint("get", "/v1/blocks/:id", "blocks.retrieve", (c) => {
     const id = param(c, "id");
-    const { block, page } = world.visibleBlock(id);
+    const { block, page } = world.visibleBlock(id, bot(c));
     // A page read as a block is its `child_page` block, or for a top-level page one made up for it.
     const record = block ?? store.blocks.find(id) ?? pageAsBlock(page);
     return { body: blockObject(record), sessions: [sessionOf(page.id)] };
@@ -220,7 +237,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   });
 
   endpoint("get", "/v1/blocks/:id/children", "blocks.children.list", (c) => {
-    const target = world.visibleBlock(param(c, "id"));
+    const target = world.visibleBlock(param(c, "id"), bot(c));
     const children = world.childrenOf(target.block ? target.block.children : target.page.children);
     return {
       body: objects.list("block", children.map(blockObject), paging(c), (block) => block.id),
@@ -229,7 +246,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   });
 
   endpoint("patch", "/v1/blocks/:id/children", "blocks.children.append", (c, body) => {
-    const target = world.visibleBlock(param(c, "id"));
+    const target = world.visibleBlock(param(c, "id"), bot(c));
     if (!Array.isArray(body.children) || body.children.length === 0)
       throw new NotionApiError(
         400,
@@ -250,7 +267,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
           ? position.after_block?.id
           : undefined;
     const session = sessionOf(target.page.id);
-    const added = world.append(session, target, body.children, bot(), after);
+    const added = world.append(session, target, body.children, bot(c), after);
     return {
       body: objects.list(
         "block",
@@ -263,40 +280,40 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   });
 
   endpoint("patch", "/v1/blocks/:id", "blocks.update", (c, body) => {
-    const { block, page } = world.visibleBlock(param(c, "id"));
+    const { block, page } = world.visibleBlock(param(c, "id"), bot(c));
     if (!block) {
-      world.updatePage(sessionOf(page.id), page, body, bot());
+      world.updatePage(sessionOf(page.id), page, body, bot(c));
       return { body: blockObject(pageAsBlock(page)), sessions: [sessionOf(page.id)] };
     }
     return {
-      body: blockObject(world.updateBlock(sessionOf(page.id), block, body, bot())),
+      body: blockObject(world.updateBlock(sessionOf(page.id), block, body, bot(c))),
       sessions: [sessionOf(page.id)],
     };
   });
 
   endpoint("delete", "/v1/blocks/:id", "blocks.delete", (c) => {
-    const { block, page } = world.visibleBlock(param(c, "id"));
+    const { block, page } = world.visibleBlock(param(c, "id"), bot(c));
     if (!block) {
-      world.updatePage(sessionOf(page.id), page, { in_trash: true }, bot());
+      world.updatePage(sessionOf(page.id), page, { in_trash: true }, bot(c));
       return { body: blockObject(pageAsBlock(page)), sessions: [sessionOf(page.id)] };
     }
-    return { body: blockObject(world.removeBlock(sessionOf(page.id), block, bot())), sessions: [sessionOf(page.id)] };
+    return { body: blockObject(world.removeBlock(sessionOf(page.id), block, bot(c))), sessions: [sessionOf(page.id)] };
   });
 
   // --- Databases and data sources -------------------------------------------------------------
 
   endpoint("get", "/v1/databases/:id", "databases.retrieve", (c) => {
-    const database = world.visibleDatabase(param(c, "id"));
+    const database = world.visibleDatabase(param(c, "id"), bot(c));
     return { body: objects.database(database), sessions: [sessionOf(database.id)] };
   });
 
   endpoint("get", "/v1/data_sources/:id", "dataSources.retrieve", (c) => {
-    const database = world.visibleDatabase(param(c, "id"));
+    const database = world.visibleDatabase(param(c, "id"), bot(c));
     return { body: objects.dataSource(database), sessions: [sessionOf(database.id)] };
   });
 
   endpoint("post", "/v1/data_sources/:id/query", "dataSources.query", (c, body) => {
-    const database = world.visibleDatabase(param(c, "id"));
+    const database = world.visibleDatabase(param(c, "id"), bot(c));
     const rows = sorted(
       database,
       world.rows(database).filter((row) => matches(database, row, body.filter)),
@@ -453,12 +470,13 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
 
   // --- Search ---------------------------------------------------------------------------------
 
-  endpoint("post", "/v1/search", "search", (_c, body) => {
+  endpoint("post", "/v1/search", "search", (c, body) => {
     const query = typeof body.query === "string" ? body.query.toLowerCase() : "";
     const only = (body.filter as { value?: string } | undefined)?.value;
-    const pages = only === "data_source" ? [] : store.pages.values().filter((page) => world.accessible(page.id));
+    const pages =
+      only === "data_source" ? [] : store.pages.values().filter((page) => world.accessible(page.id, bot(c)));
     const databases =
-      only === "page" ? [] : store.databases.values().filter((database) => world.accessible(database.id));
+      only === "page" ? [] : store.databases.values().filter((database) => world.accessible(database.id, bot(c)));
     const found = [
       ...pages
         .filter((page) => world.titleOf(page).toLowerCase().includes(query))
@@ -488,7 +506,7 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
         "validation_error",
         "query failed validation: query.block_id should be defined, instead was `undefined`.",
       );
-    const { block, page } = world.visibleBlock(id);
+    const { block, page } = world.visibleBlock(id, bot(c));
     // The open discussions of the page itself, or of one block.
     const discussions = world
       .discussionsOf(page)
@@ -505,18 +523,18 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
   endpoint("get", "/v1/comments/:id", "comments.retrieve", (c) => {
     const id = param(c, "id");
     const comment = store.comments.find(id);
-    if (!comment || !world.accessible(comment.page))
+    if (!comment || !world.accessible(comment.page, bot(c)))
       throw new NotionApiError(404, "object_not_found", `Could not find comment with ID: ${id}.`);
     return { body: objects.comment(comment), sessions: [sessionOf(comment.id)] };
   });
 
-  endpoint("post", "/v1/comments", "comments.create", (_c, body) => {
-    const rich = world.richFromRequest(body.rich_text);
+  endpoint("post", "/v1/comments", "comments.create", (c, body) => {
+    const rich = world.richFromRequest(body.rich_text, bot(c));
     if (typeof body.discussion_id === "string") {
       const discussion = store.discussions.find(body.discussion_id);
-      if (!discussion || !world.accessible(discussion.page))
+      if (!discussion || !world.accessible(discussion.page, bot(c)))
         throw new NotionApiError(404, "object_not_found", `Could not find discussion with ID: ${body.discussion_id}.`);
-      const comment = world.commentAs(sessionOf(discussion.id), { discussion }, rich, bot());
+      const comment = world.commentAs(sessionOf(discussion.id), { discussion }, rich, bot(c));
       return { body: objects.comment(comment), sessions: [sessionOf(comment.id)] };
     }
     const parent = body.parent as { page_id?: string; block_id?: string } | undefined;
@@ -527,8 +545,8 @@ export function createNotionApi(context: DriverContext, world: FakeNotionWorld):
         "validation_error",
         "body failed validation: body.parent or body.discussion_id should be defined.",
       );
-    const { block, page } = world.visibleBlock(target);
-    const comment = world.commentAs(sessionOf(page.id), block ? { block } : { page }, rich, bot());
+    const { block, page } = world.visibleBlock(target, bot(c));
+    const comment = world.commentAs(sessionOf(page.id), block ? { block } : { page }, rich, bot(c));
     return { body: objects.comment(comment), sessions: [sessionOf(comment.id)] };
   });
 

@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type {
   NotionBlockRecord,
@@ -19,7 +20,8 @@ export class NotionStore {
   readonly discussions: Collection<NotionDiscussionRecord>;
   readonly comments: Collection<NotionCommentRecord>;
   #workspace: NotionWorkspaceRecord | undefined;
-  #bot: NotionBotRecord | undefined;
+  /** The built-in integration and the ones tests made (decision 0027), all in the one workspace. */
+  readonly apps = new AppRoster<NotionBotRecord>("Notion");
   #owner: NotionUserRecord | undefined;
 
   constructor(registry: Registry) {
@@ -36,10 +38,14 @@ export class NotionStore {
     return this.#workspace;
   }
 
-  /** The integration's bot user. It belongs to no session. */
+  /** The built-in integration's bot user, `my-agent`. It belongs to no session. */
   get bot(): NotionBotRecord {
-    if (!this.#bot) throw new Error("The Notion fake hasn't been seeded");
-    return this.#bot;
+    return this.apps.builtIn;
+  }
+
+  /** The integration whose bot user this is, if any. */
+  integration(id: string): NotionBotRecord | undefined {
+    return this.apps.all().find((app) => app.id === id);
   }
 
   /** The workspace owner: who seed data is created by unless a test says otherwise. */
@@ -50,13 +56,14 @@ export class NotionStore {
 
   seed(workspace: NotionWorkspaceRecord, bot: NotionBotRecord, owner: NotionUserRecord): void {
     this.#workspace = workspace;
-    this.#bot = bot;
+    this.apps.seed(bot);
     this.#owner = owner;
   }
 
-  /** Whoever acts under this id: a person, the owner, or the bot. */
+  /** Whoever acts under this id: a person, the owner, or an integration's bot. */
   user(id: string): NotionUserRecord | NotionBotRecord | undefined {
-    if (id === this.bot.id) return this.bot;
+    const bot = this.integration(id);
+    if (bot) return bot;
     if (id === this.owner.id) return this.owner;
     return this.users.find(id);
   }
