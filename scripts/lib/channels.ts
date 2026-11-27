@@ -54,9 +54,15 @@ export const HARNESS = {
       "pushes and check runs > ",
       "delivery and failures \\(fake only\\) > ",
       "inspecting what the agent did > ",
+      // The same agent again, as the App `coder` (exit check 12.2).
+      "several apps > ",
     ],
     // The standard checks as a developer adds them (exit check 3.4).
-    suites: ["test/acceptance/checks/github-checks.test.ts"],
+    suites: [
+      "test/acceptance/checks/github-checks.test.ts",
+      // The checks against the second App, `coder` (exit check 12.7).
+      "test/acceptance/checks/github-checks-coder.test.ts",
+    ],
     agents: { probot: "/api/github/webhooks", "chat-sdk-github": "/api/webhooks/github" },
     broken: { agent: "broken-github", path: "/api/webhooks/github" },
   },

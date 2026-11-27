@@ -220,6 +220,14 @@ export function createIssues(kit: GitHubKit, repos: GitHubRepos) {
         delivery: undefined,
       });
       touch(issue);
+      // The loop guard counts what Apps write on an issue where no person writes in between (decision 0027).
+      const session = store.sessionOf(repo);
+      const writer = store.appOfBot(actor);
+      const thread = `${repo.id}#${issue.number}`;
+      if (session !== undefined) {
+        context.loops.wrote(session, thread, writer ? { kind: "app", name: writer.slug } : { kind: "person" });
+        if (writer && !context.loops.allows(session, thread)) return comment;
+      }
       comment.delivery = kit.emit(repo, "issue_comment", actor, {
         action: "created",
         issue: objects.issue(issue),

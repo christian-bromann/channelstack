@@ -11,6 +11,9 @@ import { describe, expect, test, type TestContext } from "vitest";
 
 import type {
   Duration,
+  GitHubApp,
+  GitHubDelivery,
+  GitHubFixture,
   LinearApp,
   LinearFixture,
   NotionDelivery,
@@ -78,6 +81,7 @@ export const GITHUB_CHECKS = [
   "github.redelivery",
   "github.check-run",
   "github.bad-signature",
+  "github.no-reply-loop",
 ] as const;
 
 /** The ids of the Linear checks, in the order they are registered. */
@@ -403,12 +407,22 @@ export function githubChecks(options: ChecksOptions): void {
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, GITHUB_CHECKS);
+  const turns = options.loopTurns ?? 3;
+  /** The App under test: the built-in one, or the App of that name (decision 0027). */
+  const agentOf = async (github: GitHubFixture): Promise<GitHubApp> =>
+    app === github.app.name ? github.app : github.createApp({ name: app });
   /** A repository the App is installed on, with Ana as a collaborator and an issue to talk in. */
-  const setup = async ({ github }: TestContext) => {
+  const setup = async ({ github }: TestContext, also: readonly GitHubApp[] = []) => {
+    const agent = await agentOf(github);
     const ana = await github.createUser({ login: "ana" });
-    const repo = await github.createRepo({ collaborators: [ana], apps: [github.app] });
-    return { ana, repo };
+    const repo = await github.createRepo({ collaborators: [ana], apps: [agent, ...also] });
+    return { ana, agent, repo };
   };
+  /** The delivery checks read the built-in App's delivery: another App's has no `delivery` on a comment yet. */
+  const githubDelivery = (comment: { readonly delivery?: GitHubDelivery | undefined }, context: TestContext) =>
+    app === context.github.app.name
+      ? deliveryOf(comment, context, "GitHub")
+      : context.skip(`the GitHub delivery checks read the built-in App's delivery, not ${app}'s`);
   const pullRequest = async (context: TestContext) => {
     const { ana, repo } = await setup(context);
     const pr = await ana.openPullRequest(
@@ -449,7 +463,7 @@ export function githubChecks(options: ChecksOptions): void {
       const { ana, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Delivered twice" }, { repo });
       const comment = await ana.comment(prompt, { issue });
-      const delivery = deliveryOf(comment, context, "GitHub");
+      const delivery = githubDelivery(comment, context);
       await expect(issue).toHaveCommentFrom(app, wait);
       // GitHub redelivers with the same `X-GitHub-Delivery`, from its UI and its API.
       await delivery.redeliver();
@@ -467,10 +481,34 @@ export function githubChecks(options: ChecksOptions): void {
     check("github.bad-signature", "rejects a webhook with a bad signature", async (context) => {
       const { ana, repo } = await setup(context);
       const issue = await ana.openIssue({ title: "Signed by someone else" }, { repo });
-      const delivery = deliveryOf(await ana.comment(prompt, { issue }), context, "GitHub");
+      const delivery = githubDelivery(await ana.comment(prompt, { issue }), context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
+
+    check(
+      "github.no-reply-loop",
+      "stops answering another App that mentions it after every answer",
+      async (context) => {
+        const peer = await context.github.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+        const { ana, agent, repo } = await setup(context, [peer]);
+        const issue = await ana.openIssue({ title: "A question" }, { repo });
+        await ana.comment(prompt, { issue });
+        await expect(issue).toHaveCommentFrom(agent, wait);
+        const agentComments = async () => (await issue.comments()).filter((one) => one.author.id === agent.id).length;
+        // The peer answers each comment of the agent's, mentioning it, as a second agent without a loop guard would.
+        const before = await agentComments();
+        let seen = before;
+        for (let turn = 0; turn <= turns; turn++) {
+          await peer.comment(`@${agent.name} thanks! Anything else?`, { issue });
+          await context.channelstack.quiet(wait);
+          const now = await agentComments();
+          if (now === seen) break;
+          seen = now;
+        }
+        expect(seen - before, "times it answered the other App").toBeLessThanOrEqual(turns);
+      },
+    );
   });
 }
 
