@@ -736,6 +736,10 @@ export function createFakeWorld(context: DriverContext, store: NotionStore) {
       session,
     );
     const page = store.page(discussion.page);
+    // The loop guard counts what integrations write in a discussion where no person writes in between (decision 0027).
+    const writer = store.integration(actor);
+    context.loops.wrote(session, discussion.id, writer ? { kind: "app", name: writer.name } : { kind: "person" });
+    if (writer && !context.loops.allows(session, discussion.id)) return comment;
     comment.delivery = emit(session, page, "comment.created", (eventId, payloads) =>
       payloads.commentCreated(eventId, now, [author(actor)], {
         id: comment.id,

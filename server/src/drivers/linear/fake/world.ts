@@ -485,6 +485,10 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       prompted: undefined,
     } satisfies LinearCommentRecord);
     issue.updatedAt = now;
+    // The loop guard counts what apps write on an issue where no person writes in between (decision 0027).
+    const writer = store.appByUser(user);
+    context.loops.wrote(session, issue.id, writer ? { kind: "app", name: writer.name } : { kind: "person" });
+    if (writer && !context.loops.allows(session, issue.id)) return record;
     record.delivery = entityEvent(
       session,
       "Comment",
@@ -493,7 +497,7 @@ export function createFakeWorld(context: DriverContext, store: LinearStore) {
       payloads.comment(record),
       links.comment(issue, record.id),
     );
-    if (store.appByUser(user)) return record;
+    if (writer) return record;
     // A reply in a session's thread prompts each app's session there; an app it mentions that has
     // none there gets one. The built-in app comes first, so its session is the comment's.
     const sessions = root ? store.sessionsOn(issue).filter((candidate) => candidate.thread === root.id) : [];
