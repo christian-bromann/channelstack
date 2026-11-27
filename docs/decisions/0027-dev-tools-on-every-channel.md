@@ -22,8 +22,8 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
   It is written against the channel's control API, so the CLI, MCP and the UI use the same code. An
   adapter says only what differs: what a place is (a Slack channel, a GitHub issue or pull request in
   the org's public `dev` repository (its admin is whoever first acts on GitHub), a Linear issue in a team named Dev, a Notion page connected to
-  the integration, an email thread to the agent), how its places are listed (`listing`: a list route
-  and templates for a place's id, name and transcript), how to make one with the app in it, how a
+  the integration, an email thread to the agent), how its places are listed (`listing`: a list route,
+  templates for a place's id and transcript, and how to name one), how to make one with the app in it, how a
   person says, replies and reacts there, and which handles an entry stands for (`refs`).
 - **Written once in the kit:** a person by name, made on first use; a place by name, made on first
   use; `last` (the newest entry of the most recently active place, by the transcripts' times, of

@@ -71,7 +71,7 @@ The attach commands act in one long-lived session named `dev`, which the CLI, th
 | Channel | A place is | Named by | Made |
 |---|---|---|---|
 | `slack` | a channel | its name, `"#support"` | with the person and the app in it; someone in it invites a person who isn't |
-| `github` | an issue or a pull request | its title | as an issue in the org's public `dev` repository, which has the app installed; whoever first acts on GitHub is its admin (pushes, labels, merges), the others may what anyone may on a public repository |
+| `github` | an issue or a pull request | its title | as an issue in the org's public `dev` repository, which has the app installed; whoever first acts on GitHub is its admin (pushes, labels, merges), the others may do what anyone may on a public repository |
 | `linear` | an issue | its title | in a team named Dev |
 | `notion` | a page | its title | connected to the integration |
 | `resend`, `google` | an email thread | its subject | by the person's email to the agent |
@@ -203,10 +203,10 @@ The actions are generated from the routes: every action of the channel's person 
 channelstack slack click --as ana "Approve"          # the button labelled Approve, in the latest conversation
 channelstack slack stop --thread last                # Stop, pressed by whoever started the thread
 channelstack linear delegate --as lu --in "Crash on start"
-channelstack github merge --as mo --method squash     # the newest pull request
+channelstack github merge --as mo --method squash     # the pull request of the newest entry (`last`)
 ```
 
-Prints `<name> did <action> on <place>:<entry>`, with the id of what it made when it made something, or with `--json` what the action answered. Refused like the SDK method, with the platform's error code.
+Prints `<name> did <action> on <place>:<entry>`, then in parentheses the id of what the action answered when it has one (what it made, or the delivery it sent the agent, as for `click` and `stop`), or with `--json` the whole answer. Refused like the SDK method, with the platform's error code.
 
 ## `channelstack show`
 

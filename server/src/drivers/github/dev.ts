@@ -15,7 +15,7 @@ interface Listed {
 /**
  * The repository the dev tools open issues in: public, so anyone may open and comment on one, with
  * the App installed. Whoever first acts on GitHub in the dev session made it, and is its admin:
- * they may push, label and merge; the others may what anyone may on a public repository.
+ * they may push, label and merge; the others may do what anyone may on a public repository.
  */
 const DEV_REPO = "dev";
 const segment = encodeURIComponent;
