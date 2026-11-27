@@ -1,6 +1,8 @@
+import { checkNameFree } from "../../../core/apps/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import { GITHUB_IDS } from "../ids.ts";
 import type {
+  GitHubAppRecord,
   GitHubCommitInfo,
   GitHubFileChange,
   GitHubIssueRecord,
@@ -45,7 +47,8 @@ export interface GitHubRepoInput {
   /** The first commit's files. Without any, GitHub's own start: a README. */
   files?: ReadonlyArray<{ path: string; content: Uint8Array | string }> | undefined;
   collaborators?: ReadonlyArray<{ user: number; permission: GitHubPermission }> | undefined;
-  installed?: boolean | undefined;
+  /** The Apps installed on it from the start, by name. */
+  apps?: readonly string[] | undefined;
   labels?: ReadonlyArray<{ name: string; color?: string | undefined; description?: string | undefined }> | undefined;
 }
 
@@ -58,7 +61,10 @@ export function createRepos(kit: GitHubKit) {
   const commitAuthor = (repo: GitHubRepoRecord, info: GitHubCommitInfo): GitHubUserRecord | undefined => {
     const made = store.commitActors.get(`${repo.id}:${info.sha}`);
     if (made !== undefined) return store.actor(made);
-    const people = [store.bot, ...store.list(store.users, store.sessionOf(repo))];
+    const people = [
+      ...store.apps.all().map((app) => store.botOf(app)),
+      ...store.list(store.users, store.sessionOf(repo)),
+    ];
     return people.find((person) => kit.identity(person).email === info.author.email);
   };
 
@@ -180,12 +186,13 @@ export function createRepos(kit: GitHubKit) {
   };
 
   /**
-   * `installation_repositories`: the App was given a repository, or lost one. A repository made with
-   * the App on it was made by the installation (live mode makes it with the installation's token), so
-   * the App's bot sent it; an org owner adds or removes one afterwards.
+   * `installation_repositories`, to the App it concerns only: the App was given a repository, or
+   * lost one. A repository made with the App on it was made by the installation (live mode makes it
+   * with the installation's token), so the App's bot sent it; an org owner adds or removes one afterwards.
    */
   const installationChanged = (
     repo: GitHubRepoRecord,
+    app: GitHubAppRecord,
     action: "added" | "removed",
     sender: number | "org",
   ): string | undefined => {
@@ -198,14 +205,20 @@ export function createRepos(kit: GitHubKit) {
         private: repo.private,
       },
     ];
-    return kit.emit(repo, "installation_repositories", sender, {
-      action,
-      installation: objects.installation(),
-      repository_selection: "selected",
-      repositories_added: action === "added" ? listed : [],
-      repositories_removed: action === "removed" ? listed : [],
-      requester: null,
-    });
+    return kit.emit(
+      repo,
+      "installation_repositories",
+      sender,
+      {
+        action,
+        installation: objects.installation(app),
+        repository_selection: "selected",
+        repositories_added: action === "added" ? listed : [],
+        repositories_removed: action === "removed" ? listed : [],
+        requester: null,
+      },
+      app,
+    );
   };
 
   return {
@@ -219,6 +232,12 @@ export function createRepos(kit: GitHubKit) {
       if (!LOGIN.test(input.login)) {
         throw new ProtocolError("invalid_argument", `"${input.login}" is not a valid GitHub login`);
       }
+      // A login in a matcher names one author: a person can't take the name of an App (decision 0027).
+      checkNameFree(
+        input.login,
+        store.apps.all().map((app) => app.name),
+        "person",
+      );
       // Logins are unique among one session's people; two sessions can each have an `ana` (decision 0013).
       if (store.byLogin(session, input.login)) {
         throw new ProtocolError("invalid_argument", `There is already a person "${input.login}" in this session`);
@@ -258,7 +277,7 @@ export function createRepos(kit: GitHubKit) {
         collaborators: new Map(
           (input.collaborators ?? []).map(({ user, permission }) => [store.actor(user).login, permission]),
         ),
-        installed: false,
+        apps: new Set<string>(),
         labels: new Map(),
         createdAt: now,
         pushedAt: now,
@@ -281,24 +300,29 @@ export function createRepos(kit: GitHubKit) {
         },
       });
       await git.setBranch(dir, repo.defaultBranch, first);
-      if (input.installed) {
-        repo.installed = true;
-        installationChanged(repo, "added", store.bot.id);
+      // Each App on it from the start hears so from its own installation.
+      for (const app of new Set((input.apps ?? []).map((named) => store.appNamed(named)))) {
+        repo.apps.add(app.name);
+        installationChanged(repo, app, "added", app.botId);
       }
       return repo;
     },
 
-    /** Give the App a repository, or take it away. Answers with the delivery that told it, if it could be told. */
-    setInstalled(repo: GitHubRepoRecord, installed: boolean): string | undefined {
-      if (repo.installed === installed) {
+    /** Give an App a repository, or take it away. Answers with the delivery that told that App, if it could be told. */
+    setInstalled(repo: GitHubRepoRecord, app: GitHubAppRecord, installed: boolean): string | undefined {
+      if (repo.apps.has(app.name) === installed) {
         throw new GitHubRefusal(
           422,
-          `The app is ${installed ? "already" : "not"} installed on ${repo.owner}/${repo.name}`,
+          `The app ${app.slug} is ${installed ? "already" : "not"} installed on ${repo.owner}/${repo.name}`,
         );
       }
-      repo.installed = installed;
-      kit.action(repo, installed ? "installApp" : "uninstallApp", { repo: `${repo.owner}/${repo.name}` });
-      return installationChanged(repo, installed ? "added" : "removed", "org");
+      if (installed) repo.apps.add(app.name);
+      else repo.apps.delete(app.name);
+      kit.action(repo, installed ? "installApp" : "uninstallApp", {
+        repo: `${repo.owner}/${repo.name}`,
+        ...(app === store.app ? {} : { app: app.name }),
+      });
+      return installationChanged(repo, app, installed ? "added" : "removed", "org");
     },
 
     /** A file's bytes at a branch or commit. */

@@ -5,6 +5,7 @@ import { GITHUB_IDS } from "../ids.ts";
 import { type GitHubObjects, githubObjects } from "../payloads.ts";
 import { signGitHubWebhook } from "../signing.ts";
 import {
+  type GitHubAppRecord,
   type GitHubIssueRecord,
   type GitHubPermission,
   type GitHubRepoRecord,
@@ -72,16 +73,34 @@ export interface GitHubKit {
   /** Record what a person did, for the session's event log. */
   action(repo: GitHubRepoRecord, name: string, data: Json): void;
   /**
-   * Send a webhook about a repository to the App, if it is installed there, subscribed to the
-   * event and reachable. Answers with the delivery's GUID, or nothing when nothing was sent.
+   * Send a webhook about a repository to every App that is installed there, subscribed to the
+   * event and reachable, each its own delivery (decision 0027); with `only`, to that App alone.
+   * Answers with the GUID of the delivery to `only`, or else to the built-in App, or nothing when
+   * that App wasn't sent one.
    */
-  emit(repo: GitHubRepoRecord, event: string, sender: number | "org", payload: Json): string | undefined;
-  /** GitHub's deliveries: one attempt each, with GitHub's headers, signed with the webhook secret over the exact bytes. */
+  emit(
+    repo: GitHubRepoRecord,
+    event: string,
+    sender: number | "org",
+    payload: Json,
+    only?: GitHubAppRecord,
+  ): string | undefined;
+  /** GitHub's deliveries: one attempt each, with GitHub's headers, signed with the receiving App's webhook secret over the exact bytes. */
   readonly deliveries: DeliveryKit;
-  /** May this person do something that needs `level` on the repository? The App's bot may, where it is installed. */
+  /** May this person do something that needs `level` on the repository? An App's bot may, where the App is installed. */
   can(repo: GitHubRepoRecord, user: number, level: GitHubPermission): boolean;
   /** Refuse unless they may. */
   allow(repo: GitHubRepoRecord, user: number, level: GitHubPermission): void;
+  /**
+   * Refuse an App's installation what GitHub refuses its token: a repository it isn't installed on
+   * doesn't exist for it (404), and a permission it wasn't granted is 403 `Resource not accessible
+   * by integration`. Answers with the repository it may reach.
+   */
+  allowApp(
+    repo: GitHubRepoRecord | undefined,
+    app: GitHubAppRecord,
+    needs: readonly [permission: string, level: "read" | "write"],
+  ): GitHubRepoRecord;
   requireIssue(repo: GitHubRepoRecord, number: number): GitHubIssueRecord;
   /** A pull request, or GitHub's 404 when the number is an issue or nothing. */
   requirePull(
@@ -100,7 +119,8 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
   const { ids, clock } = context;
 
   const permission = (repo: GitHubRepoRecord, user: number): GitHubPermission | undefined => {
-    if (user === store.bot.id) return repo.installed ? "write" : undefined;
+    const app = store.appOfBot(user);
+    if (app) return repo.apps.has(app.name) ? "write" : undefined;
     const person = store.users.find(String(user));
     if (!person) return undefined;
     if (person.role === "admin") return "admin";
@@ -113,13 +133,15 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     url: context.apiUrl,
     org: () => store.org,
     app: () => store.app,
+    appNamed: (name) => store.appNamed(name),
+    appOfBot: (id) => store.appOfBot(id),
     actor: (id) => store.actor(id),
     repo: (id) => store.repo(id),
     commentCount: (issue) => store.commentsOn(store.repo(issue.repo), issue.number).length,
     reviewCommentCount: (issue) => store.postedReviewComments(store.repo(issue.repo), issue.number).length,
     openIssueCount: (repo) => store.issuesOf(repo).filter((issue) => issue.state === "open").length,
     association: (repo, user) => {
-      if (user === store.bot.id) return "NONE";
+      if (store.appOfBot(user)) return "NONE";
       const person = store.users.find(String(user));
       if (person?.role === "admin" || person?.role === "member") return "MEMBER";
       return person && repo.collaborators.has(person.login) ? "COLLABORATOR" : "NONE";
@@ -130,24 +152,33 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
   const deliveries = deliveryKit(context, {
     driver: "github",
     timeoutMs: ACK_WINDOW_MS,
-    sign: (secret, body, _atMs, { id, type }) => ({
-      "user-agent": "GitHub-Hookshot/0a1b2c3",
-      "x-github-delivery": id,
-      "x-github-event": type,
-      "x-github-hook-id": String(store.app.id),
-      "x-github-hook-installation-target-id": String(store.app.id),
-      "x-github-hook-installation-target-type": "integration",
-      ...signGitHubWebhook(secret, body),
-    }),
+    // The hook and its target are the receiving App's: each App's webhook is its own.
+    sign: (secret, body, _atMs, { id, type, app }) => {
+      const target = String(store.appNamed(app).id);
+      return {
+        "user-agent": "GitHub-Hookshot/0a1b2c3",
+        "x-github-delivery": id,
+        "x-github-event": type,
+        "x-github-hook-id": target,
+        "x-github-hook-installation-target-id": target,
+        "x-github-hook-installation-target-type": "integration",
+        ...signGitHubWebhook(secret, body),
+      };
+    },
     secret: (app) => context.apps.secret(app, "webhookSecret"),
   });
 
-  const emit: GitHubKit["emit"] = (repo, event, sender, payload) => {
-    // The App hears about a repository it is installed on, for the events it subscribed to. Being
-    // added to or removed from one is the exception: GitHub sends that to every App.
+  /** Send one App its own delivery of an event: its own GUID, its installation, its secret, its URL. */
+  const emitTo = (
+    app: GitHubAppRecord,
+    repo: GitHubRepoRecord,
+    event: string,
+    sender: number | "org",
+    payload: Json,
+  ): string | undefined => {
+    const url = context.apps.webhookUrl(app.name);
+    if (url === undefined) return undefined;
     const installing = event === "installation_repositories";
-    const subscribed = installing || (repo.installed && store.app.events.includes(event));
-    if (context.webhookUrl === undefined || !subscribed) return undefined;
     const session = store.sessionOf(repo);
     const guid = ids.next(GITHUB_IDS.delivery);
     const full = {
@@ -156,11 +187,12 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
       organization: objects.organization(),
       // What an org owner does to the App's installation comes from the org itself in the fake.
       sender: sender === "org" ? objects.orgOwner() : objects.actor(sender),
-      installation: installing ? payload.installation : objects.installationLite(),
+      installation: installing ? payload.installation : objects.installationLite(app),
     };
     const action = typeof payload.action === "string" ? payload.action : null;
     store.hookDeliveries.push({
       id: Number(ids.next(GITHUB_IDS.hookDelivery)),
+      app: app.name,
       guid,
       session,
       event,
@@ -171,12 +203,30 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
     deliveries.send({
       id: guid,
       session,
+      app: app.name,
       type: event,
-      url: context.webhookUrl,
+      url,
       body: JSON.stringify(full),
-      meta: { eventType: action === null ? event : `${event}.${action}`, action, payload: full, repo: repo.id },
+      meta: {
+        eventType: action === null ? event : `${event}.${action}`,
+        action,
+        payload: full,
+        repo: repo.id,
+        app: app.name,
+      },
     });
     return guid;
+  };
+
+  const emit: GitHubKit["emit"] = (repo, event, sender, payload, only) => {
+    // An App hears about a repository it is installed on, for the events it subscribed to. Being
+    // added to or removed from one is the exception: GitHub sends that to the App it concerns.
+    // Its own actions come back to it too: GitHub has no GITHUB_TOKEN-style suppression for Apps.
+    const installing = event === "installation_repositories";
+    const hears = (app: GitHubAppRecord) => installing || (repo.apps.has(app.name) && app.events.includes(event));
+    const targets = (only ? [only] : store.apps.all()).filter(hears);
+    const sent = new Map(targets.map((app) => [app.name, emitTo(app, repo, event, sender, payload)]));
+    return sent.get((only ?? store.app).name);
   };
 
   const requireIssue: GitHubKit["requireIssue"] = (repo, number) => {
@@ -205,6 +255,15 @@ export function createKit(context: DriverContext, store: GitHubStore, git: GitSt
       if (!kit.can(repo, user, level)) {
         throw new GitHubRefusal(403, `Must have ${level} access to ${repo.owner}/${repo.name}.`);
       }
+    },
+    allowApp(repo, app, [name, level]) {
+      // A repository the App isn't installed on doesn't exist for its token.
+      if (!repo?.apps.has(app.name)) throw new GitHubRefusal(404, "Not Found");
+      const granted = name === "metadata" ? "read" : app.permissions[name];
+      if (granted === undefined || (level === "write" && granted !== "write")) {
+        throw new GitHubRefusal(403, "Resource not accessible by integration");
+      }
+      return repo;
     },
     requireIssue,
     requirePull(repo, number) {

@@ -362,7 +362,7 @@ export function registerRepos(register: Register): void {
       };
     };
     // Without an author, the commit is the App's own.
-    const own = { ...world.kit.identity(store.bot), date: world.kit.context.clock() };
+    const own = { ...world.kit.identity(store.actor(bot)), date: world.kit.context.clock() };
     const author = given(body.author) ?? own;
     const sha = await git.writeCommit(dir, {
       message,

@@ -32,7 +32,12 @@ export interface GitHubLookups {
   /** The API root, e.g. `https://github.localhost`. Web pages are served from the same host. */
   url(): string;
   org(): GitHubOrgRecord;
+  /** The built-in App. */
   app(): GitHubAppRecord;
+  /** An App by name: the one that made a check run. */
+  appNamed(name: string): GitHubAppRecord;
+  /** The App whose bot acts under this user id, if any. */
+  appOfBot(id: number): GitHubAppRecord | undefined;
   actor(id: number): GitHubUserRecord;
   repo(id: number): GitHubRepoRecord;
   /** How many comments an issue has, and review comments a pull request. */
@@ -517,9 +522,8 @@ export function githubObjects(lookups: GitHubLookups) {
     };
   };
 
-  /** The App, as `GET /app` answers and as check runs name it. */
-  const integration = (): Json => {
-    const app = lookups.app();
+  /** An App (the built-in one unless given), as `GET /app` answers and as check runs name it. */
+  const integration = (app: GitHubAppRecord = lookups.app()): Json => {
     return {
       id: app.id,
       client_id: app.clientId,
@@ -538,10 +542,13 @@ export function githubObjects(lookups: GitHubLookups) {
   };
 
   /** `performed_via_github_app`: the App, on what its bot wrote with the installation's token; null on what a person wrote. */
-  const via = (author: number): Json | null => (author === lookups.app().botId ? integration() : null);
+  const via = (author: number): Json | null => {
+    const app = lookups.appOfBot(author);
+    return app ? integration(app) : null;
+  };
 
-  const installation = (): Json => {
-    const app = lookups.app();
+  /** An App's installation on the org (the built-in App's unless given): every App has its own. */
+  const installation = (app: GitHubAppRecord = lookups.app()): Json => {
     const org = lookups.org();
     return {
       id: app.installationId,
@@ -567,13 +574,13 @@ export function githubObjects(lookups: GitHubLookups) {
     };
   };
 
-  /** The installation as every webhook of an App carries it. */
-  const installationLite = (): Json => {
-    const { installationId } = lookups.app();
+  /** The installation as every webhook of an App carries it: the receiving App's own. */
+  const installationLite = (app: GitHubAppRecord = lookups.app()): Json => {
+    const { installationId } = app;
     return { id: installationId, node_id: githubLegacyNodeId("IntegrationInstallation", installationId) };
   };
 
-  const suite = (repo: GitHubRepoRecord, id: number, sha: string): Json => ({
+  const suite = (repo: GitHubRepoRecord, id: number, sha: string, app: GitHubAppRecord): Json => ({
     id,
     node_id: githubNodeId("CheckSuite", [repo.id, id]),
     head_branch: null,
@@ -584,7 +591,7 @@ export function githubObjects(lookups: GitHubLookups) {
     before: null,
     after: sha,
     pull_requests: [],
-    app: integration(),
+    app: integration(app),
     created_at: githubTime(repo.createdAt),
     updated_at: githubTime(repo.updatedAt),
   });
@@ -592,6 +599,7 @@ export function githubObjects(lookups: GitHubLookups) {
   const checkRun = (record: GitHubCheckRunRecord): Json => {
     const repo = lookups.repo(record.repo);
     const base = `${repoApi(repo)}/check-runs/${record.id}`;
+    const app = lookups.appNamed(record.app);
     return {
       id: record.id,
       name: record.name,
@@ -600,7 +608,7 @@ export function githubObjects(lookups: GitHubLookups) {
       external_id: record.externalId,
       url: base,
       html_url: `${repoWeb(repo)}/runs/${record.id}`,
-      details_url: record.detailsUrl ?? `${web()}/apps/${lookups.app().slug}`,
+      details_url: record.detailsUrl ?? `${web()}/apps/${app.slug}`,
       status: record.status,
       conclusion: record.conclusion ?? null,
       started_at: githubTime(record.startedAt),
@@ -612,8 +620,8 @@ export function githubObjects(lookups: GitHubLookups) {
         annotations_count: record.annotations.length,
         annotations_url: `${base}/annotations`,
       },
-      check_suite: suite(repo, record.suite, record.headSha),
-      app: integration(),
+      check_suite: suite(repo, record.suite, record.headSha, app),
+      app: integration(app),
       pull_requests: [],
     };
   };
