@@ -56,6 +56,39 @@ export interface ChecksOptions {
   loopTurns?: number;
 }
 
+/** What an email app does in `<channel>.no-reply-loop`: Resend's and Google's alike. */
+interface MailPeer<Email, Agent> {
+  send(options: { to: Agent[]; subject: string; text: string; headers: Record<string, string> }): Promise<Email>;
+  reply(email: Email, options: { text: string; headers: Record<string, string> }): Promise<unknown>;
+}
+
+/**
+ * `<channel>.no-reply-loop` for email: another app mails the agent, marked as sent by a program
+ * (RFC 3834), and answers each answer the same way. The agent may answer it at most `turns` times.
+ */
+async function autoMailLoop<
+  Agent extends { readonly id: string },
+  Email extends { readonly thread: { replies(): Promise<Array<{ readonly author: { readonly id: string } }>> } },
+>(
+  context: TestContext,
+  agent: Agent,
+  peer: MailPeer<Email, Agent>,
+  turns: number,
+  wait: { timeout?: Duration },
+): Promise<void> {
+  const auto = { "Auto-Submitted": "auto-replied" };
+  const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
+  let seen = 0;
+  for (let turn = 0; turn <= turns; turn++) {
+    await context.channelstack.quiet(wait);
+    const now = (await first.thread.replies()).filter((one) => one.author.id === agent.id).length;
+    if (now === seen) break;
+    seen = now;
+    await peer.reply(first, { text: "Noted, thanks.", headers: auto });
+  }
+  expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
+}
+
 /** `toGoQuiet`'s bound from a check's wait. */
 const within = (wait: { timeout?: Duration }) => (wait.timeout === undefined ? {} : { within: wait.timeout });
 
@@ -751,18 +784,7 @@ export function resendChecks(options: ChecksOptions): void {
     check("resend.no-reply-loop", "leaves mail another program sent on its own unanswered", async (context) => {
       const agent = await agentOf(context.resend);
       const peer = await context.resend.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
-      // RFC 3834: mail a program sends on its own says so. An agent that answers it answers another agent without end.
-      const auto = { "Auto-Submitted": "auto-replied" };
-      const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
-      let seen = 0;
-      for (let turn = 0; turn <= turns; turn++) {
-        await context.channelstack.quiet(wait);
-        const now = (await first.thread.replies()).filter((one) => one.author.id === agent.id).length;
-        if (now === seen) break;
-        seen = now;
-        await peer.reply(first, { text: "Noted, thanks.", headers: auto });
-      }
-      expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
+      await autoMailLoop(context, agent, peer, turns, wait);
     });
   });
 }
@@ -848,18 +870,7 @@ export function googleChecks(options: ChecksOptions): void {
     check("google.no-reply-loop", "leaves mail another program sent on its own unanswered", async (context) => {
       const agent = await agentOf(context.google);
       const peer = await context.google.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
-      // RFC 3834: mail a program sends on its own says so. An agent that answers it answers another agent without end.
-      const auto = { "Auto-Submitted": "auto-replied" };
-      const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
-      let seen = 0;
-      for (let turn = 0; turn <= turns; turn++) {
-        await context.channelstack.quiet(wait);
-        const now = (await first.thread.replies()).filter((one) => one.author.id === agent.id).length;
-        if (now === seen) break;
-        seen = now;
-        await peer.reply(first, { text: "Noted, thanks.", headers: auto });
-      }
-      expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
+      await autoMailLoop(context, agent, peer, turns, wait);
     });
   });
 }
