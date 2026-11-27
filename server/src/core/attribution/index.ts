@@ -62,7 +62,7 @@ const MAX_EVIDENCE = 4000;
  * Text as both sides are compared: mentions and links removed (the agent strips `<@U…>` or
  * resolves it), whitespace collapsed, case ignored.
  */
-function normalise(text: string): string {
+export function normalise(text: string): string {
   return text
     .replace(/<[@#!][^>]*>/g, " ")
     .replace(/<(https?:[^>|]+)(\|[^>]*)?>/g, " $1 ")
