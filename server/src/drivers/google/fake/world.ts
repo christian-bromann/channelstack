@@ -355,7 +355,7 @@ export function createFakeWorld(context: DriverContext, store: GoogleStore) {
     };
     store.keep(email, session);
     const own = intoMailbox(email, app, ["SENT"], session, threadId);
-    deliverTo(email, session, app);
+    if (!store.halted(email, session)) deliverTo(email, session, app);
     return own;
   };
 

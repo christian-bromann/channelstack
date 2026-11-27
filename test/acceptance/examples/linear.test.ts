@@ -213,7 +213,7 @@ describe("several apps", () => {
     const team = await linear.createTeam({ members: [ana] });
     const issue = await ana.createIssue({ title: "Flaky e2e test" }, { team });
 
-    await ana.comment("@coder can you take a look?", { issue });
+    await ana.comment(`@${coder.name} can you take a look?`, { issue });
     await ana.comment("@my-agent and you too?", { issue });
 
     const sessions = await issue.sessions();

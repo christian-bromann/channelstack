@@ -103,16 +103,28 @@ export const HARNESS = {
     broken: { agent: "broken-notion", path: "/webhooks/notion" },
   },
   resend: {
-    enabled: ["email conversations > ", "delivery and failures \\(fake only\\) > ", "inspecting what the agent did > "],
-    // The standard checks as a developer adds them (exit check 8.5).
-    suites: ["test/acceptance/checks/resend-checks.test.ts"],
+    enabled: [
+      "email conversations > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
+    ],
+    // The standard checks as a developer adds them (exit check 8.5), and against `coder` (12.7).
+    suites: ["test/acceptance/checks/resend-checks.test.ts", "test/acceptance/checks/resend-checks-coder.test.ts"],
     agents: { "resend-node": "/webhooks/resend" },
     broken: { agent: "broken-resend", path: "/webhooks/resend" },
   },
   google: {
-    enabled: ["email conversations > ", "delivery and failures \\(fake only\\) > ", "inspecting what the agent did > "],
-    // The standard checks as a developer adds them (exit check 9.4).
-    suites: ["test/acceptance/checks/google-checks.test.ts"],
+    enabled: [
+      "email conversations > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
+    ],
+    // The standard checks as a developer adds them (exit check 9.4), and against `coder` (12.7).
+    suites: ["test/acceptance/checks/google-checks.test.ts", "test/acceptance/checks/google-checks-coder.test.ts"],
     agents: { "gmail-node": "/webhooks/google" },
     broken: { agent: "broken-google", path: "/webhooks/google" },
   },

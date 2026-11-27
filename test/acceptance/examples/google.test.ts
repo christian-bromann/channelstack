@@ -128,6 +128,37 @@ describe("inspecting what the agent did", () => {
   });
 });
 
+describe("several apps", () => {
+  // Decision 0027: the same agent runs a second time as the app `coder`, with its own mailbox, key and webhook.
+  test("an email to one app is answered by that app alone, marked as sent by a program", async ({ google }) => {
+    const coder = await google.createApp({ name: "coder" });
+    const ana = await google.createUser({ name: "Ana" });
+
+    const email = await ana.send({ to: [coder], subject: "Refund", text: "Where is my refund?" });
+
+    const answer = await ana.waitForEmail({ from: coder });
+    expect(answer.thread.id).toBe(email.thread.id);
+    expect(answer.headers["auto-submitted"]).toBe("auto-replied");
+    await expect(email.thread).not.toHaveReplyFrom(google.app);
+  });
+
+  test("mail another program sent on its own gets no answer, so two agents don't answer each other", async ({
+    google,
+  }) => {
+    const billing = await google.createApp({ name: "billing" });
+
+    const email = await billing.send({
+      to: [google.app],
+      subject: "Invoice 1042 paid",
+      text: "Invoice 1042 was paid.",
+      headers: { "Auto-Submitted": "auto-generated" },
+    });
+
+    await expect(email.thread).toGoQuiet({ within: "10s", maxReplies: 1 });
+    await expect(email.thread).not.toHaveReplyFrom(google.app);
+  });
+});
+
 describe("live mode", () => {
   // With the agent's OAuth client and refresh token, and CHANNELSTACK_GOOGLE_USER_ANA_TOKEN (Ana's
   // own Gmail account's refresh token) set, Ana's email goes through real Gmail to the agent's

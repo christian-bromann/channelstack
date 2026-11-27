@@ -14,11 +14,15 @@ import type {
   GitHubApp,
   GitHubDelivery,
   GitHubFixture,
+  GoogleApp,
+  GoogleFixture,
   LinearApp,
   LinearFixture,
   NotionDelivery,
   NotionFixture,
   NotionIntegration,
+  ResendApp,
+  ResendFixture,
   SlackApp,
   SlackFixture,
   SlackMessage,
@@ -110,6 +114,7 @@ export const RESEND_CHECKS = [
   "resend.redelivery",
   "resend.bad-signature",
   "resend.stale",
+  "resend.no-reply-loop",
 ] as const;
 
 /** The ids of the Google checks, in the order they are registered. */
@@ -120,6 +125,7 @@ export const GOOGLE_CHECKS = [
   "google.bad-signature",
   "google.wrong-audience",
   "google.stale",
+  "google.no-reply-loop",
 ] as const;
 
 /**
@@ -691,11 +697,25 @@ export function resendChecks(options: ChecksOptions): void {
   const prompt = options.prompt ?? "hello";
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, RESEND_CHECKS);
+  const turns = options.loopTurns ?? 3;
+  /** The app under test: the built-in one, or the app of that name (decision 0027). */
+  const agentOf = async (resend: ResendFixture): Promise<ResendApp> =>
+    app === resend.app.name ? resend.app : resend.createApp({ name: app });
   /** Ana, and her email to the agent. */
   const emailed = async ({ resend }: TestContext) => {
+    const agent = await agentOf(resend);
     const ana = await resend.createUser({ name: "Ana" });
-    const email = await ana.send({ to: [resend.app], subject: "A question", text: prompt });
-    return { ana, email };
+    const email = await ana.send({ to: [agent], subject: "A question", text: prompt });
+    return { ana, agent, email };
+  };
+  /** The delivery an email caused to the app under test. */
+  const delivered = async (context: TestContext) => {
+    const { agent, email } = await emailed(context);
+    const delivery =
+      agent.name === context.resend.app.name
+        ? deliveryOf(email, context, "Resend")
+        : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
+    return { email, delivery };
   };
 
   describe(`resend checks: ${app}`, () => {
@@ -709,8 +729,7 @@ export function resendChecks(options: ChecksOptions): void {
     });
 
     check("resend.redelivery", "a webhook sent again doesn't produce a second answer", async (context) => {
-      const { email } = await emailed(context);
-      const delivery = deliveryOf(email, context, "Resend");
+      const { email, delivery } = await delivered(context);
       await expect(email.thread).toHaveReplyFrom(app, wait);
       // Resend retries with the same svix-id and the same email_id.
       await delivery.redeliver();
@@ -718,15 +737,32 @@ export function resendChecks(options: ChecksOptions): void {
     });
 
     check("resend.bad-signature", "rejects a webhook with a bad signature", async (context) => {
-      const delivery = deliveryOf((await emailed(context)).email, context, "Resend");
+      const { delivery } = await delivered(context);
       await delivery.resend({ badSignature: true });
       await expect(delivery).toBeRejected(wait);
     });
 
     check("resend.stale", "rejects a webhook signed more than five minutes ago", async (context) => {
-      const delivery = deliveryOf((await emailed(context)).email, context, "Resend");
+      const { delivery } = await delivered(context);
       await delivery.resend({ stale: true });
       await expect(delivery).toBeRejected(wait);
+    });
+
+    check("resend.no-reply-loop", "leaves mail another program sent on its own unanswered", async (context) => {
+      const agent = await agentOf(context.resend);
+      const peer = await context.resend.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+      // RFC 3834: mail a program sends on its own says so. An agent that answers it answers another agent without end.
+      const auto = { "Auto-Submitted": "auto-replied" };
+      const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
+      let seen = 0;
+      for (let turn = 0; turn <= turns; turn++) {
+        await context.channelstack.quiet(wait);
+        const now = (await first.thread.replies()).filter((one) => one.author.id === agent.id).length;
+        if (now === seen) break;
+        seen = now;
+        await peer.reply(first, { text: "Noted, thanks.", headers: auto });
+      }
+      expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
     });
   });
 }
@@ -740,11 +776,25 @@ export function googleChecks(options: ChecksOptions): void {
   const prompt = options.prompt ?? "hello";
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, GOOGLE_CHECKS);
+  const turns = options.loopTurns ?? 3;
+  /** The app under test: the built-in one, or the app of that name (decision 0027). */
+  const agentOf = async (google: GoogleFixture): Promise<GoogleApp> =>
+    app === google.app.name ? google.app : google.createApp({ name: app });
   /** Ana, and her email to the agent. */
   const emailed = async ({ google }: TestContext) => {
+    const agent = await agentOf(google);
     const ana = await google.createUser({ name: "Ana" });
-    const email = await ana.send({ to: [google.app], subject: "A question", text: prompt });
-    return { ana, email };
+    const email = await ana.send({ to: [agent], subject: "A question", text: prompt });
+    return { ana, agent, email };
+  };
+  /** The delivery an email caused to the app under test. */
+  const delivered = async (context: TestContext) => {
+    const { agent, email } = await emailed(context);
+    const delivery =
+      agent.name === context.google.app.name
+        ? deliveryOf(email, context, "Gmail")
+        : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
+    return { email, delivery };
   };
 
   describe(`google checks: ${app}`, () => {
@@ -761,17 +811,16 @@ export function googleChecks(options: ChecksOptions): void {
       // Gmail pushes at most once a second. A first email is pushed at once; the two after it, within
       // that second, wait for its end and come in one push, so the agent must read its history.
       const ana = await google.createUser({ name: "Ana" });
-      const opener = await ana.send({ to: [google.app], subject: "Hello", text: prompt });
-      const first = await ana.send({ to: [google.app], subject: "First", text: prompt });
-      const second = await ana.send({ to: [google.app], subject: "Second", text: prompt });
+      const opener = await ana.send({ to: [await agentOf(google)], subject: "Hello", text: prompt });
+      const first = await ana.send({ to: [await agentOf(google)], subject: "First", text: prompt });
+      const second = await ana.send({ to: [await agentOf(google)], subject: "Second", text: prompt });
       await expect(opener.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
       await expect(first.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
       await expect(second.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("google.redelivery", "a push sent again doesn't produce a second answer", async (context) => {
-      const { email } = await emailed(context);
-      const push = deliveryOf(email, context, "Gmail");
+      const { email, delivery: push } = await delivered(context);
       await expect(email.thread).toHaveReplyFrom(app, wait);
       // Pub/Sub delivers at least once: the same message id again.
       await push.redeliver();
@@ -779,21 +828,38 @@ export function googleChecks(options: ChecksOptions): void {
     });
 
     check("google.bad-signature", "rejects a push whose token another key signed", async (context) => {
-      const push = deliveryOf((await emailed(context)).email, context, "Gmail");
+      const { delivery: push } = await delivered(context);
       await push.resend({ badSignature: true });
       await expect(push).toBeRejected(wait);
     });
 
     check("google.wrong-audience", "rejects a push whose token is for another audience", async (context) => {
-      const push = deliveryOf((await emailed(context)).email, context, "Gmail");
+      const { delivery: push } = await delivered(context);
       await push.resend({ wrongAudience: true });
       await expect(push).toBeRejected(wait);
     });
 
     check("google.stale", "rejects a push whose token has expired", async (context) => {
-      const push = deliveryOf((await emailed(context)).email, context, "Gmail");
+      const { delivery: push } = await delivered(context);
       await push.resend({ stale: true });
       await expect(push).toBeRejected(wait);
+    });
+
+    check("google.no-reply-loop", "leaves mail another program sent on its own unanswered", async (context) => {
+      const agent = await agentOf(context.google);
+      const peer = await context.google.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+      // RFC 3834: mail a program sends on its own says so. An agent that answers it answers another agent without end.
+      const auto = { "Auto-Submitted": "auto-replied" };
+      const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
+      let seen = 0;
+      for (let turn = 0; turn <= turns; turn++) {
+        await context.channelstack.quiet(wait);
+        const now = (await first.thread.replies()).filter((one) => one.author.id === agent.id).length;
+        if (now === seen) break;
+        seen = now;
+        await peer.reply(first, { text: "Noted, thanks.", headers: auto });
+      }
+      expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
     });
   });
 }

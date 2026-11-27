@@ -186,8 +186,7 @@ interface Sent {
 }
 
 /** The built-in app's delivery among those an event caused: what a message's `delivery` is. */
-const builtInDelivery = (sent: readonly Sent[]): string | undefined =>
-  sent.find((one) => one.app === BUILT_IN_APP)?.id;
+const builtInDelivery = (sent: readonly Sent[]): string | undefined => sent.find((one) => one.app === BUILT_IN_APP)?.id;
 
 export function createFakeWorld(
   context: DriverContext,

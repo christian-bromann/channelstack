@@ -1,5 +1,6 @@
 import { AppRoster, checkNameFree } from "../apps/index.ts";
 import { ProtocolError } from "../errors/index.ts";
+import type { DriverLoops } from "../loops/index.ts";
 import type { Collection, Registry } from "../registry/index.ts";
 import { type EmailAttachment, localPartOf, type Mailbox, parseAddresses, threadOf } from "./index.ts";
 
@@ -62,6 +63,9 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
   readonly threads: Collection<EmailThreadRecord>;
   /** The agent's mailbox and the ones tests made (decision 0027): each an app with an address of its own. */
   readonly apps: AppRoster<App>;
+
+  /** The loop guard, which the driver hands over from its context. */
+  loops: DriverLoops | undefined;
 
   constructor(registry: Registry, driver: string, title: string = driver) {
     this.users = registry.collection(driver, "user");
@@ -181,7 +185,19 @@ export class EmailStore<Email extends EmailRecord, App extends EmailAppRecord> {
     if (email.thread === email.id) {
       this.threads.add(email.id, { id: email.id, subject: email.subject, createdAt: email.createdAt }, session);
     }
+    // The loop guard counts what apps write in a conversation where no person writes in between (decision 0027).
+    const app = this.apps.all().find((candidate) => candidate.id === email.author);
+    if (session !== undefined) {
+      this.loops?.wrote(session, email.thread, app ? { kind: "app", name: app.name } : { kind: "person" });
+    }
     return this.emails.add(email.id, email, session);
+  }
+
+  /** The loop guard stopped this app email's conversation: it is kept, and nothing is delivered for it. */
+  halted(email: Email, session: string | undefined): boolean {
+    if (session === undefined || this.loops === undefined) return false;
+    const fromApp = this.apps.all().some((candidate) => candidate.id === email.author);
+    return fromApp && !this.loops.allows(session, email.thread);
   }
 
   /**

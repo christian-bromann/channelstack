@@ -37,6 +37,9 @@ async function received(id: string) {
   const { data: email } = await resend.emails.receiving.get(id);
   if (!email) return;
   const sender = (email.from.match(/<([^>]+)>/)?.[1] ?? email.from).toLowerCase();
+  // Bug: answers mail another program sent on its own, so two agents answer each other without end.
+  const auto = email.headers?.["auto-submitted"];
+  if (auto !== undefined && auto.toLowerCase() !== "no" && !broken("resend.no-reply-loop")) return;
   await resend.emails.send({
     from: FROM,
     to: [sender],
