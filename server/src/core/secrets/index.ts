@@ -24,7 +24,10 @@ interface SecretsFile {
 /** The name of each channel's built-in app, whose secrets are the driver's own. */
 const BUILT_IN_APP = "my-agent";
 
-function generateSpec(spec: SecretSpec, current: Readonly<Record<string, string>>): { values: Record<string, string>; changed: boolean } {
+function generateSpec(
+  spec: SecretSpec,
+  current: Readonly<Record<string, string>>,
+): { values: Record<string, string>; changed: boolean } {
   const values: Record<string, string> = {};
   let changed = false;
   for (const [name, format] of Object.entries(spec)) {
@@ -127,7 +130,10 @@ export class Secrets {
     const { values } = generate(specs, {});
     const known = parse(readPrivateJsonFile(path)).apps;
     const emptied = Object.fromEntries(
-      Object.entries(known).map(([driver, apps]) => [driver, Object.fromEntries(Object.keys(apps).map((app) => [app, {}]))]),
+      Object.entries(known).map(([driver, apps]) => [
+        driver,
+        Object.fromEntries(Object.keys(apps).map((app) => [app, {}])),
+      ]),
     );
     const apps = generateApps(specs, emptied).values;
     Secrets.#save(path, values, apps);
@@ -162,7 +168,8 @@ export class Secrets {
     if (app === BUILT_IN_APP) return this.get(driver, name);
     const spec = this.#specs[driver];
     if (spec === undefined) throw new Error(`No secrets declared by driver "${driver}"`);
-    const apps = (this.#apps[driver] ??= {});
+    const apps = this.#apps[driver] ?? {};
+    this.#apps[driver] = apps;
     let values = apps[app];
     if (values === undefined) {
       values = generateSpec(spec, {}).values;

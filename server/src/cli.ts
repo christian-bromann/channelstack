@@ -167,7 +167,10 @@ async function runStart(flags: {
 }
 
 /** `channelstack env`: asks the running server, so the URLs match how it was started. */
-async function runEnv(server: Attached, options: { proxy: boolean; app: string | undefined; channel: string | undefined }) {
+async function runEnv(
+  server: Attached,
+  options: { proxy: boolean; app: string | undefined; channel: string | undefined },
+) {
   const query = new URLSearchParams();
   if (options.proxy) query.set("proxy", "true");
   if (options.app !== undefined) query.set("app", options.app);

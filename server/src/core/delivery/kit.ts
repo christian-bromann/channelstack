@@ -133,7 +133,9 @@ export function deliveryKit(
       const secret = options.badSignature ? (platform.forgedSecret?.() ?? randomToken()) : platform.secret(app);
       const stale = options.stale === true;
       return delivery.again(session, id, {
-        sign: options.forge ? (body, atMs) => options.forge?.(secret, body, atMs) ?? {} : signer(secret, { ...request, app }),
+        sign: options.forge
+          ? (body, atMs) => options.forge?.(secret, body, atMs) ?? {}
+          : signer(secret, { ...request, app }),
         forged: options.badSignature === true || stale || options.forge !== undefined,
         ...(stale ? { atMs: clock() - (platform.staleMs ?? 0) } : {}),
         ...(options.headers ? { headers: options.headers } : {}),

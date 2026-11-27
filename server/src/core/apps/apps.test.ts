@@ -43,9 +43,7 @@ describe("exit check 12.12: names and limits", () => {
     for (const name of ["my-agent", "Coder", "code_reviewer", "9lives", "", "a".repeat(33), "-x"]) {
       expect(refusal(() => apps.make(name, {}, () => ({ name, made: 1 })))).toBe("invalid_argument");
     }
-    expect(refusal(() => apps.make("a".repeat(32), {}, () => ({ name: "a".repeat(32), made: 1 })))).toBe(
-      "no refusal",
-    );
+    expect(refusal(() => apps.make("a".repeat(32), {}, () => ({ name: "a".repeat(32), made: 1 })))).toBe("no refusal");
   });
 
   test(`an app beyond ${APP_LIMIT} beside my-agent is refused`, () => {

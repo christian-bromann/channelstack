@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 
+import { BUILT_IN_APP, checkAppName } from "./core/apps/index.ts";
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
@@ -34,7 +35,6 @@ import {
   type SocketSession,
 } from "./core/router/index.ts";
 import { Allowlist, runId, runTag } from "./core/safety/index.ts";
-import { BUILT_IN_APP, checkAppName } from "./core/apps/index.ts";
 import { LiveVault, randomString, randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
 import { channelsExtension, DRIVERS } from "./drivers/index.ts";
@@ -430,15 +430,23 @@ export function createApp(options: AppOptions): App {
           param: { name: "proxy", in: "query" },
           description: "For proxy mode: `channelstack env --proxy`",
         }),
-      app: z.string().min(1).optional().openapi({
-        param: { name: "app", in: "query" },
-        description:
-          "Another app's variables, under the keys the built-in app's are printed with: `channelstack env --app coder`. Makes the app the first time, with the channel's default settings",
-      }),
-      channel: z.string().min(1).optional().openapi({
-        param: { name: "channel", in: "query" },
-        description: "Only this channel's variables: `channelstack env --channel slack`",
-      }),
+      app: z
+        .string()
+        .min(1)
+        .optional()
+        .openapi({
+          param: { name: "app", in: "query" },
+          description:
+            "Another app's variables, under the keys the built-in app's are printed with: `channelstack env --app coder`. Makes the app the first time, with the channel's default settings",
+        }),
+      channel: z
+        .string()
+        .min(1)
+        .optional()
+        .openapi({
+          param: { name: "channel", in: "query" },
+          description: "Only this channel's variables: `channelstack env --channel slack`",
+        }),
     }),
     response: Env,
     errors: ["action_requires", "invalid_argument", "not_found"],

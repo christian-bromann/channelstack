@@ -139,7 +139,10 @@ describe("an app's secrets (decision 0027)", () => {
     const dir = home();
     const spec = { echo: { appToken: TOKEN } };
     const path = Secrets.path(dir);
-    writeFileSync(path, JSON.stringify({ version: 1, secrets: {}, apps: { echo: { coder: { appToken: "tampered" } } } }));
+    writeFileSync(
+      path,
+      JSON.stringify({ version: 1, secrets: {}, apps: { echo: { coder: { appToken: "tampered" } } } }),
+    );
     expect(Secrets.load(dir, spec).forApp("echo", "coder", "appToken")).toMatch(TOKEN.pattern);
   });
 });
