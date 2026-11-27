@@ -12,6 +12,7 @@ index.html
 # Generated: `pnpm spec` and `pnpm sdk` own these, and their checks compare byte for byte.
 spec/
 sdks/typescript/generated/
+server/src/cli/generated/
 sdks/python/
 pnpm-lock.yaml
 
