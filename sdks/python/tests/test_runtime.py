@@ -122,6 +122,8 @@ def email(channel: str, id: str, author: dict[str, str]) -> dict[str, object]:
         "text": f"from {author['name']}",
         "at": "2026-01-01T00:00:00Z",
         "messageId": f"<{id}@example.test>",
+        # Every header the sender set, by lower-case name (decision 0027).
+        "headers": {},
         "labels": [],
     }
 
