@@ -123,6 +123,7 @@ const auto = { auto: true } as const;
       const channelstack = await connected();
       await use({
         url: server.url,
+        sessionId: session.sessionId,
         env: () => channelstack.env(),
         quiet: (options = {}) => untilQuiet(() => session.quiet(), options),
         reset: () => channelstack.reset(),

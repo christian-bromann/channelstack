@@ -37,6 +37,8 @@ export interface ChannelstackIntegrationOptions {
 export interface ChannelstackFixture {
   /** Control API and UI base, e.g. `https://channelstack.localhost`. */
   readonly url: string;
+  /** This test's session: what a model call can carry (`user`, or the `x-channelstack-session` header) to be the test's for sure. */
+  readonly sessionId: string;
   /** Env vars for the agent: tokens, secrets and API URLs (what `channelstack env` prints). */
   env(): Promise<Record<string, string>>;
   /** Resolve when the agent is quiet in this test's session. */

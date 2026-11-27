@@ -328,3 +328,37 @@ describe("Responses", () => {
     expect(items.data.map((item) => item.type)).toEqual(["message", "message", "message", "message"]);
   });
 });
+
+describe("what the agent sent", () => {
+  test("a secret in the prompt is reported by its kind, and scrubbed from what calls() returns", async () => {
+    const { client, respond, control, h, prompt } = await setup();
+    await respond({ turns: ["ok"] });
+    const token = h.secrets.get("slack", "botToken");
+
+    await client.chat.completions.create({
+      model: "gpt-5",
+      messages: [...ask(prompt), { role: "user", content: `my token is ${token}` }],
+    });
+
+    expect(await control("GET", "/sent-secrets")).toEqual([expect.objectContaining({ kinds: ["slack.botToken"] })]);
+    const [call] = await control("GET", "/calls");
+    expect(JSON.stringify(call)).not.toContain(token);
+  });
+
+  test("a call's context: the channel, the person and the message it answers", async () => {
+    const { client, respond, control, ana, channel, prompt } = await setup();
+    await respond({ turns: ["ok"] });
+
+    await client.chat.completions.create({ model: "gpt-5", messages: ask(prompt), user: ana.id });
+
+    const [call] = await control("GET", "/calls");
+    expect(call.request.context).toEqual(
+      expect.objectContaining({
+        channel: "slack",
+        from: { id: ana.id },
+        conversation: { id: channel.id },
+        attributedBy: "tag",
+      }),
+    );
+  });
+});
