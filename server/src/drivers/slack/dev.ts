@@ -25,7 +25,11 @@ export const slackDev: DevAdapter = {
   listing: {
     path: "/conversations",
     id: "{id}",
-    name: ["#{name}", "{id}"],
+    // A DM or a group DM has no name; it is named by what it is, and its id tells them apart.
+    name: ({ name, kind, id }) =>
+      typeof name === "string" && name !== ""
+        ? `#${name}`
+        : `${kind === "im" ? "Direct message" : "Group message"} ${String(id)}`,
     transcript: "/conversations/{id}/transcript",
   },
   personBody: (name) => ({ name }),

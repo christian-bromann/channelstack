@@ -12,7 +12,12 @@ export function emailDev(title: string): DevAdapter {
     place: "thread",
     example: '"Refund for order 1234"',
     resource: `${title}Thread`,
-    listing: { path: "/threads", id: "{id}", name: ["{subject}"], transcript: "/threads/{id}/transcript" },
+    listing: {
+      path: "/threads",
+      id: "{id}",
+      name: ({ subject }) => String(subject ?? ""),
+      transcript: "/threads/{id}/transcript",
+    },
     personBody: (name) => ({ name }),
     async create({ api, person, app, name, text }) {
       const email = await api.post<{ thread: Record<string, unknown> }>(`/users/${segment(person.id)}/send`, {

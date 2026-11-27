@@ -5,6 +5,7 @@ import {
   devFind,
   devLast,
   devPerson,
+  type DevPlace,
   type DevPrincipal,
   devReference,
   DevRefusal,
@@ -235,17 +236,17 @@ export async function runAct(
     const api = await devApi(server, channel.name);
     const app = await devApp(api);
 
+    /** A place's newest entry, or the place itself while nothing was said in it. */
+    const newestOf = (place: DevPlace) =>
+      devTarget(api, adapter, place.id).catch((error: unknown) => {
+        if (error instanceof DevRefusal) return { place, entries: [], index: -1 };
+        throw error;
+      });
     let target: DevTarget | undefined;
     if (flags.on !== undefined) target = await devTarget(api, adapter, flags.on);
     else if (flags.in !== undefined) {
       const known = await devFind(api, adapter, flags.in);
-      // A place nothing was said in yet is still where the action happens.
-      target = known
-        ? await devTarget(api, adapter, known.id).catch((error: unknown) => {
-            if (error instanceof DevRefusal) return { place: known, entries: [], index: -1 };
-            throw error;
-          })
-        : undefined;
+      target = known ? await newestOf(known) : undefined;
     } else target = await devLast(api, adapter);
 
     let person: DevPrincipal;
@@ -258,7 +259,8 @@ export async function runAct(
     if (flags.in !== undefined && target === undefined) {
       // A place named for the first time is made, with the person and the app in it.
       const { place } = await devEnsurePlace({ api, adapter, person, app, name: flags.in });
-      target = { place, entries: [], index: -1 };
+      // A new GitHub or Linear issue has its description as its first entry already.
+      target = await newestOf(place);
     }
     if (target && target.index >= 0) await adapter.enter?.({ api, person, app, place: target.place });
 

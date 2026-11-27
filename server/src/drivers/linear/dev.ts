@@ -24,7 +24,7 @@ export const linearDev: DevAdapter = {
   listing: {
     path: "/issues",
     id: "{issue.identifier}",
-    name: ["{title}"],
+    name: ({ title }) => String(title ?? ""),
     transcript: "/issues/{issue.id}/transcript",
   },
   personBody: (name) => ({ name }),

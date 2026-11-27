@@ -22,7 +22,12 @@ export const notionDev: DevAdapter = {
   place: "page",
   example: '"Roadmap"',
   resource: "NotionPage",
-  listing: { path: "/pages", id: "{id}", name: ["{title}"], transcript: "/pages/{id}/transcript" },
+  listing: {
+    path: "/pages",
+    id: "{id}",
+    name: ({ title }) => String(title ?? ""),
+    transcript: "/pages/{id}/transcript",
+  },
   personBody: (name) => ({ name }),
   async create({ api, person, app, name, text }) {
     const page = await api.post<{ id: string }>("/pages", { title: name, connections: [app.id], createdBy: person.id });

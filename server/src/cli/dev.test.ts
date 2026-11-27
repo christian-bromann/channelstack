@@ -136,6 +136,11 @@ describe("the dev tools on every channel", () => {
     await runSay(server, devChannel("notion"), "a note", { as: "ana", in: "Plans" });
     expect(await runShow(server, undefined, {})).toMatch(/ana: a note\n$/);
 
+    // GitHub writes times to the second; within it, the issue that changed last is the newest.
+    later();
+    await runSay(server, github, "later still", { as: "mo", in: "Newer" });
+    expect(await runShow(server, undefined, {})).toMatch(/mo: later still\n$/);
+
     // `/places` lists them in that order, for the UI.
     const session = await server.devSession();
     const places = (await server.h.call("GET", `/sessions/${session}/places`)).body as Array<{
@@ -143,10 +148,10 @@ describe("the dev tools on every channel", () => {
       name: string;
     }>;
     expect(places.map(({ channel, name }) => `${channel} ${name}`)).toEqual([
-      "github Newer",
       "github Older",
       "slack #general",
       "notion Plans",
+      "github Newer",
     ]);
   });
 
@@ -182,6 +187,19 @@ describe("the dev tools on every channel", () => {
       "say who acts with `--as <name>`.",
     );
 
+    // An issue named for the first time is made, and the action is on it, by its handle.
+    expect(await runChannel(server, "github", "label", ["bug"], { as: "mo", in: "Brand new" })).toMatch(
+      /^mo did label on dev#3:/,
+    );
+    expect(await runChannel(server, "linear", "setState", ["In Progress"], { as: "lu", in: "Fresh" })).toMatch(
+      /^lu did setState on \S+-1:/,
+    );
+    // A DM is named by what it is.
+    await runAct(server, devChannel("slack"), "openDM", { positional: ["app"], values: {}, flags: { as: "ana" } });
+    const session = await server.devSession();
+    const places = (await server.h.call("GET", `/sessions/${session}/places`)).body as Array<{ name: string }>;
+    expect(places.map(({ name }) => name)).toContainEqual(expect.stringMatching(/^Direct message D\w+$/));
+
     // Linear: delegating to the app (filled in), then Stop on the agent session it opened.
     await runSay(server, devChannel("linear"), "please", { as: "lu", in: "Crash" });
     expect(await runChannel(server, "linear", "delegate", [], { as: "lu", in: "Crash" })).toMatch(/^lu did delegate/);
@@ -211,6 +229,24 @@ describe("the dev tools on every channel", () => {
     await expect(runChannel(server, "notion", "react", [":eyes:"], { as: "ana" })).rejects.toThrow(
       "people don't react on Notion.",
     );
+    // A review's verdict isn't a comment: reacting to it says so, and to the issue it doesn't.
+    await runChannel(server, "github", "say", ["please review"], { as: "mo", in: "Docs" });
+    const change = JSON.stringify([{ path: "README.md", content: Buffer.from("# hi\n").toString("base64") }]);
+    await runChannel(server, "github", "push", [change], { as: "mo", branch: "docs" });
+    await runChannel(server, "github", "openPullRequest", ['{"from":"docs","title":"Fix the docs"}'], { as: "mo" });
+    await runChannel(server, "github", "review", ['{"event":"COMMENT","body":"looks fine"}'], {
+      as: "ana",
+      in: "Fix the docs",
+    });
+    await expect(runChannel(server, "github", "react", [":eyes:"], { as: "mo", on: "last" })).rejects.toThrow(
+      "that entry is a review's verdict",
+    );
+    // On Linear, people react to comments, not to the issue.
+    const said = await runChannel(server, "linear", "say", ["it crashes"], { as: "lu", in: "Crash" });
+    await expect(
+      runChannel(server, "linear", "react", [":eyes:"], { as: "lu", on: referenceIn(said) }),
+    ).rejects.toThrow("on Linear people react to comments");
+
     // A place whose name has a colon is still found by its name.
     await runChannel(server, "github", "say", ["hi"], { as: "mo", in: "Bug: login" });
     expect(await runChannel(server, "github", "show", [], { in: "Bug: login" })).toMatch(/^mo: Bug: login\nhi\n$/);
