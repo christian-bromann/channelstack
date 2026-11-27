@@ -380,12 +380,14 @@ export interface GitHubIssueListing {
   issue: GitHubIssue;
   title: string;
   pullRequest: boolean;
+  updatedAt: string;
 }
 
 export interface GitHubIssueListingWire {
   issue: GitHubIssueData;
   title: string;
   pullRequest: boolean;
+  updatedAt: string;
 }
 
 function decodeGitHubIssueListing(ctx: HandleContext, data: GitHubIssueListingWire): GitHubIssueListing {

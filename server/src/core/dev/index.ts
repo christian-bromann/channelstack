@@ -38,17 +38,16 @@ interface DevTranscript {
 }
 
 /**
- * How a channel lists its places (its Slack channels, GitHub issues, email threads), as plain
- * data, so the UI page reads the same declaration. Templates name fields of a listed item:
- * `"/conversations/{id}/transcript"`, `"{repo.fullName}#{number}"`.
+ * How a channel lists its places (its Slack channels, GitHub issues, email threads). Templates
+ * name fields of a listed item: `"/conversations/{id}/transcript"`, `"{issue.repo.name}#{issue.number}"`.
  */
 interface DevListing {
   /** The list route, e.g. `/conversations`. */
   readonly path: string;
   /** How a place is written in a reference (`<place>:<entry>`). Never has a `:`. */
   readonly id: string;
-  /** What a person calls it: the first template whose fields the item has. */
-  readonly name: readonly string[];
+  /** What a person calls it: `#support`, an issue's title. */
+  name(item: Readonly<Record<string, unknown>>): string;
   /** Its transcript route. */
   readonly transcript: string;
 }
@@ -105,7 +104,7 @@ export interface DevAdapter {
   /** The transcript route of only the target's thread. Without it, or when it says nothing, the whole place. */
   thread?(api: DevApi, target: DevTarget): Promise<string | undefined>;
   /** When an entry was written, more precisely than its `at` (Slack's `ts`, to the microsecond). */
-  time?(entry: DevEntry): number;
+  time?(entry: DevEntry, place: DevPlace): number;
   /** The newest entry of a place, for a channel whose transcript's order and times don't tell (Slack's threads). */
   newest?(api: DevApi, place: DevPlace): Promise<string | undefined>;
 }
@@ -148,7 +147,7 @@ export const devApp = async (api: DevApi): Promise<DevPrincipal> => (await api.g
 function placeOf(adapter: DevAdapter, item: Record<string, unknown>): DevPlace {
   const { listing } = adapter;
   const id = fill(listing.id, item) ?? "";
-  const name = listing.name.map((template) => fill(template, item)).find((text) => text !== undefined) ?? id;
+  const name = listing.name(item) || id;
   return { id, name, transcript: route(listing.transcript, item), item };
 }
 
@@ -177,8 +176,10 @@ export async function devEnsurePlace(
     await adapter.enter?.({ ...acting, place: found });
     return { place: found, created: false };
   }
-  const item = await adapter.create({ ...acting, name: name.replace(/^#/, ""), text: acting.text });
-  return { place: placeOf(adapter, item), created: true };
+  const made = placeOf(adapter, await adapter.create({ ...acting, name: name.replace(/^#/, ""), text: acting.text }));
+  // As the list route has it now, with what only it says (when GitHub's issue last changed).
+  const listed = (await devPlaces(api, adapter)).find((place) => place.id === made.id);
+  return { place: listed ?? made, created: true };
 }
 
 // --- Transcripts, `last` and references -----------------------------------------------------------
@@ -209,7 +210,9 @@ async function newestIn(api: DevApi, adapter: DevAdapter, place: DevPlace): Prom
   const id = await adapter.newest?.(api, place);
   const index = id === undefined ? newestIndex(entries) : entries.findIndex((entry) => entry.id === id);
   const entry = entries[index];
-  return entry === undefined ? undefined : { place, entries, index, time: adapter.time?.(entry) ?? instant(entry) };
+  return entry === undefined
+    ? undefined
+    : { place, entries, index, time: adapter.time?.(entry, place) ?? instant(entry) };
 }
 
 /**

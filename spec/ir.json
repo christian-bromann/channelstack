@@ -18479,6 +18479,13 @@
               "kind": "boolean"
             },
             "optional": false
+          },
+          {
+            "name": "updatedAt",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false
           }
         ]
       }

@@ -9,17 +9,27 @@ interface Repo {
 interface Listed {
   readonly issue: { readonly repoId: string; readonly number: number };
   readonly pullRequest: boolean;
+  readonly updatedAt: string;
 }
 
-/** The repository the dev tools open issues in: public, so anyone may, with the App installed. */
+/**
+ * The repository the dev tools open issues in: public, so anyone may open and comment on one, with
+ * the App installed. Whoever first acts on GitHub in the dev session made it, and is its admin:
+ * they may push, label and merge; the others may what anyone may on a public repository.
+ */
 const DEV_REPO = "dev";
 const segment = encodeURIComponent;
 
-async function devRepo(api: DevApi, app: DevPrincipal): Promise<Repo> {
+async function devRepo(api: DevApi, app: DevPrincipal, person: DevPrincipal): Promise<Repo> {
   const repos = await api.get<Repo[]>("/repos");
   return (
     repos.find((repo) => repo.name === DEV_REPO) ??
-    api.post<Repo>("/repos", { name: DEV_REPO, private: false, apps: [app.id] })
+    api.post<Repo>("/repos", {
+      name: DEV_REPO,
+      private: false,
+      apps: [app.id],
+      collaborators: [{ user: person.id, permission: "admin" }],
+    })
   );
 }
 
@@ -62,12 +72,19 @@ export const githubDev: DevAdapter = {
   listing: {
     path: "/issues",
     id: "{issue.repo.name}#{issue.number}",
-    name: ["{title}"],
+    name: ({ title }) => String(title ?? ""),
     transcript: "/repos/{issue.repoId}/issues/{issue.number}/transcript",
   },
   personBody: (name) => ({ login: name }),
+  // GitHub writes times to the second. The newest entry of an issue is what last changed it, so
+  // within that second, when the issue changed is when it was written.
+  time(entry, place) {
+    const written = Date.parse(entry.at);
+    const changed = Date.parse(listed(place.item).updatedAt);
+    return Math.floor(changed / 1000) === Math.floor(written / 1000) ? changed : written;
+  },
   async create({ api, person, app, name, text }) {
-    const repo = await devRepo(api, app);
+    const repo = await devRepo(api, app, person);
     const issue = await api.post(`/users/${segment(person.id)}/issues`, {
       issue: { title: name, body: text ?? "" },
       repo: repo.id,
