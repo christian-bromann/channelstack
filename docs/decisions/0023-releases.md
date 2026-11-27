@@ -48,8 +48,9 @@ new major version, the range moves with it.
   replace it once the crate exists.
 
 The publishing jobs run only for a pushed tag, in those environments, and wait for the maintainer's
-approval there. A pull request that changes the release runs everything else as a dry run, with no
-secrets.
+approval there. Everything else runs as a dry run, with no secrets, only when started by hand
+from the Actions tab (2026-11-27: pull requests that touched a release file used to start it on
+their own; now nothing does but a tag or a person).
 
 ## Released from GitHub only
 
