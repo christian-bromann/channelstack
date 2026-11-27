@@ -5,6 +5,8 @@ import { expect, inject, test, type TestContext } from "vitest";
 import {
   CHANNEL_NAMES,
   type ChannelKind,
+  PROVIDER_NAMES,
+  type ProviderKind,
   type Channelstack,
   ChannelstackError,
   connect,
@@ -80,7 +82,7 @@ function channelFixture(open: (session: Session) => Promise<unknown>) {
  * them (`ana: async ({ slack }, use) => …`). They are automatic: every test has its session,
  * opened before its hooks run and closed after them, whether it names a fixture or not.
  */
-type Fixtures = Pick<TestContext, "channelstack" | ChannelKind> & {
+type Fixtures = Pick<TestContext, "channelstack" | ChannelKind | ProviderKind> & {
   channelstackSession: Session;
 };
 const auto = { auto: true } as const;
@@ -95,13 +97,21 @@ const auto = { auto: true } as const;
       // A fixture path in a test (`files: "./fixtures/web"`) starts from the test file, like an import.
       setFilesRoot(dirname(task.file.filepath));
       skips.set(session.sessionId, skip);
+      let problems: readonly string[] = [];
       try {
         await use(session);
       } finally {
         skips.delete(session.sessionId);
+        // What went wrong with the model fails the test even if it asserted nothing about it
+        // (decision 0029): read before the session, and its record, are gone.
+        problems = await session
+          .quiet()
+          .then((state) => state.problems)
+          .catch(() => []);
         // Closing the session removes everything the test created. Disposing never fails a test.
         await session[Symbol.asyncDispose]();
       }
+      if (problems.length > 0) throw new Error(`The model calls of this test went wrong:\n${problems.map((problem) => `  ${problem}`).join("\n")}`);
     },
     auto,
   ],
@@ -117,8 +127,10 @@ const auto = { auto: true } as const;
     },
     auto,
   ],
-  // One fixture per channel, by its name: `slack` opens `session.slack()`.
-  ...Object.fromEntries(CHANNEL_NAMES.map((name) => [name, [channelFixture((session) => session[name]()), auto]])),
+  // One fixture per channel, by its name: `slack` opens `session.slack()`; and one per provider (`openai`).
+  ...Object.fromEntries(
+    [...CHANNEL_NAMES, ...PROVIDER_NAMES].map((name) => [name, [channelFixture((session) => session[name]()), auto]]),
+  ),
 });
 
 expect.extend(

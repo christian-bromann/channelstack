@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 
+import { type Attribution, Attributor, bodyStrings, type KnownString, stringsOf } from "./core/attribution/index.ts";
 import { requireAccess } from "./core/auth/index.ts";
 import { UI_COOKIE, UiAccess } from "./core/auth/ui.ts";
 import { BrowserActors, type Launch } from "./core/browser/index.ts";
@@ -182,6 +183,10 @@ const Quiet = z
     open: z.array(z.string()).openapi({
       description: "What is still open, in words: deliveries in flight or about to be retried, streams never stopped.",
     }),
+    problems: z.array(z.string()).openapi({
+      description:
+        "What should fail the test at once, in words: a model call no script answered. Waiting matchers fail on these instead of timing out.",
+    }),
   })
   .openapi("Quiet");
 
@@ -219,6 +224,55 @@ export function createApp(options: AppOptions): App {
   const vault = new LiveVault(liveEnv, (secret) => redactor.register(secret));
   const browsers = new BrowserActors(options.live?.launchBrowser);
 
+  // What each session's agent was told: its deliveries' bodies and its API calls' answers. A
+  // provider's request names no session; attribution finds it in these (decision 0029).
+  const knownCache = new Map<string, { at: number; strings: KnownString[] }>();
+  const attribution = new Attributor({
+    sessions: () => sessions.ids(),
+    known: (session) => {
+      const strings: KnownString[] = [];
+      for (const record of delivery.list(session)) {
+        const sent = record.attempts[0]?.sentAt;
+        const at = sent === undefined ? clock() : Date.parse(sent);
+        let cached = knownCache.get(record.request.id);
+        if (!cached) {
+          cached = {
+            at,
+            strings: bodyStrings(record.request.body).map((text) => ({
+              text,
+              driver: record.request.driver,
+              delivery: record.request.id,
+              at,
+            })),
+          };
+          knownCache.set(record.request.id, cached);
+        }
+        strings.push(...cached.strings);
+      }
+      for (const event of events.read(session).events) {
+        if (event.kind !== "api_call" || DRIVERS.find((definition) => definition.name === event.driver)?.provider) continue;
+        const at = Date.parse(event.at);
+        for (const text of stringsOf(event.data.response)) strings.push({ text, driver: event.driver, at });
+      }
+      return strings;
+    },
+  });
+  sessions.onClose((session) => {
+    for (const record of delivery.list(session.id)) knownCache.delete(record.request.id);
+  });
+  /** Where an attributed call is in the channels: the delivery that decided it, as its driver reads it. */
+  const place = (attributed: Attribution | undefined) => {
+    const source = attributed?.source;
+    if (!attributed || !source) return {};
+    const definition = DRIVERS.find((candidate) => candidate.name === source.driver);
+    const record =
+      source.delivery === undefined
+        ? undefined
+        : delivery.list(attributed.session).find((candidate) => candidate.request.id === source.delivery);
+    const found = record ? definition?.place?.(record.request.body) : undefined;
+    return { channel: source.driver, ...(found ?? {}) };
+  };
+
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
       ids,
@@ -233,6 +287,8 @@ export function createApp(options: AppOptions): App {
       secret: (name) => secrets.get(definition.name, name),
       apiUrl: () => options.urls().driver(definition.name),
       webhookUrl: options.webhooks[definition.name],
+      attribution,
+      place,
       live: {
         active: driverReality(liveEnv, definition.live?.credentials ?? [], undefined).mode === "live",
         strict: forcedReality(liveEnv) === "live",
@@ -248,6 +304,7 @@ export function createApp(options: AppOptions): App {
     }),
   );
   const driverNames = drivers.map((driver) => driver.name);
+  const providers = new Set(drivers.filter((_, at) => DRIVERS[at]?.provider));
   const realities = new Map<string, DriverReality>(
     drivers.map((driver, at) => [
       driver.name,
@@ -379,7 +436,8 @@ export function createApp(options: AppOptions): App {
       const pending = delivery.pending(session);
       const deliveries = `${pending} ${pending === 1 ? "delivery" : "deliveries"} in flight or about to be retried`;
       const open = [...(pending > 0 ? [deliveries] : []), ...drivers.flatMap((driver) => driver.openWork(session))];
-      return { ...quiet.state(session, open.length), open };
+      const problems = drivers.flatMap((driver) => driver.problems?.(session) ?? []);
+      return { ...quiet.state(session, open.length), open, problems };
     },
   });
 
@@ -533,9 +591,12 @@ export function createApp(options: AppOptions): App {
       const host = (request.headers.get("x-forwarded-host") ?? new URL(request.url).host).split(":")[0] ?? "";
       const driver =
         byHost.get(host) ?? rooted.find(({ path }) => new URL(request.url).pathname.startsWith(path))?.driver;
-      if (driver) return quiet.during(() => driver.fake.api.fetch(request));
+      // A provider's call is in flight for its session alone (its open work), not for every session.
+      if (driver) return providers.has(driver) ? driver.fake.api.fetch(request) : quiet.during(() => driver.fake.api.fetch(request));
       // Anything outside the control API is the agent calling a fake: the agent isn't quiet while it runs.
-      const fromAgent = !new URL(request.url).pathname.startsWith(CONTROL_PREFIX);
+      const { pathname } = new URL(request.url);
+      const fromAgent =
+        !pathname.startsWith(CONTROL_PREFIX) && ![...providers].some((provider) => pathname.startsWith(`/${provider.name}/`));
       return fromAgent ? quiet.during(() => root.fetch(request)) : root.fetch(request);
     },
     openapi: () => ({

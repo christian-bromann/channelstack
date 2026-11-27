@@ -8,6 +8,8 @@ import type { Ir, IrResource } from "../ir.ts";
 export interface ChannelGlue {
   /** Each channel's name (`slack`) and type prefix (`Slack`), in the server's order. */
   readonly channels: ReadonlyArray<{ readonly name: string; readonly title: string }>;
+  /** The fakes the agent calls that aren't channels (`openai`), each with a fixture. */
+  readonly providers: ReadonlyArray<{ readonly name: string; readonly title: string }>;
   /** `SlackFixture`, … */
   readonly fixtures: readonly string[];
   /** The people of every channel (`role: "user"`), its app, and the places things happen in. */
@@ -31,8 +33,10 @@ export interface ChannelGlue {
 }
 
 export function channelGlue(ir: Ir): ChannelGlue {
-  const channels = ir.channels.filter((channel) => !channel.internal);
-  const internal = ir.channels.filter((channel) => channel.internal).map((channel) => channel.title);
+  const channels = ir.channels.filter((channel) => !channel.internal && !channel.provider);
+  const providers = ir.channels.filter((channel) => channel.provider);
+  // A provider's types are its own, like echo's: no channel union takes them.
+  const internal = ir.channels.filter((channel) => channel.internal || channel.provider).map((channel) => channel.title);
   const resources = new Map(ir.resources.map((resource) => [resource.name, resource]));
   const types = new Set(ir.types.map((type) => type.name));
   const ofChannels = (resource: IrResource) =>
@@ -60,6 +64,7 @@ export function channelGlue(ir: Ir): ChannelGlue {
   const fixtures = named("Fixture", (name) => resources.has(name));
   return {
     channels: channels.map(({ name, title }) => ({ name, title })),
+    providers: providers.map(({ name, title }) => ({ name, title })),
     fixtures,
     users: role("user"),
     apps: role("app"),

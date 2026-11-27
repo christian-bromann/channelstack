@@ -4,6 +4,7 @@ import { credential } from "../runtime/credentials.ts";
 import { type Duration, parseDuration } from "../runtime/duration.ts";
 import { type FileInput, readChanges, readDocument, readTree } from "../runtime/files.ts";
 import type { LaunchOptions } from "../runtime/launcher.ts";
+import { type Responder, respondWith } from "../runtime/responder.ts";
 import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";
 import { describeWait, fromMatches, textMatches, latestOnceQuiet, type QuietOptions, waitFor, waitForNext, type WaitOptions, retryWhile, untilQuiet, patternOnWire, type QuietState } from "../runtime/wait.ts";
 
@@ -97,6 +98,7 @@ export interface Quiet {
   busy: boolean;
   quietForMs: number;
   open: string[];
+  problems: string[];
 }
 
 export type Env = Record<string, string>;
@@ -1030,6 +1032,152 @@ export interface GoogleApiCall {
   error?: string;
 }
 
+export type OpenAITurnInput = string | OpenAITurn;
+
+export interface OpenAITurn {
+  text?: string | string[];
+  toolCalls?: OpenAIToolCallSpec[];
+  reasoning?: { summary?: string | string[]; tokens?: number };
+  refusal?: string;
+  finish?: "stop" | "length" | "content_filter";
+  usage?: { input?: number; output?: number; reasoning?: number; cached?: number };
+  timing?: OpenAITiming;
+  failAfter?: { chunks: number; how?: "error" | "drop" | "stall" };
+  pauseAfter?: number;
+  error?: "rate_limit" | "slow_down" | "insufficient_quota" | "credit_balance_exhausted" | "organization_spend_limit_exceeded" | "project_spend_limit_exceeded" | "organization_usage_limit_exceeded" | "server_error" | "overloaded" | "timeout" | "context_length_exceeded" | "content_policy" | "invalid_api_key" | "not_in_organization" | "ip_not_authorized" | "unsupported_region";
+  retryAfter?: Duration;
+  shouldRetry?: boolean;
+  message?: string;
+}
+
+export interface OpenAIToolCallSpec {
+  name: string;
+  arguments?: Record<string, unknown> | string;
+  input?: string;
+}
+
+export interface OpenAITiming {
+  firstToken?: Duration;
+  betweenChunks?: Duration;
+}
+
+export interface OpenAIMatch {
+  text?: string | RegExp;
+  prompt?: string | RegExp;
+  tools?: string[];
+  toolResult?: boolean | string;
+  endpoint?: "chat.completions" | "responses";
+  model?: string | RegExp;
+  stream?: boolean;
+  from?: string;
+  in?: string;
+}
+
+export type OpenAICalls = OpenAICall[];
+
+export interface OpenAICall {
+  id: string;
+  endpoint: "chat.completions" | "responses";
+  model: string;
+  stream: boolean;
+  at: string;
+  durationMs: number;
+  attempt: number;
+  done: boolean;
+  request: OpenAIRequest;
+  response: { status: number; text?: string; finish?: string; error?: string; aborted: boolean; chunksSent?: number; end?: "completed" | "errored" | "dropped" | "stalled" | "aborted" };
+  toolCalls: OpenAIToolCall[];
+  script?: string;
+}
+
+export interface OpenAIRequest {
+  endpoint: "chat.completions" | "responses";
+  model: string;
+  stream: boolean;
+  instructions?: string;
+  messages: OpenAIMessage[];
+  tools: OpenAITool[];
+  toolChoice?: unknown;
+  responseFormat?: unknown;
+  lastUserText?: string;
+  lastToolResults: Array<{ callId: string; name?: string; text: string }>;
+  text: string;
+  context: OpenAIContext;
+  body?: unknown;
+  headers: Record<string, string>;
+}
+
+export interface OpenAIMessage {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  text: string;
+  toolCalls?: Array<{ id: string; name: string; arguments?: unknown }>;
+  callId?: string;
+  name?: string;
+  parts?: Array<{ type: "image" | "file" | "audio"; from: "data" | "file_id" | "url"; url?: string }>;
+}
+
+export interface OpenAITool {
+  type: string;
+  name?: string;
+  description?: string;
+  parameters?: unknown;
+  strict?: boolean;
+}
+
+export interface OpenAIContext {
+  channel?: string;
+  from?: OpenAIRef;
+  conversation?: OpenAIRef;
+  thread?: OpenAIRef;
+  message?: OpenAIRef;
+  attributedBy?: "minted_id" | "tag" | "owned_id" | "text" | "order";
+}
+
+export interface OpenAIRef {
+  id: string;
+}
+
+export interface OpenAIToolCall {
+  id: string;
+  type: "function" | "custom";
+  hosted: boolean;
+  name: string;
+  arguments?: unknown;
+  madeIn: string;
+  result?: { text: string; sentIn: string };
+}
+
+export type OpenAIPausedCalls = OpenAICall[];
+
+export type OpenAIToolCalls = OpenAIToolCall[];
+
+export interface OpenAIHeldPage {
+  held: OpenAIHeldCall[];
+  cursor: string;
+}
+
+export interface OpenAIHeldCall {
+  id: string;
+  request: OpenAIRequest;
+}
+
+export type OpenAISessionCalls = OpenAICall[];
+
+export type OpenAISessionToolCalls = OpenAIToolCall[];
+
+export type OpenAIProblems = string[];
+
+export type OpenAIUnattributedCalls = OpenAIUnattributedCall[];
+
+export interface OpenAIUnattributedCall {
+  id: string;
+  endpoint: "chat.completions" | "responses";
+  model: string;
+  at: string;
+  lastUserText?: string;
+  tools: string[];
+}
+
 export type Places = Place[];
 
 export type PlacesWire = PlaceData[];
@@ -1208,6 +1356,13 @@ export class Session implements AsyncDisposable {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/google`)) as GoogleFixtureData;
     return new GoogleFixture(ctx, data);
+  }
+
+  /** The OpenAI fixture: where the agent reaches the fake model. Experimental. */
+  async openai(): Promise<OpenAIFixture> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai`)) as OpenAIFixtureData;
+    return new OpenAIFixture(ctx, data);
   }
 
   /** Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last. Experimental. */
@@ -4825,6 +4980,231 @@ export class GoogleDelivery {
       const value = await this.refresh();
       return value.status === "pending" ? undefined : value;
     }, options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link OpenAIFixture}. */
+export interface OpenAIFixtureData {
+  baseUrl: string;
+}
+
+export class OpenAIFixture {
+  readonly baseUrl: string;
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: OpenAIFixtureData) {
+    this.#ctx = ctx;
+    this.baseUrl = data.baseUrl;
+  }
+
+  /** Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added. Experimental. */
+  async respond(turns?: OpenAITurnInput | OpenAITurnInput[] | Responder<OpenAIRequest, OpenAITurnInput>, options: { when?: OpenAIMatch; times?: number; timing?: OpenAITiming } = {}): Promise<OpenAIScript> {
+    const ctx = this.#ctx;
+    const answer = typeof turns === "function" ? turns : undefined;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts`, { body: { turns: (answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined) === undefined ? undefined : [(answer === undefined ? (turns as OpenAITurnInput | OpenAITurnInput[] | undefined) : undefined)].flat(), when: options.when, times: options.times, timing: options.timing, responder: answer !== undefined } })) as OpenAIScriptData;
+    const handle = new OpenAIScript(ctx, data);
+    if (answer !== undefined) respondWith({ held: (o) => handle.heldCalls(o), answer: (id, o) => handle.answerHeld(id, o) }, answer);
+    return handle;
+  }
+
+  /** Every model call attributed to this session, oldest first. Experimental. */
+  async calls(options: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}): Promise<OpenAISessionCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/calls`, { query: { endpoint: options.endpoint, error: options.error } })) as OpenAISessionCalls;
+    return data;
+  }
+
+  /** Every tool call the model made in this session, each with the result the agent sent back. Experimental. */
+  async toolCalls(options: { name?: string } = {}): Promise<OpenAISessionToolCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/tool-calls`, { query: { name: options.name } })) as OpenAISessionToolCalls;
+    return data;
+  }
+
+  /** What went wrong with the model in this session: a call no script answered, a script that ran out or did what the real API can't, a responder that threw. Matchers fail at once on these. Experimental. */
+  async problems(): Promise<OpenAIProblems> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/problems`)) as OpenAIProblems;
+    return data;
+  }
+
+  /** Model calls no session could be given (the agent calling the model at startup, for example). Experimental. */
+  async unattributed(): Promise<OpenAIUnattributedCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/unattributed`)) as OpenAIUnattributedCalls;
+    return data;
+  }
+
+  /** Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers. Experimental. */
+  async rateLimit(options: { requests?: { limit: number; per?: Duration }; tokens?: { limit: number; per?: Duration }; error?: "rate_limit" | "slow_down" } = {}): Promise<OpenAIRateLimit> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/rate-limits`, { body: { requests: options.requests === undefined ? undefined : { ...options.requests, per: options.requests.per === undefined ? undefined : parseDuration(options.requests.per) }, tokens: options.tokens === undefined ? undefined : { ...options.tokens, per: options.tokens.per === undefined ? undefined : parseDuration(options.tokens.per) }, error: options.error } })) as OpenAIRateLimitData;
+    return new OpenAIRateLimit(ctx, data);
+  }
+
+  /** Wait for the next new model call from the agent, after the last one this handle saw. */
+  async waitForCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string }, options: WaitOptions = {}): Promise<OpenAICall> {
+    return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "a model call from the agent", options);
+  }
+
+  /** The latest model call from the agent, once the agent is quiet. Waits for at least one. */
+  async latestCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string }, options: QuietOptions = {}): Promise<OpenAICall> {
+    return latestOnceQuiet(() => this.calls(filter), () => true, () => quietOf(this.#ctx), "a model call from the agent", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link OpenAIScript}. */
+export interface OpenAIScriptData {
+  id: string;
+  responder: boolean;
+  times: number;
+  used: number;
+  problems: string[];
+}
+
+export class OpenAIScript implements AsyncDisposable {
+  readonly id: string;
+  readonly responder: boolean;
+  readonly times: number;
+  readonly used: number;
+  readonly problems: string[];
+  readonly #ctx: HandleContext;
+  readonly #seen = new Map<string, number>();
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: OpenAIScriptData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.responder = data.responder;
+    this.times = data.times;
+    this.used = data.used;
+    this.problems = data.problems;
+  }
+
+  /** Re-read a script: how many calls it answered, and its problems. Experimental. */
+  async refresh(): Promise<OpenAIScript> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}`)) as OpenAIScriptData;
+    return new OpenAIScript(ctx, data);
+  }
+
+  /** Remove a script. Closing the session does it too. Experimental. */
+  async undo(): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("DELETE", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}`);
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    await disposeQuietly(() => this.undo());
+  }
+
+  /** Let the streams this script holds at `pauseAfter` go on. Experimental. */
+  async resume(): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/resume`);
+  }
+
+  /** The calls this script answered. Experimental. */
+  async calls(): Promise<OpenAICalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/calls`)) as OpenAICalls;
+    return data;
+  }
+
+  /** The calls whose streams this script holds at `pauseAfter`. Experimental. */
+  async pausedCalls(): Promise<OpenAIPausedCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/paused`)) as OpenAIPausedCalls;
+    return data;
+  }
+
+  /** The tool calls this script made, each with the result the agent sent back. Experimental. */
+  async toolCalls(options: { name?: string } = {}): Promise<OpenAIToolCalls> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/tool-calls`, { query: { name: options.name } })) as OpenAIToolCalls;
+    return data;
+  }
+
+  /** For a responder's SDK: the calls held for it since `since`, waiting up to `waitMs` for one. Experimental. */
+  async heldCalls(options: { since?: string; waitMs?: number | undefined } = {}): Promise<OpenAIHeldPage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/requests`, { query: { since: options.since, waitMs: options.waitMs } })) as OpenAIHeldPage;
+    return data;
+  }
+
+  /** For a responder's SDK: answer a held call with a turn, or report that the test's function threw. Experimental. */
+  async answerHeld(held: string, options: { turn?: OpenAITurnInput; error?: string } = {}): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/answers`, { body: { held, turn: options.turn, error: options.error } });
+  }
+
+  /** Wait for the next new model call this script answers, after the last one this handle saw. */
+  async waitForCall(options: WaitOptions = {}): Promise<OpenAICall> {
+    return waitForNext(this.#seen, "waitForCall", () => this.calls(), () => true, "a model call this script answers", options);
+  }
+
+  /** Wait for the next new stream held at pauseAfter, after the last one this handle saw. */
+  async waitForPause(options: WaitOptions = {}): Promise<OpenAICall> {
+    return waitForNext(this.#seen, "waitForPause", () => this.pausedCalls(), () => true, "a stream held at pauseAfter", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link OpenAIRateLimit}. */
+export interface OpenAIRateLimitData {
+  id: string;
+  requests?: number;
+  tokens?: number;
+  resetsInMs: number;
+}
+
+export class OpenAIRateLimit implements AsyncDisposable {
+  readonly id: string;
+  readonly requests: number | undefined;
+  readonly tokens: number | undefined;
+  readonly resetsInMs: number;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: OpenAIRateLimitData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.requests = data.requests;
+    this.tokens = data.tokens;
+    this.resetsInMs = data.resetsInMs;
+  }
+
+  /** What the rate limit's headers would say now. Experimental. */
+  async remaining(): Promise<OpenAIRateLimit> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/rate-limits/${segment(this.id)}`)) as OpenAIRateLimitData;
+    return new OpenAIRateLimit(ctx, data);
+  }
+
+  /** Remove the rate limit. Experimental. */
+  async undo(): Promise<void> {
+    const ctx = this.#ctx;
+    await ctx.transport.request("DELETE", `/sessions/${segment(sessionOf(ctx))}/openai/rate-limits/${segment(this.id)}`);
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    await disposeQuietly(() => this.undo());
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

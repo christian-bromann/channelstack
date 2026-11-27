@@ -25,6 +25,13 @@ interface SdkBinding {
   retryWhile?: readonly string[];
   /** A read of what the agent has set: SDKs wait until the agent is quiet before they read. */
   onceQuiet?: boolean;
+  /**
+   * The first argument may also be a function the test answers with (`openai.respond(fn)`): the
+   * SDK sends `flag: true` instead of the argument, and answers each call the returned handle
+   * `held` (a long-poll read on it) with `answer` (a method on it), the function getting a value
+   * of the `request` type.
+   */
+  responder?: { flag: string; held: string; answer: string; request: string };
 }
 
 /**

@@ -317,6 +317,20 @@ fn run_session_google<'a>(
     })
 }
 
+fn run_session_openai<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/openai", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_session_places<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -6829,6 +6843,416 @@ fn run_google_delivery_resend<'a>(
     })
 }
 
+fn run_open_ai_fixture_respond<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_turns = args.next().unwrap_or(Value::Null);
+        let p_when = options.get("when").cloned().unwrap_or(Value::Null);
+        let p_times = options.get("times").cloned().unwrap_or(Value::Null);
+        let p_timing = options.get("timing").cloned().unwrap_or(Value::Null);
+        let p_responder = options.get("responder").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/openai/scripts",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "turns".into(),
+                    (&|v: &Value| enc::array(v, true, &|v: &Value| enc::plain(v)))(&p_turns)?,
+                );
+                wire.insert("when".into(), p_when.clone());
+                wire.insert("times".into(), p_times.clone());
+                wire.insert("timing".into(), p_timing.clone());
+                wire.insert("responder".into(), p_responder.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_fixture_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_endpoint = options.get("endpoint").cloned().unwrap_or(Value::Null);
+        let p_error = options.get("error").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/openai/calls", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("endpoint".into(), p_endpoint.clone());
+                wire.insert("error".into(), p_error.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_fixture_tool_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/openai/tool-calls",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_fixture_problems<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/problems",
+            encode_segment(ctx.session()?)
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_fixture_unattributed<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/unattributed",
+            encode_segment(ctx.session()?)
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_fixture_rate_limit<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_requests = options.get("requests").cloned().unwrap_or(Value::Null);
+        let p_tokens = options.get("tokens").cloned().unwrap_or(Value::Null);
+        let p_error = options.get("error").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/openai/rate-limits",
+            encode_segment(ctx.session()?)
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert(
+                    "requests".into(),
+                    (&|v: &Value| enc::object(v, None, &[("per", &|v: &Value| enc::duration(v))]))(
+                        &p_requests,
+                    )?,
+                );
+                wire.insert(
+                    "tokens".into(),
+                    (&|v: &Value| enc::object(v, None, &[("per", &|v: &Value| enc::duration(v))]))(
+                        &p_tokens,
+                    )?,
+                );
+                wire.insert("error".into(), p_error.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_script_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_script_undo<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "DELETE", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_script_resume<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}/resume",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "POST", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_script_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}/calls",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_script_paused_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}/paused",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_script_tool_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}/tool-calls",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_script_held_calls<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_since = options.get("since").cloned().unwrap_or(Value::Null);
+        let p_wait_ms = options.get("waitMs").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}/requests",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "GET",
+            path,
+            None,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("since".into(), p_since.clone());
+                wire.insert("waitMs".into(), p_wait_ms.clone());
+                wire
+            }),
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_script_answer_held<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_held = args.next().unwrap_or(Value::Null);
+        let p_turn = options.get("turn").cloned().unwrap_or(Value::Null);
+        let p_error = options.get("error").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/openai/scripts/{}/answers",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("held".into(), p_held.clone());
+                wire.insert("turn".into(), p_turn.clone());
+                wire.insert("error".into(), p_error.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_open_ai_rate_limit_remaining<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/rate-limits/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_open_ai_rate_limit_undo<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/rate-limits/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "DELETE", path, None, None, false, &[]).await
+    })
+}
+
 fn run_place_transcript<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -7278,6 +7702,17 @@ impl Session {
             vec![],
             run_session_google,
             GoogleFixture::wrap,
+        )
+    }
+
+    /// The OpenAI fixture: where the agent reaches the fake model. Experimental.
+    pub fn openai(&self) -> Call<OpenAIFixture> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_session_openai,
+            OpenAIFixture::wrap,
         )
     }
 
@@ -19638,6 +20073,872 @@ impl IntoFuture for GoogleDeliverySettled {
     }
 }
 
+/// A handle: `OpenAIFixture`.
+#[derive(Clone)]
+pub struct OpenAIFixture {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for OpenAIFixture {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl OpenAIFixture {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `baseUrl`.
+    pub fn base_url(&self) -> String {
+        self.data
+            .get("baseUrl")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+
+    /// Script what the model answers: turns used in order, one per matching call, or a responder the test answers. Scripts are tried in the order they were added. Experimental.
+    pub fn respond(&self, turns: impl IntoArg) -> OpenAIFixtureRespond {
+        OpenAIFixtureRespond(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![turns.into_arg()],
+            run_open_ai_fixture_respond,
+            OpenAIScript::wrap,
+        ))
+    }
+
+    /// Every model call attributed to this session, oldest first. Experimental.
+    pub fn calls(&self) -> OpenAIFixtureCalls {
+        OpenAIFixtureCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_fixture_calls,
+            as_value,
+        ))
+    }
+
+    /// Every tool call the model made in this session, each with the result the agent sent back. Experimental.
+    pub fn tool_calls(&self) -> OpenAIFixtureToolCalls {
+        OpenAIFixtureToolCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_fixture_tool_calls,
+            as_value,
+        ))
+    }
+
+    /// What went wrong with the model in this session: a call no script answered, a script that ran out or did what the real API can't, a responder that threw. Matchers fail at once on these. Experimental.
+    pub fn problems(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_fixture_problems,
+            as_value,
+        )
+    }
+
+    /// Model calls no session could be given (the agent calling the model at startup, for example). Experimental.
+    pub fn unattributed(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_fixture_unattributed,
+            as_value,
+        )
+    }
+
+    /// Limit this session's model calls: requests and tokens per window, with truthful x-ratelimit-* headers. Experimental.
+    pub fn rate_limit(&self) -> OpenAIFixtureRateLimit {
+        OpenAIFixtureRateLimit(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_fixture_rate_limit,
+            OpenAIRateLimit::wrap,
+        ))
+    }
+
+    /// Wait for a model call from the agent. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_call(&self) -> OpenAIFixtureWaitForCall {
+        OpenAIFixtureWaitForCall {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+
+    /// Wait for a model call from the agent. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn latest_call(&self) -> OpenAIFixtureLatestCall {
+        OpenAIFixtureLatestCall {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`OpenAIFixture::respond`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureRespond(Call<OpenAIScript>);
+
+impl OpenAIFixtureRespond {
+    /// `when`.
+    pub fn when(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("when", value))
+    }
+    /// `times`.
+    pub fn times(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("times", value))
+    }
+    /// `timing`.
+    pub fn timing(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("timing", value))
+    }
+    /// `responder`.
+    pub fn responder(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("responder", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<OpenAIScript> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIFixtureRespond {
+    type Output = Result<OpenAIScript>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAIScript>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIFixture::calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureCalls(Call<Value>);
+
+impl OpenAIFixtureCalls {
+    /// `endpoint`.
+    pub fn endpoint(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("endpoint", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIFixtureCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIFixture::tool_calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureToolCalls(Call<Value>);
+
+impl OpenAIFixtureToolCalls {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIFixtureToolCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIFixture::rate_limit`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIFixtureRateLimit(Call<OpenAIRateLimit>);
+
+impl OpenAIFixtureRateLimit {
+    /// `requests`.
+    pub fn requests(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("requests", value))
+    }
+    /// `tokens`.
+    pub fn tokens(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("tokens", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<OpenAIRateLimit> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIFixtureRateLimit {
+    type Output = Result<OpenAIRateLimit>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAIRateLimit>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIFixture::wait_for_call`].
+pub struct OpenAIFixtureWaitForCall {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl OpenAIFixtureWaitForCall {
+    /// `endpoint`.
+    pub fn endpoint(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("endpoint".into(), value.into_arg());
+        self
+    }
+    /// `error`.
+    pub fn error(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("error".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<Value> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| ["endpoint", "error"].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let item = wait_for_next(
+            &seen.positions,
+            &format!("waitForCall:{}", serde_json::Value::Object(filters.clone())),
+            || run_open_ai_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| {
+                let _ = item;
+                true
+            },
+            None,
+            "a model call from the agent",
+            &timeout,
+        )
+        .await?;
+        as_value(&ctx, item)
+    }
+}
+
+impl IntoFuture for OpenAIFixtureWaitForCall {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// The options of [`OpenAIFixture::latest_call`].
+pub struct OpenAIFixtureLatestCall {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl OpenAIFixtureLatestCall {
+    /// `endpoint`.
+    pub fn endpoint(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("endpoint".into(), value.into_arg());
+        self
+    }
+    /// `error`.
+    pub fn error(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("error".into(), value.into_arg());
+        self
+    }
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// `quietFor`.
+    pub fn quiet_for(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("quietFor".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<Value> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| ["endpoint", "error"].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let quiet_for = options
+            .get("quietFor")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_QUIET_FOR));
+        let item = latest_once_quiet(
+            || run_open_ai_fixture_calls(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| {
+                let _ = item;
+                true
+            },
+            || ctx.quiet(),
+            "a model call from the agent",
+            &timeout,
+            &quiet_for,
+        )
+        .await?;
+        as_value(&ctx, item)
+    }
+}
+
+impl IntoFuture for OpenAIFixtureLatestCall {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `OpenAIScript`.
+#[derive(Clone)]
+pub struct OpenAIScript {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for OpenAIScript {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl OpenAIScript {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `responder`.
+    pub fn responder(&self) -> bool {
+        self.data
+            .get("responder")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `times`.
+    pub fn times(&self) -> f64 {
+        self.data
+            .get("times")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+    }
+    /// `used`.
+    pub fn used(&self) -> i64 {
+        self.data.get("used").and_then(Value::as_i64).unwrap_or(0)
+    }
+    /// `problems`.
+    pub fn problems(&self) -> &Value {
+        self.data.get("problems").unwrap_or(&Value::Null)
+    }
+
+    /// Re-read a script: how many calls it answered, and its problems. Experimental.
+    pub fn refresh(&self) -> Call<OpenAIScript> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_refresh,
+            OpenAIScript::wrap,
+        )
+    }
+
+    /// Remove a script. Closing the session does it too. Experimental.
+    pub fn undo(&self) -> Call<()> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_undo,
+            as_unit,
+        )
+    }
+
+    /// Let the streams this script holds at `pauseAfter` go on. Experimental.
+    pub fn resume(&self) -> Call<()> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_resume,
+            as_unit,
+        )
+    }
+
+    /// The calls this script answered. Experimental.
+    pub fn calls(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_calls,
+            as_value,
+        )
+    }
+
+    /// The calls whose streams this script holds at `pauseAfter`. Experimental.
+    pub fn paused_calls(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_paused_calls,
+            as_value,
+        )
+    }
+
+    /// The tool calls this script made, each with the result the agent sent back. Experimental.
+    pub fn tool_calls(&self) -> OpenAIScriptToolCalls {
+        OpenAIScriptToolCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_tool_calls,
+            as_value,
+        ))
+    }
+
+    /// For a responder's SDK: the calls held for it since `since`, waiting up to `waitMs` for one. Experimental.
+    pub fn held_calls(&self) -> OpenAIScriptHeldCalls {
+        OpenAIScriptHeldCalls(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_script_held_calls,
+            as_value,
+        ))
+    }
+
+    /// For a responder's SDK: answer a held call with a turn, or report that the test's function threw. Experimental.
+    pub fn answer_held(&self, held: impl IntoArg) -> OpenAIScriptAnswerHeld {
+        OpenAIScriptAnswerHeld(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![held.into_arg()],
+            run_open_ai_script_answer_held,
+            as_unit,
+        ))
+    }
+
+    /// Wait for a model call this script answers. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_call(&self) -> OpenAIScriptWaitForCall {
+        OpenAIScriptWaitForCall {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+
+    /// Wait for a stream held at pauseAfter. Set its options on what this returns, then `.send().await` (or `.await`).
+    pub fn wait_for_pause(&self) -> OpenAIScriptWaitForPause {
+        OpenAIScriptWaitForPause {
+            ctx: self.ctx.clone(),
+            me: self.data.clone(),
+            seen: self.seen.clone(),
+            options: Map::new(),
+        }
+    }
+}
+
+/// The options of [`OpenAIScript::tool_calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIScriptToolCalls(Call<Value>);
+
+impl OpenAIScriptToolCalls {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIScriptToolCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIScript::held_calls`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIScriptHeldCalls(Call<Value>);
+
+impl OpenAIScriptHeldCalls {
+    /// `since`.
+    pub fn since(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("since", value))
+    }
+    /// `waitMs`.
+    pub fn wait_ms(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("waitMs", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIScriptHeldCalls {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIScript::answer_held`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct OpenAIScriptAnswerHeld(Call<()>);
+
+impl OpenAIScriptAnswerHeld {
+    /// `turn`.
+    pub fn turn(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("turn", value))
+    }
+    /// `error`.
+    pub fn error(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("error", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<()> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for OpenAIScriptAnswerHeld {
+    type Output = Result<()>;
+    type IntoFuture = BoxFuture<'static, Result<()>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`OpenAIScript::wait_for_call`].
+pub struct OpenAIScriptWaitForCall {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl OpenAIScriptWaitForCall {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<Value> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForCall",
+            || run_open_ai_script_calls(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| {
+                let _ = item;
+                true
+            },
+            None,
+            "a model call this script answers",
+            &timeout,
+        )
+        .await?;
+        as_value(&ctx, item)
+    }
+}
+
+impl IntoFuture for OpenAIScriptWaitForCall {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// The options of [`OpenAIScript::wait_for_pause`].
+pub struct OpenAIScriptWaitForPause {
+    ctx: Ctx,
+    me: Value,
+    seen: Seen,
+    options: Map<String, Value>,
+}
+
+impl OpenAIScriptWaitForPause {
+    /// `timeout`.
+    pub fn timeout(mut self, value: impl IntoArg) -> Self {
+        self.options.insert("timeout".into(), value.into_arg());
+        self
+    }
+    /// Wait.
+    pub async fn send(self) -> Result<Value> {
+        let Self {
+            ctx,
+            me,
+            seen,
+            options,
+        } = self;
+        let _ = &seen;
+        let filters: Map<String, Value> = options
+            .iter()
+            .filter(|(name, _)| [].contains(&name.as_str()))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        let timeout = options
+            .get("timeout")
+            .cloned()
+            .unwrap_or_else(|| Value::from(DEFAULT_TIMEOUT));
+        let item = wait_for_next(
+            &seen.positions,
+            "waitForPause",
+            || run_open_ai_script_paused_calls(&ctx, &me, vec![], filters.clone()),
+            |item: &Value| {
+                let _ = item;
+                true
+            },
+            None,
+            "a stream held at pauseAfter",
+            &timeout,
+        )
+        .await?;
+        as_value(&ctx, item)
+    }
+}
+
+impl IntoFuture for OpenAIScriptWaitForPause {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.send())
+    }
+}
+
+/// A handle: `OpenAIRateLimit`.
+#[derive(Clone)]
+pub struct OpenAIRateLimit {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for OpenAIRateLimit {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl OpenAIRateLimit {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `requests`.
+    pub fn requests(&self) -> Option<i64> {
+        self.data.get("requests").and_then(Value::as_i64)
+    }
+    /// `tokens`.
+    pub fn tokens(&self) -> Option<i64> {
+        self.data.get("tokens").and_then(Value::as_i64)
+    }
+    /// `resetsInMs`.
+    pub fn resets_in_ms(&self) -> f64 {
+        self.data
+            .get("resetsInMs")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+    }
+
+    /// What the rate limit's headers would say now. Experimental.
+    pub fn remaining(&self) -> Call<OpenAIRateLimit> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_rate_limit_remaining,
+            OpenAIRateLimit::wrap,
+        )
+    }
+
+    /// Remove the rate limit. Experimental.
+    pub fn undo(&self) -> Call<()> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_rate_limit_undo,
+            as_unit,
+        )
+    }
+}
+
 /// A handle: `Place`.
 #[derive(Clone)]
 pub struct Place {
@@ -20188,6 +21489,9 @@ pub async fn call_by_name(
         }
         ("Session", "google") => {
             run_session_google(&target.ctx, &target.data, args, options).await?
+        }
+        ("Session", "openai") => {
+            run_session_openai(&target.ctx, &target.data, args, options).await?
         }
         ("Session", "places") => {
             run_session_places(&target.ctx, &target.data, args, options).await?
@@ -20851,6 +22155,54 @@ pub async fn call_by_name(
         ("GoogleDelivery", "resend") => {
             run_google_delivery_resend(&target.ctx, &target.data, args, options).await?
         }
+        ("OpenAIFixture", "respond") => {
+            run_open_ai_fixture_respond(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIFixture", "calls") => {
+            run_open_ai_fixture_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIFixture", "toolCalls") => {
+            run_open_ai_fixture_tool_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIFixture", "problems") => {
+            run_open_ai_fixture_problems(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIFixture", "unattributed") => {
+            run_open_ai_fixture_unattributed(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIFixture", "rateLimit") => {
+            run_open_ai_fixture_rate_limit(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "refresh") => {
+            run_open_ai_script_refresh(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "undo") => {
+            run_open_ai_script_undo(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "resume") => {
+            run_open_ai_script_resume(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "calls") => {
+            run_open_ai_script_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "pausedCalls") => {
+            run_open_ai_script_paused_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "toolCalls") => {
+            run_open_ai_script_tool_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "heldCalls") => {
+            run_open_ai_script_held_calls(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIScript", "answerHeld") => {
+            run_open_ai_script_answer_held(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIRateLimit", "remaining") => {
+            run_open_ai_rate_limit_remaining(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAIRateLimit", "undo") => {
+            run_open_ai_rate_limit_undo(&target.ctx, &target.data, args, options).await?
+        }
         ("Place", "transcript") => {
             run_place_transcript(&target.ctx, &target.data, args, options).await?
         }
@@ -20939,6 +22291,11 @@ pub async fn call_by_name(
         },
         ("Session", "google") => Dyn {
             resource: Some("GoogleFixture"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("Session", "openai") => Dyn {
+            resource: Some("OpenAIFixture"),
             ctx: target.ctx.clone(),
             data,
         },
@@ -21259,6 +22616,26 @@ pub async fn call_by_name(
         },
         ("GoogleDelivery", "refresh") => Dyn {
             resource: Some("GoogleDelivery"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("OpenAIFixture", "respond") => Dyn {
+            resource: Some("OpenAIScript"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("OpenAIFixture", "rateLimit") => Dyn {
+            resource: Some("OpenAIRateLimit"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("OpenAIScript", "refresh") => Dyn {
+            resource: Some("OpenAIScript"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("OpenAIRateLimit", "remaining") => Dyn {
+            resource: Some("OpenAIRateLimit"),
             ctx: target.ctx.clone(),
             data,
         },

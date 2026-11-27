@@ -38,6 +38,11 @@ export class Sessions {
     return session;
   }
 
+  /** The open sessions' ids. */
+  ids(): string[] {
+    return [...this.#open.keys()];
+  }
+
   get(id: string): Session {
     const session = this.#open.get(id);
     if (!session) throw new ProtocolError("session_not_found", `No open session "${id}"`, { session: id });

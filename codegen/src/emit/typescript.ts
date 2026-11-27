@@ -27,6 +27,13 @@ function channelsFile(ir: Ir): string {
     "export interface ChannelFixtures {",
     ...glue.channels.map((channel) => `  ${channel.name}: G.${channel.title}Fixture;`),
     "}",
+    "/** The fakes the agent calls that aren't channels (the fake OpenAI), by name. */",
+    `export const PROVIDER_NAMES = [${glue.providers.map((provider) => JSON.stringify(provider.name)).join(", ")}] as const;`,
+    "export type ProviderKind = (typeof PROVIDER_NAMES)[number];",
+    "/** Each provider's fixture, by its name: what a test framework hands a test besides the channels. */",
+    "export interface ProviderFixtures {",
+    ...glue.providers.map((provider) => `  ${provider.name}: G.${provider.title}Fixture;`),
+    "}",
     `export type User = ${union(glue.users)};`,
     `export type App = ${union(glue.apps)};`,
     `export type Resource = ${union(glue.resources)};`,
@@ -224,17 +231,26 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     `${param.shorthand === undefined ? "" : "string | "}${typeOf(param.type, "public")}`;
 
   const method = (resource: IrResource, m: IrMethod): string[] => {
-    const optionsOptional = m.options.every((option) => option.optional);
+    const { responder } = m;
+    // A responder's flag is the SDK's to set: the caller passes a function instead.
+    const shown = responder ? m.options.filter((option) => option.name !== responder.flag) : m.options;
+    const optionsOptional = shown.every((option) => option.optional);
     // An optional argument before options that must be given is one that may be `undefined`.
-    const optionalArg = (arg: IrParam) => (!arg.optional ? "" : m.options.length > 0 && !optionsOptional ? "" : "?");
+    const optionalArg = (arg: IrParam) => (!arg.optional ? "" : shown.length > 0 && !optionsOptional ? "" : "?");
+    const [first] = m.args;
+    /** What a responder returns: one item of the argument's list. */
+    const responderType =
+      responder && first
+        ? `Responder<${responder.request}, ${typeOf(first.type.kind === "array" ? first.type.items : first.type, "public")}>`
+        : undefined;
     const parameters = [
       ...m.args.map(
         (arg) =>
-          `${arg.name}${optionalArg(arg)}: ${parameterType(arg)}${arg.optional && optionalArg(arg) === "" ? " | undefined" : ""}`,
+          `${arg.name}${optionalArg(arg)}: ${parameterType(arg)}${arg === first && responderType ? ` | ${responderType}` : ""}${arg.optional && optionalArg(arg) === "" ? " | undefined" : ""}`,
       ),
-      ...(m.options.length > 0
+      ...(shown.length > 0
         ? [
-            `options: { ${m.options.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,
+            `options: { ${shown.map((option) => `${option.name}${option.optional ? "?" : ""}: ${parameterType(option)}`).join("; ")} }${optionsOptional ? " = {}" : ""}`,
           ]
         : []),
     ];
@@ -244,7 +260,11 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         return part.from === "session" ? `\${segment(sessionOf(ctx))}` : `\${segment(this.${part.field})}`;
       })
       .join("");
-    const given = (param: IrParam) => (m.args.includes(param) ? param.name : `options.${param.name}`);
+    const given = (param: IrParam) => {
+      if (responder && param === first) return `(answer === undefined ? (${param.name} as ${parameterType(param)} | undefined) : undefined)`;
+      if (responder && param.name === responder.flag) return "answer !== undefined";
+      return m.args.includes(param) ? param.name : `options.${param.name}`;
+    };
     const value = (param: IrParam) => {
       const sent = encode(param, given(param));
       if (param.credential === undefined) return sent;
@@ -272,13 +292,22 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
       `  /** ${m.summary}.${m.stability === "experimental" ? " Experimental." : ""} */`,
       `  ${index.inherits(resource, m.name) ? "override " : ""}async ${m.name}(${parameters.join(", ")}): Promise<${returns}> {`,
       "    const ctx = this.#ctx;",
+      ...(responder && first ? [`    const answer = typeof ${first.name} === "function" ? ${first.name} : undefined;`] : []),
       ...(m.onceQuiet ? ["    await untilQuiet(() => quietOf(ctx));"] : []),
-      ...(m.returns
+      ...(m.returns && responder
         ? [
             `    const data = (await ${call}) as ${typeOf(m.returns, "wire")};`,
-            `    return ${decode(m.returns, "data")};`,
+            `    const handle = ${decode(m.returns, "data")};`,
+            // The test answers each call the server holds for this script, in the background.
+            `    if (answer !== undefined) respondWith({ held: (o) => handle.${responder.held}(o), answer: (id, o) => handle.${responder.answer}(id, o) }, answer);`,
+            "    return handle;",
           ]
-        : [`    await ${call};`]),
+        : m.returns
+          ? [
+              `    const data = (await ${call}) as ${typeOf(m.returns, "wire")};`,
+              `    return ${decode(m.returns, "data")};`,
+            ]
+          : [`    await ${call};`]),
       "  }",
       ...(m.dispose && resource.name !== ir.root
         ? [
@@ -490,6 +519,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
         ]
       : []),
     'import type { LaunchOptions } from "../runtime/launcher.ts";',
+    ...(ir.resources.some((resource) => resource.methods.some((m) => m.responder))
+      ? ['import { type Responder, respondWith } from "../runtime/responder.ts";']
+      : []),
     'import { ChannelstackError, type ErrorClasses, segment, type Transport } from "../runtime/transport.ts";',
     `import { ${[...waitImports, "type QuietState"].join(", ")} } from "../runtime/wait.ts";`,
     "",

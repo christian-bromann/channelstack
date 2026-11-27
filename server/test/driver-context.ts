@@ -1,3 +1,4 @@
+import { Attributor } from "../src/core/attribution/index.ts";
 import { BrowserActors } from "../src/core/browser/index.ts";
 import { systemClock, systemTimers } from "../src/core/clock/index.ts";
 import { DeliveryQueue } from "../src/core/delivery/index.ts";
@@ -33,6 +34,8 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
     secret: (name) => `secret-for-${name}`,
     apiUrl: () => "http://127.0.0.1:4500/fake",
     webhookUrl: undefined,
+    attribution: new Attributor({ sessions: () => [], known: () => [] }),
+    place: () => ({}),
     live: {
       active: false,
       strict: false,

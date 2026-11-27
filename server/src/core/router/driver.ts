@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 
+import type { Attribution, Attributor } from "../attribution/index.ts";
 import type { BrowserActors } from "../browser/index.ts";
 import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
@@ -171,6 +172,19 @@ export interface DriverContext {
   /** Where the agent receives this driver's events, if it has an endpoint. */
   readonly webhookUrl: string | undefined;
   readonly live: LiveContext;
+  /** For a provider: which session a request that names none belongs to (core/attribution). */
+  readonly attribution: Attributor;
+  /** For a provider: where an attributed request belongs in the channels, from the delivery that decided it. */
+  place(attribution: Attribution | undefined): MessagePlace;
+}
+
+/** Where a message is on its channel, by the platform's ids: who wrote it, the conversation, the thread, the message. */
+export interface MessagePlace {
+  readonly channel?: string;
+  readonly from?: string;
+  readonly conversation?: string;
+  readonly thread?: string;
+  readonly message?: string;
 }
 
 export interface Driver {
@@ -188,6 +202,11 @@ export interface Driver {
    * a stream it hasn't stopped, for example. Empty when nothing is.
    */
   openWork(session: string): string[];
+  /**
+   * What went wrong in a session that should fail its test at once, in words: a model call no
+   * script answered (a provider's). Waiting matchers fail on these instead of timing out.
+   */
+  problems?(session: string): string[];
 }
 
 /** How a driver registers itself with core: its name, the secrets it needs, and how to build it. */
@@ -197,6 +216,13 @@ export interface DriverDefinition {
   readonly title: string;
   /** channelstack's own test platform (`echo`): in the binary, but not a channel anyone tests against. */
   readonly internal?: boolean;
+  /**
+   * A fake the agent calls that has no people, apps or deliveries: the fake OpenAI (decision 0029).
+   * It has a fixture, but it isn't a channel.
+   */
+  readonly provider?: boolean;
+  /** Where the message a delivery tells the agent about is, by the platform's ids: what a provider's calls are about. */
+  place?(body: string): Omit<MessagePlace, "channel"> | undefined;
   /**
    * How the dev tools (the attach CLI, `channelstack mcp`, the UI) act on the channel by names and
    * `last` (`core/dev`). Every channel has one; `pnpm check:channels` holds them to it.

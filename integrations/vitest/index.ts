@@ -11,7 +11,7 @@
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ChannelFixtures, Duration } from "../../sdks/typescript/client.ts";
+import type { ChannelFixtures, Duration, ProviderFixtures } from "../../sdks/typescript/client.ts";
 import { parseDuration } from "../../sdks/typescript/runtime/duration.ts";
 import { waitDefaults } from "../../sdks/typescript/runtime/wait.ts";
 import type { MatcherName, matchers } from "../matchers-core/index.ts";
@@ -57,8 +57,8 @@ type MatcherArguments<Name extends MatcherName> = (typeof matchers)[Name] extend
 type ChannelstackMatchers = { [Name in MatcherName]: (...args: MatcherArguments<Name>) => Promise<void> };
 
 declare module "vitest" {
-  // Every channel's fixture by its name (`slack`, `github`, …), generated with the SDK.
-  interface TestContext extends ChannelFixtures {
+  // Every channel's fixture by its name (`slack`, `github`, …), and every provider's (`openai`), generated with the SDK.
+  interface TestContext extends ChannelFixtures, ProviderFixtures {
     channelstack: ChannelstackFixture;
   }
 

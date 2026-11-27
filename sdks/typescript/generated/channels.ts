@@ -15,6 +15,13 @@ export interface ChannelFixtures {
   resend: G.ResendFixture;
   google: G.GoogleFixture;
 }
+/** The fakes the agent calls that aren't channels (the fake OpenAI), by name. */
+export const PROVIDER_NAMES = ["openai"] as const;
+export type ProviderKind = (typeof PROVIDER_NAMES)[number];
+/** Each provider's fixture, by its name: what a test framework hands a test besides the channels. */
+export interface ProviderFixtures {
+  openai: G.OpenAIFixture;
+}
 export type User = G.SlackUser | G.GitHubUser | G.LinearUser | G.NotionUser | G.ResendUser | G.GoogleUser;
 export type App = G.SlackApp | G.GitHubApp | G.LinearApp | G.NotionIntegration | G.ResendApp | G.GoogleApp;
 export type Resource = G.SlackConversation | G.GitHubRepo | G.LinearTeam | G.NotionPage | G.NotionDatabase | G.ResendThread | G.GoogleThread;

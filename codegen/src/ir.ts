@@ -25,6 +25,8 @@ interface IrChannel {
   title: string;
   /** channelstack's own test platform (`echo`), not a channel people test against. */
   internal?: true;
+  /** A fake the agent calls that isn't a channel (the fake OpenAI): it has a fixture, and no people, apps or deliveries. */
+  provider?: true;
 }
 
 /** A handle: an object with an identity on the server, and methods. */
@@ -163,6 +165,12 @@ export interface IrMethod {
   retryWhile?: string[];
   /** Wait until the agent is quiet before reading. */
   onceQuiet?: true;
+  /**
+   * The first argument may also be a function (`openai.respond(fn)`): SDKs send `flag: true`
+   * instead, then answer each call the returned handle's `held` read gives with its `answer`
+   * method, from what the function returns for the `request`.
+   */
+  responder?: { flag: string; held: string; answer: string; request: string };
   /** How it works on a live driver, when not as it does in the fake (`x-channelstack-live`). Left out, it works live. */
   live?: IrLive;
 }
@@ -184,6 +192,19 @@ class SpecError extends Error {
     super(`${where}: ${problem}`);
     this.name = "SpecError";
   }
+}
+
+/** A responder binding, checked: its flag is a boolean option the SDK sets itself. */
+function responderOf(responder: Json | undefined, options: IrParam[], where: string): { responder: NonNullable<IrMethod["responder"]> } | undefined {
+  if (responder === undefined) return undefined;
+  const { flag, held, answer, request } = responder;
+  if ([flag, held, answer, request].some((value) => typeof value !== "string")) {
+    throw new SpecError(where, "a responder names its flag, its held read, its answer method and its request type");
+  }
+  if (!options.some((option) => option.name === flag && option.type.kind === "boolean")) {
+    throw new SpecError(where, `a responder's flag "${flag}" must be a boolean option`);
+  }
+  return { responder: { flag, held, answer, request } };
 }
 
 /** `x-channelstack-live` as the IR has it: `{ live }`, or nothing when the method works live. */
@@ -500,6 +521,7 @@ export function buildIr(openapi: Json): Ir {
           ? { retryWhile: binding.retryWhile }
           : {}),
         ...(binding.onceQuiet === true ? { onceQuiet: true as const } : {}),
+        ...(responderOf(binding.responder, options, where) ?? {}),
         ...(liveOf(operation["x-channelstack-live"], where) ?? {}),
       });
     }
