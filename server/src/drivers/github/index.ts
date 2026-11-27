@@ -1,4 +1,5 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
+import { githubDev } from "./dev.ts";
 import { createGitHubFake } from "./fake/index.ts";
 import { GITHUB_IDS } from "./ids.ts";
 import { removeGitHubEntry } from "./live/cleanup.ts";
@@ -12,6 +13,7 @@ import { GITHUB_SECRETS } from "./secrets.ts";
 export const github: DriverDefinition = {
   name: "github",
   title: "GitHub",
+  dev: githubDev,
   ids: GITHUB_IDS,
   tokenPatterns: [/gh[opsur]_[A-Za-z0-9]{20,}/g, /github_pat_[A-Za-z0-9_]{20,}/g],
   liveTokens: [GITHUB_SECRETS.personalToken],

@@ -1,4 +1,5 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
+import { linearDev } from "./dev.ts";
 import { createLinearFake } from "./fake/index.ts";
 import { LINEAR_IDS } from "./ids.ts";
 import { removeLinearEntry } from "./live/cleanup.ts";
@@ -12,6 +13,7 @@ import { LINEAR_SECRETS } from "./secrets.ts";
 export const linear: DriverDefinition = {
   name: "linear",
   title: "Linear",
+  dev: linearDev,
   ids: LINEAR_IDS,
   tokenPatterns: [/lin_(?:api|oauth|wh)_[A-Za-z0-9]{16,}/g],
   liveTokens: [LINEAR_SECRETS.apiKey],
