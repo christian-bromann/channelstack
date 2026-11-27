@@ -1,7 +1,7 @@
 # A fake OpenAI: interface draft
 
-> Status: **draft for the maintainer's review**, 2026-11-27. Nothing is built, and there is no decision record yet.
-> Scope: **OpenAI only**: Chat Completions and the Responses API at `https://openai.localhost/v1`. Anthropic comes later. The script vocabulary (a turn: text, chunks, tool calls, reasoning, an error) has no OpenAI-specific parts, so Anthropic's Messages API can reuse it as it is.
+> Status: **draft, second round**, 2026-11-27, revised after the maintainer's first review (§16 lists what was settled). Nothing is built, and there is no decision record yet.
+> Scope: **OpenAI only**: Chat Completions and the Responses API at `https://openai.localhost/v1`. No other model provider is planned.
 > It reverses the settled `AGENTS.md` row **Models**: "channelstack doesn't mock LLMs". The new rule: **realistic on the wire, never realistic content.** Answer-quality evals stay out of scope.
 
 ## 1. Why
@@ -39,11 +39,11 @@ The official SDKs' retry rules shape the error design (§7.3). openai-node and o
 
 | | |
 |---|---|
-| Host | `https://openai.localhost/v1` (portless); `http://localhost:4500/openai/v1` with `--no-portless`; `api.openai.com` in proxy mode (§12.3) |
+| Host | `https://openai.localhost/v1` (portless); `http://localhost:4500/openai/v1` with `--no-portless`; `api.openai.com` in proxy mode, always, like every routed host (§12.3) |
 | `channelstack env` | `OPENAI_BASE_URL=https://openai.localhost/v1`, `OPENAI_API_KEY=sk-proj-…` (random per install, in `secrets.json`, like every fake token) |
 | Endpoints | `POST /v1/chat/completions`, `POST /v1/responses`, `GET`/`DELETE /v1/responses/{id}`, `GET /v1/responses/{id}/input_items`, `GET /v1/models`, `GET /v1/models/{model}`. Everything else gets OpenAI's own 404 |
 | Fixture | `openai` in Vitest and pytest, `client.openai()` in Rust. A provider, not a channel: it has no people, apps or deliveries |
-| Unscripted calls | Answered by a default turn (§8.4), so an agent runs with no script at all |
+| Unscripted calls | Refused, and the test fails with a message saying which `openai.respond(…)` is missing (§8.4) |
 | Scripts | Belong to the test's session and go away with it, like faults |
 | Live mode | The fake model works the same whether the channels are fake or live. "A real Slack sandbox with a deterministic model" becomes possible in the nightly run |
 
@@ -71,6 +71,12 @@ export interface OpenAIFixture {
   calls(query?: ModelCallsQuery): Promise<ModelCall[]>;
   waitForCall(query?: ModelCallsQuery & WaitOptions): Promise<ModelCall>;
   latestCall(query?: ModelCallsQuery & WaitOptions): Promise<ModelCall>;
+
+  /** Every tool call the model made in this session, each with the result the agent sent back (§9.1). */
+  toolCalls(query?: { name?: string }): Promise<ModelToolCall[]>;
+
+  /** A rate limit that counts this session's calls and tokens, with truthful x-ratelimit-* headers (§7.4). */
+  rateLimit(limits: RateLimits): Promise<ModelRateLimit>;
 
   /** Calls the server could not attribute to any session (redacted to their shape and matched texts). */
   unattributed(): Promise<UnattributedCall[]>;
@@ -122,22 +128,33 @@ export interface TurnSpec {
   timing?: Timing;
   /** Break a stream after this many chunks (§7.2). */
   failAfter?: { chunks: number; how?: "drop" | "error" | "stall"; error?: ErrorTurn };
-  /** Hold a stream after this many chunks until `script.resume()`: a deterministic "while it streams". */
+  /** Hold a stream after this many chunks until `ai.resume()`: a deterministic "while it streams". */
   pauseAfter?: number;
 }
 
 /** An error the API returns instead of an answer. In a turn list it is one call's answer, so the SDK's retries can be scripted. */
 export interface ErrorTurn {
   error:
-    | "rate_limit"          // 429 rate_limit_exceeded (type "requests" or "tokens"), x-ratelimit-* at 0
-    | "slow_down"           // 429 slow_down: a sudden rise in traffic
-    | "insufficient_quota"  // 429 insufficient_quota: retrying won't help
-    | "server_error"        // 500
-    | "overloaded"          // 503 server_is_overloaded
-    | "timeout"             // no response until the client gives up (the SDK's timeout, or `after`)
-    | "context_length_exceeded" // 400, param "messages" / "input"
-    | "content_policy"      // 400 invalid_prompt
-    | "unauthorized";       // 401 invalid_api_key
+    // 429, retried by the SDKs
+    | "rate_limit"                         // "Rate limit reached for requests", x-ratelimit-remaining-* at 0
+    | "slow_down"                          // rate_limit_error / slow_down: traffic rose too fast
+    // 429, type insufficient_quota: retrying never helps (OpenAI's error-codes guide)
+    | "insufficient_quota"
+    | "credit_balance_exhausted"           // no prepaid credits left
+    | "organization_spend_limit_exceeded"  // the organisation's monthly spend limit
+    | "project_spend_limit_exceeded"       // the project's monthly spend limit
+    | "organization_usage_limit_exceeded"  // the usage limit OpenAI assigned
+    // 5xx, retried
+    | "server_error"                       // 500 "The server had an error while processing your request"
+    | "overloaded"                         // 503 service_unavailable_error / server_is_overloaded
+    | "timeout"                            // no response until the client gives up (the SDK's timeout, or `after`)
+    // 4xx, not retried
+    | "context_length_exceeded"            // 400, param "messages" / "input"
+    | "content_policy"                     // 400 invalid_prompt
+    | "invalid_api_key"                    // 401 "Incorrect API key provided"
+    | "not_in_organization"                // 401 "You must be a member of an organization to use the API"
+    | "ip_not_authorized"                  // 401 "IP not authorized"
+    | "unsupported_region";                // 403 "Country, region, or territory not supported"
   retryAfter?: Duration;    // sets retry-after and retry-after-ms. Default 0ms, so retry tests stay fast
   shouldRetry?: boolean;    // sets x-should-retry, which the official SDKs obey
   message?: string;
@@ -159,6 +176,8 @@ export interface ModelScript extends AsyncDisposable {
   readonly id: string;
   /** The calls this script answered. */
   calls(): Promise<ModelCall[]>;
+  /** The tool calls this script made, each with the agent's result (§9.1). */
+  toolCalls(query?: { name?: string }): Promise<ModelToolCall[]>;
   waitForCall(options?: WaitOptions): Promise<ModelCall>;
   /** Waits until a stream reached `pauseAfter` and is held. */
   waitForPause(options?: WaitOptions): Promise<ModelCall>;
@@ -194,7 +213,9 @@ export interface ModelCall {
     aborted?: boolean;
     chunksSent?: number;
   };
-  /** Which script answered; none for the default turn. */
+  /** The tool calls in this call's answer, each with the result the agent sent back later, if it did. */
+  toolCalls: ModelToolCall[];
+  /** Which script answered. None when the call was refused for want of one (§8.4). */
   script?: string;
   /** How the call was attributed to this session (§8). */
   attributedBy: "minted_id" | "tag" | "owned_id" | "text";
@@ -221,6 +242,15 @@ export interface ModelRequest {
   headers: Record<string, string>;
 }
 
+/** A tool call the model made, joined with the result the agent sent back in a later call. */
+export interface ModelToolCall {
+  id: string;                    // call_…
+  name: string;
+  arguments: unknown;            // parsed JSON, or the string if it isn't JSON
+  madeIn: string;                // the ModelCall whose answer made it
+  result?: { text: string; sentIn: string };   // the ModelCall whose request carried the result
+}
+
 export type ModelMessage =
   | { role: "system" | "developer"; text: string }
   | { role: "user"; text: string; images: number; files: number }
@@ -238,8 +268,9 @@ Like every matcher, they run in the test process, poll a read method, and negati
 | `toHaveSent(text \| RegExp \| handle \| handle[], { ordered? })` | a call, or `openai` (any call of the session) | The request contains the text. A handle is a channel message, comment or email: its text, normalised. An array must appear in that order (thread history). `not.toHaveSent(privateMsg)` is the leak check |
 | `toHaveSentSecrets()` (used as `not.`) | a call, or `openai` | Any secret channelstack knows appears in the request: a fake or live token, signing secret, webhook secret, private key or refresh token, and the model's own API key in the body |
 | `toHaveOfferedTool(name, { schema? })` | a call | The request offers the tool (with a matching JSON Schema) |
+| `toHaveSentToolResult(name, { text? })` | a script, or `openai` | The agent ran a tool call and sent its result back (with this text) |
 | `toBeAborted()` | a call | The agent hung up before the answer finished |
-| `toHaveAnswered({ times? })` | a script | The script answered calls |
+| `toHaveAnswered({ times? })` | a script (`ai`) | The script answered calls |
 
 ## 5. Scripting what the model answers
 
@@ -250,7 +281,7 @@ await openai.respond("Two incidents yesterday: the web deploy and a DNS blip.");
 await openai.respond({ text: ["Two incidents", " yesterday", ": web", " and DNS."], timing: { betweenChunks: "200ms" } });
 ```
 
-**When a list runs out.** A script that has used up its turns no longer matches, and the call goes to the next script, or to the default turn (§8.4). It is recorded on the script ("ms_2 ran out after 2 turns; call 3 got the default"), and a failing matcher's message shows it. Unlike `fakeModel`, running out doesn't throw inside the agent's request, and unlike the AI SDK's mock it isn't silent.
+**When a list runs out.** A script that has used up its turns no longer matches, and the call goes to the next script, or is refused if none matches (§8.4). It is recorded on the script ("ms_2 ran out after 2 turns; call 3 got the default"), and a failing matcher's message shows it. Unlike `fakeModel`, running out doesn't throw inside the agent's request, and unlike the AI SDK's mock it isn't silent.
 
 The same turn serves both endpoints, streamed or not. The agent's request decides the wire format: a `chat.completion` object or `chat.completion.chunk` events ending in `data: [DONE]`, a `response` object, or the Responses event sequence. The usage chunk is sent when `stream_options.include_usage` asks for it, and the `obfuscation` field unless `include_obfuscation: false` turns it off. Tool-call arguments stream in pieces split only between JSON tokens, so every prefix stays safe for the partial-JSON parsers agents use.
 
@@ -281,7 +312,7 @@ A script that couldn't happen on the real API is a test bug. So the fake doesn't
 - arguments don't validate against the tool's schema when the tool is `strict`;
 - text that isn't valid JSON for `response_format: json_object`, or that the strict JSON schema refuses.
 
-The agent then gets the default turn, so the test fails on the agent's behaviour with the script's problem in the message ("script ms_3 called `deploy`, but the request offered `search_incidents`").
+The agent gets the refusal of §8.4 instead, and the test fails with the script's problem in the message ("script ms_3 called `deploy`, but the request offered `search_incidents`").
 
 ## 6. Responses computed from the request
 
@@ -322,7 +353,7 @@ server   ──streams the turn, with its timing──────────�
 ```
 
 - **The SDK starts the loop when the responder is registered** and stops it on `undo()`, on dispose, or when the session closes. In TypeScript it's a background promise; Python an `asyncio` task on the session's loop; Rust a `tokio` task holding a `Fn(ModelRequest) -> impl Future<Output = Turn>`.
-- **A function that throws** makes the call get a 500 `server_error`, and the error is stored on the script. The next matcher that waits fails with it ("the responder for ms_4 threw: …"), so a bug in the test reads as a bug in the test.
+- **A function that throws** makes the call get the refusal of §8.4 (a 400, which the SDKs don't retry, so the function isn't run three times), and the error is stored on the script. The next matcher that waits fails with it ("the responder for ms_4 threw: …"), so a bug in the test reads as a bug in the test.
 - **No answer within `answerTimeout`** (default: the waits' `timeout`, 10s): the same, with "the test didn't answer". That's a test that ended without closing its session, or a blocked event loop.
 - **Timing still holds.** `firstToken` counts from the request's arrival, and the time the function took is part of it. A function slower than `firstToken` delays the answer by that much, and the call records how long the test took.
 - **Quiet.** A held call is a provider call in flight, so the session isn't quiet (the quiet detector already counts those).
@@ -373,9 +404,34 @@ The SDKs honour `retry-after` only up to 60s (Node) or 120s (Python). The fake s
 
 Every response carries OpenAI's headers: `x-request-id` (`req_…`), `openai-processing-ms`, `openai-version`, and the six `x-ratelimit-{limit,remaining,reset}-{requests,tokens}`. A `rate_limit` error sets `remaining` to 0 and `reset` from `retryAfter`, and its message has the form the live API sends ("Rate limit reached for gpt-… in organization org-… on tokens per min (TPM): Limit …, Used …, Requested …. Please try again in 1.2s."). OpenAI's docs don't show that message or the error body, so the nightly shape lane (§10.5) is what confirms them.
 
-### 7.4 What isn't scripted per call
+### 7.4 A rate limit across calls
 
-A stateful rate limiter (N requests a minute across calls) isn't in the first version. A list of error turns covers what tests need. See the open questions.
+Error turns script one call at a time. A rate limit counts:
+
+```ts
+export interface RateLimits {
+  requests?: { limit: number; per?: Duration };   // default per: "1m"
+  tokens?: { limit: number; per?: Duration };     // counted as in §10.4, the request and the answer
+  /** What a call over the limit gets. Default "rate_limit". */
+  error?: "rate_limit" | "slow_down";
+}
+
+export interface ModelRateLimit extends AsyncDisposable {
+  /** What the headers would say now. */
+  remaining(): Promise<{ requests?: number; tokens?: number; resetsIn?: Duration }>;
+  undo(): Promise<void>;
+}
+```
+
+```ts
+await openai.rateLimit({ requests: { limit: 2, per: "10s" } });
+await openai.respond("Done.", { times: Infinity });
+```
+
+- **It counts this session's calls only.** Real limits are per organisation, but a test must not be throttled by its neighbours.
+- **The headers tell the truth** on every response while a limit is set: `x-ratelimit-limit-*`, `-remaining-*`, and `-reset-*` as Go-style durations (`1s`, `6m0s`). A call over the limit gets the 429 with `retry-after` and `retry-after-ms` set to when a slot frees up. Without a limit, the headers show a generous fixed tier, so an agent that reads them sees plausible numbers.
+- **It runs on the server's clock,** the one the fakes already inject, so a test doesn't wait a real minute for a reset when the clock is controlled.
+- **Plan and spend limits aren't counted:** they don't reset, so they are error turns (`{ error: "project_spend_limit_exceeded" }`, with `times: Infinity`).
 
 ## 8. Matching a model call to a test's session
 
@@ -398,18 +454,30 @@ People's text and the agent's prompt rarely match byte for byte. The agent strip
 
 Parallel tests often send identical prompts: every `slackChecks` test says `@my-agent hello`. Text then can't decide. The rule:
 
-- **If the tied sessions' scripts would give the same answer** (none of them scripts a match, or the same turn), the oldest unanswered message wins. Which identical test gets which identical answer changes nothing.
-- **Otherwise the call is ambiguous.** It gets the default turn. It is recorded in every tied session as ambiguous, and the next matcher that waits in those sessions fails with the reason: "a model call was ambiguous between this session and 1 other: both sent '@my-agent hello'. Give the prompt something unique, or have the agent send `user`."
+- **If the tied sessions' scripts would give the same answer** (the same turn, or the same refusal), the oldest unanswered message wins. Which identical test gets which identical answer changes nothing.
+- **Otherwise the call is ambiguous.** It is refused like an unscripted call (§8.4). It is recorded in every tied session as ambiguous, and the next matcher that waits in those sessions fails with the reason: "a model call was ambiguous between this session and 1 other: both sent '@my-agent hello'. Give the prompt something unique, or have the agent send `user`."
 
 Ambiguity is loud, never a silent wrong answer. In practice it's rare: a test that scripts the model almost always says something of its own, and the checks (§12.5) put a unique token in their prompts.
 
 ### 8.4 When nothing matches
 
-No session's evidence fits. Examples: an agent that calls the model at startup, a scheduled job, a prompt rewritten past recognition.
+There is no default answer: a model call with no script to answer it is a mistake in the test, and it fails loudly. That covers three cases: the test's session has no `openai.respond(…)` whose `when` fits, the session has none at all, or the call can't be attributed to a session.
 
-- **It gets the default turn:** a successful, short, plainly fake answer, `This is channelstack's fake model. No script matched this request.`, streamed if asked, with no tool calls. An unmodified agent with no scripts at all still works end to end.
-- **It's on record in the world scope.** `openai.unattributed()` in any session, `channelstack tail`, and the UI's model inspector show it, as its shape plus what was compared.
-- **Strict mode:** `CHANNELSTACK_OPENAI_UNMATCHED=error` answers it with a 400 instead, for suites that want every call scripted. The error message names the newest user text and the tools offered, and shows the `openai.respond(…, { when })` that would have matched (emulate's `strict` does the same).
+**What the agent gets:** a 400, so the SDKs don't retry it:
+
+```json
+{ "error": { "type": "invalid_request_error", "code": "channelstack_no_script", "param": null,
+  "message": "channelstack: no openai.respond(…) in this test answers this call. Newest user message: \"what broke yesterday?\". Tools offered: search_incidents. For example: openai.respond(\"…\", { when: { text: \"what broke yesterday?\" } })" } }
+```
+
+**How the test fails,** when the call was attributed to its session:
+
+- **At once, in any matcher or wait that is running.** Each poll also reads the session's model problems, so `toHaveReplyFrom` fails right away with the same message instead of timing out ten seconds later. The same goes for a script problem (§5.4), a responder that threw, or an ambiguous call.
+- **At the latest, when the session closes,** even if the test asserts nothing about the model: the Vitest fixture fails the test, pytest's fixture raises in teardown, and Rust's `session.close()` returns the error.
+
+**A call no session claims** (the agent calls the model at startup or from a scheduled job, or rewrites the prompt past recognition) gets the same 400. No test can be blamed for it, so it's recorded in the world scope: `openai.unattributed()` in any session, `channelstack tail`, and the UI's model inspector show its shape and what was compared. Any test whose matcher fails while it's there gets a line saying so ("1 model call in the last 10s couldn't be attributed to a test: 'summarise the backlog…'").
+
+**The dev session too:** the CLI and the UI script it with `channelstack openai respond …` (§6.3). An agent driven from the UI with no script gets the same refusal, and the UI shows it on the conversation.
 
 ### 8.5 Alternatives considered
 
@@ -431,6 +499,28 @@ await expect(openai).not.toHaveSentSecrets();                                // 
 await expect(call).toHaveOfferedTool("search_incidents");
 ```
 
+### 9.1 Tool calls and their results
+
+`toolCalls()` on `openai`, a script (`ai`) or a call lists the tool calls the model made, each joined with the result the agent sent back in a later request, by its `call_…` id:
+
+```ts
+const ai = await openai.respond([
+  { toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }, { name: "page_oncall", arguments: { team: "web" } }] },
+  "Two incidents; I paged web's on-call.",
+]);
+await ana.say("@my-agent what broke yesterday?", { channel });
+await expect(ai).toHaveAnswered({ times: 2 });
+
+const calls = await ai.toolCalls();
+expect(calls.map((c) => c.name)).toEqual(["search_incidents", "page_oncall"]);
+expect(calls.every((c) => c.result)).toBe(true);          // the agent ran both and sent both results back
+await expect(ai).toHaveSentToolResult("search_incidents", { text: /deploy/ });
+```
+
+A tool call without `result` is one the agent never answered, which is a bug class of its own: a parallel call dropped, or a loop that ended early.
+
+### 9.2 Calls
+
 - **`calls()` is the session's.** Every call attributed to it, with the normalised request and the response summary, in the event log like every other API call (`readCalls`, `recordCall`).
 - **Redaction.** Recorded requests keep the agent's text, because asserting on it is the point. Headers drop `Authorization`. Secrets channelstack knows are redacted in logs and the UI as everywhere (`pnpm test:redaction`). The `toHaveSentSecrets` matcher runs in the server against the raw body before redaction, and returns only which kind of secret it found, never the value.
 
@@ -440,7 +530,7 @@ await expect(call).toHaveOfferedTool("search_incidents");
 
 - **Chat Completions:** `messages` with every role, text and image and file parts (counted, not read), `tools` with `strict`, `tool_choice`, `parallel_tool_calls`, `response_format` (`json_object`, `json_schema`), `stream` and `stream_options.include_usage`, `max_completion_tokens` (a turn longer than it ends with `finish_reason: "length"`), `n: 1`, `store` (no effect), `metadata`, `user`, `safety_identifier`.
 - **Responses:** `input` as a string or items (messages, `function_call`, `function_call_output`, `reasoning`), `instructions`, `tools` (functions), `tool_choice`, `text.format`, `reasoning`, `include`, `store` (default true: stored responses serve `GET /v1/responses/{id}` and `previous_response_id`), `max_output_tokens` (`incomplete` with its reason), `background: false`, every streaming event with its `sequence_number`.
-- **Models:** `GET /v1/models` lists current OpenAI model ids.
+- **Models:** any model name is accepted, so gateways' names (`openai/gpt-…`, `llama-3.3-70b`) work. `GET /v1/models` lists current OpenAI model ids, plus every name the agent has used.
 
 ### 10.2 What it refuses, as OpenAI does
 
@@ -448,11 +538,17 @@ A missing `model` or `messages`, an unknown role, a `tool` message whose `tool_c
 
 ### 10.3 Not in the first version
 
-Built-in tools (`web_search`, `file_search`, `code_interpreter`, `computer_use`, remote MCP): they are refused with OpenAI's 400 for an unsupported tool, and listed in the reality matrix. Also out: background responses, the Conversations API, the Assistants API, Realtime, audio, images, files, batches and `n > 1`. Embeddings are open question 7. Each gap is a line in the open questions, not a silent omission.
+The same line as emulate draws:
+
+- **Refused with a 400** (`invalid_request_error`, code `unsupported_in_fake`, the counterpart of live mode's `unsupported_in_live`), naming what isn't supported: hosted tools (`web_search`, `file_search`, `code_interpreter`, `computer_use`, remote MCP), custom tools, background responses, the Conversations API, and `n > 1`.
+- **Not served (OpenAI's 404):** embeddings, listing input items' token counts, cancelling a response, the Assistants API, Realtime, files and batches.
+- **Where it differs from emulate:** emulate also serves images, audio and video. Agents in channels rarely need them, so they're left out, and they can be added later without changing anything here.
+
+Each gap is a row in the reality matrix.
 
 ### 10.4 Ids and numbers
 
-Ids look like OpenAI's: `chatcmpl-` and 29 base-62 characters, `resp_`/`msg_`/`fc_`/`rs_` and 48 hex characters, `call_` and 24, `req_` and 32, `fp_` and 10 for `system_fingerprint`, from the world's seeded random source, like every fake id. Usage is counted as about four characters a token, so numbers grow with the prompt and `context_length_exceeded` can be triggered by length (open question: a real tokenizer).
+Ids look like OpenAI's: `chatcmpl-` and 29 base-62 characters, `resp_`/`msg_`/`fc_`/`rs_` and 48 hex characters, `call_` and 24, `req_` and 32, `fp_` and 10 for `system_fingerprint`, from the world's seeded random source, like every fake id. Usage is counted as about four characters a token, so numbers grow with the prompt and `context_length_exceeded` can be triggered by length. No tokenizer is bundled.
 
 ### 10.5 Keeping it honest
 
@@ -475,7 +571,17 @@ Anything that speaks OpenAI's wire format and takes a base URL:
 | Mastra, Pi (`pi-ai`), LlamaIndex, pydantic-ai, CrewAI and LiteLLM as clients | their OpenAI provider's base URL |
 | Agents that use a gateway: OpenRouter, Vercel AI Gateway, LiteLLM proxy, Cloudflare AI Gateway, Groq, Together, Fireworks, DeepSeek, xAI, Mistral, Ollama, vLLM, LM Studio, Azure OpenAI's v1 API, Gemini's OpenAI-compatible endpoint | the gateway's base URL replaced with the fake's. The fake answers any model name (`openai/gpt-…`, `llama-3.3-70b`) |
 
-Gateway-specific extensions (OpenRouter's `reasoning` field, DeepSeek's `reasoning_content`, Azure's `/openai/deployments/{d}/…?api-version=` paths) aren't served in the first version.
+### 11.1 Gateway dialects, where they're cheap
+
+The three that only rename or move what the fake already sends are included. The request picks the dialect, so nothing is configured:
+
+| Dialect | Picked by | What changes |
+|---|---|---|
+| OpenRouter | a `reasoning` object in a Chat Completions request | the turn's reasoning summary is sent as `message.reasoning` and `delta.reasoning`, with `reasoning_details` |
+| DeepSeek | the model name `deepseek-reasoner` (or one starting `deepseek-r`) | the reasoning summary is sent as `reasoning_content` in the message and its deltas |
+| Azure OpenAI | the path: `/openai/deployments/{deployment}/chat/completions?api-version=…`, and `/openai/v1/…` | the deployment is the model name; the key comes in the `api-key` header; a missing `api-version` on deployment paths is refused as Azure refuses it |
+
+Other gateway extensions (OpenRouter's provider routing, Groq's `x_groq`, LiteLLM's extra fields) are accepted and ignored.
 
 ## 12. Where else it appears
 
@@ -496,7 +602,7 @@ OPENAI_API_KEY=sk-proj-…
 
 ### 12.3 Proxy mode
 
-`api.openai.com` joins the routed hosts **only with `--fake-models`**. Otherwise proxy mode passes it through, because an agent behind the proxy may mean to use the real model with fake channels. With it, nothing reaches the real API: OpenClaw's "fail if any call reaches the real provider host" for free.
+`api.openai.com` is a routed host like `slack.com` and `api.github.com`: in proxy mode it always goes to the fake. So nothing reaches the real API, which gives OpenClaw's "fail if any call reaches the real provider host" for free. An agent behind the proxy that should use the real model with fake channels uses base-URL mode for the channels instead.
 
 ### 12.4 Python and Rust
 
@@ -528,7 +634,7 @@ openai.respond_with(|req: ModelRequest| async move { Turn::text(format!("You ask
 expect(&openai).not_to_have_sent_secrets().await?;
 ```
 
-In pytest the fixture is named `openai`, which shadows the `openai` package inside a test that also imports it (open question).
+In pytest the fixture is named `openai`, which shadows the `openai` package inside a test that also imports it. That is accepted: a test seldom needs both.
 
 ### 12.5 The standard checks, and a check with no tests
 
@@ -546,7 +652,7 @@ Each channel's checks take the model: `slackChecks({ app: "my-agent", model: ope
   | `slack.stop-cancels-model` | `pauseAfter`, then Stop, then the call must be `aborted` | Stop leaves the model running |
   | `<channel>.no-secrets-to-model` | `not.toHaveSentSecrets()` on every call of every check | Tokens in the prompt |
 
-- **`channelstack check`**, with no test files: `channelstack check slack --app my-agent` runs the same checks against a running agent from the CLI and prints one line per check, then exits non-zero if any failed. With the fake model in the agent's environment, an **unmodified agent with no keys** gets the whole suite in CI:
+- **`channelstack check`, a new command** (the CLI has no `check` today), with no test files: `channelstack check slack --app my-agent` runs the same checks against a running agent from the CLI and prints one line per check, then exits non-zero if any failed. With the fake model in the agent's environment, an **unmodified agent with no keys** gets the whole suite in CI:
 
   ```bash
   npx channelstack start --no-portless --port 4500 &
@@ -555,7 +661,7 @@ Each channel's checks take the model: `slackChecks({ app: "my-agent", model: ope
   npx channelstack check slack github --app my-agent
   ```
 
-  The checks are registered with Vitest's `describe` and `test`. So the CLI runs them through Vitest, bundled with the npm package and started on a generated config, rather than through a second runner (open question).
+  The checks are registered with Vitest's `describe` and `test`. So the CLI runs them through Vitest, bundled with the npm package and started on a generated config, rather than through a second runner (open question 2).
 
 ## 13. Example tests
 
@@ -572,7 +678,7 @@ describe("scripting the model", () => {
   test("a tool loop ends in one answer, in the thread", async ({ slack, openai }) => {
     const ana = await slack.createUser({ name: "Ana" });
     const channel = await slack.createChannel({ participants: [ana, slack.app] });
-    const script = await openai.respond([
+    const ai = await openai.respond([
       { toolCalls: [{ name: "search_incidents", arguments: { since: "yesterday" } }] },
       "Two incidents yesterday: the web deploy and a DNS blip.",
     ]);
@@ -581,9 +687,9 @@ describe("scripting the model", () => {
 
     await expect(msg.thread).toHaveReplyFrom("my-agent", { text: /DNS blip/ });
     await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
-    await expect(script).toHaveAnswered({ times: 2 });
-    const [, second] = await script.calls();
-    expect(second.request.lastToolResults[0]?.name).toBe("search_incidents");
+    await expect(ai).toHaveAnswered({ times: 2 });
+    const [search] = await ai.toolCalls();
+    expect(search?.result?.text).toBeDefined();               // the agent ran the tool and sent the result back
   });
 
   test("the answer is computed from what the agent sent", async ({ slack, openai }) => {
@@ -641,14 +747,38 @@ describe("timing and failures (fake only)", () => {
 
   test("Stop cancels the model request", async ({ slack, openai }) => {
     const ana = await slack.createUser({ name: "Ana" });
-    const script = await openai.respond({ text: "A long answer ".repeat(40), pauseAfter: 3 });
+    const ai = await openai.respond({ text: "A long answer ".repeat(40), pauseAfter: 3 });
 
     const msg = await ana.say("write me a long report", { to: slack.app });
-    const call = await script.waitForPause();
+    const call = await ai.waitForPause();
     await ana.stop({ thread: msg });
 
     await expect(msg.thread).toHaveStatus("stopped");
     await expect(call).toBeAborted();
+  });
+});
+
+describe("a missing script fails the test", () => {
+  // The agent calls the model, but the test scripted nothing for "status?". The agent gets a 400
+  // (channelstack_no_script) and the matcher fails at once with the missing respond(…) in its message.
+  test.fails("an unscripted model call is an error, not a made-up answer", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    await openai.respond("Deploying.", { when: { text: "deploy" } });
+
+    const msg = await ana.say("status?", { to: slack.app });
+
+    await expect(msg.thread).toHaveReplyFrom("my-agent");
+  });
+
+  test("plan limits: the agent tells the person, once, and stops retrying", async ({ slack, openai }) => {
+    const ana = await slack.createUser({ name: "Ana" });
+    await openai.respond({ error: "project_spend_limit_exceeded" }, { times: Infinity });
+
+    const msg = await ana.say("summarize #support", { to: slack.app });
+
+    await expect(msg.thread).toHaveRepliesFrom("my-agent", { count: 1 });
+    await expect(msg.thread).toHaveStatus("idle");
+    await expect(openai).toHaveReceivedCall("chat.completions", { times: 1 });   // insufficient_quota isn't worth a retry
   });
 });
 
@@ -682,7 +812,7 @@ New pieces, each a row in [code-map.md](../../docs/code-map.md) when built:
 | The provider | `server/src/providers/openai/` (a new kind next to `drivers/`: no people, apps, deliveries or transcripts) | `fake/endpoint.ts`'s `restApi` (auth, bodies, refusals in the platform's shape, call recording); ids from the world's random source; `secrets` for the key |
 | SSE writer with timing, pause, break | `server/src/core/stream/` | the injected clock and timers |
 | Attribution | `server/src/core/attribution/`: what each session's people wrote and the ids it owns, looked up per request | the event log (people's actions are already on it); the object registry |
-| Scripts, responders, templates | `server/src/providers/openai/scripts.ts` | session lifetime, like faults |
+| Scripts, responders, templates, the rate limit | `server/src/providers/openai/scripts.ts`, `rate-limit.ts` | session lifetime, like faults; the injected clock |
 | Routes | `providers/openai/routes.ts`: `respond`, `calls`, `unattributed`, the responder's `requests` and `answer` | `registerRoute`, `readCalls`, `recordCall` |
 | SDK runtime | `responder` in each SDK runtime | `wait`, transport |
 | Matchers | `integrations/matchers-core/` (and pytest's and Rust's counterparts) | the read methods |
@@ -694,15 +824,28 @@ Dependencies: none new in the server for the protocol. JSON Schema validation of
 
 ## 15. Open questions for the maintainer
 
-1. **The fixture's name.** `openai`, like `slack`, one fixture per host. The alternative is a provider-neutral `model` fixture whose scripts answer on whichever wire format the agent uses (OpenAI now, Anthropic later). Pytest's `openai` shadows the package. *Default: `openai` in every language.*
-2. **The default turn for unscripted calls.** A fixed, plainly fake text (proposed), an echo of the newest user message (friendlier for demos, but it makes `text:` matchers pass by accident), or an error. *Default: the fixed text, `CHANNELSTACK_OPENAI_UNMATCHED=error` for strict suites.*
-3. **Ambiguous calls (§8.3).** Fail the tied tests loudly (proposed), or always give the oldest unanswered message the call. *Default: loud.*
-4. **Unknown model names.** Accept any name (proposed: gateways use their own, and a fake that refuses `llama-3.3-70b` helps nobody), or refuse names not in `/v1/models` with 404 `model_not_found`, like OpenAI. *Default: accept any; record a note on the call.*
-5. **Tokenizer.** About four characters a token (proposed), or a real tokenizer (`js-tiktoken`, MIT, pure JS, about 1 MB of ranks in the binary) for exact `usage` and `context_length_exceeded`. *Default: the estimate.*
-6. **A stateful rate limiter** (`openai.rateLimit({ requestsPerMinute })`) on top of error turns. *Default: not in the first version.*
-7. **Built-in tools** (web search, file search, remote MCP), **embeddings** and the **Conversations API**. Which, if any, belong in the first version? emulate and OpenClaw both serve deterministic embedding vectors, which is cheap and helps RAG agents. *Default: embeddings yes (deterministic vectors from a hash of the text); the rest refused with OpenAI's errors.*
-8. **Gateway dialects:** OpenRouter's `reasoning`, DeepSeek's `reasoning_content`, Azure's deployment paths. *Default: none in the first version.*
-9. **Proxy mode routing `api.openai.com`** only with `--fake-models` (proposed), or always. *Default: opt-in.*
-10. **`channelstack check` running Vitest** under the hood, rather than a runner of its own. *Default: Vitest, bundled.*
-11. **Where it goes in the phase plan.** After phase 12 (multiple apps) as phase 13, or before it, since it's independent of apps. And when Anthropic follows: the same phase or the next. *Default: phase 13 for OpenAI, phase 14 for Anthropic.*
-12. **The decision record.** It reverses the `AGENTS.md` **Models** row and `devx.md` §6. The next free number is 0028 (0027 is claimed twice already, by #105 and #106). *Written once the interface is approved.*
+1. **Ambiguous calls (§8.3).** Two tests running at the same time send the same text, say `@my-agent hello`, and the agent's model call carries nothing else that tells them apart. If both tests scripted the same answer (or neither scripted one), it doesn't matter which gets the call, and the oldest message gets it. If they scripted different answers, the server can't know whose call it is. The choice:
+   - **(a) refuse it and fail both tests** with "ambiguous: both sent '@my-agent hello'; give the prompt something unique, or have the agent send `user`" (proposed);
+   - **(b) guess:** the oldest unanswered message gets it. The wrong test can then get the other's answer and fail on a confusing reply, or pass by luck.
+
+   *Default: (a).* Tests that script the model nearly always say something of their own, and the checks put a unique token in every prompt, so (a) only trips on tests that couldn't have been told apart anyway.
+2. **`channelstack check` (§12.5) is new.** Today the checks exist only as `slackChecks()` and the like inside a Vitest suite. Keep it in this phase, or make it its own phase? It's what lets an unmodified agent run the checks in CI with no test files. *Default: its own phase, after this one.*
+3. **Where it goes in the phase plan.** *Default: phase 13, after phase 12 (multiple apps). It's independent of apps, so it could also go before.*
+4. **The refusal codes.** `channelstack_no_script` and `unsupported_in_fake` are channelstack's own codes inside OpenAI's error body. OpenAI never sends them, so they're unmistakable in the agent's logs. *Default: these names.*
+
+## 16. Settled in the first review
+
+| | Decision |
+|---|---|
+| Fixture name | `openai`, in every language (pytest's shadows the `openai` package inside a test that imports it; accepted) |
+| A script's variable | `ai`: `const ai = await openai.respond(…)` |
+| Tool calls | `toolCalls()` on `openai`, a script and a call, each joined with the agent's result; `toHaveSentToolResult` beside `toHaveOfferedTool` (§9.1) |
+| Unscripted calls | No default answer. The agent gets a 400 `channelstack_no_script`, and the test fails at once in its matchers, or at the latest when its session closes (§8.4) |
+| Unknown model names | Accepted |
+| Token counts | About four characters a token |
+| Rate limits | A per-session limiter with truthful headers (§7.4), and OpenAI's documented plan, spend and access errors as error turns (§4.2) |
+| Embeddings, hosted tools, Conversations | As emulate does it: hosted tools, custom tools, background mode, Conversations and `n > 1` refused with a 400; embeddings not served (§10.3) |
+| Gateway dialects | OpenRouter's `reasoning`, DeepSeek's `reasoning_content` and Azure's deployment paths, because they're cheap (§11.1) |
+| Proxy mode | `api.openai.com` is always routed to the fake (§12.3) |
+| Other providers | None: no Anthropic |
+| Decision record | 0028, written once the interface is approved. It reverses the `AGENTS.md` **Models** row and `devx.md` §6 |
