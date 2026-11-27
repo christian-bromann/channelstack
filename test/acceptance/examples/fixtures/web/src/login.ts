@@ -1,1 +1,1 @@
-export const redirect = "/";
+export const redirect = '/';
