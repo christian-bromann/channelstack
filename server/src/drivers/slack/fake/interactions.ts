@@ -62,13 +62,18 @@ export interface InteractionKit {
   replyAsUser: Immediate<SlackWorld>["replyAsUser"];
   /** An app's Socket Mode connection (the built-in app's unless named), once it has chosen that over a request URL. */
   transport(app?: SlackAppRecord): DeliveryTransport | undefined;
-  /** Would the app be told about this kind of event in this conversation? It must be installed, subscribed and a member. */
-  hears(conversation: SlackConversationRecord | "dm", subscription: string): boolean;
+  /** Would the app (the built-in one unless named) be told about this kind of event here? It must be installed, subscribed and a member. */
+  hears(conversation: SlackConversationRecord | "dm", subscription: string, app?: SlackAppRecord): boolean;
   /**
    * Send an event about a conversation to the built-in app, if it is subscribed, installed and a
    * member: Stop and the agent split view are a person's, and belong to the app they are for.
    */
-  emit(conversation: SlackConversationRecord, subscription: string, event: Record<string, unknown>): string | undefined;
+  emit(
+    conversation: SlackConversationRecord,
+    subscription: string,
+    event: Record<string, unknown>,
+    app?: SlackAppRecord,
+  ): string | undefined;
 }
 
 /** Sending an interaction to the app, for the parts of the fake that have their own (modals). */
@@ -346,8 +351,16 @@ export function createInteractions(kit: InteractionKit): Interactions {
       const user = member(session, userId, conversation);
       const root = requireMessage(conversation, thread.ts);
       const rootTs = root.threadTs ?? root.ts;
+      // Stop is for the app working in the thread: the one streaming there, or else the last app that wrote.
+      const inThread = store
+        .messagesIn(conversation.id)
+        .filter((message) => message.ts === rootTs || message.threadTs === rootTs);
+      const working =
+        inThread.find((message) => message.stream?.state === "open") ??
+        inThread.toReversed().find((message) => store.isAppUser(message.user));
+      const app = (working && store.appOf(working.user)) ?? store.app;
       // The client only shows Stop for an app that listens for it. Refused before anything changes.
-      if (!kit.hears(conversation, "agent_session_stopped")) {
+      if (!kit.hears(conversation, "agent_session_stopped", app)) {
         throw refuse(
           "stop_unavailable",
           "The app doesn't receive agent_session_stopped here, so there is no Stop to press",
@@ -367,14 +380,19 @@ export function createInteractions(kit: InteractionKit): Interactions {
       store.threadState(conversation.id, rootTs).statusText = "";
       kit.action(session, "stop", { user: user.id, channel: conversation.id, ts: rootTs });
       return (
-        kit.emit(conversation, "agent_session_stopped", {
-          type: "agent_session_stopped",
-          channel: conversation.id,
-          thread_ts: rootTs,
-          user: user.id,
-          streaming_message_ts: streaming.map((message) => message.ts),
-          event_ts: slackTs(ids),
-        }) ?? ""
+        kit.emit(
+          conversation,
+          "agent_session_stopped",
+          {
+            type: "agent_session_stopped",
+            channel: conversation.id,
+            thread_ts: rootTs,
+            user: user.id,
+            streaming_message_ts: streaming.map((message) => message.ts),
+            event_ts: slackTs(ids),
+          },
+          app,
+        ) ?? ""
       );
     },
 

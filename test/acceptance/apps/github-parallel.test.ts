@@ -20,8 +20,9 @@ describe(`${COPIES} copies of a two-App repository in parallel`, () => {
       const deliveries = await github.deliveries();
       expect(deliveries.length).toBeGreaterThan(0);
       for (const delivery of deliveries) {
+        // GitHub's payloads carry the repository's numeric id; the handle has it as text.
         const payload = delivery.payload as { repository?: { id: number } };
-        if (payload.repository) expect(payload.repository.id).toBe(repo.id);
+        if (payload.repository) expect(String(payload.repository.id)).toBe(String(repo.id));
       }
     },
   );

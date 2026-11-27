@@ -226,6 +226,25 @@ describe("exit check 12.3: Slack apps", () => {
     expect(mine.received.length).toBe(3 + LOOP_LIMIT);
   });
 
+  test("Stop goes to the app streaming in the thread", async () => {
+    const { h, mine, theirs, post, coder, web } = await twoApps();
+    const ana = await post("/users", { name: "Ana" });
+    const msg = await post(`/users/${ana.id}/say`, { message: { text: "write a long report" }, to: [coder.id] });
+    await web(
+      "chat.startStream",
+      { channel: msg.channel, thread_ts: msg.ts, markdown_text: "Working" },
+      coder.botToken,
+    );
+    await h.app.settled();
+    const before = mine.received.length;
+
+    await post(`/users/${ana.id}/stop`, { thread: { channel: msg.channel, ts: msg.ts } });
+    await h.app.settled();
+
+    expect(mine.received.length).toBe(before);
+    expect(events(theirs).at(-1)?.event).toMatchObject({ type: "agent_session_stopped", user: ana.id });
+  });
+
   test("a person and an app of one session can't share a name", async () => {
     const { post } = await twoApps();
     expect(await refusal(post("/users", { name: "coder" }))).toBe("invalid_argument");

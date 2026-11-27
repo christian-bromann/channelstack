@@ -9,23 +9,25 @@
  */
 import { describe, expect, test, type TestContext } from "vitest";
 
-import type {
-  Duration,
-  GitHubApp,
-  GitHubDelivery,
-  GitHubFixture,
-  GoogleApp,
-  GoogleFixture,
-  LinearApp,
-  LinearFixture,
-  NotionDelivery,
-  NotionFixture,
-  NotionIntegration,
-  ResendApp,
-  ResendFixture,
-  SlackApp,
-  SlackFixture,
-  SlackMessage,
+import {
+  type Duration,
+  type GitHubApp,
+  type GitHubDelivery,
+  type GitHubFixture,
+  type GoogleApp,
+  type GoogleFixture,
+  type LinearApp,
+  type LinearFixture,
+  type NotionDelivery,
+  type NotionFixture,
+  type NotionIntegration,
+  type ResendApp,
+  type ResendFixture,
+  type SlackApp,
+  type SlackFixture,
+  type SlackMessage,
+  waitFor,
+  WaitTimeoutError,
 } from "../../sdks/typescript/client.ts";
 // The fixtures and matchers the checks use come from the Vitest integration.
 import type {} from "../vitest/index.ts";
@@ -69,19 +71,16 @@ interface MailPeer<Email, Agent> {
 async function autoMailLoop<
   Agent extends { readonly id: string },
   Email extends { readonly thread: { replies(): Promise<Array<{ readonly author: { readonly id: string } }>> } },
->(
-  context: TestContext,
-  agent: Agent,
-  peer: MailPeer<Email, Agent>,
-  turns: number,
-  wait: { timeout?: Duration },
-): Promise<void> {
+>(agent: Agent, peer: MailPeer<Email, Agent>, turns: number, wait: { timeout?: Duration }): Promise<void> {
   const auto = { "Auto-Submitted": "auto-replied" };
   const first = await peer.send({ to: [agent], subject: "Build report", text: "The build passed.", headers: auto });
   let seen = 0;
   for (let turn = 0; turn <= turns; turn++) {
-    await context.channelstack.quiet(wait);
-    const now = (await first.thread.replies()).filter((one) => one.author.id === agent.id).length;
+    const now = await answersAgain(
+      async () => (await first.thread.replies()).filter((one) => one.author.id === agent.id).length,
+      seen,
+      wait,
+    );
     if (now === seen) break;
     seen = now;
     await peer.reply(first, { text: "Noted, thanks.", headers: auto });
@@ -89,8 +88,32 @@ async function autoMailLoop<
   expect(seen, "times it answered mail another program sent on its own").toBeLessThanOrEqual(turns);
 }
 
-/** `toGoQuiet`'s bound from a check's wait. */
-const within = (wait: { timeout?: Duration }) => (wait.timeout === undefined ? {} : { within: wait.timeout });
+/**
+ * Whether `app` names the fixture's own app: `my-agent`, or, live, its real name. Any other name is
+ * an app the suite makes (decision 0027).
+ */
+const builtIn = (app: string, fixtureApp: { readonly name: string }) => app === "my-agent" || app === fixtureApp.name;
+
+/**
+ * How many answers the agent has given once it gives another, or as many as before when none comes
+ * within the check's timeout (5 s by default). An agent may answer after it acknowledged a
+ * delivery, so quiet alone doesn't say it is done.
+ */
+async function answersAgain(count: () => Promise<number>, seen: number, wait: { timeout?: Duration }): Promise<number> {
+  try {
+    return await waitFor(
+      "another answer",
+      async () => {
+        const now = await count();
+        return now > seen ? now : undefined;
+      },
+      { timeout: wait.timeout ?? "5s" },
+    );
+  } catch (error) {
+    if (error instanceof WaitTimeoutError) return seen;
+    throw error;
+  }
+}
 
 /** The ids of the Slack checks, in the order they are registered. */
 export const SLACK_CHECKS = [
@@ -234,10 +257,10 @@ export function slackChecks(options: ChecksOptions): void {
   const turns = options.loopTurns ?? 3;
   /** The app under test: the built-in one, or the app of that name (decision 0027), whose agent runs as it. */
   const agentOf = async (slack: SlackFixture): Promise<SlackApp> =>
-    app === slack.app.name ? slack.app : slack.createApp({ name: app });
+    builtIn(app, slack.app) ? slack.app : slack.createApp({ name: app });
   /** The delivery a message caused to the app under test. */
   const slackDelivery = async (msg: SlackMessage, agent: SlackApp, context: TestContext) =>
-    agent.name === context.slack.app.name
+    agent.id === context.slack.app.id
       ? deliveryOf(msg, context, "Slack")
       : ((await msg.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this message`));
 
@@ -298,28 +321,25 @@ export function slackChecks(options: ChecksOptions): void {
       await expect(msg.thread).not.toHaveReplyFrom(app, wait);
     });
 
-    check(
-      "slack.no-reply-loop",
-      "stops answering another app that answers everything it says",
-      async ({ slack, channelstack }) => {
-        const agent = await agentOf(slack);
-        const peer = await slack.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
-        const ana = await slack.createUser({ name: "Ana" });
-        const channel = await slack.createChannel({ participants: [ana, agent, peer] });
-        const msg = await ana.say(prompt, { channel });
-        // The peer answers every reply of the agent's, mentioning it, as a second agent without a loop guard would.
-        let answered = 0;
-        for (let turn = 0; turn <= turns; turn++) {
-          await channelstack.quiet(wait);
-          const replies = (await msg.thread.replies()).filter((reply) => reply.author.id === agent.id).length;
-          if (replies === answered) break;
-          answered = replies;
-          await peer.reply(`@${agent.name} thanks! Anything else?`, { thread: msg.thread });
-        }
-        // At most `turns` answers to the peer: the first reply to Ana, then the peer and the agent in turn.
-        await expect(msg.thread).toGoQuiet({ maxReplies: 2 * turns + 2, ...within(wait) });
-      },
-    );
+    check("slack.no-reply-loop", "stops answering another app that answers everything it says", async ({ slack }) => {
+      const agent = await agentOf(slack);
+      const peer = await slack.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+      const ana = await slack.createUser({ name: "Ana" });
+      const channel = await slack.createChannel({ participants: [ana, agent, peer] });
+      const msg = await ana.say(prompt, { channel });
+      const replies = async () => (await msg.thread.replies()).filter((reply) => reply.author.id === agent.id).length;
+      // The agent's answer to Ana; then the peer answers each of its answers, mentioning it, as a
+      // second agent without a loop guard would.
+      const first = await answersAgain(replies, 0, wait);
+      let seen = first;
+      for (let turn = 0; turn <= turns; turn++) {
+        await peer.reply(`@${agent.name} thanks! Anything else?`, { thread: msg.thread });
+        const now = await answersAgain(replies, seen, wait);
+        if (now === seen) break;
+        seen = now;
+      }
+      expect(seen - first, "times it answered the other app").toBeLessThanOrEqual(turns);
+    });
 
     check("slack.bad-signature", "rejects a delivery with a bad signature", async (context) => {
       const { slack } = context;
@@ -449,7 +469,7 @@ export function githubChecks(options: ChecksOptions): void {
   const turns = options.loopTurns ?? 3;
   /** The App under test: the built-in one, or the App of that name (decision 0027). */
   const agentOf = async (github: GitHubFixture): Promise<GitHubApp> =>
-    app === github.app.name ? github.app : github.createApp({ name: app });
+    builtIn(app, github.app) ? github.app : github.createApp({ name: app });
   /** A repository the App is installed on, with Ana as a collaborator and an issue to talk in. */
   const setup = async ({ github }: TestContext, also: readonly GitHubApp[] = []) => {
     const agent = await agentOf(github);
@@ -459,7 +479,7 @@ export function githubChecks(options: ChecksOptions): void {
   };
   /** The delivery checks read the built-in App's delivery: another App's has no `delivery` on a comment yet. */
   const githubDelivery = (comment: { readonly delivery?: GitHubDelivery | undefined }, context: TestContext) =>
-    app === context.github.app.name
+    builtIn(app, context.github.app)
       ? deliveryOf(comment, context, "GitHub")
       : context.skip(`the GitHub delivery checks read the built-in App's delivery, not ${app}'s`);
   const pullRequest = async (context: TestContext) => {
@@ -540,8 +560,7 @@ export function githubChecks(options: ChecksOptions): void {
         let seen = before;
         for (let turn = 0; turn <= turns; turn++) {
           await peer.comment(`@${agent.name} thanks! Anything else?`, { issue });
-          await context.channelstack.quiet(wait);
-          const now = await agentComments();
+          const now = await answersAgain(agentComments, seen, wait);
           if (now === seen) break;
           seen = now;
         }
@@ -563,7 +582,7 @@ export function linearChecks(options: ChecksOptions): void {
   const turns = options.loopTurns ?? 3;
   /** The app under test: the built-in one, or the app of that name (decision 0027). A session's delivery is its own. */
   const agentOf = async (linear: LinearFixture): Promise<LinearApp> =>
-    app === linear.app.name ? linear.app : linear.createApp({ name: app });
+    builtIn(app, linear.app) ? linear.app : linear.createApp({ name: app });
   /** Ana in a team, an issue, and a session from delegating it to the app. */
   const delegated = async ({ linear }: TestContext) => {
     const agent = await agentOf(linear);
@@ -629,8 +648,7 @@ export function linearChecks(options: ChecksOptions): void {
       let seen = before;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.comment("Thanks! Anything else?", { issue });
-        await context.channelstack.quiet(wait);
-        const now = await agentComments();
+        const now = await answersAgain(agentComments, seen, wait);
         if (now === seen) break;
         seen = now;
       }
@@ -651,7 +669,7 @@ export function notionChecks(options: ChecksOptions): void {
   const turns = options.loopTurns ?? 3;
   /** The integration under test: the built-in one, or the integration of that name (decision 0027). */
   const agentOf = async (notion: NotionFixture): Promise<NotionIntegration> =>
-    app === notion.app.name ? notion.app : notion.createApp({ name: app });
+    builtIn(app, notion.app) ? notion.app : notion.createApp({ name: app });
   /** Ana, and her comment on a page the integration is connected to. */
   const commented = async ({ notion }: TestContext, also: readonly NotionIntegration[] = []) => {
     const agent = await agentOf(notion);
@@ -666,7 +684,7 @@ export function notionChecks(options: ChecksOptions): void {
   };
   /** The delivery checks read the built-in integration's delivery: another's has no `delivery` on a comment yet. */
   const notionDelivery = (comment: { readonly delivery?: NotionDelivery | undefined }, context: TestContext) =>
-    app === context.notion.app.name
+    builtIn(app, context.notion.app)
       ? deliveryOf(comment, context, "Notion")
       : context.skip(`the Notion delivery checks read the built-in integration's delivery, not ${app}'s`);
 
@@ -711,8 +729,7 @@ export function notionChecks(options: ChecksOptions): void {
       let seen = before;
       for (let turn = 0; turn <= turns; turn++) {
         await peer.reply("Thanks! Anything else?", { discussion: comment.discussion });
-        await context.channelstack.quiet(wait);
-        const now = await agentComments();
+        const now = await answersAgain(agentComments, seen, wait);
         if (now === seen) break;
         seen = now;
       }
@@ -733,7 +750,7 @@ export function resendChecks(options: ChecksOptions): void {
   const turns = options.loopTurns ?? 3;
   /** The app under test: the built-in one, or the app of that name (decision 0027). */
   const agentOf = async (resend: ResendFixture): Promise<ResendApp> =>
-    app === resend.app.name ? resend.app : resend.createApp({ name: app });
+    builtIn(app, resend.app) ? resend.app : resend.createApp({ name: app });
   /** Ana, and her email to the agent. */
   const emailed = async ({ resend }: TestContext) => {
     const agent = await agentOf(resend);
@@ -745,7 +762,7 @@ export function resendChecks(options: ChecksOptions): void {
   const delivered = async (context: TestContext) => {
     const { agent, email } = await emailed(context);
     const delivery =
-      agent.name === context.resend.app.name
+      agent.id === context.resend.app.id
         ? deliveryOf(email, context, "Resend")
         : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
     return { email, delivery };
@@ -784,7 +801,7 @@ export function resendChecks(options: ChecksOptions): void {
     check("resend.no-reply-loop", "leaves mail another program sent on its own unanswered", async (context) => {
       const agent = await agentOf(context.resend);
       const peer = await context.resend.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
-      await autoMailLoop(context, agent, peer, turns, wait);
+      await autoMailLoop(agent, peer, turns, wait);
     });
   });
 }
@@ -801,7 +818,7 @@ export function googleChecks(options: ChecksOptions): void {
   const turns = options.loopTurns ?? 3;
   /** The app under test: the built-in one, or the app of that name (decision 0027). */
   const agentOf = async (google: GoogleFixture): Promise<GoogleApp> =>
-    app === google.app.name ? google.app : google.createApp({ name: app });
+    builtIn(app, google.app) ? google.app : google.createApp({ name: app });
   /** Ana, and her email to the agent. */
   const emailed = async ({ google }: TestContext) => {
     const agent = await agentOf(google);
@@ -813,7 +830,7 @@ export function googleChecks(options: ChecksOptions): void {
   const delivered = async (context: TestContext) => {
     const { agent, email } = await emailed(context);
     const delivery =
-      agent.name === context.google.app.name
+      agent.id === context.google.app.id
         ? deliveryOf(email, context, "Gmail")
         : ((await email.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this email`));
     return { email, delivery };
@@ -870,7 +887,7 @@ export function googleChecks(options: ChecksOptions): void {
     check("google.no-reply-loop", "leaves mail another program sent on its own unanswered", async (context) => {
       const agent = await agentOf(context.google);
       const peer = await context.google.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
-      await autoMailLoop(context, agent, peer, turns, wait);
+      await autoMailLoop(agent, peer, turns, wait);
     });
   });
 }
