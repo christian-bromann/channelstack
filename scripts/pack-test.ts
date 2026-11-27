@@ -26,15 +26,20 @@ import { capture, run } from "./lib/process.ts";
 import { startBinary } from "./lib/server.ts";
 import { runSmoke } from "./smoke.ts";
 
-/** Every name the SDK's root module (`sdks/typescript/client.ts`) exports: what `channelstack` gives a test. */
-function sdkExportNames(): string[] {
+/** Every type the SDK's root module (`sdks/typescript/client.ts`) exports: the types `channelstack` gives a test. */
+function sdkTypeNames(): string[] {
   const root = join(ROOT, "sdks", "typescript", "client.ts");
   const program = ts.createProgram([root], { noEmit: true, allowImportingTsExtensions: true });
   const checker = program.getTypeChecker();
   const module = checker.getSymbolAtLocation(program.getSourceFile(root) as ts.SourceFile);
   if (!module) throw new Error(`Can't read ${root}`);
+  const isType = (symbol: ts.Symbol) => {
+    const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+    return (target.flags & (ts.SymbolFlags.Type | ts.SymbolFlags.Class)) !== 0;
+  };
   return checker
     .getExportsOfModule(module)
+    .filter(isType)
     .map((symbol) => symbol.name)
     .sort();
 }
@@ -152,9 +157,9 @@ try {
     { cwd: project },
   ).trim();
   if (sameModule !== "true") throw new Error('`import "channelstack"` is not the client that `channelstack/client` is');
-  // Every name the SDK's sources export from `channelstack`, imported from the installed package: the
+  // Every type the SDK's sources export from `channelstack`, imported from the installed package: the
   // packed declarations leave none out.
-  const names = sdkExportNames();
+  const names = sdkTypeNames();
   writeFileSync(
     join(project, "types.ts"),
     [
@@ -174,7 +179,7 @@ try {
     { cwd: project },
   );
   console.log(
-    `import type { … } from "channelstack": the SDK's ${names.length} exported names type-check against the installed package`,
+    `import type { … } from "channelstack": the SDK's ${names.length} exported types type-check against the installed package`,
   );
 
   // The scenario runner is copied in, so its `channelstack/client` import resolves to the installed package.
