@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { waitFor } from "../../sdks/typescript/runtime/wait.ts";
+import { appWebhookVariable } from "../../server/src/core/apps/index.ts";
 import { background, capture, freePort } from "./process.ts";
 import { startBinary } from "./server.ts";
 
@@ -33,8 +34,12 @@ export interface StackOptions {
   agentEnv?: Readonly<Record<string, string>>;
   /** Extra environment for the server only: live credentials, for a test of what live does to a run. */
   serverEnv?: Readonly<Record<string, string>>;
-  /** More agents next to it, one per channel, all against the same server (every channel in one run). */
-  others?: ReadonlyArray<{ agent: string; webhook: { driver: string; path: string } }>;
+  /**
+   * More agents next to it, all against the same server: one per channel (every channel in one
+   * run), or the same channel's agent again as another app (`app`, decision 0027), configured from
+   * `channelstack env --app <app> --channel <driver>`.
+   */
+  others?: ReadonlyArray<{ agent: string; webhook: { driver: string; path: string }; app?: string }>;
 }
 
 export interface RunningStack {
@@ -64,8 +69,10 @@ export async function withStack(
     const others = await Promise.all(
       (options.others ?? []).map(async (other) => ({ ...other, port: await freePort() })),
     );
-    const webhookUrl = (webhook: { driver: string; path: string }, at: number) => ({
-      [`CHANNELSTACK_${webhook.driver.toUpperCase()}_WEBHOOK_URL`]: `http://127.0.0.1:${at}${webhook.path}`,
+    const webhookUrl = (webhook: { driver: string; path: string }, at: number, app?: string) => ({
+      [app === undefined
+        ? `CHANNELSTACK_${webhook.driver.toUpperCase()}_WEBHOOK_URL`
+        : appWebhookVariable(webhook.driver, app)]: `http://127.0.0.1:${at}${webhook.path}`,
     });
     const server = await startBinary({
       bin: options.bin,
@@ -81,18 +88,20 @@ export async function withStack(
       env: {
         ...env,
         ...(options.socketMode ? {} : webhookUrl(options.webhook, port)),
-        ...Object.assign({}, ...others.map((other) => webhookUrl(other.webhook, other.port))),
+        ...Object.assign({}, ...others.map((other) => webhookUrl(other.webhook, other.port, other.app))),
         ...options.serverEnv,
       },
     });
     stops.push(server.stop);
 
-    const agentEnv = Object.fromEntries(
-      capture(options.bin, options.proxy ? ["env", "--proxy"] : ["env"], { env })
-        .split("\n")
-        .filter((line) => line.includes("="))
-        .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
-    );
+    const envOf = (args: readonly string[]) =>
+      Object.fromEntries(
+        capture(options.bin, ["env", ...args], { env })
+          .split("\n")
+          .filter((line) => line.includes("="))
+          .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+      );
+    const agentEnv = envOf(options.proxy ? ["--proxy"] : []);
     const agent = background(process.execPath, [options.agent], {
       ...process.env,
       ...agentEnv,
@@ -105,6 +114,10 @@ export async function withStack(
       const started = background(process.execPath, [other.agent], {
         ...process.env,
         ...agentEnv,
+        // Another app's lines, under the same keys: the same agent, as that app.
+        ...(other.app === undefined
+          ? {}
+          : { ...envOf(["--app", other.app, "--channel", other.webhook.driver]), AGENT_NAME: other.app }),
         PORT: String(other.port),
       });
       stops.push(started.stop);

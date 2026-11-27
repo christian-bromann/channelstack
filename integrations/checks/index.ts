@@ -9,7 +9,7 @@
  */
 import { describe, expect, test, type TestContext } from "vitest";
 
-import type { Duration } from "../../sdks/typescript/client.ts";
+import type { Duration, SlackApp, SlackFixture, SlackMessage } from "../../sdks/typescript/client.ts";
 // The fixtures and matchers the checks use come from the Vitest integration.
 import type {} from "../vitest/index.ts";
 
@@ -32,7 +32,15 @@ export interface ChecksOptions {
   skip?: string[];
   /** How long each check waits for the agent. Default: the integration's timeout. */
   timeout?: Duration;
+  /**
+   * How many times the agent may answer another app that answers everything, with no person
+   * between them, before `<channel>.no-reply-loop` fails (decision 0027). Default: 3.
+   */
+  loopTurns?: number;
 }
+
+/** `toGoQuiet`'s bound from a check's wait. */
+const within = (wait: { timeout?: Duration }) => (wait.timeout === undefined ? {} : { within: wait.timeout });
 
 /** The ids of the Slack checks, in the order they are registered. */
 export const SLACK_CHECKS = [
@@ -42,6 +50,7 @@ export const SLACK_CHECKS = [
   "slack.retry",
   "slack.redelivery",
   "slack.ignores-bots",
+  "slack.no-reply-loop",
   "slack.bad-signature",
   "slack.ack",
   "slack.msg-too-long",
@@ -167,24 +176,36 @@ export function slackChecks(options: ChecksOptions): void {
   const prompt = options.prompt ?? `@${app} hello`;
   const wait = options.timeout === undefined ? {} : { timeout: options.timeout };
   const check = registrar(options, SLACK_CHECKS);
+  const turns = options.loopTurns ?? 3;
+  /** The app under test: the built-in one, or the app of that name (decision 0027), whose agent runs as it. */
+  const agentOf = async (slack: SlackFixture): Promise<SlackApp> =>
+    app === slack.app.name ? slack.app : slack.createApp({ name: app });
+  /** The delivery a message caused to the app under test. */
+  const slackDelivery = async (msg: SlackMessage, agent: SlackApp, context: TestContext) =>
+    agent.name === context.slack.app.name
+      ? deliveryOf(msg, context, "Slack")
+      : ((await msg.deliveryFor(agent)) ?? context.skip(`${agent.name} wasn't sent this message`));
 
   describe(`slack checks: ${app}`, () => {
     check("slack.dm-once", "replies once to a DM", async ({ slack }) => {
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const msg = await ana.say(prompt, { to: slack.app });
+      const msg = await ana.say(prompt, { to: agent });
       await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("slack.mention-once", "replies once to a mention", async ({ slack }) => {
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const channel = await slack.createChannel({ participants: [ana, slack.app] });
+      const channel = await slack.createChannel({ participants: [ana, agent] });
       const msg = await ana.say(prompt, { channel });
       await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("slack.in-thread", "replies in the thread, not in the channel", async ({ slack }) => {
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const channel = await slack.createChannel({ participants: [ana, slack.app] });
+      const channel = await slack.createChannel({ participants: [ana, agent] });
       const msg = await ana.say(prompt, { channel });
       await expect(msg.thread).toHaveReplyFrom(app, wait);
       await expect(channel).not.toHaveChannelMessageFrom(app, wait);
@@ -192,20 +213,22 @@ export function slackChecks(options: ChecksOptions): void {
 
     check("slack.retry", "survives Slack's retry after 3 seconds", async (context) => {
       const { slack } = context;
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const channel = await slack.createChannel({ participants: [ana, slack.app] });
+      const channel = await slack.createChannel({ participants: [ana, agent] });
       const msg = await ana.say(prompt, { channel });
       // Slack retries what it thinks wasn't acknowledged in time, and says so in the retry headers.
-      await deliveryOf(msg, context, "Slack").retry({ after: "3s", reason: "http_timeout" });
+      await (await slackDelivery(msg, agent, context)).retry({ after: "3s", reason: "http_timeout" });
       await expect(msg.thread).toHaveRepliesFrom(app, { count: 1, ...wait });
     });
 
     check("slack.redelivery", "handles the same event delivered twice", async (context) => {
       const { slack } = context;
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const channel = await slack.createChannel({ participants: [ana, slack.app] });
+      const channel = await slack.createChannel({ participants: [ana, agent] });
       const msg = await ana.say(prompt, { channel });
-      const delivery = deliveryOf(msg, context, "Slack");
+      const delivery = await slackDelivery(msg, agent, context);
       await expect(msg.thread).toHaveReplyFrom(app, wait);
       // The same event again, with nothing that marks it as a retry: only its event_id tells.
       await delivery.resend();
@@ -213,17 +236,42 @@ export function slackChecks(options: ChecksOptions): void {
     });
 
     check("slack.ignores-bots", "ignores what other bots write", async ({ slack }) => {
+      const agent = await agentOf(slack);
       const bot = await slack.createUser({ name: "Deploy Bot", bot: true });
-      const channel = await slack.createChannel({ participants: [bot, slack.app] });
+      const channel = await slack.createChannel({ participants: [bot, agent] });
       const msg = await bot.say(prompt, { channel });
       await expect(msg.thread).not.toHaveReplyFrom(app, wait);
     });
 
+    check(
+      "slack.no-reply-loop",
+      "stops answering another app that answers everything it says",
+      async ({ slack, channelstack }) => {
+        const agent = await agentOf(slack);
+        const peer = await slack.createApp({ name: app === "loop-peer" ? "loop-peer-2" : "loop-peer" });
+        const ana = await slack.createUser({ name: "Ana" });
+        const channel = await slack.createChannel({ participants: [ana, agent, peer] });
+        const msg = await ana.say(prompt, { channel });
+        // The peer answers every reply of the agent's, mentioning it, as a second agent without a loop guard would.
+        let answered = 0;
+        for (let turn = 0; turn <= turns; turn++) {
+          await channelstack.quiet(wait);
+          const replies = (await msg.thread.replies()).filter((reply) => reply.author.id === agent.id).length;
+          if (replies === answered) break;
+          answered = replies;
+          await peer.reply(`@${agent.name} thanks! Anything else?`, { thread: msg.thread });
+        }
+        // At most `turns` answers to the peer: the first reply to Ana, then the peer and the agent in turn.
+        await expect(msg.thread).toGoQuiet({ maxReplies: 2 * turns + 2, ...within(wait) });
+      },
+    );
+
     check("slack.bad-signature", "rejects a delivery with a bad signature", async (context) => {
       const { slack } = context;
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const msg = await ana.say(prompt, { to: slack.app });
-      const delivery = deliveryOf(msg, context, "Slack");
+      const msg = await ana.say(prompt, { to: agent });
+      const delivery = await slackDelivery(msg, agent, context);
       const first = await delivery.settled(wait);
       // Over Socket Mode there is no signature to check: the connection is the app's own.
       if (first.attempts[0]?.transport !== "http") return;
@@ -233,14 +281,16 @@ export function slackChecks(options: ChecksOptions): void {
 
     check("slack.ack", "acknowledges within 3 seconds", async (context) => {
       const { slack } = context;
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const msg = await ana.say(prompt, { to: slack.app });
-      await expect(deliveryOf(msg, context, "Slack")).toBeAccepted({ within: "3s", ...wait });
+      const msg = await ana.say(prompt, { to: agent });
+      await expect(await slackDelivery(msg, agent, context)).toBeAccepted({ within: "3s", ...wait });
     });
 
     check("slack.msg-too-long", "still answers when Slack refuses its message as too long", async ({ slack }) => {
+      const agent = await agentOf(slack);
       const ana = await slack.createUser({ name: "Ana" });
-      const channel = await slack.createChannel({ participants: [ana, slack.app] });
+      const channel = await slack.createChannel({ participants: [ana, agent] });
       // Slack refuses the agent's next message once; an agent that handles it says something shorter.
       await using _fault = await slack.fault({
         type: "error",
@@ -256,8 +306,9 @@ export function slackChecks(options: ChecksOptions): void {
       "slack.stream-stop",
       "a stream it starts, it also stops",
       async ({ slack }) => {
+        const agent = await agentOf(slack);
         const ana = await slack.createUser({ name: "Ana" });
-        const msg = await ana.say(options.streamPrompt ?? "", { to: slack.app });
+        const msg = await ana.say(options.streamPrompt ?? "", { to: agent });
         await expect(msg.thread).toHaveStreamingReplyFrom(app, wait);
         const reply = await msg.thread.latestReply({ from: app, ...wait });
         const stream = await reply.stream?.ended(wait);
@@ -271,8 +322,9 @@ export function slackChecks(options: ChecksOptions): void {
       "slack.stop",
       "honours Stop: nothing more is written after it",
       async ({ slack }) => {
+        const agent = await agentOf(slack);
         const ana = await slack.createUser({ name: "Ana" });
-        const msg = await ana.say(options.streamPrompt ?? "", { to: slack.app });
+        const msg = await ana.say(options.streamPrompt ?? "", { to: agent });
         await expect(msg.thread).toHaveStreamingReplyFrom(app, wait);
         await ana.stop({ thread: msg });
         await expect(msg.thread).toHaveStatus("stopped", wait);
@@ -285,9 +337,10 @@ export function slackChecks(options: ChecksOptions): void {
       "slack.click-unauthorized",
       "refuses a click from someone who may not act",
       async ({ slack }) => {
+        const agent = await agentOf(slack);
         const approval = options.approval ?? { prompt: "", button: "" };
         const ana = await slack.createUser({ name: "Ana" });
-        const channel = await slack.createChannel({ participants: [ana, slack.app] });
+        const channel = await slack.createChannel({ participants: [ana, agent] });
         const msg = await ana.say(approval.prompt, { channel });
         await ana.click(approval.button, { thread: msg.thread });
         // The ask is the only thing everyone sees: whatever the agent tells Ana, it tells her alone.
@@ -300,10 +353,11 @@ export function slackChecks(options: ChecksOptions): void {
       "slack.double-click",
       "a double click acts once",
       async ({ slack }) => {
+        const agent = await agentOf(slack);
         const approval = options.approval ?? { prompt: "", button: "" };
         const ana = await slack.createUser({ name: "Ana" });
         const admin = await slack.createUser({ name: "Ben", admin: true });
-        const channel = await slack.createChannel({ participants: [ana, admin, slack.app] });
+        const channel = await slack.createChannel({ participants: [ana, admin, agent] });
         const msg = await ana.say(approval.prompt, { channel });
         const ask = await msg.thread.waitForReply({ from: app, ...wait });
         // Both presses are on their way before the agent can answer the first. An agent that takes the

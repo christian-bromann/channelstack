@@ -34,9 +34,16 @@ export const HARNESS = {
       "inspecting what the agent did > ",
       // Everything but the Socket Mode test, which needs an agent started in Socket Mode (exit check 2.2).
       "delivery and failures \\(fake only\\) > (?!reconnects after the Socket Mode)",
+      // The same agent again, as the app `coder` (exit check 12.2).
+      "several apps > ",
     ],
     // Quiet and parallel sessions (not examples), and the standard checks as a developer adds them (exit check 2.3).
-    suites: ["test/acceptance/stack", "test/acceptance/checks/slack-checks.test.ts"],
+    suites: [
+      "test/acceptance/stack",
+      "test/acceptance/checks/slack-checks.test.ts",
+      // The checks against the second app, `coder` (exit check 12.7).
+      "test/acceptance/checks/slack-checks-coder.test.ts",
+    ],
     agents: { "bolt-ai-sdk": "/slack/events", "chat-sdk-slack": "/slack/events" },
     broken: { agent: "broken-slack", path: "/slack/events" },
   },
