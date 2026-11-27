@@ -93,6 +93,24 @@ jobs:
       - run: pnpm build
       - run: pnpm test:pack
 
+  packages:
+    # The packages release.yml builds for PyPI and crates.io, built the same way on every pull
+    # request: the release workflow runs for its tag only, and a fix after the tag costs a version.
+    # (The npm package is packed and installed by `packaging` above.) Neither asks a registry.
+    name: PyPI and crates.io packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - name: PyPI, channelstack and pytest-channelstack
+        run: |
+          uv build --project sdks/python --out-dir dist/python
+          uv build --project integrations/pytest-channelstack --out-dir dist/python
+          ls -l dist/python
+      - name: crates.io, channelstack (packaged and built from what is packaged)
+        run: cargo package -p channelstack --locked
+
   binaries:
     name: compile all five targets
     runs-on: ubuntu-latest

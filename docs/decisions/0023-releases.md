@@ -48,9 +48,10 @@ new major version, the range moves with it.
   replace it once the crate exists.
 
 The publishing jobs run only for a pushed tag, in those environments, and wait for the maintainer's
-approval there. The release workflow runs for the tag only: **Prepare a release** is the one
-manual trigger (2026-11-27: pull requests that touched a release file used to start it as a dry
-run; nothing but the tag starts it now).
+approval there. Nothing but the tag starts the release workflow; every pull request's CI builds
+the binaries and the packages the same way, so the version pull request is checked before the tag
+(2026-11-27: pull requests that touched a release file used to start the release workflow as a dry
+run).
 
 ## Released from GitHub only
 
