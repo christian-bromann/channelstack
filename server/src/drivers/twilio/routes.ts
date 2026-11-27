@@ -71,6 +71,7 @@ const TwilioDelivery = z
   .openapi("TwilioDelivery", { "x-channelstack-resource": { id: "id" } });
 
 const MessageStatus = z.enum([
+  "accepted",
   "queued",
   "sending",
   "sent",
@@ -168,7 +169,7 @@ export function registerTwilioRoutes(
     id: message.id,
     channel: "twilio" as const,
     conversation: conversationWire(message.conversation),
-    author: world.principalOf(message),
+    author: store.principalOf(message),
     from: message.from,
     to: message.to,
     text: message.body,
@@ -349,7 +350,7 @@ export function registerTwilioRoutes(
     sdkMethod: { on: "TwilioConversation", name: "transcript" },
     stability,
     handler: async ({ session, params }) =>
-      renderConversation(await messagesIn(session.id, params.conversation), world.principalOf),
+      renderConversation(await messagesIn(session.id, params.conversation), (message) => store.principalOf(message)),
   });
 
   // --- Deliveries and calls -------------------------------------------------------------------

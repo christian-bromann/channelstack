@@ -360,7 +360,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 - **The Twilio fake on the kit:**
   - The REST API the `twilio` SDK calls for messaging: `messages.create` (from a number or a Messaging Service, with a `StatusCallback`), `list`, `fetch`, `update` (redacting) and `remove`; `accounts.fetch` and `incomingPhoneNumbers.list`. Basic auth with the Account SID and Auth Token or an API key, and Twilio's test credentials with its magic numbers.
   - The inbound webhook: form-encoded, signed with `X-Twilio-Signature`, with `I-Twilio-Idempotency-Token`, Twilio's timeouts and retries and the connection overrides a URL carries. TwiML in the agent's answer is sent, a retry's too.
-  - Status callbacks (`queued`, `sent`, `delivered`, `undelivered`, `failed`), signed the same way.
+  - Status callbacks for each change of a message's status (`queued` through a Messaging Service, `sent`, `delivered`, `undelivered`, `failed`), signed the same way.
   - Twilio's error shape and codes, SIDs, E.164, the 1600-character limit and segments, and opt-out (`STOP`, `START`, `HELP`).
 - `twilioChecks()`, a reference agent on the `twilio` SDK, and its broken variant.
 - **Twilio live:** the agent's account and number, and each person's number on an account of theirs. Recipients are held to the allowlist, and every message a session saw is deleted when it closes.

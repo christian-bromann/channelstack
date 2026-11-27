@@ -82,9 +82,10 @@ export const twilioPayloads = {
 
   /**
    * A text to the agent's number, as Twilio posts it to the number's webhook: form-encoded, with
-   * the parameters of Twilio's request to an application. `OptOutType` for a keyword Twilio acted on.
+   * the parameters of Twilio's request to an application. (`OptOutType` comes only with Advanced
+   * Opt-Out, a Messaging Service's setting the fake doesn't have.)
    */
-  incoming(message: TwilioMessageRecord, app: TwilioAppRecord, optOutType: string | undefined): string {
+  incoming(message: TwilioMessageRecord, app: TwilioAppRecord): string {
     const params = new URLSearchParams({
       ToCountry: countryOf(message.to),
       ToState: "",
@@ -111,7 +112,6 @@ export const twilioPayloads = {
       params.set(`MediaUrl${at}`, url);
       params.set(`MediaContentType${at}`, "application/octet-stream");
     });
-    if (optOutType !== undefined) params.set("OptOutType", optOutType);
     return params.toString();
   },
 

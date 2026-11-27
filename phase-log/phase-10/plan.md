@@ -60,7 +60,7 @@ resolves the shared files.
   `undelivered` (a person whose phone is off: `reachable: false`, error 30003) or `failed`, each
   signed the same way over the callback's URL.
 - **Opt-out:** a person who texts `STOP` (or `UNSUBSCRIBE`, `END`, `QUIT`, `CANCEL`, `STOPALL`)
-  gets Twilio's own answer, the agent's webhook gets the text with `OptOutType=STOP`, and the
+  gets Twilio's own answer, the agent's webhook gets the text as it is, and the
   agent can't text them again (21610) until they text `START`. `HELP` gets Twilio's answer too.
 - **WhatsApp:** later. The Messages API is the same, but a fake WhatsApp sender needs templates,
   the 24-hour session window and its own statuses (`read`); that's not cheap on top of SMS.

@@ -155,10 +155,10 @@ describe("the fake signs like Twilio", () => {
         const got = arrived.filter(
           (entry) => entry.path === "/webhooks/twilio/status" && entry.params.MessageSid === reply.id,
         );
-        return got.length === 3 ? got : undefined;
+        return got.length === 2 ? got : undefined;
       });
       expect(callbacks.every((entry) => entry.valid)).toBe(true);
-      expect(callbacks.map((entry) => entry.params.MessageStatus).sort()).toEqual(["delivered", "queued", "sent"]);
+      expect(callbacks.map((entry) => entry.params.MessageStatus).sort()).toEqual(["delivered", "sent"]);
       for (const callback of callbacks) expect(twilioWebhookProblems("status", callback.params)).toEqual([]);
     } finally {
       answer = () => ({ status: 200 });

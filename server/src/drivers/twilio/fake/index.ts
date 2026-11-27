@@ -37,7 +37,7 @@ export function createTwilioFake(context: DriverContext): TwilioFake {
         messagingServiceSid: identity.service,
       });
     },
-    release() {},
+    release: (session) => store.release(session),
   } satisfies TwilioFake;
   fake.seed();
   return fake;

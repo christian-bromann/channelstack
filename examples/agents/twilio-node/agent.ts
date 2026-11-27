@@ -7,7 +7,7 @@
  */
 import twilio from "twilio";
 
-import { formParams, listen, scriptedText, twilioClient } from "../shared/twilio.ts";
+import { formParams, listen, scriptedText, twilioClient, twilioKeyword } from "../shared/twilio.ts";
 
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, PORT } = process.env;
 if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER || !PORT) {
@@ -33,11 +33,11 @@ const signed = (url: string, signature: string | string[] | undefined, params: R
   twilio.validateRequest(AUTH_TOKEN, String(signature ?? ""), url, params);
 
 async function reply(params: Record<string, string>) {
-  const { MessageSid: sid = "", From: from = "", Body: body = "", OptOutType: optOut } = params;
+  const { MessageSid: sid = "", From: from = "", Body: body = "" } = params;
   if (answered.has(sid)) return;
   answered.add(sid);
   // Twilio answers STOP, START and HELP itself, and a person who opted out can't be texted.
-  if (optOut !== undefined) return;
+  if (twilioKeyword(body)) return;
   await client.messages.create({
     to: from,
     from: NUMBER,

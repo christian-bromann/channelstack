@@ -146,6 +146,10 @@ const formPayload = (body: string): unknown => {
   return payload === null ? undefined : json(payload);
 };
 
+/** A form's fields, for a platform that posts its webhooks as forms (Twilio): undefined for anything else. */
+const formFields = (body: string): Record<string, string> | undefined =>
+  /^[\w.%-]+=/.test(body) ? Object.fromEntries(new URLSearchParams(body)) : undefined;
+
 /** A recorder writing to `<dir>/shapes.jsonl`, private (0600). */
 export function createRecorder(dir: string): Recorder {
   const file = join(dir, "shapes.jsonl");
@@ -169,8 +173,8 @@ export function createRecorder(dir: string): Recorder {
       return response;
     },
     webhook(channel, type, body) {
-      // JSON, or a form whose `payload` is JSON (Slack's interactions).
-      const parsed = json(body) ?? formPayload(body);
+      // JSON, a form whose `payload` is JSON (Slack's interactions), or a form's fields (Twilio's).
+      const parsed = json(body) ?? formPayload(body) ?? formFields(body);
       if (parsed === undefined) return;
       // By type and action: `issues opened` and `issues closed` are shaped differently, and so are
       // Slack's events by the event's type and subtype (`event_callback message channel_join`).

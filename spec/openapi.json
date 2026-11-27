@@ -7339,6 +7339,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "accepted",
               "queued",
               "sending",
               "sent",

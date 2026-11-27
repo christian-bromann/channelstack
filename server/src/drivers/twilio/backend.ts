@@ -1,5 +1,4 @@
 import type { Awaitable } from "../../core/router/index.ts";
-import type { TranscriptPrincipal } from "../../core/router/inspect.ts";
 import type { TwilioStore } from "./fake/store.ts";
 import type { FakeTwilioWorld } from "./fake/world.ts";
 import type { TwilioMessageRecord, TwilioPersonRecord } from "./world.ts";
@@ -25,7 +24,6 @@ export interface TwilioWorld {
   inbox(session: string, person: TwilioPersonRecord): Awaitable<TwilioMessageRecord[]>;
   /** Read again what the agent may have sent: nothing to do in the fake, which holds the truth. */
   refresh(session: string): Awaitable<void>;
-  principalOf(message: TwilioMessageRecord): TranscriptPrincipal;
 }
 
 /** The fake as a `TwilioWorld`. */
@@ -36,6 +34,5 @@ export function fakeTwilioWorld(fake: FakeTwilioWorld): TwilioWorld {
     text: (session, person, input) => fake.personTexts(session, person, input),
     inbox: (_session, person) => fake.messagesTo(person),
     refresh: () => {},
-    principalOf: fake.principalOf,
   };
 }

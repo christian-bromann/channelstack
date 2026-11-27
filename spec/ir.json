@@ -16950,6 +16950,7 @@
           "type": {
             "kind": "enum",
             "values": [
+              "accepted",
               "queued",
               "sending",
               "sent",

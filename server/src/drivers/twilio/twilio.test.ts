@@ -57,7 +57,7 @@ async function account(options: { webhook?: string } = {}) {
     });
   };
   const ana = (await control("POST", "/users", { name: "Ana" })).body as { id: string; number: string };
-  return { h, agent, env, sid, auth, basic, api, call, control, webhooks, fixture, ana, app: fixture.app };
+  return { h, agent, env, sid, auth, basic, api, call, control, webhooks, fixture, ana, app: fixture.app, sessionId };
 }
 
 /** Twilio's refusal: `{ code, message, more_info, status }`. */
@@ -220,6 +220,21 @@ describe("a person texts the agent", () => {
     ]);
   });
 
+  test("a plain-text answer is sent back as it is; an empty one sends nothing", async () => {
+    const { h, control, agent, ana, app } = await account();
+    agent.respond = (delivery) => ({
+      status: 200,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+      body: new URLSearchParams(delivery.body).get("Body") === "quiet" ? "" : "Thanks, noted.",
+    });
+    const sent = (await control("POST", `/users/${ana.id}/text`, { body: "hello", to: app.id })).body;
+    await h.app.settled();
+    await control("POST", `/users/${ana.id}/text`, { body: "quiet", to: app.id });
+    await h.app.settled();
+    const replies = (await control("GET", `/conversations/${sent.conversation.id}/replies`)).body;
+    expect(replies.map((reply: { text: string }) => reply.text)).toEqual(["Thanks, noted.", "quiet"]);
+  });
+
   test("a retry's TwiML is sent too: the agent must answer once", async () => {
     const { h, control, agent, ana, app } = await account();
     agent.respond = () => ({
@@ -275,12 +290,28 @@ describe("a person texts the agent", () => {
     expect((await control("GET", `/deliveries/${sent.delivery.id}`)).body.attempts).toHaveLength(3);
   });
 
+  test("an opt-out ends with its session: the number is free for another test", async () => {
+    const { h, control, call, app, sessionId } = await account();
+    const number = "+14155550142";
+    await control("POST", "/users", { name: "Ben", number });
+    await control("POST", `/users/${encodeURIComponent(number)}/text`, { body: "STOP", to: app.id });
+    await h.app.settled();
+    await h.call("DELETE", `/sessions/${sessionId}`);
+    const next = (await h.call("POST", "/sessions")).body.sessionId;
+    await h.call("POST", `/sessions/${next}/twilio/users`, { name: "Ben", number });
+    expect((await call("POST", "/Messages.json", { To: number, From: app.number, Body: "hi" })).status).toBe(201);
+  });
+
   test("STOP: Twilio answers, tells the agent, and refuses the agent's next text until START", async () => {
     const { h, control, call, api, webhooks, ana, app } = await account();
     const stop = (await control("POST", `/users/${ana.id}/text`, { body: " stop ", to: app.id })).body;
-    expect((await webhooks())[0]?.params.OptOutType).toBe("STOP");
+    const [webhook] = await webhooks();
+    expect(webhook?.params.Body).toBe(" stop ");
+    expect(webhook?.params).not.toHaveProperty("OptOutType");
     const transcript = (await control("GET", `/conversations/${stop.conversation.id}/transcript`)).body;
-    expect(transcript.text).toMatch(/my-agent: You have successfully been unsubscribed.*\(sent by Twilio\)/);
+    expect(transcript.text).toMatch(/Twilio: You have successfully been unsubscribed/);
+    // It isn't the agent's answer.
+    expect(transcript.entries.at(-1)?.author).toEqual({ id: "twilio", name: "Twilio", kind: "app" });
     expectRefusal(await api("POST", "/Messages.json", { To: ana.number, From: app.number, Body: "hi" }), 400, 21610);
     await control("POST", `/users/${ana.id}/text`, { body: "START", to: app.id });
     await h.app.settled();
@@ -303,28 +334,32 @@ describe("the agent texts a person", () => {
     expect(inbox).toMatchObject([{ text: "Your order shipped", author: { kind: "app", name: "my-agent" } }]);
   });
 
-  test("through the Messaging Service, from its number", async () => {
-    const { call, env, ana } = await account();
+  test("through the Messaging Service: accepted, then queued once its number is picked", async () => {
+    const { call, env, ana, webhooks, agent } = await account();
     const created = (
       await call("POST", "/Messages.json", {
         To: ana.number,
         MessagingServiceSid: env.TWILIO_MESSAGING_SERVICE_SID as string,
         Body: "hi",
+        StatusCallback: agent.url,
       })
     ).body;
     expect(created).toMatchObject({
+      status: "accepted",
       from: env.TWILIO_PHONE_NUMBER,
       messaging_service_sid: env.TWILIO_MESSAGING_SERVICE_SID,
     });
+    const callbacks = await webhooks();
+    expect(callbacks.map(({ params }) => params.MessageStatus).sort()).toEqual(["delivered", "queued", "sent"]);
   });
 
-  test("its status callbacks: queued, sent, delivered", async () => {
+  test("its status callbacks: each change from queued, so sent and delivered", async () => {
     const { call, webhooks, agent, env, ana, app } = await account();
     const created = (
       await call("POST", "/Messages.json", { To: ana.number, From: app.number, Body: "hi", StatusCallback: agent.url })
     ).body;
     const callbacks = await webhooks();
-    expect(callbacks.map(({ params }) => params.MessageStatus).sort()).toEqual(["delivered", "queued", "sent"]);
+    expect(callbacks.map(({ params }) => params.MessageStatus).sort()).toEqual(["delivered", "sent"]);
     for (const { params, headers, type } of callbacks) {
       expect(type).toBe("status");
       expect(params.MessageSid).toBe(created.sid);

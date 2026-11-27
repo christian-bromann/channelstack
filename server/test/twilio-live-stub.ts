@@ -45,7 +45,8 @@ const HEX = "0123456789abcdef";
 const sid = (prefix: string) => `${prefix}${randomString(32, HEX)}`;
 const rfc2822 = (ms: number) => new Date(ms).toUTCString().replace(/GMT$/, "+0000");
 
-export function twilioStub(): TwilioStub {
+/** `agentNumbers`: the agent's account's numbers, its own first; more for people on the same account. */
+export function twilioStub(options: { agentNumbers?: readonly string[] } = {}): TwilioStub {
   const url = "https://twilio.stub";
   const accounts: Account[] = [];
   const messages: Message[] = [];
@@ -57,7 +58,7 @@ export function twilioStub(): TwilioStub {
     accounts.push(made);
     return made;
   };
-  const agent = account("agent", ["+14155550100"]);
+  const agent = account("agent", options.agentNumbers ?? ["+14155550100"]);
   const json = (body: unknown, status = 200) =>
     new Response(status === 204 ? null : JSON.stringify(body), {
       status,

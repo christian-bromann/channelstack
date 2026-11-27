@@ -3523,7 +3523,7 @@ class TwilioMessage:
         self.to: str = data["to"]
         self.text: str = data["text"]
         self.segments: int = data["segments"]
-        self.status: Literal["queued", "sending", "sent", "delivered", "undelivered", "failed", "received", "canceled"] = data["status"]
+        self.status: Literal["accepted", "queued", "sending", "sent", "delivered", "undelivered", "failed", "received", "canceled"] = data["status"]
         self.error_code: int | None = data.get("errorCode")
         self.at: str = data["at"]
         self.delivery: TwilioDelivery | None = None if data.get("delivery") is None else TwilioDelivery(ctx, data["delivery"])

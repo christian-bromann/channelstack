@@ -94,7 +94,26 @@ describe("exit check 10.7: Twilio live", () => {
     expect(stub.messages).toEqual([]);
   });
 
-  test("a person on the agent's own account, by the number the test names", async () => {
+  test("a person on the agent's own account: one answer read, and every copy deleted", async () => {
+    const stub = twilioStub({ agentNumbers: [AGENT_NUMBER, "+14155550102"] });
+    const twilio = await liveTwilio(stub, `${AGENT_NUMBER},+14155550102`).open();
+    const { app } = (await twilio("GET", "")).body;
+    // The agent's account has one allowlisted number besides the agent's: it is Ana's.
+    const ana = (await twilio("POST", "/users", { name: "Ana", token: stub.agent.credential })).body;
+    expect(ana.number).toBe("+14155550102");
+    const text = (await twilio("POST", `/users/${encodeURIComponent(ana.id)}/text`, { body: "Where?", to: app.id }))
+      .body;
+    stub.agentReplies("+14155550102", "Your order shipped.");
+    // Both copies of the answer are on the one account; Ana's phone got one of them.
+    const replies = (await twilio("GET", `/conversations/${text.conversation.id}/replies`)).body;
+    expect(replies.map((reply: { text: string }) => reply.text)).toEqual(["Your order shipped."]);
+    expect((await twilio("GET", `/users/${encodeURIComponent(ana.id)}/messages`)).body).toHaveLength(1);
+    expect(stub.messages).toHaveLength(4);
+    await twilio.close();
+    expect(stub.messages).toEqual([]);
+  });
+
+  test("a person whose account has two allowlisted numbers names theirs", async () => {
     const stub = twilioStub();
     const shared = stub.account("shared", ["+14155550102", "+14155550103"]);
     const twilio = await liveTwilio(stub, `${AGENT_NUMBER},+14155550102,+14155550103`).open();

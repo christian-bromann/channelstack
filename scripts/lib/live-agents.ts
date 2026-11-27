@@ -89,10 +89,12 @@ const isRelay = (url: string | undefined) => {
  * A platform's webhooks, from its relay channel to the agent here. A channel's URL is never
  * printed: anyone who has it can read the events.
  */
-async function relay(name: string, source: string, target: string, stops: Stop[]): Promise<void> {
+async function relay(name: string, source: string, target: string, stops: Stop[], form = false): Promise<void> {
+  // A form goes back to being one first, so what is recorded is what the platform sent.
+  const recorded = tap ? await tapped(name.toLowerCase(), target, tap, stops) : target;
   const smee = new SmeeClient({
     source,
-    target: tap ? await tapped(name.toLowerCase(), target, tap, stops) : target,
+    target: form ? await asForm(recorded, stops) : recorded,
     logger: {
       info: () => {},
       // The reason, never a URL: the relay channel's is a secret.
@@ -107,10 +109,17 @@ async function relay(name: string, source: string, target: string, stops: Stop[]
   stops.push(() => smee.stop());
 }
 
-/** A webhook's event type, the way the platform names it: GitHub's header, Linear's and Notion's `type`. */
+/**
+ * A webhook's event type, the way the platform names it: GitHub's header, Linear's and Notion's
+ * `type`; for Twilio's forms, as the fake names its deliveries: `status` for a status callback
+ * (it has a `MessageStatus`), `message` for a text.
+ */
 function eventType(headers: IncomingHttpHeaders, body: string): string {
   const header = headers["x-github-event"];
   if (typeof header === "string") return header;
+  if (String(headers["content-type"] ?? "").startsWith("application/x-www-form-urlencoded")) {
+    return new URLSearchParams(body).has("MessageStatus") ? "status" : "message";
+  }
   try {
     return String((JSON.parse(body) as { type?: unknown }).type ?? "unknown");
   } catch {
@@ -181,7 +190,7 @@ async function webhookAgent(
   const agent = spawnAgent(options.dir, { ...options.env, PORT: String(port) }, stops);
   await listening(name, agent, port);
   const target = `http://127.0.0.1:${port}${options.path}`;
-  await relay(name, options.source, options.form ? await asForm(target, stops) : target, stops);
+  await relay(name, options.source, target, stops, options.form);
   say(`${name}: the reference agent takes the platform's webhooks through its relay channel`);
 }
 

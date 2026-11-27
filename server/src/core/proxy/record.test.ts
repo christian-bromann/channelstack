@@ -106,6 +106,8 @@ describe("the recorder", () => {
         }),
       }).toString(),
     );
+    // Twilio's webhooks are forms, by their fields.
+    recorder.webhook("twilio", "message", new URLSearchParams({ Body: "hi", NumMedia: "0" }).toString());
     const file = join(dir, "shapes.jsonl");
     expect(statSync(file).mode & 0o777).toBe(0o600);
     const lines = readFileSync(file, "utf8")
@@ -150,6 +152,7 @@ describe("the recorder", () => {
           },
         },
       },
+      { kind: "webhook", channel: "twilio", operation: "message", shape: { Body: "string", NumMedia: "string" } },
     ]);
     expect(readFileSync(file, "utf8")).not.toMatch(/xoxb-secret|hello|"hi"|deploy:|approve|reason|late/);
   });

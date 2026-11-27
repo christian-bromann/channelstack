@@ -15,7 +15,7 @@ This page shows how to test an agent that answers text messages on a Twilio numb
 
 The agent has a Twilio account and a number whose messaging webhook points at it. When someone texts the number, Twilio posts the message to that webhook as a form (`MessageSid`, `From`, `To`, `Body`, …), signed with `X-Twilio-Signature`: HMAC-SHA1 with the account's Auth Token over the URL and the sorted parameters. The agent checks it with `twilio.validateRequest`.
 
-It answers in one of two ways: with TwiML in its answer to the webhook (`<Response><Message>…</Message></Response>`), or by calling `client.messages.create({ to, from, body })`, the number that texted being `From`. With a `statusCallback`, Twilio tells it what became of each text: `queued`, `sent`, then `delivered` or `undelivered`.
+It answers in one of two ways: with TwiML in its answer to the webhook (`<Response><Message>…</Message></Response>`), or by calling `client.messages.create({ to, from, body })`, the number that texted being `From`. With a `statusCallback`, Twilio tells it what became of each text: `sent`, then `delivered` or `undelivered` (through a Messaging Service, `queued` first: such a text is `accepted` until a sender is picked).
 
 ## Connecting the agent
 
@@ -62,9 +62,9 @@ The fake is one account with one number, in the range of numbers kept for fictio
 | Sending | `messages.create` with `To`, `From` or `MessagingServiceSid`, `Body`, `MediaUrl`, `StatusCallback`; basic auth with the Account SID and Auth Token, or the API key and its secret |
 | Reading | `messages.list` (`To`, `From`, `DateSent`, paging, newest first), `fetch`, `update` (an empty `Body` redacts), `remove`; `accounts.fetch`, `incomingPhoneNumbers.list` |
 | Webhooks | A text to the number, form-encoded and signed, with `I-Twilio-Idempotency-Token` (the same on a retry); Twilio's 15-second wait and one retry on a connection failure, or what the URL's connection overrides say |
-| TwiML | Each `<Message>` of the agent's answer is sent, to the sender unless its `to` says otherwise, with its `statusCallback`; a retry's answer is acted on too |
-| Status callbacks | `queued`, `sent`, then `delivered`, or `undelivered` with `ErrorCode` 30003 for a phone that's off |
-| Opt-out | A person who texts `STOP` gets Twilio's own answer, the agent's webhook gets `OptOutType=STOP`, and the agent can't text them (21610) until they text `START`. `HELP` gets Twilio's answer too |
+| Answers | Each `<Message>` of the agent's TwiML answer is sent, to the sender unless its `to` says otherwise, with its `statusCallback`; a `text/plain` answer is sent back as it is; a retry's answer is acted on too |
+| Status callbacks | Each change from the status a send was answered with: `sent`, then `delivered`, or `undelivered` with `ErrorCode` 30003 for a phone that's off; through a Messaging Service `queued` first |
+| Opt-out | A person who texts `STOP` gets Twilio's own answer, the agent's webhook gets the text as it is (`OptOutType` comes only with Advanced Opt-Out, which the fake doesn't have), and the agent can't text them (21610) until they text `START`. `HELP` gets Twilio's answer too |
 
 Answers and errors have Twilio's shapes, held to its OpenAPI description: messages are what the description says, and a refusal is `{ code, message, more_info, status }`, with Twilio's codes: 21211 for an invalid `To`, 21606 for a `From` that isn't the account's, 21617 for a body over 1600 characters, 20003 for wrong credentials, and the others. SIDs are Twilio's (`SM` and 32 hex characters), numbers E.164, and `num_segments` is counted as Twilio counts it: 160 GSM-7 characters in one segment and 153 in each of several, 70 and 67 for anything else.
 

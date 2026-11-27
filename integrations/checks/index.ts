@@ -661,10 +661,15 @@ export function twilioChecks(options: ChecksOptions): void {
 
   describe(`twilio checks: ${app}`, () => {
     check("twilio.reply-to-sender", "answers a text, to the number that sent it", async (context) => {
-      const { ana } = await texted(context);
-      // The answer reaches Ana's phone: it went to `From`, not to the agent's own number.
-      const answer = await ana.waitForMessage({ from: app, ...wait });
-      expect(answer.to, "the answer went to another number: answer the webhook's `From`").toBe(ana.number);
+      const { text } = await texted(context);
+      // An answer to any number but `From` never reaches Ana's conversation with the agent (to its
+      // own number, `To`, Twilio refuses it), so waiting for it there is the check.
+      await text.conversation.waitForReply({ from: app, ...wait }).catch((error: unknown) => {
+        throw new Error(
+          `No answer reached ${text.from}, the number that texted: answer the webhook's \`From\`, not \`To\``,
+          { cause: error },
+        );
+      });
     });
 
     check("twilio.redelivery", "a webhook Twilio sends again doesn't produce a second answer", async (context) => {

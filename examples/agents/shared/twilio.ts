@@ -40,6 +40,13 @@ export function scriptedText(body: string): string {
   return `Thanks for your text. You wrote: ${body.trim()}`;
 }
 
+/**
+ * A keyword Twilio answers itself with its default opt-out handling (`STOP`, `START`, `HELP` and
+ * their synonyms), which an agent leaves alone: after `STOP` it may not text the person at all.
+ */
+export const twilioKeyword = (body: string): boolean =>
+  /^(stop|stopall|stop all|unsubscribe|cancel|end|quit|optout|revoke|start|yes|unstop|help|info)$/i.test(body.trim());
+
 /** A form body's parameters, as Twilio posts them. */
 export const formParams = (body: string): Record<string, string> => Object.fromEntries(new URLSearchParams(body));
 

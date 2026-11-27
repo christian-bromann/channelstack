@@ -21,13 +21,11 @@ export interface TwilioPersonRecord {
   readonly number: string;
   /** False for a phone that's off: what the agent sends them ends `undelivered` (30003). */
   readonly reachable: boolean;
-  /** The test chose the number: freed again when its session closes (decision 0006). */
-  readonly fixedId: boolean;
 }
 
 /** A message's status, as Twilio names them. */
 export type TwilioMessageStatus =
-  "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
+  "accepted" | "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
 
 /** `inbound` to the agent's number, `outbound-api` through the REST API, `outbound-reply` through TwiML. */
 export type TwilioDirection = "inbound" | "outbound-api" | "outbound-reply";

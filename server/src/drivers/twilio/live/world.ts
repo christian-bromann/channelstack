@@ -4,7 +4,6 @@ import { LivePeople } from "../../../core/people/index.ts";
 import { fakeActorInLiveWorld, liveMisconfigured, unsupportedInLive } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { LiveContext } from "../../../core/router/index.ts";
-import type { TranscriptPrincipal } from "../../../core/router/inspect.ts";
 import { LiveCredential } from "../../../core/secrets/index.ts";
 import type { TwilioWorld } from "../backend.ts";
 import { TwilioStore } from "../fake/store.ts";
@@ -148,14 +147,6 @@ export function createLiveTwilioWorld(deps: {
     store.seed({ id: found?.sid ?? number, name: deps.appName, number, accountSid: sid, messagingServiceSid: "" });
   };
 
-  const principalOf = (message: TwilioMessageRecord): TranscriptPrincipal => {
-    if (message.author === store.app.id) return { id: store.app.id, name: store.app.name, kind: "app" };
-    const person = message.author === undefined ? undefined : store.users.find(message.author);
-    return person
-      ? { id: person.id, name: person.name, kind: "user" }
-      : { id: message.from, name: message.from, kind: "user" };
-  };
-
   const world = {
     store,
 
@@ -187,11 +178,7 @@ export function createLiveTwilioWorld(deps: {
       if (number === store.app.number) throw new ProtocolError("invalid_argument", `${number} is the agent's number`);
       if (!since.has(session)) since.set(session, clock() - CLOCK_SKEW_MS);
       people.join(session, number, input.name, credential);
-      return store.users.add(
-        number,
-        { id: number, name: input.name, number, reachable: true, fixedId: false },
-        session,
-      );
+      return store.users.add(number, { id: number, name: input.name, number, reachable: true }, session);
     },
 
     /** A person texts from their number, through their account. Every recipient is allowlisted first. */
@@ -218,8 +205,10 @@ export function createLiveTwilioWorld(deps: {
     },
 
     /**
-     * Read back, for each person of the session, what reached them from the agent (on their own
-     * account), and the agent's copies of both directions (on its account), each onto the ledger.
+     * Read back, for each person of the session, what reached them from the agent: the inbound copy
+     * on their own account (with the agent's number on the same account, its outbound copy is
+     * listed there too, and is only put on the ledger). Then the agent's copies of both directions,
+     * on its account, onto the ledger as well: each copy is a message of its own, deleted on its own.
      */
     async refresh(session: string) {
       if (clock() - (read.get(session) ?? 0) < READ_CACHE_MS) return;
@@ -229,10 +218,9 @@ export function createLiveTwilioWorld(deps: {
       for (const { id: number, credential } of people.of(session)) {
         for (const wire of await listed(credential, store.app.number, number, after)) {
           ledger(session, wire.sid, number, credential);
-          mirror(session, wire);
+          if (wire.direction === "inbound") mirror(session, wire);
         }
-        if (!agent || accountOf(agent) === accountOf(credential)) continue;
-        // The agent's account keeps its own copies: what it received from the person, and what it sent them.
+        if (!agent) continue;
         for (const [from, to] of [
           [number, store.app.number],
           [store.app.number, number],
@@ -241,8 +229,6 @@ export function createLiveTwilioWorld(deps: {
         }
       }
     },
-
-    principalOf,
 
     /** Whose credential removes a ledger entry: the agent's (`app`), or a person's of the session. */
     credential: (owner: string, session: string) => (owner === "app" ? app : people.byOwner(session, owner)),

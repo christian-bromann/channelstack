@@ -1,4 +1,5 @@
 import type { Collection, Registry } from "../../../core/registry/index.ts";
+import type { TranscriptPrincipal } from "../../../core/router/inspect.ts";
 import type { TwilioAppRecord, TwilioConversationRecord, TwilioMessageRecord, TwilioPersonRecord } from "../world.ts";
 
 /** Two numbers in the order a conversation keeps them. */
@@ -12,8 +13,11 @@ export class TwilioStore {
   readonly users: Collection<TwilioPersonRecord>;
   readonly messages: Collection<TwilioMessageRecord>;
   readonly conversations: Collection<TwilioConversationRecord>;
-  /** The people who texted `STOP` to the agent's number: Twilio sends them nothing from it until `START`. */
-  readonly optedOut = new Set<string>();
+  /**
+   * The people who texted `STOP` to the agent's number, with the session they did it in: Twilio
+   * sends them nothing from it until `START`, and a closed session's opt-outs go with it.
+   */
+  readonly optedOut = new Map<string, string>();
   #app: TwilioAppRecord | undefined;
 
   constructor(registry: Registry) {
@@ -31,6 +35,24 @@ export class TwilioStore {
   seed(app: TwilioAppRecord): void {
     this.#app = app;
     this.optedOut.clear();
+  }
+
+  /**
+   * Who wrote a message: the app, a person, Twilio for its own answers to `STOP`, `START` and `HELP`
+   * (from the agent's number, but not the agent's), or for a number no one in the test has, that number.
+   */
+  principalOf(message: TwilioMessageRecord): TranscriptPrincipal {
+    if (message.automatic) return { id: "twilio", name: "Twilio", kind: "app" };
+    if (message.author === this.app.id) return { id: this.app.id, name: this.app.name, kind: "app" };
+    const person = message.author === undefined ? undefined : this.users.find(message.author);
+    return person
+      ? { id: person.id, name: person.name, kind: "user" }
+      : { id: message.from, name: message.from, kind: "user" };
+  }
+
+  /** Forget a closed session's opt-outs: the numbers are free for another test. */
+  release(session: string): void {
+    for (const [number, owner] of this.optedOut) if (owner === session) this.optedOut.delete(number);
   }
 
   /** The person with this number, in any session. */

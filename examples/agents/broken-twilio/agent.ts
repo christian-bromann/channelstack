@@ -5,7 +5,7 @@
  */
 import twilio from "twilio";
 
-import { formParams, listen, twilioClient } from "../shared/twilio.ts";
+import { formParams, listen, twilioClient, twilioKeyword } from "../shared/twilio.ts";
 
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, PORT } = process.env;
 if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER || !PORT) {
@@ -24,7 +24,7 @@ async function reply(params: Record<string, string>) {
   // Bug: answers every time Twilio sends the webhook, not once per text.
   if (answered.has(sid) && !broken("twilio.redelivery")) return;
   answered.add(sid);
-  if (params.OptOutType !== undefined) return;
+  if (twilioKeyword(params.Body ?? "")) return;
   await client.messages.create({
     // Bug: answers the webhook's `To`, the agent's own number, instead of `From`, who texted.
     to: (broken("twilio.reply-to-sender") ? params.To : params.From) ?? "",

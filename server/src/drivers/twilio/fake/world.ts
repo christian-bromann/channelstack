@@ -2,7 +2,6 @@ import type { DeliveryAttempt, RetryPolicy } from "../../../core/delivery/index.
 import { deliveryKit, fixedRetries } from "../../../core/delivery/kit.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { DriverContext } from "../../../core/router/index.ts";
-import type { TranscriptPrincipal } from "../../../core/router/inspect.ts";
 import { TWILIO_IDS } from "../ids.ts";
 import { twilioPayloads } from "../payloads.ts";
 import { TWILIO_SECRETS } from "../secrets.ts";
@@ -40,15 +39,19 @@ const refused = (code: number, message: string) => new TwilioApiError(400, code,
  */
 function connectionOverrides(url: string) {
   const fragment = new URLSearchParams(url.split("#")[1] ?? "");
-  const number = (name: string, fallback: number) => {
+  /** An override, held to the range Twilio documents for it; one that isn't a number is left out. */
+  const number = (name: string, fallback: number, [min, max]: readonly [number, number]) => {
     const value = Number(fragment.get(name));
-    return fragment.has(name) && Number.isFinite(value) && value >= 0 ? value : fallback;
+    return fragment.has(name) && Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback;
   };
   const policy = fragment.get("rp")?.split(",") ?? [...DEFAULT_OVERRIDES.policy];
   return {
     url: url.split("#")[0] as string,
-    timeoutMs: Math.min(number("tt", DEFAULT_OVERRIDES.totalMs), number("rt", DEFAULT_OVERRIDES.readMs)),
-    retry: retryPolicy(Math.min(number("rc", DEFAULT_OVERRIDES.retries), 5), policy),
+    timeoutMs: Math.min(
+      number("tt", DEFAULT_OVERRIDES.totalMs, [100, 15_000]),
+      number("rt", DEFAULT_OVERRIDES.readMs, [100, 15_000]),
+    ),
+    retry: retryPolicy(number("rc", DEFAULT_OVERRIDES.retries, [0, 5]), policy),
   };
 }
 
@@ -93,14 +96,6 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
     secret: () => context.secret("authToken"),
     forgedSecret: () => TWILIO_SECRETS.authToken.generate(),
   });
-
-  const principalOf = (message: TwilioMessageRecord): TranscriptPrincipal => {
-    if (message.author === store.app.id) return { id: store.app.id, name: store.app.name, kind: "app" };
-    const person = message.author === undefined ? undefined : store.users.find(message.author);
-    return person
-      ? { id: person.id, name: person.name, kind: "user" }
-      : { id: message.from, name: message.from, kind: "user" };
-  };
 
   /** A message's record, in its conversation. */
   const record = (
@@ -158,7 +153,8 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
         body: input.body,
         media: input.media,
         direction,
-        status: "queued",
+        // Through a Messaging Service, Twilio has yet to pick a sender: `accepted`.
+        status: input.messagingServiceSid === undefined ? "queued" : "accepted",
         errorCode: undefined,
         author: store.app.id,
         automatic: false,
@@ -171,9 +167,17 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
   };
 
   /** What happens to a sent message after Twilio took it: on its way, then on the phone, or not. */
+  /**
+   * What happens to a sent message after Twilio took it. A callback tells of each change from the
+   * status it was answered with: through a Messaging Service, `accepted`, then `queued` once a sender
+   * is chosen; then `sent`, and `delivered` or `undelivered`.
+   */
   const deliver = (message: TwilioMessageRecord) => {
     const person = store.personAt(message.to);
-    statusCallback(message, "queued");
+    if (message.status === "accepted") {
+      message.status = "queued";
+      statusCallback(message, "queued");
+    }
     message.status = "sent";
     message.sentAt = clock();
     message.updatedAt = clock();
@@ -216,9 +220,18 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
     if (store.optedOut.has(input.to)) throw refused(21610, "Attempt to send to unsubscribed recipient");
   };
 
-  /** What the agent's TwiML answer to a text sends: each `<Message>`, back to the sender unless it says otherwise. */
-  const answerWith = (incoming: TwilioMessageRecord, xml: string) => {
-    for (const message of readTwiml(xml)) {
+  /**
+   * What the agent's answer to a text sends: each `<Message>` of TwiML, back to the sender unless it
+   * says otherwise. A plain-text answer is sent back as it is, as Twilio does with `text/plain`.
+   */
+  const answerWith = (incoming: TwilioMessageRecord, answer: { contentType: string; body: string }) => {
+    const plain = answer.contentType.toLowerCase().startsWith("text/plain");
+    const messages = plain
+      ? answer.body.trim() === ""
+        ? []
+        : [{ to: undefined, from: undefined, body: answer.body, media: [], statusCallback: undefined }]
+      : readTwiml(answer.body);
+    for (const message of messages) {
       const input: SendInput = {
         to: message.to ?? incoming.from,
         from: message.from ?? incoming.to,
@@ -233,10 +246,10 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
   };
 
   /** Send the agent the webhook of a text to its number. */
-  const emitIncoming = (session: string, message: TwilioMessageRecord, optOutType: string | undefined) => {
+  const emitIncoming = (session: string, message: TwilioMessageRecord) => {
     if (context.webhookUrl === undefined) return undefined;
     const { url, timeoutMs, retry } = connectionOverrides(context.webhookUrl);
-    const body = twilioPayloads.incoming(message, store.app, optOutType);
+    const body = twilioPayloads.incoming(message, store.app);
     const delivery = deliveries.send({
       id: ids.next(TWILIO_IDS.idempotency),
       session,
@@ -251,17 +264,13 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
         conversation: message.conversation,
         payload: Object.fromEntries(new URLSearchParams(body)),
       },
-      answered: (answer) => {
-        // Twilio reads the answer as TwiML whatever its type; an empty one sends nothing.
-        answerWith(message, answer.body);
-      },
+      answered: (answer) => answerWith(message, answer),
     });
     return delivery.request.id;
   };
 
   return {
     store,
-    principalOf,
     check,
 
     /** A person: a phone, with a number the fake hands out unless the test gives one. Their id is their number. */
@@ -281,7 +290,6 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
         name: input.name,
         number,
         reachable: input.reachable ?? true,
-        fixedId: input.number !== undefined,
       };
       return store.users.add(number, person, session);
     },
@@ -316,9 +324,10 @@ export function createFakeWorld(context: DriverContext, store: TwilioStore) {
       );
       if (!toApp) return message;
       const optOut = optOutTypeOf(input.body);
-      if (optOut === "STOP") store.optedOut.add(person.number);
+      if (optOut === "STOP") store.optedOut.set(person.number, session);
       if (optOut === "START") store.optedOut.delete(person.number);
-      message.delivery = emitIncoming(session, message, optOut);
+      // With Twilio's default opt-out handling the agent gets the text as it is, `STOP` too.
+      message.delivery = emitIncoming(session, message);
       if (optOut !== undefined) {
         // Twilio's own answer, from the agent's number: the agent didn't write it.
         record(

@@ -9,7 +9,7 @@ channelstack adds **Twilio** (phase 10): people text the agent's Twilio number, 
 Programmable Messaging, SMS first:
 - **Inbound texts:** the agent's number's messaging webhook, form-encoded and signed with `X-Twilio-Signature` (HMAC-SHA1 with the Auth Token over the URL and the sorted parameters). Twilio's timeouts and retries, with the connection overrides a webhook URL carries in its fragment.
 - **Answers:** `POST /2010-04-01/Accounts/{AccountSid}/Messages.json`, with basic auth (the Account SID and Auth Token, or an API key), from the number or its Messaging Service; or TwiML in the answer to the webhook.
-- **Status callbacks:** `queued`, `sent`, then `delivered`, `undelivered` or `failed`, at the `StatusCallback` the agent gave.
+- **Status callbacks:** each change from the status a send was answered with (`accepted` through a Messaging Service, then `queued`; `sent`; then `delivered`, `undelivered` or `failed`), at the `StatusCallback` the agent gave.
 - **What Twilio refuses**, with its error codes and shape, its test credentials and magic numbers, E.164, the 1600-character limit and segments, and its default opt-out handling (`STOP`, `START`, `HELP`).
 
 Not Voice, Conversations or Verify. Voice is a call, not a conversation a test reads; Conversations is a different product with its own API and webhooks; Verify is sign-in.

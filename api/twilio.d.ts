@@ -69,8 +69,12 @@ export interface TwilioUser extends User {
 // Messages
 // ---------------------------------------------------------------------------
 
-/** What became of a message, as Twilio names it. A person's text to the agent is `received`. */
+/**
+ * What became of a message, as Twilio names it. A person's text to the agent is `received`; one the
+ * agent sends through a Messaging Service is `accepted` until a sender is picked.
+ */
 export type TwilioMessageStatus =
+  | "accepted"
   | "queued"
   | "sending"
   | "sent"
@@ -85,7 +89,10 @@ export interface TwilioMessage extends Resource {
   readonly channel: "twilio";
   /** The conversation between its two numbers. */
   readonly conversation: TwilioConversation;
-  /** Who wrote it: a person, the app, or for a number no one in the test has, that number. */
+  /**
+   * Who wrote it: a person, the app, Twilio (`twilio`) for its own answers to `STOP`, `START` and
+   * `HELP`, or for a number no one in the test has, that number.
+   */
   readonly author: Principal;
   readonly from: string;
   readonly to: string;

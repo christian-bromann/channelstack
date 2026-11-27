@@ -4809,7 +4809,7 @@ export interface TwilioMessageData {
   to: string;
   text: string;
   segments: number;
-  status: "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
+  status: "accepted" | "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
   errorCode?: number;
   at: string;
   delivery?: TwilioDeliveryData;
@@ -4824,7 +4824,7 @@ export class TwilioMessage {
   readonly to: string;
   readonly text: string;
   readonly segments: number;
-  readonly status: "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
+  readonly status: "accepted" | "queued" | "sending" | "sent" | "delivered" | "undelivered" | "failed" | "received" | "canceled";
   readonly errorCode: number | undefined;
   readonly at: string;
   readonly delivery: TwilioDelivery | undefined;
