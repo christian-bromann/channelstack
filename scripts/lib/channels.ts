@@ -62,6 +62,8 @@ export const HARNESS = {
       "test/acceptance/checks/github-checks.test.ts",
       // The checks against the second App, `coder` (exit check 12.7).
       "test/acceptance/checks/github-checks-coder.test.ts",
+      // Twenty two-App sessions at once (exit check 12.10).
+      "test/acceptance/apps",
     ],
     agents: { probot: "/api/github/webhooks", "chat-sdk-github": "/api/webhooks/github" },
     broken: { agent: "broken-github", path: "/api/webhooks/github" },
