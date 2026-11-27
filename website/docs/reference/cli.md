@@ -71,7 +71,7 @@ The attach commands act in one long-lived session named `dev`, which the CLI, th
 | Channel | A place is | Named by | Made |
 |---|---|---|---|
 | `slack` | a channel | its name, `"#support"` | with the person and the app in it; someone in it invites a person who isn't |
-| `github` | an issue or a pull request | its title | as an issue in the org's public `dev` repository, which has the app installed |
+| `github` | an issue or a pull request | its title | as an issue in the org's public `dev` repository, which has the app installed; whoever first acts on GitHub is its admin (pushes, labels, merges), the others may what anyone may on a public repository |
 | `linear` | an issue | its title | in a team named Dev |
 | `notion` | a page | its title | connected to the integration |
 | `resend`, `google` | an email thread | its subject | by the person's email to the agent |

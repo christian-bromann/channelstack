@@ -21,7 +21,7 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
   definition has one (`dev`, in the driver's `dev.ts`; the email channels share `core/email/dev.ts`).
   It is written against the channel's control API, so the CLI, MCP and the UI use the same code. An
   adapter says only what differs: what a place is (a Slack channel, a GitHub issue or pull request in
-  the org's public `dev` repository, a Linear issue in a team named Dev, a Notion page connected to
+  the org's public `dev` repository (its admin is whoever first acts on GitHub), a Linear issue in a team named Dev, a Notion page connected to
   the integration, an email thread to the agent), how its places are listed (`listing`: a list route
   and templates for a place's id, name and transcript), how to make one with the app in it, how a
   person says, replies and reacts there, and which handles an entry stands for (`refs`).
@@ -30,7 +30,9 @@ transcript per place, and the inspection routes. The SDKs are generated from tha
   equal times the one listed later, so GitHub's list is the most recently updated last; Slack says
   which entry is newest itself, `newest`); references,
   `<place>:<entry>` with the ids `show --json` lists, or a place by name; and who started a thread.
-  Times are compared as instants: channels write them to different precisions.
+  Times are compared as instants: channels write them to different precisions, and an adapter may
+  say more precisely when an entry was written (`time`: Slack from `ts`; GitHub, whose times are to
+  the second, from when its issue last changed, which its list says to the millisecond).
 - **List routes, one per channel and kind:** `GET /users` on every channel, GitHub's `/repos` and
   `/issues`, Linear's `/teams` and `/issues`, Notion's `/pages`, the email channels' `/threads`.
   Slack had `/users` and `/conversations`. They are fixture reads in the SDKs too
