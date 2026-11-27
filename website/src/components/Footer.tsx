@@ -11,6 +11,7 @@ const DOCS = [
   ["Notion", "/docs/platforms/notion"],
   ["Resend", "/docs/platforms/resend"],
   ["Google", "/docs/platforms/google"],
+  ["Discord", "/docs/platforms/discord"],
   ["Live mode", "/docs/guide/live-mode"],
   ["Reference", "/docs/reference"],
 ] as const;
@@ -26,8 +27,8 @@ export function Footer() {
           </Link>
           <p className="legal">
             MIT licensed. channelstack is an independent project, not affiliated with or endorsed by Slack, GitHub,
-            Linear, Notion, Resend or Google. All names and logos shown, including TypeScript, Python and Rust, are
-            trademarks of their owners. The docs' assistant and editor icons are from{" "}
+            Linear, Notion, Resend, Google or Discord. All names and logos shown, including TypeScript, Python and Rust,
+            are trademarks of their owners. The docs' assistant and editor icons are from{" "}
             <a href="https://github.com/lobehub/lobe-icons">Lobe Icons</a> (MIT) and Microsoft's{" "}
             <a href="https://github.com/microsoft/vscode-codicons">Codicons</a> (
             <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>).

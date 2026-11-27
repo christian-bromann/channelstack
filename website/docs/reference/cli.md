@@ -42,7 +42,7 @@ npx channelstack show
 | `channelstack --version`, `-v` | Print the version |
 | `channelstack --help`, `-h` | Print the usage |
 
-`<channel>` is `slack`, `github`, `linear`, `notion`, `resend` or `google`: every channel has the same commands.
+`<channel>` is `slack`, `github`, `linear`, `notion`, `resend`, `google` or `discord`: every channel has the same commands.
 
 ## Exit codes
 
@@ -75,6 +75,7 @@ The attach commands act in one long-lived session named `dev`, which the CLI, th
 | `linear` | an issue | its title | in a team named Dev |
 | `notion` | a page | its title | connected to the integration |
 | `resend`, `google` | an email thread | its subject | by the person's email to the agent |
+| `discord` | a channel | its name, `"#support"` | private to its participants, with the person and the app in it; the first person who acts on Discord is the guild's admin, and adds a person who isn't in it |
 
 Where a command takes an entry (a message, a comment, an email), `last` means the newest entry of the channel's most recently active place in the `dev` session. Any entry can be named `<place>:<entry>`, as `say` and `reply` print them and `show --json` lists the entries' ids, and a place by its name stands for its newest entry.
 
@@ -93,7 +94,7 @@ channelstack [start] [--no-portless] [--port <n>] [--server-file <path>] [--log-
 | `--port <n>` | `0` with portless (a free port), `4500` without | The loopback port. `0` picks a free one |
 | `--server-file <path>` | `CHANNELSTACK_SERVER_FILE`, else `<home>/server.json` | Where to write the control API's URL and token (0600) |
 | `--log-level <level>` | `CHANNELSTACK_LOG_LEVEL`, else `info` | `debug`, `info`, `warn`, `error` or `silent`. Logs go to stderr |
-| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com`, `api.resend.com`, `gmail.googleapis.com`, `oauth2.googleapis.com` and `www.googleapis.com` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
+| `--proxy` | off | Also run an HTTP proxy for apps with hard-coded hosts: `slack.com`, `api.github.com`, `api.linear.app`, `api.notion.com`, `api.resend.com`, `gmail.googleapis.com`, `oauth2.googleapis.com`, `www.googleapis.com`, `discord.com` and `gateway.discord.gg` go to the fakes, every other host passes through. See [Proxy mode](/docs/guide/proxy-mode) |
 | `--proxy-port <n>` | `7464` | The proxy's loopback port. `0` picks a free one. Needs `--proxy` |
 | `--record <dir>` | none | Write the shape of every exchange with those hosts, and of every webhook, to `<dir>/shapes.jsonl`: structure only, never a value. Needs `--proxy` |
 
@@ -166,7 +167,7 @@ channelstack <channel> reply --as <name> [--to last|<ref>] "<text>"
 | `--as <name>` | yes | Who replies |
 | `--to <ref>`, `--thread <ref>` | no, default `last` | The entry to answer |
 
-In its thread where the channel has them (a Slack thread, a Linear comment's, a Notion discussion), otherwise a new comment in the place (GitHub), or an answer to that email. A reply on a GitHub diff is the `reply` action. Prints `<name> replied (<place>:<entry>)`.
+In its thread where the channel has them (a Slack thread, a Linear comment's, a Notion discussion), otherwise a new comment in the place (GitHub), an answer to that email, or Discord's reply, which quotes the message. A reply on a GitHub diff is the `reply` action. Prints `<name> replied (<place>:<entry>)`.
 
 ## `channelstack <channel> react`
 
@@ -179,7 +180,7 @@ channelstack <channel> react --as <name> <emoji> [--on last|<ref>]
 | `--as <name>` | yes | Who reacts |
 | `--on <ref>` | no, default `last` | The entry |
 
-On Slack, GitHub (`:eyes:`, `eyes` and `+1` alike, as GitHub's reaction names) and Linear (comments only). Notion and email have no reactions: `` people don't react on Notion. ``. Prints `<name> reacted with <emoji> (<place>:<entry>)`.
+On Slack, GitHub (`:eyes:`, `eyes` and `+1` alike, as GitHub's reaction names), Linear (comments only) and Discord (`:eyes:` is the emoji named `eyes`). Notion and email have no reactions: `` people don't react on Notion. ``. Prints `<name> reacted with <emoji> (<place>:<entry>)`.
 
 ## `channelstack <channel> actions`
 
@@ -199,7 +200,7 @@ channelstack <channel> act <action> …
 | `--on <ref>` | no | The target is this entry. Without `--in` and `--on`, it is `last` |
 | `--<value name> <value>` | as the action needs | A value by name; the first values can also come in order, without names |
 
-The actions are generated from the routes: every action of the channel's person handle in the SDKs that isn't a read, such as `click`, `stop`, `select`, `invite` on Slack, `review`, `merge`, `label`, `requestReview` on GitHub, `delegate`, `setState`, `prompt` on Linear, `resolve`, `setProperty`, `mention` on Notion, `send` on email. A value is read as its type: a number, `true` or `false`, JSON for an object or a list, and a value with a shorthand as that text (a Slack button's label). A person is named, the agent's app is `app` or its name, and a handle is `last` or an id (`<field>:<field>` for one with several). A reference the action needs and isn't given comes from the target (its message, its issue, its thread, the app), and so does the place itself when the action takes it and no reference was given. `act <action>` is for an action named like a command (Slack's own `say`, with its blocks and files).
+The actions are generated from the routes: every action of the channel's person handle in the SDKs that isn't a read, such as `click`, `stop`, `select`, `invite` on Slack, `review`, `merge`, `label`, `requestReview` on GitHub, `delegate`, `setState`, `prompt` on Linear, `resolve`, `setProperty`, `mention` on Notion, `send` on email, `edit`, `startThread`, `runCommand`, `click` on Discord. A value is read as its type: a number, `true` or `false`, JSON for an object or a list, and a value with a shorthand as that text (a Slack button's label). A person is named, the agent's app is `app` or its name, and a handle is `last` or an id (`<field>:<field>` for one with several). A reference the action needs and isn't given comes from the target (its message, its issue, its thread, the app), and so does the place itself when the action takes it and no reference was given. `act <action>` is for an action named like a command (Slack's own `say`, with its blocks and files).
 
 ```bash
 channelstack slack click --as ana "Approve"          # the button labelled Approve, in the latest conversation
@@ -243,7 +244,7 @@ Prints the `dev` session's events as they happen, one line each: `<HH:MM:SS.mmm>
 channelstack deliveries [<channel>]
 ```
 
-Prints one line per delivery in the `dev` session, oldest first. `<channel>` is `slack`, `github`, `linear`, `notion`, `resend` or `google`; with one, only that channel's:
+Prints one line per delivery in the `dev` session, oldest first. `<channel>` is `slack`, `github`, `linear`, `notion`, `resend`, `google` or `discord`; with one, only that channel's:
 
 ```
 <id>  <type> <event type or action>  <status>  (attempts: <HTTP status of each attempt, or ->)
@@ -326,7 +327,7 @@ channelstack login slack --user <name> [--save <path>]
 | `--user <name>` | yes | The sandbox person, e.g. `ana` |
 | `--save <path>` | no | Also save the session here, e.g. `.auth/ana-slack.json` for a test that names it |
 
-Opens a browser window at the live workspace's sign-in page. You sign in by hand; channelstack never types or sees a password. Once signed in, it saves the session's cookies to `<home>/browser/slack-<name>.json` (0600), where the browser actor looks for them. Only `slack` is supported.
+Opens a browser window at the live workspace's sign-in page. You sign in by hand; channelstack never types or sees a password. Once signed in, it saves the session to `<home>/browser/<channel>-<name>.json` (0600), where the browser actor looks for it: its cookies. `slack` is supported. Discord has no sign-in: a live person there is a second bot, by its token.
 
 Prints `Saved <name>'s slack session to <path> (only you can read it).` Waits up to 10 minutes; exits `1` with `Not signed in after 10 minutes: nothing saved.` otherwise.
 

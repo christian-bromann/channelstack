@@ -1,7 +1,7 @@
 [project]
 name = "pytest-channelstack"
 version = "0.1.1"
-description = "pytest fixtures and expect(...) checks for channelstack: test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail."
+description = "pytest fixtures and expect(...) checks for channelstack: test the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

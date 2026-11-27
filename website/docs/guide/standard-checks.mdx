@@ -11,7 +11,15 @@ The standard checks are a set of tests for the bugs apps and agents commonly hav
 ## Add the checks
 
 ```ts title="test/checks.test.ts"
-import { githubChecks, googleChecks, linearChecks, notionChecks, resendChecks, slackChecks } from "channelstack/checks";
+import {
+  discordChecks,
+  githubChecks,
+  googleChecks,
+  linearChecks,
+  notionChecks,
+  resendChecks,
+  slackChecks,
+} from "channelstack/checks";
 
 slackChecks({
   app: "my-agent",
@@ -23,6 +31,7 @@ linearChecks({ app: "my-agent" });
 notionChecks({ app: "my-agent", prompt: "@my-agent summarize this page" });
 resendChecks({ app: "my-agent", prompt: "Where is my refund?" });
 googleChecks({ app: "my-agent", prompt: "Where is my refund?" });
+discordChecks({ app: "my-agent", command: "/deploy web", longPrompt: "write a long report on Q3" });
 ```
 
 Each call registers ordinary Vitest tests in the file it's called from, on the fixtures and matchers of `channelstack/vitest`, so the [plugin](/docs/guide/writing-tests#add-the-plugin) must be set up. The tests are grouped in a `describe` named after the platform and the app (`slack checks: my-agent`), and each test name ends in the check's id:
@@ -45,6 +54,8 @@ Call only the functions for the platforms your app is on. The checks are written
 | `prompt`       | `@<app> hello`         | Text that makes the app answer. For Linear it's the title of the issue that gets delegated, default `Look into this`                                                                        |
 | `streamPrompt` | none                   | Text that makes the app stream a longer answer in a DM. Without it, the two stream checks are left out                                                                                      |
 | `approval`     | none                   | `{ prompt, button }`: text that makes the app ask for an approval, and the label of the button it shows. Only a workspace admin may press it. Without it, the two click checks are left out |
+| `command`      | none                   | Discord: a slash command the app answers, as a person types it (`/deploy web`). Without it, the two interaction checks are left out |
+| `longPrompt`   | none                   | Discord: text that makes the app answer with more than one message may hold (2000 characters). Without it, the long-answer check is left out |
 | `skip`         | `[]`                   | Check ids to leave out, for example `["slack.stream-stop"]`. An id that no check has throws, with the list of ids                                                                           |
 | `timeout`      | the plugin's `timeout` | How long each check waits for the app                                                                                                                                                       |
 | `loopTurns`    | `3`                    | How many times the app may answer another app that answers everything, with no person between them, before `<platform>.no-reply-loop` fails. An app built to hand off to another sets it higher, or skips the check |
@@ -142,6 +153,20 @@ Each check has Ana email `prompt` (default `hello`) to the agent's Gmail address
 | `google.stale`           | Pushes it again with a token that has expired; expects a 4xx                                   | A signature check that skips the token's `exp`                                   |
 | `google.no-reply-loop`   | As `resend.no-reply-loop`, to the agent's Gmail address                                        | Answering mail marked `Auto-Submitted`                                           |
 
+## Discord checks
+
+Each check has Ana mention the app with `prompt` in a channel with the bot, or DM it, as the check says.
+
+| Id                        | What the test does                                                                                   | What it catches                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `discord.mention-once`    | Ana mentions the app in a channel; expects exactly one reply                                         | Answering both a mention and the message it is in, or answering twice            |
+| `discord.dm-once`         | Ana DMs the prompt; expects exactly one reply                                                        | Two answers to one DM                                                           |
+| `discord.ignores-bots`    | Another bot writes the prompt; expects no reply                                                      | A bot that answers bots (`author.bot`), and the loops that follow                |
+| `discord.resume`          | Drops the Gateway connection just before Ana's DM; expects one reply once the bot resumes            | A bot that identifies anew instead of resuming, and loses or repeats what it missed |
+| `discord.long-answer`     | Ana sends `longPrompt`; expects the answer split over several messages, and no 50035 refusal          | An answer over 2000 characters, which Discord refuses, or one cut short          |
+| `discord.interaction-3s`  | Ana runs `command`; expects the answer within 3 seconds, and no "This interaction failed"            | An interaction answered late, after Discord has given up on it                    |
+| `discord.bad-signature`   | Over HTTP, sends the interaction again signed with another key; expects a 401                         | An interactions endpoint that doesn't check `X-Signature-Ed25519`               |
+
 ## Skipping a check
 
 List the ids in `skip`:
@@ -159,7 +184,7 @@ To run a single check while you work on its bug, filter by its id, which is part
 npx vitest run test/checks.test.ts -t "slack.retry"
 ```
 
-The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS`, `NOTION_CHECKS`, `RESEND_CHECKS` and `GOOGLE_CHECKS`, for a script that builds `skip` from them.
+The id lists are exported too, as `SLACK_CHECKS`, `GITHUB_CHECKS`, `LINEAR_CHECKS`, `NOTION_CHECKS`, `RESEND_CHECKS`, `GOOGLE_CHECKS` and `DISCORD_CHECKS`, for a script that builds `skip` from them.
 
 ## In live mode
 
@@ -173,5 +198,6 @@ Most checks are about delivery: retries, redeliveries, forged signatures, acknow
 | `slack.in-thread`, `slack.ignores-bots`, `slack.stream-stop` | Skip, with the reason: they wait for quiet, read the status line or create a bot user, which live mode can't do yet |
 | `github.review-thread`, `github.check-run` | Skip, with the reason: they open a pull request, and pull requests aren't built live yet |
 | `<platform>.no-reply-loop` | Skip, with the reason: they make a second app, or wait for quiet, which live mode can't do yet |
+| `discord.dm-once`, `discord.resume`, `discord.long-answer`, `discord.ignores-bots`, `discord.interaction-3s`, `discord.bad-signature` | Skip, with the reason: live, a person is a bot of their own, and Discord lets no bot DM another bot or run another app's command; another bot to ignore isn't built live; and the dropped connection is a fault |
 
-Five run against the real platform: `linear.first-activity`, `linear.ends-turn`, `notion.reply-in-discussion`, `resend.reply-in-thread` and `google.reply-in-thread`. The fake run on every pull request runs them all.
+Six run against the real platform: `linear.first-activity`, `linear.ends-turn`, `notion.reply-in-discussion`, `resend.reply-in-thread`, `google.reply-in-thread` and `discord.mention-once`. The fake run on every pull request runs them all.

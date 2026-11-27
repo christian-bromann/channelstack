@@ -150,14 +150,17 @@ export async function start(options: StartOptions): Promise<RunningServer> {
   const handler = {
     fetch(request: Request, listening: Bun.Server<{ session: SocketSession }>) {
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return app.fetch(request);
-      // A WebSocket is only opened where a fake expects one (Slack's Socket Mode, with its ticket).
+      // A WebSocket is only opened where a fake expects one (Slack's Socket Mode, with its ticket; Discord's Gateway).
       const session = app.socket(request);
       if (session && listening.upgrade(request, { data: { session } })) return undefined;
       return new Response("Not Found", { status: 404 });
     },
     websocket: {
       open: (socket: Bun.ServerWebSocket<{ session: SocketSession }>) =>
-        socket.data.session.open({ send: (text) => void socket.send(text), close: () => socket.terminate() }),
+        socket.data.session.open({
+          send: (text) => void socket.send(text),
+          close: (code, reason) => (code === undefined ? socket.terminate() : socket.close(code, reason)),
+        }),
       message: (socket: Bun.ServerWebSocket<{ session: SocketSession }>, message: string | Buffer) =>
         socket.data.session.message(String(message)),
       close: (socket: Bun.ServerWebSocket<{ session: SocketSession }>) => socket.data.session.closed(),

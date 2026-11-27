@@ -1,8 +1,8 @@
 /**
- * `pnpm resend:schema --check`, `pnpm google:schema --check`: a platform's own description of its
- * API, as the tests hold its fake to it (exit checks 8.3 and 9.2). Each is the platform's file,
- * committed byte for byte from a repository at a commit; `--check` fails when it isn't that file,
- * and `--fetch` downloads it again.
+ * `pnpm resend:schema --check`, `pnpm google:schema --check`, `pnpm discord:schema --check`: a
+ * platform's own description of its API, as the tests hold its fake to it (exit checks 8.3, 9.2
+ * and 11.2). Each is the platform's file, committed byte for byte from a repository at a commit;
+ * `--check` fails when it isn't that file, and `--fetch` downloads it again.
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -40,6 +40,15 @@ const PINS: Readonly<Record<string, Pin>> = {
     commit: "e64e26ab87c7d621285fb6ab4e448436da3dffcb",
     blob: "b6af15b7d871f4d6a218ab810bf50e19d3e6289e",
     path: "gmail-discovery.json",
+  },
+  // Discord's OpenAPI description, as of 2026-11-06.
+  discord: {
+    what: "Discord's openapi.json",
+    repository: "discord/discord-api-spec",
+    file: "specs/openapi.json",
+    commit: "3a21a01249a763cd47f1dfec3da91c5ba71bb974",
+    blob: "e82fca9268d9bbefaa38979fc005101e8d04b3fb",
+    path: "discord-openapi.json",
   },
 };
 

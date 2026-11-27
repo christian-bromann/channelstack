@@ -64,9 +64,8 @@ export const github: DriverDefinition = {
           .list(fake.store.checkRuns, session)
           .filter((run) => run.status !== "completed")
           .map((run) => `a check run "${run.name}" on ${run.headSha.slice(0, 7)} that never completed`),
-      // Live, the agent talks to GitHub with its own configuration, and live credentials never leave the server.
+      // Live, `channelstack env` prints nothing for GitHub (app.ts): the agent talks to it with its own configuration.
       env: (name) => {
-        if (live) return {};
         // Another App's lines have the built-in App's keys, so its agent starts from an .env of the
         // same shape. Asking for them makes the App, so its agent can start before any test has.
         const app =

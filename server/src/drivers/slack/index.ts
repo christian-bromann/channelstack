@@ -85,9 +85,8 @@ export const slack: DriverDefinition = {
             (message) =>
               `a stream ${fake.store.appOf(message.user)?.name ?? fake.store.app.name} started and never stopped: "${excerpt(message.text)}"`,
           ),
-      // Live, the agent talks to Slack with its own configuration, and live credentials never leave the server.
+      // Live, `channelstack env` prints nothing for Slack (app.ts): the agent talks to it with its own configuration.
       env: (app) => {
-        if (live) return {};
         // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
         const name =
           app === undefined

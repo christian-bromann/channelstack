@@ -44,7 +44,11 @@ export interface SocketSession {
 /** The agent's end of a WebSocket connection. */
 export interface SocketPeer {
   send(text: string): void;
-  close(): void;
+  /**
+   * Close the connection: with a close code and reason, as a platform ends a session it refuses
+   * (Discord's 4004), or, without one, cut it the way a network drop does.
+   */
+  close(code?: number, reason?: string): void;
 }
 
 /** Per action: does it work in the fake, does it work live, and what does live need. */

@@ -55,7 +55,7 @@ The test proves the app is idempotent on `event_id`. The usual fix is to acknowl
 
 ## Redelivery
 
-A redelivery is the same event again, without anything that marks it as a retry. GitHub sends one when someone clicks Redeliver in the App's settings, Linear, Notion and Resend when the first delivery failed, and Pub/Sub when a push wasn't acknowledged:
+A redelivery is the same event again, without anything that marks it as a retry. GitHub sends one when someone clicks Redeliver in the App's settings, Linear, Notion and Resend when the first delivery failed, Pub/Sub when a push wasn't acknowledged, and Discord's Gateway when a bot resumes a dropped connection and is sent what it missed:
 
 <Example id="delivery-github-redeliver" />
 
@@ -80,7 +80,7 @@ An app must refuse a request it can't verify. `resend` sends the delivery again 
 
 | Option               | What it sends                                                                                            | Platforms                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `badSignature: true` | The same body, signed with a secret that isn't the app's                                                 | Slack, GitHub, Linear, Notion, Resend, Google (a token another key signed) |
+| `badSignature: true` | The same body, signed with a secret that isn't the app's                                                 | Slack, GitHub, Linear, Notion, Resend, Google (a token another key signed), Discord (an interaction over HTTP, signed with another Ed25519 key) |
 | `stale: true`        | Signed correctly, but with a time outside the replay window: 6 minutes old on Slack and Resend, 2 minutes on Linear; on Google, a token that has expired | Slack, Linear, Resend, Google |
 | `wrongAudience: true` | Signed correctly, but a token for another endpoint than the app's | Google |
 | `headers`            | Extra or replaced headers for this attempt                                                               | Slack                         |
@@ -138,7 +138,7 @@ Live, the real platform delivers to your app and channelstack isn't in the path.
 The rest is refused, and Vitest and pytest skip the test with the reason:
 
 - `slack.fault()` and `fault.undo()` with `action_requires`: a fault needs proxy mode, which live doesn't read the app's calls back yet ([#24](https://github.com/christian-bromann/channelstack/issues/24)).
-- `slack.uninstallApp()`, and reading or resending deliveries (`slack.deliveries()`, `linear.deliveries()`, `notion.deliveries()`, `resend.deliveries()`, `google.deliveries()`, `delivery.retry()`, `delivery.resend()`), with `unsupported_in_live`.
+- `slack.uninstallApp()`, and reading or resending deliveries (`slack.deliveries()`, `linear.deliveries()`, `notion.deliveries()`, `resend.deliveries()`, `google.deliveries()`, `discord.deliveries()`, `delivery.retry()`, `delivery.resend()`), with `unsupported_in_live`.
 
 The same test runs in full against the fake on every pull request.
 

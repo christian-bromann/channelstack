@@ -1,11 +1,11 @@
 ---
 name: channelstack
-description: Try a bot you are building against channelstack's fake Slack, GitHub, Linear, Notion, Resend or Gmail, through the channelstack MCP tools or CLI. Post as a person, read what the bot answered, act as people do on the platform (click, review, delegate, …), see what was delivered to it and what it called, redeliver, and check again. Use when changing an agent that lives in Slack, GitHub, Linear, Notion or email and you want to see it answer before you write the test.
+description: Try a bot you are building against channelstack's fake Slack, GitHub, Linear, Notion, Resend, Gmail or Discord, through the channelstack MCP tools or CLI. Post as a person, read what the bot answered, act as people do on the platform (click, review, delegate, …), see what was delivered to it and what it called, redeliver, and check again. Use when changing an agent that lives in Slack, GitHub, Linear, Notion, email or Discord and you want to see it answer before you write the test.
 ---
 
 # channelstack
 
-channelstack fakes Slack, GitHub, Linear, Notion, Resend and Gmail (`google`) in memory. Your bot talks to the fake as if it were the real platform; you act as people in it and read what a person would see.
+channelstack fakes Slack, GitHub, Linear, Notion, Resend, Gmail (`google`) and Discord in memory. Your bot talks to the fake as if it were the real platform; you act as people in it and read what a person would see.
 
 ## Set up, once
 
@@ -17,7 +17,7 @@ channelstack fakes Slack, GitHub, Linear, Notion, Resend and Gmail (`google`) in
    { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
    ```
 
-Everything happens in one long-lived `dev` session, shared with the CLI and the UI. People and places are created the first time you name them, with the bot in them. A place is what people talk in, by its name: a Slack channel (`"#support"`), a GitHub issue or pull request by its title, a Linear issue by its title, a Notion page by its title, an email thread by its subject (`resend` or `google`).
+Everything happens in one long-lived `dev` session, shared with the CLI and the UI. People and places are created the first time you name them, with the bot in them. A place is what people talk in, by its name: a Slack channel (`"#support"`), a GitHub issue or pull request by its title, a Linear issue by its title, a Notion page by its title, an email thread by its subject (`resend` or `google`), a Discord channel (`"#support"`).
 
 ## The loop
 

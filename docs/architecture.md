@@ -4,7 +4,7 @@
 
 ## 1. The big picture
 
-One server process fakes Slack, GitHub, Linear, Notion, Resend and Google (Gmail) in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
+One server process fakes Slack, GitHub, Linear, Notion, Resend, Google (Gmail) and Discord in memory. Tests, the CLI, MCP and the UI drive it through one control API. The agent under test talks to the fakes as if they were the real platforms.
 
 ```
  Vitest / pytest / Rust tests        channelstack CLI      MCP (coding agents)      UI (browser)
@@ -87,6 +87,8 @@ Objects the platform identifies by more than one value get nested paths: a Slack
 | | History | Decimal strings that grow with gaps; Pub/Sub message ids are 16 digits; user labels are `Label_<n>` |
 | | Mail | A `Message-ID` Gmail gives: `<CA` and 40 base-62 characters `@mail.gmail.com>`. A person is their mailbox: their id is their address |
 | | Tokens | Access tokens `ya29.…`, refresh tokens `1//0…`, client secrets `GOCSPX-…`, client ids `<12 digits>-<32>.apps.googleusercontent.com`; push tokens are RS256 JWTs signed with a per-install RSA key |
+| Discord | Everything | Snowflakes: Discord's epoch in the high bits, so what is made now has now in it (`discordSnowflake`), and people, the guild and roles that existed before a test have a time between 2016 and 2025. A Gateway session is 32 hex characters |
+| | Tokens | A bot token is `<the bot's id in base 64>.<6>.<38>`, so the bot's id is in it, as in Discord; an interaction's token `aW50ZXJhY3Rpb246…`; interactions are signed with a per-install Ed25519 key, whose public half is the app's |
 
 - **Generated from a seeded random source** per world, so ids are unique and realistic. `CHANNELSTACK_SEED` makes a run reproducible.
 - **Each app has its own:** an app a test makes gets every id the table lists for an app (Slack's app, bot and bot user; GitHub's App id, installation and `<name>[bot]`; Linear's and Notion's bot user; Resend's team and Google's mailbox), drawn from the seed and the app's name (`IdGenerator.named`), so they don't depend on the order tests make apps in.

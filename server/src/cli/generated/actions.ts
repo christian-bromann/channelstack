@@ -2790,11 +2790,430 @@ export const ACTIONS: Readonly<Record<string, { readonly user: string; readonly 
         ]
       }
     ]
+  },
+  "discord": {
+    "user": "DiscordUser",
+    "app": "DiscordApp",
+    "actions": [
+      {
+        "name": "say",
+        "summary": "Write a message in a channel or thread, or in a DM with the person or app in `to`",
+        "method": "POST",
+        "path": "/users/{user}/say",
+        "params": [
+          {
+            "name": "text",
+            "type": {
+              "kind": "named",
+              "name": "DiscordMessageInput"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true,
+            "shorthand": "content"
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordChannel"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "to",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordUser",
+                  "DiscordApp"
+                ]
+              },
+              "oneOrMany": true
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "reply",
+        "summary": "Reply to a message: Discord's reply, in the message's channel, which quotes it",
+        "method": "POST",
+        "path": "/users/{user}/reply",
+        "params": [
+          {
+            "name": "text",
+            "type": {
+              "kind": "named",
+              "name": "DiscordMessageInput"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true,
+            "shorthand": "content"
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "edit",
+        "summary": "Edit one of this person's own messages",
+        "method": "POST",
+        "path": "/users/{user}/edit",
+        "params": [
+          {
+            "name": "text",
+            "type": {
+              "kind": "named",
+              "name": "DiscordMessageInput"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true,
+            "shorthand": "content"
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "delete",
+        "summary": "Delete a message: this person's own, or anyone's for an admin",
+        "method": "POST",
+        "path": "/users/{user}/delete",
+        "params": [
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "react",
+        "summary": "React to a message with an emoji",
+        "method": "POST",
+        "path": "/users/{user}/react",
+        "params": [
+          {
+            "name": "emoji",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "unreact",
+        "summary": "Take this person's reaction off a message",
+        "method": "POST",
+        "path": "/users/{user}/unreact",
+        "params": [
+          {
+            "name": "emoji",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "startThread",
+        "summary": "Start a thread: from a message, or in a channel",
+        "method": "POST",
+        "path": "/users/{user}/threads",
+        "params": [
+          {
+            "name": "name",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordChannel"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "openDM",
+        "summary": "Open (or reuse) a DM with the app or another person",
+        "method": "POST",
+        "path": "/users/{user}/open-dm",
+        "params": [
+          {
+            "name": "participant",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordUser",
+                "DiscordApp"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true
+          }
+        ]
+      },
+      {
+        "name": "invite",
+        "summary": "Let people or the app see a channel. The person must be an admin",
+        "method": "POST",
+        "path": "/users/{user}/invite",
+        "params": [
+          {
+            "name": "participants",
+            "type": {
+              "kind": "array",
+              "items": {
+                "kind": "ref",
+                "resources": [
+                  "DiscordUser",
+                  "DiscordApp"
+                ]
+              },
+              "oneOrMany": true
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordChannel"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "runCommand",
+        "summary": "Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`",
+        "method": "POST",
+        "path": "/users/{user}/commands",
+        "params": [
+          {
+            "name": "command",
+            "type": {
+              "kind": "string"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordChannel"
+              ]
+            },
+            "optional": false,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      },
+      {
+        "name": "click",
+        "summary": "Press a button, found by its label or custom_id: on a message, or on the app's newest message in a channel or thread that has it",
+        "method": "POST",
+        "path": "/users/{user}/click",
+        "params": [
+          {
+            "name": "button",
+            "type": {
+              "kind": "named",
+              "name": "DiscordButtonRef"
+            },
+            "optional": false,
+            "in": "body",
+            "positional": true,
+            "shorthand": "label"
+          },
+          {
+            "name": "message",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordMessage"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          },
+          {
+            "name": "channel",
+            "type": {
+              "kind": "ref",
+              "resources": [
+                "DiscordChannel"
+              ]
+            },
+            "optional": true,
+            "in": "body",
+            "positional": false
+          }
+        ]
+      }
+    ]
   }
 };
 
 /** The handles the actions refer to: what each is on its channel, and the fields its id is sent as. */
 export const HANDLES: Readonly<Record<string, { readonly role?: "user" | "app" | "resource"; readonly id: readonly ActionField[] }>> = {
+  "DiscordApp": {
+    "role": "app",
+    "id": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false
+      }
+    ]
+  },
+  "DiscordChannel": {
+    "role": "resource",
+    "id": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false
+      }
+    ]
+  },
+  "DiscordMessage": {
+    "id": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false
+      },
+      {
+        "name": "channelId",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false
+      }
+    ]
+  },
+  "DiscordUser": {
+    "role": "user",
+    "id": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false
+      }
+    ]
+  },
   "GitHubApp": {
     "role": "app",
     "id": [
@@ -3184,6 +3603,49 @@ export const HANDLES: Readonly<Record<string, { readonly role?: "user" | "app" |
 
 /** The named types the actions' values use. */
 export const TYPES: Readonly<Record<string, ActionType>> = {
+  "DiscordButtonRef": {
+    "kind": "object",
+    "fields": [
+      {
+        "name": "label",
+        "type": {
+          "kind": "string"
+        },
+        "optional": true
+      },
+      {
+        "name": "customId",
+        "type": {
+          "kind": "string"
+        },
+        "optional": true
+      }
+    ],
+    "shorthand": "label"
+  },
+  "DiscordMessageInput": {
+    "kind": "object",
+    "fields": [
+      {
+        "name": "content",
+        "type": {
+          "kind": "string"
+        },
+        "optional": true
+      },
+      {
+        "name": "embeds",
+        "type": {
+          "kind": "array",
+          "items": {
+            "kind": "unknown"
+          }
+        },
+        "optional": true
+      }
+    ],
+    "shorthand": "content"
+  },
   "NotionPropertyValue": {
     "kind": "nullable",
     "type": {

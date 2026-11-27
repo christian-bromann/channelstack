@@ -60,9 +60,8 @@ export const notion: DriverDefinition = {
         fake.world
           .pendingContent(session)
           .map((page) => `a page.content_updated for "${fake.world.titleOf(page)}" that Notion is still batching`),
-      // Live, the agent talks to Notion with its own configuration, and live credentials never leave the server.
+      // Live, `channelstack env` prints nothing for Notion (app.ts): the agent talks to it with its own configuration.
       env: (app) => {
-        if (live) return {};
         // Another integration's lines have the built-in one's keys, so its agent starts from an .env of the same shape.
         const name =
           app === undefined

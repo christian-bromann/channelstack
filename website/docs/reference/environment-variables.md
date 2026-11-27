@@ -27,11 +27,11 @@ An empty variable counts as not set everywhere.
 | `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` | none | Where the server delivers that channel's events to the app. Read once, when the server starts |
 | `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL` | none | Where the server delivers that channel's events to another app, the one a test makes with `createApp({ name })`. Read once, when the server starts |
 
-`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND` or `GOOGLE`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`. For Google it is the push endpoint: Pub/Sub's pushes go there, and their tokens are for it as their audience.
+`<CHANNEL>` is `SLACK`, `GITHUB`, `LINEAR`, `NOTION`, `RESEND`, `GOOGLE` or `DISCORD`: `CHANNELSTACK_SLACK_WEBHOOK_URL`, `CHANNELSTACK_GITHUB_WEBHOOK_URL`, `CHANNELSTACK_LINEAR_WEBHOOK_URL`, `CHANNELSTACK_NOTION_WEBHOOK_URL`, `CHANNELSTACK_RESEND_WEBHOOK_URL`, `CHANNELSTACK_GOOGLE_WEBHOOK_URL`, `CHANNELSTACK_DISCORD_WEBHOOK_URL`. The value is the app's own endpoint for that platform, e.g. `http://localhost:3000/slack/events`. For Google it is the push endpoint: Pub/Sub's pushes go there, and their tokens are for it as their audience. For Discord it is the app's interactions endpoint URL, e.g. `http://localhost:3000/interactions`: slash commands and button presses go there, signed with Ed25519.
 
 `<NAME>` is the app's name in upper case with `-` as `_`: `coder` is `CODER`, `code-reviewer` is `CODE_REVIEWER`, as in `CHANNELSTACK_SLACK_APP_CODER_WEBHOOK_URL`. An app without one receives nothing, unless it opens its own Socket Mode connection. See [Several apps](/docs/guide/several-apps).
 
-An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. See [Connecting your app](/docs/guide/connecting-your-agent).
+An app on Slack's Socket Mode connects out and needs no webhook URL. Without one and without a socket, a Slack interaction is refused with `dispatch_failed`. A Discord bot hears everything else over the Gateway connection it opens itself; without `CHANNELSTACK_DISCORD_WEBHOOK_URL`, its interactions arrive there too, as `INTERACTION_CREATE`. See [Connecting your app](/docs/guide/connecting-your-agent).
 
 ## Client
 
@@ -56,6 +56,7 @@ The SDKs read a person's token from the environment when a test leaves `token` o
 | `CHANNELSTACK_NOTION_USER_<NAME>_TOKEN` | `notion.createUser({ name })`: a personal access token |
 | `CHANNELSTACK_RESEND_USER_<NAME>_TOKEN` | `resend.createUser({ name })`: an API key of the person's own Resend team, with a verified domain their address is on |
 | `CHANNELSTACK_GOOGLE_USER_<NAME>_TOKEN` | `google.createUser({ name })`: a refresh token for the person's own Gmail account, from the agent's OAuth client |
+| `CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN` | `discord.createUser({ name })`: the bot token of a second application in the sandbox guild, which acts as the person through Discord's API. Discord has no API that acts as a person; what the bot writes carries `author.bot` |
 
 `<NAME>` is the name in upper case with every run of other characters as `_`: `Ana` is `ANA`, `ana-smith` is `ANA_SMITH`, the login `ana-channelstack` is `ANA_CHANNELSTACK`.
 
@@ -71,8 +72,9 @@ Read by the **server**. A channel runs live when every one of its credentials is
 | Notion | `CHANNELSTACK_NOTION_TOKEN` (the integration's token) | `CHANNELSTACK_LIVE_NOTION_WORKSPACES`: workspace ids | `CHANNELSTACK_NOTION_PAGE`, `CHANNELSTACK_NOTION_UNSEEN_PAGE` |
 | Resend | `CHANNELSTACK_RESEND_API_KEY` (the agent's team's key, `re_…`) | `CHANNELSTACK_LIVE_RESEND_DOMAINS`: the domains mail may go to. Every recipient is checked before anything is sent | `CHANNELSTACK_RESEND_ADDRESS` |
 | Google | `CHANNELSTACK_GOOGLE_CLIENT_ID`, `CHANNELSTACK_GOOGLE_CLIENT_SECRET` (the agent's OAuth client, `GOCSPX-…`), `CHANNELSTACK_GOOGLE_REFRESH_TOKEN` (its mailbox's refresh token, `1//0…`) | `CHANNELSTACK_LIVE_GOOGLE_ADDRESSES`: the addresses mail may go to and come from, the agent's and the people's. Every recipient is checked before anything is sent | |
+| Discord | `CHANNELSTACK_DISCORD_BOT_TOKEN` (the agent's real bot token) | `CHANNELSTACK_LIVE_DISCORD_GUILDS`: guild ids. Live Discord runs in the first one the bot is in | |
 
-Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace (for Resend the domain, for Google the address); anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
+Allowlists are comma-separated. Live mode acts only where its allowlist names the workspace (for Resend the domain, for Google the address, for Discord the guild); anywhere else is refused with `live_not_allowlisted`, and an empty allowlist means live mode acts nowhere.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -81,6 +83,8 @@ Allowlists are comma-separated. Live mode acts only where its allowlist names th
 | `CHANNELSTACK_NOTION_PAGE` | the only top-level page the integration sees | The page live Notion tests create their pages under. Needed when the integration sees more than one |
 | `CHANNELSTACK_NOTION_UNSEEN_PAGE` | none | A page the people can write in and the integration isn't connected to, for tests that create a page the integration can't see |
 | `CHANNELSTACK_RESEND_ADDRESS` | `my-agent@` the team's first verified domain | Where people email the agent live: an address on its team's receiving domain |
+
+channelstack's own nightly live run also reads `CHANNELSTACK_DISCORD_PUBLIC_KEY` (the real application's public key, which its reference agent checks interactions with) and `CHANNELSTACK_DISCORD_RELAY_URL` (the smee.io channel the application's interactions endpoint points at, relayed to the reference agent). The server doesn't read them: your own agent has its own configuration live.
 
 Live credentials stay in the server's memory. They are never logged, never returned by the control API, and `channelstack env` prints nothing for a live channel.
 
@@ -125,6 +129,11 @@ Read by the **app**. `channelstack env` (and the `channelstack.env()` fixture) p
 | `GOOGLE_PUBSUB_TOPIC` | Google | The topic to give `users.watch`: the only one the fake publishes to |
 | `GOOGLE_PUSH_SERVICE_ACCOUNT` | Google | Who pushes: the `email` claim of every push token |
 | `GOOGLE_PUSH_AUDIENCE` | Google | The `aud` of every push token: the push endpoint, `CHANNELSTACK_GOOGLE_WEBHOOK_URL` (for another app, its own variable). Printed when that is set |
+| `DISCORD_API_URL` | Discord | The REST base to give discord.js as `rest.api`, e.g. `https://discord.localhost/api`. discord.js adds `/v10` and finds the Gateway from `GET /gateway/bot` |
+| `DISCORD_TOKEN` | Discord | The bot's token, for `client.login` |
+| `DISCORD_APPLICATION_ID` | Discord | The application's id, the bot's too: for registering commands |
+| `DISCORD_PUBLIC_KEY` | Discord | The application's Ed25519 public key (hex), which interactions over HTTP are checked against with `verifyKey` |
+| `DISCORD_GUILD_ID` | Discord | The guild the bot is in: for registering guild commands |
 | `ECHO_API_URL`, `ECHO_APP_TOKEN`, `ECHO_SIGNING_SECRET` | Echo | channelstack's own test platform. Ignore them |
 
 The names are the ones the platforms' SDKs and examples use; map them to your app's own if they differ. `channelstack secrets rotate` changes every secret; run `channelstack env` again after a restart.

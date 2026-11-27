@@ -86,8 +86,11 @@ export interface DevAdapter {
   /** The handle a place is (`SlackConversation`): act fills a reference to it in when none is given. */
   readonly resource: string;
   readonly listing: DevListing;
-  /** The body of `POST /users` that makes a person of this name. */
-  personBody(name: string): unknown;
+  /**
+   * The body of `POST /users` that makes a person of this name. `people` are the ones the dev
+   * session has already: the first can be made what a channel needs someone to be (Discord's admin).
+   */
+  personBody(name: string, people: readonly DevPrincipal[]): unknown;
   /**
    * Make the place `name` with the app in it, the person able to act there, and, with `text`,
    * the person's first words in it. Returns the new item, as the listing has it.
@@ -138,7 +141,9 @@ const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 export async function devPerson(api: DevApi, adapter: DevAdapter, name: string | undefined): Promise<DevPrincipal> {
   if (!name) throw new DevRefusal("say who is acting with `--as <name>`, e.g. `--as ana`.");
   const people = await api.get<DevPrincipal[]>("/users");
-  return people.find((known) => same(known.name, name)) ?? api.post<DevPrincipal>("/users", adapter.personBody(name));
+  return (
+    people.find((known) => same(known.name, name)) ?? api.post<DevPrincipal>("/users", adapter.personBody(name, people))
+  );
 }
 
 /** The agent's app, from the channel's fixture. */

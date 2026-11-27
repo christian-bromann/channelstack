@@ -80,10 +80,9 @@ export const google: DriverDefinition = {
       capabilities: () => ({}),
       openWork: () => [],
       // What the agent needs: `googleapis` takes `rootUrl` per API, `google-auth-library` its endpoints.
-      // Live, the agent talks to Gmail with its own configuration, and live credentials never leave the server.
+      // Live, `channelstack env` prints nothing for Gmail (app.ts): the agent talks to it with its own configuration.
       // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
       env: (app) => {
-        if (live) return {};
         const mailbox = fake.store.appForEnv(app, (name) => fake.world.createApp(undefined, { name }));
         const url = context.apiUrl();
         const audience = context.apps.webhookUrl(mailbox.name);

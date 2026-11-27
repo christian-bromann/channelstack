@@ -1,6 +1,6 @@
 # pytest-channelstack
 
-pytest fixtures and `expect(...)` checks for [channelstack](https://channelstack.dev), a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend and Gmail. You get a fixture per platform, one session per test, and checks that wait for your app the way a person would.
+pytest fixtures and `expect(...)` checks for [channelstack](https://channelstack.dev), a test harness for the apps and agents you build for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord. You get a fixture per platform, one session per test, and checks that wait for your app the way a person would.
 
 ## Install
 

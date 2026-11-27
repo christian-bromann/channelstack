@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CannotEditOthersMessageError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DiscordApiCall", "DiscordApiCalls", "DiscordApp", "DiscordButtonRef", "DiscordChannel", "DiscordChannels", "DiscordDeliveries", "DiscordDelivery", "DiscordEndpointCheck", "DiscordEphemeralMessages", "DiscordFault", "DiscordFixture", "DiscordGuild", "DiscordMembers", "DiscordMessage", "DiscordMessageDeliveries", "DiscordMessageInput", "DiscordMessages", "DiscordPrincipal", "DiscordReaction", "DiscordReactions", "DiscordReplies", "DiscordThreads", "DiscordTranscript", "DiscordTranscriptEntry", "DiscordUser", "DiscordUsers", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "EmptyMessageError", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubApps", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubIssueListing", "GitHubIssues", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubRepos", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GitHubUsers", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleApps", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleThreads", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "GoogleUsers", "InternalError", "InvalidArgumentError", "InvalidAuthError", "InvalidFormBodyError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearApps", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueListing", "LinearIssueState", "LinearIssues", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTeams", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LinearUsers", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MissingAccessError", "MissingPermissionsError", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionCapability", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionIntegrations", "NotionPage", "NotionPages", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "NotionUsers", "ObjectNotFoundError", "Place", "PlacePrincipal", "PlaceTranscript", "PlaceTranscriptEntry", "Places", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendApps", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendThreads", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "ResendUsers", "RestrictedResourceError", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "ThreadAlreadyCreatedError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationErrorError", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -42,6 +42,10 @@ class CannotDmBotError(ChannelstackError):
     pass
 
 
+class CannotEditOthersMessageError(ChannelstackError):
+    pass
+
+
 class CantDeleteMessageError(ChannelstackError):
     pass
 
@@ -55,6 +59,10 @@ class CrossWorkspaceCredentialError(ChannelstackError):
 
 
 class DispatchFailedError(ChannelstackError):
+    pass
+
+
+class EmptyMessageError(ChannelstackError):
     pass
 
 
@@ -78,11 +86,23 @@ class InvalidAuthError(ChannelstackError):
     pass
 
 
+class InvalidFormBodyError(ChannelstackError):
+    pass
+
+
 class LiveMisconfiguredError(ChannelstackError):
     pass
 
 
 class LiveNotAllowlistedError(ChannelstackError):
+    pass
+
+
+class MissingAccessError(ChannelstackError):
+    pass
+
+
+class MissingPermissionsError(ChannelstackError):
     pass
 
 
@@ -138,6 +158,10 @@ class StopUnavailableError(ChannelstackError):
     pass
 
 
+class ThreadAlreadyCreatedError(ChannelstackError):
+    pass
+
+
 class UnauthorizedError(ChannelstackError):
     pass
 
@@ -164,17 +188,22 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "already_in_channel": AlreadyInChannelError,
     "already_reacted": AlreadyReactedError,
     "cannot_dm_bot": CannotDmBotError,
+    "cannot_edit_others_message": CannotEditOthersMessageError,
     "cant_delete_message": CantDeleteMessageError,
     "cant_update_message": CantUpdateMessageError,
     "cross_workspace_credential": CrossWorkspaceCredentialError,
     "dispatch_failed": DispatchFailedError,
+    "empty_message": EmptyMessageError,
     "fake_actor_in_live_world": FakeActorInLiveWorldError,
     "forbidden": ForbiddenError,
     "internal": InternalError,
     "invalid_argument": InvalidArgumentError,
     "invalid_auth": InvalidAuthError,
+    "invalid_form_body": InvalidFormBodyError,
     "live_misconfigured": LiveMisconfiguredError,
     "live_not_allowlisted": LiveNotAllowlistedError,
+    "missing_access": MissingAccessError,
+    "missing_permissions": MissingPermissionsError,
     "msg_too_long": MsgTooLongError,
     "name_taken": NameTakenError,
     "no_reaction": NoReactionError,
@@ -188,6 +217,7 @@ _ERRORS: dict[str, type[ChannelstackError]] = {
     "session_not_found": SessionNotFoundError,
     "split_view_unavailable": SplitViewUnavailableError,
     "stop_unavailable": StopUnavailableError,
+    "thread_already_created": ThreadAlreadyCreatedError,
     "unauthorized": UnauthorizedError,
     "unsupported_in_fake": UnsupportedInFakeError,
     "unsupported_in_live": UnsupportedInLiveError,
@@ -1328,6 +1358,205 @@ class GoogleApiCall:
         )
 
 
+@dataclass(frozen=True)
+class DiscordGuild:
+    id: str
+    name: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordGuild:
+        return cls(
+            id=data["id"],
+            name=data["name"],
+        )
+
+
+type DiscordUsers = list[DiscordUser]
+
+
+type DiscordChannels = list[DiscordChannel]
+
+
+@dataclass(frozen=True)
+class DiscordMessageInput:
+    content: str | None = None
+    embeds: list[Any] | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordMessageInput:
+        return cls(
+            content=data.get("content"),
+            embeds=data.get("embeds"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"content": self.content, "embeds": self.embeds}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+@dataclass(frozen=True)
+class DiscordButtonRef:
+    label: str | None = None
+    custom_id: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordButtonRef:
+        return cls(
+            label=data.get("label"),
+            custom_id=data.get("customId"),
+        )
+
+    def _to_wire(self) -> dict[str, Any]:
+        wire = {"label": self.label, "customId": self.custom_id}
+        return {key: value for key, value in wire.items() if value is not None}
+
+
+type DiscordEphemeralMessages = list[DiscordMessage]
+
+
+type DiscordMessages = list[DiscordMessage]
+
+
+type DiscordMembers = list[DiscordUser | DiscordApp]
+
+
+type DiscordThreads = list[DiscordChannel]
+
+
+@dataclass(frozen=True)
+class DiscordTranscript:
+    entries: list[DiscordTranscriptEntry]
+    text: str
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordTranscript:
+        return cls(
+            entries=[DiscordTranscriptEntry._from_wire(ctx, item) for item in data["entries"]],
+            text=data["text"],
+        )
+
+    def __str__(self) -> str:
+        return self.text
+
+
+@dataclass(frozen=True)
+class DiscordTranscriptEntry:
+    id: str
+    author: DiscordPrincipal
+    at: str
+    text: str
+    controls: list[str]
+    edited: bool
+    depth: int
+    reply_to: str | None = None
+    streaming: Literal["open"] | None = None
+    visible_to: DiscordPrincipal | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordTranscriptEntry:
+        return cls(
+            id=data["id"],
+            author=DiscordPrincipal._from_wire(ctx, data["author"]),
+            at=data["at"],
+            text=data["text"],
+            controls=data["controls"],
+            edited=data["edited"],
+            depth=data["depth"],
+            reply_to=data.get("replyTo"),
+            streaming=data.get("streaming"),
+            visible_to=None if data.get("visibleTo") is None else DiscordPrincipal._from_wire(ctx, data["visibleTo"]),
+        )
+
+
+@dataclass(frozen=True)
+class DiscordPrincipal:
+    id: str
+    name: str
+    kind: Literal["user", "app"]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordPrincipal:
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            kind=data["kind"],
+        )
+
+
+type DiscordReplies = list[DiscordMessage]
+
+
+type DiscordReactions = list[DiscordReaction]
+
+
+@dataclass(frozen=True)
+class DiscordReaction:
+    emoji: str
+    by: list[DiscordUser | DiscordApp]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordReaction:
+        return cls(
+            emoji=data["emoji"],
+            by=[DiscordUser(ctx, item) if item["kind"] == "user" else DiscordApp(ctx, item) for item in data["by"]],
+        )
+
+
+type DiscordMessageDeliveries = list[DiscordDelivery]
+
+
+@dataclass(frozen=True)
+class DiscordEndpointCheck:
+    valid: bool
+    problems: list[str]
+    deliveries: list[str]
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordEndpointCheck:
+        return cls(
+            valid=data["valid"],
+            problems=data["problems"],
+            deliveries=data["deliveries"],
+        )
+
+
+type DiscordDeliveries = list[DiscordDelivery]
+
+
+type DiscordApiCalls = list[DiscordApiCall]
+
+
+@dataclass(frozen=True)
+class DiscordApiCall:
+    id: str
+    channel: Literal["discord"]
+    operation: str
+    method: str
+    path: str
+    at: str
+    duration_ms: float
+    response_status: int
+    request: Any | None = None
+    response: Any | None = None
+    error: str | None = None
+
+    @classmethod
+    def _from_wire(cls, ctx: HandleContext, data: dict[str, Any]) -> DiscordApiCall:
+        return cls(
+            id=data["id"],
+            channel=data["channel"],
+            operation=data["operation"],
+            method=data["method"],
+            path=data["path"],
+            at=data["at"],
+            duration_ms=data["durationMs"],
+            response_status=data["responseStatus"],
+            request=data.get("request"),
+            response=data.get("response"),
+            error=data.get("error"),
+        )
+
+
 type Places = list[Place]
 
 
@@ -1500,8 +1729,14 @@ class Session:
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/google")
         return GoogleFixture(ctx, data)
 
+    async def discord(self) -> DiscordFixture:
+        """The Discord fixture: the agent's app, the guild, and where the agent reaches the fake. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord")
+        return DiscordFixture(ctx, data)
+
     async def places(self) -> Places:
-        """Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread), the most recently active last. Experimental."""
+        """Every channel's places in the session, as the dev tools name them (a Slack channel, a GitHub issue, a Notion page, an email thread, a Discord channel), the most recently active last. Experimental."""
         ctx = self._ctx
         data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/places")
         return [Place(ctx, item) for item in data]
@@ -3937,6 +4172,317 @@ class GoogleUser:
         return await wait_for_next(self._seen, "waitForEmail", self.inbox, lambda item: from_matches(item.author, from_), describe_wait("an email", from_), timeout=timeout)
 
 
+class DiscordFixture:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.app: DiscordApp = DiscordApp(ctx, data["app"])
+        self.api_url: str = data["apiUrl"]
+        self.guild: DiscordGuild = DiscordGuild._from_wire(ctx, data["guild"])
+        self.gateway_connections: int = data["gatewayConnections"]
+
+    async def create_user(self, *, name: str, id: str | None = None, admin: bool | None = None, bot: bool | None = None, token: str | None = None) -> DiscordUser:
+        """Create a person in the guild. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users", body={"name": name, "id": id, "admin": admin, "bot": bot, "token": credential("CHANNELSTACK_DISCORD_USER_{name}_TOKEN", {"name": name}) if token is None else token})
+        return DiscordUser(ctx, data)
+
+    async def users(self) -> DiscordUsers:
+        """The people this session created. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users")
+        return [DiscordUser(ctx, item) for item in data]
+
+    async def create_channel(self, *, name: str | None = None, participants: list[DiscordUser | DiscordApp] | None = None, read_only: bool | None = None, topic: str | None = None) -> DiscordChannel:
+        """Create a text channel. Only the listed participants see it (a private channel); include the app for the bot to hear it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels", body={"name": name, "participants": None if participants is None else [item.id for item in participants], "readOnly": read_only, "topic": topic})
+        return DiscordChannel(ctx, data)
+
+    async def channels(self) -> DiscordChannels:
+        """The session's channels, threads and DMs. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels")
+        return [DiscordChannel(ctx, item) for item in data]
+
+    async def verify_endpoint(self) -> DiscordEndpointCheck:
+        """Discord's check of the app's interactions endpoint, as when it is saved in the developer portal: a PING it must answer with a PONG, and one with a bad signature it must refuse with 401. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/verify-endpoint")
+        return DiscordEndpointCheck._from_wire(ctx, data)
+
+    async def deliveries(self, *, type: str | None = None, resource: DiscordChannel | None = None) -> DiscordDeliveries:
+        """Every Gateway dispatch and interaction channelstack sent the bot for this session, with every attempt. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries", query={"type": type, "resource": None if resource is None else resource.id})
+        return [DiscordDelivery(ctx, item) for item in data]
+
+    async def calls(self, *, operation: str | None = None, error: Literal[True] | str | None = None) -> DiscordApiCalls:
+        """The REST calls the bot made about this session's channels, messages and interactions, by route (`POST /channels/{channel.id}/messages`). Calls about nothing a session owns (`GET /gateway/bot`) are in no session. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/calls", query={"operation": operation, "error": error})
+        return [DiscordApiCall._from_wire(ctx, item) for item in data]
+
+    async def fault(self, *, type: Literal["rate_limit", "drop_gateway"], route: str | None = None, retry_after: Duration | None = None, times: int | None = None) -> DiscordFault:
+        """Inject a fault: rate-limit the bot's calls of a route (removed when this session closes), or drop its Gateway connection just before the next dispatch. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/faults", body={"type": type, "route": route, "retryAfter": None if retry_after is None else parse_duration(retry_after), "times": times})
+        return DiscordFault(ctx, data)
+
+    async def wait_for_call(self, *, operation: str | None = None, error: Literal[True] | str | None = None, timeout: Duration | None = None) -> DiscordApiCall:
+        """Wait for the next new API call from the agent, after the last one this handle saw."""
+        return await wait_for_next(self._seen, f"waitForCall:{operation!r}:{error!r}", lambda: self.calls(operation=operation, error=error), lambda item: True, "an API call from the agent", timeout=timeout)
+
+
+class DiscordApp:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.name: str = data["name"]
+        self.kind: Literal["app"] = data["kind"]
+        self.channel: Literal["discord"] = data["channel"]
+        self.bot_user_id: str = data["botUserId"]
+        self.bot_token: str = data["botToken"]
+        self.public_key: str = data["publicKey"]
+        self.guild_id: str = data["guildId"]
+
+
+class DiscordUser:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.name: str = data["name"]
+        self.kind: Literal["user"] = data["kind"]
+        self.channel: Literal["discord"] = data["channel"]
+        self.username: str = data["username"]
+        self.is_admin: bool = data["isAdmin"]
+        self.is_bot: bool = data["isBot"]
+
+    async def say(self, text: str | DiscordMessageInput, *, channel: DiscordChannel | None = None, to: DiscordUser | DiscordApp | list[DiscordUser | DiscordApp] | None = None) -> DiscordMessage:
+        """Write a message in a channel or thread, or in a DM with the person or app in `to`. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/say", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "channel": None if channel is None else channel.id, "to": None if to is None else [item.id for item in (to if isinstance(to, list) else [to])]})
+        return DiscordMessage(ctx, data)
+
+    async def reply(self, text: str | DiscordMessageInput, *, message: DiscordMessage) -> DiscordMessage:
+        """Reply to a message: Discord's reply, in the message's channel, which quotes it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/reply", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "message": {"channelId": message.channel_id, "id": message.id}})
+        return DiscordMessage(ctx, data)
+
+    async def edit(self, text: str | DiscordMessageInput, *, message: DiscordMessage) -> DiscordMessage:
+        """Edit one of this person's own messages. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/edit", body={"text": {"content": text} if isinstance(text, str) else text._to_wire(), "message": {"channelId": message.channel_id, "id": message.id}})
+        return DiscordMessage(ctx, data)
+
+    async def delete(self, *, message: DiscordMessage) -> None:
+        """Delete a message: this person's own, or anyone's for an admin. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/delete", body={"message": {"channelId": message.channel_id, "id": message.id}})
+
+    async def react(self, emoji: str, *, message: DiscordMessage) -> DiscordDelivery | None:
+        """React to a message with an emoji. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/react", body={"emoji": emoji, "message": {"channelId": message.channel_id, "id": message.id}})
+        return (None if data is None else DiscordDelivery(ctx, data))
+
+    async def unreact(self, emoji: str, *, message: DiscordMessage) -> DiscordDelivery | None:
+        """Take this person's reaction off a message. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/unreact", body={"emoji": emoji, "message": {"channelId": message.channel_id, "id": message.id}})
+        return (None if data is None else DiscordDelivery(ctx, data))
+
+    async def start_thread(self, name: str, *, message: DiscordMessage | None = None, channel: DiscordChannel | None = None) -> DiscordChannel:
+        """Start a thread: from a message, or in a channel. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/threads", body={"name": name, "message": None if message is None else {"channelId": message.channel_id, "id": message.id}, "channel": None if channel is None else channel.id})
+        return DiscordChannel(ctx, data)
+
+    async def open_dm(self, participant: DiscordUser | DiscordApp) -> DiscordChannel:
+        """Open (or reuse) a DM with the app or another person. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/open-dm", body={"participant": participant.id})
+        return DiscordChannel(ctx, data)
+
+    async def invite(self, participants: DiscordUser | DiscordApp | list[DiscordUser | DiscordApp], *, channel: DiscordChannel) -> None:
+        """Let people or the app see a channel. The person must be an admin. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/invite", body={"participants": [item.id for item in (participants if isinstance(participants, list) else [participants])], "channel": channel.id})
+
+    async def run_command(self, command: str, *, channel: DiscordChannel) -> DiscordDelivery | None:
+        """Run one of the app's slash commands in a channel, e.g. `/deploy web staging` or `/deploy service:web`. Experimental."""
+        ctx = self._ctx
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/commands", body={"command": command, "channel": channel.id}))
+        return (None if data is None else DiscordDelivery(ctx, data))
+
+    async def click(self, button: str | DiscordButtonRef, *, message: DiscordMessage | None = None, channel: DiscordChannel | None = None) -> DiscordDelivery | None:
+        """Press a button, found by its label or custom_id: on a message, or on the app's newest message in a channel or thread that has it. Experimental."""
+        ctx = self._ctx
+        data = await retry_while(("not_found",), lambda: ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/click", body={"button": {"label": button} if isinstance(button, str) else button._to_wire(), "message": None if message is None else {"channelId": message.channel_id, "id": message.id}, "channel": None if channel is None else channel.id}))
+        return (None if data is None else DiscordDelivery(ctx, data))
+
+    async def ephemeral(self) -> DiscordEphemeralMessages:
+        """Messages only this person sees: the app's ephemeral responses, and "This interaction failed". Experimental."""
+        ctx = self._ctx
+        await until_quiet(lambda: quiet_of(ctx))
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/users/{quote(str(self.id), safe='')}/ephemeral")
+        return [DiscordMessage(ctx, item) for item in data]
+
+
+class DiscordChannel:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.kind: Literal["text", "dm", "public_thread"] = data["kind"]
+        self.channel: Literal["discord"] = data["channel"]
+        self.name: str | None = data.get("name")
+        self.parent_id: str | None = data.get("parentId")
+        self.starter_id: str | None = data.get("starterId")
+
+    async def messages(self) -> DiscordMessages:
+        """A channel's or thread's messages, oldest first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/messages")
+        return [DiscordMessage(ctx, item) for item in data]
+
+    async def members(self) -> DiscordMembers:
+        """Who sees a channel: a text channel's participants, a DM's two ends; a thread's are its channel's. Admins see every channel without being listed. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/members")
+        return [DiscordUser(ctx, item) if item["kind"] == "user" else DiscordApp(ctx, item) for item in data]
+
+    async def threads(self) -> DiscordThreads:
+        """The threads in a channel. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/threads")
+        return [DiscordChannel(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: DiscordUser | DiscordApp | None = None) -> DiscordTranscript:
+        """A channel or thread as a person reads it, each thread under the message that starts it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return DiscordTranscript._from_wire(ctx, data)
+
+    async def wait_for_message(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None) -> DiscordMessage:
+        """Wait for the next new message matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForMessage", self.messages, lambda item: from_matches(item.author, from_), describe_wait("a message", from_), timeout=timeout)
+
+
+class DiscordMessage:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self._seen: dict[str, int] = {}
+        self.id: str = data["id"]
+        self.channel_id: str = data["channelId"]
+        self.channel: DiscordChannel = DiscordChannel(ctx, data["channel"])
+        self.author: DiscordUser | DiscordApp = DiscordUser(ctx, data["author"]) if data["author"]["kind"] == "user" else DiscordApp(ctx, data["author"])
+        self.text: str = data["text"]
+        self.content: str = data["content"]
+        self.embeds: list[Any] = data["embeds"]
+        self.components: list[Any] = data["components"]
+        self.posted_at: str = data["postedAt"]
+        self.edited: bool = data["edited"]
+        self.reply_to: str | None = data.get("replyTo")
+        self.thread: DiscordChannel | None = None if data.get("thread") is None else DiscordChannel(ctx, data["thread"])
+        self.visible_to: DiscordUser | None = None if data.get("visibleTo") is None else DiscordUser(ctx, data["visibleTo"])
+        self.delivery: DiscordDelivery | None = None if data.get("delivery") is None else DiscordDelivery(ctx, data["delivery"])
+
+    async def refresh(self) -> DiscordMessage:
+        """Re-read a message: its latest text, edits and thread. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}")
+        return DiscordMessage(ctx, data)
+
+    async def replies(self) -> DiscordReplies:
+        """What answers a message, oldest first: Discord's replies to it, and the messages of the thread started from it. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/replies")
+        return [DiscordMessage(ctx, item) for item in data]
+
+    async def transcript(self, *, as_: DiscordUser | DiscordApp | None = None) -> DiscordTranscript:
+        """A message and what answers it, as a person reads them. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/transcript", query={"as": None if as_ is None else as_.id})
+        return DiscordTranscript._from_wire(ctx, data)
+
+    async def reactions(self) -> DiscordReactions:
+        """The reactions on a message, and who added each. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/reactions")
+        return [DiscordReaction._from_wire(ctx, item) for item in data]
+
+    async def deliveries(self) -> DiscordMessageDeliveries:
+        """Every Gateway dispatch this message caused to the bot. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/channels/{quote(str(self.channel_id), safe='')}/messages/{quote(str(self.id), safe='')}/deliveries")
+        return [DiscordDelivery(ctx, item) for item in data]
+
+    async def wait_for_reply(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None) -> DiscordMessage:
+        """Wait for the next new reply matching `from_` (anyone if omitted), after the last one this handle saw."""
+        return await wait_for_next(self._seen, "waitForReply", self.replies, lambda item: from_matches(item.author, from_), describe_wait("a reply", from_), timeout=timeout)
+
+    async def latest_reply(self, *, from_: DiscordUser | DiscordApp | str | None = None, timeout: Duration | None = None, quiet_for: Duration | None = None) -> DiscordMessage:
+        """The latest reply matching `from_`, once the agent is quiet. Waits for at least one."""
+        return await latest_once_quiet(self.replies, lambda item: from_matches(item.author, from_), lambda: quiet_of(self._ctx), describe_wait("a reply", from_), timeout=timeout, quiet_for=quiet_for)
+
+
+class DiscordDelivery:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+        self.channel: Literal["discord"] = data["channel"]
+        self.type: str = data["type"]
+        self.payload: Any | None = data.get("payload")
+        self.attempts: list[DeliveryAttempt] = [DeliveryAttempt._from_wire(ctx, item) for item in data["attempts"]]
+        self.status: Literal["pending", "acknowledged", "failed", "timed_out", "unreachable"] = data["status"]
+
+    async def refresh(self) -> DiscordDelivery:
+        """Re-read a delivery: its attempts and status. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries/{quote(str(self.id), safe='')}")
+        return DiscordDelivery(ctx, data)
+
+    async def redeliver(self) -> DeliveryAttempt:
+        """Dispatch the same event to the bot again, as a replay after a RESUME would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries/{quote(str(self.id), safe='')}/redeliver")
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def resend(self, *, bad_signature: bool | None = None) -> DeliveryAttempt:
+        """Send an interaction again, forged: signed with a key that isn't the app's, which its endpoint must refuse with 401. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/discord/deliveries/{quote(str(self.id), safe='')}/resend", body={"badSignature": bad_signature})
+        return DeliveryAttempt._from_wire(ctx, data)
+
+    async def settled(self, *, timeout: Duration | None = None) -> DiscordDelivery:
+        """Wait for the delivery to settle, and resolve with the value as it is then."""
+
+        async def settled() -> DiscordDelivery | None:
+            value = await self.refresh()
+            return None if value.status in ("pending",) else value
+
+        return await wait_for("the delivery to settle", settled, timeout=timeout)
+
+
+class DiscordFault:
+    def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
+        self._ctx = ctx
+        self.id: str = data["id"]
+
+    async def undo(self) -> None:
+        """Remove a fault. Experimental."""
+        ctx = self._ctx
+        await ctx.transport.request("DELETE", f"/sessions/{quote(session_of(ctx), safe='')}/discord/faults/{quote(str(self.id), safe='')}")
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await dispose_quietly(self.undo)
+
+
 class Place:
     def __init__(self, ctx: HandleContext, data: dict[str, Any]) -> None:
         self._ctx = ctx
@@ -3997,7 +4543,7 @@ class GitHubPullRequest(GitHubIssue):
         return data
 
 
-CHANNEL_NAMES: tuple[str, ...] = ("slack", "github", "linear", "notion", "resend", "google")
+CHANNEL_NAMES: tuple[str, ...] = ("slack", "github", "linear", "notion", "resend", "google", "discord")
 """Every channel, by name, in the server's order: what pytest-channelstack makes a fixture of."""
 
 

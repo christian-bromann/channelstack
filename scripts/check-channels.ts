@@ -135,8 +135,12 @@ for (const name of HARNESS_CHANNELS) {
 // --- CI runs every part of the acceptance suite ----------------------------------------------------
 
 const parts = spawnSync(process.execPath, [join(ROOT, "scripts", "accept.ts"), "--parts"], { encoding: "utf8" });
-const listed = /part: \[([^\]]*)\]/.exec(read(".github/workflows/ci.yml") ?? "")?.[1];
-const ciParts = (listed ?? "").split(",").map((part) => part.trim());
+// On one line, or one part a line once the formatter wraps a long list.
+const listed = /part:\s*\[([^\]]*)\]/.exec(read(".github/workflows/ci.yml") ?? "")?.[1];
+const ciParts = (listed ?? "")
+  .split(",")
+  .map((part) => part.trim())
+  .filter((part) => part !== "");
 const accepted = JSON.parse(parts.stdout || "[]") as string[];
 need(
   JSON.stringify([...ciParts].sort()) === JSON.stringify([...accepted].sort()),

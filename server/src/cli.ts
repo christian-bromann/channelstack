@@ -40,8 +40,8 @@ Usage:
   channelstack ca rotate          Replace proxy mode's CA (<home>/ca); restart the server and run \`channelstack env --proxy\`
 
   Attached to the running server (a shared "dev" session; people and places are created on first use).
-  <channel> is slack, github, linear, notion, resend or google; a place is a Slack channel, a GitHub issue,
-  a Linear issue, a Notion page or an email thread, by its name:
+  <channel> is slack, github, linear, notion, resend, google or discord; a place is a Slack channel, a GitHub
+  issue, a Linear issue, a Notion page, an email thread or a Discord channel, by its name:
   channelstack <channel> say   --as <name> --in <place> "<text>"
   channelstack <channel> reply --as <name> [--to last|<ref>] "<text>"
   channelstack <channel> react --as <name> <emoji> [--on last|<ref>]

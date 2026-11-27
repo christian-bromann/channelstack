@@ -96,6 +96,11 @@ export interface DeliveryRecord {
   readonly attempts: DeliveryAttempt[];
   /** The retry the platform has scheduled, while one is: when it is due, and how to call it off. */
   retry?: { readonly at: number; cancel(): void } | undefined;
+  /**
+   * Resolves once the first attempt has its outcome (and an answer was handed on), for a platform
+   * that acts on it right away: Discord's check of a new interactions endpoint.
+   */
+  sent?: Promise<void>;
 }
 
 /** How a later attempt differs from the first: what a platform's retry, or a test's forged delivery, changes. */
@@ -156,7 +161,7 @@ export class DeliveryQueue {
     this.#observe?.(request);
     this.#session(session).records.set(id, record);
     this.#events.append(session, driver, "delivery", { id, type, url, ...(request.meta ?? {}) });
-    this.#track(this.#chain(record, {}, 0));
+    record.sent = this.#track(this.#chain(record, {}, 0));
     return record;
   }
 

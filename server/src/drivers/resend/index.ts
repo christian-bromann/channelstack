@@ -58,10 +58,9 @@ export const resend: DriverDefinition = {
       capabilities: () => ({}),
       openWork: () => [],
       // What the agent needs: the `resend` SDK reads `RESEND_BASE_URL`; the address is where it sends from.
-      // Live, the agent talks to Resend with its own configuration, and live keys never leave the server.
+      // Live, `channelstack env` prints nothing for Resend (app.ts): the agent talks to it with its own configuration.
       // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same shape.
       env: (app) => {
-        if (live) return {};
         const team = fake.store.appForEnv(app, (name) => fake.world.createApp(undefined, { name }));
         const { apiKey, webhookSecret } = fake.world.credentials(team);
         return {

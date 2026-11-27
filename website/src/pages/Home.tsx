@@ -24,6 +24,7 @@ const LOGOS: Partial<Record<string, { onLight: string; onDark: string }>> = {
   linear: { onLight: "/logos/linear.svg", onDark: "/logos/linear-light.svg" },
   notion: { onLight: "/logos/notion.svg", onDark: "/logos/notion.svg" },
   resend: { onLight: "/logos/resend.svg", onDark: "/logos/resend-white.svg" },
+  discord: { onLight: "/logos/discord.svg", onDark: "/logos/discord.svg" },
 };
 
 const CHANNELS = [
@@ -62,6 +63,12 @@ const CHANNELS = [
     name: "Google",
     text: "Gmail agents: a watched mailbox, Pub/Sub pushes with tokens verifyIdToken checks, history to read, and answers sent in the thread.",
     chips: ["users.watch", "history.list", "messages.send", "OIDC push token", "threadId"],
+  },
+  {
+    id: "discord",
+    name: "Discord",
+    text: "Discord bots: a guild your bot hears over the Gateway, threads and DMs, and slash commands and buttons as Ed25519-signed interactions it answers within 3 seconds.",
+    chips: ["MESSAGE_CREATE", "RESUME", "slash commands", "X-Signature-Ed25519", "verifyEndpoint"],
   },
 ];
 
@@ -138,16 +145,16 @@ export default function Home() {
             <HeroWaves />
             <p className="eyebrow">
               <span className="rec" aria-hidden="true" />
-              Test harness for Slack, GitHub, Linear, Notion, Resend and Gmail apps
+              Test harness for Slack, GitHub, Linear, Notion, Resend, Gmail and Discord apps
             </p>
             <h1 id="hero-title">
               Your app’s whole world, <em>on localhost.</em>
             </h1>
             <p className="lede">
-              channelstack recreates <strong>Slack, GitHub, Linear, Notion, Resend and Gmail</strong> on your machine,
-              for the bots, integrations and AI agents you build on them. Script the people, let your app answer through
-              its real code path, and assert on what a person would see. Signed webhooks, real payload shapes and real
-              ids, with no changes to how your app works.
+              channelstack recreates <strong>Slack, GitHub, Linear, Notion, Resend, Gmail and Discord</strong> on your
+              machine, for the bots, integrations and AI agents you build on them. Script the people, let your app
+              answer through its real code path, and assert on what a person would see. Signed webhooks, real payload
+              shapes and real ids, with no changes to how your app works.
             </p>
             <div className="cta">
               <a className="btn primary" href="#quick-start">
@@ -182,11 +189,11 @@ export default function Home() {
         <section id="channels" aria-labelledby="channels-title">
           <div className="wrap">
             <div className="sec-head">
-              <p className="kicker">Six platforms, one API</p>
+              <p className="kicker">Seven platforms, one API</p>
               <h2 id="channels-title">Everywhere your app gets an event.</h2>
               <p className="sec-lede">
-                One package fakes all six, with the people, events and API calls apps actually use. Use one in a test,
-                or several when your app spans them. Discord and Stripe come next.
+                One package fakes all seven, with the people, events and API calls apps actually use. Use one in a test,
+                or several when your app spans them. Stripe comes next.
               </p>
             </div>
             <div className="channels" ref={channels}>
@@ -382,8 +389,8 @@ export default function Home() {
             </div>
             <p className="why-name">
               <strong>Why “channelstack”?</strong> Your app lives in a stack of channels: Slack, GitHub, Linear, Notion,
-              Resend, Gmail. channelstack runs that whole stack on localhost, with the people in it, so you can test the
-              conversation end to end before your users have it.
+              Resend, Gmail, Discord. channelstack runs that whole stack on localhost, with the people in it, so you can
+              test the conversation end to end before your users have it.
             </p>
           </div>
           <div className="wrap">

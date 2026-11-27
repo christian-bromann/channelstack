@@ -470,7 +470,10 @@ export function createApp(options: AppOptions): App {
       }
       const app = query.app === BUILT_IN_APP ? undefined : query.app;
       if (app !== undefined) checkAppName(app);
-      const env: Record<string, string> = Object.assign({}, ...chosen.map((driver) => driver.env(app)));
+      // A live channel prints nothing: the agent talks to the platform with its own configuration, and
+      // live credentials never leave the server.
+      const fake = chosen.filter((driver) => realities.get(driver.name)?.mode !== "live");
+      const env: Record<string, string> = Object.assign({}, ...fake.map((driver) => driver.env(app)));
       if (query.proxy !== true) return env;
       const proxy = options.urls().proxy;
       if (!proxy) {

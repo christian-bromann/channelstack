@@ -3,7 +3,13 @@ import type { DeliveryAttempt } from "../../../core/delivery/index.ts";
 import { ProtocolError } from "../../../core/errors/index.ts";
 import type { IdGenerator } from "../../../core/ids/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
-import { fakeActorInLiveWorld, liveMisconfigured, unsupportedInLive } from "../../../core/reality/index.ts";
+import {
+  checkOnce,
+  fakeActorInLiveWorld,
+  liveMisconfigured,
+  personWithoutToken,
+  unsupportedInLive,
+} from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
 import type { DeliveryView, LiveContext } from "../../../core/router/index.ts";
 import { taggedNames } from "../../../core/safety/index.ts";
@@ -111,7 +117,6 @@ export function createLiveGitHubWorld(deps: {
   const people = new LivePeople();
   const readAt = new Map<number, number>();
   const payloads = new Map<number, unknown>();
-  let checked: Promise<void> | undefined;
   let selection: "all" | "selected" = "selected";
   /** Where GitHub sends the App's webhooks: the agent's own URL. */
   let hookUrl = "";
@@ -289,39 +294,33 @@ export function createLiveGitHubWorld(deps: {
     repoWeb: (repo) => `${GITHUB_WEB}/${repo.owner}/${repo.name}`,
     installation,
 
-    async ready() {
-      checked ??= (async () => {
-        const identity = await identifyApp(client);
-        const install = testOrg(identity, live.allowlist);
-        const { app } = identity;
-        selection = install.selection;
-        // An App without a webhook URL has none to show: its deliveries have no URL either.
-        const hook = await client.call<{ url?: string }>(asApp, "GET /app/hook/config").catch(() => undefined);
-        hookUrl = hook?.url ?? "";
-        const bot = await client.call<WireUser>({ installation: install.id }, "GET /users/{username}", {
-          username: `${app.slug}[bot]`,
-        });
-        store.seed(
-          { id: install.account.id, login: install.account.login },
-          {
-            id: app.id,
-            slug: app.slug,
-            name: app.name,
-            clientId: app.clientId,
-            botId: bot.id,
-            installationId: install.id,
-            events: app.events,
-            permissions: install.permissions,
-            createdAt: app.createdAt,
-          },
-        );
-      })().catch((error: unknown) => {
-        // A definitive answer is kept; a network error, a rate limit or GitHub's own failure isn't: the next action asks again.
-        if (!(error instanceof ProtocolError) || passing(error)) checked = undefined;
-        throw error;
+    // A network error, a rate limit or the platform's own failure is asked again; anything else is kept.
+    ready: checkOnce(async () => {
+      const identity = await identifyApp(client);
+      const install = testOrg(identity, live.allowlist);
+      const { app } = identity;
+      selection = install.selection;
+      // An App without a webhook URL has none to show: its deliveries have no URL either.
+      const hook = await client.call<{ url?: string }>(asApp, "GET /app/hook/config").catch(() => undefined);
+      hookUrl = hook?.url ?? "";
+      const bot = await client.call<WireUser>({ installation: install.id }, "GET /users/{username}", {
+        username: `${app.slug}[bot]`,
       });
-      return checked;
-    },
+      store.seed(
+        { id: install.account.id, login: install.account.login },
+        {
+          id: app.id,
+          slug: app.slug,
+          name: app.name,
+          clientId: app.clientId,
+          botId: bot.id,
+          installationId: install.id,
+          events: app.events,
+          permissions: install.permissions,
+          createdAt: app.createdAt,
+        },
+      );
+    }, passing),
 
     release(session) {
       for (const issue of store.list(store.issues, session)) readAt.delete(issue.id);
@@ -345,10 +344,7 @@ export function createLiveGitHubWorld(deps: {
         throw new ProtocolError("invalid_argument", `There is already a person "${input.login}" in this session`);
       if (input.token === undefined) {
         if (live.strict) {
-          throw liveMisconfigured(
-            `CHANNELSTACK_REALITY is live and ${input.login} has no token`,
-            "set CHANNELSTACK_GITHUB_USER_<LOGIN>_TOKEN for them, or run without CHANNELSTACK_REALITY=live",
-          );
+          throw personWithoutToken(input.login, "github", { variable: "<LOGIN>" });
         }
         // A fake person can exist next to a live org, but can't act in it.
         const id = Number(ids.next(GITHUB_IDS.user));

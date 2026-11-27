@@ -2,7 +2,9 @@
 transcript_as!(
     crate::SlackMessage,
     crate::SlackConversation,
-    crate::SlackThread
+    crate::SlackThread,
+    crate::DiscordChannel,
+    crate::DiscordMessage
 );
 transcript!(
     crate::GitHubIssue,
@@ -22,7 +24,8 @@ deliveries!(
     crate::LinearDelivery,
     crate::NotionDelivery,
     crate::ResendDelivery,
-    crate::GoogleDelivery
+    crate::GoogleDelivery,
+    crate::DiscordDelivery
 );
 calls!(
     crate::SlackFixture,
@@ -30,5 +33,6 @@ calls!(
     crate::LinearFixture,
     crate::NotionFixture,
     crate::ResendFixture,
-    crate::GoogleFixture
+    crate::GoogleFixture,
+    crate::DiscordFixture
 );

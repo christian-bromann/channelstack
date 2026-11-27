@@ -1,4 +1,4 @@
-import { ProtocolError } from "../errors/index.ts";
+import { LivePlatformRefusal, ProtocolError } from "../errors/index.ts";
 
 /** Where a driver's objects live: in the fake, or on the real platform. */
 export type Reality = "fake" | "live";
@@ -120,6 +120,46 @@ export async function admitLive(
   }
   if (!reality.hasBackend) throw unsupportedInLive(operation, `live ${channel} isn't built yet`);
   await reality.ready();
+}
+
+/**
+ * A live world's check of its credentials (who the token is, the allowlist), made once for the
+ * server: a definitive answer is kept, so every later action is refused the same way without
+ * asking the platform again. A failure that will pass isn't: a network error, or a refusal
+ * `passing` says will pass (by default the platform's own failure or a rate limit, a 5xx or 429).
+ * The next action asks again.
+ */
+export function checkOnce(
+  check: () => Promise<void>,
+  passing: (error: ProtocolError) => boolean = (error) =>
+    error instanceof LivePlatformRefusal &&
+    error.httpStatus !== undefined &&
+    (error.httpStatus >= 500 || error.httpStatus === 429),
+): () => Promise<void> {
+  let checked: Promise<void> | undefined;
+  return () =>
+    (checked ??= check().catch((error: unknown) => {
+      if (!(error instanceof ProtocolError) || passing(error)) checked = undefined;
+      throw error;
+    }));
+}
+
+/**
+ * With `CHANNELSTACK_REALITY=live`, a person a test makes without a credential is refused, not
+ * made a fake person: a strict live run must not act as nobody. `lacks` is what they have no
+ * (`a token`), `variable` names the variable's person part (`<NAME>`, GitHub's `<LOGIN>`), and
+ * `as` says what goes in it, where that isn't plain.
+ */
+export function personWithoutToken(
+  who: string,
+  channel: string,
+  options: { lacks?: string; variable?: string; as?: string } = {},
+): ProtocolError {
+  const variable = `CHANNELSTACK_${channel.toUpperCase()}_USER_${options.variable ?? "<NAME>"}_TOKEN`;
+  return liveMisconfigured(
+    `CHANNELSTACK_REALITY is live and ${who} has no ${options.lacks ?? "token"}`,
+    `set ${variable} for them${options.as ? ` to ${options.as}` : ""}, or run without CHANNELSTACK_REALITY=live`,
+  );
 }
 
 /** A fake person acting in a live workspace: refused, in core, for every driver. */

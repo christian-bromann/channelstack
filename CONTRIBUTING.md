@@ -24,8 +24,10 @@ pnpm test           # the unit tests, TypeScript and Python
 pnpm test:accept    # the acceptance suite, against the reference agents
 ```
 
-`pnpm verify:phase <n>` runs everything CI runs. [docs/code-map.md](docs/code-map.md) says which
-module owns what, and [AGENTS.md](AGENTS.md) has the rules the code follows. Coding agents follow
+`pnpm verify:phase <n>` runs CI's checks and tests. CI also compiles the binaries for all five
+targets (`binaries`), builds the PyPI packages and the crate (`packages`), runs the packaging test
+on macOS and Linux (`packaging`) and builds the coverage page. [docs/code-map.md](docs/code-map.md)
+says which module owns what, and [AGENTS.md](AGENTS.md) has the rules the code follows. Coding agents follow
 them too.
 
 ## A pull request
@@ -53,7 +55,7 @@ from those titles, so the title is a [Conventional Commit](https://www.conventio
 - **Type:** `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `ci`, `build` or `chore`. The
   changelog lists `feat`, `fix` and `perf`.
 - **Scope,** one or more separated by commas (`fix(slack,github): …`):
-  - the fakes: `slack`, `github`, `linear`, `notion`, `resend`, `gmail`;
+  - the fakes: `slack`, `github`, `linear`, `notion`, `resend`, `gmail`, `discord`;
   - the packages: `server`, `sdk-ts`, `sdk-python`, `pytest`, `sdk-rust`;
   - internal, left out of the changelog: `docs`, `ci`, `codegen`, `deps`.
 - **`!`** marks a breaking change, which the changelog lists whatever its type.

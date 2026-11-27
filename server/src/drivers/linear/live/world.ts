@@ -4,9 +4,11 @@ import type { IdGenerator } from "../../../core/ids/index.ts";
 import { LivePeople } from "../../../core/people/index.ts";
 import {
   actionRequires,
+  checkOnce,
   checkRoles,
   fakeActorInLiveWorld,
   liveMisconfigured,
+  personWithoutToken,
   unsupportedInLive,
 } from "../../../core/reality/index.ts";
 import { Registry } from "../../../core/registry/index.ts";
@@ -272,7 +274,6 @@ export function createLiveLinearWorld(deps: {
   /** The real people the open sessions hold: one record each, whichever sessions have them. */
   const people = new LivePeople();
   const aliases = new Map<string, string>();
-  let checked: Promise<void> | undefined;
   const readAt = new Map<string, number>();
   const teamName = taggedNames(live.tag);
 
@@ -501,8 +502,9 @@ export function createLiveLinearWorld(deps: {
     rootOf: text.rootOf,
     stateOf: text.stateOf,
 
-    async ready() {
-      checked ??= (async () => {
+    // A network error, a rate limit or the platform's own failure is asked again; anything else is kept.
+    ready: checkOnce(
+      async () => {
         const who = await identifyLinear(client, app());
         checkLinearCredential(who, { role: "app", who: "CHANNELSTACK_LINEAR_APP_TOKEN", allowlist: live.allowlist });
         const now = clock();
@@ -521,15 +523,9 @@ export function createLiveLinearWorld(deps: {
             createdAt: now,
           },
         );
-      })().catch((error: unknown) => {
-        // A definitive answer is kept; a network error or a rate limit isn't: the next action asks again.
-        if (!(error instanceof ProtocolError) || error.code === "RATELIMITED" || error.code === "unexpected") {
-          checked = undefined;
-        }
-        throw error;
-      });
-      return checked;
-    },
+      },
+      (error) => error.code === "RATELIMITED" || error.code === "unexpected",
+    ),
 
     release(session) {
       // A person another open session holds stays theirs.
@@ -552,10 +548,7 @@ export function createLiveLinearWorld(deps: {
       }
       if (input.token === undefined) {
         if (live.strict) {
-          throw liveMisconfigured(
-            `CHANNELSTACK_REALITY is live and ${input.name} has no token`,
-            "set CHANNELSTACK_LINEAR_USER_<NAME>_TOKEN for them, or run without CHANNELSTACK_REALITY=live",
-          );
+          throw personWithoutToken(input.name, "linear");
         }
         // A fake person can exist next to a live workspace, but can't act in it.
         const id = ids.next(LINEAR_IDS.uuid);

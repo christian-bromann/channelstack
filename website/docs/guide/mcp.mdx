@@ -33,7 +33,7 @@ npx channelstack env > .env.local    # then start the bot with it
 
 ## The tools
 
-Every tool acts in the shared `dev` session, the same one the CLI and the UI use, and prints what the matching CLI command prints. Every channel has the same tools ([decision 0028](https://github.com/christian-bromann/channelstack/blob/main/docs/decisions/0028-dev-tools-on-every-channel.md)): `channel` is `slack`, `github`, `linear`, `notion`, `resend` or `google`.
+Every tool acts in the shared `dev` session, the same one the CLI and the UI use, and prints what the matching CLI command prints. Every channel has the same tools ([decision 0028](https://github.com/christian-bromann/channelstack/blob/main/docs/decisions/0028-dev-tools-on-every-channel.md)): `channel` is `slack`, `github`, `linear`, `notion`, `resend`, `google` or `discord`.
 
 | Tool              | Inputs                                                                          | Same as                                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ Every tool acts in the shared `dev` session, the same one the CLI and the UI use
 | `redeliver`       | `channel`?, `delivery`? (`last`, the default, or an id from `list_deliveries`)  | `channelstack redeliver`                                                                                      |
 
 - **`as`** is a person's name, such as `ana`. The person is created the first time the name is used.
-- **`in`** names a place: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository), a Linear issue by its title (in a team named Dev), a Notion page by its title, an email thread by its subject. `say` makes it the first time, with the person and the bot in it.
+- **`in`** names a place: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository), a Linear issue by its title (in a team named Dev), a Notion page by its title, an email thread by its subject, a Discord channel (`"#support"`). `say` makes it the first time, with the person and the bot in it.
 - **`to`**, **`on`** and **`thread`** take `"last"` (the default: the newest entry of the channel's most recently active place), or `"<place>:<entry>"`, as `say` and `reply` print it and `show` with `json` lists the entries' ids.
 - **`<channel>_act`**'s actions are generated from the channel's routes: each thing its people do that isn't a read (`click`, `stop`, `select` on Slack; `review`, `merge`, `label` on GitHub; `delegate`, `setState`, `prompt` on Linear; …). The tool's description lists each action with its values. `params` takes them by name; a person or the app (`"app"`) by name, a reference as `"last"` or an id. A reference the action needs and isn't given comes from the target: the entry `on` names, the newest one in the place `in` names, or the newest anywhere. Without `as`, whoever started the target's thread acts (`slack_act` `stop` presses Stop as the person who asked).
 

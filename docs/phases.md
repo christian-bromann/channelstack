@@ -18,6 +18,7 @@
 | 7 | done | 2026-11-25, [#32](https://github.com/christian-bromann/channelstack/pull/32) (7.2 dropped, decision 0017; MCP tools for GitHub, Linear and Notion dropped, #33) |
 | 8 | done | 2026-11-25, [#57](https://github.com/christian-bromann/channelstack/pull/57) (Resend attachments and raw MIME built since, #64, but for a person's attachments, #84; HTML to text on a library, #65) |
 | 9 | done | 2026-11-26, [#66](https://github.com/christian-bromann/channelstack/pull/66) (Gmail verified live against two accounts and a Pub/Sub topic; conformance without a difference) |
+| 11 | done | 2026-11-27, [#103](https://github.com/christian-bromann/channelstack/pull/103) (built in parallel with phase 10; Discord verified live with the agent's bot and two people's bots; conformance without a difference) |
 
 ## When a phase is done
 
@@ -75,6 +76,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 7 | SDK breadth and MCP | Smoke parity in TypeScript, Python and Rust; the pytest integration; MCP drives a conversation |
 | 8 | The channel kit, the email core and Resend | Every channel is on the kit; all fake Resend examples and `resendChecks()` pass; Resend passes live |
 | 9 | Google (Gmail) | All fake Google examples and `googleChecks()` pass on the kit; Gmail passes live |
+| 11 | Discord: a bot in a guild, on the Gateway and HTTP interactions | All fake Discord examples and `discordChecks()` pass against discord.js; Discord passes live |
 | 12 | Any number of agent apps per channel | Every channel's "several apps" examples pass against two agents; the reply loop is caught on every channel; no existing test changed |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
@@ -351,6 +353,36 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ---
 
+## Phase 11: Discord
+
+[Decision 0026](decisions/0026-discord.md): Discord as channel 8, and why the Gateway, HTTP interactions, and a second bot as a person live. Phase 10 (Twilio) is built at the same time, in its own pull request, at the maintainer's request.
+
+**Build:**
+- **The Discord fake on the kit:**
+  - The Gateway (v10, JSON): `GET /gateway/bot`, HELLO, IDENTIFY with the bot's token and intents, heartbeats, READY and GUILD_CREATE, dispatches with sequence numbers (`MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`, `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`, `CHANNEL_CREATE`, `CHANNEL_UPDATE`, `THREAD_CREATE`, `INTERACTION_CREATE`), RESUME and INVALID_SESSION, Discord's close codes. Intents enforced, `MESSAGE_CONTENT` among them. Waiting for the agent's connection moves into core (`core/socket`), and Slack's Socket Mode uses it.
+  - REST v10, the routes discord.js calls: messages, replies, edits, deletes, reactions, typing, threads, DMs, the guild, application commands, the interaction callback and followups.
+  - Interactions over HTTP, signed with Ed25519, with the PING/PONG check and the 3-second deadline; over the Gateway without an interactions endpoint.
+  - Discord's realism: snowflake ids, its error shape and JSON codes, permissions from roles and overwrites, per-route rate limits with `X-RateLimit-*` and 429 `retry_after`, the 2000-character limit.
+- `discordChecks()`, a reference agent on discord.js, and its broken variant.
+- **Discord live:** the agent's bot in a sandbox guild (`CHANNELSTACK_LIVE_DISCORD_GUILDS`), each session's channels made, tagged and deleted by it; a person as a second application's bot in the guild, acting through REST v10 with its token (`CHANNELSTACK_DISCORD_USER_<NAME>_TOKEN`), its `author.bot` recorded as a difference; the sweep.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 11.1 | Every fake Discord example passes | All of `test/acceptance/examples/discord.test.ts` except "live mode", against the discord.js reference agent |
+| 11.2 | Discord matches its description | Every fake answer, and every Gateway dispatch whose object it describes, validates against the pinned `discord/discord-api-spec` (`pnpm discord:schema --check`) |
+| 11.3 | The Gateway and interactions | Delivery cases D1–D8 ([appendix](#appendix-delivery-cases)) pass against the real fake, with discord.js and `discord-interactions`'s `verifyKey` as receivers |
+| 11.4 | Standard checks | `discordChecks()` pass, and each check fails against its broken variant |
+| 11.5 | All channels in one run | `test/acceptance/examples/shared.test.ts` passes with Discord |
+| 11.6 | The kit held | `pnpm check:channels` passes, and the PR lists every file it changed outside the Discord driver, its contract, its agents, scenarios and docs |
+| 11.7 | Discord live | The "live mode" block of `test/acceptance/examples/discord.test.ts` passes against the sandbox guild, the allowlist holds, and the sweep finds nothing left |
+| 11.8 | Conformance | `scenarios/discord/` runs in the nightly differential run, and each difference is fixed or recorded in `divergences.yaml` |
+
+**Docs to update:** the same list as phase 8, for Discord, and decision 0026.
+
+---
+
 ## Phase 12: any number of agent apps per channel
 
 [Decision 0027](decisions/0027-multiple-apps.md): a channel holds any number of people and apps, each app a real agent app with its own identity, and `my-agent` stays. Phase 12 started before phases 10 (Twilio) and 11 (Discord) merged, at the maintainer's request: it covers the six channels on `main`, and Twilio and Discord get their apps once they land. Its open questions are answered by the maintainer before it starts, or it takes their defaults.
@@ -393,7 +425,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 ## After 0.1
 
-Discord and Stripe drivers, more email providers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
+Stripe drivers, more email providers, third-party driver plugins, LLM-driven personas, transcript export to LangSmith or Braintrust judges. Teams isn't planned. (The full matcher set for pytest, once listed here, is done: [decision 0018](decisions/0018-pytest-expect.md).)
 
 ## Appendix: delivery cases
 
@@ -428,6 +460,14 @@ Checks that each fake sends deliveries the platform's **official** receiver acce
 | M1 | `google-auth-library`'s `verifyIdToken` accepts a Pub/Sub push token against the fake's certificates, with the push endpoint as audience | phase 9 |
 | M2 | A token for another audience, or signed by another key, is rejected | phase 9 |
 | M3 | An expired token is rejected | phase 9 |
+| D1 | discord.js, with the fake as its REST API, finds the Gateway at `/gateway/bot`, identifies with its token and intents, and becomes ready with the guild | phase 11 |
+| D2 | A person's message reaches discord.js as `messageCreate`, with its content under `MESSAGE_CONTENT` (without the intent it is empty unless it mentions the bot: a unit test) | phase 11 |
+| D3 | A dropped connection is resumed: discord.js sends RESUME with its session and sequence, and gets what was dispatched while it was away, once | phase 11 |
+| D4 | A bad token is closed with 4004; a privileged intent the app doesn't have with 4014 | phase 11 |
+| D5 | `discord-interactions`'s `verifyKey` accepts an interaction signed with the install's key over the sent bytes, against the app's public key | phase 11 |
+| D6 | A re-serialized body, or one signed with another key, is rejected | phase 11 |
+| D7 | Without an interactions endpoint, a slash command reaches discord.js as `interactionCreate`; its `reply` within 3 s is the response, and one after 3 s is refused with 10062 | phase 11 |
+| D8 | Discord's endpoint check: a PING is answered with a PONG, and a PING with a bad signature is refused with 401 | phase 11 |
 | A1 | On every channel, an event two apps hear is two deliveries, each with its own id, sent to its own app's URL or connection, and signed for that app where the platform signs: with its own secret on Slack, Linear, Notion and Resend; on GitHub with its own secret, `installation.id` and `X-GitHub-Hook-Installation-Target-ID`; on Google with its own push audience. Each app's official receiver (Bolt, `@octokit/webhooks`, `LinearWebhookClient`, `verifyWebhookSignature`, the `resend` SDK's `webhooks.verify`, `verifyIdToken`) accepts its own and rejects the other's. Twilio: two numbers of one account share its Auth Token, as Twilio signs, so `validateRequest` tells them apart by the URL, which is in the signature: each number's delivery fails against the other's URL. Discord: Gateway dispatches aren't signed, so each app's connection gets its own; an interaction goes to the one app it belongs to, signed with that app's key, and `verifyKey` rejects it against another app's public key | phase 12 |
 | A2 | Bolt with `ignoreSelf` drops the app's own message, and hands another app's (`bot_id`, `app_id`, `bot_profile`, no subtype) to the message handler; Probot receives an `issue_comment` by `other[bot]` with `sender.type: "Bot"` | phase 12 |
 | A3 | Two apps connected at once, over Socket Mode (Bolt) and the Gateway (discord.js), each get only their own envelopes and dispatches, and an ack or a reply on one connection is never taken as the other's | phase 12 |

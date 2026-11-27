@@ -75,9 +75,8 @@ export const linear: DriverDefinition = {
             (record) =>
               `an agent session on ${fake.store.issue(record.issue).identifier} that is still ${record.status}`,
           ),
-      // Live, the agent talks to Linear with its own configuration, and live credentials never leave the server.
+      // Live, `channelstack env` prints nothing for Linear (app.ts): the agent talks to it with its own configuration.
       env: (app) => {
-        if (live) return {};
         // Another app's lines have the built-in app's keys, so its agent starts from an .env of the same
         // shape; asking for them makes the app, so its agent can start before any test has.
         const name =

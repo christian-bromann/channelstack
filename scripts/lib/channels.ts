@@ -21,6 +21,18 @@ export interface ChannelHarness {
   readonly agents: Readonly<Record<string, string>>;
   /** The agent with one fault per standard check (`BROKEN=<check id>`), and where it takes webhooks. */
   readonly broken: { readonly agent: string; readonly path: string };
+  /**
+   * Why the fake half of the differential run can't put the reference agent behind the proxy: an
+   * agent whose WebSocket client doesn't use `HTTPS_PROXY` (discord.js's Gateway). It then runs with
+   * the fake's own URLs, started through its `tap`, which records what the fake sends it; its REST
+   * calls aren't recorded. A channel with one needs the other.
+   */
+  readonly unproxied?: string;
+  /**
+   * For an `unproxied` channel: the script that starts its reference agent and records what the
+   * platform sends it (`scripts/lib/discord-event-tap.ts`), so the fake's shapes are still compared.
+   */
+  readonly tap?: string;
 }
 
 export const HARNESS = {
@@ -129,6 +141,22 @@ export const HARNESS = {
     suites: ["test/acceptance/checks/google-checks.test.ts", "test/acceptance/checks/google-checks-coder.test.ts"],
     agents: { "gmail-node": "/webhooks/google" },
     broken: { agent: "broken-google", path: "/webhooks/google" },
+  },
+  discord: {
+    enabled: [
+      "messages and threads > ",
+      "direct messages > ",
+      "slash commands and buttons > ",
+      "reactions and edits > ",
+      "delivery and failures \\(fake only\\) > ",
+      "inspecting what the agent did > ",
+    ],
+    // The standard checks as a developer adds them (exit check 11.4).
+    suites: ["test/acceptance/checks/discord-checks.test.ts"],
+    agents: { "discord-node": "/interactions" },
+    broken: { agent: "broken-discord", path: "/interactions" },
+    unproxied: "discord.js's Gateway client (`ws`) connects directly, without HTTPS_PROXY",
+    tap: "scripts/lib/discord-event-tap.ts",
   },
 } as const satisfies Readonly<Record<string, ChannelHarness>>;
 

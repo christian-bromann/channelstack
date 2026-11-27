@@ -1,6 +1,7 @@
 import type { DevAdapter } from "../core/dev/index.ts";
 import type { DriverDefinition } from "../core/router/index.ts";
 import type { SecretSpec } from "../core/secrets/index.ts";
+import { discord } from "./discord/index.ts";
 import { echo } from "./echo/index.ts";
 import { github } from "./github/index.ts";
 import { google } from "./google/index.ts";
@@ -10,7 +11,7 @@ import { resend } from "./resend/index.ts";
 import { slack } from "./slack/index.ts";
 
 /** Every driver in the binary. Core never imports a driver; drivers are handed to it from here. */
-export const DRIVERS: readonly DriverDefinition[] = [echo, slack, github, linear, notion, resend, google];
+export const DRIVERS: readonly DriverDefinition[] = [echo, slack, github, linear, notion, resend, google, discord];
 
 /** The channels people test against: every driver but channelstack's own (`echo`), in this order everywhere. */
 export const CHANNELS: readonly DriverDefinition[] = DRIVERS.filter((driver) => !driver.internal);

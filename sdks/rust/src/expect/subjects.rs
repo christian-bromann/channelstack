@@ -10,9 +10,9 @@ use crate::runtime::client::{BoxFuture, Handle, IntoArg};
 use crate::runtime::error::Result;
 use crate::runtime::wait::QuietState;
 use crate::{
-    GitHubCommit, GitHubIssue, GitHubPullRequest, GoogleThread, LinearAgentSession, LinearIssue,
-    NotionDiscussion, NotionPage, ResendThread, SlackConversation, SlackMessage, SlackThread,
-    SlackUser,
+    DiscordChannel, DiscordMessage, GitHubCommit, GitHubIssue, GitHubPullRequest, GoogleThread,
+    LinearAgentSession, LinearIssue, NotionDiscussion, NotionPage, ResendThread, SlackConversation,
+    SlackMessage, SlackThread, SlackUser,
 };
 
 /// Something checked in a session: every handle. A check that waits for quiet asks its session.
@@ -143,32 +143,42 @@ reads!(Comments::read_comments => comments for GitHubIssue, GitHubPullRequest, L
 reads!(CheckRuns::read_check_runs => check_runs for GitHubPullRequest, GitHubCommit);
 reads!(Labels::read_labels => labels for GitHubIssue, GitHubPullRequest, LinearIssue);
 
-// A thread's replies: Slack's, and an email thread's (Resend, Gmail), as in matchers-core.
-reads!(Said::read_said => replies for SlackThread, ResendThread, GoogleThread);
+// A thread's replies: Slack's, an email thread's (Resend, Gmail) and a Discord message's (Discord's
+// replies to it), as in matchers-core.
+reads!(Said::read_said => replies for SlackThread, ResendThread, GoogleThread, DiscordMessage);
 
-impl Said for SlackConversation {
-    fn read_said(&self) -> BoxFuture<'_, Result<Value>> {
-        Box::pin(async {
-            let transcript = self.transcript().await?;
-            // A transcript entry says `streaming`; a message has a `stream`. Here they read the same.
-            let entries = transcript["entries"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default();
-            Ok(Value::Array(
-                entries
-                    .into_iter()
-                    .map(|mut entry| {
-                        if let Some(state) = entry.get("streaming").cloned() {
-                            entry["stream"] = serde_json::json!({ "state": state });
-                        }
-                        entry
-                    })
-                    .collect(),
-            ))
-        })
-    }
+/// What was said in a conversation: its transcript's entries, each read as a message.
+fn said_in(transcript: Value) -> Value {
+    // A transcript entry says `streaming`; a message has a `stream`. Here they read the same.
+    let entries = transcript["entries"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    Value::Array(
+        entries
+            .into_iter()
+            .map(|mut entry| {
+                if let Some(state) = entry.get("streaming").cloned() {
+                    entry["stream"] = serde_json::json!({ "state": state });
+                }
+                entry
+            })
+            .collect(),
+    )
 }
+
+// A conversation (Slack's, a Discord channel or DM): everything in it, as its transcript has it.
+macro_rules! said_in_transcript {
+    ($($handle:ty),+) => {$(
+        impl Said for $handle {
+            fn read_said(&self) -> BoxFuture<'_, Result<Value>> {
+                Box::pin(async { Ok(said_in(self.transcript().await?)) })
+            }
+        }
+    )+};
+}
+
+said_in_transcript!(SlackConversation, DiscordChannel);
 
 /// A transcript that takes the viewer (`as`, Slack's); only when it is given, as in matchers-core.
 macro_rules! transcript_as {

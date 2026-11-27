@@ -34,6 +34,19 @@ const ANA = "ana@people.example.org";
 const BEN = "ben@people.example.org";
 
 describe("exit check 9.7: Gmail live", () => {
+  test("a failure of Google's own on the first check isn't kept: the next action asks again", async () => {
+    const stub = googleStub();
+    let failures = 1;
+    // The platform's own failure, once: a 503 with no body of its own.
+    const flaky = (async (input: string | URL | Request, init?: RequestInit) =>
+      failures-- > 0 ? new Response("", { status: 503 }) : stub.fetch(input, init)) as typeof fetch;
+    const { google } = await liveGoogle({ ...stub, fetch: flaky }, AGENT).open();
+    const first = await google("GET", "");
+    expect([first.status, first.body.error]).toEqual([409, "http_503"]);
+    const second = await google("GET", "");
+    expect(second.status).toBe(200);
+  });
+
   test("the agent's mailbox outside CHANNELSTACK_LIVE_GOOGLE_ADDRESSES is refused before anything is sent", async () => {
     const stub = googleStub();
     const { google } = await liveGoogle(stub, ANA).open();
