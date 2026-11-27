@@ -42,12 +42,13 @@ ana: @my-agent what broke last night?
   my-agent: Here's what I found about "what broke last night?".
 ```
 
-`show` prints the most recently active conversation the way a person reads it. Replies in a thread are indented. Buttons show as `[Approve]`, and edits and streams are marked. Ephemeral messages aren't shown: `show` reads as no one in particular, and an ephemeral message is for one person only. The app works asynchronously, so if its reply isn't there yet, run `show` again.
+`show` prints the most recently active place, on any channel, the way a person reads it. Replies in a thread are indented. Buttons show as `[Approve]`, and edits and streams are marked. Ephemeral messages aren't shown: `show` reads as no one in particular, and an ephemeral message is for one person only. The app works asynchronously, so if its reply isn't there yet, run `show` again.
 
 | Flag                         | What it does                                   |
 | ---------------------------- | ---------------------------------------------- |
 | `--thread last`              | Only the thread of the newest message          |
 | `--thread <channel id>:<ts>` | Only that message's thread                     |
+| `slack show --in "#support"` | That channel; `show` on a channel is its own   |
 | `--json`                     | The transcript entries as JSON, with their ids |
 
 ## Keep the conversation going
@@ -62,19 +63,37 @@ npx channelstack slack stop --thread last
 | Command                                            | What the person does                                                                                       |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `slack say --as <name> --in "#channel" "<text>"`   | Posts a message in a channel                                                                               |
-| `slack reply --as <name> [--thread last] "<text>"` | Replies in a thread                                                                                        |
+| `slack reply --as <name> [--to last] "<text>"`     | Replies in a thread (`--thread` works too)                                                                 |
 | `slack react --as <name> <:emoji:> [--on last]`    | Reacts to a message. `:eyes:` and `eyes` are the same reaction                                             |
 | `slack click --as <name> "<button>"`               | Clicks the button with that label in the latest message that has it                                        |
 | `slack stop [--as <name>] [--thread last]`         | Presses Stop on the agent's work in a thread. Without `--as`, the person who started the thread presses it |
 
 A person who isn't in the conversation yet joins it first, so Ben can reply in Ana's thread without any setup.
 
+`click` and `stop` are two of Slack's actions: `npx channelstack slack actions` lists the others (`select`, `shortcut`, `runCommand`, `invite`, `openDM`, …) with the values each takes, as the SDK's `SlackUser` has them. They are generated from the routes, so every action a test can take, the CLI can too.
+
+## Every channel the same way
+
+`say`, `reply`, `react`, `show` and the actions work on every channel: `slack`, `github`, `linear`, `notion`, `resend` and `google`. A place is what people talk in there, by its name, made the first time with the app in it:
+
+```bash
+npx channelstack github say --as mo --in "Login fails" "@my-agent can you look?"   # opens the issue in the org's dev repository
+npx channelstack github review --as mo --review '{"event":"APPROVE"}'            # on the newest pull request
+npx channelstack linear say --as lu --in "Crash on start" "the app crashes"      # an issue in the Dev team
+npx channelstack linear delegate --as lu                                         # to the app, on the newest issue
+npx channelstack notion say --as nu --in "Roadmap" "@my-agent summarize this"    # a page connected to the integration
+npx channelstack resend say --as re --in "Refund for order 1234" "Where is it?"  # an email to the agent
+npx channelstack github show                                                     # the most recently active issue
+```
+
+A reference an action needs and isn't given (the message, the issue, the app) comes from the newest entry, or from the place `--in` names, or the entry `--on` names. The [CLI reference](/docs/reference/cli#channelstack-channel-action) has the details.
+
 ### `last` and message references
 
 `--thread`, `--on` and `show --thread` take `last` (the default) or a reference to one message:
 
 - **`last`** is the newest message of the most recently active conversation. For `--thread last`, it's the thread that message is in.
-- **`<channel id>:<ts>`** names one message, as every `say` and `reply` prints it in parentheses, for example `C0A1B2C3D4E:1732451234.000100`.
+- **`<channel id>:<ts>`** names one message, as every `say` and `reply` prints it in parentheses, for example `C0A1B2C3D4E:1732451234.000100`. On the other channels it is `<place>:<entry>` the same way (`acme/dev#1:3902182145` for a GitHub comment), with the ids `show --json` lists.
 
 So a loop of "say, look, fix the code, say again" needs no ids, and you can still go back to an older thread when you need to.
 
