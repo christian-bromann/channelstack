@@ -7,6 +7,7 @@ import { SlackWebClient } from "./live/client.ts";
 import { slackMaintenance } from "./live/maintenance.ts";
 import { createLiveWorld } from "./live/world.ts";
 import { registerSlackRoutes } from "./routes.ts";
+import { slackPlace } from "./place.ts";
 import { SLACK_SECRETS } from "./secrets.ts";
 
 /** The start of a text, short enough for one line of a failure message. */
@@ -24,6 +25,7 @@ export const slack: DriverDefinition = {
   tokenPatterns: [/xox[abeoprs]-[A-Za-z0-9-]{10,}/g, /xapp-\d-[A-Za-z0-9-]{10,}/g],
   liveTokens: [SLACK_SECRETS.userToken],
   redeliver: "retry",
+  place: slackPlace,
   hosts: ["slack.com"],
   secrets: {
     botToken: SLACK_SECRETS.botToken,

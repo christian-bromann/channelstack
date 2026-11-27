@@ -104,6 +104,18 @@ export interface QuietState {
   quietForMs: number;
   /** What is still open, in words: a delivery in flight or about to be retried, a stream the agent never stopped. */
   open: string[];
+  /** What should fail a test at once: a model call no script answered (decision 0029). */
+  problems?: string[];
+}
+
+/** A wait that stopped because the session's model calls went wrong: no script answered one, a script ran out. */
+export class ModelProblemError extends Error {
+  readonly problems: readonly string[];
+  constructor(problems: readonly string[]) {
+    super(`The model calls of this test went wrong:\n${problems.map((problem) => `  ${problem}`).join("\n")}`);
+    this.name = "ModelProblemError";
+    this.problems = problems;
+  }
 }
 
 /** Anyone who can author something: a handle with an id and a name. */
@@ -186,6 +198,7 @@ export async function untilQuiet(
     async () => {
       const state = await quiet();
       open = state.open;
+      if (state.problems !== undefined && state.problems.length > 0) throw new ModelProblemError(state.problems);
       if (options.watching && Date.now() - started < quietFor) return undefined;
       return !state.busy && state.quietForMs >= quietFor ? true : undefined;
     },

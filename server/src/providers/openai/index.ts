@@ -36,7 +36,15 @@ export const openai: DriverDefinition = {
         seed: () => world.reset(),
         release: (session) => world.release(session),
       },
-      routes: (router) => registerOpenAIRoutes(router, { world, ids: context.ids, timers: context.timers, baseUrl }),
+      routes: (router) =>
+        registerOpenAIRoutes(router, {
+          world,
+          ids: context.ids,
+          timers: context.timers,
+          baseUrl,
+          scrub: (value) => context.scrub(value),
+          findSecrets: (text) => context.findSecrets(text),
+        }),
       capabilities: () => ({}),
       openWork: (session) => world.openWork(session),
       problems: (session) => world.problems(session),

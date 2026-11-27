@@ -107,7 +107,7 @@ const Call = z
     toolCalls: z.array(ToolCall),
     script: z.string().optional().openapi({ description: "The script that answered. None: the call was refused for want of one." }),
   })
-  .openapi("OpenAICall");
+  .openapi("OpenAICall", { "x-channelstack-resource": { id: "id" } });
 
 const Script = z
   .object({
@@ -149,8 +149,15 @@ const Held = z
 
 const ScriptParams = z.object({ script: pathParam("script") });
 
-/** A call's request, as a test reads it. */
-function requestWire(call: CallRecord) {
+/** How the routes scrub what they return: a secret the agent leaked into a prompt never leaves the server. */
+type Scrub = <T>(value: T) => T;
+
+/** A call's request, as a test reads it, with every token and secret channelstack knows scrubbed. */
+function requestWire(call: CallRecord, scrub: Scrub) {
+  return scrub(rawRequestWire(call));
+}
+
+function rawRequestWire(call: CallRecord) {
   const request: ModelRequest = call.request;
   return {
     endpoint: request.endpoint,
@@ -215,7 +222,7 @@ function toolCallsOf(calls: readonly CallRecord[], made: readonly CallRecord[] =
   );
 }
 
-function callWire(call: CallRecord, all: readonly CallRecord[]) {
+function callWire(call: CallRecord, all: readonly CallRecord[], scrub: Scrub) {
   return {
     id: call.id,
     endpoint: call.endpoint,
@@ -225,7 +232,7 @@ function callWire(call: CallRecord, all: readonly CallRecord[]) {
     durationMs: call.durationMs ?? 0,
     attempt: call.attempt,
     done: call.done,
-    request: requestWire(call),
+    request: requestWire(call, scrub),
     response: {
       status: call.status,
       ...(call.answer === undefined ? {} : { text: call.answer.text, finish: call.answer.finish }),
@@ -245,9 +252,17 @@ const LONG_POLL_MS = 25_000;
 /** The fake OpenAI's control API: what a test scripts, and what it reads back. */
 export function registerOpenAIRoutes(
   router: DriverRouter,
-  deps: { world: OpenAIWorld; ids: IdGenerator; timers: Timers; baseUrl: () => string },
+  deps: {
+    world: OpenAIWorld;
+    ids: IdGenerator;
+    timers: Timers;
+    baseUrl: () => string;
+    scrub<T>(value: T): T;
+    findSecrets(text: string): string[];
+  },
 ): void {
   const { world } = deps;
+  const { scrub } = deps;
   const scriptWire = (script: NonNullable<ReturnType<OpenAIWorld["scripts"]["get"]>>) => ({
     id: script.id,
     responder: script.turns === undefined,
@@ -381,7 +396,7 @@ export function registerOpenAIRoutes(
     handler: ({ session, params }) => {
       const script = scriptOf(session.id, params.script);
       const all = world.calls(session.id);
-      return all.filter((call) => call.script === script.id).map((call) => callWire(call, all));
+      return all.filter((call) => call.script === script.id).map((call) => callWire(call, all, scrub));
     },
   });
 
@@ -398,7 +413,7 @@ export function registerOpenAIRoutes(
     handler: ({ session, params }) => {
       const script = scriptOf(session.id, params.script);
       const all = world.calls(session.id);
-      return all.filter((call) => script.paused.has(call.id)).map((call) => callWire(call, all));
+      return all.filter((call) => script.paused.has(call.id)).map((call) => callWire(call, all, scrub));
     },
   });
 
@@ -454,9 +469,8 @@ export function registerOpenAIRoutes(
         });
         page = read();
       }
-      const all = world.calls(session.id);
       return {
-        held: page.held.map((item) => ({ id: item.id, request: requestWire(item.request as CallRecord) })),
+        held: page.held.map((item) => ({ id: item.id, request: requestWire(item.request as CallRecord, scrub) })),
         cursor: page.cursor,
       };
     },
@@ -511,7 +525,24 @@ export function registerOpenAIRoutes(
               ? call.error !== undefined
               : call.error === query.error,
         )
-        .map((call) => callWire(call, all));
+        .map((call) => callWire(call, all, scrub));
+    },
+  });
+
+  router.route({
+    method: "get",
+    path: "/calls/{call}",
+    summary: "Re-read a model call: whether it is done, how it ended",
+    params: z.object({ call: pathParam("call") }),
+    response: Call,
+    errors: ["not_found"],
+    sdkMethod: { on: "OpenAICall", name: "refresh" },
+    stability,
+    handler: ({ session, params }) => {
+      const all = world.calls(session.id);
+      const call = all.find((candidate) => candidate.id === params.call);
+      if (!call) throw new ProtocolError("not_found", `No model call "${params.call}" in this session`, { id: params.call });
+      return callWire(call, all, scrub);
     },
   });
 
@@ -536,6 +567,23 @@ export function registerOpenAIRoutes(
     sdkMethod: { on: "OpenAIFixture", name: "problems" },
     stability,
     handler: ({ session }) => world.problems(session.id),
+  });
+
+  router.route({
+    method: "get",
+    path: "/sent-secrets",
+    summary:
+      "The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values",
+    response: z
+      .array(z.object({ call: z.string(), kinds: z.array(z.string()) }).openapi("OpenAISentSecret"))
+      .openapi("OpenAISentSecrets"),
+    sdkMethod: { on: "OpenAIFixture", name: "sentSecrets" },
+    stability,
+    handler: ({ session }) =>
+      world.calls(session.id).flatMap((call) => {
+        const kinds = deps.findSecrets(JSON.stringify(call.body ?? ""));
+        return kinds.length === 0 ? [] : [{ call: call.id, kinds }];
+      }),
   });
 
   router.route({

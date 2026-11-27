@@ -6963,6 +6963,23 @@ fn run_open_ai_fixture_problems<'a>(
     })
 }
 
+fn run_open_ai_fixture_sent_secrets<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/sent-secrets",
+            encode_segment(ctx.session()?)
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_open_ai_fixture_unattributed<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -7214,6 +7231,24 @@ fn run_open_ai_script_answer_held<'a>(
             &[],
         )
         .await
+    })
+}
+
+fn run_open_ai_call_refresh<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!(
+            "/sessions/{}/openai/calls/{}",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(ctx, "GET", path, None, None, false, &[]).await
     })
 }
 
@@ -20173,6 +20208,17 @@ impl OpenAIFixture {
         )
     }
 
+    /// The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values. Experimental.
+    pub fn sent_secrets(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_fixture_sent_secrets,
+            as_value,
+        )
+    }
+
     /// Model calls no session could be given (the agent calling the model at startup, for example). Experimental.
     pub fn unattributed(&self) -> Call<Value> {
         Call::new(
@@ -20353,7 +20399,7 @@ impl OpenAIFixtureWaitForCall {
         self
     }
     /// Wait.
-    pub async fn send(self) -> Result<Value> {
+    pub async fn send(self) -> Result<OpenAICall> {
         let Self {
             ctx,
             me,
@@ -20383,13 +20429,13 @@ impl OpenAIFixtureWaitForCall {
             &timeout,
         )
         .await?;
-        as_value(&ctx, item)
+        OpenAICall::wrap(&ctx, item)
     }
 }
 
 impl IntoFuture for OpenAIFixtureWaitForCall {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    type Output = Result<OpenAICall>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAICall>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
     }
@@ -20425,7 +20471,7 @@ impl OpenAIFixtureLatestCall {
         self
     }
     /// Wait.
-    pub async fn send(self) -> Result<Value> {
+    pub async fn send(self) -> Result<OpenAICall> {
         let Self {
             ctx,
             me,
@@ -20458,13 +20504,13 @@ impl OpenAIFixtureLatestCall {
             &quiet_for,
         )
         .await?;
-        as_value(&ctx, item)
+        OpenAICall::wrap(&ctx, item)
     }
 }
 
 impl IntoFuture for OpenAIFixtureLatestCall {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    type Output = Result<OpenAICall>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAICall>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
     }
@@ -20746,7 +20792,7 @@ impl OpenAIScriptWaitForCall {
         self
     }
     /// Wait.
-    pub async fn send(self) -> Result<Value> {
+    pub async fn send(self) -> Result<OpenAICall> {
         let Self {
             ctx,
             me,
@@ -20776,13 +20822,13 @@ impl OpenAIScriptWaitForCall {
             &timeout,
         )
         .await?;
-        as_value(&ctx, item)
+        OpenAICall::wrap(&ctx, item)
     }
 }
 
 impl IntoFuture for OpenAIScriptWaitForCall {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    type Output = Result<OpenAICall>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAICall>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
     }
@@ -20803,7 +20849,7 @@ impl OpenAIScriptWaitForPause {
         self
     }
     /// Wait.
-    pub async fn send(self) -> Result<Value> {
+    pub async fn send(self) -> Result<OpenAICall> {
         let Self {
             ctx,
             me,
@@ -20833,15 +20879,150 @@ impl OpenAIScriptWaitForPause {
             &timeout,
         )
         .await?;
-        as_value(&ctx, item)
+        OpenAICall::wrap(&ctx, item)
     }
 }
 
 impl IntoFuture for OpenAIScriptWaitForPause {
-    type Output = Result<Value>;
-    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    type Output = Result<OpenAICall>;
+    type IntoFuture = BoxFuture<'static, Result<OpenAICall>>;
     fn into_future(self) -> Self::IntoFuture {
         Box::pin(self.send())
+    }
+}
+
+/// A handle: `OpenAICall`.
+#[derive(Clone)]
+pub struct OpenAICall {
+    ctx: Ctx,
+    data: Value,
+    seen: Seen,
+}
+
+impl Handle for OpenAICall {
+    fn data(&self) -> &Value {
+        &self.data
+    }
+    fn ctx(&self) -> &Ctx {
+        &self.ctx
+    }
+}
+
+impl OpenAICall {
+    #[doc(hidden)]
+    pub fn from_wire(ctx: &Ctx, data: Value) -> Self {
+        Self::from_wire_in(ctx, data, Seen::default())
+    }
+    /// A handle read from a field of another: it keeps the wait state that field's handle had.
+    #[doc(hidden)]
+    pub fn from_wire_in(ctx: &Ctx, data: Value, seen: Seen) -> Self {
+        let ctx = ctx.clone();
+        Self { ctx, data, seen }
+    }
+    #[doc(hidden)]
+    pub fn wrap(ctx: &Ctx, data: Value) -> Result<Self> {
+        Ok(Self::from_wire(ctx, data))
+    }
+    #[doc(hidden)]
+    pub fn wrap_opt(ctx: &Ctx, data: Value) -> Result<Option<Self>> {
+        Ok((!data.is_null()).then(|| Self::from_wire(ctx, data)))
+    }
+    #[doc(hidden)]
+    pub fn wrap_vec(ctx: &Ctx, data: Value) -> Result<Vec<Self>> {
+        Ok(data
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| Self::from_wire(ctx, item.clone()))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+    /// `id`.
+    pub fn id(&self) -> String {
+        self.data
+            .get("id")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `endpoint`.
+    pub fn endpoint(&self) -> String {
+        self.data
+            .get("endpoint")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `model`.
+    pub fn model(&self) -> String {
+        self.data
+            .get("model")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `stream`.
+    pub fn stream(&self) -> bool {
+        self.data
+            .get("stream")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `at`.
+    pub fn at(&self) -> String {
+        self.data
+            .get("at")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or(String::new())
+    }
+    /// `durationMs`.
+    pub fn duration_ms(&self) -> f64 {
+        self.data
+            .get("durationMs")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+    }
+    /// `attempt`.
+    pub fn attempt(&self) -> i64 {
+        self.data
+            .get("attempt")
+            .and_then(Value::as_i64)
+            .unwrap_or(0)
+    }
+    /// `done`.
+    pub fn done(&self) -> bool {
+        self.data
+            .get("done")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+    /// `request`.
+    pub fn request(&self) -> &Value {
+        self.data.get("request").unwrap_or(&Value::Null)
+    }
+    /// `response`.
+    pub fn response(&self) -> &Value {
+        self.data.get("response").unwrap_or(&Value::Null)
+    }
+    /// `toolCalls`.
+    pub fn tool_calls(&self) -> &Value {
+        self.data.get("toolCalls").unwrap_or(&Value::Null)
+    }
+    /// `script`.
+    pub fn script(&self) -> Option<String> {
+        self.data
+            .get("script")
+            .and_then(|v| v.as_str().map(str::to_owned))
+    }
+
+    /// Re-read a model call: whether it is done, how it ended. Experimental.
+    pub fn refresh(&self) -> Call<OpenAICall> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_open_ai_call_refresh,
+            OpenAICall::wrap,
+        )
     }
 }
 
@@ -22167,6 +22348,9 @@ pub async fn call_by_name(
         ("OpenAIFixture", "problems") => {
             run_open_ai_fixture_problems(&target.ctx, &target.data, args, options).await?
         }
+        ("OpenAIFixture", "sentSecrets") => {
+            run_open_ai_fixture_sent_secrets(&target.ctx, &target.data, args, options).await?
+        }
         ("OpenAIFixture", "unattributed") => {
             run_open_ai_fixture_unattributed(&target.ctx, &target.data, args, options).await?
         }
@@ -22196,6 +22380,9 @@ pub async fn call_by_name(
         }
         ("OpenAIScript", "answerHeld") => {
             run_open_ai_script_answer_held(&target.ctx, &target.data, args, options).await?
+        }
+        ("OpenAICall", "refresh") => {
+            run_open_ai_call_refresh(&target.ctx, &target.data, args, options).await?
         }
         ("OpenAIRateLimit", "remaining") => {
             run_open_ai_rate_limit_remaining(&target.ctx, &target.data, args, options).await?
@@ -22631,6 +22818,11 @@ pub async fn call_by_name(
         },
         ("OpenAIScript", "refresh") => Dyn {
             resource: Some("OpenAIScript"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("OpenAICall", "refresh") => Dyn {
+            resource: Some("OpenAICall"),
             ctx: target.ctx.clone(),
             data,
         },

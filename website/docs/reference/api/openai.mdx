@@ -128,6 +128,28 @@ let problems = openai.problems().await?;
 
 **Returns** [`OpenAIProblems`](/docs/reference/api/openai#openaiproblems).
 
+### sentSecrets()
+
+The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const sentSecrets = await openai.sentSecrets();
+```
+
+```python title="Python"
+sent_secrets = await openai.sent_secrets()
+```
+
+```rust title="Rust"
+let sent_secrets = openai.sent_secrets().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`OpenAISentSecrets`](/docs/reference/api/openai#openaisentsecrets).
+
 ### unattributed()
 
 Model calls no session could be given (the agent calling the model at startup, for example).
@@ -490,6 +512,47 @@ let call = script.wait_for_pause().await?;
 
 **Returns** [`OpenAICall`](/docs/reference/api/openai#openaicall). When the time is up, it fails with what it was waiting for.
 
+## OpenAICall
+
+Returned by [`OpenAICall.refresh()`](/docs/reference/api/openai#refresh-1).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `endpoint` | `endpoint` | `"chat.completions" \| "responses"` |
+| `model` | `model` | `string` |
+| `stream` | `stream` | `boolean` |
+| `at` | `at` | `string` |
+| `durationMs` | `duration_ms` | `number` |
+| `attempt` | `attempt` | `number` |
+| `done` | `done` | `boolean` |
+| `request` | `request` | `OpenAIRequest` |
+| `response` | `response` | `{ status: number; text?: string; finish?: string; error?: string; aborted: boolean; chunksSent?: number; end?: "completed" \| "errored" \| "dropped" \| "stalled" \| "aborted" }` |
+| `toolCalls` | `tool_calls` | `OpenAIToolCall[]` |
+| `script` | `script` | `string \| undefined` |
+
+### refresh()
+
+Re-read a model call: whether it is done, how it ended.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await call.refresh();
+```
+
+```python title="Python"
+updated = await call.refresh()
+```
+
+```rust title="Rust"
+let updated = call.refresh().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`OpenAICall`](/docs/reference/api/openai#openaicall).
+
 ## OpenAIRateLimit
 
 Returned by [`OpenAIFixture.rateLimit()`](/docs/reference/api/openai#ratelimit), [`OpenAIRateLimit.remaining()`](/docs/reference/api/openai#remaining).
@@ -608,23 +671,6 @@ type OpenAITurnInput = string | OpenAITurn;
 type OpenAICalls = OpenAICall[];
 ```
 
-### OpenAICall
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `endpoint` | `endpoint` | `"chat.completions" \| "responses"` |
-| `model` | `model` | `string` |
-| `stream` | `stream` | `boolean` |
-| `at` | `at` | `string` |
-| `durationMs` | `duration_ms` | `number` |
-| `attempt` | `attempt` | `number` |
-| `done` | `done` | `boolean` |
-| `request` | `request` | `OpenAIRequest` |
-| `response` | `response` | `{ status: number; text?: string; finish?: string; error?: string; aborted: boolean; chunksSent?: number; end?: "completed" \| "errored" \| "dropped" \| "stalled" \| "aborted" }` |
-| `toolCalls` | `tool_calls` | `OpenAIToolCall[]` |
-| `script` | `script` | `string \| undefined` |
-
 ### OpenAIRequest
 
 | Field | Python / Rust | Type |
@@ -737,6 +783,19 @@ type OpenAISessionToolCalls = OpenAIToolCall[];
 ```ts
 type OpenAIProblems = string[];
 ```
+
+### OpenAISentSecrets
+
+```ts
+type OpenAISentSecrets = OpenAISentSecret[];
+```
+
+### OpenAISentSecret
+
+| Field | Type |
+|---|---|
+| `call` | `string` |
+| `kinds` | `string[]` |
 
 ### OpenAIUnattributedCalls
 

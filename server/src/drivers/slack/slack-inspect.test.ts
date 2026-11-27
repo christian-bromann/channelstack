@@ -309,6 +309,7 @@ describe("quiet", () => {
       busy: true,
       quietForMs: 0,
       open: ["2 deliveries in flight or about to be retried"],
+      problems: [],
     });
     await h.app.settled();
     expect(await quiet()).toMatchObject({ busy: false, open: [] });
@@ -328,6 +329,7 @@ describe("quiet", () => {
       busy: true,
       quietForMs: 0,
       open: ['a stream my-agent started and never stopped: "Thinking…"'],
+      problems: [],
     });
     await api("chat.stopStream", { channel: channel.id, ts: stream.ts });
     await h.app.settled();

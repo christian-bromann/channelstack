@@ -176,6 +176,10 @@ export interface DriverContext {
   readonly attribution: Attributor;
   /** For a provider: where an attributed request belongs in the channels, from the delivery that decided it. */
   place(attribution: Attribution | undefined): MessagePlace;
+  /** The kinds of secret channelstack knows that are in this text (`slack.botToken`), never their values. */
+  findSecrets(text: string): string[];
+  /** A value with every token and registered secret scrubbed, as the event log records it. */
+  scrub<T>(value: T): T;
 }
 
 /** Where a message is on its channel, by the platform's ids: who wrote it, the conversation, the thread, the message. */

@@ -166,7 +166,9 @@ export class Attributor {
       const holders = owners.get(normalise(tag));
       if (holders?.size === 1) {
         const [session] = holders as Set<string>;
-        return this.#answer({ session: session as string, by: "tag", matched: tag });
+        // Where the tag came from (the delivery that carried a person's id) says where the call belongs.
+        const source = knownBy.get(session as string)?.get(normalise(tag));
+        return this.#answer({ session: session as string, by: "tag", matched: tag, ...(source ? { source } : {}) });
       }
     }
 

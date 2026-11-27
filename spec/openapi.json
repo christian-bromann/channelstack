@@ -7802,7 +7802,10 @@
           "request",
           "response",
           "toolCalls"
-        ]
+        ],
+        "x-channelstack-resource": {
+          "id": "id"
+        }
       },
       "OpenAIRequest": {
         "type": "object",
@@ -8163,6 +8166,30 @@
         "items": {
           "type": "string"
         }
+      },
+      "OpenAISentSecrets": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OpenAISentSecret"
+        }
+      },
+      "OpenAISentSecret": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "type": "string"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "call",
+          "kinds"
+        ]
       },
       "OpenAIUnattributedCalls": {
         "type": "array",
@@ -28418,6 +28445,69 @@
         }
       }
     },
+    "/sessions/{session}/openai/calls/{call}": {
+      "get": {
+        "summary": "Re-read a model call: whether it is done, how it ended",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAICall",
+          "name": "refresh"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found",
+          "not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "call",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAICall"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session}/openai/tool-calls": {
       "get": {
         "summary": "Every tool call the model made in this session, each with the result the agent sent back",
@@ -28520,6 +28610,60 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpenAIProblems"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A protocol error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session}/openai/sent-secrets": {
+      "get": {
+        "summary": "The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-channelstack-method": {
+          "on": "OpenAIFixture",
+          "name": "sentSecrets"
+        },
+        "x-channelstack-error-codes": [
+          "unauthorized",
+          "invalid_argument",
+          "internal",
+          "session_not_found"
+        ],
+        "x-channelstack-stability": "experimental",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_k3f9a1b2c3d4e5f6g7h8"
+            },
+            "required": true,
+            "name": "session",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAISentSecrets"
                 }
               }
             }

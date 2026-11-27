@@ -13,6 +13,7 @@ export { ChannelstackError, onRefusal, unreportedRefusals } from "./runtime/tran
 export type * from "./types.ts";
 export {
   fromMatches,
+  ModelProblemError,
   type QuietOptions,
   type QuietState,
   setWaitDefaults,

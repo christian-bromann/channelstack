@@ -1075,19 +1075,10 @@ export interface OpenAIMatch {
 
 export type OpenAICalls = OpenAICall[];
 
-export interface OpenAICall {
-  id: string;
-  endpoint: "chat.completions" | "responses";
-  model: string;
-  stream: boolean;
-  at: string;
-  durationMs: number;
-  attempt: number;
-  done: boolean;
-  request: OpenAIRequest;
-  response: { status: number; text?: string; finish?: string; error?: string; aborted: boolean; chunksSent?: number; end?: "completed" | "errored" | "dropped" | "stalled" | "aborted" };
-  toolCalls: OpenAIToolCall[];
-  script?: string;
+export type OpenAICallsWire = OpenAICallData[];
+
+function decodeOpenAICalls(ctx: HandleContext, data: OpenAICallsWire): OpenAICalls {
+  return data.map((item) => new OpenAICall(ctx, item));
 }
 
 export interface OpenAIRequest {
@@ -1149,6 +1140,12 @@ export interface OpenAIToolCall {
 
 export type OpenAIPausedCalls = OpenAICall[];
 
+export type OpenAIPausedCallsWire = OpenAICallData[];
+
+function decodeOpenAIPausedCalls(ctx: HandleContext, data: OpenAIPausedCallsWire): OpenAIPausedCalls {
+  return data.map((item) => new OpenAICall(ctx, item));
+}
+
 export type OpenAIToolCalls = OpenAIToolCall[];
 
 export interface OpenAIHeldPage {
@@ -1163,9 +1160,22 @@ export interface OpenAIHeldCall {
 
 export type OpenAISessionCalls = OpenAICall[];
 
+export type OpenAISessionCallsWire = OpenAICallData[];
+
+function decodeOpenAISessionCalls(ctx: HandleContext, data: OpenAISessionCallsWire): OpenAISessionCalls {
+  return data.map((item) => new OpenAICall(ctx, item));
+}
+
 export type OpenAISessionToolCalls = OpenAIToolCall[];
 
 export type OpenAIProblems = string[];
+
+export type OpenAISentSecrets = OpenAISentSecret[];
+
+export interface OpenAISentSecret {
+  call: string;
+  kinds: string[];
+}
 
 export type OpenAIUnattributedCalls = OpenAIUnattributedCall[];
 
@@ -1607,7 +1617,7 @@ export class SlackFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<SlackApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string } = {}, options: WaitOptions = {}): Promise<SlackApiCall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
@@ -2350,7 +2360,7 @@ export class GitHubFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<GitHubApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string } = {}, options: WaitOptions = {}): Promise<GitHubApiCall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
@@ -3148,7 +3158,7 @@ export class LinearFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<LinearApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string } = {}, options: WaitOptions = {}): Promise<LinearApiCall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
@@ -3826,7 +3836,7 @@ export class NotionFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<NotionApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string } = {}, options: WaitOptions = {}): Promise<NotionApiCall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
@@ -4339,7 +4349,7 @@ export class ResendFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<ResendApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string } = {}, options: WaitOptions = {}): Promise<ResendApiCall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
@@ -4688,7 +4698,7 @@ export class GoogleFixture {
   }
 
   /** Wait for the next new API call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { operation?: string; error?: true | string }, options: WaitOptions = {}): Promise<GoogleApiCall> {
+  async waitForCall(filter: { operation?: string; error?: true | string } = {}, options: WaitOptions = {}): Promise<GoogleApiCall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "an API call from the agent", options);
   }
 
@@ -5017,8 +5027,8 @@ export class OpenAIFixture {
   /** Every model call attributed to this session, oldest first. Experimental. */
   async calls(options: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}): Promise<OpenAISessionCalls> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/calls`, { query: { endpoint: options.endpoint, error: options.error } })) as OpenAISessionCalls;
-    return data;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/calls`, { query: { endpoint: options.endpoint, error: options.error } })) as OpenAISessionCallsWire;
+    return decodeOpenAISessionCalls(ctx, data);
   }
 
   /** Every tool call the model made in this session, each with the result the agent sent back. Experimental. */
@@ -5032,6 +5042,13 @@ export class OpenAIFixture {
   async problems(): Promise<OpenAIProblems> {
     const ctx = this.#ctx;
     const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/problems`)) as OpenAIProblems;
+    return data;
+  }
+
+  /** The calls that sent a secret channelstack knows to the model, and the kinds they sent (`slack.botToken`): never the values. Experimental. */
+  async sentSecrets(): Promise<OpenAISentSecrets> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/sent-secrets`)) as OpenAISentSecrets;
     return data;
   }
 
@@ -5050,12 +5067,12 @@ export class OpenAIFixture {
   }
 
   /** Wait for the next new model call from the agent, after the last one this handle saw. */
-  async waitForCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string }, options: WaitOptions = {}): Promise<OpenAICall> {
+  async waitForCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}, options: WaitOptions = {}): Promise<OpenAICall> {
     return waitForNext(this.#seen, `waitForCall:${JSON.stringify(filter)}`, () => this.calls(filter), () => true, "a model call from the agent", options);
   }
 
   /** The latest model call from the agent, once the agent is quiet. Waits for at least one. */
-  async latestCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string }, options: QuietOptions = {}): Promise<OpenAICall> {
+  async latestCall(filter: { endpoint?: "chat.completions" | "responses"; error?: true | string } = {}, options: QuietOptions = {}): Promise<OpenAICall> {
     return latestOnceQuiet(() => this.calls(filter), () => true, () => quietOf(this.#ctx), "a model call from the agent", options);
   }
 
@@ -5119,15 +5136,15 @@ export class OpenAIScript implements AsyncDisposable {
   /** The calls this script answered. Experimental. */
   async calls(): Promise<OpenAICalls> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/calls`)) as OpenAICalls;
-    return data;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/calls`)) as OpenAICallsWire;
+    return decodeOpenAICalls(ctx, data);
   }
 
   /** The calls whose streams this script holds at `pauseAfter`. Experimental. */
   async pausedCalls(): Promise<OpenAIPausedCalls> {
     const ctx = this.#ctx;
-    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/paused`)) as OpenAIPausedCalls;
-    return data;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/scripts/${segment(this.id)}/paused`)) as OpenAIPausedCallsWire;
+    return decodeOpenAIPausedCalls(ctx, data);
   }
 
   /** The tool calls this script made, each with the result the agent sent back. Experimental. */
@@ -5158,6 +5175,67 @@ export class OpenAIScript implements AsyncDisposable {
   /** Wait for the next new stream held at pauseAfter, after the last one this handle saw. */
   async waitForPause(options: WaitOptions = {}): Promise<OpenAICall> {
     return waitForNext(this.#seen, "waitForPause", () => this.pausedCalls(), () => true, "a stream held at pauseAfter", options);
+  }
+
+  /** @internal Is the agent quiet in this handle's session? Matchers ask this. */
+  [QUIET](): Promise<QuietState> {
+    return quietOf(this.#ctx);
+  }
+}
+
+/** Wire data of a {@link OpenAICall}. */
+export interface OpenAICallData {
+  id: string;
+  endpoint: "chat.completions" | "responses";
+  model: string;
+  stream: boolean;
+  at: string;
+  durationMs: number;
+  attempt: number;
+  done: boolean;
+  request: OpenAIRequest;
+  response: { status: number; text?: string; finish?: string; error?: string; aborted: boolean; chunksSent?: number; end?: "completed" | "errored" | "dropped" | "stalled" | "aborted" };
+  toolCalls: OpenAIToolCall[];
+  script?: string;
+}
+
+export class OpenAICall {
+  readonly id: string;
+  readonly endpoint: "chat.completions" | "responses";
+  readonly model: string;
+  readonly stream: boolean;
+  readonly at: string;
+  readonly durationMs: number;
+  readonly attempt: number;
+  readonly done: boolean;
+  readonly request: OpenAIRequest;
+  readonly response: { status: number; text?: string; finish?: string; error?: string; aborted: boolean; chunksSent?: number; end?: "completed" | "errored" | "dropped" | "stalled" | "aborted" };
+  readonly toolCalls: OpenAIToolCall[];
+  readonly script: string | undefined;
+  readonly #ctx: HandleContext;
+
+  /** @internal Handles come from the SDK, never from `new`. */
+  constructor(ctx: HandleContext, data: OpenAICallData) {
+    this.#ctx = ctx;
+    this.id = data.id;
+    this.endpoint = data.endpoint;
+    this.model = data.model;
+    this.stream = data.stream;
+    this.at = data.at;
+    this.durationMs = data.durationMs;
+    this.attempt = data.attempt;
+    this.done = data.done;
+    this.request = data.request;
+    this.response = data.response;
+    this.toolCalls = data.toolCalls;
+    this.script = data.script;
+  }
+
+  /** Re-read a model call: whether it is done, how it ended. Experimental. */
+  async refresh(): Promise<OpenAICall> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/openai/calls/${segment(this.id)}`)) as OpenAICallData;
+    return new OpenAICall(ctx, data);
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

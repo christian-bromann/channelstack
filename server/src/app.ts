@@ -39,7 +39,7 @@ import {
 import { Allowlist, runId, runTag } from "./core/safety/index.ts";
 import { LiveVault, randomString, randomToken, type Secrets } from "./core/secrets/index.ts";
 import { Sessions } from "./core/sessions/index.ts";
-import { channelsExtension, DEV_CHANNELS, DRIVERS } from "./drivers/index.ts";
+import { channelsExtension, DEV_CHANNELS, DRIVERS, secretSpecs } from "./drivers/index.ts";
 
 export const CONTROL_PREFIX = "/_channelstack";
 
@@ -273,6 +273,25 @@ export function createApp(options: AppOptions): App {
     return { channel: source.driver, ...(found ?? {}) };
   };
 
+  /** Which secrets channelstack knows are in a text, by kind: fake ones by name, tokens by shape, the control token, live credentials. */
+  const findSecrets = (text: string): string[] => {
+    const kinds: string[] = [];
+    for (const [driver, spec] of Object.entries(secretSpecs())) {
+      for (const name of Object.keys(spec)) {
+        const value = secrets.get(driver, name);
+        if (value.length >= 8 && text.includes(value)) kinds.push(`${driver}.${name}`);
+      }
+    }
+    for (const definition of DRIVERS) {
+      const shaped = definition.tokenPatterns.some((pattern) => new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, "")).test(text));
+      if (shaped && !kinds.some((kind) => kind.startsWith(`${definition.name}.`))) kinds.push(`a ${definition.title} token`);
+    }
+    if (text.includes(options.token)) kinds.push("the control API's token");
+    // Anything else the redactor knows: a live credential, registered when it was handed over.
+    if (kinds.length === 0 && JSON.stringify(redactor.tokens(text)) !== JSON.stringify(text)) kinds.push("a live credential");
+    return kinds;
+  };
+
   const drivers: Driver[] = DRIVERS.map((definition) =>
     definition.create({
       ids,
@@ -289,6 +308,8 @@ export function createApp(options: AppOptions): App {
       webhookUrl: options.webhooks[definition.name],
       attribution,
       place,
+      findSecrets,
+      scrub: (value) => redactor.tokens(value),
       live: {
         active: driverReality(liveEnv, definition.live?.credentials ?? [], undefined).mode === "live",
         strict: forcedReality(liveEnv) === "live",

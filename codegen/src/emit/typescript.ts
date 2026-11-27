@@ -337,7 +337,9 @@ export function emitTypeScript(ir: Ir): Map<string, string> {
     const what = from ? `describeWait(${JSON.stringify(w.what)}, options.from)` : JSON.stringify(w.what);
     // With `filter`, the read's own options come first and are passed through to it.
     const read = resource.methods.find((m) => m.name === w.read);
-    const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }, ` : "";
+    // Without anything it must be given, the filter may be left out: `openai.latestCall()`.
+    const filterDefault = read?.options.every((option) => option.optional) ? " = {}" : "";
+    const filter = w.filter && read ? `filter: { ${fields(read.options, "public").join("; ")} }${filterDefault}, ` : "";
     const call = `() => this.${w.read}(${filter === "" ? "" : "filter"})`;
     const noun = w.what.replace(/^an? /, "");
     if (w.mode === "until" && w.in) {

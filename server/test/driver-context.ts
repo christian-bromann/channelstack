@@ -36,6 +36,8 @@ export function driverContext(overrides: Partial<DriverContext> = {}): DriverCon
     webhookUrl: undefined,
     attribution: new Attributor({ sessions: () => [], known: () => [] }),
     place: () => ({}),
+    findSecrets: () => [],
+    scrub: (value) => value,
     live: {
       active: false,
       strict: false,
