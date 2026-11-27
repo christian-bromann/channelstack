@@ -1,3 +1,4 @@
+import { AppRoster } from "../../../core/apps/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type {
   LinearActivityRecord,
@@ -21,8 +22,10 @@ export class LinearStore {
   readonly sessions: Collection<LinearSessionRecord>;
   readonly activities: Collection<LinearActivityRecord>;
   #org: LinearOrgRecord | undefined;
-  #app: LinearAppRecord | undefined;
-  #appUser: LinearUserRecord | undefined;
+  /** The built-in app and the ones tests made (decision 0027), each installed workspace-wide. */
+  readonly apps = new AppRoster<LinearAppRecord>("Linear");
+  /** Each app's own user, by its id. They belong to no session. */
+  readonly #appUsers = new Map<string, LinearUserRecord>();
 
   constructor(registry: Registry) {
     this.users = registry.collection("linear", "user");
@@ -38,21 +41,48 @@ export class LinearStore {
     return this.#org;
   }
 
+  /** The built-in app, `my-agent`. */
   get app(): LinearAppRecord {
-    if (!this.#app) throw new Error("The Linear fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
   }
 
-  /** The app's user. It belongs to no session. */
+  /** The built-in app's user. It belongs to no session. */
   get appUser(): LinearUserRecord {
-    if (!this.#appUser) throw new Error("The Linear fake hasn't been seeded");
-    return this.#appUser;
+    return this.appUserOf(this.app);
   }
 
+  /** The built-in app and its user. The apps tests made stay: they live as long as the server. */
   seed(org: LinearOrgRecord, app: LinearAppRecord, appUser: LinearUserRecord): void {
     this.#org = org;
-    this.#app = app;
-    this.#appUser = appUser;
+    this.apps.seed(app);
+    this.#appUsers.set(appUser.id, appUser);
+  }
+
+  /** Keep the user of an app a test made. */
+  addAppUser(user: LinearUserRecord): void {
+    this.#appUsers.set(user.id, user);
+  }
+
+  /** The user an app acts as. */
+  appUserOf(app: LinearAppRecord): LinearUserRecord {
+    const user = this.#appUsers.get(app.userId);
+    if (!user) throw new Error(`The Linear app ${app.name} has no user`);
+    return user;
+  }
+
+  /** Every app's user, the built-in app's first. */
+  appUsers(): LinearUserRecord[] {
+    return this.apps.all().map((app) => this.appUserOf(app));
+  }
+
+  /** The app whose user this is, if any. */
+  appByUser(id: string): LinearAppRecord | undefined {
+    return this.apps.all().find((app) => app.userId === id);
+  }
+
+  /** The app a handle names: its user's id, or its name. */
+  appOf(ref: string): LinearAppRecord | undefined {
+    return this.appByUser(ref) ?? this.apps.named(ref);
   }
 
   /** Keep a new object for its session. */
@@ -75,9 +105,9 @@ export class LinearStore {
     collection.remove(id);
   }
 
-  /** Whoever acts under this id: a person, or the app's user. */
+  /** Whoever acts under this id: a person, or an app's user. */
   user(id: string): LinearUserRecord | undefined {
-    return id === this.appUser.id ? this.appUser : this.users.find(id);
+    return this.#appUsers.get(id) ?? this.users.find(id);
   }
 
   /** The session an issue (and everything on it) belongs to. */

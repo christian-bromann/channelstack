@@ -30,7 +30,7 @@ export function linearText(
     /** The people and apps a Markdown text mentions. */
     mentioned: (body: string): string[] => {
       const handles = [...body.matchAll(links.profilePattern())].map((match) => match[1]);
-      const everyone = [store.appUser, ...store.all(store.users)];
+      const everyone = [...store.appUsers(), ...store.all(store.users)];
       return everyone.filter((user) => handles.includes(user.displayName)).map((user) => user.id);
     },
 

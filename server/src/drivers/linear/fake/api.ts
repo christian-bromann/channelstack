@@ -31,16 +31,18 @@ const authError = (message: string) => ({
  */
 export function createLinearApi(context: DriverContext, world: FakeLinearWorld): Hono {
   const { clock } = context;
-  const root = linearResolvers(world);
+  let syncId = 1000;
+  const sync = () => ++syncId;
   const api = new Hono();
 
   api.post("/graphql", async (c) => {
     const startedAt = clock();
     const token = bearerFrom(c.req.header("authorization")) ?? c.req.header("authorization") ?? "";
     if (token === "") return c.json(authError("Authentication required, not authenticated"), 401);
-    // A personal API key or anything else isn't the app.
-    if (!constantTimeEqual(token, context.secret("oauthToken")))
-      return c.json(authError("Authentication failed - invalid token"), 401);
+    // Each app's token answers as that app (decision 0027); a personal API key or anything else is no app.
+    const caller = world.apps().find((app) => constantTimeEqual(token, context.apps.secret(app.name, "oauthToken")));
+    if (!caller) return c.json(authError("Authentication failed - invalid token"), 401);
+    const root = linearResolvers(world, caller, sync);
 
     let request: GraphQLRequest;
     try {
