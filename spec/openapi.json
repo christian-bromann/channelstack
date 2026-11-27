@@ -9517,6 +9517,9 @@
           "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+        },
         "parameters": [
           {
             "schema": {
@@ -9585,6 +9588,9 @@
           "cross_workspace_credential"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+        },
         "parameters": [
           {
             "schema": {
@@ -9657,6 +9663,9 @@
           "msg_too_long"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+        },
         "parameters": [
           {
             "schema": {
@@ -9745,6 +9754,9 @@
           "msg_too_long"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+        },
         "parameters": [
           {
             "schema": {
@@ -9832,6 +9844,9 @@
           "already_reacted"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+        },
         "parameters": [
           {
             "schema": {
@@ -9926,6 +9941,9 @@
           "no_reaction"
         ],
         "x-channelstack-stability": "experimental",
+        "x-channelstack-live": {
+          "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+        },
         "parameters": [
           {
             "schema": {

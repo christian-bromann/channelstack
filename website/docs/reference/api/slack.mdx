@@ -115,6 +115,8 @@ let app = slack.create_app().name("…").await?;
 
 **Returns** [`SlackApp`](/docs/reference/api/slack#slackapp).
 
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
 ### apps()
 
 The workspace's apps: the built-in one first, then the others in the order they were made.
@@ -136,6 +138,8 @@ let apps = slack.apps().await?;
 </CodeGroup>
 
 **Returns** [`SlackApps`](/docs/reference/api/slack#slackapps).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
 
 ### conversations()
 
@@ -383,6 +387,8 @@ let message = app.say("…").channel(&channel).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`cannot_dm_bot`](/docs/reference/api/errors#cannot-dm-bot), [`no_text`](/docs/reference/api/errors#no-text), [`msg_too_long`](/docs/reference/api/errors#msg-too-long).
 
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
 ### reply()
 
 An app a test made replies in a thread: pass the message that starts it, or any reply in it.
@@ -411,6 +417,8 @@ let message = app.reply("…").thread(&thread).await?;
 **Returns** [`SlackMessage`](/docs/reference/api/slack#slackmessage).
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`no_text`](/docs/reference/api/errors#no-text), [`msg_too_long`](/docs/reference/api/errors#msg-too-long).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
 
 ### react()
 
@@ -441,6 +449,8 @@ let delivery = app.react("…").message(&message).await?;
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`already_reacted`](/docs/reference/api/errors#already-reacted).
 
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
+
 ### unreact()
 
 An app a test made takes its reaction back.
@@ -469,6 +479,8 @@ let delivery = app.unreact("…").message(&message).await?;
 **Returns** [`SlackDelivery | undefined`](/docs/reference/api/slack#slackdelivery).
 
 **Errors** [`not_in_channel`](/docs/reference/api/errors#not-in-channel), [`no_reaction`](/docs/reference/api/errors#no-reaction).
+
+**Live:** refused with [`unsupported_in_live`](/docs/reference/api/errors#unsupported-in-live): not yet: live, the workspace holds only the app channelstack has credentials for.
 
 ## SlackUser
 

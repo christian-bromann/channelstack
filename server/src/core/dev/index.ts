@@ -3,7 +3,7 @@
  * channel in the shared `dev` session by the names a person types (`ana`, `#support`, `Login
  * fails`) and by `last`, instead of by ids. Each channel's driver has one (`definition.dev`), written
  * against the channel's control API, so it works the same from the terminal, over MCP and in the
- * UI. What is the same for every channel is here, once; decision 0027 says why.
+ * UI. What is the same for every channel is here, once; decision 0028 says why.
  */
 
 /** A channel's control API in the dev session: paths are relative to `/sessions/<dev>/<channel>`. */

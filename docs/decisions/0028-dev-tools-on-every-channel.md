@@ -1,6 +1,6 @@
-# 0027: The dev tools act on every channel, through a dev adapter and the generated actions
+# 0028: The dev tools act on every channel, through a dev adapter and the generated actions
 
-Status: accepted, 2026-11-27. The direction was agreed with the maintainer; this records how it was built.
+Status: accepted, 2026-11-27. The direction was agreed with the maintainer; this records how it was built. Numbered 0028: [decision 0027](0027-multiple-apps.md) was merged first with the same number.
 
 ## Context
 

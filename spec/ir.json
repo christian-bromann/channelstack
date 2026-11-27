@@ -1328,7 +1328,10 @@
             "fake_actor_in_live_world",
             "cross_workspace_credential"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+          }
         },
         {
           "name": "apps",
@@ -1363,7 +1366,10 @@
             "fake_actor_in_live_world",
             "cross_workspace_credential"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+          }
         },
         {
           "name": "conversations",
@@ -1924,7 +1930,10 @@
             "no_text",
             "msg_too_long"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+          }
         },
         {
           "name": "reply",
@@ -1992,7 +2001,10 @@
             "no_text",
             "msg_too_long"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+          }
         },
         {
           "name": "react",
@@ -2059,7 +2071,10 @@
             "not_in_channel",
             "already_reacted"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+          }
         },
         {
           "name": "unreact",
@@ -2126,7 +2141,10 @@
             "not_in_channel",
             "no_reaction"
           ],
-          "dispose": false
+          "dispose": false,
+          "live": {
+            "unsupported": "not yet: live, the workspace holds only the app channelstack has credentials for"
+          }
         }
       ]
     },

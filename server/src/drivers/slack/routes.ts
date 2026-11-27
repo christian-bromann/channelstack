@@ -204,6 +204,11 @@ const ChannelParams = z.object({ channel: z.string().openapi({ param: { name: "c
 const MessageParams = ChannelParams.extend({ ts: z.string().openapi({ param: { name: "ts", in: "path" } }) });
 const messageBinding = { channel: "channel", ts: "ts" };
 
+/** Live, the workspace holds only the app channelstack has credentials for: decision 0027's live apps aren't built yet (#111). */
+const APPS_NOT_YET: LiveSupport = {
+  unsupported: "not yet: live, the workspace holds only the app channelstack has credentials for",
+};
+
 /** What a person does only in Slack's client: live, the browser actor does it (live-mode.md, A3). */
 const IN_THE_CLIENT: LiveSupport = {
   requires: "browser",
@@ -422,6 +427,7 @@ export function registerSlackRoutes(
     response: SlackApp,
     errors: ["invalid_argument"],
     factory: { on: "SlackFixture", name: "createApp", options: ["name", "scopes", "botEvents"] },
+    live: APPS_NOT_YET,
     stability,
     handler: ({ session, body }) => appWire(fake.createApp(session.id, body)),
   });
@@ -432,6 +438,7 @@ export function registerSlackRoutes(
     summary: "The workspace's apps: the built-in one first, then the others in the order they were made",
     response: z.array(SlackApp).openapi("SlackApps"),
     sdkMethod: { on: "SlackFixture", name: "apps" },
+    live: APPS_NOT_YET,
     stability,
     handler: () => fake.apps().map(appWire),
   });
@@ -448,6 +455,7 @@ export function registerSlackRoutes(
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "cannot_dm_bot", "invalid_argument", "no_text", "msg_too_long"],
     sdkMethod: { on: "SlackApp", name: "say", args: ["message"], options: ["channel", "to"] },
+    live: APPS_NOT_YET,
     stability,
     handler: ({ session, params, body }) => {
       const where =
@@ -468,6 +476,7 @@ export function registerSlackRoutes(
     response: SlackMessage,
     errors: ["not_found", "not_in_channel", "invalid_argument", "no_text", "msg_too_long"],
     sdkMethod: { on: "SlackApp", name: "reply", args: ["message"], options: ["thread"] },
+    live: APPS_NOT_YET,
     stability,
     handler: ({ session, params, body }) =>
       messageWire(session.id, fake.replyAsApp(session.id, params.app, body.message, body.thread)),
@@ -489,6 +498,7 @@ export function registerSlackRoutes(
       response: SlackDelivery.nullable(),
       errors: ["not_found", "not_in_channel", "invalid_argument", action === "add" ? "already_reacted" : "no_reaction"],
       sdkMethod: { on: "SlackApp", name, args: ["emoji"], options: ["message"] },
+      live: APPS_NOT_YET,
       stability,
       handler: ({ session, params, body }) => {
         const delivery = fake.reactAsApp(session.id, params.app, body.emoji, body.message, action);

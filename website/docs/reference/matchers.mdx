@@ -97,6 +97,25 @@ expect(subject).toHaveRepliesFrom(author, options)
   <dd>`to_have_replies_from`, and `not_to_have_replies_from` for the negation</dd>
 </dl>
 
+### toGoQuiet
+
+```ts
+expect(subject).toGoQuiet(options)
+```
+
+<dl className="facts">
+  <dt>Subject</dt>
+  <dd>A thread or a conversation (`replies()` or `transcript()`), or anything with `comments()`: a GitHub or Linear issue, a pull request, a Notion discussion</dd>
+  <dt>Arguments and options</dt>
+  <dd>`maxReplies: number` (required), `within` (default: the timeout), `quietFor`</dd>
+  <dt>Waits</dt>
+  <dd>Quiet, then once: it counts the app messages since a person last wrote, those before the check included (decision 0027)</dd>
+  <dt>Fails with</dt>
+  <dd>`Expected the conversation to go quiet within <within> with at most <n> app messages since a person last wrote.`, whether it went quiet or was still busy, and the apps in turn: `my-agent → coder → …`</dd>
+  <dt>Python and Rust</dt>
+  <dd>`to_go_quiet(max_replies=…)`; Rust's `to_go_quiet(n)` on threads and conversations</dd>
+</dl>
+
 ### toHaveChannelMessageFrom
 
 ```ts
@@ -623,6 +642,7 @@ Every matcher is built on a plain read, so a test can read the value itself:
 |---|---|
 | `toContainText` | `transcript()` |
 | `toHaveReplyFrom`, `toHaveRepliesFrom`, `toHaveStreamingReplyFrom` | `thread.replies()`, or a conversation's `transcript()` |
+| `toGoQuiet` | `replies()`, `transcript()` or `comments()`, and their authors' `kind` |
 | `toHaveChannelMessageFrom` | `conversation.messages()` |
 | `toHaveStatus`, `toHaveStatusText` | `thread.status()` |
 | `toHaveButton` | the transcript entry's `controls` |

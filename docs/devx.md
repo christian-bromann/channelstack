@@ -192,7 +192,7 @@ channelstack sweep                                        # remove leftovers fro
 
 `last` always refers to the most recent entry, thread or delivery, so a loop of "say, look, fix the code, say again" needs no IDs: on a channel, the newest entry of its most recently active place; for `show` without a channel, of any channel's. Any other entry is `<place>:<entry>`, as the commands print them and `show --json` lists the ids.
 
-The actions are generated from the routes, like the SDKs ([decision 0027](decisions/0027-dev-tools-on-every-channel.md)): each method of a channel's person handle that isn't a read, with the same values (`channelstack <channel> actions` lists them). Values come in order or as `--<name> <value>`; a person or the app (`app`) is named, an object can be JSON, and one with a shorthand takes it as text (a button's label). A reference the action needs and wasn't given comes from the target: the entry `--on` names, the newest one in the place `--in` names, or `last`. Without `--as`, whoever started the target's thread acts. An action named like a verb is `channelstack <channel> act <action>` (Slack's own `say`, with its files and blocks). A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
+The actions are generated from the routes, like the SDKs ([decision 0028](decisions/0028-dev-tools-on-every-channel.md)): each method of a channel's person handle that isn't a read, with the same values (`channelstack <channel> actions` lists them). Values come in order or as `--<name> <value>`; a person or the app (`app`) is named, an object can be JSON, and one with a shorthand takes it as text (a button's label). A reference the action needs and wasn't given comes from the target: the entry `--on` names, the newest one in the place `--in` names, or `last`. Without `--as`, whoever started the target's thread acts. An action named like a verb is `channelstack <channel> act <action>` (Slack's own `say`, with its files and blocks). A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
 
 Everything the CLI does happens in one shared session called `dev`, which the UI shows too. It lives until the server stops ([decision 0010](decisions/0010-dev-session-and-attach-cli.md)).
 
@@ -202,7 +202,7 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
 ```
 
-The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`), on every channel the same way ([decision 0027](decisions/0027-dev-tools-on-every-channel.md)):
+The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`), on every channel the same way ([decision 0028](decisions/0028-dev-tools-on-every-channel.md)):
 
 - `say`, `reply`, `react` and `show`, each with a `channel` (`channelstack <channel> say|reply|react|show`; `show` without one is `channelstack show`).
 - `<channel>_act` for everything else that channel's people do (`slack_act`, `github_act`, …): an `action` enum generated from the routes, the action's values as `params`, and `as`, `in` and `on` as on the CLI. Its description lists each action's values.
