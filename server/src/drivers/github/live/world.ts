@@ -383,7 +383,14 @@ export function createLiveGitHubWorld(deps: {
 
     async createRepo(session, input) {
       const org = store.org.login;
-      const installed = input.installed === true;
+      // Live, the org holds the one App channelstack has credentials for (decision 0027's extra Apps aren't live yet).
+      if ((input.apps ?? []).some((app) => app !== store.app.name)) {
+        throw unsupportedInLive(
+          "GitHubFixture.createRepo({ apps }) with an App a test made",
+          "live, the org holds only the App channelstack has credentials for",
+        );
+      }
+      const installed = (input.apps?.length ?? 0) > 0;
       if (installed && selection !== "all") {
         throw liveMisconfigured(
           `the App's installation on ${org} covers selected repositories`,
@@ -431,7 +438,7 @@ export function createLiveGitHubWorld(deps: {
         private: created.private,
         defaultBranch: created.default_branch,
         collaborators: new Map(),
-        installed,
+        apps: new Set(installed ? [store.app.name] : []),
         labels: new Map(),
         createdAt: Date.parse(created.created_at),
         pushedAt: time(created.pushed_at) ?? Date.parse(created.created_at),

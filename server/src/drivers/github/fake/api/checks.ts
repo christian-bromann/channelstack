@@ -67,14 +67,14 @@ export function registerChecks(register: Register): void {
   };
 
   register("post", "/check-runs", write, async (call) => {
-    const { c, world, repo, body } = call;
+    const { c, world, repo, body, app } = call;
     const given = input(body);
     if (given.name === undefined) throw invalid("CheckRun", "name");
     if (given.headSha === undefined) throw invalid("CheckRun", "head_sha");
     if (!(await world.kit.git.readCommit(world.kit.dir(repo), given.headSha))) {
       throw new GitHubRefusal(422, `No commit found for SHA: ${given.headSha}`);
     }
-    const run = world.checks.create(repo, { ...given, name: given.name, headSha: given.headSha });
+    const run = world.checks.create(repo, { ...given, name: given.name, headSha: given.headSha }, app);
     return c.json(world.kit.objects.checkRun(run), 201);
   });
 

@@ -1,19 +1,21 @@
 import type { Context } from "hono";
 
-import type { GitHubIssueRecord, GitHubRepoRecord } from "../../world.ts";
+import type { GitHubAppRecord, GitHubIssueRecord, GitHubRepoRecord } from "../../world.ts";
 import { GitHubRefusal, invalid as validation } from "../kit.ts";
 import type { FakeGitHubWorld } from "../world.ts";
 
 export type Json = Record<string, unknown>;
 
-/** What a handler is given: the request, the world, and the repository the path names (the App is installed on it). */
+/** What a handler is given: the request, the world, and the repository the path names (the calling App is installed on it). */
 export interface Call {
   c: Context;
   world: FakeGitHubWorld;
   repo: GitHubRepoRecord;
   /** The JSON body, or `{}` when there is none. */
   body: Json;
-  /** The App's bot: whoever an installation token acts as. */
+  /** The App whose installation token made the call. */
+  app: GitHubAppRecord;
+  /** That App's bot: whoever an installation token acts as. */
   bot: number;
 }
 
