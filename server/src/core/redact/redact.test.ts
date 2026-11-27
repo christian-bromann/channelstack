@@ -30,6 +30,11 @@ describe("redaction", () => {
     expect(out).toBe("Authorization: Bearer [redacted] from [redacted] using [redacted]");
   });
 
+  test("basic credentials are scrubbed from text: an account and its secret, in base64", () => {
+    const basic = Buffer.from(`AC${"0".repeat(32)}:${"f".repeat(32)}`).toString("base64");
+    expect(new Redactor(PATTERNS).text(`Authorization: Basic ${basic}`)).toBe("Authorization: Basic [redacted]");
+  });
+
   test("an address in a URL is scrubbed too, and error data is scrubbed like text", () => {
     const redactor = new Redactor(PATTERNS);
     expect(redactor.text("GET /resend/users/ana.mar%40example.com/inbox")).toBe("GET /resend/users/[redacted]/inbox");

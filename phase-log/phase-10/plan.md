@@ -130,3 +130,21 @@ New, with why nothing existing fits:
 - `docs/reality-matrix.md` (`## Twilio`), `docs/live-mode.md` (section 4), the `devx.md` tables, `docs/architecture.md`'s id table;
 - `docs/decisions/0025-twilio.md`, phase 10 in `docs/phases.md` with its delivery cases;
 - the environment-variable reference, the Twilio platform page, README, `index.html`, the skill.
+
+## Changed while building
+
+- **A message's words are `text`,** as every other channel's: the matchers read `text`. The SDK's
+  method that sends is still `ana.text(body, { to })`.
+- **Live credentials are `<Account SID>:<Auth Token>`,** one string per account, for the agent
+  (built from its two variables) and each person, so one client call takes one credential. API
+  keys work in the fake; live people use their account's token.
+- **One OpenAPI answer check** (`server/test/schemas/openapi.ts`): Twilio's would have repeated
+  Resend's; Resend moved onto it.
+- **The live run's relay puts a form back** (`asForm` in `scripts/lib/live-agents.ts`): smee.io's
+  client posts a form's fields as JSON. Both relay steps share one local hop.
+- **`check:channels` reads CI's matrix as YAML:** with a seventh part the formatter wraps the list.
+- **`PREFIXED_TOKENS` takes a two-letter prefix**, so a live Twilio credential (`AC…:…`) is in the
+  redaction checks; the redactor scrubs whatever follows `Basic` too.
+- **Decision 0025, not 0022:** 0022 to 0024 were taken on `main`.
+- **The PR is titled `feat(server)`:** the `PR title` check runs on `pull_request_target`, so it
+  reads `main`'s scopes; this PR adds `twilio` for the ones after it.
