@@ -41,7 +41,14 @@ export interface NotionWorld extends NotionReads {
     actor: string,
   ): Awaitable<void>;
   rename(session: string, page: NotionPageRecord, title: string, actor: string): Awaitable<string | undefined>;
-  mention(session: string, page: NotionPageRecord, inBlock: TextPattern | undefined, actor: string): Awaitable<void>;
+  /** A person mentions an integration in the page body: the built-in one unless another's bot is named. */
+  mention(
+    session: string,
+    page: NotionPageRecord,
+    inBlock: TextPattern | undefined,
+    actor: string,
+    integration?: string,
+  ): Awaitable<void>;
   comment(
     session: string,
     page: NotionPageRecord,
