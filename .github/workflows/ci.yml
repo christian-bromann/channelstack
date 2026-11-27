@@ -46,7 +46,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [slack, github-linear, notion-shared-own, proxy, conformance, broken-slack, broken-others, resend, google, twilio]
+        part:
+          [
+            slack,
+            github-linear,
+            notion-shared-own,
+            proxy,
+            conformance,
+            broken-slack,
+            broken-others,
+            resend,
+            google,
+            twilio,
+          ]
         run: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 10

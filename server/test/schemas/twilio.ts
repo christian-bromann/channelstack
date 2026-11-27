@@ -1,5 +1,6 @@
 import { Ajv, type ValidateFunction } from "ajv";
 
+import { openApiChecks } from "./openapi.ts";
 import description from "./twilio-api-v2010.json" with { type: "json" };
 
 /**
@@ -24,52 +25,10 @@ ajv.addFormat("uri", /^(?:[a-z][a-z0-9+.-]*:|\/)/i);
 ajv.addFormat("date-time", true);
 ajv.addFormat("date", /^\d{4}-\d{2}-\d{2}$/);
 ajv.addSchema(description as Json, "twilio");
-const compiled = new Map<string, ValidateFunction | undefined>();
-const schemaAt = (pointer: string) => {
-  if (!compiled.has(pointer)) compiled.set(pointer, ajv.getSchema(`twilio#/${pointer}`));
-  return compiled.get(pointer);
-};
-const pointerPart = (part: string) => part.replaceAll("~", "~0").replaceAll("/", "~1");
-
-const paths = description.paths as Record<string, Record<string, { responses?: Record<string, Json> }>>;
-/** Each path template as a pattern: `/2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json` matches a message's. */
-const templates = Object.keys(paths).map((template) => ({
-  template,
-  pattern: new RegExp(`^${template.replace(/\./g, "\\.").replace(/\{[^}]+\}/g, "[^/]+")}$`),
-  literal: template.split("{").length,
-}));
-
-const problemsOf = (validate: ValidateFunction | undefined, value: unknown, where: string): string[] => {
-  if (!validate) return [`${where}: Twilio's description has no schema for it`];
-  if (validate(value)) return [];
-  return (validate.errors ?? []).map((error) => `${where}: ${error.instancePath || "/"} ${error.message}`);
-};
+const checks = openApiChecks(ajv, "twilio", description, "Twilio", { strictStatus: true });
 
 /** What Twilio's description says about one answer of the API: nothing when it fits. */
-export function twilioResponseProblems(method: string, path: string, status: number, body: unknown): string[] {
-  const match = templates.filter(({ pattern }) => pattern.test(path)).sort((a, b) => a.literal - b.literal)[0];
-  if (!match) return [`${method} ${path}: not in Twilio's description`];
-  const operation = paths[match.template]?.[method.toLowerCase()];
-  if (!operation) return [`${method} ${path}: Twilio's description has no ${method} for ${match.template}`];
-  const response = operation.responses?.[String(status)] as { content?: Record<string, unknown> } | undefined;
-  // A refusal, or an answer the description lists without a body (a 204), has nothing to hold it to.
-  if (status >= 400) return [];
-  if (!response) return [`${method} ${path}: Twilio's description has no ${status} answer`];
-  if (response.content?.["application/json"] === undefined) return [];
-  const pointer = [
-    "paths",
-    match.template,
-    method.toLowerCase(),
-    "responses",
-    String(status),
-    "content",
-    "application/json",
-    "schema",
-  ]
-    .map(pointerPart)
-    .join("/");
-  return problemsOf(schemaAt(pointer), body, `${method} ${path} ${status}`);
-}
+export const twilioResponseProblems = checks.responseProblems;
 
 /** The Message resource's schema of one field, by its name in the description. */
 const field = (name: string) => ({ $ref: `twilio#/components/schemas/api.v2010.account.message/properties/${name}` });
@@ -156,5 +115,5 @@ const WEBHOOKS: Readonly<Record<string, ValidateFunction>> = {
 
 /** What it says about one webhook: a text to the agent's number (`message`), or a status callback (`status`). */
 export function twilioWebhookProblems(type: string, payload: unknown): string[] {
-  return problemsOf(WEBHOOKS[type], payload, `webhook ${type}`);
+  return checks.problemsOf(WEBHOOKS[type], payload, `webhook ${type}`);
 }

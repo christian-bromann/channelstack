@@ -11,7 +11,7 @@ export interface TwimlMessage {
 }
 
 /** TwiML Twilio can't act on: its error 12100 (the document doesn't parse) or 12200 (not TwiML Twilio knows). */
-export class TwimlError extends Error {
+class TwimlError extends Error {
   readonly code: number;
   constructor(code: number, message: string) {
     super(`${code}: ${message}`);

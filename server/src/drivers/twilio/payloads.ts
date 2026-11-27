@@ -10,17 +10,16 @@ export const rfc2822 = (ms: number): string => new Date(ms).toUTCString().replac
 const SEGMENT_PRICE = 0.0083;
 
 /** Where Twilio documents an error code. */
-export const moreInfo = (code: number) => `https://www.twilio.com/docs/errors/${code}`;
+const moreInfo = (code: number) => `https://www.twilio.com/docs/errors/${code}`;
 
 /** What an error code means, as Twilio's `error_message` and its status callbacks say. */
-export const ERROR_MESSAGES: Readonly<Record<number, string>> = {
+const ERROR_MESSAGES: Readonly<Record<number, string>> = {
   30003: "Unreachable destination handset",
   30005: "Unknown destination handset",
 };
 
 /** A message's resource path, relative to `https://api.twilio.com`. */
-export const messageUri = (accountSid: string, sid: string) =>
-  `/${API_VERSION}/Accounts/${accountSid}/Messages/${sid}.json`;
+const messageUri = (accountSid: string, sid: string) => `/${API_VERSION}/Accounts/${accountSid}/Messages/${sid}.json`;
 
 /** The country a number is in, as the webhooks' `FromCountry` and `ToCountry` say: the fake knows North America's. */
 const countryOf = (number: string) => (number.startsWith("+1") ? "US" : "");

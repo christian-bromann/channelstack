@@ -8,7 +8,7 @@
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { createServer, type IncomingHttpHeaders } from "node:http";
+import { createServer, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
@@ -119,16 +119,15 @@ function eventType(headers: IncomingHttpHeaders, body: string): string {
 }
 
 /**
- * Between a relay and its agent: each webhook's shape is recorded (live-mode.md 6, the platforms'
- * real payloads), then the delivery goes on to the agent as it came, and the agent's answer back.
+ * A local hop between a relay and its agent: each request, its body as `change` makes it, goes on
+ * to `target` with its headers, and the agent's answer goes back. Answers where it listens.
  */
-async function tapped(channel: string, target: string, recorder: Recorder, stops: Stop[]): Promise<string> {
+async function hop(target: string, stops: Stop[], change: (body: Buffer, request: IncomingMessage) => Buffer | string) {
   const server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", async () => {
-      const body = Buffer.concat(chunks);
-      recorder.webhook(channel, eventType(request.headers, body.toString("utf8")), body.toString("utf8"));
+      const body = change(Buffer.concat(chunks), request);
       const headers = Object.fromEntries(
         Object.entries(request.headers).flatMap(([name, value]) =>
           typeof value === "string" && name !== "host" && name !== "content-length" ? [[name, value]] : [],
@@ -148,6 +147,30 @@ async function tapped(channel: string, target: string, recorder: Recorder, stops
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
+/**
+ * Between a relay and its agent: each webhook's shape is recorded (live-mode.md 6, the platforms'
+ * real payloads), then the delivery goes on to the agent as it came, and the agent's answer back.
+ */
+const tapped = (channel: string, target: string, recorder: Recorder, stops: Stop[]): Promise<string> =>
+  hop(target, stops, (body, request) => {
+    recorder.webhook(channel, eventType(request.headers, body.toString("utf8")), body.toString("utf8"));
+    return body;
+  });
+
+/**
+ * Between a relay and an agent whose platform posts forms (Twilio): smee.io parses a form and its
+ * client posts the fields as JSON, so this puts them back as the form the platform sent, with its
+ * headers. The fields and their order are the platform's.
+ */
+const asForm = (target: string, stops: Stop[]): Promise<string> =>
+  hop(target, stops, (body) => {
+    try {
+      return new URLSearchParams(JSON.parse(body.toString("utf8")) as Record<string, string>).toString();
+    } catch {
+      return body;
+    }
+  });
+
 /** An agent that takes webhooks: started on a free port, then its relay channel forwarded to it. */
 async function webhookAgent(
   name: string,
@@ -160,42 +183,6 @@ async function webhookAgent(
   const target = `http://127.0.0.1:${port}${options.path}`;
   await relay(name, options.source, options.form ? await asForm(target, stops) : target, stops);
   say(`${name}: the reference agent takes the platform's webhooks through its relay channel`);
-}
-
-/**
- * Between a relay and an agent whose platform posts forms (Twilio): smee.io parses a form and its
- * client posts the fields as JSON, so this puts them back as the form the platform sent, with its
- * headers, and hands the agent's answer back. The fields and their order are the platform's.
- */
-async function asForm(target: string, stops: Stop[]): Promise<string> {
-  const server = createServer((request, response) => {
-    const chunks: Buffer[] = [];
-    request.on("data", (chunk: Buffer) => chunks.push(chunk));
-    request.on("end", async () => {
-      const text = Buffer.concat(chunks).toString("utf8");
-      let body = text;
-      try {
-        body = new URLSearchParams(JSON.parse(text) as Record<string, string>).toString();
-      } catch {
-        // A form already.
-      }
-      const headers = Object.fromEntries(
-        Object.entries(request.headers).flatMap(([name, value]) =>
-          typeof value === "string" && name !== "host" && name !== "content-length" ? [[name, value]] : [],
-        ),
-      );
-      try {
-        const answer = await fetch(target, { method: request.method ?? "POST", headers, body });
-        response.writeHead(answer.status, { "content-type": answer.headers.get("content-type") ?? "text/plain" });
-        response.end(Buffer.from(await answer.arrayBuffer()));
-      } catch {
-        response.writeHead(502).end();
-      }
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  stops.push(() => new Promise((resolve) => server.close(() => resolve(undefined))));
-  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
 /** How the live run starts one channel's reference agent against the real platform, from the environment. */

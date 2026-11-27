@@ -66,7 +66,7 @@ describe("text conversations", () => {
 
     expect(stop.delivery?.payload.OptOutType).toBe("STOP");
     const transcript = await stop.conversation.transcript();
-    expect(transcript.text).toMatch(/unsubscribed/);
+    expect(transcript.entries.at(-1)?.text).toMatch(/unsubscribed/);
     expect(await twilio.calls({ error: true })).toEqual([]);
   });
 });

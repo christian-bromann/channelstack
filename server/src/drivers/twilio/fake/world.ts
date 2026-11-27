@@ -38,7 +38,7 @@ const refused = (code: number, message: string) => new TwilioApiError(400, code,
  * timeout), `rt` (read timeout), `tt` (total time), in milliseconds; `rc`, how many retries; `rp`,
  * which failures to retry (`4xx`, `5xx`, `rt`, `ct`, `all`).
  */
-export function connectionOverrides(url: string) {
+function connectionOverrides(url: string) {
   const fragment = new URLSearchParams(url.split("#")[1] ?? "");
   const number = (name: string, fallback: number) => {
     const value = Number(fragment.get(name));

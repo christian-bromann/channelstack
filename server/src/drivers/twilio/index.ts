@@ -1,5 +1,4 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
-import { fakeTwilioWorld } from "./backend.ts";
 import { createTwilioFake } from "./fake/index.ts";
 import { TWILIO_IDS } from "./ids.ts";
 import { TwilioRestClient } from "./live/client.ts";
@@ -47,19 +46,12 @@ export const twilio: DriverDefinition = {
         await deleteMessage(client, credential, entry.ref.sid ?? "");
       });
     }
-    const world = live ?? fakeTwilioWorld(fake.world);
     return {
       name: "twilio",
       fake,
       ...(live ? { live } : {}),
-      routes: (router) =>
-        registerTwilioRoutes(router, {
-          fake: fake.world,
-          live,
-          world,
-          events: context.events,
-          apiUrl: context.apiUrl,
-        }),
+      // The routes read the live world where there is one, and the fake's otherwise.
+      routes: (router) => registerTwilioRoutes(router, { fake: fake.world, live, context }),
       capabilities: () => ({}),
       openWork: () => [],
       // What the agent needs: `twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)`, its number, and where

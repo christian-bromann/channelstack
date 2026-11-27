@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
+import { parse } from "yaml";
+
 import * as checks from "../integrations/checks/index.ts";
 import { CHANNELS, DRIVERS } from "../server/src/drivers/index.ts";
 import { HARNESS, HARNESS_CHANNELS } from "./lib/channels.ts";
@@ -99,8 +101,10 @@ for (const name of HARNESS_CHANNELS) {
 // --- CI runs every part of the acceptance suite ----------------------------------------------------
 
 const parts = spawnSync(process.execPath, [join(ROOT, "scripts", "accept.ts"), "--parts"], { encoding: "utf8" });
-const listed = /part: \[([^\]]*)\]/.exec(read(".github/workflows/ci.yml") ?? "")?.[1];
-const ciParts = (listed ?? "").split(",").map((part) => part.trim());
+const workflow = parse(read(".github/workflows/ci.yml") ?? "") as {
+  jobs?: { accept?: { strategy?: { matrix?: { part?: string[] } } } };
+};
+const ciParts = workflow.jobs?.accept?.strategy?.matrix?.part ?? [];
 const accepted = JSON.parse(parts.stdout || "[]") as string[];
 need(
   JSON.stringify([...ciParts].sort()) === JSON.stringify([...accepted].sort()),

@@ -21,7 +21,7 @@ export interface TwilioStub {
   failNext(path: string, code: number, status: number): void;
 }
 
-export interface Account {
+interface Account {
   name: string;
   sid: string;
   token: string;

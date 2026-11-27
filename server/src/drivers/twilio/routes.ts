@@ -3,10 +3,10 @@ import { z } from "@hono/zod-openapi";
 import { iso } from "../../core/clock/index.ts";
 import type { DeliveryRecord } from "../../core/delivery/index.ts";
 import { ProtocolError } from "../../core/errors/index.ts";
-import type { EventLog } from "../../core/events/index.ts";
 import { DELIVERY_IS_THE_PLATFORMS, type LiveSupport } from "../../core/reality/index.ts";
 import {
   type DeliveryView,
+  type DriverContext,
   type DriverRouter,
   pathParam,
   refTo,
@@ -19,7 +19,7 @@ import {
   principalSchema,
   transcriptSchema,
 } from "../../core/router/inspect.ts";
-import type { TwilioWorld } from "./backend.ts";
+import { fakeTwilioWorld, type TwilioWorld } from "./backend.ts";
 import type { FakeTwilioWorld } from "./fake/world.ts";
 import { TWILIO_API } from "./live/client.ts";
 import { renderConversation } from "./transcript.ts";
@@ -128,15 +128,10 @@ const NO_REDELIVERY: LiveSupport = { unsupported: "Twilio has no API to send a w
 /** The Twilio driver's control API: what a test's people do, and what a test reads back. */
 export function registerTwilioRoutes(
   router: DriverRouter,
-  deps: {
-    fake: FakeTwilioWorld;
-    live: TwilioWorld | undefined;
-    world: TwilioWorld;
-    events: EventLog;
-    apiUrl: () => string;
-  },
+  deps: { fake: FakeTwilioWorld; live: TwilioWorld | undefined; context: Pick<DriverContext, "events" | "apiUrl"> },
 ): void {
-  const { fake, world } = deps;
+  const { fake, context } = deps;
+  const world = deps.live ?? fakeTwilioWorld(fake);
   const { store } = world;
   const stability = "experimental";
 
@@ -209,7 +204,7 @@ export function registerTwilioRoutes(
     response: TwilioFixture,
     factory: { on: "Session", name: "twilio" },
     stability,
-    handler: () => ({ app: appWire(), apiUrl: deps.live ? TWILIO_API : deps.apiUrl() }),
+    handler: () => ({ app: appWire(), apiUrl: deps.live ? TWILIO_API : context.apiUrl() }),
   });
 
   router.route({
@@ -361,7 +356,7 @@ export function registerTwilioRoutes(
 
   registerInspectionRoutes(router, {
     title: "Twilio",
-    events: deps.events,
+    events: context.events,
     stability,
     deliveries: fake,
     delivery: { schema: TwilioDelivery, wire: deliveryWire },
