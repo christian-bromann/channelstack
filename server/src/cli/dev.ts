@@ -3,13 +3,12 @@ import {
   devApp,
   devEnsurePlace,
   type DevEntry,
+  devEverywhere,
   devFind,
-  devLast,
   devPerson,
   devReference,
   DevRefusal,
   devSaid,
-  type DevTarget,
   devTarget,
   devTranscript,
 } from "../core/dev/index.ts";
@@ -110,9 +109,6 @@ interface Shown {
   readonly text: string;
 }
 
-/** The newest entry's time of a target, to compare channels by. */
-const timeOf = (target: DevTarget) => target.entries[target.index]?.at ?? "";
-
 /**
  * `show`: a place as a person reads it. On one channel: the place `--in` names, the thread of the
  * entry `--thread` names (`last` is the newest), or its most recently active place. On none: the
@@ -133,18 +129,16 @@ export async function runShow(server: Attached, channel: DevChannel | undefined,
         const path = flags.thread === undefined ? undefined : await adapter.thread?.(api, target);
         return devTranscript(api, path ?? target.place.transcript);
       }
-      let newest: { api: DevApi; target: DevTarget; channel: DevChannel } | undefined;
-      for (const candidate of DEV_CHANNELS) {
-        const api = await devApi(server, candidate.name);
-        const target = await devLast(api, candidate.adapter);
-        if (target && (newest === undefined || timeOf(target) > timeOf(newest.target))) {
-          newest = { api, target, channel: candidate };
-        }
-      }
-      if (!newest)
+      const channels = await Promise.all(
+        DEV_CHANNELS.map(async (candidate) => ({ ...candidate, api: await devApi(server, candidate.name) })),
+      );
+      const last = (await devEverywhere(channels)).at(-1);
+      const owner = channels.find((candidate) => candidate.name === last?.channel);
+      if (!last?.newest || !owner)
         throw new CliError(
           'nothing has been said yet. Start with `channelstack slack say --as ana --in "#support" "@my-agent hi"`.',
         );
+      const newest = { api: owner.api, target: last.newest, channel: owner };
       const path =
         flags.thread === undefined ? undefined : await newest.channel.adapter.thread?.(newest.api, newest.target);
       return devTranscript(newest.api, path ?? newest.target.place.transcript);

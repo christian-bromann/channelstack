@@ -43,7 +43,7 @@ export const slackDev: DevAdapter = {
     await join(api, target.place, person);
     await api.post(`/users/${segment(person.id)}/reply`, {
       message: { text },
-      thread: { channel: target.place.id, ts: devRoot(target).id },
+      thread: { channel: target.place.id, ts: devRoot(target)?.id },
     });
   },
   async react({ api, target, person, emoji }) {
@@ -59,11 +59,13 @@ export const slackDev: DevAdapter = {
     return {
       SlackConversation: channel,
       SlackMessage: { channel, ts: target.entries[target.index]?.id },
-      SlackThread: { channel, ts: devRoot(target).id },
+      SlackThread: { channel, ts: devRoot(target)?.id },
     };
   },
   thread: async (_api, target) =>
-    `/conversations/${segment(target.place.id)}/threads/${segment(devRoot(target).id)}/transcript`,
+    `/conversations/${segment(target.place.id)}/threads/${segment(devRoot(target)?.id ?? "")}/transcript`,
+  // A message's `ts` is when it was posted, to the microsecond; the transcript's `at` is to the second.
+  time: (entry) => Number(entry.id) * 1000,
   // A conversation's transcript lists replies under their thread: the server knows which message is newest.
   async newest(api, place) {
     return (await api.get<{ ts: string }>(`/conversations/${segment(place.id)}/latest`)).ts;

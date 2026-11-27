@@ -67,6 +67,8 @@ export interface DevTarget {
   readonly entries: readonly DevEntry[];
   /** Where the entry is in `entries`. */
   readonly index: number;
+  /** When the entry was written, in milliseconds, as precisely as its channel tells (`DevAdapter.time`). */
+  readonly time?: number;
 }
 
 /** Who acts and where: what each of the adapter's actions is handed. */
@@ -102,6 +104,8 @@ export interface DevAdapter {
   refs(api: DevApi, target: DevTarget): Promise<Record<string, unknown>>;
   /** The transcript route of only the target's thread. Without it, or when it says nothing, the whole place. */
   thread?(api: DevApi, target: DevTarget): Promise<string | undefined>;
+  /** When an entry was written, more precisely than its `at` (Slack's `ts`, to the microsecond). */
+  time?(entry: DevEntry): number;
   /** The newest entry of a place, for a channel whose transcript's order and times don't tell (Slack's threads). */
   newest?(api: DevApi, place: DevPlace): Promise<string | undefined>;
 }
@@ -181,11 +185,19 @@ export async function devEnsurePlace(
 
 export const devTranscript = (api: DevApi, path: string) => api.get<DevTranscript>(path);
 
+/** When an entry was written, as an instant: channels write their times to different precisions. */
+const instant = (entry: DevEntry | undefined) =>
+  entry === undefined ? Number.NEGATIVE_INFINITY : Date.parse(entry.at);
+
+/** When a target's entry was written; before everything for a place nothing was said in. */
+export const devTime = (target: DevTarget | undefined): number =>
+  target === undefined ? Number.NEGATIVE_INFINITY : (target.time ?? instant(target.entries[target.index]));
+
 /** The newest entry of a list of entries: the latest time, and of equal times the one listed later. */
 function newestIndex(entries: readonly DevEntry[]): number {
   let newest = -1;
   entries.forEach((entry, index) => {
-    if (newest === -1 || entry.at >= (entries[newest] as DevEntry).at) newest = index;
+    if (newest === -1 || instant(entry) >= instant(entries[newest])) newest = index;
   });
   return newest;
 }
@@ -196,31 +208,62 @@ async function newestIn(api: DevApi, adapter: DevAdapter, place: DevPlace): Prom
   if (entries.length === 0) return undefined;
   const id = await adapter.newest?.(api, place);
   const index = id === undefined ? newestIndex(entries) : entries.findIndex((entry) => entry.id === id);
-  return index === -1 ? undefined : { place, entries, index };
+  const entry = entries[index];
+  return entry === undefined ? undefined : { place, entries, index, time: adapter.time?.(entry) ?? instant(entry) };
 }
 
 /**
- * What `last` means on a channel: the newest entry of its most recently active place. Of places
- * whose newest entries are as new, the one listed later.
+ * A channel's places with their newest entries, the most recently active last: of places whose
+ * newest entries are as new, the one its list route lists later; places nothing was said in first.
+ * What `last` means, and the order the UI lists places in.
  */
-export async function devLast(api: DevApi, adapter: DevAdapter): Promise<DevTarget | undefined> {
-  let last: DevTarget | undefined;
-  for (const place of await devPlaces(api, adapter)) {
-    const target = await newestIn(api, adapter, place);
-    const at = target?.entries[target.index]?.at;
-    if (target && at !== undefined && (last === undefined || at >= (last.entries[last.index] as DevEntry).at)) {
-      last = target;
-    }
+async function devActivity(
+  api: DevApi,
+  adapter: DevAdapter,
+): Promise<Array<{ place: DevPlace; newest: DevTarget | undefined }>> {
+  const active: Array<{ place: DevPlace; newest: DevTarget | undefined; order: number }> = [];
+  for (const [order, place] of (await devPlaces(api, adapter)).entries()) {
+    active.push({ place, newest: await newestIn(api, adapter, place), order });
   }
-  return last;
+  return active
+    .sort((a, b) => byTime(a.newest, b.newest) || a.order - b.order)
+    .map(({ place, newest }) => ({ place, newest }));
+}
+
+/** Older first; nothing said before anything was. */
+function byTime(a: DevTarget | undefined, b: DevTarget | undefined): number {
+  const [left, right] = [devTime(a), devTime(b)];
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * Every channel's places, the most recently active last, as `devActivity` orders one channel's:
+ * of places as new, the one of the channel listed later. `channelstack show` shows the last;
+ * the UI lists them in this order.
+ */
+export async function devEverywhere(
+  channels: ReadonlyArray<{ readonly name: string; readonly adapter: DevAdapter; readonly api: DevApi }>,
+): Promise<Array<{ channel: string; place: DevPlace; newest: DevTarget | undefined }>> {
+  const all: Array<{ channel: string; place: DevPlace; newest: DevTarget | undefined }> = [];
+  for (const { name, adapter, api } of channels) {
+    for (const active of await devActivity(api, adapter)) all.push({ channel: name, ...active });
+  }
+  // Sorting is stable, so places as new keep the order of their channels.
+  return all.sort((a, b) => byTime(a.newest, b.newest));
+}
+
+/** What `last` means on a channel: the newest entry of its most recently active place (`devActivity`). */
+export async function devLast(api: DevApi, adapter: DevAdapter): Promise<DevTarget | undefined> {
+  return (await devActivity(api, adapter)).at(-1)?.newest;
 }
 
 /** How a reference writes a target: `<place>:<entry>`. */
 export const devReference = (target: DevTarget): string => `${target.place.id}:${target.entries[target.index]?.id}`;
 
 /**
- * A target from what a person typed: `last` (or nothing), a reference (`<place>:<entry>`, as the
- * commands print them and `show --json` lists the entries), or a place by name or id (its newest entry).
+ * A target from what a person typed: `last` (or nothing), a place by name or id (its newest
+ * entry), or a reference (`<place>:<entry>`, as the commands print them and `show --json` lists
+ * the entries). A place whose name has a `:` is found by its name before the text is split.
  */
 export async function devTarget(api: DevApi, adapter: DevAdapter, reference: string | undefined): Promise<DevTarget> {
   if (reference === undefined || reference === "last") {
@@ -228,14 +271,15 @@ export async function devTarget(api: DevApi, adapter: DevAdapter, reference: str
     if (!last) throw new DevRefusal(`nothing has been said yet. Start with \`say --in ${adapter.example}\`.`);
     return last;
   }
-  const colon = reference.lastIndexOf(":");
-  const place = await devFind(api, adapter, colon === -1 ? reference : reference.slice(0, colon));
-  if (!place) throw new DevRefusal(`there is no ${adapter.place} "${reference}". Name one, or use \`last\`.`);
-  if (colon === -1) {
-    const newest = await newestIn(api, adapter, place);
-    if (!newest) throw new DevRefusal(`nothing has been said in ${place.name} yet.`);
+  const named = await devFind(api, adapter, reference);
+  if (named) {
+    const newest = await newestIn(api, adapter, named);
+    if (!newest) throw new DevRefusal(`nothing has been said in ${named.name} yet.`);
     return newest;
   }
+  const colon = reference.lastIndexOf(":");
+  const place = colon === -1 ? undefined : await devFind(api, adapter, reference.slice(0, colon));
+  if (!place) throw new DevRefusal(`there is no ${adapter.place} "${reference}". Name one, or use \`last\`.`);
   const { entries } = await devTranscript(api, place.transcript);
   const entry = reference.slice(colon + 1);
   const index = entries.findIndex((candidate) => candidate.id === entry);
@@ -243,13 +287,16 @@ export async function devTarget(api: DevApi, adapter: DevAdapter, reference: str
   return { place, entries, index };
 }
 
-/** The entry of the target's thread that started it: the nearest one at depth 0, the target's own included. */
-export function devRoot(target: DevTarget): DevEntry {
+/**
+ * The entry of the target's thread that started it: the nearest one at depth 0, the target's own
+ * included. Nothing for a place nothing was said in.
+ */
+export function devRoot(target: DevTarget): DevEntry | undefined {
   for (let index = target.index; index >= 0; index -= 1) {
-    const entry = target.entries[index] as DevEntry;
-    if (entry.depth === 0) return entry;
+    const entry = target.entries[index];
+    if (entry?.depth === 0) return entry;
   }
-  return target.entries[0] as DevEntry;
+  return target.entries[0];
 }
 
 /** The newest entry by this person in a place: what a person just said there. */

@@ -1,4 +1,4 @@
-import type { DevAdapter, DevApi, DevPrincipal, DevTarget } from "../../core/dev/index.ts";
+import { type DevAdapter, type DevApi, type DevPrincipal, DevRefusal, type DevTarget } from "../../core/dev/index.ts";
 import { REACTIONS } from "./world.ts";
 
 interface Repo {
@@ -28,8 +28,24 @@ const issueRef = (target: DevTarget) => {
   const { issue } = listed(target.place.item);
   return { repoId: issue.repoId, number: issue.number };
 };
-/** The first entry of an issue's transcript is the issue itself; the rest are comments. */
-const commentOf = (target: DevTarget) => (target.index === 0 ? undefined : Number(target.entries[target.index]?.id));
+/**
+ * What an entry of an issue's transcript is: the first is the issue itself; then a comment in the
+ * conversation, a comment on the diff, or a review's verdict, which no handle stands for.
+ */
+async function entryOf(api: DevApi, target: DevTarget): Promise<"issue" | "comment" | "reviewComment" | "review"> {
+  if (target.index === 0) return "issue";
+  const id = target.entries[target.index]?.id;
+  const { issue, pullRequest } = listed(target.place.item);
+  const comments = await api.get<Array<{ id: number }>>(
+    `/repos/${segment(issue.repoId)}/issues/${issue.number}/comments`,
+  );
+  if (comments.some((comment) => String(comment.id) === id)) return "comment";
+  if (!pullRequest) return "review";
+  const onTheDiff = await api.get<Array<{ id: number }>>(
+    `/repos/${segment(issue.repoId)}/pulls/${issue.number}/review-comments`,
+  );
+  return onTheDiff.some((comment) => String(comment.id) === id) ? "reviewComment" : "review";
+}
 
 /** `:eyes:`, `eyes` and `👀` alike, as GitHub's reaction names. */
 function reaction(emoji: string): string {
@@ -45,7 +61,7 @@ export const githubDev: DevAdapter = {
   resource: "GitHubIssue",
   listing: {
     path: "/issues",
-    id: "{issue.repo.fullName}#{issue.number}",
+    id: "{issue.repo.name}#{issue.number}",
     name: ["{title}"],
     transcript: "/repos/{issue.repoId}/issues/{issue.number}/transcript",
   },
@@ -71,20 +87,24 @@ export const githubDev: DevAdapter = {
   },
   async react({ api, target, person, emoji }) {
     const content = reaction(emoji);
-    const comment = commentOf(target);
+    const entry = await entryOf(api, target);
+    if (entry === "review") throw new DevRefusal("that entry is a review's verdict: react to a comment, or the issue.");
+    const id = Number(target.entries[target.index]?.id);
     await api.post(`/users/${segment(person.id)}/react`, {
       content: (REACTIONS as readonly string[]).includes(content) ? content : emoji,
-      ...(comment === undefined ? { issue: issueRef(target) } : { comment }),
+      ...(entry === "issue" ? { issue: issueRef(target) } : { comment: id }),
     });
   },
-  async refs(_api, target) {
+  async refs(api, target) {
     const issue = issueRef(target);
-    const comment = commentOf(target);
+    const entry = await entryOf(api, target);
+    const id = Number(target.entries[target.index]?.id);
     return {
       GitHubRepo: issue.repoId,
       GitHubIssue: issue,
       ...(listed(target.place.item).pullRequest ? { GitHubPullRequest: issue } : {}),
-      ...(comment === undefined ? {} : { GitHubComment: comment, GitHubReviewComment: comment }),
+      ...(entry === "comment" ? { GitHubComment: id } : {}),
+      ...(entry === "reviewComment" ? { GitHubReviewComment: id } : {}),
     };
   },
 };

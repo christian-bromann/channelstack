@@ -47,8 +47,10 @@ function typeText(type: ActionType, shorthand?: string): string {
   switch (type.kind) {
     case "ref":
       return type.resources.join(" | ");
-    case "array":
-      return `${typeText(type.items)}[]`;
+    case "array": {
+      const items = typeText(type.items);
+      return items.includes(" | ") ? `(${items})[]` : `${items}[]`;
+    }
     case "enum":
       return type.values.map((value) => JSON.stringify(value)).join(" | ");
     case "literal":
@@ -114,7 +116,8 @@ async function reference(scope: Scope, resources: readonly string[], value: unkn
     return known ? known.id : (await devPerson(scope.api, scope.channel.adapter, value)).id;
   }
   const id = HANDLES[resources[0] ?? ""]?.id ?? [];
-  if (id.length < 2) return value;
+  // An id typed on the command line is text; a handle whose id is a number (a GitHub comment) takes it as one.
+  if (id.length < 2) return id[0] ? scalar(id[0].type, value) : value;
   const parts = value.split(":");
   if (parts.length !== id.length) {
     throw new CliError(`${scope.what}: write a ${resources[0]} as ${id.map((field) => `<${field.name}>`).join(":")}.`);
@@ -248,7 +251,7 @@ export async function runAct(
     let person: DevPrincipal;
     if (flags.as !== undefined) person = await devPerson(api, adapter, flags.as);
     else {
-      const root = target ? devRoot(target).author : undefined;
+      const root = target ? devRoot(target)?.author : undefined;
       if (root?.kind !== "user") throw new CliError("say who acts with `--as <name>`.");
       person = root;
     }
