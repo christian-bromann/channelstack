@@ -228,11 +228,7 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     /** A finished Responses answer is stored, and its conversation grows by its input and output. */
     const keep = () => {
       if (endpoint !== "responses") return;
-      const own = inputItems(body.input).map((item) =>
-        item.id === undefined && (item.type ?? "message") === "message"
-          ? { ...item, id: ids.next(OPENAI_IDS.message) }
-          : item,
-      );
+      const own = inputItems(body.input).map((item) => withId(item));
       const output = outputItems(answer, responseMeta);
       const conversation = normalised.history?.conversation;
       if (conversation) {
@@ -487,10 +483,25 @@ export function createOpenAIApi(context: DriverContext, world: OpenAIWorld): Hon
     plain(c, { id: c.req.param("model"), object: "model", created: MODEL_CREATED, owned_by: "system" }),
   );
 
-  const withId = (item: InputItem): InputItem =>
-    item.id === undefined
-      ? { ...item, id: ids.next(OPENAI_IDS.message), ...(item.type === undefined ? { type: "message" } : {}) }
-      : item;
+  /**
+   * An input item as OpenAI keeps it, in a conversation or a response's input: an id, a status,
+   * and a message's content as parts (`input_text`; the model's own as `output_text`).
+   */
+  function withId(item: InputItem): InputItem {
+    const type = typeof item.type === "string" ? item.type : "message";
+    const id =
+      typeof item.id === "string"
+        ? item.id
+        : ids.next(type === "message" ? OPENAI_IDS.message : OPENAI_IDS.functionCall);
+    if (type !== "message") return { ...item, type, id, status: item.status ?? "completed" };
+    const role = typeof item.role === "string" ? item.role : "user";
+    const kind = role === "assistant" ? "output_text" : "input_text";
+    const content =
+      typeof item.content === "string"
+        ? [{ type: kind, text: item.content, ...(kind === "output_text" ? { annotations: [] } : {}) }]
+        : item.content;
+    return { ...item, type, id, status: item.status ?? "completed", role, content };
+  }
   const conversationWire = (conversation: Conversation) => ({
     id: conversation.id,
     object: "conversation",

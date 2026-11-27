@@ -33,6 +33,7 @@
     "linear:schema": "node scripts/linear-schema.ts",
     "resend:schema": "node scripts/pinned-schema.ts resend",
     "google:schema": "node scripts/pinned-schema.ts google",
+    "openai:schema": "node scripts/pinned-schema.ts openai",
     "google:token": "node scripts/google-token.ts",
     "linear:schema:check": "node scripts/linear-schema.ts --check",
     "check:dupes": "jscpd",

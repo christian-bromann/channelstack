@@ -84,6 +84,8 @@ export function responseObject(
     id: meta.id,
     object: "response",
     created_at: meta.created,
+    // The access programs the request was resolved under: the standard one, as for any model without a tier.
+    access_programs: { cyber: "standard" },
     status,
     background: false,
     error: error ? { code: error.code ?? error.type, message: error.message } : null,
@@ -117,7 +119,7 @@ export function responseObject(
     usage: done
       ? {
           input_tokens: answer.usage.input,
-          input_tokens_details: { cached_tokens: answer.usage.cached },
+          input_tokens_details: { cached_tokens: answer.usage.cached, cache_write_tokens: 0 },
           output_tokens: answer.usage.output,
           output_tokens_details: { reasoning_tokens: answer.usage.reasoning },
           total_tokens: answer.usage.input + answer.usage.output,
