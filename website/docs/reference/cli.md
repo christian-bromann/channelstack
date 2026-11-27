@@ -279,17 +279,16 @@ Serves the attach commands as MCP tools over stdio, for a coding agent that is b
 
 | Tool | Inputs | Same as |
 |---|---|---|
-| `slack_say` | `as`, `channel`, `text` | `slack say` |
-| `slack_reply` | `as`, `text`, `thread?` | `slack reply` |
-| `slack_react` | `as`, `emoji`, `on?` | `slack react` |
-| `slack_click` | `as`, `label` | `slack click` |
-| `slack_stop` | `as?`, `thread?` | `slack stop` |
-| `show_thread` | `thread?`, `json?` | `show` |
+| `say` | `channel`, `as`, `in`, `text` | `<channel> say` |
+| `reply` | `channel`, `as`, `text`, `to?` | `<channel> reply` |
+| `react` | `channel`, `as`, `emoji`, `on?` | `<channel> react` |
+| `show` | `channel?`, `in?`, `thread?`, `json?` | `<channel> show`; without `channel`, `show` |
+| `<channel>_act` | `action`, `params?`, `as?`, `in?`, `on?` | `<channel> <action>`, with the values by name in `params` |
 | `tail` | none | `tail --once`, from where the last call stopped (`Nothing new.` when nothing happened) |
 | `list_deliveries` | `channel?` | `deliveries` |
 | `redeliver` | `channel?`, `delivery?` (`last`, the default, or an id) | `redeliver` |
 
-`thread` and `on` take `last` (the default) or `<channel id>:<ts>`.
+`to`, `on` and `thread` take `last` (the default), `<place>:<entry>`, or a place by name.
 
 ## `channelstack doctor`
 

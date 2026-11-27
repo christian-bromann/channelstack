@@ -146,7 +146,7 @@ channelstack slack actions                                # click, stop, select,
 channelstack slack click --as ana "Approve"               # the button in the latest message that has it
 channelstack slack stop  --thread last                    # press Stop on the agent's work in the thread
 channelstack linear delegate --as lu --in "Crash on start"   # to the agent's app; references the action needs come from the target
-channelstack github review --as mo --review '{"event":"APPROVE"}'   # on the newest pull request; values in order or as --<name>
+channelstack github review --as mo --review '{"event":"APPROVE"}'   # the newest entry's pull request (`last`); values in order or as --<name>
 
 # Watching
 channelstack show                                         # the most recently active place on any channel, as a person would read it
@@ -195,7 +195,7 @@ The MCP tools are the attach CLI's commands, each written once for both (`server
 
 They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
 
-What differs per channel (what a place is, how a person says, replies and reacts there) is the channel's dev adapter (`core/dev`, `definition.dev`); the rest, and the UI's list of places, are the same for every channel, and `pnpm check:channels` requires an adapter for each.
+What differs per channel (what a place is, how a person says, replies and reacts there) is the channel's dev adapter (`core/dev`, `definition.dev`); the rest is the same for every channel, and the UI lists the places the adapters find (`/places`), and `pnpm check:channels` requires an adapter for each.
 
 ## 5. Tests: plug into Vitest and pytest
 
@@ -456,7 +456,7 @@ A test can use one of those, or a real model. The matchers are designed for this
 
 ## 7. The UI is functional, not faithful
 
-Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for every channel and shows the same transcript the matchers read. Its list of places is every channel's, from the same declarations the CLI and MCP list them with (each channel's dev adapter, decision 0027):
+Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for every channel and shows the same transcript the matchers read. Its list of places is every channel's, from the same dev adapters the CLI and MCP use (`GET /sessions/{session}/places`, decision 0027):
 
 - **Threads and conversations as text:** who said what, in which thread, edited or deleted, streaming or done, and the agent's status ("thinking…", "stopped").
 - **Interactive elements that work:** a button is a button, a select is a select, and a modal opens as a plain form. Clicking one sends the real `block_actions` or `view_submission` delivery. The same goes for GitHub review comments (shown with path and line), Linear Stop, and Notion comment replies.

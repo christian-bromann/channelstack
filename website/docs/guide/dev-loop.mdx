@@ -78,7 +78,7 @@ A person who isn't in the conversation yet joins it first, so Ben can reply in A
 
 ```bash
 npx channelstack github say --as mo --in "Login fails" "@my-agent can you look?"   # opens the issue in the org's dev repository
-npx channelstack github review --as mo --review '{"event":"APPROVE"}'            # on the newest pull request
+npx channelstack github review --as mo --review '{"event":"APPROVE"}'            # the pull request of the newest entry (`last`)
 npx channelstack linear say --as lu --in "Crash on start" "the app crashes"      # an issue in the Dev team
 npx channelstack linear delegate --as lu                                         # to the app, on the newest issue
 npx channelstack notion say --as nu --in "Roadmap" "@my-agent summarize this"    # a page connected to the integration
