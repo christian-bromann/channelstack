@@ -32,7 +32,7 @@ Your app talks to a fake as if it were the real platform. It uses the platform's
 - **Refusals are real.** A fake refuses what the platform refuses, with the same error code: `not_in_channel` when the bot posts where it isn't a member, `missing_scope`, `msg_too_long`.
 - **Deliveries are real.** Events arrive signed the way each platform signs them, within the same ack windows, and Slack retries the way Slack does. See [delivery and failures](/docs/guide/delivery-and-failures).
 
-Each fake has one built-in app, named `my-agent`, that your code acts as. There is one workspace, org or integration per fake, and the state lives in memory: a restart starts a fresh world.
+Each fake has one built-in app, named `my-agent`, that your code acts as. A test can add more apps beside it, each a real app of its platform with its own credentials and endpoint, to test agents that work together; see [several apps](/docs/guide/several-apps). There is one workspace, org or integration per fake, holding all of its apps, and the state lives in memory: a restart starts a fresh world.
 
 The fakes are channelstack's own implementation. They follow each platform's documentation, schemas and recorded traffic, and live runs against real sandboxes keep them honest.
 
@@ -67,7 +67,7 @@ By default the app reaches the fakes because its SDK's base URL points at them (
 
 ## Sessions: scopes in one shared world
 
-Your app is configured once: one bot token and one base URL per platform. So there is only one fake Slack workspace, one GitHub org, one Linear workspace, one Notion workspace, one Resend team and one Gmail mailbox per server. Tests don't get separate worlds. Each test gets a **session**, a scope inside the shared one.
+Your app is configured once: one bot token and one base URL per platform. So there is only one fake Slack workspace, one GitHub org, one Linear workspace and one Notion workspace per server, and on email one Resend team and one Gmail mailbox per app. The apps belong to that shared world too, not to a test, so an agent's credentials outlive each test. Tests don't get separate worlds. Each test gets a **session**, a scope inside the shared one.
 
 <SessionScopes />
 

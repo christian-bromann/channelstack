@@ -119,7 +119,7 @@ Without `operation`, a fault applies to every Web API method; without `times`, t
 A fault lasts until `fault.undo()`, the end of an `await using` scope, or the end of the test's session, whichever comes first.
 
 > [!WARNING]
-> A fault applies to the whole workspace, not only to the test that set it: there is one app, and its calls belong to no session until they finish. While a fault is in effect, other tests running at the same time see it too. Put fault tests in a file of their own and run it in a separate `vitest run`, so nothing else runs alongside.
+> A fault applies to the whole workspace, not only to the test that set it: it hits every app's calls, `my-agent`'s and those of any app a test made, and an app's calls belong to no session until they finish. While a fault is in effect, other tests running at the same time see it too. Put fault tests in a file of their own and run it in a separate `vitest run`, so nothing else runs alongside.
 
 ## The uninstall
 
