@@ -7,7 +7,7 @@ Status: accepted, 2026-11-27, on the maintainer's instruction. The design below 
 - **A channel holds any number of people and apps.** Each app is a real app of its platform, with its own identity (ids in the platform's format), its own credentials, its own delivery endpoint and subscriptions. It hears what the real platform would send it, including what the other apps do.
 - **A test adds an app with `createApp({ name })`** on the channel's fixture and puts it where the platform puts apps: `participants: [ana, slack.app, coder]`, `createRepo({ apps: [github.app, reviewer] })`, `connections: [notion.app, writer]`.
 - **`my-agent` stays.** Every fake keeps its built-in app, `slack.app` and the other fixtures' `app` are still it, and `CHANNELSTACK_<CHANNEL>_WEBHOOK_URL` and `channelstack env` mean what they mean today. No existing test, check, variable or agent changes.
-- **Apps belong to the shared world, not to a session**, as `my-agent` does: an agent process is configured once, so its app outlives each test. A session still scopes what happens in its own conversations, issues, pages and threads.
+- **Apps belong to the shared world, not to a session**, as `my-agent` does: an agent process is configured once, so its app outlives each test. A session still scopes what happens in its own conversations, issues, pages and threads. There is still one world per channel: the one workspace, org or guild every app is installed in (for Resend, the fake platform's teams, one per app; for Twilio, the account and its numbers). AGENTS.md's "World" row says so.
 - **channelstack still never starts an agent.** Each app is driven by its own agent process, or one process holds several apps. channelstack still doesn't mock models.
 
 ## Why
@@ -48,10 +48,11 @@ class SlackApp {
   readonly botToken: string;  // xoxb-…, fake only; "" live
   readonly appToken: string;
   readonly signingSecret: string;
-  // Scripted acting, extra apps only (see "Scripted apps"):
-  say(text: string, options: { channel?: SlackConversation; to?: SlackUser | SlackApp }): Promise<SlackMessage>;
-  reply(text: string, options: { thread: SlackThread }): Promise<SlackMessage>;
-  react(emoji: string, options: { message: SlackMessage }): Promise<void>;
+  // Scripted acting, extra apps only (see "Scripted apps"): the acting methods SlackUser has,
+  // with the same signatures (say, reply, edit, delete, react, unreact, …).
+  say: SlackUser["say"];
+  reply: SlackUser["reply"];
+  react: SlackUser["react"];
 }
 ```
 
@@ -65,17 +66,18 @@ test("the triage agent hands off to the coder", async ({ slack }) => {
 
   await expect(msg.thread).toHaveReplyFrom(slack.app, { text: /@coder/ });
   await expect(msg.thread).toHaveReplyFrom(coder, { text: /pull request/ });
-  await expect(msg.thread).toGoQuiet({ within: "10s", maxReplies: 4 });
+  await expect(msg.thread).toGoQuiet({ within: "10s", maxReplies: 4 }); // at most 4 app messages since Ana's
 });
 ```
 
 Rules that hold on every channel:
 
-- **An app is found by its name.** `createApp({ name: "coder" })` makes the app the first time any session asks for it, and returns the same app afterwards, so parallel tests share it as they share `my-agent`. The same name with other settings is refused with `invalid_argument`. `my-agent` is reserved, and so are names that would read as an existing variable (`id`, `token`, …, see below). Names are unique per channel, and a person and an app can't share one, so a matcher's `"coder"` always means one author.
+- **An app is found by its name.** `createApp({ name: "coder" })` makes the app the first time any session asks for it, and returns the same app afterwards, so parallel tests share it as they share `my-agent`. The same name with other settings is refused with `invalid_argument`. A name is 1 to 32 lower-case letters, digits and hyphens, starting with a letter (`coder`, `code-reviewer`), unique per channel; `my-agent` is reserved. With no `_` in names, each name has one variable name (`code-reviewer` is `CODE_REVIEWER`), and an app's variables always end in a credential after the name, so none reads as an existing variable such as `CHANNELSTACK_SLACK_APP_ID`.
+- **A name in a matcher** (`toHaveReplyFrom("coder")`) is looked up among the session's people and the apps the session has used (`my-agent`, and each app it got from `createApp`), so what another test does can't change its meaning. A name that is both a person's and an app's in that session is refused with `invalid_argument`, asking for the handle.
 - **A limit of 10 apps per channel** keeps a run from making apps without end, since they live as long as the server (open question 3).
 - **Its ids** come from the seeded id generator, derived from `CHANNELSTACK_SEED` and the app's name, so they don't depend on the order tests make apps in.
-- **Its secrets** are made once per install from the CSPRNG and kept in `secrets.json` (0600) under the driver and the app's name, so its agent's `.env` stays valid across restarts. `channelstack secrets rotate` rotates them with the rest. The redactor's token shapes cover them, since they have the shapes `my-agent`'s have.
-- **Where its events go** is `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, read once at start like today's variable (`<NAME>` upper-cased as for people: `coder` is `CODER`). An app without one, and without a connection it opened itself (Slack's Socket Mode, Discord's Gateway), is unreachable, as `my-agent` is today. Open question 2: a `webhookUrl` option on `createApp` as well.
+- **Its secrets** are made once per install from the CSPRNG when the app is first made, and kept in `secrets.json` (0600) beside the driver's own, under `apps.<name>`, each checked against the driver's format for it as the driver's own are. Today `Secrets.load` keeps only what the drivers declare, so it learns to keep the apps' too: they stay across restarts, and the app's agent's `.env` stays valid. `channelstack secrets rotate` rotates them with the rest. The redactor's token shapes cover them, since they have the shapes `my-agent`'s have.
+- **Where its events go** is `CHANNELSTACK_<CHANNEL>_APP_<NAME>_WEBHOOK_URL`, read once at start like today's variable. An app without one, and without a connection it opened itself (Slack's Socket Mode, Discord's Gateway), is unreachable, as `my-agent` is today. Open question 2: a `webhookUrl` option on `createApp` as well.
 - **`channelstack env --app coder`** prints the app's variables under the same keys `channelstack env` prints for `my-agent` (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, …), so a second agent process starts from an `.env` of the same shape. It makes the app if no test has yet, so the agent can start first. The `channelstack.env({ app })` fixture does the same.
 - **Every delivery says which app it went to.** `deliveries({ app })` filters; `msg.delivery` stays the delivery to `my-agent`, and `msg.deliveryFor(coder)` reads another app's.
 - **Faults** stay workspace-wide by default, and take `app` to hit one app's calls only.
@@ -100,7 +102,7 @@ The scripted app is what lets a check suite test the reply loop without a second
 
 ### Per channel
 
-What an app is, how it gets its credentials, and which of one app's actions the platform sends to the others. "To confirm" marks what isn't known from documentation or the probes; each is answered in the live spike (B1–B9 below) before the fake is held to it.
+What an app is, how it gets its credentials, and which of one app's actions the platform sends to the others. "To confirm" marks what isn't known from documentation or the probes. Until the live spike answers it (B1–B10 below), the fake does what the row says, its tests hold it to that, and the reality matrix marks the row unconfirmed; an answer that differs changes the fake and its test.
 
 #### Slack
 
@@ -122,7 +124,7 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 - **What it hears from another App B,** for every event it subscribes to on a repository it is installed on: B's comments, issues, labels, pull requests, reviews, review comments and pushes, with `sender: { login: "b[bot]", type: "Bot" }`. One event that two Apps hear is two deliveries: each with its own GUID, signed with its own App's secret, with that App's `installation.id` and `X-GitHub-Hook-Installation-Target-ID`.
 - **Its own actions come back to it**, as GitHub sends them: there is no `GITHUB_TOKEN`-style suppression for Apps, which is where the loop comes from.
 - **Checks:** `check_run` `rerequested` and `requested_action` go to the App that made the check run only; `created` and `completed` go to every subscribed App (to confirm, B3). `check_suite` `requested` goes to each App with checks permission.
-- **Tokens:** an installation token is the App's and acts as `b[bot]`; another App's JWT or token is refused for this App's installation (401 or 404, as GitHub answers).
+- **Tokens:** an installation token is the App's and acts as `b[bot]`. For another App's installation the fake refuses it: a JWT for another installation's token with 404, a repository the installation doesn't cover with 404, a permission the App lacks with 403 `Resource not accessible by integration` (to confirm the codes, B10).
 
 #### Linear
 
@@ -136,7 +138,7 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 - **An app:** an internal integration with its own bot user, token and capabilities, and its own webhook subscription: URL, verification handshake and verification token.
 - **It joins** a page through its connections: `createPage({ connections: [notion.app, writer] })`, inherited by child pages as today. It sees only pages it is connected to.
 - **What it hears from another integration B,** on pages it is connected to: `page.*` and `comment.*` events for B's changes, with `authors: [{ id: <B's bot>, type: "bot" }]`, batched like a person's (to confirm that Notion sends events for an integration's changes to the others, and to the integration itself, B7).
-- **What another integration can't do:** mention it. Notion's API takes user mentions of people only, so an integration hands off by comment or page, not by `@` (to confirm the refusal, B7).
+- **What another integration can't do:** mention it. Notion's changelog ("User mentions can only be of people") says the API takes user mentions of people only, so an integration hands off by comment or page, not by `@`. Until B7 confirms the refusal and its code, the fake refuses an integration's mention of a bot with `validation_error`.
 
 #### Resend
 
@@ -153,7 +155,7 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 
 #### Twilio (phase 10)
 
-- **An app:** a phone number of its own on the agent's account, with its own messaging webhook URL. Twilio signs every webhook with the account's Auth Token, so two numbers on one account share it; that is the platform, not a shortcut. `createApp({ subaccount: true })` puts the number on a subaccount with its own Account SID and Auth Token (open question 7, the default).
+- **An app:** a phone number of its own on the agent's account, with its own messaging webhook URL. Twilio signs every webhook with the account's Auth Token, so two numbers on one account share it; that is the platform, not a shortcut. `createApp({ subaccount: true })` puts the number on a subaccount with its own Account SID and Auth Token instead (open question 7).
 - **What it hears from another app B:** B's text to its number is an inbound message on its webhook, as a person's is; B gets its own status callbacks. A text costs money live, and two numbers texting each other is the most expensive loop there is, so the guard below matters most here.
 - **Opt-out:** `STOP` from B stops it texting B, as for a person.
 
@@ -169,8 +171,9 @@ What an app is, how it gets its credentials, and which of one app's actions the 
 
 A loop is the same conversation (thread, issue, pull request, page discussion, email thread, pair of numbers) receiving app messages with no person's action between them, for longer than a correct swarm needs.
 
-- **The matcher:** `expect(thread).toGoQuiet({ within, maxReplies })` waits until the conversation is quiet (the quiet detector, as negative matchers do) and fails when that takes longer than `within`, or when more than `maxReplies` messages came since the check began. Its message names the authors in turn: `my-agent → coder → my-agent → coder … (14 replies, no person between them)`. It is in matchers-core, so Vitest, pytest and Rust share its semantics. `toHaveRepliesFrom(app, { count, quietFor })` already bounds one app's replies, and stays.
-- **The guard:** without one, two looping fakes run as fast as the machine allows, and the test only stops at its timeout. The fake counts app-authored messages per conversation since the last person's action; at 50 (open question 1) it stops delivering events caused by apps in that conversation, records a `bot_loop` event naming the conversation and the authors, and fails the session: the fixture fails the test at teardown with that message, and `toGoQuiet` fails at once. The real platforms throttle instead (rate limits) and never stop, so the guard isn't platform realism. It is a harness stop, set far above what a correct swarm sends, and it is never silent. Live mode has no guard: the agents receive from the real platform, and channelstack doesn't stand between them.
+- **The matcher:** `expect(thread).toGoQuiet({ within, maxReplies })` waits until the conversation is quiet (the quiet detector, as negative matchers do) and fails when that takes longer than `within`, or when the conversation holds more than `maxReplies` app messages since its last person's message, counting those written before the check began. Its message names the authors in turn: `my-agent → coder → my-agent → coder … (14 replies, no person between them)`. It is in matchers-core, so Vitest, pytest and Rust share its semantics. `toHaveRepliesFrom(app, { count, quietFor })` already bounds one app's replies, and stays.
+- **The guard:** without one, two looping fakes run as fast as the machine allows, and the test only stops at its timeout. The fake counts app-authored messages per conversation since the last person's action; at 50 (open question 1) it stops delivering events caused by apps in that conversation, records a `bot_loop` event naming the conversation and the authors, and fails the session: the fixture fails the test at teardown with that message, and `toGoQuiet` fails at once. The real platforms throttle instead (rate limits) and never stop, so the guard isn't platform realism. It is a harness stop, set far above what a correct swarm sends, and it is never silent; the reality matrix lists it as fake only. Live mode has no guard: the agents receive from the real platform, and channelstack doesn't stand between them.
+- **One owner:** the guard is core's, a new `core/loops/` in the code map. Each driver tells it, through its world's one message path, the conversation and whether a person or an app wrote; the delivery kit asks it before sending an event an app caused. No driver counts. `bot_loop` is a new kind in the event log, so the generated event types change with it (`pnpm spec`, `pnpm sdk`).
 - **The check:** each `<channel>Checks()` gets `<channel>.no-reply-loop`. A scripted peer app answers every message the agent writes in a conversation, and the agent must stop answering it within a few turns without a person (the count is an option, default 3). The broken agents get a variant that answers every app. Agents built to hand off to each other set the option, or skip the check.
 
 ### Live mode
@@ -180,7 +183,7 @@ Live mode still acts on the real platforms and reads the results back; it never 
 - **Credentials per app:** `CHANNELSTACK_<CHANNEL>_APP_<NAME>_<CREDENTIAL>`, with the credentials `my-agent` has live: `CHANNELSTACK_SLACK_APP_CODER_APP_ID` and `…_BOT_TOKEN`, `CHANNELSTACK_GITHUB_APP_REVIEWER_APP_ID` and `…_PRIVATE_KEY`, `CHANNELSTACK_LINEAR_APP_CODER_TOKEN`, `CHANNELSTACK_NOTION_APP_WRITER_TOKEN`, `CHANNELSTACK_RESEND_APP_BILLING_API_KEY` and `…_ADDRESS`, the Google OAuth client and refresh token, the Twilio number (and subaccount), the Discord bot token. They stay in the server's memory like every live credential, are never logged, and are never returned: an app handle's tokens are empty live, and `env --app` prints nothing for a live channel.
 - **Checked when made:** `createApp` live finds the app by those variables, and checks its token is an app's (not a person's and not `my-agent`'s), that no other app has it, and that it is installed in an allowlisted workspace, org, team or guild. Missing variables are `live_misconfigured`, naming them; the allowlists are unchanged.
 - **Cleanup:** the app isn't made or deleted by a run. What a scripted app writes is tagged and on the ledger like a person's, and the sweep finds it.
-- **The spike:** each sandbox app's Request URL points at the nightly run's internal receivers (phase 6, live-mode.md section 6), so the run records what the platform sent the other app and the differ compares it with the fake. That answers B1–B9, and keeps answering them.
+- **The spike:** each sandbox app's Request URL points at the nightly run's internal receivers (phase 6, live-mode.md section 6), so the run records what the platform sent the other app and the differ compares it with the fake. That answers the B items of each channel with a second sandbox app, and keeps answering them. The others stay "to confirm" until their channel has one (open question 8).
 
 | # | To confirm live |
 |---|---|
@@ -193,6 +196,7 @@ Live mode still acts on the real platforms and reads the results back; it never 
 | B7 | Whether Notion sends an integration events for another integration's changes, and for its own; and its refusal of a bot mention |
 | B8 | Twilio delivers a text between two numbers of one account as an inbound message, with the same signature |
 | B9 | Discord's `MESSAGE_CREATE` for another bot's message, with and without `MESSAGE_CONTENT` |
+| B10 | GitHub's codes for one App's token or JWT used on another App's installation |
 
 ### What it means for each part
 
@@ -201,7 +205,10 @@ Live mode still acts on the real platforms and reads the results back; it never 
 - **The SDK generator:** nothing new in the IR for `createApp` and `apps()`, which are a factory and a method like `createUser` and `users()`. The channel unions already list every handle whose role is `app`. App handles gain methods (`sdkMethod on: "SlackApp"`), which the generator supports for users already. Python and Rust get the same from the same IR; `pnpm sdk:check` holds them.
 - **The matchers:** they already take an app handle or a name as the author. A name now resolves against every app of the channel and the session's people (unique by the rule above). `toGoQuiet` is new, in matchers-core, the pytest `expect` and the Rust crate.
 - **The transcripts:** each entry's author already has a `kind` and a name; apps are told apart by their names (`coder: opened #12`). The UI shows each app with its name and a bot badge, and its inspector lists deliveries per app.
-- **The `*Checks()` suites:** `app` already names the app under test; the suite resolves it among the channel's apps, so `slackChecks({ app: "coder" })` runs every check against the agent driving `coder`. `<channel>.no-reply-loop` is new on every channel.
+- **The `*Checks()` suites:** today `app` only sets the prompt and the matchers' author, and the checks use the fixture's `app` (`slack.app`) and `msg.delivery` directly. The suite now resolves `app` to its handle once (`createApp` for any name but `my-agent`), and every check uses that handle and `msg.deliveryFor(handle)`, so `slackChecks({ app: "coder" })` runs every check against the agent driving `coder`. `<channel>.no-reply-loop` is new on every channel.
+- **Proxy mode:** the fakes already tell callers apart by their credentials, not by host, so several apps through the proxy need nothing new; `channelstack env --app coder --proxy` prints what proxy mode adds for that app.
+- **The CLI and MCP:** the attach commands and MCP tools act as people, as today, and their transcripts name each app; `channelstack deliveries` takes `--app`. Acting as an app from the terminal is left for later.
+- **Conformance:** each channel with a second sandbox app gets a two-app scenario in `scenarios/<channel>/`, and the differ compares each app's deliveries with the fake's; differences go into `divergences.yaml` as today.
 - **`pnpm check:channels`:** every channel needs `createApp` and `apps()`, an app schema with role `app`, per-app secrets and env, the delivery cases A1–A3, the "several apps" examples and `<channel>.no-reply-loop`.
 - **The quiet detector:** already counts every delivery and call in flight; it counts every app's.
 

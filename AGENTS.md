@@ -95,7 +95,7 @@ Don't reopen these without asking.
 |---|---|
 | Channels | Slack, GitHub, Linear, Notion, and email: Resend and Google (Gmail), [decision 0021](docs/decisions/0021-email-channels.md). No Teams for now |
 | Addresses | portless names: `https://channelstack.localhost` (UI and control API at `/_channelstack`), `slack.localhost`, `github.localhost`, `linear.localhost`, `notion.localhost`, `resend.localhost`, `google.localhost` |
-| World | One shared fake workspace, org or integration per channel per server. Sessions are scopes inside it, not separate worlds |
+| World | One shared fake world per channel per server: the workspace, org or guild every app of the channel is installed in (for Resend, the teams; for Twilio, the account and its numbers). Sessions are scopes inside it, not separate worlds |
 | State | In memory. A restart starts fresh |
 | The agent | channelstack never starts or wraps it. `channelstack env` prints what it needs |
 | Default mode | Base-URL mode through portless. Proxy mode is opt-in |
