@@ -1,3 +1,4 @@
+import { AppRoster, BUILT_IN_APP } from "../../../core/apps/index.ts";
 import { CursorList } from "../../../core/events/index.ts";
 import type { Collection, Registry } from "../../../core/registry/index.ts";
 import type { EchoApp, EchoMessage, EchoRoom, EchoUser } from "../world.ts";
@@ -7,20 +8,26 @@ export class EchoStore {
   readonly users: Collection<EchoUser>;
   readonly rooms: Collection<EchoRoom>;
   readonly #messages = new Map<string, CursorList<EchoMessage>>();
-  #app: EchoApp | undefined;
+  /** The built-in app and the ones tests made (decision 0027). */
+  readonly apps = new AppRoster<EchoApp>("echo");
 
   constructor(registry: Registry) {
     this.users = registry.collection<EchoUser>("echo", "user");
     this.rooms = registry.collection<EchoRoom>("echo", "room");
   }
 
+  /** The built-in app. */
   get app(): EchoApp {
-    if (!this.#app) throw new Error("The echo fake hasn't been seeded");
-    return this.#app;
+    return this.apps.builtIn;
   }
 
   set app(app: EchoApp) {
-    this.#app = app;
+    this.apps.seed(app);
+  }
+
+  /** How core knows an app: echo's built-in app is `echo-agent`, but its secrets and endpoint are the built-in app's. */
+  keyOf(app: EchoApp): string {
+    return app.id === this.app.id ? BUILT_IN_APP : app.name;
   }
 
   messagesIn(room: string): CursorList<EchoMessage> {

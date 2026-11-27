@@ -1,0 +1,66 @@
+name: apps
+description: A second app in a room (decision 0027). A test acts as it; the echo agent hears it and answers only the person; my-agent is no name for another app.
+requires: [echo-agent]
+steps:
+  - call: session.echo
+    as: echo
+  - call: echo.createApp
+    options: { name: coder }
+    as: coder
+  - expect:
+      - { value: $coder.id, matches: "^EA[0-9A-Z]{10}$" }
+      - { value: $coder.kind, equals: app }
+      - { value: $coder.name, equals: coder }
+  # The same name gives the same app.
+  - call: echo.createApp
+    options: { name: coder }
+    as: again
+  - expect:
+      - { value: $again.id, equals: $coder.id }
+  - call: echo.apps
+    as: apps
+  - expect:
+      - { value: $apps.length, equals: 2 }
+      - { value: $apps.0.id, equals: $echo.app.id }
+      - { value: $apps.1.id, equals: $coder.id }
+
+  - call: echo.createUser
+    options: { name: Ana }
+    as: ana
+  - call: echo.createRoom
+    options: { participants: [$ana, $echo.app, $coder] }
+    as: room
+
+  - call: coder.say
+    args: [hello]
+    options: { room: $room }
+    as: message
+  - expect:
+      - { value: $message.author.id, equals: $coder.id }
+      - { value: $message.author.kind, equals: app }
+      - { value: $message.delivery, matches: "^ED[0-9A-Z]{10}$" }
+
+  # The echo agent is told, with its own signed delivery, and answers people only: not another app.
+  - call: session.events
+    as: log
+    until:
+      - {
+          value: $log.events,
+          contains: { kind: delivery_attempt, data: { status: acknowledged, responseStatus: 200 } },
+        }
+  - call: ana.say
+    args: [hi]
+    options: { room: $room }
+  - call: room.messages
+    as: page
+    until:
+      - { value: $page.messages.length, equals: 3 }
+  - expect:
+      - { value: $page.messages.0.author.id, equals: $coder.id }
+      - { value: $page.messages.1.author.id, equals: $ana.id }
+      - { value: $page.messages.2.text, equals: "echo: hi" }
+      - { value: $page.messages.2.author.id, equals: $echo.app.id }
+
+  - call: echo.createApp
+    options: { name: my-agent }
+    throws: invalid_argument

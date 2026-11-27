@@ -17,7 +17,7 @@ from ..runtime.files import ChangesInput, DocumentInput, TreeInput, read_changes
 from ..runtime.transport import ChannelstackError, Transport
 from ..runtime.wait import Text, describe_wait, from_matches, latest_once_quiet, retry_while, text_matches, until_quiet, wait_for, wait_for_next, pattern_on_wire
 
-__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
+__all__ = ["AccountInactiveError", "ActionRequiresError", "AlreadyInChannelError", "AlreadyReactedError", "CHANNEL_NAMES", "CannotDmBotError", "CantDeleteMessageError", "CantUpdateMessageError", "Capabilities", "Capability", "Channelstack", "ChannelstackError", "CrossWorkspaceCredentialError", "DeliveryAttempt", "DispatchFailedError", "EchoApp", "EchoApps", "EchoFixture", "EchoMessage", "EchoMessagePage", "EchoPrincipal", "EchoRoom", "EchoTranscript", "EchoTranscriptEntry", "EchoUser", "Env", "EventPage", "FakeActorInLiveWorldError", "ForbiddenError", "GitHubApiCall", "GitHubApiCalls", "GitHubApp", "GitHubAppCalls", "GitHubAssignDeliveries", "GitHubCheckRun", "GitHubCheckRuns", "GitHubComment", "GitHubComments", "GitHubCommit", "GitHubCommits", "GitHubDeliveries", "GitHubDelivery", "GitHubFixture", "GitHubIssue", "GitHubLabelDeliveries", "GitHubPrincipal", "GitHubPullCheckRuns", "GitHubPullRequest", "GitHubReaction", "GitHubReactions", "GitHubRepo", "GitHubReview", "GitHubReviewComment", "GitHubReviewCommentReplies", "GitHubReviewComments", "GitHubReviews", "GitHubStatuses", "GitHubTranscript", "GitHubTranscriptEntry", "GitHubUnlabelDeliveries", "GitHubUser", "GoogleApiCall", "GoogleApiCalls", "GoogleApp", "GoogleDeliveries", "GoogleDelivery", "GoogleEmail", "GoogleFixture", "GoogleInbox", "GoogleMessages", "GooglePrincipal", "GoogleReplies", "GoogleThread", "GoogleTranscript", "GoogleTranscriptEntry", "GoogleUser", "InternalError", "InvalidArgumentError", "InvalidAuthError", "LinearAgentActivities", "LinearAgentActivity", "LinearAgentSession", "LinearAgentSessions", "LinearApiCall", "LinearApiCalls", "LinearApp", "LinearComment", "LinearCommentReplies", "LinearComments", "LinearDeliveries", "LinearDelivery", "LinearExternalUrls", "LinearFixture", "LinearIssue", "LinearIssueState", "LinearPlan", "LinearPrincipal", "LinearTeam", "LinearTranscript", "LinearTranscriptEntry", "LinearUser", "LiveMisconfiguredError", "LiveNotAllowlistedError", "LogEvent", "MsgTooLongError", "NameTakenError", "NoReactionError", "NoTextError", "NotAllowedError", "NotFoundError", "NotInChannelError", "NotInRoomError", "NotionApiCall", "NotionApiCalls", "NotionBlocks", "NotionChildPages", "NotionComment", "NotionComments", "NotionConnections", "NotionDatabase", "NotionDeliveries", "NotionDelivery", "NotionDiscussion", "NotionDiscussions", "NotionFixture", "NotionIntegration", "NotionPage", "NotionPrincipal", "NotionPropertySchema", "NotionPropertyValue", "NotionRows", "NotionTranscript", "NotionTranscriptEntry", "NotionUser", "Quiet", "ResendApiCall", "ResendApiCalls", "ResendApp", "ResendDeliveries", "ResendDelivery", "ResendEmail", "ResendFixture", "ResendInbox", "ResendMessages", "ResendPrincipal", "ResendReplies", "ResendThread", "ResendTranscript", "ResendTranscriptEntry", "ResendUser", "Session", "SessionNotFoundError", "SlackApiCall", "SlackApiCalls", "SlackApp", "SlackApps", "SlackButtonRef", "SlackConversation", "SlackConversations", "SlackDeliveries", "SlackDelivery", "SlackEphemeralMessages", "SlackFault", "SlackFixture", "SlackMembers", "SlackMenuRef", "SlackMessage", "SlackMessageDeliveries", "SlackMessageInput", "SlackMessageMetadata", "SlackMessages", "SlackModal", "SlackModalValues", "SlackModals", "SlackPrincipal", "SlackReaction", "SlackReactions", "SlackReplies", "SlackStream", "SlackSuggestedPrompts", "SlackTeam", "SlackThread", "SlackThreadStatus", "SlackTranscript", "SlackTranscriptEntry", "SlackUninstallDeliveries", "SlackUser", "SlackUsers", "SplitViewUnavailableError", "Status", "StopUnavailableError", "UiLoginLink", "UnauthorizedError", "UnsupportedInFakeError", "UnsupportedInLiveError", "VERSION", "ValidationFailedError", "connect"]
 
 VERSION = "0.1.1"
 
@@ -246,6 +246,9 @@ class Quiet:
 
 
 type Env = dict[str, str]
+
+
+type EchoApps = list[EchoApp]
 
 
 @dataclass(frozen=True)
@@ -1356,6 +1359,18 @@ class EchoFixture:
         data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/echo/users", body={"name": name})
         return EchoUser(ctx, data)
 
+    async def create_app(self, *, name: str) -> EchoApp:
+        """Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps", body={"name": name})
+        return EchoApp(ctx, data)
+
+    async def apps(self) -> EchoApps:
+        """The apps, the built-in one first. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("GET", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps")
+        return [EchoApp(ctx, item) for item in data]
+
     async def create_room(self, *, name: str | None = None, participants: list[EchoUser | EchoApp] | None = None) -> EchoRoom:
         """Create a room. Only the listed participants are members; include the app for it to receive events. Experimental."""
         ctx = self._ctx
@@ -1375,6 +1390,12 @@ class EchoApp:
         self.id: str = data["id"]
         self.name: str = data["name"]
         self.kind: Literal["app"] = data["kind"]
+
+    async def say(self, text: str, *, room: EchoRoom) -> EchoMessage:
+        """An app a test made posts in a room it is a member of, as its own call would. Experimental."""
+        ctx = self._ctx
+        data = await ctx.transport.request("POST", f"/sessions/{quote(session_of(ctx), safe='')}/echo/apps/{quote(str(self.id), safe='')}/say", body={"text": text, "room": room.id})
+        return EchoMessage._from_wire(ctx, data)
 
 
 class EchoUser:

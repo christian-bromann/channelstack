@@ -104,6 +104,14 @@ export interface Quiet {
 
 export type Env = Record<string, string>;
 
+export type EchoApps = EchoApp[];
+
+export type EchoAppsWire = EchoAppData[];
+
+function decodeEchoApps(ctx: HandleContext, data: EchoAppsWire): EchoApps {
+  return data.map((item) => new EchoApp(ctx, item));
+}
+
 export interface EchoMessage {
   id: string;
   room: string;
@@ -1083,6 +1091,20 @@ export class EchoFixture {
     return new EchoUser(ctx, data);
   }
 
+  /** Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL. Experimental. */
+  async createApp(options: { name: string }): Promise<EchoApp> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/echo/apps`, { body: { name: options.name } })) as EchoAppData;
+    return new EchoApp(ctx, data);
+  }
+
+  /** The apps, the built-in one first. Experimental. */
+  async apps(): Promise<EchoApps> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("GET", `/sessions/${segment(sessionOf(ctx))}/echo/apps`)) as EchoAppsWire;
+    return decodeEchoApps(ctx, data);
+  }
+
   /** Create a room. Only the listed participants are members; include the app for it to receive events. Experimental. */
   async createRoom(options: { name?: string; participants?: Array<EchoUser | EchoApp> } = {}): Promise<EchoRoom> {
     const ctx = this.#ctx;
@@ -1122,6 +1144,13 @@ export class EchoApp {
     this.id = data.id;
     this.name = data.name;
     this.kind = data.kind;
+  }
+
+  /** An app a test made posts in a room it is a member of, as its own call would. Experimental. */
+  async say(text: string, options: { room: EchoRoom }): Promise<EchoMessage> {
+    const ctx = this.#ctx;
+    const data = (await ctx.transport.request("POST", `/sessions/${segment(sessionOf(ctx))}/echo/apps/${segment(this.id)}/say`, { body: { text, room: options.room.id } })) as EchoMessage;
+    return data;
   }
 
   /** @internal Is the agent quiet in this handle's session? Matchers ask this. */

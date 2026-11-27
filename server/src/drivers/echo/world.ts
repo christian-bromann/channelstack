@@ -36,6 +36,12 @@ export interface EchoMessage {
 export interface EchoWorld {
   app(): EchoApp;
   createUser(session: string, input: { name: string }): EchoUser;
+  /** The apps, the built-in one first (decision 0027). */
+  apps(): EchoApp[];
+  /** Make an app by name, or return the one of that name. */
+  createApp(session: string | undefined, input: { name: string }): EchoApp;
+  /** An app a test made writes in a room it is a member of. */
+  sayAsApp(session: string, app: string, room: string, text: string): EchoMessage;
   createRoom(session: string, input: { name?: string | undefined; participants: readonly string[] }): EchoRoom;
   postAsUser(session: string, user: string, room: string, text: string): EchoMessage;
   messages(session: string, room: string, since?: string): { messages: EchoMessage[]; cursor: string };

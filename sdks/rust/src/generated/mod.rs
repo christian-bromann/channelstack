@@ -350,6 +350,48 @@ fn run_echo_fixture_create_user<'a>(
     })
 }
 
+fn run_echo_fixture_create_app<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_name = options.get("name").cloned().unwrap_or(Value::Null);
+        let path = format!("/sessions/{}/echo/apps", encode_segment(ctx.session()?));
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("name".into(), p_name.clone());
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
+    })
+}
+
+fn run_echo_fixture_apps<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let path = format!("/sessions/{}/echo/apps", encode_segment(ctx.session()?));
+        send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
 fn run_echo_fixture_create_room<'a>(
     ctx: &'a Ctx,
     me: &'a Value,
@@ -399,6 +441,43 @@ fn run_echo_fixture_capabilities<'a>(
             encode_segment(ctx.session()?)
         );
         send(ctx, "GET", path, None, None, false, &[]).await
+    })
+}
+
+fn run_echo_app_say<'a>(
+    ctx: &'a Ctx,
+    me: &'a Value,
+    args: Vec<Value>,
+    options: Map<String, Value>,
+) -> BoxFuture<'a, Result<Value>> {
+    Box::pin(async move {
+        let _ = (&me, &options);
+        let mut args = args.into_iter();
+        let p_text = args.next().unwrap_or(Value::Null);
+        let p_room = options.get("room").cloned().unwrap_or(Value::Null);
+        let path = format!(
+            "/sessions/{}/echo/apps/{}/say",
+            encode_segment(ctx.session()?),
+            path_value(&me["id"])?
+        );
+        send(
+            ctx,
+            "POST",
+            path,
+            Some({
+                let mut wire = Map::new();
+                wire.insert("text".into(), p_text.clone());
+                wire.insert(
+                    "room".into(),
+                    (&|v: &Value| enc::ref_ids(v, &["id"]))(&p_room)?,
+                );
+                wire
+            }),
+            None,
+            false,
+            &[],
+        )
+        .await
     })
 }
 
@@ -7445,6 +7524,28 @@ impl EchoFixture {
         ))
     }
 
+    /// Make another app (decision 0027), or return the one with this name. Its events go to CHANNELSTACK_ECHO_APP_<NAME>_WEBHOOK_URL. Experimental.
+    pub fn create_app(&self) -> EchoFixtureCreateApp {
+        EchoFixtureCreateApp(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_echo_fixture_create_app,
+            EchoApp::wrap,
+        ))
+    }
+
+    /// The apps, the built-in one first. Experimental.
+    pub fn apps(&self) -> Call<Value> {
+        Call::new(
+            &self.ctx,
+            &self.data,
+            vec![],
+            run_echo_fixture_apps,
+            as_value,
+        )
+    }
+
     /// Create a room. Only the listed participants are members; include the app for it to receive events. Experimental.
     pub fn create_room(&self) -> EchoFixtureCreateRoom {
         EchoFixtureCreateRoom(Call::new(
@@ -7485,6 +7586,28 @@ impl EchoFixtureCreateUser {
 impl IntoFuture for EchoFixtureCreateUser {
     type Output = Result<EchoUser>;
     type IntoFuture = BoxFuture<'static, Result<EchoUser>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
+    }
+}
+
+/// The options of [`EchoFixture::create_app`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct EchoFixtureCreateApp(Call<EchoApp>);
+
+impl EchoFixtureCreateApp {
+    /// `name`.
+    pub fn name(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("name", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<EchoApp> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for EchoFixtureCreateApp {
+    type Output = Result<EchoApp>;
+    type IntoFuture = BoxFuture<'static, Result<EchoApp>>;
     fn into_future(self) -> Self::IntoFuture {
         self.0.into_future()
     }
@@ -7584,6 +7707,39 @@ impl EchoApp {
             .get("kind")
             .and_then(|v| v.as_str().map(str::to_owned))
             .unwrap_or(String::new())
+    }
+
+    /// An app a test made posts in a room it is a member of, as its own call would. Experimental.
+    pub fn say(&self, text: impl IntoArg) -> EchoAppSay {
+        EchoAppSay(Call::new(
+            &self.ctx,
+            &self.data,
+            vec![text.into_arg()],
+            run_echo_app_say,
+            as_value,
+        ))
+    }
+}
+
+/// The options of [`EchoApp::say`]: set the ones you need, then `.send().await` (or `.await`).
+pub struct EchoAppSay(Call<Value>);
+
+impl EchoAppSay {
+    /// `room`.
+    pub fn room(self, value: impl IntoArg) -> Self {
+        Self(self.0.option("room", value))
+    }
+    /// Send the request.
+    pub async fn send(self) -> Result<Value> {
+        self.0.send().await
+    }
+}
+
+impl IntoFuture for EchoAppSay {
+    type Output = Result<Value>;
+    type IntoFuture = BoxFuture<'static, Result<Value>>;
+    fn into_future(self) -> Self::IntoFuture {
+        self.0.into_future()
     }
 }
 
@@ -20254,12 +20410,19 @@ pub async fn call_by_name(
         ("EchoFixture", "createUser") => {
             run_echo_fixture_create_user(&target.ctx, &target.data, args, options).await?
         }
+        ("EchoFixture", "createApp") => {
+            run_echo_fixture_create_app(&target.ctx, &target.data, args, options).await?
+        }
+        ("EchoFixture", "apps") => {
+            run_echo_fixture_apps(&target.ctx, &target.data, args, options).await?
+        }
         ("EchoFixture", "createRoom") => {
             run_echo_fixture_create_room(&target.ctx, &target.data, args, options).await?
         }
         ("EchoFixture", "capabilities") => {
             run_echo_fixture_capabilities(&target.ctx, &target.data, args, options).await?
         }
+        ("EchoApp", "say") => run_echo_app_say(&target.ctx, &target.data, args, options).await?,
         ("EchoUser", "say") => run_echo_user_say(&target.ctx, &target.data, args, options).await?,
         ("EchoRoom", "messages") => {
             run_echo_room_messages(&target.ctx, &target.data, args, options).await?
@@ -20983,6 +21146,11 @@ pub async fn call_by_name(
         },
         ("EchoFixture", "createUser") => Dyn {
             resource: Some("EchoUser"),
+            ctx: target.ctx.clone(),
+            data,
+        },
+        ("EchoFixture", "createApp") => Dyn {
+            resource: Some("EchoApp"),
             ctx: target.ctx.clone(),
             data,
         },
