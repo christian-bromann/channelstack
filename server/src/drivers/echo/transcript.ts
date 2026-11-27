@@ -1,6 +1,6 @@
 import type { EchoMessage } from "./world.ts";
 
-/** A room reduced to what a person would read, in the shape every channel's transcript has (`api/common.d.ts`). */
+/** A room reduced to what a person would read, in the shape every channel's transcript has. */
 export function renderTranscript(messages: readonly EchoMessage[]) {
   return {
     entries: messages.map((message) => ({

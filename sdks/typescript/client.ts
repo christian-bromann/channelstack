@@ -1,6 +1,6 @@
 /**
  * `channelstack` and `channelstack/client`: the generated client the test integrations are built
- * on, and its types (`import type { SlackUser } from "channelstack"`). The public contract is `api/*.d.ts`.
+ * on, and its types (`import type { SlackUser } from "channelstack"`).
  */
 export { CHANNEL_NAMES, type ChannelFixtures } from "./generated/channels.ts";
 export * from "./generated/index.ts";

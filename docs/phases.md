@@ -42,17 +42,16 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 
 | Check | Command | Passes when |
 |---|---|---|
-| Types | `pnpm typecheck` | No errors in `server/`, `codegen/`, `integrations/`, `sdks/typescript/`, `sdks/python/`, `scenarios/`, `scripts/` and `api/` (the examples against `api/*.d.ts`, with the Vitest version the contract names) |
+| Types | `pnpm typecheck` | No errors in `server/`, `codegen/`, `integrations/`, `sdks/typescript/`, `sdks/python/`, `scenarios/`, `scripts/` and `test/` (the examples in `test/acceptance/examples/` against the generated TypeScript SDK) |
 | Lint and format | `pnpm lint` | No errors (`bun fmt --check` and lint rules for TypeScript, ruff for Python) |
 | Unit tests | `pnpm test` | Green |
 | Spec is current | `pnpm spec:check` | Regenerating `spec/openapi.json` and `spec/ir.json` from the routes gives no diff |
 | SDKs are current | `pnpm sdk:check` | Regenerating every SDK gives no diff |
-| API contract | `pnpm api:check` (from phase 1) | `api/examples/*.test.ts` type-checks against the **generated** TypeScript SDK, not just against `api/*.d.ts`; and every member of every contract handle exists on the generated handle, except the gaps listed with their issues |
 | No secrets in output | `pnpm test:redaction` | A test run with known fake and live-shaped tokens finds none of them in logs, errors, recordings or the UI |
 | No duplicate code | `pnpm check:dupes` | jscpd finds no copy-pasted block over 15 lines (generated code excluded) |
 | Architecture boundaries | `pnpm check:deps` | dependency-cruiser: drivers don't import each other, core doesn't import drivers, nothing imports `generated/` except its SDK |
 | No dead code | `pnpm check:unused` | knip finds no unused files, exports or dependencies |
-| Flake-free acceptance | `pnpm test:accept --repeat 3` | The acceptance tests pass three runs in a row. In phase 0 these are the smoke scenarios through every SDK; the `api/examples` suites join from phase 1 |
+| Flake-free acceptance | `pnpm test:accept --repeat 3` | The acceptance tests pass three runs in a row. In phase 0 these are the smoke scenarios through every SDK; the `test/acceptance/examples` suites join from phase 1 |
 | Docs updated | The phase review | The phase's "Docs to update" list is done, and `docs/code-map.md` matches the code |
 
 ### Rules for exit checks
@@ -60,7 +59,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 - **Automated.** Every exit check is a test or a script with a pass or fail result. "Looks right" doesn't count.
 - **Against real code paths.** Acceptance tests run reference agents built on the platforms' official SDKs (Bolt, Octokit/Probot, `@linear/sdk`, `@notionhq/client`, Chat SDK). They're never run against channelstack's own client code.
 - **Deterministic.** Reference agents use a scripted model from their framework (for example the AI SDK's mock provider), never a real LLM in CI.
-- **The examples are the spec.** The tests in `api/examples/` become the acceptance suite as phases enable them. A phase lists which `describe` blocks must pass.
+- **The examples are the spec.** The tests in `test/acceptance/examples/` become the acceptance suite as phases enable them. A phase lists which `describe` blocks must pass.
 
 ## Phase overview
 
@@ -126,7 +125,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 
 | # | Check | How |
 |---|---|---|
-| 1.1 | Conversation examples pass | `api/examples/slack.test.ts`: "mentions and threads", "direct messages", "reactions, edits and deletes", "inspecting what the agent did", and the stream and status test, against both reference agents |
+| 1.1 | Conversation examples pass | `test/acceptance/examples/slack.test.ts`: "mentions and threads", "direct messages", "reactions, edits and deletes", "inspecting what the agent did", and the stream and status test, against both reference agents |
 | 1.2 | Delivery basics | "delivery and failures": the 3 s retry, bad and stale signatures, rate limit, uninstall |
 | 1.3 | The fake signs like Slack | Delivery cases S1 and S6–S8 ([appendix](#appendix-delivery-cases)) as integration tests against the fake's real delivery code, received by Bolt. S2–S5 are interactions (buttons, modals, commands), which phase 2 builds; they are part of exit check 2.2 |
 | 1.4 | A real bug is caught | The `mdac-220` agent fails the stream and status test with a message that names the leftover message |
@@ -144,14 +143,14 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 - `click`, `select`, `shortcut`, `runCommand`, `stop` (`agent_session_stopped`, `chat.appendStream` returning `stopped_by_user`), `waitForModal` / `submit` / `close` (`views.open`, `views.update`, `view_submission`, `view_closed`), `response_url`.
 - The agent split view: `openAgentThread`, `pickPrompt`, `switchContext`, suggested prompts.
 - Socket Mode: `apps.connections.open`, WebSocket envelopes, acks with response payloads, `drop_socket` fault.
-- `slackChecks()` with the full list in `api/checks.d.ts`.
+- `slackChecks()` with the full list in `integrations/checks/`.
 - Attach CLI: `click`, `stop`.
 
 **Exit checks:**
 
 | # | Check | How |
 |---|---|---|
-| 2.1 | Every fake Slack example passes | All of `api/examples/slack.test.ts` except "live mode", against both reference agents |
+| 2.1 | Every fake Slack example passes | All of `test/acceptance/examples/slack.test.ts` except "live mode", against both reference agents |
 | 2.2 | Socket Mode works with Bolt | The DM and modal tests pass with the Bolt reference agent switched to Socket Mode; delivery cases S2–S5 and K1–K4 ([appendix](#appendix-delivery-cases)) pass against the real fake |
 | 2.3 | Standard checks | `slackChecks({ app: "my-agent" })` passes against both reference agents, and against a deliberately broken agent each check fails (one broken variant per check) |
 
@@ -173,7 +172,7 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 
 | # | Check | How |
 |---|---|---|
-| 3.1 | Every fake GitHub example passes | All of `api/examples/github.test.ts` except "live mode", against both reference agents |
+| 3.1 | Every fake GitHub example passes | All of `test/acceptance/examples/github.test.ts` except "live mode", against both reference agents |
 | 3.2 | Responses match GitHub's REST description | Every fake response in the test run validates against `github/rest-api-description` |
 | 3.3 | Webhooks match GitHub's schemas | Every delivery validates against `octokit/openapi-webhooks` |
 | 3.4 | Standard checks | `githubChecks()` passes, and each check fails against its broken variant |
@@ -201,12 +200,12 @@ Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake d
 
 | # | Check | How |
 |---|---|---|
-| 4.1 | Every fake Linear example passes | All of `api/examples/linear.test.ts` except "live mode" |
-| 4.2 | Every fake Notion example passes | All of `api/examples/notion.test.ts` except "live mode" |
+| 4.1 | Every fake Linear example passes | All of `test/acceptance/examples/linear.test.ts` except "live mode" |
+| 4.2 | Every fake Notion example passes | All of `test/acceptance/examples/notion.test.ts` except "live mode" |
 | 4.3 | Linear matches its schema | Every fake GraphQL response validates against the committed introspected schema |
 | 4.4 | Signatures | Delivery cases L1–L3 and N1–N3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with `LinearWebhookClient` and `verifyWebhookSignature` as receivers |
 | 4.5 | Standard checks | `linearChecks()` and `notionChecks()` pass, and each check fails against its broken variant |
-| 4.6 | All channels in one run | `api/examples/shared.test.ts` passes |
+| 4.6 | All channels in one run | `test/acceptance/examples/shared.test.ts` passes |
 
 **Docs to update:** reality-matrix, close the Notion items in `devx.md` "Still open".
 
@@ -295,7 +294,7 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
   - one harness table for the acceptance, live and conformance scripts;
   - schema validators registered per channel.
 - `ResendOptions`, `SlackResendOptions` and `LinearResendOptions` become `DeliveryResendOptions`, `SlackDeliveryResendOptions` and `LinearDeliveryResendOptions`, so they don't read as the Resend channel's types.
-- **The email core** (`server/src/core/email/`, `api/email.d.ts`): addresses, threading by `Message-ID`, `In-Reply-To` and `References`, email threads as transcripts, and the contract's email bases. Building MIME comes with Gmail's `raw` format in phase 9; Resend's attachments and a received email's raw message are built on it since (#64), but for a person's attachments, which the contract has no option for yet (#84).
+- **The email core** (`server/src/core/email/`): addresses, threading by `Message-ID`, `In-Reply-To` and `References`, email threads as transcripts, and the contract's email bases. Building MIME comes with Gmail's `raw` format in phase 9; Resend's attachments and a received email's raw message are built on it since (#64), but for a person's attachments, which the contract has no option for yet (#84).
 - **The Resend fake:**
   - The REST surface the `resend` SDK uses: sending, batches, receiving, attachments and the raw message (#64).
   - `email.received` and the outbound events, signed the Svix way, with Resend's retry schedule.
@@ -308,12 +307,12 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 | # | Check | How |
 |---|---|---|
 | 8.1 | Every channel is on the kit | `pnpm check:channels` passes: each channel has every piece listed in adding-a-channel.md, and no driver bypasses the kit |
-| 8.2 | Every fake Resend example passes | All of `api/examples/resend.test.ts` except "live mode" |
+| 8.2 | Every fake Resend example passes | All of `test/acceptance/examples/resend.test.ts` except "live mode" |
 | 8.3 | Resend matches its schema | Every fake answer and webhook validates against the pinned `resend-openapi` description |
 | 8.4 | Signatures | Delivery cases R1–R3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with the `resend` SDK's `webhooks.verify` as the receiver |
 | 8.5 | Standard checks | `resendChecks()` pass, and each check fails against its broken variant |
-| 8.6 | All channels in one run | `api/examples/shared.test.ts` passes with Resend |
-| 8.7 | Resend live | The "live mode" block of `api/examples/resend.test.ts` passes against the sandbox teams; sending to an address outside the allowlist fails with `live_not_allowlisted` before any call |
+| 8.6 | All channels in one run | `test/acceptance/examples/shared.test.ts` passes with Resend |
+| 8.7 | Resend live | The "live mode" block of `test/acceptance/examples/resend.test.ts` passes against the sandbox teams; sending to an address outside the allowlist fails with `live_not_allowlisted` before any call |
 | 8.8 | Conformance | `scenarios/resend/` runs in the nightly differential run, and each difference is fixed or recorded in `divergences.yaml` |
 
 **Docs to update:**
@@ -338,13 +337,13 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 
 | # | Check | How |
 |---|---|---|
-| 9.1 | Every fake Google example passes | All of `api/examples/google.test.ts` except "live mode" |
+| 9.1 | Every fake Google example passes | All of `test/acceptance/examples/google.test.ts` except "live mode" |
 | 9.2 | Gmail matches its schema | Every fake answer validates against the pinned Gmail discovery document, and every push against Pub/Sub's push format |
 | 9.3 | Push tokens | Delivery cases M1–M3 ([appendix](#appendix-delivery-cases)) pass against the real fake, with `google-auth-library`'s `verifyIdToken` as the receiver |
 | 9.4 | Standard checks | `googleChecks()` pass, and each check fails against its broken variant |
-| 9.5 | All channels in one run | `api/examples/shared.test.ts` passes with Google |
+| 9.5 | All channels in one run | `test/acceptance/examples/shared.test.ts` passes with Google |
 | 9.6 | The kit held | `pnpm check:channels` passes, and the PR lists every file it changed outside the Google driver, its contract, its agents, scenarios and docs |
-| 9.7 | Gmail live | The "live mode" block of `api/examples/google.test.ts` passes against the sandbox accounts, the allowlist holds, and the sweep finds nothing left |
+| 9.7 | Gmail live | The "live mode" block of `test/acceptance/examples/google.test.ts` passes against the sandbox accounts, the allowlist holds, and the sweep finds nothing left |
 | 9.8 | Conformance | `scenarios/google/` runs in the nightly differential run, and each difference is fixed or recorded in `divergences.yaml` |
 
 **Docs to update:** the same list as phase 8, for Google.

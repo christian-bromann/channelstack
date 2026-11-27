@@ -12,7 +12,7 @@ A test harness for AI agents that live in Slack, GitHub, Linear, Notion and emai
 |---|---|---|---|
 | 1 | [docs/phases.md](docs/phases.md) | What to build, in which order, and the gate that proves each phase is done | **Spec** |
 | 2 | [docs/architecture.md](docs/architecture.md) | How the server and the SDK generator work, id formats | **Spec** |
-| 3 | [api/](api/) (`*.d.ts` and `examples/`) | The public TypeScript API, and examples that become the acceptance tests | **Spec** (the contract) |
+| 3 | [test/acceptance/examples/](test/acceptance/examples/) | The examples that are the acceptance tests, type-checked against the generated TypeScript SDK | **Spec** (the behaviour) |
 | 4 | [docs/devx.md](docs/devx.md) | How developers use it: CLI, environment, tests, UI | **Spec** |
 | 5 | [docs/live-mode.md](docs/live-mode.md) | Live mode: acting on real platforms and observing results | **Spec** |
 | 6 | [docs/reality-matrix.md](docs/reality-matrix.md) | Per method: works in fake, works live, and what live needs | **Spec** (reference) |
@@ -22,14 +22,15 @@ A test harness for AI agents that live in Slack, GitHub, Linear, Notion and emai
 | — | [phase-log/](phase-log/) | Each phase's plan and closing note (reviews live on the PRs) | Working record |
 | — | [index.html](index.html) | The landing page | Marketing; must match the API |
 
+**The public API is the generated SDKs.** The server's routes describe it (`spec/openapi.json`), and the generator turns that into the TypeScript, Python and Rust SDKs. There is no hand-written contract beside them ([decision 0025](docs/decisions/0025-no-hand-written-contract.md)).
+
 **When documents disagree,** the order of precedence is:
-1. `api/*.d.ts`
-2. `docs/phases.md`
-3. `docs/architecture.md`
-4. `docs/live-mode.md`
-5. `docs/devx.md`
-6. `docs/reality-matrix.md`
-7. `docs/implementation-plan.md`
+1. `docs/phases.md`
+2. `docs/architecture.md`
+3. `docs/live-mode.md`
+4. `docs/devx.md`
+5. `docs/reality-matrix.md`
+6. `docs/implementation-plan.md`
 
 Fix the lower-ranked document in the same PR, and say so in the PR description.
 
@@ -65,8 +66,8 @@ implement-phase ─► draft PR ─► gate green, PR ready ─► review-phase 
 ### Rules
 
 - **One phase at a time.** Don't start phase *n+1* until phase *n*'s PR is merged and tagged. Set up `verify:phase` and CI in phase 0.
-- **The examples are the acceptance tests.** `api/examples/*.test.ts` must pass against reference agents as each phase enables them. Don't weaken an example to make it pass. If an example is wrong, fix it and the types together, and say why.
-- **Keep `api/*.d.ts` and the generated TypeScript SDK in sync.** `pnpm api:check` type-checks the examples against the generated SDK, and checks that every member of every contract type exists on what implements it (gaps listed with their issues). If the generated SDK can't satisfy `api/*.d.ts`, change the generator or the routes, or change the contract on purpose with a note in the PR.
+- **The examples are the acceptance tests.** `test/acceptance/examples/*.test.ts` must pass against reference agents as each phase enables them. Don't weaken an example to make it pass. If an example is wrong, fix it and say why.
+- **The examples type-check against the generated TypeScript SDK** (`pnpm typecheck`), and so do the website's samples (`pnpm typecheck:samples` in `website/`). If an example needs what the SDK doesn't have, change the routes or the generator, not the example.
 - **Update the docs a phase lists** under "Docs to update", in the same PR.
 - **Record decisions** in `docs/decisions/<id>.md`: what was decided, why, and the alternatives.
 

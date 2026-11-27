@@ -2,7 +2,7 @@
  * Linear examples. Every test runs against the in-memory fake by default.
  * Tests marked "fake only" use delivery chaos, which live mode doesn't support.
  */
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 
 describe("delegation and agent sessions", () => {
   test("delegating an issue opens one session with a first thought", async ({ linear }) => {
@@ -21,7 +21,10 @@ describe("delegation and agent sessions", () => {
     const ana = await linear.createUser({ name: "Ana" });
     const team = await linear.createTeam({ members: [ana] });
 
-    const issue = await ana.createIssue({ title: "Bump the Node version", delegate: linear.app, priority: 3 }, { team });
+    const issue = await ana.createIssue(
+      { title: "Bump the Node version", delegate: linear.app, priority: 3 },
+      { team },
+    );
 
     const session = await issue.session();
     await expect(session).toHaveSessionState("active");
@@ -184,7 +187,7 @@ describe("inspecting what the agent did", () => {
     await ana.delegate(linear.app, { issue });
 
     await expect(linear).toHaveReceivedCall("agentActivityCreate");
-    const errors = await linear.calls({ operation: /.*/, error: true });
+    const errors = await linear.calls({ error: true });
     expect(errors).toEqual([]);
   });
 });
@@ -192,13 +195,16 @@ describe("inspecting what the agent did", () => {
 describe("live mode", () => {
   // With the OAuth app's token and CHANNELSTACK_LINEAR_USER_ANA_TOKEN (Ana's personal API key) set,
   // this runs in the real test workspace. Linear delivers to the agent itself.
-  test.skipIf(!process.env.CHANNELSTACK_LINEAR_USER_ANA_TOKEN)("a real delegation in the real workspace", async ({ linear }) => {
-    const ana = await linear.createUser({ name: "Ana" });
-    const team = await linear.createTeam({ members: [ana] });
-    const issue = await ana.createIssue({ title: "Live smoke test" }, { team });
+  test.skipIf(!process.env.CHANNELSTACK_LINEAR_USER_ANA_TOKEN)(
+    "a real delegation in the real workspace",
+    async ({ linear }) => {
+      const ana = await linear.createUser({ name: "Ana" });
+      const team = await linear.createTeam({ members: [ana] });
+      const issue = await ana.createIssue({ title: "Live smoke test" }, { team });
 
-    const session = await ana.delegate(linear.app, { issue });
+      const session = await ana.delegate(linear.app, { issue });
 
-    await expect(session).toHaveActivity({ type: "thought" }, { timeout: "30s" });
-  });
+      await expect(session).toHaveActivity({ type: "thought" }, { timeout: "30s" });
+    },
+  );
 });

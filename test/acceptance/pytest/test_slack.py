@@ -1,4 +1,4 @@
-"""The Slack conversation tests of `api/examples/slack.test.ts`, ported to pytest (exit check 7.3).
+"""The Slack conversation tests of `test/acceptance/examples/slack.test.ts`, ported to pytest (exit check 7.3).
 
 Each test reads like its Vitest original: the fixtures give the test its session and the Slack
 fixture, and `expect(...)` checks what a person would see, with the matchers' semantics.
@@ -11,7 +11,7 @@ from channelstack import SlackFixture
 from pytest_channelstack import expect
 
 # The Vitest examples' snapshots: the port holds the same transcript to the same snapshot.
-SNAPSHOTS = Path(__file__).parents[3] / "api" / "examples" / "__snapshots__" / "slack.test.ts.snap"
+SNAPSHOTS = Path(__file__).parents[1] / "examples" / "__snapshots__" / "slack.test.ts.snap"
 
 
 def vitest_snapshot(name: str) -> str:

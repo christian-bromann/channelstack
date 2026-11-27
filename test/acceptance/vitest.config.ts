@@ -6,7 +6,7 @@ import channelstack from "../../integrations/vitest/index.ts";
 import { examplesOf, HARNESS_CHANNELS } from "../../scripts/lib/channels.ts";
 
 /**
- * The acceptance suite: `api/examples` run unchanged against a reference agent and the compiled
+ * The acceptance suite: `test/acceptance/examples` run unchanged against a reference agent and the compiled
  * binary, and the tests in `stack/` that need the same pair. `scripts/accept.ts` starts both and
  * names the `describe` blocks of the examples this phase has enabled.
  */
@@ -23,7 +23,7 @@ export default defineConfig({
     root: fileURLToPath(new URL("../..", import.meta.url)),
     include: [
       ...HARNESS_CHANNELS.map(examplesOf),
-      "api/examples/shared.test.ts",
+      "test/acceptance/examples/shared.test.ts",
       "test/acceptance/stack/**/*.test.ts",
       "test/acceptance/checks/**/*.test.ts",
     ],

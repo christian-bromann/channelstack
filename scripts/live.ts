@@ -32,7 +32,7 @@ const ok = await withLiveStack({ bin, env }, async ({ env: live, home, serverLog
         "run",
         "--config",
         "test/acceptance/vitest.config.ts",
-        ...CHANNEL_NAMES.map((channel) => `api/examples/${channel}.test.ts`),
+        ...CHANNEL_NAMES.map((channel) => `test/acceptance/examples/${channel}.test.ts`),
         "-t",
         "live mode",
         // A real platform and a real agent take their time: the examples' own waits (60 s) decide, not Vitest's.
@@ -65,7 +65,9 @@ const ok = await withLiveStack({ bin, env }, async ({ env: live, home, serverLog
   for (const driver of CHANNELS) {
     const credentials = driver.live?.credentials ?? [];
     if (credentials.length === 0 || credentials.some((name) => !env[name])) continue;
-    const file = results.testResults.find((result) => result.name.endsWith(`api/examples/${driver.name}.test.ts`));
+    const file = results.testResults.find((result) =>
+      result.name.endsWith(`test/acceptance/examples/${driver.name}.test.ts`),
+    );
     if (!file?.assertionResults.some((test) => test.status === "passed")) {
       failed = true;
       process.stderr.write(

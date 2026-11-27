@@ -2,7 +2,7 @@
  * Slack examples. Every test runs against the in-memory fake by default.
  * Tests marked "fake only" use delivery chaos or faults, which live mode doesn't support.
  */
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 
 describe("mentions and threads", () => {
   test("a mention gets exactly one reply, in the thread", async ({ slack }) => {
@@ -311,14 +311,17 @@ describe("live mode", () => {
   // With CHANNELSTACK_SLACK_BOT_TOKEN and CHANNELSTACK_SLACK_USER_ANA_TOKEN set, Ana is a real person
   // in the sandbox workspace and the same test acts on real Slack. The agent receives the
   // event from Slack itself; channelstack only acts and reads the result back.
-  test.skipIf(!process.env.CHANNELSTACK_SLACK_USER_ANA_TOKEN)("a real person asks the real agent", async ({ slack }) => {
-    const ana = await slack.createUser({ name: "Ana" });
-    const channel = await slack.createChannel({ participants: [ana, slack.app] });
+  test.skipIf(!process.env.CHANNELSTACK_SLACK_USER_ANA_TOKEN)(
+    "a real person asks the real agent",
+    async ({ slack }) => {
+      const ana = await slack.createUser({ name: "Ana" });
+      const channel = await slack.createChannel({ participants: [ana, slack.app] });
 
-    const msg = await ana.say("@my-agent summarize #support today", { channel });
+      const msg = await ana.say("@my-agent summarize #support today", { channel });
 
-    await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
-  });
+      await expect(msg.thread).toHaveReplyFrom("my-agent", { timeout: "30s" });
+    },
+  );
 
   // Button clicks have no API. Live, the browser actor clicks as Ana. The agent lets only admins
   // approve, so Ana's account must be one: live, a role the account doesn't have is refused.

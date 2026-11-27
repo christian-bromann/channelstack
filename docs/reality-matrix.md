@@ -1,6 +1,6 @@
 # channelstack: fake and live, feature by feature
 
-> Draft, 2026-11-20. Every row is a method in `api/*.d.ts`. Checked against the platforms' official API docs on 2026-11-19; sources at the end. Cells still marked **unverified** aren't settled by the docs and need a live spike.
+> Draft, 2026-11-20. Every row is a method of the SDKs. Checked against the platforms' official API docs on 2026-11-19; sources at the end. Cells still marked **unverified** aren't settled by the docs and need a live spike.
 
 Every feature runs in the fake server (in memory). The question this document answers is whether the same call can also run against a **real** app in a real sandbox workspace, and what that takes.
 
@@ -128,7 +128,7 @@ Built (phase 5), and checked against the test organization on 2026-11-24: the Ap
 | `ana.editIssue`, `close`, `reopen` | Done | Built | User token | |
 | `ana.label` / `unlabel` | Done | Built | User token | |
 | `ana.assign([ben], { issue })` | Done | Built | User token | |
-| `ana.assign(github.app, { issue })` | Done | No | — | The contract takes the app here (`api/github.d.ts`), so the fake accepts it and sends `assigned`. **Unverified live**, likely refused for an ordinary App: the docs don't cover bot assignees, and community reports say it fails. Confirm in the first live spike, then either refuse in the fake or keep it |
+| `ana.assign(github.app, { issue })` | Done | No | — | The SDK takes the app here, so the fake accepts it and sends `assigned`. **Unverified live**, likely refused for an ordinary App: the docs don't cover bot assignees, and community reports say it fails. Confirm in the first live spike, then either refuse in the fake or keep it |
 | `ana.comment(text, { issue })` | Done | Built | User token | `@my-agent` becomes a real mention |
 | `ana.edit` / `delete` (comments) | Done | Built | User token | |
 | `ana.react(content, { issue \| comment })` | Done | Built | User token | |

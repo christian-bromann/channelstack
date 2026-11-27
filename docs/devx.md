@@ -523,7 +523,7 @@ portless trusts its CA in the system store, but not every runtime reads that sto
 | `channelstack` | CLI, the client and the test integrations. The root export is the client and its types (`import type { SlackUser } from "channelstack"`), as is `channelstack/client`; the integrations are `channelstack/vitest` and `channelstack/checks`. The server is a single binary, installed per platform through optional dependencies (`@channelstack/server-<platform>`) |
 | `pytest-channelstack` | pytest plugin: fixtures and `expect(...)` checks over the control API |
 
-> The exact TypeScript interfaces live in [`api/`](../api/index.d.ts), and compile against Vitest 5. Examples are in `api/examples/`.
+> The exact TypeScript types are the generated SDK's (`sdks/typescript`), and the Vitest integration targets Vitest 5. Examples are in `test/acceptance/examples/`.
 
 ## 13. Settled since the first draft
 

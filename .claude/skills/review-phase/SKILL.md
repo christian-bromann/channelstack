@@ -36,7 +36,7 @@ Go through every dimension. A finding needs a location and evidence.
 
 | Dimension | What to check |
 |---|---|
-| **Spec conformance** | Every exit check of the phase has a test, and the test proves what the check says (not a weaker version). `api/examples` weren't weakened. The API matches `api/*.d.ts`. Behaviour matches architecture.md, devx.md, live-mode.md |
+| **Spec conformance** | Every exit check of the phase has a test, and the test proves what the check says (not a weaker version). `test/acceptance/examples` weren't weakened, and they type-check against the generated SDK. Behaviour matches architecture.md, devx.md, live-mode.md |
 | **Duplication** | No concern is implemented twice. Search for parallel versions of: id generation, signing, HTTP calls to the agent, polling and waiting, duration parsing, error mapping, redaction, payload building, store lookups. Compare every new module with `docs/code-map.md`; each must be listed, with one owner. Read the `check:dupes` report for near-copies |
 | **Architecture** | Drivers don't import each other; core doesn't import drivers; actions are written once against `World`; generated code wasn't edited by hand |
 | **Platform realism** | Payloads, headers, ids and error codes match the platform (schemas, the id format table in architecture.md 3.2). The fake refuses what the platform refuses |

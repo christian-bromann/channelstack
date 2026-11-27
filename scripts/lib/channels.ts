@@ -7,7 +7,7 @@
 
 export interface ChannelHarness {
   /**
-   * What is enabled of `api/examples/<channel>.test.ts` (docs/phases.md), as patterns on Vitest's
+   * What is enabled of `test/acceptance/examples/<channel>.test.ts` (docs/phases.md), as patterns on Vitest's
    * full test names ("describe > test"): whole `describe` blocks, and single tests of blocks a later
    * phase completes.
    */
@@ -99,7 +99,7 @@ export type HarnessChannel = keyof typeof HARNESS;
 export const HARNESS_CHANNELS = Object.keys(HARNESS) as HarnessChannel[];
 
 /** A channel's examples file. */
-export const examplesOf = (channel: HarnessChannel): string => `api/examples/${channel}.test.ts`;
+export const examplesOf = (channel: HarnessChannel): string => `test/acceptance/examples/${channel}.test.ts`;
 
 /** A channel's reference agent: the first of its agents. */
 export const referenceOf = (channel: HarnessChannel): string => Object.keys(HARNESS[channel].agents)[0] as string;

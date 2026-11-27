@@ -162,8 +162,8 @@ There is no config file. Each fake has a built-in app named `my-agent`, and wher
 
 | Path                                         | What it is                                                           |
 | -------------------------------------------- | -------------------------------------------------------------------- |
-| [`api/`](api/)                               | The public TypeScript API and the examples that are its acceptance tests |
 | [`server/`](server/)                         | The server: control API and the fake platforms                       |
+| [`test/acceptance/`](test/acceptance/)       | The acceptance tests, the examples among them                        |
 | [`codegen/`](codegen/), [`sdks/`](sdks/)     | The SDK generator and the SDKs it produces                           |
 | [`website/`](website/)                       | [channelstack.dev](https://channelstack.dev)                          |
 | [`docs/`](docs/)                             | Design documents: [how it's used](docs/devx.md), [how it works](docs/architecture.md), [the build plan](docs/phases.md) |

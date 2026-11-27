@@ -1,6 +1,6 @@
 # Adding a channel
 
-A channel is its driver folder, its contract, its agents and its docs. Everything else (the
+A channel is its driver folder, its examples, its agents and its docs. Everything else (the
 channel list, the SDKs' unions and fixtures, the Vitest and pytest fixtures, the inspection routes,
 the acceptance parts) comes from those. `pnpm check:channels` names what is still missing, so the
 order below is also the order its failures come in.
@@ -29,8 +29,8 @@ The kit the driver is built on, all in `server/src/core/`:
    role: "user" | "app" | "resource" }` for the person, the app and the places things happen in.
 2. **Generate**: `pnpm spec` and `pnpm sdk`. The SDKs, their channel unions and fixtures, and the
    Rust matcher subjects follow from the routes.
-3. **The contract**: `api/<name>.d.ts`, exported from `api/index.d.ts`, and
-   `api/examples/<name>.test.ts`. `pnpm api:check` holds them to the generated SDK.
+3. **The examples**: `test/acceptance/examples/<name>.test.ts`, written against the generated SDK.
+   `pnpm typecheck` holds them to it, and the acceptance run plays them against the agents.
 4. **The agents**: a reference agent on the platform's official SDK in `examples/agents/<agent>/`,
    and one with one fault per check, `examples/agents/broken-<name>/`. Both go into
    `scripts/lib/channels.ts` (`HARNESS`), with what of the examples is enabled.

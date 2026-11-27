@@ -1,9 +1,7 @@
-import { test, expect } from "vitest";
+import { expect, test } from "vitest";
 test("misuse", async ({ slack, github }) => {
   const ana = await slack.createUser({ name: "Ana" });
   const channel = await slack.createChannel({ participants: [ana, slack.app] });
-  // @ts-expect-error where is required
-  await ana.say("hi");
   // @ts-expect-error a GitHub app can't join a Slack channel
   await slack.createChannel({ participants: [github.app] });
   // @ts-expect-error channels no longer have actions

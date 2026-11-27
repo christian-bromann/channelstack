@@ -73,7 +73,7 @@ export interface RetryPolicy {
   ): { afterMs: number; headers: Record<string, string> } | undefined;
 }
 
-/** One attempt to deliver, as `api/common.d.ts` describes it. */
+/** One attempt to deliver, as a test reads it from a delivery's `attempts`. */
 export interface DeliveryAttempt {
   readonly number: number;
   readonly sentAt: string;

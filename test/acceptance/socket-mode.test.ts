@@ -34,7 +34,7 @@ test("the DM, modal and reconnect examples pass against the Bolt agent in Socket
           "run",
           "--config",
           "test/acceptance/vitest.config.ts",
-          "api/examples",
+          "test/acceptance/examples",
           "-t",
           `^(${EXAMPLES.join("|")})`,
         ],

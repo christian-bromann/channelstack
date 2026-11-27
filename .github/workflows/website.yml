@@ -10,7 +10,6 @@ on:
       - "website/**"
       # The examples are type-checked against these (website/tsconfig.samples.json), so a change to
       # them runs `typecheck:samples` too.
-      - "api/**"
       - "sdks/**"
       - "integrations/**"
       - ".github/workflows/website.yml"
@@ -21,7 +20,6 @@ on:
       - "website/**"
       # The examples are type-checked against these (website/tsconfig.samples.json), so a change to
       # them runs `typecheck:samples` too.
-      - "api/**"
       - "sdks/**"
       - "integrations/**"
       - ".github/workflows/website.yml"

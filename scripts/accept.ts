@@ -1,6 +1,6 @@
 /**
  * `pnpm test:accept [--part <part>] [--repeat <n>]`: the acceptance suite, n runs in a row (flake check).
- * The suite is the smoke scenarios through every SDK, then `api/examples` and the stack tests
+ * The suite is the smoke scenarios through every SDK, then `test/acceptance/examples` and the stack tests
  * against each reference agent, then the tests in `test/acceptance` that bring their own agent.
  *
  * `--part` runs one part of it, so CI can run the parts side by side (`.github/workflows/ci.yml`);

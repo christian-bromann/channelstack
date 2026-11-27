@@ -1,5 +1,6 @@
 {
-  // Type-checks the TypeScript samples and docs examples shown on the site against the public API in ../api/*.d.ts.
+  // Type-checks the TypeScript samples and docs examples shown on the site against the TypeScript SDK in
+  // ../sdks/typescript and its Vitest integration, the sources of the published `channelstack` package.
   // The Python ones are type-checked with pyright at the repository root (samples/python/README.md), and the
   // Rust examples are compiled by `pnpm test:rust` there.
   "compilerOptions": {
@@ -13,10 +14,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {
-      "channelstack": ["../api/index.d.ts"],
-      "channelstack/vitest": ["../api/vitest.d.ts"],
-      // The client is the TypeScript SDK itself: the contract in ../api has no `connect`.
+      "channelstack": ["../sdks/typescript/client.ts"],
       "channelstack/client": ["../sdks/typescript/client.ts"],
+      "channelstack/vitest": ["../integrations/vitest/index.ts"],
+      "channelstack/checks": ["../integrations/checks/index.ts"],
       "vite": ["./node_modules/vite"],
       "vitest": ["./node_modules/vitest"],
       "vitest/*": ["./node_modules/vitest/*"]

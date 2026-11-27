@@ -1,5 +1,5 @@
 /**
- * `RichText`, the text a test writes for a person (`api/common.d.ts`): `@name` mentions the person
+ * `RichText`, the text a test writes for a person: `@name` mentions the person
  * or app with that name, and `@@` is a literal `@`. Each driver turns the pieces into its
  * platform's own mention (`<@U…>` in Slack, a profile link in Linear, a mention object in Notion).
  */

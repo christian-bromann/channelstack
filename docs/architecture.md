@@ -1,6 +1,6 @@
 # channelstack architecture
 
-> Concise overview, 2026-11-20. Detail lives in [implementation-plan.md](implementation-plan.md) (sections 3, 4, 8 and 11), [live-mode.md](live-mode.md) and the public types in [`api/`](../api).
+> Concise overview, 2026-11-20. Detail lives in [implementation-plan.md](implementation-plan.md) (sections 3, 4, 8 and 11), [live-mode.md](live-mode.md) and the generated API reference on the website.
 
 ## 1. The big picture
 
@@ -147,7 +147,6 @@ That keeps the fake and the real platform from drifting apart in code. The night
 | Piece | Where | Hand-written or generated |
 |---|---|---|
 | Control API routes and schemas | `server/src/drivers/*/routes.ts` | Hand-written; **source of truth** for the SDKs |
-| Public TypeScript API (the design contract) | `api/*.d.ts` | Hand-designed; the generated TS SDK must satisfy it |
 | SDK resource classes and methods | `sdks/<lang>/generated/` | **Generated** |
 | SDK transport, launcher, credential lookup | `sdks/<lang>/runtime/` | Hand-written, small |
 | Fixtures and matchers | `integrations/` (`channelstack/vitest`, `pytest-channelstack`) | Hand-written on top of the generated read methods |
@@ -258,7 +257,7 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 
 - **One protocol, proven in every language.** About ten smoke scenarios in a small YAML step format (`scenarios/smoke/`, defined in [decisions/0002-smoke-scenario-format.md](decisions/0002-smoke-scenario-format.md)) run through every SDK in CI, like WebDriver's WPT.
 - **No stale output.** CI fails if `openapi.json`, `ir.json` or any generated SDK is out of date with the routes.
-- **The TS contract holds.** CI type-checks `api/examples/*.test.ts` against the generated TypeScript SDK, and checks that every member of every handle in `api/*.d.ts` exists on the generated handle (gaps listed with their issues), so the hand-designed API and the generated one can't drift.
+- **The examples hold the TypeScript SDK to its use.** `pnpm typecheck` type-checks `test/acceptance/examples/*.test.ts` against the generated TypeScript SDK, and the acceptance run plays them against the reference agents.
 - **Versioning.** One tag releases the server, the spec and every SDK at the same version ([releasing](release.md)). SDKs check the server's major version on connect.
 
 ## 6. Distribution
@@ -277,7 +276,6 @@ In Rust (`sdks/rust`, crate `channelstack`), every handle is a struct with typed
 channelstack/
   server/            Bun + Hono: src/app.ts, src/serve.ts, src/cli.ts, src/core/, src/drivers/{echo,slack,github,linear,notion}/
   ui/                functional browser UI (transcripts, inspector, chaos controls)
-  api/               hand-designed public types (*.d.ts) + examples: the TS contract
   spec/              openapi.json, ir.json (generated, committed)
   codegen/           src/ir.ts (OpenAPI → IR) + src/emit/{typescript,python,rust}.ts
   sdks/typescript/   the npm package `channelstack`: runtime/ (hand-written), generated/, bin/ (runs the platform binary)
@@ -285,6 +283,7 @@ channelstack/
   sdks/rust/         the crate `channelstack`: src/runtime/ (hand-written) + src/generated/
   integrations/      vitest, pytest-channelstack, checks
   scenarios/         smoke/*.yaml (protocol parity), runners/<language>/, agents/ (reference agents for the scenarios) + per-driver differential suites
+  test/acceptance/   the acceptance suite: examples/ (the API in use), stack/, checks/, pytest/
   scripts/           the gate (verify-phase), spec and SDK generation, the binary build, packaging and smoke runs
   conformance/       schema validators, shape differ, coverage page
   skills/channelstack/  the skill for coding agents that drive the MCP tools (skills.sh)
