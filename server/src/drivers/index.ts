@@ -1,3 +1,4 @@
+import type { DevAdapter } from "../core/dev/index.ts";
 import type { DriverDefinition } from "../core/router/index.ts";
 import type { SecretSpec } from "../core/secrets/index.ts";
 import { echo } from "./echo/index.ts";
@@ -16,6 +17,11 @@ export const CHANNELS: readonly DriverDefinition[] = DRIVERS.filter((driver) => 
 
 /** Each channel's name, for a CLI argument or a script's loop. */
 export const CHANNEL_NAMES: readonly string[] = CHANNELS.map((channel) => channel.name);
+
+/** Each channel with its dev adapter, for the dev tools and the UI (`pnpm check:channels` makes sure every one has it). */
+export const DEV_CHANNELS: ReadonlyArray<{ name: string; title: string; adapter: DevAdapter }> = CHANNELS.flatMap(
+  ({ name, title, dev }) => (dev ? [{ name, title, adapter: dev }] : []),
+);
 
 /** What the spec says about each driver (`x-channelstack-channels`), for the code generators and the scripts. */
 export function channelsExtension(): Array<{ name: string; title: string; internal?: true }> {

@@ -16,6 +16,7 @@ The kit the driver is built on, all in `server/src/core/`:
 | A REST platform's fake API | `restApi(context, { driver, authorize, refusal, invalidJson, notFound })` from `core/fake/endpoint.ts`: each endpoint authorized, its JSON body parsed, a refusal answered in the platform's shape, the call on record. An endpoint that takes a form (an OAuth token request) says so: `endpoint(…, { form: true })`; a 204 answers no body. For routes that answer Hono responses and check their own credentials (GitHub), `wrapRest(context, { driver, refusal, decorate, internal }, router, { sessions, recorded })` answers refusals in the platform's shape and puts each call on record; the routes parse bodies with `bodyOf` |
 | SDKs that keep their paths at the root | the definition's `rootPaths` (`/gmail/v1/`): served at the server's root too, without portless, for an SDK that rebuilds each URL against its base and drops the base's path (`googleapis`) |
 | An email channel | `core/email`: the store (`EmailStore`: the agent's mailbox, people, emails, conversations), the control routes (`registerEmailRoutes` over an `EmailWorld`: the fixture, people who send, reply and read their inbox, the threads), MIME (`composeMime`, `parseMime`, `mimeHeaders`, `withHeaders`), and `replyOf`, `emailAuthor`, `threadOf`, `threadTranscript`. Resend and Google are built on it; their reference agents share `examples/agents/shared/email.ts` |
+| The dev tools | `DevAdapter` from `core/dev`, as the definition's `dev`: the CLI, `channelstack mcp` and the UI act on the channel through it ([decision 0027](decisions/0027-dev-tools-on-every-channel.md)) |
 | Route helpers | `refTo`, `pathParam`, `Awaitable`, `DeliveryView` from `core/router`; `iso` from `core/clock` |
 | Live clients | `LivePlatformRefusal` (`core/errors`), `waitRetryAfter` and `RATE_LIMIT_RETRIES` (`core/clock`), and `core/reality`, `core/people`, `core/ledger`, `core/safety`, `core/maintenance` as the other drivers use them |
 | Schema checks | for a platform that publishes a description of its API (OpenAPI, GraphQL): the validators in `server/test/schemas/<name>.ts` and their entry in `SCHEMAS` (`index.ts`), which the acceptance run then applies to every test. A platform without one types its payloads with its SDK's types instead (Notion) |
@@ -43,7 +44,11 @@ The kit the driver is built on, all in `server/src/core/`:
    start in `scripts/lib/live-agents.ts` (`LIVE_AGENTS`).
 8. **Conformance**: a scenario in `scenarios/<name>/`, and its divergences, if any, in
    `conformance/divergences.yaml`.
-9. **Docs**: a `## <Title>` section in `docs/reality-matrix.md`, the guide
+9. **The dev tools**: the channel's dev adapter in `server/src/drivers/<name>/dev.ts` (`core/dev`),
+   on the definition as `dev`: what a place is, its list route (add `GET /users` and one for its
+   places if the channel has none), and how a person says, replies and reacts there. Its actions
+   come from its routes with `pnpm sdk`. Add its case to `server/src/cli/dev.test.ts` (`CASES`).
+10. **Docs**: a `## <Title>` section in `docs/reality-matrix.md`, the guide
    `website/docs/platforms/<name>.mdx`, the channel's variables in
    `website/docs/reference/environment-variables.md`, and the rows of `docs/code-map.md`.
 

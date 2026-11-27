@@ -1,4 +1,5 @@
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
+import { notionDev } from "./dev.ts";
 import { createNotionFake } from "./fake/index.ts";
 import { NOTION_IDS } from "./ids.ts";
 import { removeNotionEntry } from "./live/cleanup.ts";
@@ -12,6 +13,7 @@ import { NOTION_SECRETS } from "./secrets.ts";
 export const notion: DriverDefinition = {
   name: "notion",
   title: "Notion",
+  dev: notionDev,
   ids: NOTION_IDS,
   tokenPatterns: [/ntn_[A-Za-z0-9]{20,}/g, /secret_[A-Za-z0-9]{20,}/g],
   hosts: ["api.notion.com"],

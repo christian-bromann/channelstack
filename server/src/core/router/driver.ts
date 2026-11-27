@@ -3,6 +3,7 @@ import type { Hono } from "hono";
 import type { BrowserActors } from "../browser/index.ts";
 import type { Clock, Timers } from "../clock/index.ts";
 import type { DeliveryQueue } from "../delivery/index.ts";
+import type { DevAdapter } from "../dev/index.ts";
 import type { EventLog } from "../events/index.ts";
 import type { IdFormat, IdGenerator } from "../ids/index.ts";
 import type { Ledger, LedgerEntry } from "../ledger/index.ts";
@@ -196,6 +197,11 @@ export interface DriverDefinition {
   readonly title: string;
   /** channelstack's own test platform (`echo`): in the binary, but not a channel anyone tests against. */
   readonly internal?: boolean;
+  /**
+   * How the dev tools (the attach CLI, `channelstack mcp`, the UI) act on the channel by names and
+   * `last` (`core/dev`). Every channel has one; `pnpm check:channels` holds them to it.
+   */
+  readonly dev?: DevAdapter;
   /**
    * The last path segment that sends a delivery again (`/deliveries/{delivery}/<this>`), in the
    * platform's own word: Slack retries. Defaults to `redeliver`.

@@ -54,6 +54,50 @@ let user = notion.create_user().name("…").await?;
 
 **Returns** [`NotionUser`](/docs/reference/api/notion#notionuser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await notion.users();
+```
+
+```python title="Python"
+users = await notion.users()
+```
+
+```rust title="Rust"
+let users = notion.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionUsers`](/docs/reference/api/notion#notionusers).
+
+### pages()
+
+The pages this session created, a database's rows included, read again from Notion live, oldest first. Not those in the trash.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const pages = await notion.pages();
+```
+
+```python title="Python"
+pages = await notion.pages()
+```
+
+```rust title="Rust"
+let pages = notion.pages().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`NotionPages`](/docs/reference/api/notion#notionpages).
+
 ### createPage()
 
 Create a page as seed data. The integration sees it only through `connections`, its own or a parent's. In the fake it sends no event; live, a real person makes it, so Notion sends `page.created` to a connected integration. A person creating the page sends the event in both worlds.
@@ -1145,6 +1189,18 @@ let comment = discussion.latest_comment().from("my-agent").await?;
 ## Types
 
 Plain values the handles return and take.
+
+### NotionUsers
+
+```ts
+type NotionUsers = NotionUser[];
+```
+
+### NotionPages
+
+```ts
+type NotionPages = NotionPage[];
+```
 
 ### NotionPropertySchema
 

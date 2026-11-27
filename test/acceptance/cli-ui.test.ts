@@ -82,8 +82,11 @@ test("the attach CLI talks to the agent, and the UI shows the same conversation"
       // A button the agent shows can be pressed from the terminal, and Stop too.
       cli("slack", "say", "--as", "ana", "--in", "#deploys", "@my-agent deploy web to staging");
       await waitFor("the agent's question", async () => (cli("show").includes("[Approve]") ? true : undefined));
-      expect(cli("slack", "click", "--as", "ana", "Approve")).toBe('ana clicked "Approve"\n');
-      expect(cli("slack", "stop", "--thread", "last")).toMatch(/^ana pressed Stop/);
+      // An action of Slack's own, from its routes: the button by its label, in the latest conversation.
+      // It prints the id of the delivery the click sent the agent.
+      expect(cli("slack", "click", "--as", "ana", "Approve")).toMatch(/^ana did click on C\w+:\d+\.\d+ \(\w+\)\n$/);
+      // Without `--as`, whoever started the thread presses Stop.
+      expect(cli("slack", "stop", "--thread", "last")).toMatch(/^ana did stop/);
       expect(cli("tail", "--once")).toMatch(/→ slack agent_session_stopped {2}200/);
     },
   );

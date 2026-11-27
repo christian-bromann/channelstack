@@ -52,6 +52,50 @@ let user = google.create_user().name("…").await?;
 
 **Returns** [`GoogleUser`](/docs/reference/api/google#googleuser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await google.users();
+```
+
+```python title="Python"
+users = await google.users()
+```
+
+```rust title="Rust"
+let users = google.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleUsers`](/docs/reference/api/google#googleusers).
+
+### threads()
+
+The threads this session's people started, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const threads = await google.threads();
+```
+
+```python title="Python"
+threads = await google.threads()
+```
+
+```rust title="Rust"
+let threads = google.threads().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleThreads`](/docs/reference/api/google#googlethreads).
+
 ### deliveries()
 
 Every push channelstack sent the agent for this session, with every attempt.
@@ -269,48 +313,6 @@ let email = user.wait_for_email().from("my-agent").await?;
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail). When the time is up, it fails with what it was waiting for.
 
-## GoogleEmail
-
-Returned by [`GoogleUser.send()`](/docs/reference/api/google#send), [`GoogleUser.reply()`](/docs/reference/api/google#reply), [`GoogleEmail.refresh()`](/docs/reference/api/google#refresh).
-
-| Field | Python / Rust | Type |
-|---|---|---|
-| `id` | `id` | `string` |
-| `channel` | `channel` | `"google"` |
-| `thread` | `thread` | `GoogleThread` |
-| `author` | `author` | `GooglePrincipal` |
-| `from` | `from_` · `from` | `string` |
-| `to` | `to` | `string[]` |
-| `cc` | `cc` | `string[]` |
-| `subject` | `subject` | `string` |
-| `text` | `text` | `string` |
-| `at` | `at` | `string` |
-| `messageId` | `message_id` | `string` |
-| `labels` | `labels` | `string[]` |
-| `delivery` | `delivery` | `GoogleDelivery \| undefined` |
-
-### refresh()
-
-Re-read an email.
-
-<CodeGroup>
-
-```ts title="TypeScript"
-const updated = await email.refresh();
-```
-
-```python title="Python"
-updated = await email.refresh()
-```
-
-```rust title="Rust"
-let updated = email.refresh().await?;
-```
-
-</CodeGroup>
-
-**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
-
 ## GoogleThread
 
 | Field | Type |
@@ -440,6 +442,48 @@ let email = thread.latest_reply().from("my-agent").await?;
 
 **Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail). When the time is up, it fails with what it was waiting for.
 
+## GoogleEmail
+
+Returned by [`GoogleUser.send()`](/docs/reference/api/google#send), [`GoogleUser.reply()`](/docs/reference/api/google#reply), [`GoogleEmail.refresh()`](/docs/reference/api/google#refresh).
+
+| Field | Python / Rust | Type |
+|---|---|---|
+| `id` | `id` | `string` |
+| `channel` | `channel` | `"google"` |
+| `thread` | `thread` | `GoogleThread` |
+| `author` | `author` | `GooglePrincipal` |
+| `from` | `from_` · `from` | `string` |
+| `to` | `to` | `string[]` |
+| `cc` | `cc` | `string[]` |
+| `subject` | `subject` | `string` |
+| `text` | `text` | `string` |
+| `at` | `at` | `string` |
+| `messageId` | `message_id` | `string` |
+| `labels` | `labels` | `string[]` |
+| `delivery` | `delivery` | `GoogleDelivery \| undefined` |
+
+### refresh()
+
+Re-read an email.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const updated = await email.refresh();
+```
+
+```python title="Python"
+updated = await email.refresh()
+```
+
+```rust title="Rust"
+let updated = email.refresh().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`GoogleEmail`](/docs/reference/api/google#googleemail).
+
 ## GoogleDelivery
 
 Returned by [`GoogleDelivery.refresh()`](/docs/reference/api/google#refresh-1).
@@ -562,6 +606,18 @@ let updated = delivery.settled().await?;
 ## Types
 
 Plain values the handles return and take.
+
+### GoogleUsers
+
+```ts
+type GoogleUsers = GoogleUser[];
+```
+
+### GoogleThreads
+
+```ts
+type GoogleThreads = GoogleThread[];
+```
 
 ### GooglePrincipal
 

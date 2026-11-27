@@ -56,6 +56,50 @@ let user = linear.create_user().name("…").await?;
 
 **Returns** [`LinearUser`](/docs/reference/api/linear#linearuser).
 
+### users()
+
+The people this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const users = await linear.users();
+```
+
+```python title="Python"
+users = await linear.users()
+```
+
+```rust title="Rust"
+let users = linear.users().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`LinearUsers`](/docs/reference/api/linear#linearusers).
+
+### teams()
+
+The teams this session created.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const teams = await linear.teams();
+```
+
+```python title="Python"
+teams = await linear.teams()
+```
+
+```rust title="Rust"
+let teams = linear.teams().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`LinearTeams`](/docs/reference/api/linear#linearteams).
+
 ### createTeam()
 
 Create a team: its members, workflow states and labels. Without a key one is made up, so parallel tests never share one.
@@ -85,6 +129,28 @@ let team = linear.create_team().key("…").await?;
 | `labels` | `string[]` | no | option |
 
 **Returns** [`LinearTeam`](/docs/reference/api/linear#linearteam).
+
+### issues()
+
+The issues in this session's teams, read again from Linear live, oldest first.
+
+<CodeGroup>
+
+```ts title="TypeScript"
+const issues = await linear.issues();
+```
+
+```python title="Python"
+issues = await linear.issues()
+```
+
+```rust title="Rust"
+let issues = linear.issues().await?;
+```
+
+</CodeGroup>
+
+**Returns** [`LinearIssues`](/docs/reference/api/linear#linearissues).
 
 ### deliveries()
 
@@ -1328,6 +1394,31 @@ let transcript = comment.transcript().await?;
 ## Types
 
 Plain values the handles return and take.
+
+### LinearUsers
+
+```ts
+type LinearUsers = LinearUser[];
+```
+
+### LinearTeams
+
+```ts
+type LinearTeams = LinearTeam[];
+```
+
+### LinearIssues
+
+```ts
+type LinearIssues = LinearIssueListing[];
+```
+
+### LinearIssueListing
+
+| Field | Type |
+|---|---|
+| `issue` | `LinearIssue` |
+| `title` | `string` |
 
 ### LinearIssueState
 

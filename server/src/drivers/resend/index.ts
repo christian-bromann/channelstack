@@ -1,3 +1,4 @@
+import { emailDev } from "../../core/email/dev.ts";
 import type { Driver, DriverDefinition } from "../../core/router/index.ts";
 import { fakeResendWorld } from "./backend.ts";
 import { createResendFake } from "./fake/index.ts";
@@ -12,6 +13,7 @@ import { RESEND_SECRETS } from "./secrets.ts";
 export const resend: DriverDefinition = {
   name: "resend",
   title: "Resend",
+  dev: emailDev("Resend"),
   ids: RESEND_IDS,
   tokenPatterns: [/re_[A-Za-z0-9]{8}_[A-Za-z0-9]{24}/g, /whsec_[A-Za-z0-9+/=]{20,}/g],
   hosts: ["api.resend.com"],

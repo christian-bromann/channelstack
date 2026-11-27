@@ -131,16 +131,26 @@ The link signs one browser in and works once; `channelstack ui` prints a fresh o
 The CLI attaches to a running server. It finds it through portless (`channelstack.localhost`), or through `--server <url>` or `CHANNELSTACK_URL`. It's for poking the agent by hand while developing, and for shell scripts.
 
 ```bash
-# Slack (people and channels are created the first time they're named)
+# Any channel: slack, github, linear, notion, resend, google (people and places are created the first time they're named)
 channelstack slack say   --as ana --in "#support" "@my-agent what broke last night?"
-channelstack slack reply --as ben --thread last "and the one before?"
+channelstack slack reply --as ben --to last "and the one before?"         # --thread works too
 channelstack slack react --as ben :eyes: --on last
-channelstack slack click --as ana "Approve"              # the button in the latest message that has it
-channelstack slack stop  --thread last                   # press Stop on the agent's work in the thread
+channelstack github say  --as mo --in "Login fails" "@my-agent can you look?"   # opens the issue, or comments on it
+channelstack linear say  --as lu --in "Crash on start" "@my-agent take this"
+channelstack notion say  --as nu --in "Roadmap" "@my-agent summarize this page"
+channelstack resend say  --as re --in "Refund for order 1234" "Where is my refund?"   # an email to the agent
+channelstack github show [--in "Login fails"] [--thread last] [--json]    # a place as a person reads it
+
+# What else a channel's people do, generated from its routes
+channelstack slack actions                                # click, stop, select, shortcut, invite, …; github: review, merge, label, …
+channelstack slack click --as ana "Approve"               # the button in the latest message that has it
+channelstack slack stop  --thread last                    # press Stop on the agent's work in the thread
+channelstack linear delegate --as lu --in "Crash on start"   # to the agent's app; references the action needs come from the target
+channelstack github review --as mo --review '{"event":"APPROVE"}'   # the newest entry's pull request (`last`); values in order or as --<name>
 
 # Watching
-channelstack show                                         # the latest conversation as a person would read it
-channelstack show --thread last                           # only the latest thread; --json for raw
+channelstack show                                         # the most recently active place on any channel, as a person would read it
+channelstack show --thread last                           # only the latest thread; --json for the entries and their ids
 channelstack tail                                         # events to the agent and its API calls, as they happen; --once
 channelstack ui                                           # a one-time link that opens the UI in a browser
 
@@ -163,9 +173,11 @@ channelstack login slack --user ana                       # sign Ana in by hand,
 channelstack sweep                                        # remove leftovers from crashed runs; --older-than-hours, --run, --check
 ```
 
-`--as <name>` creates that user the first time it's used, and `--in "#name"` does the same for channels, so the dev loop needs no seed data either. GitHub, Linear and Notion have no person commands on the CLI: drive them from a test. `deliveries` and `redeliver` cover every channel.
+`--as <name>` creates that person the first time it's used, and `--in <place>` does the same for places, with the agent's app in them, so the dev loop needs no seed data either. A place is what people talk in on the channel, by its name: a Slack channel (`"#support"`), a GitHub issue or pull request by its title (in the org's public `dev` repository, whose admin is whoever first acted on GitHub; the others may do what anyone may on a public repository), a Linear issue by its title (in a team named Dev), a Notion page by its title (connected to the integration), an email thread by its subject (started with an email to the agent). Every channel has `say`, `reply`, `show` and its actions; `react` where its people react (Slack, GitHub, Linear). `deliveries` and `redeliver` cover every channel.
 
-`last` always refers to the most recent message, thread or delivery, so a loop of "say, look, fix the code, say again" needs no IDs. A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
+`last` always refers to the most recent entry, thread or delivery, so a loop of "say, look, fix the code, say again" needs no IDs: on a channel, the newest entry of its most recently active place; for `show` without a channel, of any channel's. Any other entry is `<place>:<entry>`, as the commands print them and `show --json` lists the ids.
+
+The actions are generated from the routes, like the SDKs ([decision 0027](decisions/0027-dev-tools-on-every-channel.md)): each method of a channel's person handle that isn't a read, with the same values (`channelstack <channel> actions` lists them). Values come in order or as `--<name> <value>`; a person or the app (`app`) is named, an object can be JSON, and one with a shorthand takes it as text (a button's label). A reference the action needs and wasn't given comes from the target: the entry `--on` names, the newest one in the place `--in` names, or `last`. Without `--as`, whoever started the target's thread acts. An action named like a verb is `channelstack <channel> act <action>` (Slack's own `say`, with its files and blocks). A retry after a delay, a bad signature or a stale timestamp are for tests: the SDK's `delivery.retry({ after })` and `delivery.resend({ badSignature: true })`.
 
 Everything the CLI does happens in one shared session called `dev`, which the UI shows too. It lives until the server stops ([decision 0010](decisions/0010-dev-session-and-attach-cli.md)).
 
@@ -175,7 +187,15 @@ Everything the CLI does happens in one shared session called `dev`, which the UI
 { "mcpServers": { "channelstack": { "command": "npx", "args": ["channelstack", "mcp"] } } }
 ```
 
-The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`): `slack_say`, `slack_reply`, `slack_react`, `slack_click`, `slack_stop` (`channelstack slack …`), `show_thread` (`channelstack show`), `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver). They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
+The MCP tools are the attach CLI's commands, each written once for both (`server/src/cli/`), on every channel the same way ([decision 0027](decisions/0027-dev-tools-on-every-channel.md)):
+
+- `say`, `reply`, `react` and `show`, each with a `channel` (`channelstack <channel> say|reply|react|show`; `show` without one is `channelstack show`).
+- `<channel>_act` for everything else that channel's people do (`slack_act`, `github_act`, …): an `action` enum generated from the routes, the action's values as `params`, and `as`, `in` and `on` as on the CLI. Its description lists each action's values.
+- `tail` (what happened since its last call), `list_deliveries` and `redeliver` (`channelstack deliveries [<channel>]`, `channelstack redeliver [<channel>] [last|<id>]`; Slack retries the way Slack does, the others redeliver).
+
+They act in the shared `dev` session and never return the server's token. That gives a coding agent a feedback loop while it edits the bot: post as Ana, read what the bot answered, redeliver, check again. The `channelstack` skill (`skills/channelstack/SKILL.md`, for skills.sh) comes with it, the same way portless and emulate ship theirs.
+
+What differs per channel (what a place is, how a person says, replies and reacts there) is the channel's dev adapter (`core/dev`, `definition.dev`); the rest is the same for every channel, and the UI lists the places the adapters find (`/places`), and `pnpm check:channels` requires an adapter for each.
 
 ## 5. Tests: plug into Vitest and pytest
 
@@ -436,7 +456,7 @@ A test can use one of those, or a real model. The matchers are designed for this
 
 ## 7. The UI is functional, not faithful
 
-Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for all four channels and shows the same transcript the matchers read:
+Nobody needs the UI to look like Slack, GitHub, Linear, Notion or an inbox. What matters is that a developer can **use** each channel and **see what happened**. So the UI uses one neutral design for every channel and shows the same transcript the matchers read. Its list of places is every channel's, from the same dev adapters the CLI and MCP use (`GET /sessions/{session}/places`, decision 0027):
 
 - **Threads and conversations as text:** who said what, in which thread, edited or deleted, streaming or done, and the agent's status ("thinking…", "stopped").
 - **Interactive elements that work:** a button is a button, a select is a select, and a modal opens as a plain form. Clicking one sends the real `block_actions` or `view_submission` delivery. The same goes for GitHub review comments (shown with path and line), Linear Stop, and Notion comment replies.

@@ -22,12 +22,13 @@ npx channelstack show
 |---|---|
 | [`channelstack [start]`](#channelstack-start) | Start the server |
 | [`channelstack env`](#channelstack-env) | Print `.env` lines for the app |
-| [`channelstack slack say`](#channelstack-slack-say) | Post a message as a person |
-| [`channelstack slack reply`](#channelstack-slack-reply) | Reply in a thread as a person |
-| [`channelstack slack react`](#channelstack-slack-react) | React to a message as a person |
-| [`channelstack slack click`](#channelstack-slack-click) | Click a button as a person |
-| [`channelstack slack stop`](#channelstack-slack-stop) | Press Stop on the agent's work in a thread |
-| [`channelstack show`](#channelstack-show) | Print the latest conversation as a person reads it |
+| [`channelstack <channel> say`](#channelstack-channel-say) | Say something in a place as a person |
+| [`channelstack <channel> reply`](#channelstack-channel-reply) | Reply to an entry as a person |
+| [`channelstack <channel> react`](#channelstack-channel-react) | React to an entry as a person |
+| [`channelstack <channel> show`](#channelstack-show) | Print a place as a person reads it |
+| [`channelstack <channel> actions`](#channelstack-channel-actions) | List what else the channel's people do |
+| [`channelstack <channel> <action>`](#channelstack-channel-action) | Do one of those as a person: click, stop, review, delegate, … |
+| [`channelstack show`](#channelstack-show) | Print the most recently active place on any channel |
 | [`channelstack tail`](#channelstack-tail) | Print deliveries and API calls as they happen |
 | [`channelstack deliveries`](#channelstack-deliveries) | List what was delivered to the app |
 | [`channelstack redeliver`](#channelstack-redeliver) | Deliver something again |
@@ -41,7 +42,7 @@ npx channelstack show
 | `channelstack --version`, `-v` | Print the version |
 | `channelstack --help`, `-h` | Print the usage |
 
-The attach CLI has Slack commands only. GitHub, Linear, Notion, Resend and Google are driven from tests.
+`<channel>` is `slack`, `github`, `linear`, `notion`, `resend` or `google`: every channel has the same commands.
 
 ## Exit codes
 
@@ -52,7 +53,7 @@ The attach CLI has Slack commands only. GitHub, Linear, Notion, Resend and Googl
 
 ## Attaching to the running server
 
-`env`, `slack …`, `show`, `tail`, `deliveries`, `redeliver`, `ui` and `mcp` talk to a running server through its control API.
+`env`, `<channel> …`, `show`, `tail`, `deliveries`, `redeliver`, `ui` and `mcp` talk to a running server through its control API.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -65,9 +66,17 @@ The attach CLI has Slack commands only. GitHub, Linear, Notion, Resend and Googl
 | `CHANNELSTACK_TOKEN is needed to talk to <url>.` | A URL without a token |
 | `` the server at <url> isn't reachable. Start one with `channelstack start`. `` | Nothing answers there |
 
-The attach commands act in one long-lived session named `dev`, which the CLI, the UI and `mcp` share. People and channels are created there on first use, by name.
+The attach commands act in one long-lived session named `dev`, which the CLI, the UI and `mcp` share. People and places are created there on first use, by name, with the app in them. A place is what people talk in on the channel:
 
-Where a command takes a message, `last` means the newest message of the most recently active conversation in the `dev` session. A message can also be named `<channel id>:<ts>`, as `slack say` and the other `slack` commands print them.
+| Channel | A place is | Named by | Made |
+|---|---|---|---|
+| `slack` | a channel | its name, `"#support"` | with the person and the app in it; someone in it invites a person who isn't |
+| `github` | an issue or a pull request | its title | as an issue in the org's public `dev` repository, which has the app installed; whoever first acts on GitHub is its admin (pushes, labels, merges), the others may do what anyone may on a public repository |
+| `linear` | an issue | its title | in a team named Dev |
+| `notion` | a page | its title | connected to the integration |
+| `resend`, `google` | an email thread | its subject | by the person's email to the agent |
+
+Where a command takes an entry (a message, a comment, an email), `last` means the newest entry of the channel's most recently active place in the `dev` session. Any entry can be named `<place>:<entry>`, as `say` and `reply` print them and `show --json` lists the entries' ids, and a place by its name stands for its newest entry.
 
 ## `channelstack start`
 
@@ -131,82 +140,88 @@ Prints `KEY=value` lines for the app, one per line, from the running server, so 
 
 What it prints is listed in [Environment variables](/docs/reference/environment-variables#what-channelstack-env-prints). A channel that runs live prints nothing: the app keeps its own configuration.
 
-## `channelstack slack say`
+## `channelstack <channel> say`
 
 ```bash
-channelstack slack say --as <name> --in "#<channel>" "<text>"
+channelstack <channel> say --as <name> --in <place> "<text>"
 ```
 
 | Flag | Required | Meaning |
 |---|---|---|
 | `--as <name>` | yes | Who speaks. Created the first time the name is used; names match case-insensitively |
-| `--in "#<channel>"` | yes | Where. Created with the person and the app in it the first time; if it exists and the person isn't in it, someone in it invites them |
+| `--in <place>` | yes | Where, by its name. Made the first time, with the app in it, and the text as the person's first words there (a GitHub issue's or Linear issue's description, the email's text) |
 
-`@name` in the text becomes a real mention. Prints `<name> said it in #<channel> (<channel id>:<ts>)`.
+`@name` in the text becomes a real mention. In an email thread that exists, it answers the thread's newest email, to everyone. Prints `<name> said it in <place> (<place>:<entry>)`.
 
-## `channelstack slack reply`
+## `channelstack <channel> reply`
 
 ```bash
-channelstack slack reply --as <name> [--thread last|<channel id>:<ts>] "<text>"
+channelstack <channel> reply --as <name> [--to last|<ref>] "<text>"
 ```
 
 | Flag | Required | Meaning |
 |---|---|---|
 | `--as <name>` | yes | Who replies |
-| `--thread <ref>` | no, default `last` | A message in the thread: its first message or any reply |
+| `--to <ref>`, `--thread <ref>` | no, default `last` | The entry to answer |
 
-Prints `<name> replied (<channel id>:<ts>)`.
+In its thread where the channel has them (a Slack thread, a Linear comment's, a Notion discussion), otherwise a new comment in the place (GitHub), or an answer to that email. A reply on a GitHub diff is the `reply` action. Prints `<name> replied (<place>:<entry>)`.
 
-## `channelstack slack react`
+## `channelstack <channel> react`
 
 ```bash
-channelstack slack react --as <name> <:emoji:> [--on last|<channel id>:<ts>]
+channelstack <channel> react --as <name> <emoji> [--on last|<ref>]
 ```
 
 | Flag | Required | Meaning |
 |---|---|---|
 | `--as <name>` | yes | Who reacts |
-| `--on <ref>` | no, default `last` | The message |
+| `--on <ref>` | no, default `last` | The entry |
 
-`:eyes:` and `eyes` are the same reaction. Prints `<name> reacted with <emoji> (<channel id>:<ts>)`.
+On Slack, GitHub (`:eyes:`, `eyes` and `+1` alike, as GitHub's reaction names) and Linear (comments only). Notion and email have no reactions: `` people don't react on Notion. ``. Prints `<name> reacted with <emoji> (<place>:<entry>)`.
 
-## `channelstack slack click`
+## `channelstack <channel> actions`
+
+Lists what else the channel's people do, one action per line with its values (`?` when optional), as the routes have them: `click(button: SlackButtonRef (or its label), message?: SlackMessage, thread?: SlackThread | SlackMessage, channel?: SlackConversation): …`.
+
+## `channelstack <channel> <action>`
 
 ```bash
-channelstack slack click --as <name> "<button>"
+channelstack <channel> <action> [--as <name>] [--in <place>] [--on last|<ref>] [<value>…] [--<value name> <value>…]
+channelstack <channel> act <action> …
 ```
 
 | Flag | Required | Meaning |
 |---|---|---|
-| `--as <name>` | yes | Who clicks |
+| `--as <name>` | no | Who acts. Default: the person who started the target's thread |
+| `--in <place>` | no | The target is the newest entry of this place (made the first time, as for `say`) |
+| `--on <ref>` | no | The target is this entry. Without `--in` and `--on`, it is `last` |
+| `--<value name> <value>` | as the action needs | A value by name; the first values can also come in order, without names |
 
-Clicks the button with that label in the latest message that has it, in the most recently active conversation. Prints `<name> clicked "<button>"`.
-
-## `channelstack slack stop`
+The actions are generated from the routes: every action of the channel's person handle in the SDKs that isn't a read, such as `click`, `stop`, `select`, `invite` on Slack, `review`, `merge`, `label`, `requestReview` on GitHub, `delegate`, `setState`, `prompt` on Linear, `resolve`, `setProperty`, `mention` on Notion, `send` on email. A value is read as its type: a number, `true` or `false`, JSON for an object or a list, and a value with a shorthand as that text (a Slack button's label). A person is named, the agent's app is `app` or its name, and a handle is `last` or an id (`<field>:<field>` for one with several). A reference the action needs and isn't given comes from the target (its message, its issue, its thread, the app), and so does the place itself when the action takes it and no reference was given. `act <action>` is for an action named like a command (Slack's own `say`, with its blocks and files).
 
 ```bash
-channelstack slack stop [--as <name>] [--thread last|<channel id>:<ts>]
+channelstack slack click --as ana "Approve"          # the button labelled Approve, in the latest conversation
+channelstack slack stop --thread last                # Stop, pressed by whoever started the thread
+channelstack linear delegate --as lu --in "Crash on start"
+channelstack github merge --as mo --method squash     # the pull request of the newest entry (`last`)
 ```
 
-| Flag | Required | Meaning |
-|---|---|---|
-| `--as <name>` | no | Who presses Stop. Default: the person who started the thread |
-| `--thread <ref>` | no, default `last` | A message in the thread |
-
-Fails with `` say who presses Stop with `--as <name>`. `` when the thread was started by the app. Refused with `stop_unavailable` when the app doesn't receive `agent_session_stopped`. Prints `<name> pressed Stop (<channel id>:<ts>)`.
+Prints `<name> did <action> on <place>:<entry>`, then in parentheses the id of what the action answered when it has one (what it made, or the delivery it sent the agent, as for `click` and `stop`), or with `--json` the whole answer. Refused like the SDK method, with the platform's error code.
 
 ## `channelstack show`
 
 ```bash
-channelstack show [--thread last|<channel id>:<ts>] [--json]
+channelstack show [--thread last|<ref>] [--json]
+channelstack <channel> show [--in <place>] [--thread last|<ref>] [--json]
 ```
 
 | Flag | Meaning |
 |---|---|
-| `--thread <ref>` | Only that message's thread. Without it, the whole most recently active conversation, threads included |
+| `--in <place>` | That place. Without it, the most recently active one: of the channel, or of any channel without one |
+| `--thread <ref>` | Only that entry's thread (a Slack thread, a Linear comment's, a Notion discussion). Without it, the whole place, threads included |
 | `--json` | The transcript entries as JSON (with their ids, authors, controls), instead of text |
 
-Prints the conversation as a person would read it: edits applied, deletes removed, stream chunks joined.
+Prints the place as a person would read it: edits applied, deletes removed, stream chunks joined.
 
 ## `channelstack tail`
 
@@ -264,17 +279,16 @@ Serves the attach commands as MCP tools over stdio, for a coding agent that is b
 
 | Tool | Inputs | Same as |
 |---|---|---|
-| `slack_say` | `as`, `channel`, `text` | `slack say` |
-| `slack_reply` | `as`, `text`, `thread?` | `slack reply` |
-| `slack_react` | `as`, `emoji`, `on?` | `slack react` |
-| `slack_click` | `as`, `label` | `slack click` |
-| `slack_stop` | `as?`, `thread?` | `slack stop` |
-| `show_thread` | `thread?`, `json?` | `show` |
+| `say` | `channel`, `as`, `in`, `text` | `<channel> say` |
+| `reply` | `channel`, `as`, `text`, `to?` | `<channel> reply` |
+| `react` | `channel`, `as`, `emoji`, `on?` | `<channel> react` |
+| `show` | `channel?`, `in?`, `thread?`, `json?` | `<channel> show`; without `channel`, `show` |
+| `<channel>_act` | `action`, `params?`, `as?`, `in?`, `on?` | `<channel> <action>`, with the values by name in `params` |
 | `tail` | none | `tail --once`, from where the last call stopped (`Nothing new.` when nothing happened) |
 | `list_deliveries` | `channel?` | `deliveries` |
 | `redeliver` | `channel?`, `delivery?` (`last`, the default, or an id) | `redeliver` |
 
-`thread` and `on` take `last` (the default) or `<channel id>:<ts>`.
+`to`, `on` and `thread` take `last` (the default), `<place>:<entry>`, or a place by name.
 
 ## `channelstack doctor`
 

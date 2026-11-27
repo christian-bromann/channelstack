@@ -79,6 +79,12 @@ for (const channel of CHANNELS) {
     );
   }
   need((read("docs/code-map.md") ?? "").includes(`(${title})`), `${of}: no rows for its driver in docs/code-map.md`);
+  // The dev tools (the attach CLI, `channelstack mcp`, the UI) act on every channel through its adapter.
+  need(channel.dev !== undefined, `${of}: no dev adapter, the definition's \`dev\` (core/dev, docs/devx.md 4b)`);
+  need(
+    new RegExp(`\\n  ${name}: \\{`).test(read("server/src/cli/dev.test.ts") ?? ""),
+    `${of}: no case for the dev tools in server/src/cli/dev.test.ts (CASES)`,
+  );
   if (channel.live) {
     need(
       new RegExp(`\\n  async ${name}\\(`).test(read("scripts/lib/live-agents.ts") ?? ""),
