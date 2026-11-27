@@ -134,10 +134,10 @@ export const twilioPayloads = {
     }
     if (status === "delivered") {
       // The carrier's delivery report's time, as Twilio passes it on: `YYMMDDhhmm`, in UTC.
-      const iso = new Date(atMs).toISOString();
+      const done = new Date(atMs).toISOString();
       params.set(
         "RawDlrDoneDate",
-        `${iso.slice(2, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}${iso.slice(11, 13)}${iso.slice(14, 16)}`,
+        `${done.slice(2, 4)}${done.slice(5, 7)}${done.slice(8, 10)}${done.slice(11, 13)}${done.slice(14, 16)}`,
       );
     }
     return params.toString();

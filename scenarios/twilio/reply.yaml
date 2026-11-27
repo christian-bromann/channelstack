@@ -1,0 +1,25 @@
+name: twilio/reply
+description: A person texts the agent's number and the agent answers, to the number that texted it. Runs against the fake and against the sandbox numbers (the differential run).
+requires: [twilio-agent]
+# What the coverage page credits this scenario with (`Type.method`, as the spec names them).
+covers: [TwilioFixture.createUser, TwilioUser.text, TwilioConversation.replies, TwilioConversation.messages]
+steps:
+  - call: session.twilio
+    as: twilio
+  - call: twilio.createUser
+    options: { name: Ana }
+    as: ana
+  - call: ana.text
+    args: [Where is my order?]
+    options: { to: $twilio.app }
+    as: text
+  - call: text.conversation.waitForReply
+    options: { from: $twilio.app, timeout: 60s }
+    as: answer
+  - call: text.conversation.replies
+    as: replies
+  - call: text.conversation.messages
+    as: messages
+  - record:
+      replies: $replies
+      messages: $messages

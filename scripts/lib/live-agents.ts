@@ -151,14 +151,51 @@ async function tapped(channel: string, target: string, recorder: Recorder, stops
 /** An agent that takes webhooks: started on a free port, then its relay channel forwarded to it. */
 async function webhookAgent(
   name: string,
-  options: { dir: string; path: string; source: string; env: Record<string, string> },
+  options: { dir: string; path: string; source: string; env: Record<string, string>; form?: boolean },
   stops: Stop[],
 ): Promise<void> {
   const port = await freePort();
   const agent = spawnAgent(options.dir, { ...options.env, PORT: String(port) }, stops);
   await listening(name, agent, port);
-  await relay(name, options.source, `http://127.0.0.1:${port}${options.path}`, stops);
+  const target = `http://127.0.0.1:${port}${options.path}`;
+  await relay(name, options.source, options.form ? await asForm(target, stops) : target, stops);
   say(`${name}: the reference agent takes the platform's webhooks through its relay channel`);
+}
+
+/**
+ * Between a relay and an agent whose platform posts forms (Twilio): smee.io parses a form and its
+ * client posts the fields as JSON, so this puts them back as the form the platform sent, with its
+ * headers, and hands the agent's answer back. The fields and their order are the platform's.
+ */
+async function asForm(target: string, stops: Stop[]): Promise<string> {
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", async () => {
+      const text = Buffer.concat(chunks).toString("utf8");
+      let body = text;
+      try {
+        body = new URLSearchParams(JSON.parse(text) as Record<string, string>).toString();
+      } catch {
+        // A form already.
+      }
+      const headers = Object.fromEntries(
+        Object.entries(request.headers).flatMap(([name, value]) =>
+          typeof value === "string" && name !== "host" && name !== "content-length" ? [[name, value]] : [],
+        ),
+      );
+      try {
+        const answer = await fetch(target, { method: request.method ?? "POST", headers, body });
+        response.writeHead(answer.status, { "content-type": answer.headers.get("content-type") ?? "text/plain" });
+        response.end(Buffer.from(await answer.arrayBuffer()));
+      } catch {
+        response.writeHead(502).end();
+      }
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  stops.push(() => new Promise((resolve) => server.close(() => resolve(undefined))));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
 /** How the live run starts one channel's reference agent against the real platform, from the environment. */
@@ -305,6 +342,35 @@ const LIVE_AGENTS: Readonly<Partial<Record<HarnessChannel, LiveAgent>>> = {
           RESEND_API_KEY: key,
           RESEND_WEBHOOK_SECRET: env.CHANNELSTACK_RESEND_WEBHOOK_SECRET,
           ...(env.CHANNELSTACK_RESEND_ADDRESS ? { RESEND_FROM: `my-agent <${env.CHANNELSTACK_RESEND_ADDRESS}>` } : {}),
+        },
+      },
+      stops,
+    );
+  },
+
+  // Twilio: the agent's number's messaging webhook goes to CHANNELSTACK_TWILIO_RELAY_URL, which is
+  // also the URL Twilio signs. The agent answers through the API: a relay drops TwiML.
+  async twilio(env, stops, { dir, path }) {
+    const { CHANNELSTACK_TWILIO_ACCOUNT_SID: sid, CHANNELSTACK_TWILIO_AUTH_TOKEN: token } = env;
+    const number = env.CHANNELSTACK_TWILIO_NUMBER;
+    if (!(sid && token && number && isRelay(env.CHANNELSTACK_TWILIO_RELAY_URL))) {
+      if (token) say("Twilio: no account, number and smee.io CHANNELSTACK_TWILIO_RELAY_URL, so no agent runs here");
+      return;
+    }
+    await webhookAgent(
+      "Twilio",
+      {
+        dir,
+        path,
+        source: env.CHANNELSTACK_TWILIO_RELAY_URL as string,
+        form: true,
+        env: {
+          TWILIO_ACCOUNT_SID: sid,
+          TWILIO_AUTH_TOKEN: token,
+          TWILIO_PHONE_NUMBER: number,
+          TWILIO_WEBHOOK_URL: env.CHANNELSTACK_TWILIO_RELAY_URL as string,
+          // Its status callbacks would need a relay of their own: none live.
+          TWILIO_STATUS_CALLBACK_URL: "",
         },
       },
       stops,

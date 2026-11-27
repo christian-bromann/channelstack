@@ -13,9 +13,9 @@ export const twilio: DriverDefinition = {
   name: "twilio",
   title: "Twilio",
   ids: TWILIO_IDS,
-  // A key and its secret as one credential (`AC…:…`). The Auth Token and the key's secret have no
-  // shape of their own: they are scrubbed by value, once loaded.
-  tokenPatterns: [/\b(?:AC|SK)[0-9a-f]{32}:[0-9A-Za-z]{32}\b/g],
+  // An account and its Auth Token as one credential (`AC…:…`), as a live person's is. The Auth Token
+  // and the API key's secret alone have no shape of their own: they are scrubbed by value, once loaded.
+  tokenPatterns: [/\bAC[0-9a-f]{32}:[0-9a-f]{32}\b/g],
   liveTokens: [TWILIO_PERSON_TOKEN],
   hosts: ["api.twilio.com"],
   secrets: {

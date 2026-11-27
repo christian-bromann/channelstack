@@ -111,6 +111,9 @@ const EXIT_CHECKS: Readonly<Record<number, readonly Check[]>> = {
   9: [
     { name: "9.2 Gmail's discovery document is the pinned one", script: ["google:schema", "--check"], group: "static" },
   ],
+  // 10.1 to 10.6 run in the acceptance and unit checks above, once Twilio's examples, agents and
+  // checks are enabled; 10.7 and 10.8 in the nightly live run.
+  10: [{ name: "10.2 Twilio's description is the pinned one", script: ["twilio:schema", "--check"], group: "static" }],
 };
 
 const phase = Number(process.argv[2]);

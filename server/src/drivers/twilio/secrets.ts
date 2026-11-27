@@ -11,10 +11,10 @@ export const TWILIO_SECRETS = {
 } as const satisfies Record<string, SecretFormat>;
 
 /**
- * A live person's credential, `<Account SID>:<Auth Token>` (or an API key's `<SID>:<secret>`):
- * the account that owns their number. Never one the fake makes.
+ * A live person's credential, `<Account SID>:<Auth Token>`: the account that owns their number.
+ * Never one the fake makes.
  */
 export const TWILIO_PERSON_TOKEN: SecretFormat = {
-  pattern: /^(?:AC|SK)[0-9a-f]{32}:[0-9A-Za-z]{32}$/,
+  pattern: /^AC[0-9a-f]{32}:[0-9a-f]{32}$/,
   generate: () => `AC${hex(32)}:${hex(32)}`,
 };
