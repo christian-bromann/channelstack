@@ -96,7 +96,9 @@ jobs:
   packages:
     # The packages release.yml builds for PyPI and crates.io, built the same way on every pull
     # request: the release workflow runs for its tag only, and a fix after the tag costs a version.
-    # (The npm package is packed and installed by `packaging` above.) Neither asks a registry.
+    # (The npm package is packed and installed by `packaging` above.) Neither asks whether the version
+    # is already published, so a released version doesn't fail it. Keep it in step with release.yml's
+    # `packages` job.
     name: PyPI and crates.io packages
     runs-on: ubuntu-latest
     timeout-minutes: 15

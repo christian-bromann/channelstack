@@ -141,6 +141,7 @@ jobs:
           # From where the npm job publishes, with the path it uses (a leading ./: npm reads
           # "packs/x.tgz" as the GitHub repository packs/x.tgz).
           (cd dist && npm publish --dry-run "./packs/channelstack-$VERSION.tgz")
+      # The same two steps run in ci.yml's `packages` job on every pull request: change both.
       - name: PyPI, channelstack and pytest-channelstack
         run: |
           uv build --project sdks/python --out-dir dist/python
