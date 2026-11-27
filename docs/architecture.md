@@ -129,7 +129,11 @@ That keeps the fake and the real platform from drifting apart in code. The night
 
 **Transcripts.** Each driver renders its state into what a person would read: edits applied, deletes removed, streams joined, Block Kit as text with button labels, ephemeral messages only for their recipient. Text matchers and the UI both read this view.
 
-### 3.4 Core services
+### 3.4 Providers: the agent's model
+
+A **provider** is a fake the agent calls but that has no people, apps, deliveries or transcripts: the fake OpenAI at `openai.localhost` ([decision 0029](decisions/0029-fake-openai.md), phases 13 and 14). It lives in `server/src/providers/<name>/`, beside the drivers, and uses the same core: the event log for its calls, the quiet detector for calls in flight, the secrets store for its key, and the proxy for `api.openai.com`. A model call carries no session, so `core/attribution/` assigns it to one from the evidence in the request: ids the fake minted, a tag the agent sent, ids the session owns, or text its people wrote. Scripts belong to the session, like faults. A responder (a function of the request) runs in the test process: the server holds the agent's request until the SDK answers it over a long poll.
+
+### 3.5 Core services
 
 | Service | Job |
 |---|---|

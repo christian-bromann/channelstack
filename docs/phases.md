@@ -58,7 +58,7 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 
 - **Automated.** Every exit check is a test or a script with a pass or fail result. "Looks right" doesn't count.
 - **Against real code paths.** Acceptance tests run reference agents built on the platforms' official SDKs (Bolt, Octokit/Probot, `@linear/sdk`, `@notionhq/client`, Chat SDK). They're never run against channelstack's own client code.
-- **Deterministic.** Reference agents use a scripted model from their framework (for example the AI SDK's mock provider), never a real LLM in CI.
+- **Deterministic.** Reference agents use a scripted model, never a real LLM in CI: their framework's (for example the AI SDK's mock provider), or, from phase 13, the fake OpenAI that the test scripts ([decision 0029](decisions/0029-fake-openai.md)).
 - **The examples are the spec.** The tests in `test/acceptance/examples/` become the acceptance suite as phases enable them. A phase lists which `describe` blocks must pass.
 
 ## Phase overview
@@ -76,6 +76,8 @@ pnpm verify:phase <n>     # runs the gates of phase 0..n, in order
 | 8 | The channel kit, the email core and Resend | Every channel is on the kit; all fake Resend examples and `resendChecks()` pass; Resend passes live |
 | 9 | Google (Gmail) | All fake Google examples and `googleChecks()` pass on the kit; Gmail passes live |
 | 12 | Any number of agent apps per channel | Every channel's "several apps" examples pass against two agents; the reply loop is caught on every channel; no existing test changed |
+| 13 | A fake OpenAI: Chat Completions, Responses, Conversations | The OpenAI examples pass against agents on the official SDK and the AI SDK; every response validates against OpenAI's description; a missing script fails the test |
+| 14 | The fake OpenAI's images, audio, files and built-in tools | The "images and built-in tools" examples pass; every built-in tool's items and events validate against OpenAI's description |
 
 Phases 1–4 are fake only. Live mode for all channels is phase 5, so the fake design settles before live adapters are written against it.
 
@@ -388,6 +390,77 @@ Spec: [live-mode.md](live-mode.md). Live mode acts and observes, and never relay
 - `devx.md` section 3 and the `channelstack env` section, `architecture.md` (the world holds apps; the id table's app ids per app), `implementation-plan.md` (the no-config-file lines), `live-mode.md` (per-app credentials and the spike), decision 0013 (one installation per App);
 - reality-matrix (a "several apps" row per channel, the loop guard as fake only, B1–B10), `code-map.md` (`core/loops/`), `adding-a-channel.md` (apps in the checklist);
 - the website: the environment-variable reference, "How it works", "Writing tests", "Standard checks", each platform page, and a guide to testing agents together.
+
+---
+
+## Phase 13: a fake OpenAI
+
+[Decision 0029](decisions/0029-fake-openai.md): channelstack fakes OpenAI's API on the wire at `openai.localhost`, scripted per test, realistic on the wire and never in content. The full design is [the approved interface](../phase-log/model-providers/interface-draft.md); its section numbers are cited below as "design §n". Phase 13 is the next phase after phase 12. Phase 14 is stacked on it: its branch starts from phase 13's, and its PR is opened while 13 is in review and merged after it (an exception to "one phase at a time", on the maintainer's instruction).
+
+**Build:**
+- **A provider beside the drivers:** `server/src/providers/openai/`, mounted at `openai.localhost` (and `/openai` without portless), with no people, apps, deliveries or transcripts. `check:channels` knows a provider isn't a channel. `channelstack env` prints `OPENAI_BASE_URL` and an `OPENAI_API_KEY` (`sk-proj-…`, random per install, in `secrets.json`). Proxy mode routes `api.openai.com` to it.
+- **The endpoints:** Chat Completions; Responses, with stored responses (`GET`, `DELETE`, `input_items`), `previous_response_id`, reasoning items and `encrypted_content`; the Conversations API and Responses' `conversation`; `GET /v1/models`. Any model name. OpenRouter's and DeepSeek's reasoning fields and Azure's deployment paths (design §11.1). Refusals as OpenAI makes them, plus `unsupported_in_fake` for background responses and `n > 1` (design §10).
+- **Streams** (`core/stream/`): SSE with OpenAI's event sequences for both endpoints, `include_usage`, `obfuscation`, and tool arguments split only between JSON tokens. Timing (`firstToken`, `betweenChunks`), `failAfter` (`error`, `drop`, `stall`), `pauseAfter` and `resume`, on the injected clock. The agent hanging up is recorded as `aborted`.
+- **Scripts:** `openai.respond(turns | responder, { when, times, timing })` on the session, removed with it. Turns: text, chunks, function and custom tool calls, reasoning, refusal, finish, usage, error turns for every documented error, and templates for the CLI and UI. The script's own checks (design §5.4). `openai.rateLimit(…)` with truthful headers (design §7.4).
+- **Responders in every SDK:** the `x-channelstack-responder` extension, the long-poll and answer routes, and a `responder` runtime module in TypeScript, Python and Rust (design §6).
+- **Attribution** (`core/attribution/`): the four kinds of evidence, attribution by order, `request.context`, `when: { from, in }`, and `unattributed()` (design §8).
+- **No script, no answer:** `channelstack_no_script`, matchers that fail at once on a session's model problems, and the session's close failing the test in Vitest, pytest and Rust (design §8.4).
+- **Reading:** `calls()`, `waitForCall()`, `latestCall()`, `toolCalls()`, and the matchers in matchers-core, pytest and the Rust crate: `toHaveReceivedCall`, `toHaveSent`, `toHaveSentSecrets`, `toHaveOfferedTool`, `toHaveSentToolResult`, `toBeAborted`, `toHaveAnswered`. Model calls in `channelstack tail`, the UI's Models inspector, `channelstack openai respond` and `calls`, and the MCP tools.
+- **The checks:** `model: "openai"` on every `<channel>Checks()`, with `<channel>.slow-model`, `.model-error`, `.model-retry`, `.no-secrets-to-model`, `slack.stream-breaks` and `slack.stop-cancels-model`, and a broken variant per new check.
+- **Reference agents:** a Slack agent on the official `openai` SDK (Chat Completions, sending `user`), and one on the AI SDK's `@ai-sdk/openai` (Responses), both answering from the fake.
+- **The examples:** `test/acceptance/examples/openai.test.ts` (design §13), with Python and Rust ports of the tool-loop and responder tests.
+- **Conformance:** OpenAI's OpenAPI description pinned like Resend's (`pnpm openai:schema`), and a nightly shape lane against the real API with a cheap model. The lane needs a key from the maintainer; until then it is listed as waiting.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 13.1 | The OpenAI examples pass | Every `describe` block of `test/acceptance/examples/openai.test.ts` except "images and built-in tools", against both reference agents |
+| 13.2 | Responses match OpenAI's description | Every response body and stream event the fake sends in the test run validates against the pinned OpenAPI description (`pnpm openai:schema --check` in the gate) |
+| 13.3 | The official SDKs parse it all | Tests with `openai` (Node and Python) for every turn kind, streamed and not, on both endpoints. Each error turn raises the SDK's own class with OpenAI's status, `type` and `code`. The SDKs retry exactly the turns they should (408, 409, 429, 5xx), skip them with `x-should-retry: false`, and wait `retry-after-ms` |
+| 13.4 | A missing script fails the test | Tests: an unscripted call gets the 400 `channelstack_no_script` with the newest user text and the tools offered; a waiting matcher fails within a second, not at its timeout; a test that asserts nothing fails when its session closes (Vitest, pytest, Rust); a list that runs out, a responder that throws, and a script problem fail the same way |
+| 13.5 | Attribution | Unit tests for each kind of evidence and for attribution by order, whose failure message names it. 20 parallel copies of a scripted tool-loop test with prompts of their own each get only their own answers. A call no session claims is in `unattributed()` and named in a failing matcher's message |
+| 13.6 | Responders in every SDK | TypeScript, Python and Rust tests: a responder answers from the request and its context; one that throws or never answers fails the test with its reason; `firstToken` holds with a slow responder |
+| 13.7 | Timing and breaks | Tests on the injected clock: `firstToken` and `betweenChunks`; `failAfter` with `error`, `drop` and `stall`, each as the official SDK sees it; `pauseAfter` and `resume`; a call the agent abandons is `aborted` |
+| 13.8 | Rate limits | Tests: every response carries the `x-ratelimit-*` headers; `rateLimit` counts one session's calls and tokens, refuses the one over the limit with `retry-after`, and frees up on the clock; another session's calls don't count |
+| 13.9 | The checks | Every `<channel>Checks({ model: "openai" })` passes against the reference agents, and each new model check fails against its broken variant |
+| 13.10 | No secrets | Tests: `toHaveSentSecrets` finds every kind of secret channelstack knows when one is planted in a prompt, and reports only its kind; `pnpm test:redaction` knows the `sk-proj-` prefix |
+| 13.11 | Conversations, stored responses, dialects | Tests with the official SDK: a conversation's items grow with each response; `previous_response_id` chains; an unknown id is refused as OpenAI refuses it. OpenRouter's `reasoning`, DeepSeek's `reasoning_content` and `AzureOpenAI` on a deployment path each answer a scripted turn |
+| 13.12 | Proxy mode | An agent with a hard-coded `api.openai.com` passes the tool-loop example in proxy mode, unmodified |
+| 13.13 | Shapes against the real API | The nightly lane diffs the fake's response and event shapes with the real API's; each difference is fixed or recorded in `divergences.yaml`. Waiting for the maintainer's key, and recorded as waiting until then |
+
+**Docs to update:**
+- `AGENTS.md` (the **Models** and **Addresses** rows: already done with decision 0029), README, `index.html` and the skill;
+- `devx.md` (sections 1, 2 and 6: already done with decision 0029, except the final API), `architecture.md` (the providers), `implementation-plan.md`, `live-mode.md` (the fake model in a live run);
+- reality-matrix (an OpenAI section: every endpoint and turn kind, all fake), `code-map.md` (the provider, `core/stream/`, `core/attribution/`, the `responder` runtime module);
+- the website: a page for the fake model, the environment-variable reference, "How it works", "Writing tests", "Standard checks", and the AI SDK and LangChain quickstarts on the fake model.
+
+---
+
+## Phase 14: the fake OpenAI's images, audio, files and built-in tools
+
+Stacked on phase 13 ([decision 0029](decisions/0029-fake-openai.md)): its branch starts from phase 13's, its PR is opened while 13 is in review, and it merges once 13 is merged and tagged.
+
+**Build:**
+- **Media in requests:** image, file and audio parts on both endpoints, each with its media type, size and SHA-256; `toHaveSentFile`. A URL on a fake host is fetched without credentials, so Slack's `url_private` is refused as OpenAI refuses it (`invalid_image_url`) (design §5.5).
+- **Media in answers:** the Images API (generations, edits), speech, transcriptions (streamed too) and translations, and Chat Completions' audio output. A `MediaSource` is a path the SDK uploads, bytes, or a PNG or WAV/PCM placeholder.
+- **Files:** `/v1/files`, its ids usable in `file_id` parts, and container file downloads.
+- **Built-in tools, scripted and never run:** `web_search`, `file_search`, `code_interpreter`, `image_generation`, remote `mcp` with approval requests, `shell` (hosted and local), `computer`, `apply_patch`, and citations on text, each with its items and events (design §5.6, `providers/openai/tools/`).
+- **The examples:** the "images and built-in tools" block of `openai.test.ts`, against the Responses reference agent, which learns to forward files and to turn an MCP approval request into a Slack button.
+
+**Exit checks:**
+
+| # | Check | How |
+|---|---|---|
+| 14.1 | The examples pass | The "images and built-in tools" block of `test/acceptance/examples/openai.test.ts`, against the Responses reference agent |
+| 14.2 | Media in requests | Tests: each kind of part (data URL, `file_id`, URL) is recorded with its hash and matched by `toHaveSentFile`; a `url_private` is refused with `invalid_image_url`; a public URL on a fake host is fetched; other URLs are recorded, not fetched |
+| 14.3 | Media in answers | Tests with the official SDK: every media endpoint answers a scripted turn in each format the request may ask for, and the placeholders are valid PNG and WAV files; a placeholder in a format the fake can't make is a script problem |
+| 14.4 | Built-in tools | Per tool: its items and events validate against the pinned description; a tool the request didn't offer is a script problem; the MCP approval round trip works; a client-run tool's output is joined in `toolCalls()` |
+| 14.5 | Every SDK uploads media | TypeScript, Python and Rust tests: a `MediaSource` given as a path is read in the test process and served by the fake byte for byte |
+
+**Docs to update:**
+- reality-matrix (the media endpoints and built-in tools), `code-map.md` (`media.ts`, `tools/`);
+- the website's page for the fake model: images, audio, files and built-in tools.
 
 ---
 
